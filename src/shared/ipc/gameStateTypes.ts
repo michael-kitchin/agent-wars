@@ -6,6 +6,8 @@ import type { UnitOrigin } from '../unitOriginTypes';
 import type { TechLevel } from '../techBonusTypes';
 import type { WeatherState } from '../weatherBonusTypes';
 import type { GameMapProfile } from '../gameMapTypes';
+import type { SeatSnapshot } from '../seatRoster';
+import type { GameEndReason, VictorySettings } from '../victoryRules';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -340,41 +342,41 @@ gameMap?: GameMapProfile;
    */
 gameMapLoadError?: string;
     /**
-   * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion?: string;).
-
-   * Contract: Describes stable behavior for callers of `humanHomeRegion` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * The roster in seat order, with a random doctrine hidden until the match is over.
+   *
+   * Contract: Present on every snapshot built while a database is open. Each entry is a `SeatSnapshot`.
+   * When to use: UI lists, fog, and any caller that used to read only the human and AI home names.
+   * Expected outcome: Two entries for a match started from today's new-game screen.
+   * Exceptions: Absent on a snapshot built before scenario metadata is attached.
    */
-humanHomeRegion?: string;
+seats?: readonly SeatSnapshot[];
     /**
-   * Specifies the contract for the `aiHomeRegion` member (aiHomeRegion?: string;).
-
-   * Contract: Describes stable behavior for callers of `aiHomeRegion` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Each seat's home hexes, keyed by seat id.
+   *
+   * Contract: Keys are seat ids. Values are the hexes of that seat's `homeRegion`.
+   * When to use: Home outlines and intersection once more than two homes exist.
+   * Expected outcome: Each present seat has one list. A hex in two lists is a shared home.
+   * Exceptions: Absent on a snapshot built before scenario metadata is attached.
    */
-aiHomeRegion?: string;
+homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
     /**
-   * Specifies the contract for the `humanHomeRegionHexes` member (humanHomeRegionHexes?: string[];).
-
-   * Contract: Describes stable behavior for callers of `humanHomeRegionHexes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * The match's win rule and turn limit.
+   *
+   * Contract: A regional match has `last_side_standing` and a null limit. A global match has a turn limit.
+   * When to use: The status bar and the end-of-turn check.
+   * Expected outcome: Present on a snapshot read from an open match.
+   * Exceptions: Absent on an empty snapshot built before a match exists.
    */
-humanHomeRegionHexes?: string[];
+victory?: VictorySettings;
     /**
-   * Specifies the contract for the `aiHomeRegionHexes` member (aiHomeRegionHexes?: string[];).
-
-   * Contract: Describes stable behavior for callers of `aiHomeRegionHexes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Why the match ended.
+   *
+   * Contract: Absent while the match is still being played. One of last side standing, the turn limit, a mutual wipe, or the human ending the match.
+   * When to use: The result line after `gameOver` is set.
+   * Expected outcome: The stored `game_end_reason`.
+   * Exceptions: Absent when that key is missing or not a known reason.
    */
-aiHomeRegionHexes?: string[];
+gameEndReason?: GameEndReason;
     /**
    * Specifies the contract for the `intersectingHomeRegionHexes` member (intersectingHomeRegionHexes?: string[];).
 

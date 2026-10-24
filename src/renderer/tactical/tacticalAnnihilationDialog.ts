@@ -32,7 +32,7 @@ function tacticalAnnihilationMessageForOutcome(outcome: TacticalAnnihilationOutc
  * Purpose: Replaces the former annihilation toast + immediate auto-exit with an explicit confirmation step.
  * When to use: From `tacticalMaybeScheduleAnnihilationExit` when a planning-phase snapshot is terminal.
  * Expected outcome: Overlay visible, `S.tacticalAnnihilationOutcomeDialog` set, exit button hidden, Ready disabled.
- * Cancels any in-flight `game:requestAiOrders` so a pending Run prefetch cannot finish with an LLM call after the modal is shown.
+ * Stops in-flight commander planning so a consult cannot finish with a model call after the modal is shown.
  * Exceptions: None; idempotent if the same outcome is already displayed.
  */
 export function openTacticalAnnihilationOutcomeDialog(outcome: TacticalAnnihilationOutcomeKind): void {

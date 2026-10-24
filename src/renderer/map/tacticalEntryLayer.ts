@@ -1,4 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { observeModeControls } from '../../shared/observeModeControls';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
@@ -23,16 +25,16 @@ export function hideTacticalEntryLayer(layer: HTMLElement, clearHtml = true): vo
 }
 
 /**
- * Returns true when both human and opponent parent units share the same strategic hex.
+ * Returns true when the human seat and exactly one other owner share the strategic hex.
  *
- * Purpose: Detects tactical-entry eligibility independent of fog-of-war exploration filters.
+ * Purpose: A magnifier starts a battle, which needs two parties and one of them the human seat.
  * When to use: While building tactical magnifier buttons for explored strategic hexes.
- * Expected outcome: True only when at least one human and one opponent unit occupy `h3Index`.
+ * Expected outcome: True for the human seat plus one other owner, including Neutral. False for three owners or two other sides.
  * Exceptions: None.
  */
 function isContestedStrategicHex(state: GameStateSnapshot, h3Index: string): boolean {
-  const here = state.units.filter((u) => u.h3Index === h3Index);
-  return here.some((u) => u.player === 'human') && here.some((u) => u.player === 'opponent');
+  const owners = new Set(state.units.filter((unit) => unit.h3Index === h3Index).map((unit) => unit.player));
+  return owners.has(HUMAN_SEAT_ID) && owners.size === 2;
 }
 
 /**
@@ -53,7 +55,7 @@ export function syncTacticalEntryButton(deps: {
     if (layer) hideTacticalEntryLayer(layer, false);
     return;
   }
-  if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot) {
+  if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot || !observeModeControls(S.gameState.seats ?? []).magnifierEnabled) {
     hideTacticalEntryLayer(layer);
     return;
   }

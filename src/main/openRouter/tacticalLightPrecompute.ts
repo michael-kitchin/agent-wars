@@ -5,8 +5,8 @@ import { logDebug } from '../logger';
  *
  * Purpose: Optional light-precompute mode — strips heavy assessment tools from the tactical tool loop while leaving
  * routing and distance checks available (default **off** so production behavior is unchanged).
- * When to use: Set to `true` locally when profiling tactical `requestAiOrders`; never ship enabled without re-validating
- * prompt/tool parity.
+ * When to use: Set to `true` locally when profiling a tactical consult. Do not ship it enabled without re-checking
+ * prompt and tool parity.
  * Expected outcome: When `true`, tactical passes intersect `enabledToolNames` with `TACTICAL_LIGHT_TOOL_NAMES`.
  * Exceptions: None.
  */

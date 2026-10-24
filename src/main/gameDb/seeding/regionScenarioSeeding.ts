@@ -11,6 +11,8 @@ import type { BuildUnitType } from '../../productionRules';
 import { readPersistedMaxUnitsPerType } from '../gameSizeConfig';
 import { getScenarioHomeRegionHexes, isScenarioPassableLandTerrainKind } from '../../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../scenarioState';
+import { readSeatRoster } from '../seatRosterStore';
+import type { SeatId } from '../../../shared/seatIds';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
@@ -380,7 +382,7 @@ function averageLatLng(candidates: ReadonlyArray<SpawnCandidate>): { lat: number
 
  * Purpose: Seeds a region-versus-region match without putting both sides in the same hex.
  * When to use: From `seedUnits` before the world-map seeder. Returns false when the active scenario is not region-versus-region.
- * Expected outcome: `true` after both sides are inserted. A flex unit that would land on the other side is omitted. An empty terrain candidate list still drops that type.
+ * Expected outcome: `true` after every seat is inserted. A flex unit that would land on another side is omitted. An empty terrain candidate list still drops that type.
  * Exceptions: Throws when a required unit has candidates and every one is held by the other side, or when a hex would contain both sides.
  */
 export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boolean {
@@ -399,7 +401,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
     const terrain = terrainByH3.get(h3)?.terrain ?? 'land';
     return { h3, lat, lng, terrain };
   });
-  const buildSidePlan = (player: 'human' | 'opponent', regionName: string): { units: PlannedUnitPlan[] } => {
+  const buildSidePlan = (player: SeatId, regionName: string): { units: PlannedUnitPlan[] } => {
     const regionHexes = new Set(getScenarioHomeRegionHexes(regionName));
     const regionCandidates = allCandidates.filter((candidate) => regionHexes.has(candidate.h3));
     const passableLandCandidates = regionCandidates.filter(
@@ -481,17 +483,23 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
     }
     return { units };
   };
-  const humanPlan = buildSidePlan('human', scenario.humanHomeRegion);
-  const opponentPlan = buildSidePlan('opponent', scenario.aiHomeRegion);
-  const mixedHexes = findMixedInitialPlacementHexes([
-    ...humanPlan.units.map((unit) => ({ h3Index: unit.h3Index, side: 'human' as const })),
-    ...opponentPlan.units.map((unit) => ({ h3Index: unit.h3Index, side: 'opponent' as const })),
-  ]);
+  const roster = readSeatRoster(deps);
+  if (roster.length === 0) {
+    const err = new Error('Region versus region seeding needs a roster');
+    logError('trySeedScenarioRegionVsRegion: empty roster', err);
+    throw err;
+  }
+  const plans = roster.map((seat) => ({
+    seatId: seat.seatId,
+    units: buildSidePlan(seat.seatId, seat.homeRegion).units,
+  }));
+  const mixedHexes = findMixedInitialPlacementHexes(
+    plans.flatMap((plan) => plan.units.map((unit) => ({ h3Index: unit.h3Index, side: plan.seatId })))
+  );
   if (mixedHexes.length > 0) {
     logError('trySeedScenarioRegionVsRegion opening placement mixed sides', { hexes: mixedHexes });
     throw new Error('Opening placement mixed sides');
   }
-  insertPlannedUnitsForPlayer(deps, 'human', humanPlan.units);
-  insertPlannedUnitsForPlayer(deps, 'opponent', opponentPlan.units);
+  for (const plan of plans) insertPlannedUnitsForPlayer(deps, plan.seatId, plan.units);
   return true;
 }

@@ -8,6 +8,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import type { OpenRouterChatTransport } from './openRouterChatTransport';
@@ -107,7 +108,7 @@ export interface RequestOrdersFlowDeps {
    * and the repair call.
    * Exceptions: None.
    */
-  resolveOrdersRequestProfile?: (modelId: string) => OrdersRequestProfile;
+  resolveOrdersRequestProfile?: (modelId: string, seatId: AiSeatId) => OrdersRequestProfile;
   /**
    * Maps a tool name to its configured group id, if any.
    *
@@ -128,7 +129,7 @@ export interface RequestOrdersFlowDeps {
   validateAiOrder: (
     order: { unitId: string; toH3Index: string },
     state: GameStateSnapshot,
-    opts?: { labelForUnitId?: (unitId: string) => string }
+    opts?: { labelForUnitId?: (unitId: string) => string; seatId?: AiSeatId }
   ) => { valid: true } | { valid: false; reason: string };
   /**
    * Validates a single AI ranged attack order against the authoritative snapshot.
@@ -141,7 +142,7 @@ export interface RequestOrdersFlowDeps {
   validateAiRangedOrder: (
     order: { unitId: string; targetH3Index: string },
     state: GameStateSnapshot,
-    opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot }
+    opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot; seatId?: AiSeatId }
   ) => { valid: true } | { valid: false; reason: string };
   /**
    * Formats a lat/lng pair for human-readable prompts and logs.

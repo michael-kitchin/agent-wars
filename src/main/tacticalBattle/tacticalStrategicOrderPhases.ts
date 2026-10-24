@@ -12,7 +12,8 @@ import type {
 } from '../../shared/ipcTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
-import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import type { TacticalBattlePlayerId, TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
 import {
   tacticalMovementTerrainAnchorH3,
@@ -192,7 +193,7 @@ export function sortTacticalAirStrikesForStrategicPhaseOrder(
 export function applyTacticalEmbarkPhaseOnBattle(
   battle: TacticalBattleSnapshot,
   embarkOrders: readonly EmbarkOrder[] | undefined,
-  player: 'human' | 'opponent'
+  player: TacticalBattlePlayerId
 ): TacticalBattleSnapshot {
   if (!embarkOrders?.length) return battle;
   let sub = battle.subUnits.map((u) => ({ ...u }));
@@ -317,7 +318,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   battle: TacticalBattleSnapshot,
   airStrikes: readonly AirStrikeOrder[] | undefined,
   rangedAttacks: readonly { unitId: string; targetH3Index: string }[] | undefined,
-  rangedPlayer: 'human' | 'opponent',
+  rangedPlayer: TacticalBattlePlayerId,
   next: () => number,
   resolutionScope: TacticalAirRangedResolutionScope = 'singlePlayer'
 ): TacticalAirRangedPhaseAccum {
@@ -739,7 +740,7 @@ export type TacticalFerryPhaseResult = {
 export function applyTacticalFerryPhaseOnBattle(
   battle: TacticalBattleSnapshot,
   ferryOrders: readonly FerryOrder[] | undefined,
-  player: 'human' | 'opponent'
+  player: TacticalBattlePlayerId
 ): TacticalFerryPhaseResult {
   if (!ferryOrders?.length) return { battle, removedUnits: [] };
   let sub = battle.subUnits.map((u) => ({ ...u }));
@@ -759,7 +760,7 @@ export function applyTacticalFerryPhaseOnBattle(
     if (fi < 0) continue;
     const air = sub[fi]!;
     if (air.player !== player || air.unitType !== 'air') continue;
-    if (player === 'opponent' && !tacticalGuardOpponentAirSubUnitForFerry(sub, fi)) continue;
+    if (player !== HUMAN_SEAT_ID && !tacticalGuardOpponentAirSubUnitForFerry(sub, fi, player)) continue;
     const outcome = tacticalFerryApplyOutcome(battle, air.h3Index, f.destinationH3Index);
     if (outcome === 'move') {
       sub[fi] = { ...air, h3Index: f.destinationH3Index };

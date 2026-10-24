@@ -40,7 +40,17 @@ export function formatBattleHeaderStatus(input: {
   readonly beat: number;
   readonly beatPlaybackActive: boolean;
   readonly dateLabel: string;
+  /**
+   * Whether the enemy is a neutral garrison.
+   *
+   * Contract: True only for a Neutral opposing party.
+   * When to use: The status line of that battle.
+   * Expected outcome: The line ends with "The garrison defends in place".
+   * Exceptions: None.
+   */
+  readonly garrisonDefendsInPlace?: boolean;
 }): string {
   const beatLine = formatBattleBeatLine(input.beat, input.beatPlaybackActive);
-  return input.dateLabel.length > 0 ? `${beatLine} · ${input.dateLabel}` : beatLine;
+  const dated = input.dateLabel.length > 0 ? `${beatLine} · ${input.dateLabel}` : beatLine;
+  return input.garrisonDefendsInPlace ? `${dated} · The garrison defends in place` : dated;
 }

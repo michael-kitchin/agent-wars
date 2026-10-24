@@ -6,18 +6,19 @@ import type {
   MovementOrder,
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import { gameDbOps } from './dbConnection';
 import {
   addAiLossEventsSinceConsultation as addAiLossEventsSinceConsultationFromModule,
-  addOpponentCombatParticipants as addOpponentCombatParticipantsFromModule,
+  addCombatSinceConsultation as addCombatSinceConsultationFromModule,
   clearAiLossEventsSinceConsultation as clearAiLossEventsSinceConsultationFromModule,
   clearAiPendingOrders as clearAiPendingOrdersFromModule,
-  clearOpponentCombatSinceConsultation as clearOpponentCombatSinceConsultationFromModule,
+  clearCombatSinceConsultation as clearCombatSinceConsultationFromModule,
   getAiLastConsultationTurn as getAiLastConsultationTurnFromModule,
   getAiLossEventsSinceConsultation as getAiLossEventsSinceConsultationFromModule,
   getAiPendingOrders as getAiPendingOrdersFromModule,
   getAndClearAiToolLimitExceededLastTurn as getAndClearAiToolLimitExceededLastTurnFromModule,
-  getOpponentUnitsInCombatSinceConsultation as getOpponentUnitsInCombatSinceConsultationFromModule,
+  getCombatSinceConsultation as getCombatSinceConsultationFromModule,
   setAiLastConsultationTurn as setAiLastConsultationTurnFromModule,
   setAiPendingOrders as setAiPendingOrdersFromModule,
   setAiToolLimitExceededLastTurn as setAiToolLimitExceededLastTurnFromModule,
@@ -41,8 +42,8 @@ import {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiToolLimitExceededLastTurn(): void {
-  setAiToolLimitExceededLastTurnFromModule(gameDbOps);
+export function setAiToolLimitExceededLastTurn(seatId: AiSeatId): void {
+  setAiToolLimitExceededLastTurnFromModule(gameDbOps, seatId);
 }
 
 /**
@@ -53,8 +54,8 @@ export function setAiToolLimitExceededLastTurn(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAndClearAiToolLimitExceededLastTurn(): boolean {
-  return getAndClearAiToolLimitExceededLastTurnFromModule(gameDbOps);
+export function getAndClearAiToolLimitExceededLastTurn(seatId: AiSeatId): boolean {
+  return getAndClearAiToolLimitExceededLastTurnFromModule(gameDbOps, seatId);
 }
 
 /**
@@ -65,8 +66,8 @@ export function getAndClearAiToolLimitExceededLastTurn(): boolean {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiLastConsultationTurn(): number {
-  return getAiLastConsultationTurnFromModule(gameDbOps);
+export function getAiLastConsultationTurn(seatId: AiSeatId): number {
+  return getAiLastConsultationTurnFromModule(gameDbOps, seatId);
 }
 
 /**
@@ -77,8 +78,8 @@ export function getAiLastConsultationTurn(): number {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiLastConsultationTurn(turn: number): void {
-  setAiLastConsultationTurnFromModule(gameDbOps, turn);
+export function setAiLastConsultationTurn(seatId: AiSeatId, turn: number): void {
+  setAiLastConsultationTurnFromModule(gameDbOps, seatId, turn);
 }
 
 /**
@@ -89,8 +90,8 @@ export function setAiLastConsultationTurn(turn: number): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getOpponentUnitsInCombatSinceConsultation(): string[] {
-  return getOpponentUnitsInCombatSinceConsultationFromModule(gameDbOps);
+export function getCombatSinceConsultation(seatId: AiSeatId): string[] {
+  return getCombatSinceConsultationFromModule(gameDbOps, seatId);
 }
 
 /**
@@ -101,8 +102,8 @@ export function getOpponentUnitsInCombatSinceConsultation(): string[] {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function addOpponentCombatParticipants(unitIds: string[]): void {
-  addOpponentCombatParticipantsFromModule(gameDbOps, unitIds);
+export function addCombatSinceConsultation(seatId: AiSeatId, unitIds: string[]): void {
+  addCombatSinceConsultationFromModule(gameDbOps, seatId, unitIds);
 }
 
 /**
@@ -113,12 +114,12 @@ export function addOpponentCombatParticipants(unitIds: string[]): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearOpponentCombatSinceConsultation(): void {
-  clearOpponentCombatSinceConsultationFromModule(gameDbOps);
+export function clearCombatSinceConsultation(seatId: AiSeatId): void {
+  clearCombatSinceConsultationFromModule(gameDbOps, seatId);
 }
 
 /**
- * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( playerId: string, turnNumber: number, removedUnits: { id: string; player: string }[], kills: { vic).
+ * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( playerId: AiSeatId, turnNumber: number, removedUnits: { id: string; player: string }[], kills: { vic).
 
  * Purpose: Supports maintainability by documenting why `addAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -126,7 +127,7 @@ export function clearOpponentCombatSinceConsultation(): void {
  * Exceptions: None.
  */
 export function addAiLossEventsSinceConsultation(
-  playerId: string,
+  playerId: AiSeatId,
   turnNumber: number,
   removedUnits: { id: string; player: string }[],
   kills: KillEdge[],
@@ -145,38 +146,38 @@ export function addAiLossEventsSinceConsultation(
 }
 
 /**
- * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[]).
+ * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(playerId: AiSeatId): AiLossEventSinceConsultation[]).
 
  * Purpose: Supports maintainability by documenting why `getAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[] {
+export function getAiLossEventsSinceConsultation(playerId: AiSeatId): AiLossEventSinceConsultation[] {
   return getAiLossEventsSinceConsultationFromModule(gameDbOps, playerId);
 }
 
 /**
- * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(playerId: string): void).
+ * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(playerId: AiSeatId): void).
 
  * Purpose: Supports maintainability by documenting why `clearAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearAiLossEventsSinceConsultation(playerId: string): void {
+export function clearAiLossEventsSinceConsultation(playerId: AiSeatId): void {
   clearAiLossEventsSinceConsultationFromModule(gameDbOps, playerId);
 }
 
 /**
- * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders(playerId: string): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[]; airStrikeOrders: AirStrikeO).
+ * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders(playerId: AiSeatId): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[]; airStrikeOrders: AirStrikeO).
 
  * Purpose: Supports maintainability by documenting why `getAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiPendingOrders(playerId: string): {
+export function getAiPendingOrders(playerId: AiSeatId): {
   movementOrders: MovementOrder[];
   rangedOrders: RangedAttackOrder[];
   airStrikeOrders: AirStrikeOrder[];
@@ -187,7 +188,7 @@ export function getAiPendingOrders(playerId: string): {
 }
 
 /**
- * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( playerId: string, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airStrikeOrders: AirStrike).
+ * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( playerId: AiSeatId, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airStrikeOrders: AirStrike).
 
  * Purpose: Supports maintainability by documenting why `setAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -195,7 +196,7 @@ export function getAiPendingOrders(playerId: string): {
  * Exceptions: None.
  */
 export function setAiPendingOrders(
-  playerId: string,
+  playerId: AiSeatId,
   movementOrders: MovementOrder[],
   rangedOrders: RangedAttackOrder[],
   airStrikeOrders: AirStrikeOrder[] = [],
@@ -214,14 +215,14 @@ export function setAiPendingOrders(
 }
 
 /**
- * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(playerId: string): void).
+ * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(playerId: AiSeatId): void).
 
  * Purpose: Supports maintainability by documenting why `clearAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearAiPendingOrders(playerId: string): void {
+export function clearAiPendingOrders(playerId: AiSeatId): void {
   clearAiPendingOrdersFromModule(gameDbOps, playerId);
 }
 
@@ -234,12 +235,13 @@ export function clearAiPendingOrders(playerId: string): void {
  * Exceptions: None; underlying module logs errors without throwing.
  */
 export function upsertTurnStrategyNote(
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   turnNumber: number,
   texts: TurnConsultationNoteTexts
 ): void {
-  upsertTurnStrategyNoteFromModule(gameDbOps, scope, battleId, turnNumber, texts);
+  upsertTurnStrategyNoteFromModule(gameDbOps, seatId, scope, battleId, turnNumber, texts);
 }
 
 /**
@@ -251,13 +253,14 @@ export function upsertTurnStrategyNote(
  * Exceptions: None; underlying module logs errors without throwing.
  */
 export function upsertTurnLossNote(
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   turnNumber: number,
-  humanLossJson: string,
-  aiLossJson: string
+  ownLossJson: string,
+  enemyLossJson: string
 ): void {
-  upsertTurnLossNoteFromModule(gameDbOps, scope, battleId, turnNumber, humanLossJson, aiLossJson);
+  upsertTurnLossNoteFromModule(gameDbOps, seatId, scope, battleId, turnNumber, ownLossJson, enemyLossJson);
 }
 
 /**
@@ -269,12 +272,13 @@ export function upsertTurnLossNote(
  * Exceptions: None; returns empty array when DB unavailable.
  */
 export function getRecentTurnNotes(
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   beforeTurnNumber: number,
   limit = 3
 ): TurnNoteRow[] {
-  return getRecentTurnNotesFromModule(gameDbOps, scope, battleId, beforeTurnNumber, limit);
+  return getRecentTurnNotesFromModule(gameDbOps, seatId, scope, battleId, beforeTurnNumber, limit);
 }
 
 /**

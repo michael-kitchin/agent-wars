@@ -4,7 +4,7 @@
  * character for character.
  *
  * Purpose: The console has no collapse button, so each tab says how to hide it.
- * When to use: The last sentence of the Orders, Reports, and Opponent tabs' tips.
+ * When to use: The last sentence of the Orders, Reports, and Commanders tabs' tips.
  * Expected outcome: The control tip ends with this sentence.
  * Exceptions: None.
  */
@@ -21,15 +21,15 @@ const consoleTabCollapseSentence = 'Click the selected tab to hide the console a
 export const ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
 
 /**
- * The Opponent tab's tip.
+ * The Commanders tab's tip.
  *
- * Purpose: Says what the Opponent tab shows, and how to hide the console.
- * When to use: `#console-tab-opponent`.
+ * Purpose: Says what the Commanders tab shows, and how to hide the console.
+ * When to use: `#console-tab-commanders`.
  * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const opponentTabTooltipText =
-  `Show whether the opponent is planning, its model, its tools, and the AI activity log. ${consoleTabCollapseSentence}`;
+  `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
 
 /**
  * Builds the tip for a control this version does not offer.
@@ -76,7 +76,7 @@ export const humanHomeStatTooltipText = 'Hexes of your home region that you hold
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const opponentHomeStatTooltipText = "Hexes of the opponent's home region that you hold, out of all its hexes.";
+export const enemyHomeStatTooltipText = "Hexes of the opponent's home region that you hold, out of all its hexes.";
 
 /**
  * Purpose: Names what the game menu holds.

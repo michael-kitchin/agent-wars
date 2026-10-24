@@ -10,26 +10,6 @@
   var UNIT_RADIUS = 18;
   var SELECTION_RING_COLOR = "#f2c14e";
   var SELECTION_RING_WIDTH = 3;
-  var PLAYER_COLORS = {
-    /**
-       * Documents the object literal property `human` (human: '#115e59').
-    
-       * Purpose: Supports maintainability by documenting why `human` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    human: "#115e59",
-    /**
-       * Documents the object literal property `opponent` (opponent: '#9d174d').
-    
-       * Purpose: Supports maintainability by documenting why `opponent` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    opponent: "#9d174d"
-  };
   var UNIT_TYPE_LABELS = {
     /**
        * Documents the object literal property `infantry` (infantry: 'I').
@@ -68,10 +48,8 @@
        */
     air: "S"
   };
-  var ORDER_LINE_COLOR = PLAYER_COLORS.human;
   var ORDER_LINE_WIDTH = 2.5;
   var ORDER_ARROW_SIZE = 10;
-  var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
   var ORDER_LINE_CASING_COLOR = "rgba(255, 255, 255, 0.8)";
   var ORDER_LINE_CASING_PAD = 1.5;
   var TOOLTIP_OFFSET_PX = 12;
@@ -192,15 +170,6 @@
        */
     tacticalBattleSnapshot: null,
     /**
-       * Documents the object literal property `tacticalOpponentDraft` (tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null).
-    
-       * Purpose: Holds the latest buffered opponent tactical plan from `requestAiOrders` until tactical Ready commits it with human drafts.
-       * When to use: Written on successful tactical AI consultation; cleared on successful Ready commit, tactical exit, or session stash.
-       * Expected outcome: Null when no plan buffered yet or after commit; normalized arrays when set.
-       * Exceptions: None.
-       */
-    tacticalOpponentDraft: null,
-    /**
        * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
     
        * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
@@ -222,7 +191,7 @@
        * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
     
        * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
-       * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+       * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while a tactical advance is waiting on its commit.
        * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
        * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
        */
@@ -898,60 +867,6 @@
        */
     useEventDrivenConsultation: true,
     /**
-       * Documents the object literal property `eventDrivenInitialConsultationDone` (eventDrivenInitialConsultationDone: false).
-    
-       * Purpose: Event-driven mode consults once up front, then only from post-resolution callbacks. This flag marks that the opening consult finished.
-       * When to use: Set after a successful opening `requestAiOrders` or a successful post-resolution consult. Cleared on new game, Run off, mode switch, and abandoned deferred consult.
-       * Expected outcome: While true, strategic Ready does not wait on a null precompute buffer and does not start a second model call for the same turn.
-       * Exceptions: None.
-       */
-    eventDrivenInitialConsultationDone: false,
-    /**
-       * Documents the object literal property `precomputedAiOrders` (precomputedAiOrders: null as MovementOrder[] | null).
-    
-       * Purpose: Supports maintainability by documenting why `precomputedAiOrders` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    precomputedAiOrders: null,
-    /**
-       * Documents the object literal property `precomputedAiRangedOrders` (precomputedAiRangedOrders: null as { unitId: string; targetH3Index: string }[] | null).
-    
-       * Purpose: Supports maintainability by documenting why `precomputedAiRangedOrders` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    precomputedAiRangedOrders: null,
-    /**
-       * Documents the object literal property `precomputedAiEmbarkOrders` (precomputedAiEmbarkOrders: null as EmbarkOrder[] | null).
-    
-       * Purpose: Supports maintainability by documenting why `precomputedAiEmbarkOrders` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    precomputedAiEmbarkOrders: null,
-    /**
-       * Documents the object literal property `precomputedAiStrategy` (precomputedAiStrategy: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `precomputedAiStrategy` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    precomputedAiStrategy: null,
-    /**
-       * Documents the object literal property `precomputedAiMessage` (precomputedAiMessage: null as string | null).
-    
-       * Purpose: Caches the opponent taunt/threat from background `requestAiOrders` until Ready consumes it.
-       * When to use: Set from a successful prefetch; cleared with the rest of precomputed AI state.
-       * Expected outcome: Copied onto `GameReadyIpcPayload.precomputedAiMessage`.
-       * Exceptions: None.
-       */
-    precomputedAiMessage: null,
-    /**
        * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
     
        * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
@@ -960,15 +875,6 @@
        * Exceptions: None.
        */
     precomputedToolInvocationCounts: null,
-    /**
-       * Documents the object literal property `backgroundRequestInFlight` (backgroundRequestInFlight: false).
-    
-       * Purpose: Supports maintainability by documenting why `backgroundRequestInFlight` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    backgroundRequestInFlight: false,
     /**
        * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
        * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
@@ -998,15 +904,6 @@
        */
     readyBtnAiWaitIntervalId: null,
     /**
-       * Documents the object literal property `openRouterGameCost` (openRouterGameCost: 0).
-    
-       * Purpose: Supports maintainability by documenting why `openRouterGameCost` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    openRouterGameCost: 0,
-    /**
        * Documents the object literal property `toastHideTimer` (toastHideTimer: null as ReturnType<typeof setTimeout> | null).
     
        * Purpose: Supports maintainability by documenting why `toastHideTimer` exists.
@@ -1032,7 +929,25 @@
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    lastAppliedMapInteractionCursor: ""
+    lastAppliedMapInteractionCursor: "",
+    /**
+     * Which side a watch is looking through.
+     *
+     * Purpose: All sides shows every hex. A seat id shows that seat's fog.
+     * When to use: `getGameState` while no human seat is active, and the View as control.
+     * Expected outcome: `'all'` until the player picks a seat. A new match resets it.
+     * Exceptions: None.
+     */
+    viewAs: "all",
+    /**
+     * Whether Ready should press itself once every commander is ready.
+     *
+     * Purpose: A watch can advance without a click. Watch the rest turns it on.
+     * When to use: The footer checkbox, and the press that follows playback.
+     * Expected outcome: False for a new match. True after Watch the rest, until the player turns it off or Ready fails.
+     * Exceptions: None.
+     */
+    autoAdvance: false
   };
 
   // src/shared/selectionUnitIdSets.ts
@@ -3192,41 +3107,11 @@
   }
 
   // src/shared/lossSummary.ts
-  var LOSS_ENTRY_LIST_MAX = 5;
-  var GROUP_LABEL_BY_TYPE = {
-    naval: "Naval",
-    air: "Air",
-    armor: "Armored",
-    infantry: "Infantry"
-  };
-  var GROUP_ORDER = ["naval", "air", "armor", "infantry"];
   function emptyPlayerLossSummary() {
     return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
   }
   function emptyTurnLossSummary() {
-    return { human: emptyPlayerLossSummary(), ai: emptyPlayerLossSummary() };
-  }
-  function playerHasAnyLoss(summary) {
-    return summary.ranged.length > 0 || summary.melee.length > 0 || summary.returnFire.length > 0 || summary.airStrike.length > 0 || summary.other.length > 0;
-  }
-  function formatLossEntries(units) {
-    if (units.length === 0) return "";
-    if (units.length <= LOSS_ENTRY_LIST_MAX) {
-      return units.map((u) => u.displayName).join(", ");
-    }
-    return formatGroupedTypeTotals(units);
-  }
-  function formatGroupedTypeTotals(units) {
-    const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
-    for (const u of units) {
-      if (u.unitType in counts) counts[u.unitType] += 1;
-    }
-    const parts = [];
-    for (const t of GROUP_ORDER) {
-      const n = counts[t];
-      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
-    }
-    return parts.join(", ");
+    return { byOwner: {} };
   }
   var CAUSE_SPECS = [
     { key: "ranged", label: "Ranged attack" },
@@ -3237,15 +3122,31 @@
   ];
   var LOSS_CAUSE_LABELS = CAUSE_SPECS.map((spec) => spec.label);
   var LOSS_CAUSE_KEYS = CAUSE_SPECS.map((spec) => spec.key);
-  function formatPlayerLossLinesMultiline(summary) {
-    const lines = [];
-    for (const spec of CAUSE_SPECS) {
-      const units = summary[spec.key];
-      if (units.length === 0) continue;
-      const text = formatLossEntries(units);
-      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
+
+  // src/shared/seatIds.ts
+  var HUMAN_SEAT_ID = "human";
+  var AI_SEAT_IDS = ["opponent", "opponent2", "opponent3", "opponent4"];
+  var NEUTRAL_OWNER_ID = "neutral";
+  var MIN_SEATS = 2;
+  var MAX_SEATS = 4;
+  function isHumanSeatId(value) {
+    return value === HUMAN_SEAT_ID;
+  }
+  function isAiSeatId(value) {
+    return AI_SEAT_IDS.includes(value);
+  }
+  function isSeatId(value) {
+    return isHumanSeatId(value) || isAiSeatId(value);
+  }
+  function isNeutralOwnerId(value) {
+    return value === NEUTRAL_OWNER_ID;
+  }
+  function aiSeatIdForIndex(aiIndex) {
+    const seatId = AI_SEAT_IDS[aiIndex - 1];
+    if (!Number.isInteger(aiIndex) || seatId === void 0) {
+      throw new RangeError(`AI seat index must be from 1 to ${MAX_SEATS}, got ${aiIndex}`);
     }
-    return lines;
+    return seatId;
   }
 
   // src/shared/unitIds.ts
@@ -3275,13 +3176,17 @@
     const typeCode = match[3];
     const ordinalDigits = match[4];
     if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-    if (playerIndexDigits !== "1") return null;
+    const playerIndex = Number.parseInt(playerIndexDigits, 10);
     const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
     if (!unitType) return null;
-    const ordinal = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal)) return null;
-    const player = playerLetter === "h" ? "human" : "opponent";
-    return { player, unitType, ordinal };
+    const ordinal3 = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal3)) return null;
+    if (playerLetter === "h") {
+      if (playerIndex !== 1) return null;
+      return { player: HUMAN_SEAT_ID, unitType, ordinal: ordinal3 };
+    }
+    if (playerIndex < 1 || playerIndex > 4) return null;
+    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal: ordinal3 };
   }
   function parseTacticalSubUnitId(unitId) {
     const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
@@ -3312,8 +3217,8 @@
       const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
       if (parentOwner) return parentOwner;
     }
-    if (unitId.startsWith("opponent-")) return "opponent";
-    if (unitId.startsWith("human-")) return "human";
+    if (unitId.startsWith("opponent-")) return AI_SEAT_IDS[0];
+    if (unitId.startsWith("human-")) return HUMAN_SEAT_ID;
     return null;
   }
 
@@ -3398,18 +3303,19 @@
     return out;
   }
   function unitDisplayOwner(unit) {
-    if (unit.player === "human" || unit.player === "opponent") return unit.player;
+    if (unit.player !== void 0 && isSeatId(unit.player)) return unit.player;
     return unitIdOwnerFromId(unit.id) ?? "other";
   }
   function formatUnitNumberLabel(unit, value, locale) {
-    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+    const owner = unitDisplayOwner(unit);
+    return owner !== "other" && isAiSeatId(owner) ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
   }
   function parseSeedUnitIdParts(unitId) {
     const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
     if (!match) return null;
-    const ordinal = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
-    return { unitType: match[2], ordinal };
+    const ordinal3 = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal3) || ordinal3 <= 0) return null;
+    return { unitType: match[2], ordinal: ordinal3 };
   }
   function productionSpawnSequenceFromUnitId(unitId) {
     const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
@@ -3465,8 +3371,8 @@
       const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
       const noun = getUnitDisplayNoun(unitType);
       for (const unit of withPersisted) {
-        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
+        const ordinal3 = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal3, locale);
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
       let fallbackOrdinal = withPersisted.reduce(
@@ -18332,13 +18238,13 @@
     return baseline;
   }
   function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
-    const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
+    const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
     const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
     let budget;
     if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
-      if (tacticalCellIsUrbanOrRubble(battle, anchor)) {
+      if (tacticalCellIsUrbanOrRubble(battle, anchor2)) {
         budget = Math.max(0, 1);
-      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor)) {
+      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) {
         const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
         budget = Math.max(0, inf);
       } else {
@@ -18632,7 +18538,7 @@ ${bonuses}`;
   function buildUnitOriginByLossDisplayName(summary) {
     const flagByName = /* @__PURE__ */ new Map();
     const ambiguousNames = /* @__PURE__ */ new Set();
-    const victims = [summary.human, summary.ai].flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
+    const victims = Object.values(summary.byOwner).flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
     for (const victim of victims) {
       const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
       if (!origin || !victim.unitId) continue;
@@ -18664,592 +18570,269 @@ ${bonuses}`;
     return segments;
   }
 
-  // src/renderer/openRouter/aiPlanningState.ts
-  function isDeferredResolutionPlaybackConsultPending() {
-    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  // src/renderer/core/matchEpoch.ts
+  var rendererMatchEpoch = 0;
+  function advanceRendererMatchEpoch() {
+    rendererMatchEpoch += 1;
+    return rendererMatchEpoch;
   }
-  function isDeferredResolutionConsultRunning() {
-    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
+  function currentRendererMatchEpoch() {
+    return rendererMatchEpoch;
   }
-  function isWaitingForPrecomputedAiOrders() {
-    if (!rendererSharedState.runButtonOn) return false;
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-      const opponentAlive = rendererSharedState.tacticalBattleSnapshot.subUnits.some((u) => u.player === "opponent");
-      if (!opponentAlive) return false;
-      return rendererSharedState.tacticalOpponentDraft === null;
-    }
-    if (rendererSharedState.useEventDrivenConsultation && rendererSharedState.eventDrivenInitialConsultationDone) return false;
-    return rendererSharedState.precomputedAiOrders === null;
+  function rendererMatchEpochCurrent(captured) {
+    return captured === rendererMatchEpoch;
   }
 
-  // src/shared/openRouterToolInvocationCounts.ts
-  function resolveToolInvocationCountsAfterReady(args) {
-    if (args.fromResult) return { ...args.fromResult };
-    if (args.allowPrecomputedFallback && args.cachedPrecomputed) return { ...args.cachedPrecomputed };
-    return null;
+  // src/shared/observeModeControls.ts
+  function observeModeControls(seats) {
+    const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null);
+    return {
+      observing,
+      ordersEnabled: !observing,
+      buildEnabled: false,
+      forcesEnabled: false,
+      unitSelectionEnabled: !observing,
+      magnifierEnabled: !observing,
+      hexOnlySelection: observing
+    };
+  }
+  function readoutViewerSeatId(seats, viewAs) {
+    if (seats.length === 0) return void 0;
+    if (!observeModeControls(seats).observing) {
+      return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+    }
+    if (viewAs === "all") return null;
+    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
+    return chosen?.seatId ?? null;
+  }
+  function staleIntelViewer(playerPerspective) {
+    if (playerPerspective === "all") return null;
+    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
+    return HUMAN_SEAT_ID;
   }
 
-  // src/shared/consoleReportLog.ts
-  var CONSOLE_REPORT_KIND_LABELS = Object.freeze({
-    turn: "Turn report",
-    message: "Message",
-    notice: "Notice"
-  });
-  var MAX_CONSOLE_REPORTS = 200;
-  function formatConsoleReportTag(turnNumber, battleBeat) {
-    if (battleBeat != null) return `B${battleBeat}`;
-    if (turnNumber != null) return `T${turnNumber}`;
-    return "";
+  // src/renderer/core/matchSnapshotClient.ts
+  function matchViewArgument() {
+    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return void 0;
+    return rendererSharedState.viewAs;
+  }
+  function fetchMatchSnapshot() {
+    const api = window.gameApi;
+    if (!api?.getGameState) return Promise.reject(new Error("getGameState is unavailable"));
+    return api.getGameState(matchViewArgument());
   }
 
-  // src/renderer/chrome/frameTooltipText.ts
-  var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
-  var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
-  var opponentTabTooltipText = `Show whether the opponent is planning, its model, its tools, and the AI activity log. ${consoleTabCollapseSentence}`;
-  function unavailableTooltipText(name) {
-    return `${name} is not available in this version.`;
-  }
-  function forcesStatTooltipText(breakdown) {
-    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
-  }
-  var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
-  var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
-  var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
-  var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
-  var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
-
-  // src/renderer/chrome/consoleReports.ts
-  var unreadCount = 0;
-  var reportsVisible = false;
-  var listeners = [];
-  function notifyReportsChanged() {
-    for (const listener of listeners) listener();
-  }
-  function syncReportsEmptyState(list) {
-    document.getElementById("reports-empty")?.toggleAttribute("hidden", list.childElementCount > 0);
-  }
-  function createReplayPlaceholder() {
-    const host = document.createElement("span");
-    host.className = "control-tooltip-host console-report-replay-host";
-    host.setAttribute("data-control-tooltip", unavailableTooltipText("Replay"));
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "console-report-replay";
-    button.disabled = true;
-    button.textContent = "Replay";
-    host.append(button);
-    return host;
-  }
-  function currentConsoleReportTag() {
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    return formatConsoleReportTag(rendererSharedState.gameState?.turnNumber ?? null, battle ? battle.tacticalTurnNumber : null);
-  }
-  function recordConsoleReport(kind, tag, body) {
-    const list = document.getElementById("reports-list");
-    if (!list) return;
-    const entry = document.createElement("li");
-    entry.className = `console-report console-report-${kind}`;
-    entry.dataset.fresh = "true";
-    const head = document.createElement("div");
-    head.className = "console-report-head";
-    if (tag) {
-      const tagEl = document.createElement("span");
-      tagEl.className = "console-report-tag";
-      tagEl.textContent = tag;
-      head.append(tagEl);
-    }
-    const kindEl = document.createElement("span");
-    kindEl.className = "console-report-kind";
-    kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
-    head.append(kindEl);
-    if (kind === "turn") head.append(createReplayPlaceholder());
-    const content = document.createElement("div");
-    content.className = "console-report-body";
-    content.append(...Array.from(body.cloneNode(true).childNodes));
-    entry.append(head, content);
-    list.prepend(entry);
-    while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
-    syncReportsEmptyState(list);
-    if (!reportsVisible) unreadCount = Math.min(unreadCount + 1, list.childElementCount);
-    notifyReportsChanged();
-  }
-  function unreadConsoleReportCount() {
-    return unreadCount;
-  }
-  function setConsoleReportsVisible(visible) {
-    if (visible === reportsVisible) return;
-    reportsVisible = visible;
-    if (visible) unreadCount = 0;
-    else document.querySelectorAll("#reports-list [data-fresh]").forEach((entry) => entry.removeAttribute("data-fresh"));
-    notifyReportsChanged();
-  }
-  function clearConsoleReports() {
-    const list = document.getElementById("reports-list");
-    list?.replaceChildren();
-    if (list) syncReportsEmptyState(list);
-    unreadCount = 0;
-    notifyReportsChanged();
-  }
-  function onConsoleReportsChanged(listener) {
-    listeners.push(listener);
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
   }
 
-  // src/shared/opponentPlanningStatus.ts
-  var OPPONENT_STATUS_LINE_LABELS = Object.freeze({
-    off: "Opponent planning off",
-    on: "Opponent planning on",
-    planning: "Opponent planning\u2026"
-  });
-  var NO_MODEL_LABEL = "No model";
-  function opponentPlanningStatus(runOn, planning) {
-    if (!runOn) return "off";
-    return planning ? "planning" : "on";
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
   }
-  function opponentStatusSentence(status) {
-    return status === "off" ? "Opponent planning is off." : "Opponent planning is on.";
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
   }
-  function modelNameFromOptionLabel(optionLabel) {
-    const bracket = optionLabel.indexOf(" [");
-    const name = (bracket >= 0 ? optionLabel.slice(0, bracket) : optionLabel).trim();
-    return name || NO_MODEL_LABEL;
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
   }
-
-  // src/renderer/openRouter/openRouterUiHelpers.ts
-  function formatElapsedMmSs(ms) {
-    const totalSeconds = Math.floor(ms / 1e3);
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
   }
-  var READY_CHECK_ICON_PATH = "M3 8.5l3.2 3.2L13 4.8";
-  function buildReadyCheckIcon() {
-    const svgNs = "http://www.w3.org/2000/svg";
-    const icon = document.createElementNS(svgNs, "svg");
-    icon.setAttribute("class", "chrome-icon ready-btn-check");
-    icon.setAttribute("viewBox", "0 0 16 16");
-    icon.setAttribute("aria-hidden", "true");
-    const path = document.createElementNS(svgNs, "path");
-    path.setAttribute("d", READY_CHECK_ICON_PATH);
-    icon.appendChild(path);
-    return icon;
-  }
-  function setReadyButtonLabelReady(readyBtn) {
-    if (readyBtn.querySelector(".ready-btn-check")) return;
-    const label = document.createElement("span");
-    label.className = "ready-btn-label";
-    label.textContent = "Ready";
-    readyBtn.replaceChildren(buildReadyCheckIcon(), label);
-  }
-  function setReadyButtonLabelAiWait(readyBtn, elapsedMs) {
-    const text = `AI: ${formatElapsedMmSs(elapsedMs)}`;
-    let label = readyBtn.querySelector(".ready-btn-ai-label");
-    if (!label) {
-      label = document.createElement("span");
-      label.className = "ready-btn-ai-label";
-      readyBtn.replaceChildren(label);
-    }
-    if (label.textContent !== text) label.textContent = text;
-  }
-  function updateReadyButtonState() {
-    const readyBtn = document.getElementById("ready-btn");
-    if (!readyBtn) return;
-    const gameOver = rendererSharedState.gameState?.gameOver ?? false;
-    const deferredConsult = isDeferredResolutionPlaybackConsultPending();
-    const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
-    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
-    const showAiWait = waitingOnAi || rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning();
-    if (showAiWait) {
-      const now = Date.now();
-      if (rendererSharedState.readyBtnAiWaitStartTime === null) {
-        rendererSharedState.readyBtnAiWaitStartTime = now;
-        rendererSharedState.readyBtnAiWaitIntervalId = setInterval(() => {
-          if (rendererSharedState.readyBtnAiWaitStartTime === null) return;
-          const btn = document.getElementById("ready-btn");
-          if (btn) setReadyButtonLabelAiWait(btn, Date.now() - rendererSharedState.readyBtnAiWaitStartTime);
-        }, 1e3);
-      }
-      setReadyButtonLabelAiWait(readyBtn, now - (rendererSharedState.readyBtnAiWaitStartTime ?? now));
-    } else {
-      if (rendererSharedState.readyBtnAiWaitIntervalId !== null) {
-        clearInterval(rendererSharedState.readyBtnAiWaitIntervalId);
-        rendererSharedState.readyBtnAiWaitIntervalId = null;
-      }
-      rendererSharedState.readyBtnAiWaitStartTime = null;
-      setReadyButtonLabelReady(readyBtn);
-    }
-    renderOpponentStatus();
-  }
-  function renderOpponentStatus() {
-    const status = opponentPlanningStatus(
-      rendererSharedState.runButtonOn,
-      isWaitingForPrecomputedAiOrders() || isDeferredResolutionConsultRunning()
-    );
-    const sentence = document.getElementById("opponent-status-text");
-    if (sentence) sentence.textContent = opponentStatusSentence(status);
-    document.getElementById("opponent-status-line")?.setAttribute("data-status", status);
-    const label = document.getElementById("opponent-status-label");
-    if (label) label.textContent = OPPONENT_STATUS_LINE_LABELS[status];
-    const modelSelect = document.getElementById("openrouter-model");
-    const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : void 0;
-    const model = document.getElementById("opponent-status-model");
-    if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
-    const cost = document.getElementById("opponent-status-cost");
-    if (cost) cost.textContent = formatOpenRouterCost(rendererSharedState.openRouterGameCost);
-  }
-  function updateOpenRouterToolCountLabels() {
-    for (const group of rendererSharedState.openRouterToolGroups) {
-      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
-      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-    }
-  }
-  function applyToolInvocationCountsAfterReady(args) {
-    const next = resolveToolInvocationCountsAfterReady(args);
-    if (next) {
-      rendererSharedState.toolInvocationCounts = next;
-      updateOpenRouterToolCountLabels();
-    }
-    rendererSharedState.precomputedToolInvocationCounts = null;
-  }
-  function formatOpenRouterCost(dollars) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(dollars);
-  }
-  function updateOpenRouterCostLabel() {
-    const el = document.getElementById("openrouter-cost");
-    if (el) el.textContent = formatOpenRouterCost(rendererSharedState.openRouterGameCost);
-    renderOpponentStatus();
-  }
-  function appendOpenRouterLog(line, isError = false) {
-    const el = document.getElementById("openrouter-log");
-    if (!el) return;
-    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString();
-    const span = document.createElement("div");
-    span.textContent = `${time} ${line}`;
-    if (isError) span.className = "chrome-error";
-    el.appendChild(span);
-    scrollOpenRouterLogToEnd();
-  }
-  function scrollOpenRouterLogToEnd() {
-    const el = document.getElementById("openrouter-log");
-    if (el) el.scrollTop = el.scrollHeight;
-  }
-  function clearOpenRouterLog() {
-    const el = document.getElementById("openrouter-log");
-    if (el) el.textContent = "";
-  }
-  var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
-  function appendMapToastBulletLine(target, line, indent, unitOriginByDisplayName) {
-    const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
-    const span = document.createElement("span");
-    span.style.display = "block";
-    if (indent) {
-      span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
-    }
-    if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
-      for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
-        const flag = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
-        if (flag && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
-        span.appendChild(document.createTextNode(segment.text));
-      }
-    } else {
-      span.textContent = text;
-    }
-    target.appendChild(span);
-  }
-  function appendMapToastSectionHeader(target, title) {
-    const strong = document.createElement("strong");
-    strong.style.display = "block";
-    strong.textContent = title.endsWith(":") ? title : `${title}:`;
-    target.appendChild(strong);
-  }
-  function appendMapToastMessageBody(target, message, unitOriginByDisplayName) {
-    const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-    let inSection = false;
-    let isFirstSection = true;
-    for (const line of lines) {
-      if (line.startsWith("## ")) {
-        inSection = true;
-        if (!isFirstSection) {
-          target.appendChild(document.createElement("br"));
-        }
-        isFirstSection = false;
-        appendMapToastSectionHeader(target, line.slice(3));
-        continue;
-      }
-      appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
-    }
-  }
-  function showToast(el, textEl, textContentBuilder, isInfo) {
-    textEl.textContent = "";
-    textContentBuilder(textEl);
-    el.classList.toggle("toast-info", isInfo);
-    el.classList.remove("hidden");
-  }
-  function showMapToast(message, options) {
-    if (rendererSharedState.toastHideTimer !== null) {
-      clearTimeout(rendererSharedState.toastHideTimer);
-      rendererSharedState.toastHideTimer = null;
-    }
-    const el = document.getElementById("map-toast");
-    const textEl = document.getElementById("map-toast-text");
-    if (el && textEl) {
-      showToast(
-        el,
-        textEl,
-        (target) => {
-          appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
-        },
-        options?.isError === false
-      );
-      if (options?.isError === false) {
-        recordConsoleReport(options.report?.kind ?? "notice", options.report?.tag ?? currentConsoleReportTag(), textEl);
-      }
-    }
-    rendererSharedState.toastHideTimer = setTimeout(() => {
-      rendererSharedState.toastHideTimer = null;
-      hideMapToast();
-    }, TOAST_DURATION_MS);
-  }
-  function hideMapToast() {
-    if (rendererSharedState.toastHideTimer !== null) {
-      clearTimeout(rendererSharedState.toastHideTimer);
-      rendererSharedState.toastHideTimer = null;
-    }
-    const el = document.getElementById("map-toast");
-    if (el) el.classList.add("hidden");
-  }
-  function showAiStrategyToast(content) {
-    if (!hasAiStrategyToastContent(content)) {
-      hideAiStrategyToast();
-      return;
-    }
-    if (rendererSharedState.aiStrategyToastHideTimer !== null) {
-      clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
-      rendererSharedState.aiStrategyToastHideTimer = null;
-    }
-    const el = document.getElementById("ai-strategy-toast");
-    const textEl = document.getElementById("ai-strategy-toast-text");
-    if (el && textEl) {
-      showToast(
-        el,
-        textEl,
-        (target) => {
-          const sections = buildAiStrategyToastSections(content);
-          sections.forEach((section, index) => {
-            if (index > 0) target.appendChild(document.createElement("br"));
-            appendMapToastSectionHeader(target, section.title);
-            const span = document.createElement("span");
-            span.style.display = "block";
-            span.textContent = section.body;
-            target.appendChild(span);
-          });
-        },
-        true
-      );
-      recordConsoleReport("message", currentConsoleReportTag(), textEl);
-    }
-    rendererSharedState.aiStrategyToastHideTimer = setTimeout(() => {
-      rendererSharedState.aiStrategyToastHideTimer = null;
-      hideAiStrategyToast();
-    }, TOAST_DURATION_MS);
-  }
-  function hideAiStrategyToast() {
-    if (rendererSharedState.aiStrategyToastHideTimer !== null) {
-      clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
-      rendererSharedState.aiStrategyToastHideTimer = null;
-    }
-    const el = document.getElementById("ai-strategy-toast");
-    if (el) el.classList.add("hidden");
-  }
-  function hidePlanningChromeToasts() {
-    hideMapToast();
-    hideAiStrategyToast();
-  }
-  async function callReadyWithTimeout(payload2) {
-    if (!window.gameApi?.ready) {
-      throw new Error("Ready action unavailable.");
-    }
-    return Promise.race([
-      window.gameApi.ready(payload2),
-      new Promise((_resolve, reject) => {
-        setTimeout(
-          () => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)),
-          READY_REQUEST_TIMEOUT_MS
-        );
-      })
-    ]);
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
   }
 
-  // src/renderer/core/selection.ts
-  function isEmbarkedLandUnitBlockedForSelection(unitId) {
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      const sub = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
-      if (!sub || sub.unitType !== "infantry" && sub.unitType !== "armor") return false;
-      return !!sub.embarkedOnSubUnitId;
-    }
-    const unit = rendererSharedState.gameState?.units.find((u) => u.id === unitId);
-    if (!unit || unit.unitType !== "infantry" && unit.unitType !== "armor") return false;
-    return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+  // src/shared/loadedStrategicFootprint.ts
+  var footprint = null;
+  var footprintSet = null;
+  var hexRoles = null;
+  var footprintVersion = 0;
+  function setLoadedStrategicFootprint(hexes, roles) {
+    footprint = hexes ? [...hexes] : null;
+    footprintSet = hexes ? new Set(hexes) : null;
+    hexRoles = hexes && roles ? new Map(roles) : null;
+    footprintVersion += 1;
   }
-  function shouldBlockEmbarkedLandUnitSelect(unitId) {
-    if (!isEmbarkedLandUnitBlockedForSelection(unitId)) return false;
-    return !rendererSharedState.selectedUnitIds.includes(unitId);
+  function loadedStrategicFootprintVersion() {
+    return footprintVersion;
   }
-  function reconcileSelectionToCurrentState() {
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      const validHumanUnitIds2 = new Set(
-        rendererSharedState.tacticalBattleSnapshot.subUnits.filter((u) => u.player === "human").map((u) => u.id)
-      );
-      rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter(
-        (id) => validHumanUnitIds2.has(id) && !isEmbarkedLandUnitBlockedForSelection(id)
-      );
-      return;
+  function loadedStrategicFootprint() {
+    return footprint ? [...footprint] : null;
+  }
+  function isOnMap(h3Index) {
+    if (!footprintSet) return true;
+    return footprintSet.has(h3Index);
+  }
+  function loadedHexRole(h3Index) {
+    return hexRoles?.get(h3Index) ?? null;
+  }
+
+  // src/shared/h3Resolutions.ts
+  function strategicH3Resolution() {
+    return activeGameMap().strategicResolution;
+  }
+  function tacticalH3Resolution() {
+    return activeGameMap().tacticalResolution;
+  }
+  function strategicParentOf(h3Index) {
+    return cellToParent(h3Index, strategicH3Resolution());
+  }
+  function tacticalChildrenOf(h3Index) {
+    return cellToChildren(h3Index, tacticalH3Resolution());
+  }
+  function isTacticalCell(h3Index) {
+    return getResolution(h3Index) === tacticalH3Resolution();
+  }
+  function strategicCellAt(lat, lng) {
+    return latLngToCell(lat, lng, strategicH3Resolution());
+  }
+  function tacticalCellAt(lat, lng) {
+    return latLngToCell(lat, lng, tacticalH3Resolution());
+  }
+  function isNeutralBorderHex(h3Index) {
+    return loadedHexRole(h3Index) === "neutral_border";
+  }
+
+  // src/shared/hexLlmCodeAssignment.ts
+  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  var strategicH3ToCodeSingleton = null;
+  function indexToCode(index) {
+    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
+      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
     }
-    if (!rendererSharedState.gameState) {
-      rendererSharedState.selectedUnitIds = [];
-      return;
-    }
-    const validHumanUnitIds = new Set(rendererSharedState.gameState.units.filter((u) => u.player === "human").map((u) => u.id));
-    rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => {
-      if (!validHumanUnitIds.has(id)) return false;
-      return !isEmbarkedLandUnitBlockedForSelection(id);
+    const hi = Math.floor(index / CODE_ALPHABET.length);
+    const lo = index % CODE_ALPHABET.length;
+    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
+  }
+  function sortCellsForStableLlmCodes(cells) {
+    const decorated = cells.map((h3) => {
+      const [lat, lng] = cellToLatLng(h3);
+      return { h3, lat, lng };
     });
+    decorated.sort((a, b) => {
+      if (a.lat !== b.lat) return b.lat - a.lat;
+      if (a.lng !== b.lng) return a.lng - b.lng;
+      return a.h3.localeCompare(b.h3);
+    });
+    return decorated.map((d) => d.h3);
   }
-  function replaceSelection(unitIds) {
-    const previousIds = [...rendererSharedState.selectedUnitIds];
-    const unique = [...new Set(unitIds)];
-    rendererSharedState.selectedUnitIds = unique;
-    reconcileSelectionToCurrentState();
-    if (rendererSharedState.selectedUnitIds.length === 0) {
-      rendererSharedState.selectedHexIndex = null;
-      rendererSharedState.hoverRoutePreview = null;
-      rendererSharedState.hoverPreviewRequestSeq++;
-      rendererSharedState.rangedModeActive = false;
-      rendererSharedState.airStrikeModeActive = false;
-      return;
+  function buildStrategicH3ToCodeMap() {
+    const footprint2 = loadedStrategicFootprint();
+    const strategicSet = new Set(footprint2 ?? []);
+    if (!footprint2) {
+      const res0 = getRes0Cells();
+      for (const r0 of res0) {
+        for (const child of cellToChildren(r0, strategicH3Resolution())) {
+          strategicSet.add(child);
+        }
+      }
     }
-    if (selectionUnitIdSetsDiffer(previousIds, rendererSharedState.selectedUnitIds)) {
-      hidePlanningChromeToasts();
+    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
+    const h3ToCode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < sorted.length; i++) {
+      h3ToCode.set(sorted[i], indexToCode(i));
     }
-    const tb = rendererSharedState.tacticalBattleSnapshot;
-    const primary = tb ? tb.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
-    rendererSharedState.selectedHexIndex = primary?.h3Index ?? null;
+    return h3ToCode;
   }
-  function addUnitsToSelection(unitIds) {
-    replaceSelection([...rendererSharedState.selectedUnitIds, ...unitIds]);
-  }
-  function removeUnitsFromSelection(unitIds) {
-    const remove = new Set(unitIds);
-    replaceSelection(rendererSharedState.selectedUnitIds.filter((id) => !remove.has(id)));
-  }
-  function toggleUnitSelection(unitId) {
-    if (rendererSharedState.selectedUnitIds.includes(unitId)) {
-      removeUnitsFromSelection([unitId]);
-    } else {
-      addUnitsToSelection([unitId]);
+  function getStrategicH3ToCodeMap() {
+    if (!strategicH3ToCodeSingleton) {
+      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
     }
+    return strategicH3ToCodeSingleton;
   }
-  function clearSelection() {
-    replaceSelection([]);
+  function resetStrategicHexCodeCache() {
+    strategicH3ToCodeSingleton = null;
   }
-  function clearMapSelectionChrome() {
-    clearSelection();
-    rendererSharedState.selectedUnitIdsAtMouseDown = [];
-    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+  registerActiveGameMapReset(resetStrategicHexCodeCache);
+  function getStrategicHexCode(h3Index) {
+    return getStrategicH3ToCodeMap().get(h3Index);
   }
-  function getVisibleHexSet(state) {
-    if (!state) return /* @__PURE__ */ new Set();
-    if (!Array.isArray(state.visibleHexes)) return new Set(state.hexes.map((h) => h.h3Index));
-    return new Set(state.visibleHexes);
+  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
+    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
+    const idx = children.indexOf(childTacticalH3Index);
+    if (idx < 0) return void 0;
+    return indexToCode(idx);
   }
-  function getExploredHexSet(state) {
-    if (!state) return /* @__PURE__ */ new Set();
-    if (!Array.isArray(state.exploredHexes)) return new Set(state.hexes.map((h) => h.h3Index));
-    return new Set(state.exploredHexes);
-  }
-  function isHexExploredByPlayer(h3Index) {
-    if (!rendererSharedState.gameState) return false;
-    const explored = getExploredHexSet(rendererSharedState.gameState);
-    return explored.has(h3Index);
+  function getLlmHexLocationParenLabelForNamingTarget(target) {
+    if (target.resolution === 1) {
+      const c = getStrategicHexCode(target.h3Index);
+      return c ? `(${c})` : null;
+    }
+    const parent = strategicParentOf(target.h3Index);
+    const parentCode = getStrategicHexCode(parent);
+    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
+    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
   }
 
-  // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
-  function mergePendingTacticalEmbarkOrdersIntoSealiftState(base, pendingEmbark) {
-    if (pendingEmbark.length === 0) {
-      return { ...base, navalRows: base.navalRows.map((r) => ({ ...r })) };
+  // src/shared/tacticalBattleFootprint.ts
+  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
+  var footprintByKey = /* @__PURE__ */ new Map();
+  function resetTacticalBattleFootprintCache() {
+    footprintByKey.clear();
+  }
+  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
+  function frozenCodeMap(entries) {
+    const map = new Map(entries);
+    const reject = () => {
+      throw new TypeError("tactical battle footprint code map is frozen");
+    };
+    map.set = reject;
+    map.delete = reject;
+    map.clear = reject;
+    return map;
+  }
+  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
+    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
+    const coreSet = new Set(coreChildH3Indexes);
+    const cells = new Set(coreChildH3Indexes);
+    for (const cell of coreChildH3Indexes) {
+      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
+        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
+      }
     }
-    const landType = new Map(base.landOptions.map((o) => [o.unitId, o.unitType]));
-    const rows = base.navalRows.map((r) => ({ ...r }));
-    const pendingLand = new Set(pendingEmbark.map((e) => e.unitId));
-    for (const row of rows) {
-      if (row.slot1UnitId && pendingLand.has(row.slot1UnitId)) row.slot1UnitId = null;
-      if (row.slot2UnitId && pendingLand.has(row.slot2UnitId)) row.slot2UnitId = null;
-    }
-    const sorted = [...pendingEmbark].sort((a, b) => a.navalUnitId.localeCompare(b.navalUnitId) || a.unitId.localeCompare(b.unitId));
-    for (const e of sorted) {
-      const row = rows.find((r) => r.navalUnitId === e.navalUnitId);
-      if (!row) continue;
-      const t = landType.get(e.unitId);
-      if (t === "armor") {
-        row.slot1UnitId = e.unitId;
-        row.slot2UnitId = null;
+    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
+    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
+    return { coreChildH3Indexes, h3Indexes, codeByH3 };
+  }
+  function tacticalBattleFootprint(enclosingStrategicH3Index) {
+    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
+    const cached = footprintByKey.get(key);
+    if (cached) return cached;
+    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
+    footprintByKey.set(key, built);
+    return built;
+  }
+  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
+    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
+  }
+  function tacticalBattleTerrainKindByCell(args) {
+    const kinds = {};
+    for (const cell of args.cells) {
+      const tacticalKind = args.tacticalKindByH3.get(cell);
+      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
+        kinds[cell] = tacticalKind;
         continue;
       }
-      if (!row.slot1UnitId) row.slot1UnitId = e.unitId;
-      else if (!row.slot2UnitId && !row.slot2Disabled) row.slot2UnitId = e.unitId;
-      else row.slot1UnitId = e.unitId;
+      let parentKind;
+      try {
+        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
+      } catch {
+        parentKind = void 0;
+      }
+      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
     }
-    return { ...base, navalRows: rows };
-  }
-
-  // src/shared/basemapStyleLogic.ts
-  var ATLAS_BASEMAP_CSS_FILTER = "saturate(0.78) contrast(1.2) brightness(1.03)";
-  var SCIENTIFIC_BASEMAP_CSS_FILTER = "grayscale(1) contrast(1.18) brightness(1.08)";
-  var WARGAME_BASEMAP_CSS_FILTER = "invert(1) hue-rotate(180deg)";
-  function basemapNeedsRemount(currentId, nextId) {
-    return currentId !== nextId;
-  }
-  function basemapNeedsRemountForMaps(mainProviderId, miniProviderId, nextProviderId) {
-    return basemapNeedsRemount(mainProviderId, nextProviderId) || basemapNeedsRemount(miniProviderId, nextProviderId);
-  }
-  function basemapCssFilterForStyle(styleId) {
-    if (styleId === "wargame") return WARGAME_BASEMAP_CSS_FILTER;
-    if (styleId === "atlas") return ATLAS_BASEMAP_CSS_FILTER;
-    if (styleId === "scientific") return SCIENTIFIC_BASEMAP_CSS_FILTER;
-    return "";
-  }
-
-  // src/renderer/map/basemapProvider.ts
-  var RASTER_BASEMAP_ORDER = [
-    {
-      id: "esri_world_shaded_relief",
-      displayName: "Esri World Shaded Relief",
-      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
-      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
-      maxZoom: 13,
-      minZoom: 0
-    },
-    {
-      id: "osm_mapnik",
-      displayName: "OpenStreetMap Standard",
-      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      subdomains: "abc",
-      maxZoom: 19,
-      minZoom: 0
-    }
-  ];
-  function getRasterBasemapChain() {
-    return RASTER_BASEMAP_ORDER;
-  }
-  function getRasterBasemapChainStartIndex(providerId) {
-    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
-    return i >= 0 ? i : 0;
+    return kinds;
   }
 
   // src/shared/mapExtent.ts
@@ -19341,6 +18924,51 @@ ${bonuses}`;
     return boundary.map(
       ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), alignLngToReference(lng, refLng)]
     );
+  }
+
+  // src/shared/basemapStyleLogic.ts
+  var ATLAS_BASEMAP_CSS_FILTER = "saturate(0.78) contrast(1.2) brightness(1.03)";
+  var SCIENTIFIC_BASEMAP_CSS_FILTER = "grayscale(1) contrast(1.18) brightness(1.08)";
+  var WARGAME_BASEMAP_CSS_FILTER = "invert(1) hue-rotate(180deg)";
+  function basemapNeedsRemount(currentId, nextId) {
+    return currentId !== nextId;
+  }
+  function basemapNeedsRemountForMaps(mainProviderId, miniProviderId, nextProviderId) {
+    return basemapNeedsRemount(mainProviderId, nextProviderId) || basemapNeedsRemount(miniProviderId, nextProviderId);
+  }
+  function basemapCssFilterForStyle(styleId) {
+    if (styleId === "wargame") return WARGAME_BASEMAP_CSS_FILTER;
+    if (styleId === "atlas") return ATLAS_BASEMAP_CSS_FILTER;
+    if (styleId === "scientific") return SCIENTIFIC_BASEMAP_CSS_FILTER;
+    return "";
+  }
+
+  // src/renderer/map/basemapProvider.ts
+  var RASTER_BASEMAP_ORDER = [
+    {
+      id: "esri_world_shaded_relief",
+      displayName: "Esri World Shaded Relief",
+      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
+      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
+      maxZoom: 13,
+      minZoom: 0
+    },
+    {
+      id: "osm_mapnik",
+      displayName: "OpenStreetMap Standard",
+      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: "abc",
+      maxZoom: 19,
+      minZoom: 0
+    }
+  ];
+  function getRasterBasemapChain() {
+    return RASTER_BASEMAP_ORDER;
+  }
+  function getRasterBasemapChainStartIndex(providerId) {
+    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
+    return i >= 0 ? i : 0;
   }
 
   // src/renderer/map/worldLeafletMap.ts
@@ -19581,57 +19209,6 @@ ${bonuses}`;
     notifyMainViewChanged();
   }
 
-  // src/shared/loadedStrategicFootprint.ts
-  var footprint = null;
-  var footprintSet = null;
-  var hexRoles = null;
-  var footprintVersion = 0;
-  function setLoadedStrategicFootprint(hexes, roles) {
-    footprint = hexes ? [...hexes] : null;
-    footprintSet = hexes ? new Set(hexes) : null;
-    hexRoles = hexes && roles ? new Map(roles) : null;
-    footprintVersion += 1;
-  }
-  function loadedStrategicFootprintVersion() {
-    return footprintVersion;
-  }
-  function loadedStrategicFootprint() {
-    return footprint ? [...footprint] : null;
-  }
-  function isOnMap(h3Index) {
-    if (!footprintSet) return true;
-    return footprintSet.has(h3Index);
-  }
-  function loadedHexRole(h3Index) {
-    return hexRoles?.get(h3Index) ?? null;
-  }
-
-  // src/shared/h3Resolutions.ts
-  function strategicH3Resolution() {
-    return activeGameMap().strategicResolution;
-  }
-  function tacticalH3Resolution() {
-    return activeGameMap().tacticalResolution;
-  }
-  function strategicParentOf(h3Index) {
-    return cellToParent(h3Index, strategicH3Resolution());
-  }
-  function tacticalChildrenOf(h3Index) {
-    return cellToChildren(h3Index, tacticalH3Resolution());
-  }
-  function isTacticalCell(h3Index) {
-    return getResolution(h3Index) === tacticalH3Resolution();
-  }
-  function strategicCellAt(lat, lng) {
-    return latLngToCell(lat, lng, strategicH3Resolution());
-  }
-  function tacticalCellAt(lat, lng) {
-    return latLngToCell(lat, lng, tacticalH3Resolution());
-  }
-  function isNeutralBorderHex(h3Index) {
-    return loadedHexRole(h3Index) === "neutral_border";
-  }
-
   // src/shared/mapKeyboardPanLogic.ts
   var MAP_PAN_BASELINE_INTERVAL_MS = 200;
   var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
@@ -19837,9 +19414,9 @@ ${bonuses}`;
     const leafletRef = globalThis.L;
     if (!map || !leafletRef) return;
     const humanGround = state.units.filter(
-      (u) => u.player === "human" && (u.unitType === "infantry" || u.unitType === "armor")
+      (u) => u.player === HUMAN_SEAT_ID && (u.unitType === "infantry" || u.unitType === "armor")
     );
-    const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === "human");
+    const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
     if (anchors.length === 0) return;
     const [, anchorLng] = cellToLatLng(anchors[0].h3Index);
     let latSum = 0;
@@ -20026,6 +19603,3068 @@ ${bonuses}`;
       if (p.y > maxY) maxY = p.y;
     }
     return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
+
+  // src/shared/hexNamingCaption.ts
+  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
+  function formatHexNamingCaptionHtml(caption) {
+    const { text } = caption;
+    let html = "";
+    let cursor = 0;
+    for (const span of caption.spans) {
+      html += escapeHtmlText(text.slice(cursor, span.start));
+      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
+      const name = escapeHtmlText(text.slice(span.start, span.end));
+      if (span.role === "heading") {
+        const hasColon = text[span.end] === ":";
+        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
+        cursor = hasColon ? span.end + 1 : span.end;
+      } else {
+        html += `${flag}${name}`;
+        cursor = span.end;
+      }
+    }
+    return html + escapeHtmlText(text.slice(cursor));
+  }
+
+  // src/shared/progressFormatting.ts
+  function computeRoundedPercentage(numerator, denominator) {
+    if (denominator <= 0) return 0;
+    return Math.round(numerator / denominator * 100);
+  }
+
+  // src/shared/homeRegionRules.ts
+  function resolveHomeRegionOwnerIdentity(input) {
+    const owners = declaredHomeSeatIds(input);
+    if (owners.length === 0) return null;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(homeListsForIntersection(input))
+    );
+    if (owners.length >= 2 || intersectionSet.has(input.h3Index)) return { kind: "shared" };
+    return { kind: "single", seatId: owners[0] };
+  }
+  function declaredHomeSeatIds(input) {
+    const bySeat = input.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(input.h3Index)).map(([seatId]) => seatId);
+  }
+  function homeListsForIntersection(input) {
+    const bySeat = input.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.values(bySeat);
+  }
+  function uniqueSortedHexes(hexes) {
+    return [...new Set(hexes)].sort();
+  }
+  function computeIntersectingHomeRegionHexes(homeHexLists) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const list of homeHexLists) {
+      for (const h3Index of new Set(list)) {
+        counts.set(h3Index, (counts.get(h3Index) ?? 0) + 1);
+      }
+    }
+    const shared = [...counts.entries()].filter(([, count]) => count >= 2).map(([h3Index]) => h3Index);
+    return uniqueSortedHexes(shared);
+  }
+  function hasHomeRegionMetadata(state) {
+    const lists = Object.values(state.homeRegionHexesBySeat ?? {});
+    return lists.some((hexes) => hexes.length > 0);
+  }
+  function ownershipPerspective(value) {
+    if (value === "all") return "all";
+    if (value !== void 0 && isSeatId(value)) return value;
+    return HUMAN_SEAT_ID;
+  }
+  function isHexOwnershipVisibleToPerspective(input) {
+    if (input.playerPerspective === "all") return true;
+    if (input.visibleHexes.has(input.h3Index)) return true;
+    if (!hasHomeRegionMetadata(input)) return false;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(Object.values(input.homeRegionHexesBySeat ?? {}))
+    );
+    if (intersectionSet.has(input.h3Index)) return true;
+    const ownHomeHexSet = new Set(input.homeRegionHexesBySeat?.[input.playerPerspective] ?? []);
+    return ownHomeHexSet.has(input.h3Index);
+  }
+  function resolveOwnershipBorderStyle(input) {
+    const isHomeHex = declaredHomeSeatIds(input).length > 0;
+    const controller = input.controllerPlayerId ?? null;
+    if (isHomeHex) {
+      if (controller != null && isSeatId(controller)) return { kind: "outlined", ownerId: controller };
+      return { kind: "outlinedNeutral" };
+    }
+    if (!input.isOwnershipVisible) return { kind: "none" };
+    if (controller != null && isSeatId(controller)) return { kind: "normal", ownerId: controller };
+    if (controller != null && isNeutralOwnerId(controller)) return { kind: "outlinedNeutral" };
+    return { kind: "none" };
+  }
+  function countControlledHexesInRegion(controlRows, regionHexes, playerId) {
+    const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
+    const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));
+    const controlled = uniqueRegionHexes.filter((h3Index) => controlByHex.get(h3Index) === playerId).length;
+    const total = uniqueRegionHexes.length;
+    const pct = computeRoundedPercentage(controlled, total);
+    return { controlled, total, pct };
+  }
+
+  // src/shared/seatRoster.ts
+  var DOCTRINES = ["aggressive", "balanced", "cautious"];
+  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
+  function sortSeatsByOrder(seats) {
+    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function isSeatActive(seat) {
+    return seat.outTurn === null;
+  }
+  function activeAiSeats(seats) {
+    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === "ai"));
+  }
+  function findHumanSeat(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID) ?? null;
+  }
+  var COMPASS_PREFIXES = [
+    ["Northern", "N."],
+    ["Southern", "S."],
+    ["Eastern", "E."],
+    ["Western", "W."],
+    ["Central", "C."],
+    ["North", "N."],
+    ["South", "S."],
+    ["East", "E."],
+    ["West", "W."]
+  ];
+  function cutAtFirstSeparator(displayName) {
+    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
+    if (separatorAt.length === 0) return displayName;
+    return displayName.slice(0, Math.min(...separatorAt));
+  }
+  function shortenLeadingCompass(name) {
+    for (const [word, short] of COMPASS_PREFIXES) {
+      if (name === word) return short;
+      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+    }
+    return name;
+  }
+  function shortSideName(displayName) {
+    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
+  }
+
+  // src/shared/sideLabels.ts
+  function homeSeatIdsAtHex(h3Index, lists) {
+    const bySeat = lists.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
+  }
+  function viewerSeatIdForRoster(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID)?.seatId ?? null;
+  }
+  function sideDisplayName(seatId, seats, viewerSeatId2) {
+    const seat = seats.find((row) => row.seatId === seatId);
+    if (viewerSeatId2 != null && seatId === viewerSeatId2) return "You";
+    return seat?.homeRegion ?? seatId;
+  }
+  function homesInOrder(homeSeatIds, seats) {
+    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function formatHexControlLabel(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    const controllerIsSeat = args.controllerId != null && isSeatId(args.controllerId);
+    const controllerName = controllerIsSeat ? sideDisplayName(args.controllerId, args.seats, args.viewerSeatId) : "Neutral";
+    if (homes.length === 0) return controllerName;
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => sideDisplayName(seat.seatId, args.seats, args.viewerSeatId));
+      return `${controllerName} (${names.join(" & ")} homes)`;
+    }
+    const home = homes[0];
+    if (args.viewerSeatId != null && home.seatId === args.viewerSeatId) return `${controllerName} (your home)`;
+    if (home.outTurn != null) return `${controllerName} (was ${home.homeRegion})`;
+    return `${controllerName} (${home.homeRegion} home)`;
+  }
+  function formatUnitNameForViewer(args) {
+    if (isNeutralOwnerId(args.ownerId)) return `Neutral \xB7 ${args.baseName}`;
+    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
+    if (args.seats.length === 2) return args.baseName;
+    const seat = args.seats.find((row) => row.seatId === args.ownerId);
+    if (!seat) return args.baseName;
+    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
+  }
+  function formatHomeChip(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
+      return { kind: "home", text: "Home" };
+    }
+    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => shortSideName(seat.homeRegion));
+      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
+    }
+    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
+    return null;
+  }
+
+  // src/shared/statusIconHtml.ts
+  var STATUS_ICON_CLASS_NAME = "status-icon";
+  var STATUS_ICON = Object.freeze({
+    up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
+    doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
+    down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
+    doubleDown: Object.freeze({ file: "arrow_down_double.svg", alt: "--" }),
+    blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
+  });
+  var EFFECT_SYMBOL_KIND = Object.freeze({
+    "+": "up",
+    "-": "down",
+    x: "blocked"
+  });
+  function formatStatusIconHtml(kind) {
+    const icon = STATUS_ICON[kind];
+    const src = escapeHtmlText(`status/${icon.file}`);
+    const alt = escapeHtmlText(icon.alt);
+    return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
+  }
+  function formatEffectSymbolPrefixHtml(symbols) {
+    const icons = [];
+    for (const symbol of symbols) {
+      const kind = EFFECT_SYMBOL_KIND[symbol];
+      if (kind) icons.push(formatStatusIconHtml(kind));
+    }
+    return icons.join("|");
+  }
+
+  // src/shared/terrainEffectsForTooltip.ts
+  var SYMBOL_ORDER = ["x", "-", "+"];
+  var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
+  var MOVEMENT_UNIT_LABEL = {
+    infantry: "Infantry",
+    armor: "Armored",
+    naval: "Naval"
+  };
+  function wrapTerrainEffectSymbolSetForDisplay(symbols) {
+    if (!symbols) return "";
+    return `(${symbols})`;
+  }
+  function unwrapTerrainEffectSymbolSetFromDisplay(display) {
+    const match = /^\(([-x+/]+)\)$/.exec(display);
+    return match ? match[1] : display;
+  }
+  function formatTerrainEffectLabel(category, unit) {
+    return unit === "All" ? `All ${category}` : `${unit} ${category}`;
+  }
+  function formatTerrainEffectSymbolPrefixHtml(symbols) {
+    return formatEffectSymbolPrefixHtml(symbols);
+  }
+  function formatTerrainEffectEntryPlain(symbols, category, unit) {
+    return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
+  }
+  function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
+    return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
+  }
+  function formatTerrainEffectEntries(grouped) {
+    const entries = [];
+    for (const [key, symbols] of grouped) {
+      const slash = formatSymbolSet(symbols);
+      if (!slash) continue;
+      const pipe = key.indexOf("|");
+      const category = key.slice(0, pipe);
+      const unit = key.slice(pipe + 1);
+      entries.push(formatTerrainEffectEntryPlain(slash, category, unit));
+    }
+    return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
+  }
+  function formatTerrainEffectEntryHtml(entry) {
+    const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
+    if (!match) return entry;
+    return formatTerrainEffectEntryHtmlFromParts(
+      unwrapTerrainEffectSymbolSetFromDisplay(match[1]),
+      match[3],
+      match[2]
+    );
+  }
+  function formatTerrainEffectsLineHtml(line) {
+    return line.split(", ").map(formatTerrainEffectEntryHtml).join(", ");
+  }
+  function buildTerrainEffectGroupedMap(input) {
+    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+    const movementByUnit = /* @__PURE__ */ new Map();
+    for (const unitType of MOVEMENT_UNIT_TYPES) {
+      const label = MOVEMENT_UNIT_LABEL[unitType];
+      const symbol = movementSymbolForUnit(unitType, cat, input, hasTransport);
+      if (symbol) {
+        movementByUnit.set(label, /* @__PURE__ */ new Set([symbol]));
+      }
+    }
+    const movementOccupiable = [...occupiableMovementUnits(cat, input)];
+    if (hasTransport && !movementOccupiable.includes("Infantry")) {
+      movementOccupiable.push("Infantry", "Armored");
+    }
+    const rangeByUnit = /* @__PURE__ */ new Map();
+    applyRangeSymbols(rangeByUnit, cat, input);
+    const grouped = /* @__PURE__ */ new Map();
+    collapseCategoryEntries(grouped, "Movement", movementByUnit, movementOccupiable);
+    collapseCategoryEntries(grouped, "Range", rangeByUnit, occupiableRangeUnits(cat, input));
+    return grouped;
+  }
+  function computeTerrainEffectsLine(input) {
+    const formatted = formatTerrainEffectEntries(buildTerrainEffectGroupedMap(input));
+    return formatted.length > 0 ? formatted.join(", ") : null;
+  }
+  function computeTerrainEffectsLineHtml(input) {
+    const plain = computeTerrainEffectsLine(input);
+    return plain == null ? null : formatTerrainEffectsLineHtml(plain);
+  }
+  function formatSymbolSet(symbols) {
+    return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
+  }
+  function movementEffectSymbolForUnit(unitType, input) {
+    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+    return movementSymbolForUnit(unitType, cat, input, hasTransport);
+  }
+  function movementSymbolForUnit(unitType, cat, input, hasTransport) {
+    if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
+      return "+";
+    }
+    if (input.isRubble && (unitType === "infantry" || unitType === "armor")) {
+      const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
+      if (rubbleCost === Infinity) {
+        if (shouldSuppressMovementBlock(unitType, cat)) return null;
+        return "x";
+      }
+      if (input.hasRoad || input.hasRail) return null;
+      return "-";
+    }
+    if (input.isUrban) {
+      if (unitType === "infantry" || unitType === "armor") return "-";
+      return null;
+    }
+    const cost = tacticalEnterHexMovementCost(unitType, cat);
+    if (cost === Infinity) {
+      if (shouldSuppressMovementBlock(unitType, cat)) return null;
+      return "x";
+    }
+    if (cost === 2) return "-";
+    return null;
+  }
+  function shouldSuppressMovementBlock(unitType, cat) {
+    if (unitType === "naval") {
+      return cat !== "water" && cat !== "coastal";
+    }
+    if (unitType === "infantry" || unitType === "armor") {
+      return cat === "water";
+    }
+    return false;
+  }
+  function applyRangeSymbols(rangeByUnit, cat, input) {
+    const rangedCap = cat === "forests" || input.isUrban || input.isRubble;
+    if (rangedCap) {
+      addSymbol(rangeByUnit, "Infantry", "-");
+      addSymbol(rangeByUnit, "Armored", "-");
+    }
+    if (cat === "mountains") {
+      addSymbol(rangeByUnit, "Armored", "x");
+      addSymbol(rangeByUnit, "Naval", "x");
+    }
+  }
+  function addSymbol(map, unit, symbol) {
+    const existing = map.get(unit) ?? /* @__PURE__ */ new Set();
+    existing.add(symbol);
+    map.set(unit, existing);
+  }
+  function occupiableMovementUnits(cat, input) {
+    const units = [];
+    if (isInfantryOrArmorOccupiable(cat, input)) {
+      units.push("Infantry", "Armored");
+    }
+    if (isNavalTacticalCellNavigable({
+      resolvedKindForCell: input.terrainKind,
+      parentTerrain: input.parentTerrain,
+      parentTerrainKind: input.parentTerrainKind,
+      isSeaportCell: input.isSeaport
+    })) {
+      units.push("Naval");
+    }
+    return units;
+  }
+  function occupiableRangeUnits(cat, input) {
+    return occupiableMovementUnits(cat, input);
+  }
+  function isInfantryOrArmorOccupiable(cat, input) {
+    if (input.isUrban || input.isRubble) return true;
+    return isInfantryOrArmorTacticalSpawnCell({
+      resolvedKindForCell: input.terrainKind,
+      parentTerrain: input.parentTerrain,
+      parentTerrainKind: input.parentTerrainKind
+    });
+  }
+  function collapseCategoryEntries(grouped, category, byUnit, occupiable) {
+    const occupiableWithSymbols = occupiable.filter((u) => {
+      const set = byUnit.get(u);
+      return set !== void 0 && set.size > 0;
+    });
+    const collapsedUnits = /* @__PURE__ */ new Set();
+    if (occupiableWithSymbols.length >= 2) {
+      const reference = formatSymbolSet(byUnit.get(occupiableWithSymbols[0]));
+      const allSame = occupiableWithSymbols.every(
+        (u) => formatSymbolSet(byUnit.get(u)) === reference
+      );
+      if (allSame && reference.length > 0) {
+        grouped.set(`${category}|All`, new Set(byUnit.get(occupiableWithSymbols[0])));
+        for (const u of occupiableWithSymbols) collapsedUnits.add(u);
+      }
+    }
+    for (const [unit, symbols] of byUnit) {
+      if (collapsedUnits.has(unit)) continue;
+      if (symbols.size === 0) continue;
+      grouped.set(`${category}|${unit}`, new Set(symbols));
+    }
+  }
+
+  // src/shared/terrainCoverRules.ts
+  var TERRAIN_COVER_BY_CATEGORY = Object.freeze({
+    plains: Object.freeze({ surface: 0, air: 0 }),
+    forests: Object.freeze({ surface: 2, air: 1 }),
+    mountains: Object.freeze({ surface: 2, air: 0 }),
+    wetlands: Object.freeze({ surface: 1, air: 0 }),
+    desert: Object.freeze({ surface: 0, air: 0 }),
+    arctic: Object.freeze({ surface: 0, air: 0 }),
+    coastal: Object.freeze({ surface: 0, air: 0 }),
+    water: Object.freeze({ surface: 0, air: 0 })
+  });
+  var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
+  function terrainCoverPairFor(place) {
+    const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
+    const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
+    const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
+    const citySurface = place.city === true ? 2 : 0;
+    const cityAir = place.city === true ? 1 : 0;
+    const ruggedSurface = place.rugged === true ? 2 : 0;
+    return {
+      surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface),
+      air: Math.max(terrain.air, urbanAir, cityAir)
+    };
+  }
+  function terrainCoverFor(place, shooter) {
+    return terrainCoverPairFor(place)[shooter];
+  }
+  function tacticalCellCoverPlace(battle, tacticalH3) {
+    return {
+      terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3),
+      isUrban: battle.tacticalIsUrbanByH3?.[tacticalH3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[tacticalH3] === true
+    };
+  }
+  function terrainCoverSourceLabel(place) {
+    if (place.isRubble === true) return "Rubble";
+    if (place.isUrban === true) return "Urban";
+    const category = normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land");
+    if (category === "forests") return "Forest";
+    if (category === "mountains") return "Mountain";
+    if (category === "wetlands") return "Wetlands";
+    return null;
+  }
+  var GROUND_NAVAL_COVER_LABEL = "Ground & Naval Cover";
+  var AIR_COVER_LABEL = "Air Cover";
+  function coverClauseHtml(value, label) {
+    if (value <= 0) return null;
+    const kind = value >= 2 ? "doubleUp" : "up";
+    return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
+  }
+  function formatTerrainCoverTooltipHtml(pair) {
+    const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
+      (part) => part != null
+    );
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
+  function presentEffectHtml(html) {
+    if (html == null) return null;
+    return html.trim().length > 0 ? html : null;
+  }
+  function joinHexTooltipEffectsHtml(movementRangeHtml2, coverHtml) {
+    const movement = presentEffectHtml(movementRangeHtml2);
+    const cover = presentEffectHtml(coverHtml);
+    if (movement == null && cover == null) return null;
+    if (movement == null) return cover;
+    if (cover == null) return movement;
+    return `${movement}, ${cover}`;
+  }
+  function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
+    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("doubleDown")}Armored Movement` : null;
+    const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
+    return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
+  }
+
+  // src/shared/tooltipSectionGap.ts
+  var TOOLTIP_SECTION_GAP_HTML = '<br/><span style="display:block;height:0.5em"></span>';
+
+  // src/renderer/rendererTacticalHydration.ts
+  function applyTacticalCityOverlayRows(cityRows, roadRailRows, vectorRows) {
+    const nextCities = /* @__PURE__ */ new Map();
+    for (const row of cityRows) {
+      if (row.label) nextCities.set(row.h3Index, row.label);
+    }
+    rendererSharedState.tacticalCityOverlayLabelByH3 = nextCities;
+    const nextRoadRail = /* @__PURE__ */ new Map();
+    for (const row of roadRailRows) {
+      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
+    }
+    rendererSharedState.tacticalRoadRailSidesByH3 = nextRoadRail;
+    rendererSharedState.tacticalTransportVectorOverlayRows = vectorRows.map((row) => ({
+      kind: row.kind,
+      points: row.points.map((p) => [p[0], p[1]])
+    }));
+  }
+  function applyStrategicBaselineUrbanHexCounts(rows) {
+    const next = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      if (!row.h3Index || !Number.isFinite(row.urbanHexCount)) continue;
+      const count = Math.trunc(row.urbanHexCount);
+      if (count <= 0) continue;
+      next.set(row.h3Index, count);
+    }
+    rendererSharedState.baselineUrbanHexCountByStrategicH3 = next;
+    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+  }
+  function baselineUrbanHexCountForStrategicHex(h3Index) {
+    const count = rendererSharedState.baselineUrbanHexCountByStrategicH3.get(h3Index);
+    return count == null || !Number.isFinite(count) ? 0 : count;
+  }
+
+  // src/renderer/map/terrainTooltipHtml.ts
+  function formatLlmLocationBoldPrefixHtml(namingTarget) {
+    if (!namingTarget) return "";
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
+      if (!strategicCode || !tacticalCode) return "";
+      return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
+    }
+    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
+    if (!label) return "";
+    return `<strong>${escapeHtmlText(label)}</strong> `;
+  }
+  function formatTerrainVariantSuffix(state) {
+    const variants = [];
+    if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+    else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
+    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
+  }
+  function resolveStrategicHexForControlLine(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.enclosingStrategicH3Index;
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) return namingTarget.h3Index;
+    try {
+      return strategicParentOf(namingTarget.h3Index);
+    } catch {
+      return null;
+    }
+  }
+  function getTooltipControlLabel(namingTarget) {
+    if (!rendererSharedState.gameState) return "Unknown";
+    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
+    if (!strategicHex) return "Unknown";
+    const controller = (rendererSharedState.gameState.strategicControl ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
+    const homeSeatIds = homeSeatIdsAtHex(strategicHex, rendererSharedState.gameState);
+    const label = formatHexControlLabel({
+      controllerId: controller,
+      homeSeatIds,
+      viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState.seats ?? []),
+      seats: rendererSharedState.gameState.seats ?? []
+    });
+    if (homeSeatIds.length > 0) return label;
+    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
+    const perspective = ownershipPerspective(rendererSharedState.gameState.playerPerspective);
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: strategicHex,
+      playerPerspective: perspective,
+      visibleHexes,
+      homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (!ownershipVisible) return "Unknown";
+    return label;
+  }
+  function tooltipWeather(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
+    if (!namingTarget) return null;
+    if (!rendererSharedState.gameState) return null;
+    const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
+    if (!strategicHex) return null;
+    return rendererSharedState.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
+  }
+  function parentStrategicHex(h3Index) {
+    try {
+      return strategicParentOf(h3Index);
+    } catch {
+      return null;
+    }
+  }
+  function movementRangeHtml(state, namingTarget) {
+    if (namingTarget?.resolution !== 4) return null;
+    return computeTerrainEffectsLineHtml({
+      terrainKind: state.terrainKind,
+      parentTerrain: state.parentTerrain,
+      parentTerrainKind: state.parentTerrainKind,
+      isUrban: state.isUrban,
+      isRubble: state.isRubble,
+      isSeaport: state.isSeaport,
+      hasRoad: state.hasRoad,
+      hasRail: state.hasRail
+    });
+  }
+  function coverPair(state, namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) {
+      const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
+      return hex?.terrainKind ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true }) : null;
+    }
+    return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
+  }
+  function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+    const techLine = producedUnitTechLineHtml(namingTarget);
+    const showControlLine = namingTarget?.resolution === 1;
+    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
+    const terrainValue = state.strategicTerrainSummary != null ? formatTerrainNameListHtml(state.strategicTerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
+    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+    const weather = tooltipWeather(namingTarget);
+    const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
+    const featuresLine = state.strategicFeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.strategicFeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
+    const pair = coverPair(state, namingTarget);
+    const effectsHtml = strategicHexEffectsBodyHtml(
+      namingTarget?.resolution ?? null,
+      namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
+      pair,
+      movementRangeHtml(state, namingTarget)
+    );
+    const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
+    const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
+    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const resolution = namingTarget?.resolution;
+    const orderedLines = resolution === 1 ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
+    const bodyParts = orderedLines.filter((line) => line != null);
+    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
+    if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
+    return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
+  }
+  function terrainTooltipContentKey(state, namingCaption, namingTarget) {
+    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
+    const namingKey = namingCaption?.text ?? "";
+    const urbanKey = state.isUrban ? "1" : "0";
+    const rubbleKey = state.isRubble ? "1" : "0";
+    const featuresKey = state.features.join("|");
+    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
+    const strategicTerrainSummaryKey = state.strategicTerrainSummary ?? "";
+    const strategicFeaturesSummaryKey = state.strategicFeaturesSummary ?? "";
+    const weatherKey = tooltipWeather(namingTarget) ?? "";
+    const pair = coverPair(state, namingTarget);
+    const coverKey = pair == null ? "none" : `${pair.surface}:${pair.air}`;
+    const controlKey = getTooltipControlLabel(namingTarget);
+    const parentTerrainKey = state.parentTerrain;
+    const parentTerrainKindKey = state.parentTerrainKind;
+    const seaportKey = state.isSeaport ? "1" : "0";
+    const roadKey = state.hasRoad ? "1" : "0";
+    const railKey = state.hasRail ? "1" : "0";
+    const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
+    const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : "x";
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
+  }
+  function producedUnitTechLineHtml(namingTarget) {
+    if (namingTarget?.resolution !== 1) return null;
+    return formatProducedUnitTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)
+    });
+  }
+  function strategicHexStopsArmor(h3Index) {
+    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === h3Index);
+    return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
+  }
+  function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
+    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
+    if (cachedHtml !== void 0) return cachedHtml;
+    const html = formatTerrainTooltipHtml(state, namingCaption, namingTarget);
+    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
+    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+    return html;
+  }
+
+  // src/renderer/map/terrainTooltipStrategicState.ts
+  var namingLineByLookupKey = /* @__PURE__ */ new Map();
+  var EMPTY_TERRAIN_EFFECT_FIELDS = {
+    parentTerrain: "",
+    parentTerrainKind: "",
+    isSeaport: false,
+    hasRoad: false,
+    hasRail: false
+  };
+  function parentPassabilityForStrategicHex(parentH3) {
+    if (!rendererSharedState.gameState) return "land";
+    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === parentH3);
+    return hx?.terrain ?? "land";
+  }
+  function tacticalRoadRailSideMasksForChild(detailH3) {
+    const roadRail = rendererSharedState.tacticalRoadRailSidesByH3.get(detailH3);
+    return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
+  }
+  function tacticalEffectFieldsForChild(parentH3, detailH3) {
+    if (!infraGlyphsAllowedForTacticalChild(parentH3, detailH3)) {
+      return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
+    }
+    const parentKind = terrainKindForStrategicHex(parentH3);
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+    return {
+      parentTerrain: parentPassabilityForStrategicHex(parentH3),
+      parentTerrainKind: parentKind,
+      isSeaport: rendererSharedState.terrainInfraTacticalSeaport.has(detailH3),
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
+    };
+  }
+  function clearTerrainTooltipTimer() {
+    if (rendererSharedState.terrainTooltipDelayTimer !== null) {
+      clearTimeout(rendererSharedState.terrainTooltipDelayTimer);
+      rendererSharedState.terrainTooltipDelayTimer = null;
+    }
+  }
+  function hideTerrainTooltipVisual() {
+    rendererSharedState.terrainTooltipRequestSeq++;
+    const el = document.getElementById("hex-tooltip");
+    if (el) {
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+    }
+  }
+  function terrainStateForStrategicHex(h3) {
+    if (!rendererSharedState.gameState) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
+    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === h3);
+    if (!hx) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
+    return {
+      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains"),
+      isUrban: false,
+      isRubble: false
+    };
+  }
+  function terrainKindForStrategicHex(h3) {
+    return terrainStateForStrategicHex(h3).terrainKind;
+  }
+  function infraGlyphsAllowedForStrategicHex(h3) {
+    if (!isHexExploredByPlayer(h3)) return false;
+    return true;
+  }
+  function infraGlyphsAllowedForTacticalChild(parentH3, childH3) {
+    if (!isHexExploredByPlayer(parentH3)) return false;
+    void childH3;
+    return true;
+  }
+  function featureLabelsForStrategicHex(h3) {
+    if (!infraGlyphsAllowedForStrategicHex(h3)) return [];
+    const counts = getStrategicFeatureCounts(h3);
+    const labels = [];
+    if (counts.airportCount > 0) labels.push("Airports");
+    if (counts.seaportCount > 0) labels.push("Seaports");
+    return labels;
+  }
+  function transportSideMaskHasAnyTrue(mask) {
+    if (!mask || mask.length === 0) return false;
+    return mask.some((v) => v === true);
+  }
+  function battleTerrainTooltipState(detailH3, battle) {
+    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
+    const tacticalKindByH3 = /* @__PURE__ */ new Map();
+    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
+      tacticalKindByH3.set(detailH3, override.terrainKind);
+    }
+    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
+    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
+      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
+    }
+    const enclosingKind = loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || "plains";
+    const terrainKind = tacticalBattleTerrainKindByCell({
+      cells: [detailH3],
+      tacticalKindByH3,
+      enclosingKind,
+      loadedStrategicKindByH3
+    })[detailH3] ?? enclosingKind;
+    const features = [];
+    if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push("Airport");
+    if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push("Seaport");
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) features.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) features.push("Rail");
+    return {
+      terrainKind,
+      isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+      features,
+      urbanHexCount: null,
+      strategicTerrainSummary: null,
+      strategicFeaturesSummary: null,
+      parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
+      parentTerrainKind: enclosingKind,
+      isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
+    };
+  }
+  function featureLabelsForTacticalChild(parentH3, childH3) {
+    if (!infraGlyphsAllowedForTacticalChild(parentH3, childH3)) return [];
+    const labels = [];
+    if (rendererSharedState.terrainInfraTacticalAirport.has(childH3)) labels.push("Airport");
+    if (rendererSharedState.terrainInfraTacticalSeaport.has(childH3)) labels.push("Seaport");
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(childH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) labels.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) labels.push("Rail");
+    return labels;
+  }
+  function countUrbanTacticalHexesInStrategicHex(parentH3) {
+    let children = rendererSharedState.tacticalChildrenByParent.get(parentH3);
+    if (!children) {
+      children = tacticalChildrenOf(parentH3);
+      rendererSharedState.tacticalChildrenByParent.set(parentH3, children);
+    }
+    let count = 0;
+    for (const child of children) {
+      if (rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.isUrban) count++;
+    }
+    return count;
+  }
+  function getUrbanProductionCapacityForHex(h3Index) {
+    return countUrbanTacticalHexesInStrategicHex(h3Index);
+  }
+  function roundToNearestInteger(value) {
+    return Math.round(value);
+  }
+  function formatPercentInteger(value) {
+    return value.toLocaleString();
+  }
+  function clearStrategicTooltipSummaryCaches() {
+    rendererSharedState.strategicDominantTerrainKindByH3.clear();
+    rendererSharedState.strategicTerrainSummaryByH3.clear();
+    rendererSharedState.strategicFeaturesSummaryByH3.clear();
+    rendererSharedState.strategicFeatureCountsByH3.clear();
+    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+  }
+  function getStrategicFeatureCounts(h3) {
+    const cached = rendererSharedState.strategicFeatureCountsByH3.get(h3);
+    if (cached) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    let airportCount = 0;
+    let seaportCount = 0;
+    for (const child of children) {
+      if (rendererSharedState.terrainInfraTacticalAirport.has(child)) airportCount++;
+      if (rendererSharedState.terrainInfraTacticalSeaport.has(child)) seaportCount++;
+    }
+    const counts = { airportCount, seaportCount };
+    rendererSharedState.strategicFeatureCountsByH3.set(h3, counts);
+    return counts;
+  }
+  function getStrategicDominantTerrainKind(h3, parentKind) {
+    const cached = rendererSharedState.strategicDominantTerrainKindByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    if (children.length <= 0) {
+      rendererSharedState.strategicDominantTerrainKindByH3.set(h3, parentKind);
+      return parentKind;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    let dominantKind = parentKind;
+    let dominantCount = -1;
+    for (const [kind, count] of counts.entries()) {
+      if (count > dominantCount || count === dominantCount && kind.localeCompare(dominantKind) < 0) {
+        dominantKind = kind;
+        dominantCount = count;
+      }
+    }
+    rendererSharedState.strategicDominantTerrainKindByH3.set(h3, dominantKind);
+    return dominantKind;
+  }
+  function getStrategicTerrainSummary(h3, parentKind) {
+    const cached = rendererSharedState.strategicTerrainSummaryByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    const total = children.length;
+    if (total <= 0) {
+      const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
+      rendererSharedState.strategicTerrainSummaryByH3.set(h3, fallback);
+      return fallback;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    const entries = Array.from(counts.entries()).sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      return a[0].localeCompare(b[0]);
+    });
+    if (entries.length <= 3) {
+      const parts2 = entries.map(([kind, count]) => {
+        const pct = roundToNearestInteger(count * 100 / total);
+        return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+      });
+      const summary2 = parts2.join(", ");
+      rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary2);
+      return summary2;
+    }
+    const topTwo = entries.slice(0, 2);
+    const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
+    const parts = topTwo.map(([kind, count]) => {
+      const pct = roundToNearestInteger(count * 100 / total);
+      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+    });
+    const otherPct = roundToNearestInteger((total - topTwoCount) * 100 / total);
+    parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
+    const summary = parts.join(", ");
+    rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function getStrategicFeaturesSummary(h3) {
+    if (rendererSharedState.strategicFeaturesSummaryByH3.has(h3)) return rendererSharedState.strategicFeaturesSummaryByH3.get(h3) ?? null;
+    if (!infraGlyphsAllowedForStrategicHex(h3)) {
+      rendererSharedState.strategicFeaturesSummaryByH3.set(h3, null);
+      return null;
+    }
+    const { airportCount, seaportCount } = getStrategicFeatureCounts(h3);
+    const parts = [];
+    if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
+    if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
+    const summary = parts.length > 0 ? parts.join(", ") : null;
+    rendererSharedState.strategicFeaturesSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function terrainTooltipStateForStrategicHex(h3) {
+    const state = terrainStateForStrategicHex(h3);
+    return {
+      ...state,
+      ...EMPTY_TERRAIN_EFFECT_FIELDS,
+      features: featureLabelsForStrategicHex(h3),
+      urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
+      strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
+      strategicFeaturesSummary: getStrategicFeaturesSummary(h3)
+    };
+  }
+  function terrainStateForPointer(clientX, clientY, fallbackStrategicH3) {
+    if (!rendererSharedState.gameState) {
+      return {
+        terrainKind: "Unknown",
+        isUrban: false,
+        isRubble: false,
+        features: [],
+        urbanHexCount: null,
+        strategicTerrainSummary: null,
+        strategicFeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS
+      };
+    }
+    const tacticalOn = shouldRenderTacticalHexes();
+    if (!tacticalOn) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      const battle = rendererSharedState.tacticalBattleSnapshot;
+      if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
+      const parentH3 = strategicParentOf(detailH3);
+      const parentKind = terrainKindForStrategicHex(parentH3);
+      const detail = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
+      return {
+        terrainKind: detail?.terrainKind ?? parentKind,
+        isUrban: detail?.isUrban ?? false,
+        isRubble: detail?.isRubble ?? false,
+        features: featureLabelsForTacticalChild(parentH3, detailH3),
+        urbanHexCount: null,
+        strategicTerrainSummary: null,
+        strategicFeaturesSummary: null,
+        ...tacticalEffectFieldsForChild(parentH3, detailH3)
+      };
+    } catch {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+  }
+  function namingLookupTargetForPointer(clientX, clientY, fallbackStrategicH3) {
+    const tacticalOn = shouldRenderTacticalHexes();
+    if (!tacticalOn) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      return { h3Index: detailH3, resolution: 4 };
+    } catch {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+  }
+  function namingLookupKey(target) {
+    if (!target) return null;
+    return `${target.resolution}:${target.h3Index}`;
+  }
+  async function getCachedNamingLineForTarget(target) {
+    const key = namingLookupKey(target);
+    if (!key || !target) return null;
+    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
+    if (!window.gameApi?.getHexNamingTooltipLine) return null;
+    try {
+      const caption = await window.gameApi.getHexNamingTooltipLine(target);
+      namingLineByLookupKey.set(key, caption ?? null);
+      return caption ?? null;
+    } catch (err) {
+      console.error("getHexNamingTooltipLine failed:", err);
+      namingLineByLookupKey.set(key, null);
+      return null;
+    }
+  }
+
+  // src/renderer/chrome/controlTooltip.ts
+  var controlTooltipAttr = "data-control-tooltip";
+  var controlTooltipElementId = "control-tooltip";
+  var installed = false;
+  var delayTimer = null;
+  var currentHost = null;
+  var pointerInside = false;
+  var placeFromPointer = false;
+  var suppressedHost = null;
+  var lastClientX = 0;
+  var lastClientY = 0;
+  function tipElement() {
+    return document.getElementById(controlTooltipElementId);
+  }
+  function clearDelayTimer() {
+    if (delayTimer !== null) {
+      clearTimeout(delayTimer);
+      delayTimer = null;
+    }
+  }
+  function hideTip() {
+    clearDelayTimer();
+    const el = tipElement();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function orderTipVisible() {
+    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains("hidden")) return true;
+    }
+    return false;
+  }
+  function hostFromTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const closest = target.closest(`[${controlTooltipAttr}]`);
+    if (closest instanceof HTMLElement) return closest;
+    if (target instanceof HTMLLabelElement && target.htmlFor) {
+      const linked = document.getElementById(target.htmlFor);
+      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
+    }
+    const label = target.closest("label");
+    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
+    return descendant instanceof HTMLElement ? descendant : null;
+  }
+  function hostText(host) {
+    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
+  }
+  function keyOpensNativeList(ev) {
+    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
+    if (ev.key === "ArrowDown" && ev.altKey) return true;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
+    return false;
+  }
+  function selectForTip(target) {
+    if (!(target instanceof Element)) return null;
+    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
+    if (!(select instanceof HTMLSelectElement)) return null;
+    return hostFromTarget(select) ? select : null;
+  }
+  function placeTip(el, x, y) {
+    el.style.left = "0px";
+    el.style.top = "0px";
+    const { width, height } = el.getBoundingClientRect();
+    const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
+    const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
+    const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
+    const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+  function showTip(host, text) {
+    const el = tipElement();
+    if (!el) return;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    let x = lastClientX;
+    let y = lastClientY;
+    if (!placeFromPointer) {
+      const rect = host.getBoundingClientRect();
+      x = rect.left;
+      y = rect.top;
+    }
+    el.textContent = text;
+    el.classList.remove("hidden");
+    placeTip(el, x, y);
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function scheduleShow(host) {
+    clearDelayTimer();
+    if (suppressedHost === host) return;
+    const text = hostText(host);
+    if (!text) {
+      hideTip();
+      return;
+    }
+    delayTimer = setTimeout(() => {
+      delayTimer = null;
+      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
+      if (orderTipVisible()) return;
+      const next = hostText(host);
+      if (!next) {
+        hideTip();
+        return;
+      }
+      showTip(host, next);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
+  function suppressHost(host) {
+    suppressedHost = host;
+    hideTip();
+  }
+  function adoptHost(host, fromPointer, clientX, clientY) {
+    if (fromPointer && host === currentHost) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+      moveVisibleTip(lastClientX, lastClientY);
+      return;
+    }
+    if (!fromPointer && host === currentHost) return;
+    if (currentHost !== host) {
+      hideTip();
+      suppressedHost = null;
+    }
+    currentHost = host;
+    if (fromPointer) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+    } else {
+      pointerInside = pointerIsOn(host);
+      placeFromPointer = pointerInside;
+    }
+    if (suppressedHost === host) return;
+    scheduleShow(host);
+  }
+  function releaseHost(host) {
+    if (suppressedHost === host) suppressedHost = null;
+    if (currentHost !== host) return;
+    pointerInside = false;
+    currentHost = null;
+    hideTip();
+  }
+  function relatedStaysInside(host, related) {
+    if (!(related instanceof Element)) return false;
+    const next = hostFromTarget(related);
+    if (next === host) return true;
+    if (next) return false;
+    return related === host || host.contains(related);
+  }
+  function pointerIsOn(host) {
+    return host.matches(":hover");
+  }
+  function focusIsOn(host) {
+    const active2 = document.activeElement;
+    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
+    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
+  }
+  function hostIsAvailable(host) {
+    if (!host.isConnected || host.getClientRects().length === 0) return false;
+    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
+    if (controls.length === 0) return true;
+    return controls.some((control) => control.getClientRects().length > 0);
+  }
+  function dismissStaleControlTooltip() {
+    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+  }
+  function moveVisibleTip(clientX, clientY) {
+    const el = tipElement();
+    if (!el || el.classList.contains("hidden")) return;
+    placeTip(el, clientX, clientY);
+  }
+  function installControlTooltip() {
+    if (installed) return;
+    installed = true;
+    document.addEventListener(
+      "pointerover",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, true, ev.clientX, ev.clientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        releaseHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointermove",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (orderTipVisible()) {
+          if (currentHost) releaseHost(currentHost);
+          return;
+        }
+        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+        if (host && host !== currentHost) {
+          adoptHost(host, true, ev.clientX, ev.clientY);
+          return;
+        }
+        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
+          releaseHost(currentHost);
+        }
+        if (!host || host !== currentHost) return;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        placeFromPointer = true;
+        pointerInside = true;
+        moveVisibleTip(lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerdown",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "keydown",
+      (ev) => {
+        if (!keyOpensNativeList(ev)) return;
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "change",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusin",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, false, lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        if (pointerInside && currentHost === host) return;
+        releaseHost(host);
+      },
+      true
+    );
+  }
+
+  // src/renderer/map/mapExtent.ts
+  var active = "world";
+  function loadedMapExtentTarget() {
+    return active;
+  }
+  var appliedKey = "";
+  var resizeListenerAttached = false;
+  var activeBounds = null;
+  var lockedMinZoom = null;
+  function applyLoadedMapExtent(target, fit = true) {
+    const maps = extentMaps();
+    if (!maps) return false;
+    active = target;
+    if (target === "world") {
+      activeBounds = null;
+      lockedMinZoom = null;
+      setMapExtentReferenceLng(null);
+      const bounds2 = worldBounds(maps.leaflet);
+      applyToMap(maps.main, bounds2, true, 1.5, fit);
+      applyToMap(maps.mini, bounds2, true, 0, fit);
+      return true;
+    }
+    setMapExtentReferenceLng(target.referenceLng);
+    const bounds = maps.leaflet.latLngBounds(
+      maps.leaflet.latLng(target.south, target.west, true),
+      maps.leaflet.latLng(target.north, target.east, true)
+    );
+    activeBounds = bounds;
+    if (fit) maps.main.setMinZoom?.(0);
+    applyToMap(maps.main, bounds, false, null, fit);
+    applyToMap(maps.mini, bounds, false, 0, fit);
+    if (fit && maps.main.getZoom && maps.main.setMinZoom) {
+      lockedMinZoom = maps.main.getZoom();
+      maps.main.setMinZoom(lockedMinZoom);
+    } else if (lockedMinZoom != null) {
+      maps.main.setMinZoom?.(lockedMinZoom);
+    }
+    attachResize(maps.main);
+    return true;
+  }
+  function restoreLoadedMapExtent(fit = false) {
+    applyLoadedMapExtent(active, fit);
+  }
+  function syncMapExtentToSnapshot(state, options) {
+    const mapId = state.gameMap?.id ?? "global";
+    const key = loadedMapExtentKey(
+      mapId,
+      state.hexes.map((hex) => hex.h3Index)
+    );
+    if (!extentMaps()) return;
+    if (!shouldApplyLoadedMapExtent(appliedKey, key, options?.refit === true)) return;
+    if (mapId === "global" || state.hexes.length === 0) {
+      applyLoadedMapExtent("world", true);
+      appliedKey = key;
+      return;
+    }
+    const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
+    const box = mapExtentBoxForHexes(
+      longitudeIntervalFromCenters(longitudes),
+      state.hexes.map((hex) => hex.h3Index)
+    );
+    if (!box) return;
+    applyLoadedMapExtent(box, true);
+    appliedKey = key;
+  }
+  function extentMaps() {
+    const leaflet = globalThis.L;
+    const main = getMainLeafletMap();
+    if (!leaflet || !main) return null;
+    const mini = getMiniLeafletMap();
+    return { leaflet, main, mini };
+  }
+  function worldBounds(leaflet) {
+    return leaflet.latLngBounds(
+      leaflet.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+  }
+  function applyToMap(map, bounds, worldCopyJump, minZoom, fit) {
+    if (!map) return;
+    if (map.options) map.options.worldCopyJump = worldCopyJump;
+    map.setMaxBounds?.(bounds);
+    if (minZoom != null) map.setMinZoom?.(minZoom);
+    if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
+  }
+  function attachResize(map) {
+    if (resizeListenerAttached || !map.on) return;
+    resizeListenerAttached = true;
+    let recomputing = false;
+    map.on("resize", () => {
+      if (recomputing || active === "world" || activeBounds == null) return;
+      recomputing = true;
+      try {
+        const view = map;
+        const zoom = view.getZoom?.() ?? 0;
+        const center = view.getCenter?.();
+        view.setMinZoom?.(0);
+        view.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
+        const fitted = view.getZoom?.() ?? zoom;
+        view.setMinZoom?.(fitted);
+        if (center && view.setView) view.setView(center, Math.max(fitted, zoom));
+      } finally {
+        recomputing = false;
+      }
+    });
+  }
+
+  // src/renderer/map/mainMapCameraReturn.ts
+  var saved = null;
+  function saveMainMapCameraForReturn() {
+    const map = getMainLeafletMap();
+    if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
+      saved = null;
+      return;
+    }
+    saved = {
+      extent: loadedMapExtentTarget(),
+      center: map.getCenter(),
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      maxBounds: map.options?.maxBounds ?? null,
+      worldCopyJump: map.options?.worldCopyJump === true
+    };
+  }
+  function returnMainMapCamera() {
+    const camera = saved;
+    saved = null;
+    const map = getMainLeafletMap();
+    if (!camera || !map) return false;
+    applyLoadedMapExtent(camera.extent, true);
+    if (map.options) map.options.worldCopyJump = camera.worldCopyJump;
+    map.setMaxBounds?.(camera.maxBounds);
+    map.setMinZoom?.(camera.minZoom);
+    map.setMaxZoom?.(camera.maxZoom);
+    map.setView?.(camera.center, camera.zoom, { animate: false });
+    return true;
+  }
+  function forgetMainMapCameraForReturn() {
+    saved = null;
+  }
+
+  // src/renderer/chrome/panelSlideHelpers.ts
+  var PANEL_SLIDE_MS = 150;
+  function reducedMotionRequested() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  }
+  function startPanelHeightSlide(panel, from, to, onFinish) {
+    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") return null;
+    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: PANEL_SLIDE_MS,
+      easing: "ease-out"
+    });
+    running.onfinish = () => onFinish(running);
+    return running;
+  }
+
+  // src/shared/mapChromePlacement.ts
+  var MAP_CHROME_INSET = 12;
+  var MAP_CHROME_GAP = 8;
+  var TOAST_BAND_MIN_WIDTH = 280;
+  function legendPopoverPosition(input) {
+    const besideLeft = input.panelRight + MAP_CHROME_GAP;
+    if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
+      return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
+    }
+    return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
+  }
+  function toastBandSpan(input) {
+    const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
+    const left = input.leftObstacleRight + MAP_CHROME_INSET;
+    if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
+      return { left: MAP_CHROME_INSET, right, overChrome: true };
+    }
+    return { left, right, overChrome: false };
+  }
+  function floatingPanelOffset(input) {
+    const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
+    const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
+    return {
+      left: Math.min(maxLeft, Math.max(MAP_CHROME_INSET, input.left)),
+      top: Math.min(maxTop, Math.max(MAP_CHROME_INSET, input.top))
+    };
+  }
+
+  // src/renderer/map/mapChromeLayout.ts
+  function layoutMapChrome() {
+    const map = document.getElementById("canvas-container");
+    const panel = document.getElementById("minimap-panel");
+    if (!map || !panel) return;
+    const mapBox = map.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+    const panelRight = panelBox.right - mapBox.left;
+    let leftObstacleRight = panelRight;
+    const legend = document.getElementById("terrain-legend");
+    if (legend && !legend.hidden) {
+      const place = legendPopoverPosition({
+        mapWidth: mapBox.width,
+        panelRight,
+        panelBottom: panelBox.bottom - mapBox.top,
+        legendWidth: legend.offsetWidth
+      });
+      legend.style.left = `${place.left}px`;
+      legend.style.top = `${place.top}px`;
+      if (place.beside) leftObstacleRight = place.left + legend.offsetWidth;
+    }
+    const dialog = document.getElementById("game-over-overlay");
+    if (dialog && !dialog.classList.contains("hidden")) {
+      leftObstacleRight = Math.max(leftObstacleRight, dialog.getBoundingClientRect().right - mapBox.left);
+    }
+    const band = document.getElementById("map-toast-band");
+    if (!band) return;
+    const span = toastBandSpan({
+      mapWidth: mapBox.width,
+      leftObstacleRight,
+      rightObstacleLeft: mapBox.width
+    });
+    band.style.left = `${span.left}px`;
+    band.style.right = `${span.right}px`;
+  }
+
+  // src/renderer/gameplay/newGameDialogMove.ts
+  var dragStart = null;
+  function dialogAndArea() {
+    const panel = document.getElementById("game-over-overlay");
+    const area = document.getElementById("app-body");
+    if (!panel || !area) return null;
+    return { panel, area };
+  }
+  function applyOffset(panel, area, left, top, panelHeight = panel.offsetHeight) {
+    const place = floatingPanelOffset({
+      left,
+      top,
+      panelWidth: panel.offsetWidth,
+      panelHeight,
+      mapWidth: area.clientWidth,
+      mapHeight: area.clientHeight
+    });
+    panel.style.left = `${place.left}px`;
+    panel.style.top = `${place.top}px`;
+  }
+  function placeNewGameDialogAtInset() {
+    dragStart = null;
+    const parts = dialogAndArea();
+    if (!parts) return;
+    parts.panel.style.removeProperty("left");
+    parts.panel.style.removeProperty("top");
+    layoutMapChrome();
+  }
+  function keepNewGameDialogOnMap(panelHeight) {
+    const parts = dialogAndArea();
+    if (!parts || parts.panel.style.left === "" || parts.panel.classList.contains("hidden")) return;
+    applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
+  }
+  function endDrag() {
+    if (!dragStart) return;
+    dragStart = null;
+    layoutMapChrome();
+  }
+  function wireNewGameDialogMove() {
+    const grip = document.getElementById("new-game-panel-grip");
+    if (!grip) return;
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const parts = dialogAndArea();
+      if (!parts) return;
+      event.preventDefault();
+      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener("pointermove", (event) => {
+      const parts = dialogAndArea();
+      if (!dragStart || !parts) return;
+      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
+    });
+    grip.addEventListener("pointerup", endDrag);
+    grip.addEventListener("pointercancel", endDrag);
+    window.addEventListener("resize", () => keepNewGameDialogOnMap());
+  }
+
+  // src/renderer/gameplay/newGameDialogCollapse.ts
+  var EXPANDED_LABEL = "Hide the new game choices";
+  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
+  var COLLAPSED_LABEL = "Show the new game choices";
+  var COLLAPSED_TOOLTIP = "Show the new game choices.";
+  var expanded = true;
+  var slide = null;
+  function newGameOverlayIsOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+  function dialogParts() {
+    const panel = document.getElementById("game-over-overlay");
+    const header = document.getElementById("new-game-panel-header");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
+    return { panel, header, button };
+  }
+  function syncCollapseControl(button) {
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
+    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
+  }
+  function placeStartButton(state) {
+    const button = document.getElementById("new-game-btn");
+    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
+    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
+    if (state === "compact") {
+      const close = document.getElementById("new-game-dialog-close");
+      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
+      return;
+    }
+    parent.appendChild(button);
+  }
+  function setPanelState(panel, state) {
+    placeStartButton(state);
+    panel.dataset.state = state;
+  }
+  function settle(panel) {
+    slide?.cancel();
+    slide = null;
+    setPanelState(panel, expanded ? "expanded" : "compact");
+  }
+  function slideTo(panel, from, to) {
+    slide = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide === finished) settle(panel);
+    });
+    if (!slide) settle(panel);
+  }
+  function expandNewGameDialog() {
+    const parts = dialogParts();
+    if (!parts) return;
+    expanded = true;
+    syncCollapseControl(parts.button);
+    settle(parts.panel);
+  }
+  function toggleNewGameDialogCollapsed() {
+    const parts = dialogParts();
+    if (!parts) return;
+    const { panel, header, button } = parts;
+    const from = panel.getBoundingClientRect().height;
+    slide?.cancel();
+    slide = null;
+    expanded = !expanded;
+    syncCollapseControl(button);
+    if (expanded) {
+      setPanelState(panel, "expanding");
+      const to = panel.getBoundingClientRect().height;
+      keepNewGameDialogOnMap(to);
+      slideTo(panel, from, to);
+      return;
+    }
+    const active2 = document.activeElement;
+    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
+    setPanelState(panel, "collapsing");
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slideTo(panel, from, header.offsetHeight + borders);
+  }
+  function syncNewGameDialogMapPointer() {
+    const overlay = document.getElementById("game-over-overlay");
+    const map = document.getElementById("main-map");
+    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
+    if (overlay.classList.contains("hidden")) return;
+    map.style.pointerEvents = "auto";
+  }
+
+  // src/renderer/gameplay/newGameReturn.ts
+  var matchWaiting = false;
+  function syncCloseControl() {
+    const close = document.getElementById("new-game-dialog-close");
+    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
+  }
+  function isMatchWaitingUnderNewGame() {
+    return matchWaiting;
+  }
+  function holdMatchUnderNewGame() {
+    matchWaiting = true;
+    saveMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function forgetMatchUnderNewGame() {
+    matchWaiting = false;
+    forgetMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function closeNewGameOverlayToMatch(deps) {
+    if (!matchWaiting || !newGameOverlayIsOpen()) return;
+    matchWaiting = false;
+    syncCloseControl();
+    document.getElementById("game-over-overlay")?.classList.add("hidden");
+    dismissStaleControlTooltip();
+    deps.setMainUIControlsEnabled(true);
+    invalidateLeafletMapSizes();
+    returnMainMapCamera();
+    deps.updateReadyButtonState();
+    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    deps.resizeAndRedraw();
+  }
+
+  // src/renderer/openRouter/commanderPoolClient.ts
+  var POLL_MS = 1e3;
+  var snapshot = { statuses: [], dispatches: [] };
+  var pollTimer = null;
+  var showToast = null;
+  var fileMessage = null;
+  var onPoolChanged = null;
+  var poolListeners = /* @__PURE__ */ new Set();
+  function notifyPoolChanged() {
+    onPoolChanged?.();
+    for (const listener of poolListeners) listener();
+  }
+  function bindCommanderPoolScreen(deps) {
+    showToast = deps.showCommanderMessages;
+    fileMessage = deps.fileCommanderMessage;
+    onPoolChanged = deps.updateReadyButtonState;
+  }
+  function anyCommanderIsPlanning() {
+    return snapshot.statuses.some((row) => row.status === "planning");
+  }
+  var commanderStartDepth = 0;
+  function commanderStartIsSettling() {
+    return commanderStartDepth > 0;
+  }
+  function longestPlanningElapsedMs() {
+    let longest = 0;
+    for (const row of snapshot.statuses) {
+      if (row.status !== "planning" || row.planningElapsedMs == null) continue;
+      if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
+    }
+    return longest;
+  }
+  function commanderSeatCostUsd() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    return seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
+  }
+  async function startCommanderPlanningIfAllowed() {
+    commanderStartDepth += 1;
+    try {
+      if (!rendererSharedState.runButtonOn) return;
+      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+      if (isNewGameOverlayOpen()) return;
+      if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
+      if (!window.gameApi?.startCommanderPlanning) return;
+      const tactical = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning;
+      if (rendererSharedState.gameState?.phase !== "planning" && !tactical) return;
+      const mode = tactical ? "tactical" : "strategic";
+      const matchEpoch = currentRendererMatchEpoch();
+      try {
+        const next = await window.gameApi.startCommanderPlanning({ mode });
+        if (!poolReplyIsCurrent(matchEpoch)) return;
+        snapshot = next;
+      } catch (err) {
+        console.error("startCommanderPlanning failed", err);
+      }
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      syncCommanderPoolPolling();
+      notifyPoolChanged();
+    } finally {
+      commanderStartDepth -= 1;
+      notifyPoolChanged();
+    }
+  }
+  async function stopCommanderPlanningFromScreen(reason) {
+    try {
+      await window.gameApi?.stopCommanderPlanning?.(reason);
+      await readCommanderPoolAndApply(true);
+    } catch (err) {
+      console.error("stopCommanderPlanning failed", reason, err);
+    }
+  }
+  function messageLines(dispatches) {
+    const observing = matchIsObserving();
+    const lines = [];
+    for (const dispatch of dispatches) {
+      const keep = Boolean(dispatch.message) || observing && Boolean(dispatch.strategy);
+      if (!keep) continue;
+      fileMessage?.(dispatch);
+      if (dispatch.message) lines.push(`${dispatchSeatName(dispatch.seatId)}: ${dispatch.message}`);
+    }
+    return lines;
+  }
+  function matchIsObserving() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    return seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+  }
+  function dispatchSeatName(seatId) {
+    return rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId)?.homeRegion ?? seatId;
+  }
+  async function readCommanderPoolAndApply(drain) {
+    if (!window.gameApi?.readCommanderPool) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    const wasPlanning = anyCommanderIsPlanning();
+    try {
+      const next = await window.gameApi.readCommanderPool(drain);
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      snapshot = next;
+      const consultFinished = wasPlanning && !anyCommanderIsPlanning();
+      if (drain && (next.dispatches.length > 0 || consultFinished)) {
+        const lines = messageLines(next.dispatches);
+        if (lines.length > 0) showToast?.(lines);
+        await refreshSeatCosts();
+      }
+    } catch (err) {
+      console.error("readCommanderPool failed", err);
+    }
+    if (!poolReplyIsCurrent(matchEpoch)) return;
+    notifyPoolChanged();
+    syncCommanderPoolPolling();
+  }
+  function commanderPoolStatuses() {
+    return snapshot.statuses;
+  }
+  function subscribeCommanderPool(listener) {
+    poolListeners.add(listener);
+  }
+  function syncCommanderPoolPolling() {
+    if (!shouldPoll()) {
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      return;
+    }
+    if (pollTimer !== null) return;
+    pollTimer = setInterval(() => {
+      void readCommanderPoolAndApply(true);
+    }, POLL_MS);
+  }
+  function shouldPoll() {
+    if (!rendererSharedState.runButtonOn || rendererSharedState.gameState?.gameOver) return false;
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    if (rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning) return true;
+    if (anyCommanderIsPlanning()) return true;
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  async function refreshCommanderSeatCosts() {
+    await refreshSeatCosts();
+  }
+  async function refreshSeatCosts() {
+    if (!window.gameApi?.getGameState || !rendererSharedState.gameState) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    try {
+      const next = await fetchMatchSnapshot();
+      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats) return;
+      rendererSharedState.gameState.seats = next.seats;
+    } catch (err) {
+      console.error("commander pool cost refresh failed", err);
+    }
+  }
+  function poolReplyIsCurrent(matchEpoch) {
+    return rendererMatchEpochCurrent(matchEpoch) || isMatchWaitingUnderNewGame();
+  }
+
+  // src/renderer/openRouter/aiPlanningState.ts
+  function isDeferredResolutionPlaybackConsultPending() {
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  function isDeferredResolutionConsultRunning() {
+    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
+  }
+  function isWaitingForPrecomputedAiOrders() {
+    return anyCommanderIsPlanning();
+  }
+
+  // src/shared/commanderCardState.ts
+  function formatCommanderClock(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+  function commanderCardPresentation(input) {
+    if (input.status === "out" || input.outTurn !== null) {
+      const turn = input.outTurn ?? input.timedOutTurn;
+      return {
+        chip: turn === null ? "Out" : `Out, turn ${turn}`,
+        detail: null,
+        dimmed: true,
+        summaryDisabled: true
+      };
+    }
+    if (input.status === "planning") {
+      return { chip: `Planning ${formatCommanderClock(input.planningElapsedMs)}`, detail: null, dimmed: false, summaryDisabled: false };
+    }
+    if (input.status === "timed_out") {
+      const waited = formatCommanderClock(input.planningElapsedMs || AI_CONSULTATION_WALL_CLOCK_MS);
+      const cap = formatCommanderClock(AI_CONSULTATION_WALL_CLOCK_MS);
+      const turn = input.timedOutTurn ?? 0;
+      return {
+        chip: "Timed out",
+        detail: `No reply in ${waited} of ${cap} on turn ${turn}. Its standing orders ran instead.`,
+        dimmed: false,
+        summaryDisabled: false
+      };
+    }
+    if (input.status === "no_model") {
+      return { chip: "Standing orders", detail: null, dimmed: false, summaryDisabled: false };
+    }
+    return { chip: "Ready", detail: null, dimmed: false, summaryDisabled: false };
+  }
+
+  // src/shared/doctrineDescriptions.ts
+  var DOCTRINE_CHOICE_LABELS = {
+    aggressive: "Aggressive",
+    balanced: "Balanced",
+    cautious: "Cautious",
+    random: "Random"
+  };
+  var DOCTRINE_CHOICE_DESCRIPTIONS = {
+    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
+    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
+    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
+    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
+  };
+
+  // src/shared/commanderPlanningStatus.ts
+  var NO_MODEL_LABEL = "No model";
+  function commanderPlanningStatus(runOn, planning) {
+    if (!runOn) return "off";
+    return planning ? "planning" : "on";
+  }
+  function commanderPlanningSentence(runOn, commanderCount) {
+    return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
+  }
+  function commanderFooterLabel(counts) {
+    if (counts.status === "off") return "Commanders off";
+    if (counts.status !== "planning") return "Commanders ready";
+    const progress = `${counts.ready} of ${counts.active} ready`;
+    return counts.observing ? `Planning \xB7 ${progress}` : `Commanders planning \xB7 ${progress}`;
+  }
+  function modelNameFromOptionLabel(optionLabel2) {
+    const bracket = optionLabel2.indexOf(" [");
+    const name = (bracket >= 0 ? optionLabel2.slice(0, bracket) : optionLabel2).trim();
+    return name || NO_MODEL_LABEL;
+  }
+
+  // src/shared/openRouterReasoningEffort.ts
+  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "minimal",
+    "none"
+  ]);
+  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
+    ["none", "None"],
+    ["minimal", "Min"],
+    ["low", "Low"],
+    ["medium", "Med"],
+    ["high", "High"],
+    ["xhigh", "Xhigh"],
+    ["max", "Max"]
+  ]);
+  function capitalizeReasoningEffortName(effort) {
+    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
+  }
+  function abbreviateReasoningEffort(effort) {
+    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
+  }
+  function sortReasoningEffortsAscending(efforts) {
+    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
+    return [...efforts].sort((a, b) => rank(b) - rank(a));
+  }
+  function listSelectableReasoningEfforts(model) {
+    const reasoning = model?.reasoning;
+    if (!reasoning || reasoning.supported_efforts === void 0) return [];
+    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
+    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
+  }
+  function resolveDefaultReasoningEffort(model) {
+    const defaultEffort = model?.reasoning?.default_effort;
+    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
+  }
+  function resolveRequestedReasoningEffort(model, persistedEffort) {
+    const trimmed = persistedEffort.trim();
+    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
+  }
+  function isReasoningEffortSelectable(model) {
+    return listSelectableReasoningEfforts(model).length >= 2;
+  }
+
+  // src/shared/commanderSummary.ts
+  function formatCommanderSummary(input) {
+    const modelName = displayModelName(input.modelLabel);
+    if (!modelName) return "No model \xB7 standing orders only";
+    const parts = [modelName];
+    const effort = input.reasoningEffort?.trim();
+    if (effort) parts.push(capitalizeReasoningEffortName(effort));
+    parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
+    return parts.join(" \xB7 ");
+  }
+  function displayModelName(modelLabel2) {
+    if (!modelLabel2?.trim()) return "";
+    const withoutSuffix = modelNameFromOptionLabel(modelLabel2);
+    if (withoutSuffix === NO_MODEL_LABEL) return "";
+    const colon = withoutSuffix.indexOf(": ");
+    return (colon >= 0 ? withoutSuffix.slice(colon + 2) : withoutSuffix).trim();
+  }
+  function doctrineSegment(choice, revealed) {
+    if (choice === "random" && revealed) return `Random, drew ${DOCTRINE_CHOICE_LABELS[revealed]}`;
+    return DOCTRINE_CHOICE_LABELS[choice];
+  }
+
+  // src/shared/seatPalette.ts
+  var SEAT_PALETTES = [
+    { map: "#115E59", forceBar: "#1B8A82", text: "#7DCEC8" },
+    { map: "#9D174D", forceBar: "#B02A62", text: "#F0B4C8" },
+    { map: "#C2410C", forceBar: "#EA580C", text: "#FDBA74" },
+    { map: "#2563EB", forceBar: "#3B82F6", text: "#A9C1F5" }
+  ];
+  var NEUTRAL_PALETTE = {
+    map: "#141414",
+    heldHexOutline: "#1F1F1F",
+    forceBar: "#9CA3AF",
+    text: "#D9D9D9"
+  };
+  function paletteForOwner(ownerId, seats) {
+    if (ownerId == null) return null;
+    if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;
+    const seat = seats.find((row) => row.seatId === ownerId);
+    if (!seat) return null;
+    const palette = SEAT_PALETTES[seat.seatOrder - 1];
+    return palette ?? null;
+  }
+
+  // src/renderer/openRouter/openRouterModelCatalog.ts
+  var modelsById = /* @__PURE__ */ new Map();
+  function replaceOpenRouterModelCatalog(models) {
+    modelsById.clear();
+    for (const model of models) modelsById.set(model.id, model);
+  }
+  function clearOpenRouterModelCatalog() {
+    modelsById.clear();
+  }
+  function openRouterModelById(modelId) {
+    return modelsById.get(modelId);
+  }
+
+  // src/renderer/openRouter/reasoningEffortSelect.ts
+  function formatReasoningEffortOptionLabel(effort, isDefault) {
+    const label = capitalizeReasoningEffortName(effort);
+    return isDefault ? `${label} (default)` : label;
+  }
+  function attachReasoningEffortSelect(args) {
+    const { select, onEffortChange } = args;
+    let currentDefault = null;
+    select.addEventListener("change", () => {
+      onEffortChange(select.value === currentDefault ? "" : select.value);
+    });
+    return {
+      showForModel(model, persistedEffort) {
+        const efforts = listSelectableReasoningEfforts(model);
+        const defaultEffort = resolveDefaultReasoningEffort(model);
+        currentDefault = defaultEffort;
+        select.replaceChildren();
+        if (efforts.length === 0 || defaultEffort === null) {
+          select.appendChild(new Option(capitalizeReasoningEffortName("model default"), ""));
+        }
+        efforts.forEach((effort) => {
+          select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));
+        });
+        select.value = resolveRequestedReasoningEffort(model, persistedEffort) ?? defaultEffort ?? "";
+        select.disabled = !isReasoningEffortSelectable(model);
+      }
+    };
+  }
+
+  // src/renderer/openRouter/commanderPopover.ts
+  var popover = null;
+  var anchor = null;
+  var detachListeners = null;
+  var notifyClosed = null;
+  function openCommanderPopover(request) {
+    closeCommanderPopover();
+    anchor = request.anchor;
+    notifyClosed = request.onClose ?? null;
+    const draft = {
+      modelId: request.commander.modelId,
+      reasoningEffort: request.commander.reasoningEffort,
+      doctrineChoice: request.commander.doctrineChoice
+    };
+    const root = document.createElement("div");
+    root.className = "commander-popover";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-label", request.title);
+    root.append(popoverHeader(request.title), popoverFields(draft, request));
+    document.body.appendChild(root);
+    popover = root;
+    placeCommanderPopover();
+    const onKey = (event) => {
+      if (event.key === "Escape") closeCommanderPopover();
+    };
+    const onPointer = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (popover?.contains(target) || anchor?.contains(target)) return;
+      closeCommanderPopover();
+    };
+    const onScroll = () => placeCommanderPopover();
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    detachListeners = () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }
+  function closeCommanderPopover() {
+    detachListeners?.();
+    detachListeners = null;
+    popover?.remove();
+    popover = null;
+    anchor = null;
+    const closed = notifyClosed;
+    notifyClosed = null;
+    closed?.();
+  }
+  function reanchorCommanderPopover(next) {
+    if (!popover) return;
+    anchor = next;
+    placeCommanderPopover();
+  }
+  function commanderPopoverIsOpen() {
+    return popover != null;
+  }
+  function popoverHeader(title) {
+    const header = document.createElement("div");
+    header.className = "commander-popover-header";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "commander-popover-close";
+    close.textContent = "\xD7";
+    close.setAttribute("aria-label", "Close");
+    close.addEventListener("click", () => closeCommanderPopover());
+    header.append(heading, close);
+    return header;
+  }
+  function popoverFields(draft, request) {
+    const fields = document.createElement("div");
+    fields.className = "commander-popover-fields";
+    const model = document.createElement("select");
+    model.setAttribute("aria-label", "Model");
+    copyModelOptions(model, draft.modelId);
+    const reasoningRow = document.createElement("label");
+    reasoningRow.className = "commander-popover-field";
+    reasoningRow.textContent = "Reasoning";
+    const reasoning = document.createElement("select");
+    reasoning.setAttribute("aria-label", "Reasoning");
+    reasoningRow.appendChild(reasoning);
+    const reasoningSelect = attachReasoningEffortSelect({
+      select: reasoning,
+      onEffortChange: (effort) => {
+        draft.reasoningEffort = effort ? effort : null;
+        request.onChange({ ...draft });
+      }
+    });
+    const showReasoning = () => {
+      const record = openRouterModelById(draft.modelId ?? "");
+      reasoningSelect.showForModel(record, draft.reasoningEffort ?? "");
+      const hidden = listSelectableReasoningEfforts(record).length === 0;
+      reasoningRow.hidden = hidden;
+      if (hidden) draft.reasoningEffort = null;
+    };
+    model.addEventListener("change", () => {
+      draft.modelId = model.value ? model.value : null;
+      draft.reasoningEffort = null;
+      saveAppWideModel(draft.modelId);
+      showReasoning();
+      request.onChange({ ...draft });
+    });
+    showReasoning();
+    const doctrine = doctrineField(draft, request);
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "commander-popover-apply";
+    apply.textContent = request.applyAllLabel;
+    apply.addEventListener("click", () => request.onApplyAll({ ...draft }));
+    fields.append(labeledField("Model", model), reasoningRow, doctrine, apply);
+    return fields;
+  }
+  function copyModelOptions(select, modelId) {
+    const source = document.getElementById("openrouter-model");
+    if (!source) {
+      select.appendChild(new Option("\u2014 Select model \u2014", ""));
+      return;
+    }
+    for (const option2 of source.options) select.appendChild(new Option(option2.text, option2.value));
+    if (modelId && ![...select.options].some((option2) => option2.value === modelId)) {
+      select.appendChild(new Option(modelId, modelId));
+    }
+    select.value = modelId ?? "";
+  }
+  function doctrineField(draft, request) {
+    const wrap = document.createElement("div");
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Doctrine");
+    for (const choice of DOCTRINE_CHOICES) {
+      select.appendChild(new Option(DOCTRINE_CHOICE_LABELS[choice], choice));
+    }
+    select.value = draft.doctrineChoice;
+    const description = document.createElement("p");
+    description.className = "commander-popover-doctrine";
+    const show = () => {
+      description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[draft.doctrineChoice];
+    };
+    select.addEventListener("change", () => {
+      draft.doctrineChoice = select.value;
+      show();
+      request.onChange({ ...draft });
+    });
+    show();
+    wrap.append(labeledField("Doctrine", select), description);
+    return wrap;
+  }
+  function labeledField(text, control) {
+    const label = document.createElement("label");
+    label.className = "commander-popover-field";
+    label.append(document.createTextNode(text), control);
+    return label;
+  }
+  function saveAppWideModel(modelId) {
+    const select = document.getElementById("openrouter-model");
+    const next = modelId ?? "";
+    if (!select) {
+      void window.gameApi?.openRouter?.setSelectedModel(next);
+      return;
+    }
+    if (select.value === next) return;
+    select.value = next;
+    select.dispatchEvent(new Event("change"));
+  }
+  function placeCommanderPopover() {
+    if (!popover || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    popover.style.top = `${rect.bottom + 6}px`;
+    popover.style.left = `${Math.max(8, rect.left)}px`;
+    const box = popover.getBoundingClientRect();
+    if (box.right > window.innerWidth - 8) popover.style.left = `${Math.max(8, window.innerWidth - box.width - 8)}px`;
+    if (box.bottom > window.innerHeight - 8) popover.style.top = `${Math.max(8, rect.top - box.height - 6)}px`;
+  }
+
+  // src/renderer/openRouter/commanderCardsUi.ts
+  var logSeatFilter = "";
+  function markCommanderLogLine(line) {
+    const owner = line.dataset.seatId ?? "";
+    line.hidden = logSeatFilter !== "" && owner !== logSeatFilter;
+  }
+  function setCommanderLogSeatFilter(seatId) {
+    logSeatFilter = seatId;
+    const log = document.getElementById("openrouter-log");
+    if (!log) return;
+    for (const child of log.children) {
+      if (child instanceof HTMLElement) markCommanderLogLine(child);
+    }
+  }
+  function renderCommanderCards() {
+    const host = document.getElementById("commander-cards");
+    if (!host) return;
+    const seats = sortSeatsByOrder((rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === "ai"));
+    syncLogFilter(seats);
+    const openSeat = host.querySelector('.commander-card-summary[aria-expanded="true"]')?.dataset.seatId ?? null;
+    host.replaceChildren();
+    for (const seat of seats) host.append(cardElement(seat));
+    const nextAnchor = openSeat ? host.querySelector(`[data-seat-id="${openSeat}"]`) : null;
+    if (nextAnchor && commanderPopoverIsOpen()) {
+      nextAnchor.setAttribute("aria-expanded", "true");
+      reanchorCommanderPopover(nextAnchor);
+    }
+  }
+  function syncLogFilter(seats) {
+    const select = document.getElementById("commander-log-filter");
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (!select.dataset.bound) {
+      select.dataset.bound = "true";
+      select.addEventListener("change", () => setCommanderLogSeatFilter(select.value));
+    }
+    const current = select.value;
+    select.replaceChildren(option("All commanders", ""));
+    for (const seat of seats) select.append(option(seat.homeRegion, seat.seatId));
+    if ([...select.options].some((row) => row.value === current)) select.value = current;
+  }
+  function option(label, value) {
+    const row = document.createElement("option");
+    row.value = value;
+    row.textContent = label;
+    return row;
+  }
+  function cardElement(seat) {
+    const status = statusOf(seat);
+    const presentation = commanderCardPresentation({
+      status,
+      planningElapsedMs: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.planningElapsedMs ?? 0,
+      timedOutTurn: commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.timedOutTurn ?? null,
+      outTurn: seat.outTurn
+    });
+    const card = document.createElement("article");
+    card.className = presentation.dimmed ? "commander-card is-out" : "commander-card";
+    const dot = document.createElement("span");
+    dot.className = "commander-card-dot";
+    dot.style.background = paletteForOwner(seat.seatId, rendererSharedState.gameState?.seats ?? [])?.map ?? "#115E59";
+    const name = document.createElement("span");
+    name.className = "commander-card-name";
+    name.textContent = seat.homeRegion;
+    const chip = document.createElement("span");
+    chip.className = "commander-card-chip";
+    chip.textContent = presentation.chip;
+    const cost = document.createElement("span");
+    cost.className = "commander-card-cost";
+    cost.textContent = formatCost(seat.costUsd);
+    const summary = document.createElement("button");
+    summary.type = "button";
+    summary.className = "commander-card-summary";
+    summary.dataset.seatId = seat.seatId;
+    summary.textContent = summaryText(seat);
+    summary.disabled = presentation.summaryDisabled;
+    summary.addEventListener("click", () => openSeatCommander(seat, summary));
+    card.append(dot, name, chip, cost, summary);
+    if (presentation.detail) {
+      const detail = document.createElement("p");
+      detail.className = "commander-card-detail";
+      detail.textContent = presentation.detail;
+      card.append(detail);
+    }
+    return card;
+  }
+  function statusOf(seat) {
+    if (seat.outTurn !== null) return "out";
+    return commanderPoolStatuses().find((row) => row.seatId === seat.seatId)?.status ?? (seat.commander?.modelId ? "ready" : "no_model");
+  }
+  function summaryText(seat) {
+    const commander = seat.commander;
+    return formatCommanderSummary({
+      modelLabel: modelLabel(commander?.modelId ?? null),
+      reasoningEffort: commander?.reasoningEffort ?? null,
+      doctrineChoice: commander?.doctrineChoice ?? "balanced",
+      revealedDoctrine: commander?.doctrine ?? null
+    });
+  }
+  function modelLabel(modelId) {
+    if (!modelId) return null;
+    const select = document.getElementById("openrouter-model");
+    if (!(select instanceof HTMLSelectElement)) return modelId;
+    const optionRow = [...select.options].find((row) => row.value === modelId);
+    return optionRow?.textContent?.trim() || modelId;
+  }
+  function openSeatCommander(seat, anchor2) {
+    if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
+    const seatId = seat.seatId;
+    const commander = {
+      modelId: seat.commander.modelId,
+      reasoningEffort: seat.commander.reasoningEffort,
+      doctrineChoice: seat.commander.doctrineChoice
+    };
+    const observing = !(rendererSharedState.gameState?.seats ?? []).some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+    openCommanderPopover({
+      anchor: anchor2,
+      title: `${seat.homeRegion} commander`,
+      commander,
+      applyAllLabel: observing ? "Use for every side" : "Use for every opponent",
+      onChange: (next) => void saveCommander(seatId, next),
+      onApplyAll: (next) => void saveEveryCommander(next)
+    });
+    anchor2.setAttribute("aria-expanded", "true");
+  }
+  async function saveCommander(seatId, commander) {
+    try {
+      const updated = await window.gameApi?.setSeatCommander(seatId, commander);
+      if (!updated || !rendererSharedState.gameState?.seats) return;
+      rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
+      renderCommanderCards();
+    } catch (err) {
+      console.error("setSeatCommander failed", seatId, err);
+    }
+  }
+  async function saveEveryCommander(commander) {
+    const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === "ai" && seat.outTurn === null && isAiSeatId(seat.seatId));
+    for (const seat of seats) {
+      if (isAiSeatId(seat.seatId)) await saveCommander(seat.seatId, commander);
+    }
+  }
+  function formatCost(dollars) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
+  }
+  subscribeCommanderPool(() => {
+    renderCommanderCards();
+  });
+
+  // src/renderer/openRouter/readyButtonLabel.ts
+  function formatElapsedMmSs(ms) {
+    const totalSeconds = Math.floor(ms / 1e3);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  var READY_CHECK_ICON_PATH = "M3 8.5l3.2 3.2L13 4.8";
+  function buildReadyCheckIcon() {
+    const svgNs = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(svgNs, "svg");
+    icon.setAttribute("class", "chrome-icon ready-btn-check");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(svgNs, "path");
+    path.setAttribute("d", READY_CHECK_ICON_PATH);
+    icon.appendChild(path);
+    return icon;
+  }
+  function setReadyButtonLabelReady(readyBtn) {
+    if (readyBtn.querySelector(".ready-btn-check")) return;
+    const label = document.createElement("span");
+    label.className = "ready-btn-label";
+    label.textContent = "Ready";
+    readyBtn.replaceChildren(buildReadyCheckIcon(), label);
+  }
+  function setReadyButtonLabelAiWait(readyBtn, elapsedMs, planningCount = 1) {
+    const text = `AI: ${formatElapsedMmSs(elapsedMs)} \xB7 ${planningCount} planning`;
+    let label = readyBtn.querySelector(".ready-btn-ai-label");
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "ready-btn-ai-label";
+      readyBtn.replaceChildren(label);
+    }
+    if (label.textContent !== text) label.textContent = text;
+  }
+
+  // src/shared/openRouterToolInvocationCounts.ts
+  function resolveToolInvocationCountsAfterReady(args) {
+    if (args.fromResult) return { ...args.fromResult };
+    if (args.allowPrecomputedFallback && args.cachedPrecomputed) return { ...args.cachedPrecomputed };
+    return null;
+  }
+
+  // src/shared/consoleReportLog.ts
+  var CONSOLE_REPORT_KIND_LABELS = Object.freeze({
+    turn: "Turn report",
+    message: "Message",
+    notice: "Notice"
+  });
+  var MAX_CONSOLE_REPORTS = 200;
+  function formatConsoleReportTag(turnNumber, battleBeat) {
+    if (battleBeat != null) return `B${battleBeat}`;
+    if (turnNumber != null) return `T${turnNumber}`;
+    return "";
+  }
+  function consoleReportVisible(kind, senderSeatId, filterSeatId) {
+    if (filterSeatId === "") return true;
+    if (kind !== "message") return true;
+    return senderSeatId === filterSeatId;
+  }
+
+  // src/renderer/chrome/frameTooltipText.ts
+  var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
+  var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
+  var opponentTabTooltipText = `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
+  function unavailableTooltipText(name) {
+    return `${name} is not available in this version.`;
+  }
+  function forcesStatTooltipText(breakdown) {
+    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
+  }
+  var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
+  var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
+  var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
+  var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
+  var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
+
+  // src/renderer/chrome/consoleReports.ts
+  var reportSenderFilter = "";
+  var unreadCount = 0;
+  var reportsVisible = false;
+  var listeners = [];
+  function messageReportBody(meta) {
+    const wrap = document.createElement("div");
+    const line = document.createElement("div");
+    line.className = "console-report-sender";
+    const dot = document.createElement("span");
+    dot.className = "console-report-dot";
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const seat = seats.find((row) => row.seatId === meta.senderSeatId);
+    dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
+    const name = document.createElement("span");
+    name.textContent = `${seat?.homeRegion ?? "Commander"} "${meta.messageText ?? ""}"`;
+    line.append(dot, name);
+    wrap.append(line);
+    const observing = seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+    if (observing && meta.strategyText) {
+      const strategy = document.createElement("p");
+      strategy.className = "console-report-strategy";
+      strategy.textContent = `Strategy: ${meta.strategyText}`;
+      wrap.append(strategy);
+    }
+    return wrap;
+  }
+  function refreshReportSenderFilter() {
+    const select = document.getElementById("reports-sender-filter");
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (!select.dataset.bound) {
+      select.dataset.bound = "true";
+      select.addEventListener("change", () => setReportSenderFilter(select.value));
+    }
+    const current = select.value;
+    select.replaceChildren(filterOption("Everyone", ""));
+    for (const seat of rendererSharedState.gameState?.seats ?? []) select.append(filterOption(seat.homeRegion, seat.seatId));
+    if ([...select.options].some((row) => row.value === current)) select.value = current;
+  }
+  function filterOption(label, value) {
+    const row = document.createElement("option");
+    row.value = value;
+    row.textContent = label;
+    return row;
+  }
+  function setReportSenderFilter(seatId) {
+    reportSenderFilter = seatId;
+    document.querySelectorAll("#reports-list .console-report").forEach((entry) => {
+      if (!(entry instanceof HTMLElement)) return;
+      const kind = entry.dataset.reportKind ?? "notice";
+      entry.hidden = !consoleReportVisible(kind, entry.dataset.senderSeatId ?? null, reportSenderFilter);
+    });
+    const list = document.getElementById("reports-list");
+    if (list) syncReportsEmptyState(list);
+  }
+  function notifyReportsChanged() {
+    for (const listener of listeners) listener();
+  }
+  function syncReportsEmptyState(list) {
+    const anyVisible = [...list.querySelectorAll(".console-report")].some((entry) => entry instanceof HTMLElement && !entry.hidden);
+    document.getElementById("reports-empty")?.toggleAttribute("hidden", anyVisible);
+  }
+  function createReplayPlaceholder() {
+    const host = document.createElement("span");
+    host.className = "control-tooltip-host console-report-replay-host";
+    host.setAttribute("data-control-tooltip", unavailableTooltipText("Replay"));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "console-report-replay";
+    button.disabled = true;
+    button.textContent = "Replay";
+    host.append(button);
+    return host;
+  }
+  function currentConsoleReportTag() {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    return formatConsoleReportTag(rendererSharedState.gameState?.turnNumber ?? null, battle ? battle.tacticalTurnNumber : null);
+  }
+  function recordConsoleReport(kind, tag, body, meta) {
+    const list = document.getElementById("reports-list");
+    if (!list) return;
+    const entry = document.createElement("li");
+    entry.className = `console-report console-report-${kind}`;
+    entry.dataset.fresh = "true";
+    entry.dataset.reportKind = kind;
+    if (meta?.senderSeatId) entry.dataset.senderSeatId = meta.senderSeatId;
+    const head = document.createElement("div");
+    head.className = "console-report-head";
+    if (tag) {
+      const tagEl = document.createElement("span");
+      tagEl.className = "console-report-tag";
+      tagEl.textContent = tag;
+      head.append(tagEl);
+    }
+    const kindEl = document.createElement("span");
+    kindEl.className = "console-report-kind";
+    kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
+    head.append(kindEl);
+    if (meta?.modelLabel) {
+      const model = document.createElement("span");
+      model.className = "console-report-model";
+      model.textContent = meta.modelLabel;
+      head.append(model);
+    }
+    if (kind === "turn") head.append(createReplayPlaceholder());
+    const content = document.createElement("div");
+    content.className = "console-report-body";
+    if (meta?.messageText !== void 0) content.append(messageReportBody(meta));
+    else content.append(...Array.from(body.cloneNode(true).childNodes));
+    entry.append(head, content);
+    entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
+    list.prepend(entry);
+    while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
+    syncReportsEmptyState(list);
+    if (!reportsVisible) unreadCount = Math.min(unreadCount + 1, list.childElementCount);
+    notifyReportsChanged();
+  }
+  function unreadConsoleReportCount() {
+    return unreadCount;
+  }
+  function setConsoleReportsVisible(visible) {
+    if (visible === reportsVisible) return;
+    reportsVisible = visible;
+    if (visible) unreadCount = 0;
+    else document.querySelectorAll("#reports-list [data-fresh]").forEach((entry) => entry.removeAttribute("data-fresh"));
+    notifyReportsChanged();
+  }
+  function clearConsoleReports() {
+    const list = document.getElementById("reports-list");
+    list?.replaceChildren();
+    if (list) syncReportsEmptyState(list);
+    unreadCount = 0;
+    notifyReportsChanged();
+  }
+  function onConsoleReportsChanged(listener) {
+    listeners.push(listener);
+  }
+
+  // src/renderer/openRouter/openRouterUiHelpers.ts
+  function updateReadyButtonState() {
+    const readyBtn = document.getElementById("ready-btn");
+    if (!readyBtn) return;
+    const gameOver = rendererSharedState.gameState?.gameOver ?? false;
+    const deferredConsult = isDeferredResolutionPlaybackConsultPending();
+    const waitingOnAi = isWaitingForPrecomputedAiOrders();
+    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+    const deferredClock = rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
+    if (waitingOnAi) {
+      clearReadyAiWaitClock();
+      setReadyButtonLabelAiWait(readyBtn, longestPlanningElapsedMs(), planningCommanderCount());
+    } else if (deferredClock) {
+      const now = Date.now();
+      if (rendererSharedState.readyBtnAiWaitStartTime === null) {
+        rendererSharedState.readyBtnAiWaitStartTime = now;
+        rendererSharedState.readyBtnAiWaitIntervalId = setInterval(() => {
+          if (rendererSharedState.readyBtnAiWaitStartTime === null) return;
+          const btn = document.getElementById("ready-btn");
+          if (btn) setReadyButtonLabelAiWait(btn, Date.now() - rendererSharedState.readyBtnAiWaitStartTime, planningCommanderCount());
+        }, 1e3);
+      }
+      setReadyButtonLabelAiWait(readyBtn, now - (rendererSharedState.readyBtnAiWaitStartTime ?? now), planningCommanderCount());
+    } else {
+      clearReadyAiWaitClock();
+      setReadyButtonLabelReady(readyBtn);
+    }
+    renderOpponentStatus();
+  }
+  function clearReadyAiWaitClock() {
+    if (rendererSharedState.readyBtnAiWaitIntervalId !== null) {
+      clearInterval(rendererSharedState.readyBtnAiWaitIntervalId);
+      rendererSharedState.readyBtnAiWaitIntervalId = null;
+    }
+    rendererSharedState.readyBtnAiWaitStartTime = null;
+  }
+  function renderOpponentStatus() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const active2 = seats.length === 0 ? [] : activeAiSeats(seats);
+    const statuses = commanderPoolStatuses();
+    const ready = active2.filter((seat) => statuses.find((row) => row.seatId === seat.seatId)?.status === "ready").length;
+    const status = commanderPlanningStatus(rendererSharedState.runButtonOn, isWaitingForPrecomputedAiOrders());
+    const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
+    const sentence = document.getElementById("commander-status-text");
+    if (sentence) sentence.textContent = commanderPlanningSentence(rendererSharedState.runButtonOn, active2.length || 1);
+    document.getElementById("commander-status-line")?.setAttribute("data-status", status);
+    const label = document.getElementById("commander-status-label");
+    if (label) label.textContent = commanderFooterLabel({ status, ready, active: active2.length, observing });
+    renderCommanderCards();
+    const modelSelect = document.getElementById("openrouter-model");
+    const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : void 0;
+    const model = document.getElementById("commander-status-model");
+    if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
+    const cost = document.getElementById("commander-status-cost");
+    if (cost) cost.textContent = formatOpenRouterCost(commanderSeatCostUsd());
+  }
+  function updateOpenRouterToolCountLabels() {
+    for (const group of rendererSharedState.openRouterToolGroups) {
+      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
+      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+    }
+  }
+  function applyToolInvocationCountsAfterReady(args) {
+    const next = resolveToolInvocationCountsAfterReady(args);
+    if (next) {
+      rendererSharedState.toolInvocationCounts = next;
+      updateOpenRouterToolCountLabels();
+    }
+    rendererSharedState.precomputedToolInvocationCounts = null;
+  }
+  function formatOpenRouterCost(dollars) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(dollars);
+  }
+  function updateOpenRouterCostLabel() {
+    const el = document.getElementById("openrouter-cost");
+    if (el) el.textContent = formatOpenRouterCost(commanderSeatCostUsd());
+    renderOpponentStatus();
+  }
+  function appendOpenRouterLog(line, isError = false, seatId) {
+    const el = document.getElementById("openrouter-log");
+    if (!el) return;
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString();
+    const span = document.createElement("div");
+    if (seatId) span.dataset.seatId = seatId;
+    span.textContent = `${time} ${activitySeatPrefix(seatId)}${line}`;
+    if (isError) span.className = "chrome-error";
+    markCommanderLogLine(span);
+    el.appendChild(span);
+    scrollOpenRouterLogToEnd();
+  }
+  function activitySeatPrefix(seatId) {
+    if (!seatId) return "";
+    const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId);
+    const name = seat ? shortSideName(seat.homeRegion) : seatId;
+    const turn = rendererSharedState.gameState?.turnNumber;
+    return `${turn ? `T${turn} ` : ""}${name} `;
+  }
+  function planningCommanderCount() {
+    return commanderPoolStatuses().filter((row) => row.status === "planning").length;
+  }
+  function scrollOpenRouterLogToEnd() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+  function clearOpenRouterLog() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.textContent = "";
+  }
+  var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
+  function appendMapToastBulletLine(target, line, indent, unitOriginByDisplayName) {
+    const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
+    const span = document.createElement("span");
+    span.style.display = "block";
+    if (indent) {
+      span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+    }
+    if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
+      for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
+        const flag = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
+        if (flag && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
+        span.appendChild(document.createTextNode(segment.text));
+      }
+    } else {
+      span.textContent = text;
+    }
+    target.appendChild(span);
+  }
+  function appendMapToastSectionHeader(target, title) {
+    const strong = document.createElement("strong");
+    strong.style.display = "block";
+    strong.textContent = title.endsWith(":") ? title : `${title}:`;
+    target.appendChild(strong);
+  }
+  function appendMapToastMessageBody(target, message, unitOriginByDisplayName) {
+    const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    let inSection = false;
+    let isFirstSection = true;
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        inSection = true;
+        if (!isFirstSection) {
+          target.appendChild(document.createElement("br"));
+        }
+        isFirstSection = false;
+        appendMapToastSectionHeader(target, line.slice(3));
+        continue;
+      }
+      appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
+    }
+  }
+  function showToast2(el, textEl, textContentBuilder, isInfo) {
+    textEl.textContent = "";
+    textContentBuilder(textEl);
+    el.classList.toggle("toast-info", isInfo);
+    el.classList.remove("hidden");
+  }
+  function showMapToast(message, options) {
+    if (rendererSharedState.toastHideTimer !== null) {
+      clearTimeout(rendererSharedState.toastHideTimer);
+      rendererSharedState.toastHideTimer = null;
+    }
+    const el = document.getElementById("map-toast");
+    const textEl = document.getElementById("map-toast-text");
+    if (el && textEl) {
+      showToast2(
+        el,
+        textEl,
+        (target) => {
+          appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
+        },
+        options?.isError === false
+      );
+      if (options?.isError === false && options.skipReport !== true) {
+        recordConsoleReport(options.report?.kind ?? "notice", options.report?.tag ?? currentConsoleReportTag(), textEl);
+      }
+    }
+    rendererSharedState.toastHideTimer = setTimeout(() => {
+      rendererSharedState.toastHideTimer = null;
+      hideMapToast();
+    }, TOAST_DURATION_MS);
+  }
+  function hideMapToast() {
+    if (rendererSharedState.toastHideTimer !== null) {
+      clearTimeout(rendererSharedState.toastHideTimer);
+      rendererSharedState.toastHideTimer = null;
+    }
+    const el = document.getElementById("map-toast");
+    if (el) el.classList.add("hidden");
+  }
+  function showFilledAiStrategyToast(build, fileReport) {
+    if (rendererSharedState.aiStrategyToastHideTimer !== null) {
+      clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
+      rendererSharedState.aiStrategyToastHideTimer = null;
+    }
+    const el = document.getElementById("ai-strategy-toast");
+    const textEl = document.getElementById("ai-strategy-toast-text");
+    if (el && textEl) {
+      showToast2(el, textEl, build, true);
+      if (fileReport) recordConsoleReport("message", currentConsoleReportTag(), textEl);
+    }
+    rendererSharedState.aiStrategyToastHideTimer = setTimeout(() => {
+      rendererSharedState.aiStrategyToastHideTimer = null;
+      hideAiStrategyToast();
+    }, TOAST_DURATION_MS);
+  }
+  function showAiStrategyToast(content) {
+    if (!hasAiStrategyToastContent(content)) {
+      hideAiStrategyToast();
+      return;
+    }
+    showFilledAiStrategyToast((target) => {
+      const sections = buildAiStrategyToastSections(content);
+      sections.forEach((section, index) => {
+        if (index > 0) target.appendChild(document.createElement("br"));
+        appendMapToastSectionHeader(target, section.title);
+        const span = document.createElement("span");
+        span.style.display = "block";
+        span.textContent = section.body;
+        target.appendChild(span);
+      });
+    }, true);
+  }
+  function hideAiStrategyToast() {
+    if (rendererSharedState.aiStrategyToastHideTimer !== null) {
+      clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
+      rendererSharedState.aiStrategyToastHideTimer = null;
+    }
+    const el = document.getElementById("ai-strategy-toast");
+    if (el) el.classList.add("hidden");
+  }
+  function hidePlanningChromeToasts() {
+    hideMapToast();
+    hideAiStrategyToast();
+  }
+  async function callReadyWithTimeout(payload2) {
+    if (!window.gameApi?.ready) {
+      throw new Error("Ready action unavailable.");
+    }
+    return Promise.race([
+      window.gameApi.ready(payload2),
+      new Promise((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)),
+          READY_REQUEST_TIMEOUT_MS
+        );
+      })
+    ]);
+  }
+
+  // src/renderer/core/selection.ts
+  function isEmbarkedLandUnitBlockedForSelection(unitId) {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      const sub = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
+      if (!sub || sub.unitType !== "infantry" && sub.unitType !== "armor") return false;
+      return !!sub.embarkedOnSubUnitId;
+    }
+    const unit = rendererSharedState.gameState?.units.find((u) => u.id === unitId);
+    if (!unit || unit.unitType !== "infantry" && unit.unitType !== "armor") return false;
+    return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+  }
+  function shouldBlockEmbarkedLandUnitSelect(unitId) {
+    if (!isEmbarkedLandUnitBlockedForSelection(unitId)) return false;
+    return !rendererSharedState.selectedUnitIds.includes(unitId);
+  }
+  function reconcileSelectionToCurrentState() {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      const validHumanUnitIds2 = new Set(
+        rendererSharedState.tacticalBattleSnapshot.subUnits.filter((u) => u.player === HUMAN_SEAT_ID).map((u) => u.id)
+      );
+      rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter(
+        (id) => validHumanUnitIds2.has(id) && !isEmbarkedLandUnitBlockedForSelection(id)
+      );
+      return;
+    }
+    if (!rendererSharedState.gameState) {
+      rendererSharedState.selectedUnitIds = [];
+      return;
+    }
+    const validHumanUnitIds = new Set(rendererSharedState.gameState.units.filter((u) => u.player === HUMAN_SEAT_ID).map((u) => u.id));
+    rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => {
+      if (!validHumanUnitIds.has(id)) return false;
+      return !isEmbarkedLandUnitBlockedForSelection(id);
+    });
+  }
+  function replaceSelection(unitIds) {
+    const previousIds = [...rendererSharedState.selectedUnitIds];
+    const unique = [...new Set(unitIds)];
+    rendererSharedState.selectedUnitIds = unique;
+    reconcileSelectionToCurrentState();
+    if (rendererSharedState.selectedUnitIds.length === 0) {
+      rendererSharedState.selectedHexIndex = null;
+      rendererSharedState.hoverRoutePreview = null;
+      rendererSharedState.hoverPreviewRequestSeq++;
+      rendererSharedState.rangedModeActive = false;
+      rendererSharedState.airStrikeModeActive = false;
+      return;
+    }
+    if (selectionUnitIdSetsDiffer(previousIds, rendererSharedState.selectedUnitIds)) {
+      hidePlanningChromeToasts();
+    }
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    const primary = tb ? tb.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
+    rendererSharedState.selectedHexIndex = primary?.h3Index ?? null;
+  }
+  function addUnitsToSelection(unitIds) {
+    replaceSelection([...rendererSharedState.selectedUnitIds, ...unitIds]);
+  }
+  function removeUnitsFromSelection(unitIds) {
+    const remove = new Set(unitIds);
+    replaceSelection(rendererSharedState.selectedUnitIds.filter((id) => !remove.has(id)));
+  }
+  function toggleUnitSelection(unitId) {
+    if (rendererSharedState.selectedUnitIds.includes(unitId)) {
+      removeUnitsFromSelection([unitId]);
+    } else {
+      addUnitsToSelection([unitId]);
+    }
+  }
+  function clearSelection() {
+    replaceSelection([]);
+  }
+  function clearMapSelectionChrome() {
+    clearSelection();
+    rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+  }
+  function getVisibleHexSet(state) {
+    if (!state) return /* @__PURE__ */ new Set();
+    if (!Array.isArray(state.visibleHexes)) return new Set(state.hexes.map((h) => h.h3Index));
+    return new Set(state.visibleHexes);
+  }
+  function getExploredHexSet(state) {
+    if (!state) return /* @__PURE__ */ new Set();
+    if (!Array.isArray(state.exploredHexes)) return new Set(state.hexes.map((h) => h.h3Index));
+    return new Set(state.exploredHexes);
+  }
+  function isHexExploredByPlayer(h3Index) {
+    if (!rendererSharedState.gameState) return false;
+    const explored = getExploredHexSet(rendererSharedState.gameState);
+    return explored.has(h3Index);
+  }
+
+  // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
+  function mergePendingTacticalEmbarkOrdersIntoSealiftState(base, pendingEmbark) {
+    if (pendingEmbark.length === 0) {
+      return { ...base, navalRows: base.navalRows.map((r) => ({ ...r })) };
+    }
+    const landType = new Map(base.landOptions.map((o) => [o.unitId, o.unitType]));
+    const rows = base.navalRows.map((r) => ({ ...r }));
+    const pendingLand = new Set(pendingEmbark.map((e) => e.unitId));
+    for (const row of rows) {
+      if (row.slot1UnitId && pendingLand.has(row.slot1UnitId)) row.slot1UnitId = null;
+      if (row.slot2UnitId && pendingLand.has(row.slot2UnitId)) row.slot2UnitId = null;
+    }
+    const sorted = [...pendingEmbark].sort((a, b) => a.navalUnitId.localeCompare(b.navalUnitId) || a.unitId.localeCompare(b.unitId));
+    for (const e of sorted) {
+      const row = rows.find((r) => r.navalUnitId === e.navalUnitId);
+      if (!row) continue;
+      const t = landType.get(e.unitId);
+      if (t === "armor") {
+        row.slot1UnitId = e.unitId;
+        row.slot2UnitId = null;
+        continue;
+      }
+      if (!row.slot1UnitId) row.slot1UnitId = e.unitId;
+      else if (!row.slot2UnitId && !row.slot2Disabled) row.slot2UnitId = e.unitId;
+      else row.slot1UnitId = e.unitId;
+    }
+    return { ...base, navalRows: rows };
   }
 
   // src/renderer/core/parityDiagnostics.ts
@@ -20301,8 +22940,8 @@ ${bonuses}`;
     if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
     return aiming ? rangedStopTooltipText : rangedAimTooltipText;
   }
-  var runDisabledTooltipText = "Turn opponent planning on or off. Enter an API key and choose a model first.";
-  var runEnabledTooltipText = "Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.";
+  var runDisabledTooltipText = "Turn planning on or off for every commander. Enter an API key and choose a commander's model first.";
+  var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
   function runButtonTooltipText(enabled) {
     return enabled ? runEnabledTooltipText : runDisabledTooltipText;
   }
@@ -21134,9 +23773,6 @@ ${bonuses}`;
     });
   }
 
-  // src/shared/tooltipSectionGap.ts
-  var TOOLTIP_SECTION_GAP_HTML = '<br/><span style="display:block;height:0.5em"></span>';
-
   // src/shared/orderPreviewSlowTerrainTooltip.ts
   var SLOW_TERRAIN_LABEL_SORT_PRIORITY = {
     Urban: 0,
@@ -21241,10 +23877,10 @@ ${bonuses}`;
     const baseLine = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
     const eff = effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, battle.subUnits, moveType);
     if (eff < baseLine) {
-      const anchor = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
-      if (battle.tacticalIsRubbleByH3?.[anchor]) push("Rubble");
-      else if (battle.tacticalIsUrbanByH3?.[anchor]) push("Urban");
-      else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor)) push("Forest");
+      const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
+      if (battle.tacticalIsRubbleByH3?.[anchor2]) push("Rubble");
+      else if (battle.tacticalIsUrbanByH3?.[anchor2]) push("Urban");
+      else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) push("Forest");
       const terrainOnly = effectiveTacticalMovementPointBudgetForMarchLeg(
         { ...battle, weatherBonusEnabled: false },
         subUnit,
@@ -21332,13 +23968,13 @@ ${bonuses}`;
     if (unitType !== "infantry" && unitType !== "armor") return null;
     const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
     if (!u) return null;
-    const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+    const anchor2 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
     const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor);
+    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor2);
     if (eff >= baseline) return null;
-    if (battle.tacticalIsRubbleByH3?.[anchor]) return "Rubble";
-    if (battle.tacticalIsUrbanByH3?.[anchor]) return "Urban";
-    if (tacticalCellIsForestClass(battle, anchor)) return "Forest";
+    if (battle.tacticalIsRubbleByH3?.[anchor2]) return "Rubble";
+    if (battle.tacticalIsUrbanByH3?.[anchor2]) return "Urban";
+    if (tacticalCellIsForestClass(battle, anchor2)) return "Forest";
     return null;
   }
   function collectTacticalRangedSlowTerrainLabels(battle, previewUnitIds) {
@@ -21346,7 +23982,7 @@ ${bonuses}`;
     const seen = /* @__PURE__ */ new Set();
     for (const id of previewUnitIds) {
       const sub = battle.subUnits.find((s) => s.id === id);
-      if (!sub || sub.player !== "human") continue;
+      if (!sub || sub.player !== HUMAN_SEAT_ID) continue;
       const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
       if (t && !seen.has(t)) {
         seen.add(t);
@@ -21475,1129 +24111,6 @@ ${bonuses}`;
     const m = t.match(/^blocked:\s*(.*)$/i);
     if (!m) return escapeHtmlForOrderPreviewTooltip(t);
     return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1].trim())}`;
-  }
-
-  // src/shared/hexLlmCodeAssignment.ts
-  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  var strategicH3ToCodeSingleton = null;
-  function indexToCode(index) {
-    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
-      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
-    }
-    const hi = Math.floor(index / CODE_ALPHABET.length);
-    const lo = index % CODE_ALPHABET.length;
-    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
-  }
-  function sortCellsForStableLlmCodes(cells) {
-    const decorated = cells.map((h3) => {
-      const [lat, lng] = cellToLatLng(h3);
-      return { h3, lat, lng };
-    });
-    decorated.sort((a, b) => {
-      if (a.lat !== b.lat) return b.lat - a.lat;
-      if (a.lng !== b.lng) return a.lng - b.lng;
-      return a.h3.localeCompare(b.h3);
-    });
-    return decorated.map((d) => d.h3);
-  }
-  function buildStrategicH3ToCodeMap() {
-    const footprint2 = loadedStrategicFootprint();
-    const strategicSet = new Set(footprint2 ?? []);
-    if (!footprint2) {
-      const res0 = getRes0Cells();
-      for (const r0 of res0) {
-        for (const child of cellToChildren(r0, strategicH3Resolution())) {
-          strategicSet.add(child);
-        }
-      }
-    }
-    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
-    const h3ToCode = /* @__PURE__ */ new Map();
-    for (let i = 0; i < sorted.length; i++) {
-      h3ToCode.set(sorted[i], indexToCode(i));
-    }
-    return h3ToCode;
-  }
-  function getStrategicH3ToCodeMap() {
-    if (!strategicH3ToCodeSingleton) {
-      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
-    }
-    return strategicH3ToCodeSingleton;
-  }
-  function resetStrategicHexCodeCache() {
-    strategicH3ToCodeSingleton = null;
-  }
-  registerActiveGameMapReset(resetStrategicHexCodeCache);
-  function getStrategicHexCode(h3Index) {
-    return getStrategicH3ToCodeMap().get(h3Index);
-  }
-  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
-    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
-    const idx = children.indexOf(childTacticalH3Index);
-    if (idx < 0) return void 0;
-    return indexToCode(idx);
-  }
-  function getLlmHexLocationParenLabelForNamingTarget(target) {
-    if (target.resolution === 1) {
-      const c = getStrategicHexCode(target.h3Index);
-      return c ? `(${c})` : null;
-    }
-    const parent = strategicParentOf(target.h3Index);
-    const parentCode = getStrategicHexCode(parent);
-    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
-    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
-  }
-
-  // src/shared/tacticalBattleFootprint.ts
-  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
-  var footprintByKey = /* @__PURE__ */ new Map();
-  function resetTacticalBattleFootprintCache() {
-    footprintByKey.clear();
-  }
-  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
-  function frozenCodeMap(entries) {
-    const map = new Map(entries);
-    const reject = () => {
-      throw new TypeError("tactical battle footprint code map is frozen");
-    };
-    map.set = reject;
-    map.delete = reject;
-    map.clear = reject;
-    return map;
-  }
-  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
-    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
-    const coreSet = new Set(coreChildH3Indexes);
-    const cells = new Set(coreChildH3Indexes);
-    for (const cell of coreChildH3Indexes) {
-      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
-        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
-      }
-    }
-    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
-    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
-    return { coreChildH3Indexes, h3Indexes, codeByH3 };
-  }
-  function tacticalBattleFootprint(enclosingStrategicH3Index) {
-    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
-    const cached = footprintByKey.get(key);
-    if (cached) return cached;
-    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
-    footprintByKey.set(key, built);
-    return built;
-  }
-  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
-    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
-  }
-  function tacticalBattleTerrainKindByCell(args) {
-    const kinds = {};
-    for (const cell of args.cells) {
-      const tacticalKind = args.tacticalKindByH3.get(cell);
-      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
-        kinds[cell] = tacticalKind;
-        continue;
-      }
-      let parentKind;
-      try {
-        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
-      } catch {
-        parentKind = void 0;
-      }
-      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
-    }
-    return kinds;
-  }
-
-  // src/shared/hexNamingCaption.ts
-  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
-  function formatHexNamingCaptionHtml(caption) {
-    const { text } = caption;
-    let html = "";
-    let cursor = 0;
-    for (const span of caption.spans) {
-      html += escapeHtmlText(text.slice(cursor, span.start));
-      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
-      const name = escapeHtmlText(text.slice(span.start, span.end));
-      if (span.role === "heading") {
-        const hasColon = text[span.end] === ":";
-        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
-        cursor = hasColon ? span.end + 1 : span.end;
-      } else {
-        html += `${flag}${name}`;
-        cursor = span.end;
-      }
-    }
-    return html + escapeHtmlText(text.slice(cursor));
-  }
-
-  // src/shared/progressFormatting.ts
-  function computeRoundedPercentage(numerator, denominator) {
-    if (denominator <= 0) return 0;
-    return Math.round(numerator / denominator * 100);
-  }
-
-  // src/shared/homeRegionRules.ts
-  function resolveHomeRegionOwnerIdentity(input) {
-    const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
-    const inAi = (input.aiHomeRegionHexes ?? []).includes(input.h3Index);
-    if (!inHuman && !inAi) return null;
-    const intersectionSet = new Set(
-      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
-    );
-    if (intersectionSet.has(input.h3Index) || inHuman && inAi) return "both";
-    if (inHuman) return "human";
-    return "opponent";
-  }
-  function formatHomeRegionAssignmentControlSuffix(identity) {
-    if (identity === "both") return "(Human & AI Home Region)";
-    if (identity === "human") return "(Human Home Region)";
-    return "(AI Home Region)";
-  }
-  function uniqueSortedHexes(hexes) {
-    return [...new Set(hexes)].sort();
-  }
-  function computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes) {
-    const aiSet = new Set(aiHomeRegionHexes);
-    return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
-  }
-  function hasHomeRegionMetadata(state) {
-    return (state.humanHomeRegionHexes?.length ?? 0) > 0 || (state.aiHomeRegionHexes?.length ?? 0) > 0;
-  }
-  function isHexOwnershipVisibleToPerspective(input) {
-    if (input.visibleHexes.has(input.h3Index)) return true;
-    if (!hasHomeRegionMetadata(input)) return false;
-    const intersectionSet = new Set(
-      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
-    );
-    if (intersectionSet.has(input.h3Index)) return true;
-    const ownHomeHexSet = new Set(
-      input.playerPerspective === "human" ? input.humanHomeRegionHexes ?? [] : input.aiHomeRegionHexes ?? []
-    );
-    return ownHomeHexSet.has(input.h3Index);
-  }
-  function resolveOwnershipBorderStyle(input) {
-    const humanHomeHexes = new Set(input.humanHomeRegionHexes ?? []);
-    const aiHomeHexes = new Set(input.aiHomeRegionHexes ?? []);
-    const isHomeHex = humanHomeHexes.has(input.h3Index) || aiHomeHexes.has(input.h3Index);
-    if (isHomeHex) {
-      if (input.controllerPlayerId === "human") return "outlinedControlledByHuman";
-      if (input.controllerPlayerId === "opponent") return "outlinedControlledByOpponent";
-      return "outlinedNeutral";
-    }
-    if (!input.isOwnershipVisible) return "none";
-    if (input.controllerPlayerId === "human") return "normalControlledByHuman";
-    if (input.controllerPlayerId === "opponent") return "normalControlledByOpponent";
-    return "none";
-  }
-  function countControlledHexesInRegion(controlRows, regionHexes, playerId) {
-    const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
-    const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));
-    const controlled = uniqueRegionHexes.filter((h3Index) => controlByHex.get(h3Index) === playerId).length;
-    const total = uniqueRegionHexes.length;
-    const pct = computeRoundedPercentage(controlled, total);
-    return { controlled, total, pct };
-  }
-
-  // src/shared/statusIconHtml.ts
-  var STATUS_ICON_CLASS_NAME = "status-icon";
-  var STATUS_ICON = Object.freeze({
-    up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
-    doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
-    down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
-    doubleDown: Object.freeze({ file: "arrow_down_double.svg", alt: "--" }),
-    blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
-  });
-  var EFFECT_SYMBOL_KIND = Object.freeze({
-    "+": "up",
-    "-": "down",
-    x: "blocked"
-  });
-  function formatStatusIconHtml(kind) {
-    const icon = STATUS_ICON[kind];
-    const src = escapeHtmlText(`status/${icon.file}`);
-    const alt = escapeHtmlText(icon.alt);
-    return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
-  }
-  function formatEffectSymbolPrefixHtml(symbols) {
-    const icons = [];
-    for (const symbol of symbols) {
-      const kind = EFFECT_SYMBOL_KIND[symbol];
-      if (kind) icons.push(formatStatusIconHtml(kind));
-    }
-    return icons.join("|");
-  }
-
-  // src/shared/terrainEffectsForTooltip.ts
-  var SYMBOL_ORDER = ["x", "-", "+"];
-  var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
-  var MOVEMENT_UNIT_LABEL = {
-    infantry: "Infantry",
-    armor: "Armored",
-    naval: "Naval"
-  };
-  function wrapTerrainEffectSymbolSetForDisplay(symbols) {
-    if (!symbols) return "";
-    return `(${symbols})`;
-  }
-  function unwrapTerrainEffectSymbolSetFromDisplay(display) {
-    const match = /^\(([-x+/]+)\)$/.exec(display);
-    return match ? match[1] : display;
-  }
-  function formatTerrainEffectLabel(category, unit) {
-    return unit === "All" ? `All ${category}` : `${unit} ${category}`;
-  }
-  function formatTerrainEffectSymbolPrefixHtml(symbols) {
-    return formatEffectSymbolPrefixHtml(symbols);
-  }
-  function formatTerrainEffectEntryPlain(symbols, category, unit) {
-    return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
-  }
-  function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
-    return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
-  }
-  function formatTerrainEffectEntries(grouped) {
-    const entries = [];
-    for (const [key, symbols] of grouped) {
-      const slash = formatSymbolSet(symbols);
-      if (!slash) continue;
-      const pipe = key.indexOf("|");
-      const category = key.slice(0, pipe);
-      const unit = key.slice(pipe + 1);
-      entries.push(formatTerrainEffectEntryPlain(slash, category, unit));
-    }
-    return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
-  }
-  function formatTerrainEffectEntryHtml(entry) {
-    const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
-    if (!match) return entry;
-    return formatTerrainEffectEntryHtmlFromParts(
-      unwrapTerrainEffectSymbolSetFromDisplay(match[1]),
-      match[3],
-      match[2]
-    );
-  }
-  function formatTerrainEffectsLineHtml(line) {
-    return line.split(", ").map(formatTerrainEffectEntryHtml).join(", ");
-  }
-  function buildTerrainEffectGroupedMap(input) {
-    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
-    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
-    const movementByUnit = /* @__PURE__ */ new Map();
-    for (const unitType of MOVEMENT_UNIT_TYPES) {
-      const label = MOVEMENT_UNIT_LABEL[unitType];
-      const symbol = movementSymbolForUnit(unitType, cat, input, hasTransport);
-      if (symbol) {
-        movementByUnit.set(label, /* @__PURE__ */ new Set([symbol]));
-      }
-    }
-    const movementOccupiable = [...occupiableMovementUnits(cat, input)];
-    if (hasTransport && !movementOccupiable.includes("Infantry")) {
-      movementOccupiable.push("Infantry", "Armored");
-    }
-    const rangeByUnit = /* @__PURE__ */ new Map();
-    applyRangeSymbols(rangeByUnit, cat, input);
-    const grouped = /* @__PURE__ */ new Map();
-    collapseCategoryEntries(grouped, "Movement", movementByUnit, movementOccupiable);
-    collapseCategoryEntries(grouped, "Range", rangeByUnit, occupiableRangeUnits(cat, input));
-    return grouped;
-  }
-  function computeTerrainEffectsLine(input) {
-    const formatted = formatTerrainEffectEntries(buildTerrainEffectGroupedMap(input));
-    return formatted.length > 0 ? formatted.join(", ") : null;
-  }
-  function computeTerrainEffectsLineHtml(input) {
-    const plain = computeTerrainEffectsLine(input);
-    return plain == null ? null : formatTerrainEffectsLineHtml(plain);
-  }
-  function formatSymbolSet(symbols) {
-    return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
-  }
-  function movementEffectSymbolForUnit(unitType, input) {
-    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
-    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
-    return movementSymbolForUnit(unitType, cat, input, hasTransport);
-  }
-  function movementSymbolForUnit(unitType, cat, input, hasTransport) {
-    if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
-      return "+";
-    }
-    if (input.isRubble && (unitType === "infantry" || unitType === "armor")) {
-      const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
-      if (rubbleCost === Infinity) {
-        if (shouldSuppressMovementBlock(unitType, cat)) return null;
-        return "x";
-      }
-      if (input.hasRoad || input.hasRail) return null;
-      return "-";
-    }
-    if (input.isUrban) {
-      if (unitType === "infantry" || unitType === "armor") return "-";
-      return null;
-    }
-    const cost = tacticalEnterHexMovementCost(unitType, cat);
-    if (cost === Infinity) {
-      if (shouldSuppressMovementBlock(unitType, cat)) return null;
-      return "x";
-    }
-    if (cost === 2) return "-";
-    return null;
-  }
-  function shouldSuppressMovementBlock(unitType, cat) {
-    if (unitType === "naval") {
-      return cat !== "water" && cat !== "coastal";
-    }
-    if (unitType === "infantry" || unitType === "armor") {
-      return cat === "water";
-    }
-    return false;
-  }
-  function applyRangeSymbols(rangeByUnit, cat, input) {
-    const rangedCap = cat === "forests" || input.isUrban || input.isRubble;
-    if (rangedCap) {
-      addSymbol(rangeByUnit, "Infantry", "-");
-      addSymbol(rangeByUnit, "Armored", "-");
-    }
-    if (cat === "mountains") {
-      addSymbol(rangeByUnit, "Armored", "x");
-      addSymbol(rangeByUnit, "Naval", "x");
-    }
-  }
-  function addSymbol(map, unit, symbol) {
-    const existing = map.get(unit) ?? /* @__PURE__ */ new Set();
-    existing.add(symbol);
-    map.set(unit, existing);
-  }
-  function occupiableMovementUnits(cat, input) {
-    const units = [];
-    if (isInfantryOrArmorOccupiable(cat, input)) {
-      units.push("Infantry", "Armored");
-    }
-    if (isNavalTacticalCellNavigable({
-      resolvedKindForCell: input.terrainKind,
-      parentTerrain: input.parentTerrain,
-      parentTerrainKind: input.parentTerrainKind,
-      isSeaportCell: input.isSeaport
-    })) {
-      units.push("Naval");
-    }
-    return units;
-  }
-  function occupiableRangeUnits(cat, input) {
-    return occupiableMovementUnits(cat, input);
-  }
-  function isInfantryOrArmorOccupiable(cat, input) {
-    if (input.isUrban || input.isRubble) return true;
-    return isInfantryOrArmorTacticalSpawnCell({
-      resolvedKindForCell: input.terrainKind,
-      parentTerrain: input.parentTerrain,
-      parentTerrainKind: input.parentTerrainKind
-    });
-  }
-  function collapseCategoryEntries(grouped, category, byUnit, occupiable) {
-    const occupiableWithSymbols = occupiable.filter((u) => {
-      const set = byUnit.get(u);
-      return set !== void 0 && set.size > 0;
-    });
-    const collapsedUnits = /* @__PURE__ */ new Set();
-    if (occupiableWithSymbols.length >= 2) {
-      const reference = formatSymbolSet(byUnit.get(occupiableWithSymbols[0]));
-      const allSame = occupiableWithSymbols.every(
-        (u) => formatSymbolSet(byUnit.get(u)) === reference
-      );
-      if (allSame && reference.length > 0) {
-        grouped.set(`${category}|All`, new Set(byUnit.get(occupiableWithSymbols[0])));
-        for (const u of occupiableWithSymbols) collapsedUnits.add(u);
-      }
-    }
-    for (const [unit, symbols] of byUnit) {
-      if (collapsedUnits.has(unit)) continue;
-      if (symbols.size === 0) continue;
-      grouped.set(`${category}|${unit}`, new Set(symbols));
-    }
-  }
-
-  // src/shared/terrainCoverRules.ts
-  var TERRAIN_COVER_BY_CATEGORY = Object.freeze({
-    plains: Object.freeze({ surface: 0, air: 0 }),
-    forests: Object.freeze({ surface: 2, air: 1 }),
-    mountains: Object.freeze({ surface: 2, air: 0 }),
-    wetlands: Object.freeze({ surface: 1, air: 0 }),
-    desert: Object.freeze({ surface: 0, air: 0 }),
-    arctic: Object.freeze({ surface: 0, air: 0 }),
-    coastal: Object.freeze({ surface: 0, air: 0 }),
-    water: Object.freeze({ surface: 0, air: 0 })
-  });
-  var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
-  function terrainCoverPairFor(place) {
-    const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
-    const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
-    const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
-    const citySurface = place.city === true ? 2 : 0;
-    const cityAir = place.city === true ? 1 : 0;
-    const ruggedSurface = place.rugged === true ? 2 : 0;
-    return {
-      surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface),
-      air: Math.max(terrain.air, urbanAir, cityAir)
-    };
-  }
-  function terrainCoverFor(place, shooter) {
-    return terrainCoverPairFor(place)[shooter];
-  }
-  function tacticalCellCoverPlace(battle, tacticalH3) {
-    return {
-      terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3),
-      isUrban: battle.tacticalIsUrbanByH3?.[tacticalH3] === true,
-      isRubble: battle.tacticalIsRubbleByH3?.[tacticalH3] === true
-    };
-  }
-  function terrainCoverSourceLabel(place) {
-    if (place.isRubble === true) return "Rubble";
-    if (place.isUrban === true) return "Urban";
-    const category = normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land");
-    if (category === "forests") return "Forest";
-    if (category === "mountains") return "Mountain";
-    if (category === "wetlands") return "Wetlands";
-    return null;
-  }
-  var GROUND_NAVAL_COVER_LABEL = "Ground & Naval Cover";
-  var AIR_COVER_LABEL = "Air Cover";
-  function coverClauseHtml(value, label) {
-    if (value <= 0) return null;
-    const kind = value >= 2 ? "doubleUp" : "up";
-    return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
-  }
-  function formatTerrainCoverTooltipHtml(pair) {
-    const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
-      (part) => part != null
-    );
-    return parts.length > 0 ? parts.join(", ") : null;
-  }
-  function presentEffectHtml(html) {
-    if (html == null) return null;
-    return html.trim().length > 0 ? html : null;
-  }
-  function joinHexTooltipEffectsHtml(movementRangeHtml2, coverHtml) {
-    const movement = presentEffectHtml(movementRangeHtml2);
-    const cover = presentEffectHtml(coverHtml);
-    if (movement == null && cover == null) return null;
-    if (movement == null) return cover;
-    if (cover == null) return movement;
-    return `${movement}, ${cover}`;
-  }
-  function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
-    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("doubleDown")}Armored Movement` : null;
-    const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
-    return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
-  }
-
-  // src/renderer/rendererTacticalHydration.ts
-  function applyTacticalCityOverlayRows(cityRows, roadRailRows, vectorRows) {
-    const nextCities = /* @__PURE__ */ new Map();
-    for (const row of cityRows) {
-      if (row.label) nextCities.set(row.h3Index, row.label);
-    }
-    rendererSharedState.tacticalCityOverlayLabelByH3 = nextCities;
-    const nextRoadRail = /* @__PURE__ */ new Map();
-    for (const row of roadRailRows) {
-      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
-    }
-    rendererSharedState.tacticalRoadRailSidesByH3 = nextRoadRail;
-    rendererSharedState.tacticalTransportVectorOverlayRows = vectorRows.map((row) => ({
-      kind: row.kind,
-      points: row.points.map((p) => [p[0], p[1]])
-    }));
-  }
-  function applyStrategicBaselineUrbanHexCounts(rows) {
-    const next = /* @__PURE__ */ new Map();
-    for (const row of rows) {
-      if (!row.h3Index || !Number.isFinite(row.urbanHexCount)) continue;
-      const count = Math.trunc(row.urbanHexCount);
-      if (count <= 0) continue;
-      next.set(row.h3Index, count);
-    }
-    rendererSharedState.baselineUrbanHexCountByStrategicH3 = next;
-    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-  }
-  function baselineUrbanHexCountForStrategicHex(h3Index) {
-    const count = rendererSharedState.baselineUrbanHexCountByStrategicH3.get(h3Index);
-    return count == null || !Number.isFinite(count) ? 0 : count;
-  }
-
-  // src/renderer/map/terrainTooltipHtml.ts
-  function formatLlmLocationBoldPrefixHtml(namingTarget) {
-    if (!namingTarget) return "";
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    if (battle) {
-      const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
-      const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
-      if (!strategicCode || !tacticalCode) return "";
-      return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
-    }
-    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
-    if (!label) return "";
-    return `<strong>${escapeHtmlText(label)}</strong> `;
-  }
-  function formatTerrainVariantSuffix(state) {
-    const variants = [];
-    if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
-    else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
-    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
-  }
-  function resolveStrategicHexForControlLine(namingTarget) {
-    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.enclosingStrategicH3Index;
-    if (!namingTarget) return null;
-    if (namingTarget.resolution === 1) return namingTarget.h3Index;
-    try {
-      return strategicParentOf(namingTarget.h3Index);
-    } catch {
-      return null;
-    }
-  }
-  function getTooltipControlLabel(namingTarget) {
-    if (!rendererSharedState.gameState) return "Unknown";
-    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
-    if (!strategicHex) return "Unknown";
-    const controller = (rendererSharedState.gameState.strategicControl ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
-    const ownerLabel = controller === "human" ? "Human" : controller === "opponent" ? "AI" : "Unknown";
-    const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
-      h3Index: strategicHex,
-      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
-      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-    });
-    if (homeRegionIdentity != null) {
-      return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
-    }
-    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
-    const ownershipVisible = isHexOwnershipVisibleToPerspective({
-      h3Index: strategicHex,
-      playerPerspective: perspective,
-      visibleHexes,
-      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
-      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-    });
-    if (!ownershipVisible) return "Unknown";
-    return ownerLabel;
-  }
-  function tooltipWeather(namingTarget) {
-    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
-    if (!namingTarget) return null;
-    if (!rendererSharedState.gameState) return null;
-    const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
-    if (!strategicHex) return null;
-    return rendererSharedState.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
-  }
-  function parentStrategicHex(h3Index) {
-    try {
-      return strategicParentOf(h3Index);
-    } catch {
-      return null;
-    }
-  }
-  function movementRangeHtml(state, namingTarget) {
-    if (namingTarget?.resolution !== 4) return null;
-    return computeTerrainEffectsLineHtml({
-      terrainKind: state.terrainKind,
-      parentTerrain: state.parentTerrain,
-      parentTerrainKind: state.parentTerrainKind,
-      isUrban: state.isUrban,
-      isRubble: state.isRubble,
-      isSeaport: state.isSeaport,
-      hasRoad: state.hasRoad,
-      hasRail: state.hasRail
-    });
-  }
-  function coverPair(state, namingTarget) {
-    if (!namingTarget) return null;
-    if (namingTarget.resolution === 1) {
-      const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
-      return hex?.terrainKind ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true }) : null;
-    }
-    return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
-  }
-  function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
-    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
-    const techLine = producedUnitTechLineHtml(namingTarget);
-    const showControlLine = namingTarget?.resolution === 1;
-    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-    const terrainValue = state.strategicTerrainSummary != null ? formatTerrainNameListHtml(state.strategicTerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
-    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-    const weather = tooltipWeather(namingTarget);
-    const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-    const featuresLine = state.strategicFeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.strategicFeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
-    const pair = coverPair(state, namingTarget);
-    const effectsHtml = strategicHexEffectsBodyHtml(
-      namingTarget?.resolution ?? null,
-      namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
-      pair,
-      movementRangeHtml(state, namingTarget)
-    );
-    const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
-    const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
-    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
-    const resolution = namingTarget?.resolution;
-    const orderedLines = resolution === 1 ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
-    const bodyParts = orderedLines.filter((line) => line != null);
-    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
-    if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
-    return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
-  }
-  function terrainTooltipContentKey(state, namingCaption, namingTarget) {
-    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
-    const namingKey = namingCaption?.text ?? "";
-    const urbanKey = state.isUrban ? "1" : "0";
-    const rubbleKey = state.isRubble ? "1" : "0";
-    const featuresKey = state.features.join("|");
-    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
-    const strategicTerrainSummaryKey = state.strategicTerrainSummary ?? "";
-    const strategicFeaturesSummaryKey = state.strategicFeaturesSummary ?? "";
-    const weatherKey = tooltipWeather(namingTarget) ?? "";
-    const pair = coverPair(state, namingTarget);
-    const coverKey = pair == null ? "none" : `${pair.surface}:${pair.air}`;
-    const controlKey = getTooltipControlLabel(namingTarget);
-    const parentTerrainKey = state.parentTerrain;
-    const parentTerrainKindKey = state.parentTerrainKind;
-    const seaportKey = state.isSeaport ? "1" : "0";
-    const roadKey = state.hasRoad ? "1" : "0";
-    const railKey = state.hasRail ? "1" : "0";
-    const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
-    const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : "x";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
-  }
-  function producedUnitTechLineHtml(namingTarget) {
-    if (namingTarget?.resolution !== 1) return null;
-    return formatProducedUnitTechLineHtml({
-      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
-      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)
-    });
-  }
-  function strategicHexStopsArmor(h3Index) {
-    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === h3Index);
-    return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
-  }
-  function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
-    const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
-    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
-    if (cachedHtml !== void 0) return cachedHtml;
-    const html = formatTerrainTooltipHtml(state, namingCaption, namingTarget);
-    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
-    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-    return html;
-  }
-
-  // src/renderer/map/terrainTooltipStrategicState.ts
-  var namingLineByLookupKey = /* @__PURE__ */ new Map();
-  var EMPTY_TERRAIN_EFFECT_FIELDS = {
-    parentTerrain: "",
-    parentTerrainKind: "",
-    isSeaport: false,
-    hasRoad: false,
-    hasRail: false
-  };
-  function parentPassabilityForStrategicHex(parentH3) {
-    if (!rendererSharedState.gameState) return "land";
-    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === parentH3);
-    return hx?.terrain ?? "land";
-  }
-  function tacticalRoadRailSideMasksForChild(detailH3) {
-    const roadRail = rendererSharedState.tacticalRoadRailSidesByH3.get(detailH3);
-    return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
-  }
-  function tacticalEffectFieldsForChild(parentH3, detailH3) {
-    if (!infraGlyphsAllowedForTacticalChild(parentH3, detailH3)) {
-      return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
-    }
-    const parentKind = terrainKindForStrategicHex(parentH3);
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
-    return {
-      parentTerrain: parentPassabilityForStrategicHex(parentH3),
-      parentTerrainKind: parentKind,
-      isSeaport: rendererSharedState.terrainInfraTacticalSeaport.has(detailH3),
-      hasRoad: transportSideMaskHasAnyTrue(roadSides),
-      hasRail: transportSideMaskHasAnyTrue(railSides)
-    };
-  }
-  function clearTerrainTooltipTimer() {
-    if (rendererSharedState.terrainTooltipDelayTimer !== null) {
-      clearTimeout(rendererSharedState.terrainTooltipDelayTimer);
-      rendererSharedState.terrainTooltipDelayTimer = null;
-    }
-  }
-  function hideTerrainTooltipVisual() {
-    rendererSharedState.terrainTooltipRequestSeq++;
-    const el = document.getElementById("hex-tooltip");
-    if (el) {
-      el.classList.add("hidden");
-      el.setAttribute("aria-hidden", "true");
-    }
-  }
-  function terrainStateForStrategicHex(h3) {
-    if (!rendererSharedState.gameState) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
-    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === h3);
-    if (!hx) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
-    return {
-      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains"),
-      isUrban: false,
-      isRubble: false
-    };
-  }
-  function terrainKindForStrategicHex(h3) {
-    return terrainStateForStrategicHex(h3).terrainKind;
-  }
-  function infraGlyphsAllowedForStrategicHex(h3) {
-    if (!isHexExploredByPlayer(h3)) return false;
-    return true;
-  }
-  function infraGlyphsAllowedForTacticalChild(parentH3, childH3) {
-    if (!isHexExploredByPlayer(parentH3)) return false;
-    void childH3;
-    return true;
-  }
-  function featureLabelsForStrategicHex(h3) {
-    if (!infraGlyphsAllowedForStrategicHex(h3)) return [];
-    const counts = getStrategicFeatureCounts(h3);
-    const labels = [];
-    if (counts.airportCount > 0) labels.push("Airports");
-    if (counts.seaportCount > 0) labels.push("Seaports");
-    return labels;
-  }
-  function transportSideMaskHasAnyTrue(mask) {
-    if (!mask || mask.length === 0) return false;
-    return mask.some((v) => v === true);
-  }
-  function battleTerrainTooltipState(detailH3, battle) {
-    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
-    const tacticalKindByH3 = /* @__PURE__ */ new Map();
-    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
-      tacticalKindByH3.set(detailH3, override.terrainKind);
-    }
-    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
-    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
-      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
-    }
-    const enclosingKind = loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || "plains";
-    const terrainKind = tacticalBattleTerrainKindByCell({
-      cells: [detailH3],
-      tacticalKindByH3,
-      enclosingKind,
-      loadedStrategicKindByH3
-    })[detailH3] ?? enclosingKind;
-    const features = [];
-    if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push("Airport");
-    if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push("Seaport");
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
-    if (transportSideMaskHasAnyTrue(roadSides)) features.push("Road");
-    if (transportSideMaskHasAnyTrue(railSides)) features.push("Rail");
-    return {
-      terrainKind,
-      isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
-      isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
-      features,
-      urbanHexCount: null,
-      strategicTerrainSummary: null,
-      strategicFeaturesSummary: null,
-      parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
-      parentTerrainKind: enclosingKind,
-      isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
-      hasRoad: transportSideMaskHasAnyTrue(roadSides),
-      hasRail: transportSideMaskHasAnyTrue(railSides)
-    };
-  }
-  function featureLabelsForTacticalChild(parentH3, childH3) {
-    if (!infraGlyphsAllowedForTacticalChild(parentH3, childH3)) return [];
-    const labels = [];
-    if (rendererSharedState.terrainInfraTacticalAirport.has(childH3)) labels.push("Airport");
-    if (rendererSharedState.terrainInfraTacticalSeaport.has(childH3)) labels.push("Seaport");
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(childH3);
-    if (transportSideMaskHasAnyTrue(roadSides)) labels.push("Road");
-    if (transportSideMaskHasAnyTrue(railSides)) labels.push("Rail");
-    return labels;
-  }
-  function countUrbanTacticalHexesInStrategicHex(parentH3) {
-    let children = rendererSharedState.tacticalChildrenByParent.get(parentH3);
-    if (!children) {
-      children = tacticalChildrenOf(parentH3);
-      rendererSharedState.tacticalChildrenByParent.set(parentH3, children);
-    }
-    let count = 0;
-    for (const child of children) {
-      if (rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.isUrban) count++;
-    }
-    return count;
-  }
-  function getUrbanProductionCapacityForHex(h3Index) {
-    return countUrbanTacticalHexesInStrategicHex(h3Index);
-  }
-  function roundToNearestInteger(value) {
-    return Math.round(value);
-  }
-  function formatPercentInteger(value) {
-    return value.toLocaleString();
-  }
-  function clearStrategicTooltipSummaryCaches() {
-    rendererSharedState.strategicDominantTerrainKindByH3.clear();
-    rendererSharedState.strategicTerrainSummaryByH3.clear();
-    rendererSharedState.strategicFeaturesSummaryByH3.clear();
-    rendererSharedState.strategicFeatureCountsByH3.clear();
-    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-  }
-  function getStrategicFeatureCounts(h3) {
-    const cached = rendererSharedState.strategicFeatureCountsByH3.get(h3);
-    if (cached) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    let airportCount = 0;
-    let seaportCount = 0;
-    for (const child of children) {
-      if (rendererSharedState.terrainInfraTacticalAirport.has(child)) airportCount++;
-      if (rendererSharedState.terrainInfraTacticalSeaport.has(child)) seaportCount++;
-    }
-    const counts = { airportCount, seaportCount };
-    rendererSharedState.strategicFeatureCountsByH3.set(h3, counts);
-    return counts;
-  }
-  function getStrategicDominantTerrainKind(h3, parentKind) {
-    const cached = rendererSharedState.strategicDominantTerrainKindByH3.get(h3);
-    if (cached !== void 0) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    if (children.length <= 0) {
-      rendererSharedState.strategicDominantTerrainKindByH3.set(h3, parentKind);
-      return parentKind;
-    }
-    const counts = /* @__PURE__ */ new Map();
-    for (const child of children) {
-      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-      counts.set(kind, (counts.get(kind) ?? 0) + 1);
-    }
-    let dominantKind = parentKind;
-    let dominantCount = -1;
-    for (const [kind, count] of counts.entries()) {
-      if (count > dominantCount || count === dominantCount && kind.localeCompare(dominantKind) < 0) {
-        dominantKind = kind;
-        dominantCount = count;
-      }
-    }
-    rendererSharedState.strategicDominantTerrainKindByH3.set(h3, dominantKind);
-    return dominantKind;
-  }
-  function getStrategicTerrainSummary(h3, parentKind) {
-    const cached = rendererSharedState.strategicTerrainSummaryByH3.get(h3);
-    if (cached !== void 0) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    const total = children.length;
-    if (total <= 0) {
-      const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
-      rendererSharedState.strategicTerrainSummaryByH3.set(h3, fallback);
-      return fallback;
-    }
-    const counts = /* @__PURE__ */ new Map();
-    for (const child of children) {
-      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-      counts.set(kind, (counts.get(kind) ?? 0) + 1);
-    }
-    const entries = Array.from(counts.entries()).sort((a, b) => {
-      if (b[1] !== a[1]) return b[1] - a[1];
-      return a[0].localeCompare(b[0]);
-    });
-    if (entries.length <= 3) {
-      const parts2 = entries.map(([kind, count]) => {
-        const pct = roundToNearestInteger(count * 100 / total);
-        return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-      });
-      const summary2 = parts2.join(", ");
-      rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary2);
-      return summary2;
-    }
-    const topTwo = entries.slice(0, 2);
-    const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
-    const parts = topTwo.map(([kind, count]) => {
-      const pct = roundToNearestInteger(count * 100 / total);
-      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-    });
-    const otherPct = roundToNearestInteger((total - topTwoCount) * 100 / total);
-    parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
-    const summary = parts.join(", ");
-    rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary);
-    return summary;
-  }
-  function getStrategicFeaturesSummary(h3) {
-    if (rendererSharedState.strategicFeaturesSummaryByH3.has(h3)) return rendererSharedState.strategicFeaturesSummaryByH3.get(h3) ?? null;
-    if (!infraGlyphsAllowedForStrategicHex(h3)) {
-      rendererSharedState.strategicFeaturesSummaryByH3.set(h3, null);
-      return null;
-    }
-    const { airportCount, seaportCount } = getStrategicFeatureCounts(h3);
-    const parts = [];
-    if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
-    if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
-    const summary = parts.length > 0 ? parts.join(", ") : null;
-    rendererSharedState.strategicFeaturesSummaryByH3.set(h3, summary);
-    return summary;
-  }
-  function terrainTooltipStateForStrategicHex(h3) {
-    const state = terrainStateForStrategicHex(h3);
-    return {
-      ...state,
-      ...EMPTY_TERRAIN_EFFECT_FIELDS,
-      features: featureLabelsForStrategicHex(h3),
-      urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
-      strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
-      strategicFeaturesSummary: getStrategicFeaturesSummary(h3)
-    };
-  }
-  function terrainStateForPointer(clientX, clientY, fallbackStrategicH3) {
-    if (!rendererSharedState.gameState) {
-      return {
-        terrainKind: "Unknown",
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        strategicTerrainSummary: null,
-        strategicFeaturesSummary: null,
-        ...EMPTY_TERRAIN_EFFECT_FIELDS
-      };
-    }
-    const tacticalOn = shouldRenderTacticalHexes();
-    if (!tacticalOn) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const map = getMainLeafletMap();
-    if (!map) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const L = getLeafletGlobal();
-    if (!L) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-    try {
-      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
-      const battle = rendererSharedState.tacticalBattleSnapshot;
-      if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
-      const parentH3 = strategicParentOf(detailH3);
-      const parentKind = terrainKindForStrategicHex(parentH3);
-      const detail = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
-      return {
-        terrainKind: detail?.terrainKind ?? parentKind,
-        isUrban: detail?.isUrban ?? false,
-        isRubble: detail?.isRubble ?? false,
-        features: featureLabelsForTacticalChild(parentH3, detailH3),
-        urbanHexCount: null,
-        strategicTerrainSummary: null,
-        strategicFeaturesSummary: null,
-        ...tacticalEffectFieldsForChild(parentH3, detailH3)
-      };
-    } catch {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-  }
-  function namingLookupTargetForPointer(clientX, clientY, fallbackStrategicH3) {
-    const tacticalOn = shouldRenderTacticalHexes();
-    if (!tacticalOn) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const map = getMainLeafletMap();
-    if (!map) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const L = getLeafletGlobal();
-    if (!L) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-    try {
-      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
-      return { h3Index: detailH3, resolution: 4 };
-    } catch {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-  }
-  function namingLookupKey(target) {
-    if (!target) return null;
-    return `${target.resolution}:${target.h3Index}`;
-  }
-  async function getCachedNamingLineForTarget(target) {
-    const key = namingLookupKey(target);
-    if (!key || !target) return null;
-    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
-    if (!window.gameApi?.getHexNamingTooltipLine) return null;
-    try {
-      const caption = await window.gameApi.getHexNamingTooltipLine(target);
-      namingLineByLookupKey.set(key, caption ?? null);
-      return caption ?? null;
-    } catch (err) {
-      console.error("getHexNamingTooltipLine failed:", err);
-      namingLineByLookupKey.set(key, null);
-      return null;
-    }
   }
 
   // src/renderer/map/transientPointerTooltipTtl.ts
@@ -23044,7 +24557,7 @@ ${bonuses}`;
     applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
   }
   function getSelectableHumanIdsForStackCallout(units) {
-    return units.filter((u) => u.player === "human" && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
+    return units.filter((u) => u.player === HUMAN_SEAT_ID && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
   }
   function removeSealiftSection(calloutEl) {
     calloutEl.querySelectorAll(".stack-sealift-section").forEach((el) => el.remove());
@@ -23112,10 +24625,10 @@ ${bonuses}`;
           noneOption.value = "";
           noneOption.textContent = "(none)";
           select.appendChild(noneOption);
-          for (const option of state.landOptions) {
+          for (const option2 of state.landOptions) {
             const opt = document.createElement("option");
-            opt.value = option.unitId;
-            opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
+            opt.value = option2.unitId;
+            opt.textContent = buildSealiftUnitLabel(option2.unitId, option2.unitType);
             select.appendChild(opt);
           }
           select.value = selectedUnitId ?? "";
@@ -23283,7 +24796,7 @@ ${bonuses}`;
       hideStackCallout();
     });
     header.appendChild(closeBtn);
-    const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
+    const humanIds = sorted.filter((u) => u.player === HUMAN_SEAT_ID).map((u) => u.id);
     if (humanIds.length > 0 && !rendererSharedState.shiftKeyActive) {
       const selectAllBtn = document.createElement("button");
       selectAllBtn.type = "button";
@@ -23319,7 +24832,7 @@ ${bonuses}`;
       label.className = "unit-label";
       setUnitNameContent(label, u.id, formatUnitDisplayName(u.id));
       li.appendChild(label);
-      if (u.player === "human") {
+      if (u.player === HUMAN_SEAT_ID) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "unit-select stack-unit-toggle";
@@ -23415,7 +24928,7 @@ ${bonuses}`;
     "antiAir",
     "infrastructureCounterFire"
   ];
-  var PLAYER_ORDER = ["human", "opponent"];
+  var PLAYER_ORDER = [HUMAN_SEAT_ID, ...AI_SEAT_IDS, NEUTRAL_OWNER_ID];
   var UNIT_TYPE_ORDER = ["infantry", "armor", "naval", "air"];
   function isCombatDiceHit(roll) {
     return roll.face <= roll.threshold;
@@ -23626,50 +25139,19 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/newGameRegionUi.ts
-  var HUMAN_REGION_SELECT_ID = "new-game-human-region-select";
-  var AI_REGION_SELECT_ID = "new-game-ai-region-select";
-  function getRegionSelect(id) {
-    return document.getElementById(id);
+  var cachedNames = [];
+  function cachedScenarioHomeRegionNames() {
+    return cachedNames;
   }
-  function randomizeScenarioRegionSelect(id) {
-    const select = getRegionSelect(id);
-    if (!select || select.options.length <= 0) return;
-    const idx = Math.floor(Math.random() * select.options.length);
-    select.selectedIndex = idx;
-  }
-  function randomizeScenarioRegionSelects() {
-    randomizeScenarioRegionSelect(HUMAN_REGION_SELECT_ID);
-    randomizeScenarioRegionSelect(AI_REGION_SELECT_ID);
-  }
-  async function ensureScenarioRegionOptionsLoaded() {
-    const humanSelect = getRegionSelect(HUMAN_REGION_SELECT_ID);
-    const aiSelect = getRegionSelect(AI_REGION_SELECT_ID);
-    if (!humanSelect || !aiSelect) return;
-    if (humanSelect.options.length > 0 && aiSelect.options.length > 0) return;
+  async function loadScenarioHomeRegionNames() {
+    if (cachedNames.length > 0) return cachedNames;
     const regions = await window.gameApi?.listScenarioHomeRegions?.();
-    if (!Array.isArray(regions) || regions.length <= 0) return;
-    const renderOptions = (select) => {
-      select.innerHTML = "";
-      for (const region of regions) {
-        const option = document.createElement("option");
-        option.value = region;
-        option.textContent = region;
-        select.appendChild(option);
-      }
-    };
-    renderOptions(humanSelect);
-    renderOptions(aiSelect);
+    if (Array.isArray(regions) && regions.length > 0) cachedNames = regions;
+    return cachedNames;
   }
   async function initializeScenarioRegionSelectorsOnOverlayOpen() {
     randomizeNewGameStartMonth();
-    await ensureScenarioRegionOptionsLoaded();
-    randomizeScenarioRegionSelects();
-  }
-  function getSelectedScenarioRegions() {
-    return {
-      humanHomeRegion: getRegionSelect(HUMAN_REGION_SELECT_ID)?.value ?? "",
-      aiHomeRegion: getRegionSelect(AI_REGION_SELECT_ID)?.value ?? ""
-    };
+    await loadScenarioHomeRegionNames();
   }
 
   // src/shared/gameMapList.ts
@@ -23678,19 +25160,6 @@ ${bonuses}`;
   }
   function formatAdvancedTechLine(advancedMinUrbanCells) {
     return `Advanced tech: $${advancedMinUrbanCells}+ hexes`;
-  }
-  function pickDistinctIndexes(length, random = Math.random) {
-    if (length < 2) return null;
-    const first = Math.floor(random() * length);
-    let second = Math.floor(random() * (length - 1));
-    if (second >= first) second += 1;
-    return { first, second };
-  }
-  function pickIndexExcept(length, otherIndex, random = Math.random) {
-    if (length < 2) return null;
-    let next = Math.floor(random() * (length - 1));
-    if (next >= otherIndex) next += 1;
-    return next;
   }
 
   // src/renderer/chrome/selectTabPanel.ts
@@ -23708,113 +25177,6 @@ ${bonuses}`;
         panelEl?.setAttribute("hidden", "");
       }
     }
-  }
-
-  // src/renderer/map/mapExtent.ts
-  var active = "world";
-  function loadedMapExtentTarget() {
-    return active;
-  }
-  var appliedKey = "";
-  var resizeListenerAttached = false;
-  var activeBounds = null;
-  var lockedMinZoom = null;
-  function applyLoadedMapExtent(target, fit = true) {
-    const maps = extentMaps();
-    if (!maps) return false;
-    active = target;
-    if (target === "world") {
-      activeBounds = null;
-      lockedMinZoom = null;
-      setMapExtentReferenceLng(null);
-      const bounds2 = worldBounds(maps.leaflet);
-      applyToMap(maps.main, bounds2, true, 1.5, fit);
-      applyToMap(maps.mini, bounds2, true, 0, fit);
-      return true;
-    }
-    setMapExtentReferenceLng(target.referenceLng);
-    const bounds = maps.leaflet.latLngBounds(
-      maps.leaflet.latLng(target.south, target.west, true),
-      maps.leaflet.latLng(target.north, target.east, true)
-    );
-    activeBounds = bounds;
-    if (fit) maps.main.setMinZoom?.(0);
-    applyToMap(maps.main, bounds, false, null, fit);
-    applyToMap(maps.mini, bounds, false, 0, fit);
-    if (fit && maps.main.getZoom && maps.main.setMinZoom) {
-      lockedMinZoom = maps.main.getZoom();
-      maps.main.setMinZoom(lockedMinZoom);
-    } else if (lockedMinZoom != null) {
-      maps.main.setMinZoom?.(lockedMinZoom);
-    }
-    attachResize(maps.main);
-    return true;
-  }
-  function restoreLoadedMapExtent(fit = false) {
-    applyLoadedMapExtent(active, fit);
-  }
-  function syncMapExtentToSnapshot(state, options) {
-    const mapId = state.gameMap?.id ?? "global";
-    const key = loadedMapExtentKey(
-      mapId,
-      state.hexes.map((hex) => hex.h3Index)
-    );
-    if (!extentMaps()) return;
-    if (!shouldApplyLoadedMapExtent(appliedKey, key, options?.refit === true)) return;
-    if (mapId === "global" || state.hexes.length === 0) {
-      applyLoadedMapExtent("world", true);
-      appliedKey = key;
-      return;
-    }
-    const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
-    const box = mapExtentBoxForHexes(
-      longitudeIntervalFromCenters(longitudes),
-      state.hexes.map((hex) => hex.h3Index)
-    );
-    if (!box) return;
-    applyLoadedMapExtent(box, true);
-    appliedKey = key;
-  }
-  function extentMaps() {
-    const leaflet = globalThis.L;
-    const main = getMainLeafletMap();
-    if (!leaflet || !main) return null;
-    const mini = getMiniLeafletMap();
-    return { leaflet, main, mini };
-  }
-  function worldBounds(leaflet) {
-    return leaflet.latLngBounds(
-      leaflet.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-  }
-  function applyToMap(map, bounds, worldCopyJump, minZoom, fit) {
-    if (!map) return;
-    if (map.options) map.options.worldCopyJump = worldCopyJump;
-    map.setMaxBounds?.(bounds);
-    if (minZoom != null) map.setMinZoom?.(minZoom);
-    if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
-  }
-  function attachResize(map) {
-    if (resizeListenerAttached || !map.on) return;
-    resizeListenerAttached = true;
-    let recomputing = false;
-    map.on("resize", () => {
-      if (recomputing || active === "world" || activeBounds == null) return;
-      recomputing = true;
-      try {
-        const view = map;
-        const zoom = view.getZoom?.() ?? 0;
-        const center = view.getCenter?.();
-        view.setMinZoom?.(0);
-        view.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
-        const fitted = view.getZoom?.() ?? zoom;
-        view.setMinZoom?.(fitted);
-        if (center && view.setView) view.setView(center, Math.max(fitted, zoom));
-      } finally {
-        recomputing = false;
-      }
-    });
   }
 
   // src/shared/inspectionStatusIconLine.ts
@@ -23867,13 +25229,12 @@ ${bonuses}`;
 
   // src/shared/newGameMapPreviewCore.ts
   var WEATHER_STATES = /* @__PURE__ */ new Set(["mild", "rain", "snow", "heat"]);
-  function previewHomeBorder(h3Index, humanHomeHexes, aiHomeHexes) {
-    const inHuman = humanHomeHexes.has(h3Index);
-    const inAi = aiHomeHexes.has(h3Index);
-    if (inHuman && inAi) return { controllerPlayerId: null, homeOwnerIdentity: "both" };
-    if (inHuman) return { controllerPlayerId: "human", homeOwnerIdentity: "human" };
-    if (inAi) return { controllerPlayerId: "opponent", homeOwnerIdentity: "opponent" };
-    return { controllerPlayerId: null, homeOwnerIdentity: null };
+  function previewHomeSeatOrders(h3Index, homesBySeatOrder) {
+    const orders = [];
+    homesBySeatOrder.forEach((hexes, index) => {
+      if (hexes.includes(h3Index)) orders.push(index + 1);
+    });
+    return orders;
   }
   function previewHexIsDrawn(gameMapId, homeOwnerIdentity, mapInspectionHeld) {
     if (gameMapId !== "global") return true;
@@ -24135,37 +25496,6 @@ ${bonuses}`;
     productionDetailChosen = chosen;
   }
 
-  // src/shared/newGameBannerText.ts
-  function newGameBannerText(kind, tab) {
-    if (kind === "startup") return `Start the ${tab} game when ready.`;
-    return `Start a new ${tab} game when ready.`;
-  }
-
-  // src/renderer/gameplay/newGameBanner.ts
-  var bannerKind = null;
-  function writeNewGameBanner(text) {
-    const messageEl = document.getElementById("game-over-message");
-    if (!messageEl) return;
-    messageEl.textContent = text;
-    messageEl.style.display = "";
-  }
-  function showNewGameBanner(kind, tab) {
-    bannerKind = kind;
-    writeNewGameBanner(newGameBannerText(kind, tab));
-  }
-  function showGameOverBanner(text) {
-    bannerKind = null;
-    writeNewGameBanner(text);
-  }
-  function syncNewGameBannerToTab(tab) {
-    if (bannerKind === null) return;
-    writeNewGameBanner(newGameBannerText(bannerKind, tab));
-  }
-  function isNewGameOverlayOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
-  }
-
   // src/renderer/gameplay/productionOverlayHelpers.ts
   function getControllerForHex(state, h3Index) {
     const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
@@ -24193,7 +25523,7 @@ ${bonuses}`;
     return isChosenLayerShown(isProductionDetailChosen());
   }
   function isStrategicHexHumanUrbanProduction(state, hx) {
-    if (getControllerForHex(state, hx.h3Index) !== "human") return false;
+    if (getControllerForHex(state, hx.h3Index) !== HUMAN_SEAT_ID) return false;
     return getUrbanProductionCapacityForHex2(hx.h3Index) > 0;
   }
   function getBuildQueueSummaryForHex(state, h3Index) {
@@ -24215,8 +25545,8 @@ ${bonuses}`;
     if (!nextUnitType || capacityPerTurn <= 0) {
       return `${capacityText} / ?t`;
     }
-    if (controller === "human" || controller === "opponent") {
-      const countsByType = controller === "human" ? unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, "human") : unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, "opponent");
+    if (controller && isSeatId(controller)) {
+      const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
       if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
         return `${capacityText} / \u221Et`;
       }
@@ -24226,11 +25556,18 @@ ${bonuses}`;
     return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
-    if (controller !== "human") return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
+    if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
     return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
   }
   function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
     return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
+  }
+  function unitCountsForReveal(state) {
+    const seatIds = (state.seats ?? []).map((seat) => seat.seatId);
+    const ids = seatIds.length > 0 ? seatIds : [HUMAN_SEAT_ID];
+    const counts = {};
+    for (const seatId of ids) counts[seatId] = getUnitCountsByTypeForPlayer(state, seatId);
+    return counts;
   }
   function buildProductionOverlayContext(state) {
     const mapInspectionHeld = isMapInspectionModeHeld();
@@ -24241,10 +25578,7 @@ ${bonuses}`;
       productionDetailShown,
       revealAllControllerQueues,
       unitHexes: new Set(state.units.map((u) => u.h3Index)),
-      unitCountsByPlayer: revealAllControllerQueues ? {
-        human: getUnitCountsByTypeForPlayer(state, "human"),
-        opponent: getUnitCountsByTypeForPlayer(state, "opponent")
-      } : void 0
+      unitCountsByPlayer: revealAllControllerQueues ? unitCountsForReveal(state) : void 0
     };
   }
 
@@ -24321,7 +25655,7 @@ ${bonuses}`;
     try {
       for (const hx of state.hexes) {
         const explored = deps.isHexExploredByPlayer(hx.h3Index);
-        const controlledByHuman = getControllerForHex(state, hx.h3Index) === "human";
+        const controlledByHuman = getControllerForHex(state, hx.h3Index) === HUMAN_SEAT_ID;
         const humanUrbanProduction = isStrategicHexHumanUrbanProduction(state, hx);
         const surface = strategicProductionLabelSurface({
           tacticalRendered: false,
@@ -24617,34 +25951,54 @@ ${bonuses}`;
     }
   }
 
-  // src/renderer/rendering/terrainRendering.ts
-  function getMapZoomStrokeScale(zoom) {
-    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+  // src/renderer/rendering/ownerColors.ts
+  function paletteSeats() {
+    return rendererSharedState.gameState?.seats ?? [];
   }
-  function getHomeRegionOwnershipLineWidth(zoom) {
-    const stroke = getActiveHexStrokeStyle();
-    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
-    return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+  function paletteForCurrentOwner(ownerId) {
+    if (ownerId == null || ownerId === "") return null;
+    const seats = paletteSeats();
+    const palette = paletteForOwner(ownerId, seats);
+    if (palette) return palette;
+    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
+    return null;
   }
-  function buildControlByHex(state) {
-    return new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  }
+
+  // src/renderer/rendering/homeRegionBorderDrawing.ts
   function resolveControllerBorderColor(controllerPlayerId) {
-    if (controllerPlayerId === "human") return PLAYER_COLORS.human;
-    if (controllerPlayerId === "opponent") return PLAYER_COLORS.opponent;
-    return MULTI_PLAYER_FILL;
+    if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
+    return paletteForCurrentOwner(controllerPlayerId)?.map ?? MULTI_PLAYER_FILL;
   }
   function resolveHomeRegionOwnerBorderColor(identity) {
-    if (identity === "human") return PLAYER_COLORS.human;
-    if (identity === "opponent") return PLAYER_COLORS.opponent;
-    if (identity === "both") return MULTI_PLAYER_FILL;
-    return null;
+    if (identity == null) return null;
+    if (identity.kind === "shared") return MULTI_PLAYER_STROKE;
+    return paletteForCurrentOwner(identity.seatId)?.map ?? MULTI_PLAYER_FILL;
+  }
+  function buildInsetPolygonPoints(pts, insetPx) {
+    if (pts.length === 0 || insetPx <= 0) return [...pts];
+    let sumX = 0;
+    let sumY = 0;
+    for (const p of pts) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    const cx = sumX / pts.length;
+    const cy = sumY / pts.length;
+    return pts.map((p) => {
+      const dx = cx - p.x;
+      const dy = cy - p.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 1e-4) return { x: p.x, y: p.y };
+      const appliedInset = Math.min(insetPx, dist * 0.35);
+      const t = appliedInset / dist;
+      return { x: p.x + dx * t, y: p.y + dy * t };
+    });
   }
   function drawOutlinedHomeRegionOwnershipBorders(ctx, pts, args) {
     ctx.save();
     ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
-    const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
-    const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
+    const outerColor = args.outerColor ?? resolveControllerBorderColor(args.controllerPlayerId);
+    const innerColor = args.innerColor ?? resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
     const drawClosedPath = (points) => {
       ctx.beginPath();
       for (let i = 0; i < points.length; i++) {
@@ -24670,30 +26024,25 @@ ${bonuses}`;
     ctx.restore();
   }
   function resolveOwnershipBorderColor(style) {
-    if (style === "normalControlledByHuman") return PLAYER_COLORS.human;
-    if (style === "normalControlledByOpponent") return PLAYER_COLORS.opponent;
-    if (style === "outlinedNeutral") return MULTI_PLAYER_FILL;
+    if (style.kind === "normal") return paletteForCurrentOwner(style.ownerId)?.map ?? MULTI_PLAYER_FILL;
+    if (style.kind === "outlinedNeutral") return MULTI_PLAYER_FILL;
     return null;
   }
-  function buildInsetPolygonPoints(pts, insetPx) {
-    if (pts.length === 0 || insetPx <= 0) return [...pts];
-    let sumX = 0;
-    let sumY = 0;
-    for (const p of pts) {
-      sumX += p.x;
-      sumY += p.y;
-    }
-    const cx = sumX / pts.length;
-    const cy = sumY / pts.length;
-    return pts.map((p) => {
-      const dx = cx - p.x;
-      const dy = cy - p.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= 1e-4) return { x: p.x, y: p.y };
-      const appliedInset = Math.min(insetPx, dist * 0.35);
-      const t = appliedInset / dist;
-      return { x: p.x + dx * t, y: p.y + dy * t };
-    });
+  function ownershipStyleIsOutlined(style) {
+    return style.kind === "outlined" || style.kind === "outlinedNeutral";
+  }
+
+  // src/renderer/rendering/terrainRendering.ts
+  function getMapZoomStrokeScale(zoom) {
+    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+  }
+  function getHomeRegionOwnershipLineWidth(zoom) {
+    const stroke = getActiveHexStrokeStyle();
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
+    return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+  }
+  function buildControlByHex(state) {
+    return new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   }
   function drawTerrainHexes(ctx, deps) {
     if (!rendererSharedState.gameState) return;
@@ -24709,7 +26058,7 @@ ${bonuses}`;
     const L = getLeafletGlobal();
     const visibleHexes = rendererSharedState.gameState.visibleHexes ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(rendererSharedState.gameState);
-    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
+    const perspective = ownershipPerspective(rendererSharedState.gameState.playerPerspective);
     const controlBordersShown2 = areControlBordersShown();
     for (const hx of rendererSharedState.gameState.hexes) {
       const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
@@ -24743,32 +26092,29 @@ ${bonuses}`;
         h3Index: hx.h3Index,
         playerPerspective: perspective,
         visibleHexes,
-        humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-        aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+        homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
         intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
       });
       const ownershipStyle = controlBordersShown2 ? resolveOwnershipBorderStyle({
         h3Index: hx.h3Index,
         controllerPlayerId: controlByHex.get(hx.h3Index),
         isOwnershipVisible: ownershipVisible,
-        humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-        aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+        homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
         intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-      }) : "none";
+      }) : { kind: "none" };
       const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
-      ctx.strokeStyle = ownershipStyle.startsWith("outlined") ? "rgba(0, 0, 0, 0)" : stroke.color;
+      ctx.strokeStyle = ownershipStyleIsOutlined(ownershipStyle) ? "rgba(0, 0, 0, 0)" : stroke.color;
       ctx.lineWidth = stroke.width * zoomStrokeScale;
       drawClosedPath();
       ctx.stroke();
-      if (ownershipStyle !== "none") {
+      if (ownershipStyle.kind !== "none") {
         const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
-        if (ownershipStyle.startsWith("outlined")) {
+        if (ownershipStyleIsOutlined(ownershipStyle)) {
           drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
             controllerPlayerId: controlByHex.get(hx.h3Index),
             homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
               h3Index: hx.h3Index,
-              humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-              aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+              homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
               intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
             }),
             ownershipLineWidth
@@ -24785,7 +26131,7 @@ ${bonuses}`;
       }
       if (rendererSharedState.selectedHexIndex === hx.h3Index) {
         drawClosedPath();
-        ctx.strokeStyle = PLAYER_COLORS.human;
+        ctx.strokeStyle = paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? "#115E59";
         ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
         ctx.stroke();
       }
@@ -24851,14 +26197,14 @@ ${bonuses}`;
   function drawScenarioHomeRegionOutlines(ctx) {
     const state = rendererSharedState.gameState;
     if (!state || !areControlBordersShown()) return;
-    const homeRegionHexes = [.../* @__PURE__ */ new Set([...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])];
+    const homeRegionHexes = [...new Set(Object.values(state.homeRegionHexesBySeat ?? {}).flat())];
     if (homeRegionHexes.length === 0) return;
     if (!shouldRenderTacticalHexes()) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
-    const perspective = state.playerPerspective === "opponent" ? "opponent" : "human";
+    const perspective = ownershipPerspective(state.playerPerspective);
     const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(state);
     for (const h3Index of homeRegionHexes) {
@@ -24866,19 +26212,17 @@ ${bonuses}`;
         h3Index,
         playerPerspective: perspective,
         visibleHexes,
-        humanHomeRegionHexes: state.humanHomeRegionHexes,
-        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        homeRegionHexesBySeat: state.homeRegionHexesBySeat,
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
       });
       const style = resolveOwnershipBorderStyle({
         h3Index,
         controllerPlayerId: controlByHex.get(h3Index),
         isOwnershipVisible: ownershipVisible,
-        humanHomeRegionHexes: state.humanHomeRegionHexes,
-        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        homeRegionHexesBySeat: state.homeRegionHexesBySeat,
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
       });
-      if (style === "none") continue;
+      if (style.kind === "none") continue;
       const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
       const pts = boundary.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
@@ -24889,8 +26233,7 @@ ${bonuses}`;
         controllerPlayerId: controlByHex.get(h3Index),
         homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
           h3Index,
-          humanHomeRegionHexes: state.humanHomeRegionHexes,
-          aiHomeRegionHexes: state.aiHomeRegionHexes,
+          homeRegionHexesBySeat: state.homeRegionHexesBySeat,
           intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
         }),
         ownershipLineWidth
@@ -25000,6 +26343,13 @@ ${bonuses}`;
     payload = next;
     return true;
   }
+  function previewRingColors(orders) {
+    if (orders.length === 1) {
+      const color = SEAT_PALETTES[orders[0] - 1]?.map ?? MULTI_PLAYER_FILL;
+      return { outer: color, inner: color };
+    }
+    return { outer: MULTI_PLAYER_FILL, inner: MULTI_PLAYER_STROKE };
+  }
   function drawNewGameMapPreview(ctx, requestRedraw3) {
     if (!payload || payload.gameMapId !== shownGameMapId) return;
     const map = getMainLeafletMapForProjection();
@@ -25015,14 +26365,13 @@ ${bonuses}`;
     const weatherBonusLevel = choices.weatherBonusLevel;
     const techBonusLevel = choices.techBonusLevel;
     const startMonth = readNewGameStartMonth();
-    const humanHomes = new Set(payload.humanHomeRegionHexes);
-    const aiHomes = new Set(payload.aiHomeRegionHexes);
+    const homesBySeat = payload.homeRegionHexesBySeatOrder;
     const icons = [];
     for (const hex of payload.hexes) {
-      const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
+      const orders = previewHomeSeatOrders(hex.h3Index, homesBySeat);
       const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       if (pts.length === 0) continue;
-      if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity, inspectionHeld)) {
+      if (previewHexIsDrawn(payload.gameMapId, orders.length > 0 ? { kind: "shared" } : null, inspectionHeld)) {
         const drawClosedPath = () => {
           ctx.beginPath();
           for (let i = 0; i < pts.length; i++) {
@@ -25033,7 +26382,7 @@ ${bonuses}`;
           ctx.closePath();
         };
         fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
-        if (border.homeOwnerIdentity == null) {
+        if (orders.length === 0) {
           ctx.strokeStyle = stroke.color;
           ctx.lineWidth = stroke.width * zoomStrokeScale;
           drawClosedPath();
@@ -25043,10 +26392,13 @@ ${bonuses}`;
           ctx.lineWidth = stroke.width * zoomStrokeScale;
           drawClosedPath();
           ctx.stroke();
+          const rings = previewRingColors(orders);
           drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
-            controllerPlayerId: border.controllerPlayerId,
-            homeOwnerIdentity: border.homeOwnerIdentity,
-            ownershipLineWidth
+            controllerPlayerId: null,
+            homeOwnerIdentity: { kind: "shared" },
+            ownershipLineWidth,
+            outerColor: rings.outer,
+            innerColor: rings.inner
           });
         }
       }
@@ -25133,6 +26485,10 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/newGameMapPreviewUi.ts
+  var readHomeKeys = () => [];
+  function setPreviewHomeKeyReader(reader) {
+    readHomeKeys = reader;
+  }
   var requestSerial = 0;
   var framedExtentKey = null;
   var mapCameraHeldForStart = false;
@@ -25186,26 +26542,14 @@ ${bonuses}`;
     }
   }
   function readPreviewDialogRequest() {
+    const homeKeys = readHomeKeys();
     const regional = document.getElementById("new-game-tab-regional")?.getAttribute("aria-selected") === "true";
     if (!regional) {
-      const homes = getSelectedScenarioRegions();
-      return {
-        gameMapId: "global",
-        request: {
-          scope: "global",
-          humanHomeRegion: homes.humanHomeRegion,
-          aiHomeRegion: homes.aiHomeRegion
-        }
-      };
+      return { gameMapId: "global", request: { scope: "global", homeKeys } };
     }
     const gameMapId = selectValue("new-game-region-select");
-    const humanSideGroupId = selectValue("new-game-human-side-select");
-    const aiSideGroupId = selectValue("new-game-ai-side-select");
-    if (!gameMapId || !humanSideGroupId || !aiSideGroupId) return null;
-    return {
-      gameMapId,
-      request: { scope: "regional", gameMapId, humanSideGroupId, aiSideGroupId }
-    };
+    if (!gameMapId) return null;
+    return { gameMapId, request: { scope: "regional", gameMapId, homeKeys } };
   }
   function selectValue(id) {
     const select = document.getElementById(id);
@@ -25232,15 +26576,24 @@ ${bonuses}`;
   ];
   var loadedMaps = [];
   var controlsRegistered = false;
+  var onHomesChanged = null;
+  function setNewGameHomesChangedListener(listener) {
+    onHomesChanged = listener;
+  }
+  function regionalHomeOptions() {
+    return selectedSideGroups().map((group) => ({ key: group.id, label: group.displayName }));
+  }
   function registerNewGameMapControls() {
     if (controlsRegistered) return;
     controlsRegistered = true;
     document.getElementById("new-game-tab-global")?.addEventListener("click", () => {
       selectNewGameTab("global");
+      onHomesChanged?.();
       void refreshNewGameMapPreview();
     });
     document.getElementById("new-game-tab-regional")?.addEventListener("click", () => {
       selectNewGameTab("regional");
+      onHomesChanged?.();
       void refreshNewGameMapPreview();
     });
     document.getElementById("new-game-region-select")?.addEventListener("change", () => {
@@ -25249,14 +26602,6 @@ ${bonuses}`;
     document.getElementById("new-game-region-randomize")?.addEventListener("click", () => {
       randomizeSelectedRegion();
     });
-    document.getElementById("new-game-human-side-select")?.addEventListener("change", () => {
-      void refreshNewGameMapPreview();
-    });
-    document.getElementById("new-game-ai-side-select")?.addEventListener("change", () => {
-      void refreshNewGameMapPreview();
-    });
-    document.getElementById("new-game-human-side-randomize")?.addEventListener("click", () => randomizeOneRegionalSide("human"));
-    document.getElementById("new-game-ai-side-randomize")?.addEventListener("click", () => randomizeOneRegionalSide("ai"));
   }
   async function prepareNewGameMapPanel() {
     setAdvancedTechLine("");
@@ -25270,19 +26615,11 @@ ${bonuses}`;
   }
   function readNewGameMapChoice() {
     if (!regionalTabSelected()) return {};
-    return {
-      gameMapId: selectValue2("new-game-region-select"),
-      humanSideGroupId: selectValue2("new-game-human-side-select"),
-      aiSideGroupId: selectValue2("new-game-ai-side-select")
-    };
-  }
-  function regionalStartBlocked() {
-    return regionalTabSelected() && selectedSideGroups().length < 2;
+    return { gameMapId: selectValue2("new-game-region-select") };
   }
   function selectNewGameTab(which) {
     selectTabPanel(which === "regional" ? "new-game-tab-regional" : "new-game-tab-global", NEW_GAME_TABS);
     applyVisibleCosts();
-    syncStartEnabled();
     syncNewGameBannerToTab(which);
   }
   function fillRegionSelect(regions) {
@@ -25290,15 +26627,14 @@ ${bonuses}`;
     if (!select) return;
     select.innerHTML = "";
     for (const region of regions) {
-      const option = document.createElement("option");
-      option.value = region.id;
-      option.textContent = region.displayName;
-      select.appendChild(option);
+      const option2 = document.createElement("option");
+      option2.value = region.id;
+      option2.textContent = region.displayName;
+      select.appendChild(option2);
     }
   }
   function randomizeRegionalMap() {
     pickRandomRegionIndex();
-    applySelectedRegionSides(true);
   }
   function randomizeSelectedRegion() {
     if (!pickRandomRegionIndex()) return;
@@ -25311,33 +26647,8 @@ ${bonuses}`;
     return true;
   }
   function onRegionalRegionChanged() {
-    applySelectedRegionSides(true);
     if (regionalTabSelected()) applyVisibleCosts();
-    syncStartEnabled();
-    void refreshNewGameMapPreview();
-  }
-  function applySelectedRegionSides(randomize) {
-    const groups = selectedSideGroups();
-    fillSideSelect("new-game-human-side-select", groups);
-    fillSideSelect("new-game-ai-side-select", groups);
-    if (!randomize) return;
-    const picked = pickDistinctIndexes(groups.length);
-    const human = document.getElementById("new-game-human-side-select");
-    const ai = document.getElementById("new-game-ai-side-select");
-    if (!picked || !human || !ai) return;
-    human.selectedIndex = picked.first;
-    ai.selectedIndex = picked.second;
-  }
-  function randomizeOneRegionalSide(which) {
-    const groups = selectedSideGroups();
-    const human = document.getElementById("new-game-human-side-select");
-    const ai = document.getElementById("new-game-ai-side-select");
-    if (!human || !ai) return;
-    const target = which === "human" ? human : ai;
-    const otherIndex = which === "human" ? ai.selectedIndex : human.selectedIndex;
-    const next = pickIndexExcept(groups.length, otherIndex);
-    if (next === null) return;
-    target.selectedIndex = next;
+    onHomesChanged?.();
     void refreshNewGameMapPreview();
   }
   function applyVisibleCosts() {
@@ -25360,13 +26671,6 @@ ${bonuses}`;
     const el = document.getElementById(id);
     if (el) el.textContent = formatUnitCostLabel(cost);
   }
-  function syncStartEnabled() {
-    const button = document.getElementById("new-game-btn");
-    if (!button) return;
-    const blocked = regionalStartBlocked();
-    button.disabled = blocked;
-    if (blocked) showMapToast("This map has no two sides.");
-  }
   function selectedSideGroups() {
     return selectedRegionalEntry()?.sideGroups ?? [];
   }
@@ -25383,16 +26687,616 @@ ${bonuses}`;
   function selectValue2(id) {
     return document.getElementById(id)?.value ?? "";
   }
-  function fillSideSelect(id, groups) {
-    const select = document.getElementById(id);
-    if (!select) return;
-    select.innerHTML = "";
-    for (const group of groups) {
-      const option = document.createElement("option");
-      option.value = group.id;
-      option.textContent = group.displayName;
-      select.appendChild(option);
+
+  // src/shared/newGameSides.ts
+  function initialSidesState(args) {
+    const requested = args.rowCount ?? MIN_SEATS;
+    const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
+    const rows = args.homes.slice(0, count).map((home, index) => ({
+      kind: index === 0 ? HUMAN_SEAT_ID : "ai",
+      homeKey: home.key,
+      commander: index === 0 ? null : args.defaultCommander
+    }));
+    return { mapKind: args.mapKind, observeOnly: false, rows };
+  }
+  function setObserveOnly(state, on, defaultCommander2) {
+    if (state.rows.length === 0) return { ...state, observeOnly: on };
+    const first = state.rows[0];
+    const nextFirst = on ? { ...first, kind: "ai", commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_ID, commander: null };
+    return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
+  }
+  function addSideRow(state, homes, defaultCommander2) {
+    if (addRowBlockedReason(state, homes)) return state;
+    const taken = new Set(state.rows.map((row2) => row2.homeKey));
+    const free = homes.find((home) => !taken.has(home.key));
+    if (!free) return state;
+    const row = { kind: "ai", homeKey: free.key, commander: defaultCommander2 };
+    return { ...state, rows: [...state.rows, row] };
+  }
+  function removeSideRow(state, index) {
+    if (state.rows.length <= MIN_SEATS) return state;
+    if (index < 0 || index >= state.rows.length) return state;
+    return { ...state, rows: state.rows.filter((_, rowIndex) => rowIndex !== index) };
+  }
+  function setRowHome(state, index, homeKey) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
+    if (taken) return state;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey } : row);
+    return { ...state, rows };
+  }
+  function randomizeRowHome(state, index, homes, random) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const current = state.rows[index].homeKey;
+    const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
+    if (free.length === 0) return state;
+    const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
+    return setRowHome(state, index, picked.key);
+  }
+  function setRowCommander(state, index, commander) {
+    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== "ai") return state;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
+    return { ...state, rows };
+  }
+  function setEveryAiCommander(state, commander) {
+    const rows = state.rows.map((row) => row.kind === "ai" ? { ...row, commander } : row);
+    return { ...state, rows };
+  }
+  function rowLabel(state, index) {
+    if (index < 0 || index >= state.rows.length) return "";
+    if (state.observeOnly) return `Side ${index + 1}`;
+    if (state.rows[index].kind === HUMAN_SEAT_ID) return "You";
+    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === "ai").length;
+    return `Opponent ${opponentNumber}`;
+  }
+  function homeOptionsForRow(state, index, homes) {
+    return homes.map((home) => {
+      const taker = state.rows.findIndex((row, rowIndex) => rowIndex !== index && row.homeKey === home.key);
+      return {
+        key: home.key,
+        label: home.label,
+        disabled: taker >= 0,
+        takenBy: taker >= 0 ? rowLabel(state, taker) : null
+      };
+    });
+  }
+  function sidesCaption(state, homes) {
+    const max = Math.min(MAX_SEATS, homes.length);
+    const noun = state.observeOnly ? `${state.rows.length} of ${max} sides, all AI` : `${state.rows.length} of ${max} sides in play`;
+    return noun;
+  }
+  function addRowBlockedReason(state, homes) {
+    if (state.rows.length >= MAX_SEATS) return "Up to 4 sides";
+    const taken = new Set(state.rows.map((row) => row.homeKey));
+    const free = homes.some((home) => !taken.has(home.key));
+    if (!free) return "No free side on this map";
+    return null;
+  }
+  function startBlockedReason(state) {
+    if (!state || state.rows.length < MIN_SEATS) return "At least 2 sides";
+    if (state.rows.some((row) => !row.homeKey)) return "Each side needs a home";
+    const keys = state.rows.map((row) => row.homeKey);
+    if (new Set(keys).size !== keys.length) return "Two sides share a home";
+    return null;
+  }
+  function buildSeatsPayload(state) {
+    return state.rows.map((row) => {
+      const home = row.homeKey ?? void 0;
+      const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
+      if (row.kind === "ai" && row.commander) return { ...seat, commander: row.commander };
+      return seat;
+    });
+  }
+
+  // src/shared/victoryRules.ts
+  var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
+  var DEFAULT_TURN_LIMIT = 30;
+  function countCityHexesBySeat(control, infrastructure) {
+    const urbanByHex = new Map(infrastructure.map((row) => [row.h3Index, row.urbanHexCount]));
+    const counts = /* @__PURE__ */ new Map();
+    for (const row of control) {
+      if (!row.controllerPlayerId || !isSeatId(row.controllerPlayerId)) continue;
+      if ((urbanByHex.get(row.h3Index) ?? 0) <= 0) continue;
+      counts.set(row.controllerPlayerId, (counts.get(row.controllerPlayerId) ?? 0) + 1);
     }
+    return counts;
+  }
+  function rankSeatsByCityHexes(seatIds, cityHexCountBySeat) {
+    const places = /* @__PURE__ */ new Map();
+    for (const seatId of seatIds) {
+      const held = cityHexCountBySeat.get(seatId) ?? 0;
+      const better = seatIds.filter((other) => (cityHexCountBySeat.get(other) ?? 0) > held).length;
+      places.set(seatId, 1 + better);
+    }
+    return places;
+  }
+
+  // src/renderer/gameplay/newGameSidesUi.ts
+  var sidesState = null;
+  var requestedRows = MIN_SEATS;
+  var openCommanderRow = null;
+  function homesForTab() {
+    if (selectedNewGameTab() === "regional") return regionalHomeOptions();
+    return cachedScenarioHomeRegionNames().map((name) => ({ key: name, label: name }));
+  }
+  function defaultCommander() {
+    const modelSelect = document.getElementById("openrouter-model");
+    const effortSelect = document.getElementById("openrouter-reasoning-effort");
+    const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
+    const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
+    const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
+    return { modelId, reasoningEffort, doctrineChoice: "balanced" };
+  }
+  function commanderButtonLabel(commander) {
+    const modelSelect = document.getElementById("openrouter-model");
+    const option2 = commander?.modelId ? [...modelSelect?.options ?? []].find((entry) => entry.value === commander.modelId) : void 0;
+    const modelLabel2 = commander?.modelId ? modelNameFromOptionLabel(option2?.textContent ?? commander.modelId) : null;
+    return formatCommanderSummary({
+      modelLabel: modelLabel2,
+      reasoningEffort: commander?.reasoningEffort ?? null,
+      doctrineChoice: commander?.doctrineChoice ?? "balanced"
+    });
+  }
+  function refreshNewGameSides(options) {
+    closeCommanderPopover();
+    if (options?.reset) requestedRows = MIN_SEATS;
+    const homes = homesForTab();
+    const mapKind = selectedNewGameTab();
+    const commander = defaultCommander();
+    let next = initialSidesState({ mapKind, homes, defaultCommander: commander, rowCount: requestedRows });
+    if (!options?.reset && sidesState?.observeOnly) next = setObserveOnly(next, true, commander);
+    for (let index = 0; index < next.rows.length; index += 1) {
+      next = randomizeRowHome(next, index, homes, Math.random);
+    }
+    sidesState = next;
+    renderNewGameSides();
+  }
+  function bindNewGameSides() {
+    fillVictoryControls();
+    setPreviewHomeKeyReader(previewHomeKeys);
+    document.getElementById("new-game-observe-only")?.addEventListener("change", () => {
+      if (!sidesState) return;
+      const box = document.getElementById("new-game-observe-only");
+      closeCommanderPopover();
+      sidesState = setObserveOnly(sidesState, box?.checked === true, defaultCommander());
+      renderNewGameSides();
+      void refreshNewGameMapPreview();
+    });
+    document.getElementById("new-game-add-side-btn")?.addEventListener("click", () => {
+      if (!sidesState) return;
+      closeCommanderPopover();
+      sidesState = addSideRow(sidesState, homesForTab(), defaultCommander());
+      requestedRows = sidesState.rows.length;
+      renderNewGameSides();
+      void refreshNewGameMapPreview();
+    });
+    setNewGameHomesChangedListener(() => {
+      refreshNewGameSides();
+      void refreshNewGameMapPreview();
+    });
+  }
+  function readNewGameSeatsStart() {
+    const blocked = startBlockedReason(sidesState);
+    const turnLimit = readTurnLimit();
+    return {
+      seats: sidesState && !blocked ? buildSeatsPayload(sidesState) : [],
+      turnLimit,
+      blocked
+    };
+  }
+  function previewHomeKeys() {
+    return (sidesState?.rows ?? []).map((row) => row.homeKey ?? "");
+  }
+  function fillVictoryControls() {
+    const victory = document.getElementById("new-game-victory-select");
+    if (victory && victory.options.length === 0) {
+      const option2 = document.createElement("option");
+      option2.value = "rule";
+      option2.textContent = "Last side standing";
+      victory.appendChild(option2);
+    }
+    const limit = document.getElementById("new-game-turn-limit-select");
+    if (limit && limit.options.length === 0) {
+      for (const turns of TURN_LIMIT_OPTIONS) {
+        const option2 = document.createElement("option");
+        option2.value = String(turns);
+        option2.textContent = `${turns} turns`;
+        if (turns === DEFAULT_TURN_LIMIT) option2.selected = true;
+        limit.appendChild(option2);
+      }
+    }
+  }
+  function readTurnLimit() {
+    const limit = document.getElementById("new-game-turn-limit-select");
+    const parsed = Number(limit?.value);
+    return TURN_LIMIT_OPTIONS.includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
+  }
+  function renderNewGameSides() {
+    const homes = homesForTab();
+    const caption = document.getElementById("new-game-sides-caption");
+    if (caption && sidesState) caption.textContent = sidesCaption(sidesState, homes);
+    const observe = document.getElementById("new-game-observe-only");
+    if (observe && sidesState) observe.checked = sidesState.observeOnly;
+    const host = document.getElementById("new-game-side-rows");
+    if (host && sidesState) {
+      host.replaceChildren();
+      sidesState.rows.forEach((_, index) => host.appendChild(renderRow(sidesState, homes, index)));
+      if (openCommanderRow != null) {
+        const button = host.querySelector(`[data-commander-row="${openCommanderRow}"]`);
+        if (button instanceof HTMLElement) reanchorCommanderPopover(button);
+        else closeCommanderPopover();
+      }
+    }
+    const blocked = sidesState ? addRowBlockedReason(sidesState, homes) : "No free side on this map";
+    const add = document.getElementById("new-game-add-side-btn");
+    const addHost = document.querySelector(".new-game-add-side-host");
+    if (add && sidesState) {
+      add.disabled = blocked != null;
+      add.textContent = "";
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("class", "chrome-icon");
+      icon.setAttribute("viewBox", "0 0 16 16");
+      icon.setAttribute("aria-hidden", "true");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M8 3v10M3 8h10");
+      icon.appendChild(path);
+      add.append(icon, document.createTextNode(sidesState.observeOnly ? "Add another side" : "Add another opponent"));
+    }
+    if (addHost) addHost.setAttribute("data-control-tooltip", blocked ?? "Add a side on the next free home.");
+    const startBlocked = startBlockedReason(sidesState);
+    const start = document.getElementById("new-game-btn");
+    if (start) {
+      start.disabled = startBlocked != null;
+      start.setAttribute(
+        "data-control-tooltip",
+        startBlocked ?? newGameButtonTooltipText(start.textContent !== "New game")
+      );
+    }
+    const global = selectedNewGameTab() === "global";
+    const victory = document.getElementById("new-game-victory-select");
+    if (victory && victory.options[0]) {
+      victory.options[0].textContent = global ? "Most city hexes at turn limit" : "Last side standing";
+    }
+    const limitRow = document.getElementById("new-game-turn-limit-row");
+    if (limitRow) limitRow.hidden = !global;
+  }
+  function openRowCommander(index, button) {
+    if (!sidesState) return;
+    if (openCommanderRow === index && commanderPopoverIsOpen()) {
+      closeCommanderPopover();
+      return;
+    }
+    const row = sidesState.rows[index];
+    if (!row || row.kind !== "ai") return;
+    const label = rowLabel(sidesState, index);
+    const observeOnly = sidesState.observeOnly;
+    openCommanderPopover({
+      anchor: button,
+      title: `${label} commander`,
+      commander: row.commander ?? defaultCommander(),
+      applyAllLabel: observeOnly ? "Use for every side" : "Use for every opponent",
+      onChange: (commander) => {
+        if (!sidesState) return;
+        sidesState = setRowCommander(sidesState, index, commander);
+        renderNewGameSides();
+      },
+      onApplyAll: (commander) => {
+        if (!sidesState) return;
+        sidesState = setEveryAiCommander(sidesState, commander);
+        renderNewGameSides();
+      },
+      onClose: () => {
+        if (openCommanderRow === index) openCommanderRow = null;
+      }
+    });
+    openCommanderRow = index;
+  }
+  function renderRow(state, homes, index) {
+    const row = state.rows[index];
+    const label = rowLabel(state, index);
+    const wrap = document.createElement("div");
+    wrap.className = "new-game-side-row";
+    const name = document.createElement("span");
+    name.className = "new-game-side-label";
+    name.textContent = label;
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `${label} home`);
+    for (const option2 of homeOptionsForRow(state, index, homes)) {
+      const entry = document.createElement("option");
+      entry.value = option2.key;
+      entry.textContent = option2.takenBy ? `${option2.label} \xB7 ${option2.takenBy}` : option2.label;
+      entry.disabled = option2.disabled;
+      if (option2.key === row.homeKey) entry.selected = true;
+      select.appendChild(entry);
+    }
+    select.addEventListener("change", () => {
+      if (!sidesState) return;
+      sidesState = setRowHome(sidesState, index, select.value);
+      renderNewGameSides();
+      void refreshNewGameMapPreview();
+    });
+    const randomize = document.createElement("button");
+    randomize.type = "button";
+    randomize.className = "compact-blue-btn compact-square-btn new-game-randomize";
+    randomize.textContent = "\u21BB";
+    randomize.setAttribute("aria-label", `Randomize ${label} home`);
+    randomize.addEventListener("click", () => {
+      if (!sidesState) return;
+      sidesState = randomizeRowHome(sidesState, index, homesForTab(), Math.random);
+      renderNewGameSides();
+      void refreshNewGameMapPreview();
+    });
+    wrap.append(name, select, randomize);
+    const showRemove = state.observeOnly || row.kind === "ai";
+    if (showRemove) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "compact-blue-btn compact-square-btn new-game-side-remove";
+      remove.textContent = "\xD7";
+      remove.disabled = state.rows.length <= 2;
+      remove.setAttribute("aria-label", `Remove ${label}`);
+      remove.addEventListener("click", () => {
+        if (!sidesState) return;
+        closeCommanderPopover();
+        sidesState = removeSideRow(sidesState, index);
+        requestedRows = sidesState.rows.length;
+        renderNewGameSides();
+        void refreshNewGameMapPreview();
+      });
+      wrap.appendChild(remove);
+    }
+    if (row.kind === "ai") {
+      const commander = document.createElement("button");
+      commander.type = "button";
+      commander.className = "new-game-side-commander";
+      commander.textContent = commanderButtonLabel(row.commander);
+      commander.dataset.commanderRow = String(index);
+      commander.setAttribute("aria-label", `${label} commander`);
+      commander.setAttribute("data-control-tooltip", "Change this side's model, reasoning, and doctrine.");
+      commander.addEventListener("click", () => openRowCommander(index, commander));
+      wrap.appendChild(commander);
+    }
+    return wrap;
+  }
+
+  // src/shared/standings.ts
+  var TOTAL_LABEL = "Model cost this match";
+  function buildStandings(input) {
+    const first = input.seats.filter((seat) => seat.place === 1).sort((left, right) => left.seatOrder - right.seatOrder);
+    const rows = [...input.seats].sort((left, right) => (left.place ?? Number.MAX_SAFE_INTEGER) - (right.place ?? Number.MAX_SAFE_INTEGER) || left.seatOrder - right.seatOrder).map((seat) => standingsRow(seat, input, first.length === 1));
+    const total = input.seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
+    return {
+      heading: headingFor(input.seats, first),
+      dateLine: input.dateLabel.trim() ? `Turn ${input.turnNumber} \xB7 ${input.dateLabel.trim()}` : `Turn ${input.turnNumber}`,
+      resultLine: resultLine(input, first),
+      rows,
+      totalLabel: TOTAL_LABEL,
+      totalCost: formatMatchCost(total)
+    };
+  }
+  function headingFor(seats, first) {
+    if (first.length !== 1) return "No side won.";
+    const human = seats.find((seat) => seat.kind === HUMAN_SEAT_ID);
+    if (!human) return `${first[0].homeRegion} wins.`;
+    return `You placed ${ordinal(human.place ?? seats.length)} of ${seats.length}.`;
+  }
+  function resultLine(input, first) {
+    const shared = input.gameEndReason === "turn_limit" || input.gameEndReason === "mutual_elimination";
+    if (shared && first.length > 1) return shareSentence(first);
+    if (input.gameEndReason === "ended_by_human") return `You ended the match on turn ${input.turnNumber}.`;
+    if (first.length !== 1) return "";
+    const winner = first[0];
+    if (input.gameEndReason === "mutual_elimination") return `${winner.homeRegion} holds the most city hexes.`;
+    if (input.gameEndReason === "turn_limit") {
+      return `${winner.homeRegion} holds the most city hexes at the end of turn ${input.turnNumber}.`;
+    }
+    return lastStandingLine(winner, input.seats);
+  }
+  function lastStandingLine(winner, seats) {
+    const opening = `${winner.homeRegion} is the last side standing.`;
+    const victims = seats.filter((seat) => seat.outBy === winner.seatId && seat.outTurn !== null).sort((left, right) => (right.outTurn ?? 0) - (left.outTurn ?? 0) || left.seatOrder - right.seatOrder);
+    const latest = victims[0];
+    if (!latest || latest.outTurn === null) return opening;
+    return `${opening} It knocked out ${latest.homeRegion} on turn ${latest.outTurn}.`;
+  }
+  function shareSentence(first) {
+    const names = first.map((seat) => seat.homeRegion);
+    const named = names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+    return `${named} share first place with ${cityHexPhrase(first[0]?.cityHexes ?? 0)} each.`;
+  }
+  function standingsRow(seat, input, singleWinner) {
+    const you = input.viewerSeatId !== null && seat.seatId === input.viewerSeatId;
+    const ai = seat.commander !== null;
+    return {
+      place: seat.place,
+      seatId: seat.seatId,
+      name: you ? `${seat.homeRegion} (you)` : seat.homeRegion,
+      dotColor: paletteForOwner(seat.seatId, input.seats)?.map ?? "#9CA3AF",
+      status: statusFor(seat, input.gameEndReason, singleWinner),
+      commanderSummary: ai ? commanderSummary(seat, input.modelLabels) : null,
+      consultationsLabel: ai ? consultationPhrase(seat.consultationCount) : null,
+      costLabel: ai ? formatMatchCost(seat.costUsd) : null,
+      knockedOutBy: knockedOutBy(seat, input)
+    };
+  }
+  function statusFor(seat, reason, singleWinner) {
+    if (seat.outTurn !== null) return `Out, turn ${seat.outTurn}`;
+    if (reason === "last_side_standing" && singleWinner && seat.place === 1) return "Winner";
+    return cityHexPhrase(seat.cityHexes);
+  }
+  function commanderSummary(seat, modelLabels2) {
+    const commander = seat.commander;
+    const modelLabel2 = commander.modelId ? modelLabels2[commander.modelId] ?? commander.modelId : null;
+    return formatCommanderSummary({
+      modelLabel: modelLabel2,
+      reasoningEffort: commander.reasoningEffort,
+      doctrineChoice: commander.doctrineChoice,
+      revealedDoctrine: commander.revealedDoctrine
+    });
+  }
+  function knockedOutBy(seat, input) {
+    if (seat.outBy === null) return null;
+    if (input.viewerSeatId !== null && seat.outBy === input.viewerSeatId) return "Knocked out by you";
+    const name = input.seats.find((row) => row.seatId === seat.outBy)?.homeRegion;
+    return `Knocked out by ${name ?? "A side"}`;
+  }
+  function cityHexPhrase(count) {
+    return count === 1 ? "1 city hex" : `${count} city hexes`;
+  }
+  function consultationPhrase(count) {
+    return count === 1 ? "1 consultation" : `${count} consultations`;
+  }
+  function ordinal(place) {
+    const mod100 = place % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
+    switch (place % 10) {
+      case 1:
+        return `${place}st`;
+      case 2:
+        return `${place}nd`;
+      case 3:
+        return `${place}rd`;
+      default:
+        return `${place}th`;
+    }
+  }
+  function formatMatchCost(dollars) {
+    const cents = Math.round((Number.isFinite(dollars) ? dollars : 0) * 100);
+    const sign = cents < 0 ? "-" : "";
+    const abs = Math.abs(cents);
+    return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+  }
+
+  // src/renderer/gameplay/gameOverStandings.ts
+  function hideGameOverStandings() {
+    const section = document.getElementById("game-over-standings");
+    if (!section) return;
+    section.hidden = true;
+    section.replaceChildren();
+  }
+  function renderGameOverStandings(state) {
+    const section = document.getElementById("game-over-standings");
+    const seats = state.seats;
+    if (!section || !seats || seats.length === 0 || !state.gameEndReason) {
+      hideGameOverStandings();
+      return "The match is over.";
+    }
+    const standings = buildStandings({
+      seats: seats.map((seat) => seatInput(seat, cityHexes2(state))),
+      viewerSeatId: findHumanSeat(seats)?.seatId ?? null,
+      gameEndReason: state.gameEndReason,
+      turnNumber: state.turnNumber,
+      dateLabel: state.currentDateLabel ?? "",
+      modelLabels: modelLabels(seats)
+    });
+    paint(section, standings);
+    section.hidden = false;
+    return standings.heading;
+  }
+  function cityHexes2(state) {
+    return countCityHexesBySeat(state.strategicControl ?? [], state.strategicInfrastructure ?? []);
+  }
+  function seatInput(seat, counts) {
+    const commander = seat.commander;
+    return {
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      kind: seat.kind,
+      homeRegion: seat.homeRegion,
+      outTurn: seat.outTurn,
+      outBy: seat.outBy,
+      place: seat.place,
+      consultationCount: seat.consultationCount,
+      costUsd: seat.costUsd,
+      cityHexes: counts.get(seat.seatId) ?? 0,
+      commander: commander ? {
+        modelId: commander.modelId,
+        reasoningEffort: commander.reasoningEffort,
+        doctrineChoice: commander.doctrineChoice,
+        revealedDoctrine: commander.doctrine
+      } : null
+    };
+  }
+  function modelLabels(seats) {
+    const select = document.getElementById("openrouter-model");
+    const labels = {};
+    for (const seat of seats) {
+      const modelId = seat.commander?.modelId;
+      if (!modelId || labels[modelId]) continue;
+      labels[modelId] = optionLabel(select, modelId);
+    }
+    return labels;
+  }
+  function optionLabel(select, modelId) {
+    if (!(select instanceof HTMLSelectElement)) return modelId;
+    const option2 = [...select.options].find((row) => row.value === modelId);
+    return option2?.textContent?.trim() || modelId;
+  }
+  function paint(section, standings) {
+    section.replaceChildren();
+    const head = document.createElement("div");
+    head.className = "game-over-standings-head";
+    const kicker = document.createElement("p");
+    kicker.className = "game-over-standings-kicker";
+    kicker.textContent = "Result";
+    const date = document.createElement("p");
+    date.className = "game-over-standings-date";
+    date.textContent = standings.dateLine;
+    head.append(kicker, date);
+    const result = document.createElement("p");
+    result.className = "game-over-standings-result";
+    result.textContent = standings.resultLine;
+    const list = document.createElement("ol");
+    list.className = "game-over-standings-rows";
+    for (const row of standings.rows) list.append(rowElement(row));
+    const total = document.createElement("p");
+    total.className = "game-over-standings-total";
+    const totalName = document.createElement("span");
+    totalName.textContent = standings.totalLabel;
+    const totalCost = document.createElement("span");
+    totalCost.textContent = standings.totalCost;
+    total.append(totalName, totalCost);
+    section.append(head, result, list, total);
+  }
+  function rowElement(row) {
+    const item = document.createElement("li");
+    item.className = "game-over-standings-row";
+    const place = document.createElement("span");
+    place.className = "game-over-standings-place";
+    place.textContent = row.place === null ? "\u2013" : String(row.place);
+    const dot = document.createElement("span");
+    dot.className = "game-over-standings-dot";
+    dot.style.backgroundColor = row.dotColor;
+    const body = document.createElement("div");
+    body.className = "game-over-standings-body";
+    const title = document.createElement("div");
+    title.className = "game-over-standings-title";
+    const name = document.createElement("span");
+    name.className = "game-over-standings-name";
+    name.textContent = row.name;
+    const status = document.createElement("span");
+    status.className = "game-over-standings-status";
+    status.textContent = row.status;
+    title.append(name, status);
+    body.append(title);
+    const meta = metaLine(row);
+    if (meta) body.append(meta);
+    if (row.knockedOutBy) {
+      const knocked = document.createElement("p");
+      knocked.className = "game-over-standings-knockout";
+      knocked.textContent = row.knockedOutBy;
+      body.append(knocked);
+    }
+    item.append(place, dot, body);
+    return item;
+  }
+  function metaLine(row) {
+    const parts = [row.commanderSummary, row.consultationsLabel, row.costLabel].filter((part) => part !== null);
+    if (parts.length === 0) return null;
+    const meta = document.createElement("p");
+    meta.className = "game-over-standings-meta";
+    meta.textContent = parts.join(" ");
+    return meta;
   }
 
   // src/renderer/gameplay/newGameSizeUi.ts
@@ -25416,602 +27320,251 @@ ${bonuses}`;
     syncGameSizeCapPreview();
   }
 
-  // src/renderer/chrome/controlTooltip.ts
-  var controlTooltipAttr = "data-control-tooltip";
-  var controlTooltipElementId = "control-tooltip";
-  var installed = false;
-  var delayTimer = null;
-  var currentHost = null;
-  var pointerInside = false;
-  var placeFromPointer = false;
-  var suppressedHost = null;
-  var lastClientX = 0;
-  var lastClientY = 0;
-  function tipElement() {
-    return document.getElementById(controlTooltipElementId);
+  // src/renderer/openRouter/resolutionPlaybackDeferral.ts
+  var playbackCompleteNotifyQueue = [];
+  var playbackFinishedListeners = [];
+  function onResolutionPlaybackFinished(listener) {
+    playbackFinishedListeners.push(listener);
   }
-  function clearDelayTimer() {
-    if (delayTimer !== null) {
-      clearTimeout(delayTimer);
-      delayTimer = null;
-    }
-  }
-  function hideTip() {
-    clearDelayTimer();
-    const el = tipElement();
-    if (!el) return;
-    el.classList.add("hidden");
-    el.setAttribute("aria-hidden", "true");
-    el.textContent = "";
-  }
-  function orderTipVisible() {
-    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
-      const el = document.getElementById(id);
-      if (el && !el.classList.contains("hidden")) return true;
-    }
-    return false;
-  }
-  function hostFromTarget(target) {
-    if (!(target instanceof Element)) return null;
-    const closest = target.closest(`[${controlTooltipAttr}]`);
-    if (closest instanceof HTMLElement) return closest;
-    if (target instanceof HTMLLabelElement && target.htmlFor) {
-      const linked = document.getElementById(target.htmlFor);
-      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
-    }
-    const label = target.closest("label");
-    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
-    return descendant instanceof HTMLElement ? descendant : null;
-  }
-  function hostText(host) {
-    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
-  }
-  function keyOpensNativeList(ev) {
-    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
-    if (ev.key === "ArrowDown" && ev.altKey) return true;
-    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
-    return false;
-  }
-  function selectForTip(target) {
-    if (!(target instanceof Element)) return null;
-    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
-    if (!(select instanceof HTMLSelectElement)) return null;
-    return hostFromTarget(select) ? select : null;
-  }
-  function placeTip(el, x, y) {
-    el.style.left = "0px";
-    el.style.top = "0px";
-    const { width, height } = el.getBoundingClientRect();
-    const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
-    const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
-    const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
-    const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }
-  function showTip(host, text) {
-    const el = tipElement();
-    if (!el) return;
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-    let x = lastClientX;
-    let y = lastClientY;
-    if (!placeFromPointer) {
-      const rect = host.getBoundingClientRect();
-      x = rect.left;
-      y = rect.top;
-    }
-    el.textContent = text;
-    el.classList.remove("hidden");
-    placeTip(el, x, y);
-    el.setAttribute("aria-hidden", "false");
-    el.setAttribute("role", "tooltip");
-  }
-  function scheduleShow(host) {
-    clearDelayTimer();
-    if (suppressedHost === host) return;
-    const text = hostText(host);
-    if (!text) {
-      hideTip();
-      return;
-    }
-    delayTimer = setTimeout(() => {
-      delayTimer = null;
-      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
-      if (orderTipVisible()) return;
-      const next = hostText(host);
-      if (!next) {
-        hideTip();
-        return;
+  function notifyResolutionPlaybackFinished() {
+    for (const listener of playbackFinishedListeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.error("resolutionPlaybackDeferral: playback-finished listener failed", err);
       }
-      showTip(host, next);
-    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-  }
-  function suppressHost(host) {
-    suppressedHost = host;
-    hideTip();
-  }
-  function adoptHost(host, fromPointer, clientX, clientY) {
-    if (fromPointer && host === currentHost) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-      moveVisibleTip(lastClientX, lastClientY);
-      return;
     }
-    if (!fromPointer && host === currentHost) return;
-    if (currentHost !== host) {
-      hideTip();
-      suppressedHost = null;
+  }
+  function enqueueResolutionPlaybackCompleteNotify(fn) {
+    playbackCompleteNotifyQueue.length = 0;
+    playbackCompleteNotifyQueue.push(fn);
+  }
+  function dropQueuedResolutionPlaybackCompleteNotifies() {
+    playbackCompleteNotifyQueue.length = 0;
+  }
+  function flushResolutionPlaybackCompleteNotifyCallbacks() {
+    const queue = [...playbackCompleteNotifyQueue];
+    playbackCompleteNotifyQueue.length = 0;
+    for (const fn of queue) {
+      try {
+        fn();
+      } catch (err) {
+        console.error("resolutionPlaybackDeferral: notify callback failed", err);
+      }
     }
-    currentHost = host;
-    if (fromPointer) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-    } else {
-      pointerInside = pointerIsOn(host);
-      placeFromPointer = pointerInside;
-    }
-    if (suppressedHost === host) return;
-    scheduleShow(host);
-  }
-  function releaseHost(host) {
-    if (suppressedHost === host) suppressedHost = null;
-    if (currentHost !== host) return;
-    pointerInside = false;
-    currentHost = null;
-    hideTip();
-  }
-  function relatedStaysInside(host, related) {
-    if (!(related instanceof Element)) return false;
-    const next = hostFromTarget(related);
-    if (next === host) return true;
-    if (next) return false;
-    return related === host || host.contains(related);
-  }
-  function pointerIsOn(host) {
-    return host.matches(":hover");
-  }
-  function focusIsOn(host) {
-    const active2 = document.activeElement;
-    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
-    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
-  }
-  function hostIsAvailable(host) {
-    if (!host.isConnected || host.getClientRects().length === 0) return false;
-    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
-    if (controls.length === 0) return true;
-    return controls.some((control) => control.getClientRects().length > 0);
-  }
-  function dismissStaleControlTooltip() {
-    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-  }
-  function moveVisibleTip(clientX, clientY) {
-    const el = tipElement();
-    if (!el || el.classList.contains("hidden")) return;
-    placeTip(el, clientX, clientY);
-  }
-  function installControlTooltip() {
-    if (installed) return;
-    installed = true;
-    document.addEventListener(
-      "pointerover",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, true, ev.clientX, ev.clientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        releaseHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointermove",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (orderTipVisible()) {
-          if (currentHost) releaseHost(currentHost);
-          return;
-        }
-        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-        if (host && host !== currentHost) {
-          adoptHost(host, true, ev.clientX, ev.clientY);
-          return;
-        }
-        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
-          releaseHost(currentHost);
-        }
-        if (!host || host !== currentHost) return;
-        lastClientX = ev.clientX;
-        lastClientY = ev.clientY;
-        placeFromPointer = true;
-        pointerInside = true;
-        moveVisibleTip(lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerdown",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "keydown",
-      (ev) => {
-        if (!keyOpensNativeList(ev)) return;
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "change",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusin",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, false, lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        if (pointerInside && currentHost === host) return;
-        releaseHost(host);
-      },
-      true
-    );
+    notifyResolutionPlaybackFinished();
   }
 
-  // src/renderer/chrome/panelSlideHelpers.ts
-  var PANEL_SLIDE_MS = 150;
-  function reducedMotionRequested() {
-    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  }
-  function startPanelHeightSlide(panel, from, to, onFinish) {
-    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") return null;
-    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-      duration: PANEL_SLIDE_MS,
-      easing: "ease-out"
-    });
-    running.onfinish = () => onFinish(running);
-    return running;
-  }
-
-  // src/shared/mapChromePlacement.ts
-  var MAP_CHROME_INSET = 12;
-  var MAP_CHROME_GAP = 8;
-  var TOAST_BAND_MIN_WIDTH = 280;
-  function legendPopoverPosition(input) {
-    const besideLeft = input.panelRight + MAP_CHROME_GAP;
-    if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
-      return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
-    }
-    return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
-  }
-  function toastBandSpan(input) {
-    const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
-    const left = input.leftObstacleRight + MAP_CHROME_INSET;
-    if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
-      return { left: MAP_CHROME_INSET, right, overChrome: true };
-    }
-    return { left, right, overChrome: false };
-  }
-  function floatingPanelOffset(input) {
-    const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
-    const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
-    return {
-      left: Math.min(maxLeft, Math.max(MAP_CHROME_INSET, input.left)),
-      top: Math.min(maxTop, Math.max(MAP_CHROME_INSET, input.top))
-    };
-  }
-
-  // src/renderer/map/mapChromeLayout.ts
-  function layoutMapChrome() {
-    const map = document.getElementById("canvas-container");
-    const panel = document.getElementById("minimap-panel");
-    if (!map || !panel) return;
-    const mapBox = map.getBoundingClientRect();
-    const panelBox = panel.getBoundingClientRect();
-    const panelRight = panelBox.right - mapBox.left;
-    let leftObstacleRight = panelRight;
-    const legend = document.getElementById("terrain-legend");
-    if (legend && !legend.hidden) {
-      const place = legendPopoverPosition({
-        mapWidth: mapBox.width,
-        panelRight,
-        panelBottom: panelBox.bottom - mapBox.top,
-        legendWidth: legend.offsetWidth
-      });
-      legend.style.left = `${place.left}px`;
-      legend.style.top = `${place.top}px`;
-      if (place.beside) leftObstacleRight = place.left + legend.offsetWidth;
-    }
-    const dialog = document.getElementById("game-over-overlay");
-    if (dialog && !dialog.classList.contains("hidden")) {
-      leftObstacleRight = Math.max(leftObstacleRight, dialog.getBoundingClientRect().right - mapBox.left);
-    }
-    const band = document.getElementById("map-toast-band");
-    if (!band) return;
-    const span = toastBandSpan({
-      mapWidth: mapBox.width,
-      leftObstacleRight,
-      rightObstacleLeft: mapBox.width
-    });
-    band.style.left = `${span.left}px`;
-    band.style.right = `${span.right}px`;
-  }
-
-  // src/renderer/gameplay/newGameDialogMove.ts
-  var dragStart = null;
-  function dialogAndArea() {
-    const panel = document.getElementById("game-over-overlay");
-    const area = document.getElementById("app-body");
-    if (!panel || !area) return null;
-    return { panel, area };
-  }
-  function applyOffset(panel, area, left, top, panelHeight = panel.offsetHeight) {
-    const place = floatingPanelOffset({
-      left,
-      top,
-      panelWidth: panel.offsetWidth,
-      panelHeight,
-      mapWidth: area.clientWidth,
-      mapHeight: area.clientHeight
-    });
-    panel.style.left = `${place.left}px`;
-    panel.style.top = `${place.top}px`;
-  }
-  function placeNewGameDialogAtInset() {
-    dragStart = null;
-    const parts = dialogAndArea();
-    if (!parts) return;
-    parts.panel.style.removeProperty("left");
-    parts.panel.style.removeProperty("top");
-    layoutMapChrome();
-  }
-  function keepNewGameDialogOnMap(panelHeight) {
-    const parts = dialogAndArea();
-    if (!parts || parts.panel.style.left === "" || parts.panel.classList.contains("hidden")) return;
-    applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
-  }
-  function endDrag() {
-    if (!dragStart) return;
-    dragStart = null;
-    layoutMapChrome();
-  }
-  function wireNewGameDialogMove() {
-    const grip = document.getElementById("new-game-panel-grip");
-    if (!grip) return;
-    grip.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const parts = dialogAndArea();
-      if (!parts) return;
-      event.preventDefault();
-      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
-      grip.setPointerCapture(event.pointerId);
-    });
-    grip.addEventListener("pointermove", (event) => {
-      const parts = dialogAndArea();
-      if (!dragStart || !parts) return;
-      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
-    });
-    grip.addEventListener("pointerup", endDrag);
-    grip.addEventListener("pointercancel", endDrag);
-    window.addEventListener("resize", () => keepNewGameDialogOnMap());
-  }
-
-  // src/renderer/gameplay/newGameDialogCollapse.ts
-  var EXPANDED_LABEL = "Hide the new game choices";
-  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
-  var COLLAPSED_LABEL = "Show the new game choices";
-  var COLLAPSED_TOOLTIP = "Show the new game choices.";
-  var expanded = true;
-  var slide = null;
-  function newGameOverlayIsOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
-  }
-  function dialogParts() {
-    const panel = document.getElementById("game-over-overlay");
-    const header = document.getElementById("new-game-panel-header");
-    const button = document.getElementById("new-game-dialog-collapse");
-    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
-    return { panel, header, button };
-  }
-  function syncCollapseControl(button) {
-    button.setAttribute("aria-expanded", String(expanded));
-    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
-    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
-  }
-  function placeStartButton(state) {
-    const button = document.getElementById("new-game-btn");
-    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
-    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
-    if (state === "compact") {
-      const close = document.getElementById("new-game-dialog-close");
-      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
-      return;
-    }
-    parent.appendChild(button);
-  }
-  function setPanelState(panel, state) {
-    placeStartButton(state);
-    panel.dataset.state = state;
-  }
-  function settle(panel) {
-    slide?.cancel();
-    slide = null;
-    setPanelState(panel, expanded ? "expanded" : "compact");
-  }
-  function slideTo(panel, from, to) {
-    slide = startPanelHeightSlide(panel, from, to, (finished) => {
-      if (slide === finished) settle(panel);
-    });
-    if (!slide) settle(panel);
-  }
-  function expandNewGameDialog() {
-    const parts = dialogParts();
-    if (!parts) return;
-    expanded = true;
-    syncCollapseControl(parts.button);
-    settle(parts.panel);
-  }
-  function toggleNewGameDialogCollapsed() {
-    const parts = dialogParts();
-    if (!parts) return;
-    const { panel, header, button } = parts;
-    const from = panel.getBoundingClientRect().height;
-    slide?.cancel();
-    slide = null;
-    expanded = !expanded;
-    syncCollapseControl(button);
-    if (expanded) {
-      setPanelState(panel, "expanding");
-      const to = panel.getBoundingClientRect().height;
-      keepNewGameDialogOnMap(to);
-      slideTo(panel, from, to);
-      return;
-    }
-    const active2 = document.activeElement;
-    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
-    setPanelState(panel, "collapsing");
-    const borders = panel.offsetHeight - panel.clientHeight;
-    slideTo(panel, from, header.offsetHeight + borders);
-  }
-  function syncNewGameDialogMapPointer() {
-    const overlay = document.getElementById("game-over-overlay");
-    const map = document.getElementById("main-map");
-    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
-    if (overlay.classList.contains("hidden")) return;
-    map.style.pointerEvents = "auto";
-  }
-
-  // src/renderer/map/mainMapCameraReturn.ts
-  var saved = null;
-  function saveMainMapCameraForReturn() {
-    const map = getMainLeafletMap();
-    if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
-      saved = null;
-      return;
-    }
-    saved = {
-      extent: loadedMapExtentTarget(),
-      center: map.getCenter(),
-      zoom: map.getZoom(),
-      minZoom: map.getMinZoom(),
-      maxZoom: map.getMaxZoom(),
-      maxBounds: map.options?.maxBounds ?? null,
-      worldCopyJump: map.options?.worldCopyJump === true
-    };
-  }
-  function returnMainMapCamera() {
-    const camera = saved;
-    saved = null;
-    const map = getMainLeafletMap();
-    if (!camera || !map) return false;
-    applyLoadedMapExtent(camera.extent, true);
-    if (map.options) map.options.worldCopyJump = camera.worldCopyJump;
-    map.setMaxBounds?.(camera.maxBounds);
-    map.setMinZoom?.(camera.minZoom);
-    map.setMaxZoom?.(camera.maxZoom);
-    map.setView?.(camera.center, camera.zoom, { animate: false });
+  // src/renderer/gameplay/observeChrome.ts
+  var applySnapshot = null;
+  var pressReady = null;
+  var wired = false;
+  var pressing = false;
+  var viewSeq = 0;
+  function autoAdvanceReady() {
+    if (!rendererSharedState.autoAdvance || pressing || rendererSharedState.readyRequestInFlight) return false;
+    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return false;
+    if (rendererSharedState.gameState?.gameOver || rendererSharedState.gameState?.phase !== "planning") return false;
+    if (rendererSharedState.resolutionMoveAnimation || rendererSharedState.tacticalBattleSnapshot) return false;
+    if (isDeferredResolutionPlaybackConsultPending() || anyCommanderIsPlanning() || commanderStartIsSettling()) return false;
+    if (newGameOverlayIsOpen()) return false;
+    const knockout = document.getElementById("knockout-dialog");
+    if (knockout && !knockout.classList.contains("hidden")) return false;
+    const annihilation = document.getElementById("tactical-annihilation-overlay");
+    if (annihilation && !annihilation.classList.contains("hidden")) return false;
     return true;
   }
-  function forgetMainMapCameraForReturn() {
-    saved = null;
+  async function maybeObserveAutoAdvance() {
+    if (!autoAdvanceReady() || !pressReady) return;
+    pressing = true;
+    try {
+      await pressReady();
+    } finally {
+      pressing = false;
+    }
   }
-
-  // src/renderer/gameplay/newGameReturn.ts
-  var matchWaiting = false;
-  function syncCloseControl() {
-    const close = document.getElementById("new-game-dialog-close");
-    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
+  function stopObserveAutoAdvance(reason, log) {
+    if (!rendererSharedState.autoAdvance) return;
+    rendererSharedState.autoAdvance = false;
+    const box = document.getElementById("observe-auto-advance-input");
+    if (box instanceof HTMLInputElement) box.checked = false;
+    console.error("observe auto-advance stopped", reason);
+    log(`Auto-advance stopped: ${reason}`);
   }
-  function isMatchWaitingUnderNewGame() {
-    return matchWaiting;
+  function currentViewAs() {
+    if (rendererSharedState.viewAs === "all") return "all";
+    const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === rendererSharedState.viewAs);
+    if (!seat || seat.outTurn != null) return "all";
+    return rendererSharedState.viewAs;
   }
-  function holdMatchUnderNewGame() {
-    matchWaiting = true;
-    saveMainMapCameraForReturn();
-    syncCloseControl();
+  async function refreshObservedSnapshot() {
+    const seq = ++viewSeq;
+    try {
+      const next = await fetchMatchSnapshot();
+      if (seq !== viewSeq || !applySnapshot) return;
+      await applySnapshot(next);
+    } catch (err) {
+      console.error("observe view refresh failed", err);
+    }
   }
-  function forgetMatchUnderNewGame() {
-    matchWaiting = false;
-    forgetMainMapCameraForReturn();
-    syncCloseControl();
+  function syncObserveChrome() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const observing = observeModeControls(seats).observing;
+    const host = document.getElementById("topbar-view-as");
+    const select = document.getElementById("topbar-view-as-select");
+    const dot = document.getElementById("topbar-view-as-dot");
+    if (host) host.hidden = !observing;
+    const checkbox = document.getElementById("observe-auto-advance");
+    const input = document.getElementById("observe-auto-advance-input");
+    if (checkbox) checkbox.hidden = !observing;
+    if (input instanceof HTMLInputElement && document.activeElement !== input) input.checked = rendererSharedState.autoAdvance;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (!observing) return;
+    const view = currentViewAs();
+    if (view !== rendererSharedState.viewAs) {
+      rendererSharedState.viewAs = view;
+      void refreshObservedSnapshot();
+    }
+    const ordered = sortSeatsByOrder(seats);
+    const key = ordered.map((seat) => `${seat.seatId}:${seat.outTurn ?? ""}:${seat.homeRegion}`).join("|");
+    if (select.dataset.seats !== key) {
+      select.dataset.seats = key;
+      const all = document.createElement("option");
+      all.value = "all";
+      all.textContent = "All sides, no fog";
+      const options = ordered.map((seat) => {
+        const option2 = document.createElement("option");
+        option2.value = seat.seatId;
+        option2.textContent = seat.homeRegion;
+        option2.disabled = seat.outTurn != null;
+        return option2;
+      });
+      select.replaceChildren(all, ...options);
+    }
+    if (document.activeElement !== select) select.value = rendererSharedState.viewAs;
+    if (dot) {
+      const palette = rendererSharedState.viewAs === "all" ? null : paletteForOwner(rendererSharedState.viewAs, seats);
+      dot.hidden = palette == null;
+      if (palette) dot.style.background = palette.map;
+    }
   }
-  function closeNewGameOverlayToMatch(deps) {
-    if (!matchWaiting || !newGameOverlayIsOpen()) return;
-    matchWaiting = false;
-    syncCloseControl();
-    document.getElementById("game-over-overlay")?.classList.add("hidden");
-    dismissStaleControlTooltip();
-    deps.setMainUIControlsEnabled(true);
-    invalidateLeafletMapSizes();
-    returnMainMapCamera();
-    deps.updateReadyButtonState();
-    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
-    deps.resizeAndRedraw();
+  function wireObserveMode(deps) {
+    applySnapshot = deps.applySnapshot;
+    pressReady = deps.pressReady;
+    if (wired) return;
+    wired = true;
+    document.getElementById("topbar-view-as-select")?.addEventListener("change", (event) => {
+      const select = event.target;
+      if (!(select instanceof HTMLSelectElement)) return;
+      const value = select.value;
+      rendererSharedState.viewAs = value !== "all" && isSeatId(value) ? value : "all";
+      void refreshObservedSnapshot();
+    });
+    document.getElementById("observe-auto-advance-input")?.addEventListener("change", (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      rendererSharedState.autoAdvance = input.checked;
+      if (input.checked) void maybeObserveAutoAdvance();
+    });
+    subscribeCommanderPool(() => {
+      void maybeObserveAutoAdvance();
+    });
+    onResolutionPlaybackFinished(() => {
+      void maybeObserveAutoAdvance();
+    });
   }
 
   // src/shared/topBarDateBlock.ts
   function formatTopBarDateBlock(args) {
     if (!args.hasGameState) return { date: "\u2014", turnPhase: "\u2014" };
     const date = args.dateLabel.length > 0 ? args.dateLabel : "\u2014";
-    return { date, turnPhase: `Turn ${args.turnNumber} \xB7 ${args.strategicPhaseLabel}` };
+    const turn = args.turnLimit != null ? `Turn ${args.turnNumber} of ${args.turnLimit}` : `Turn ${args.turnNumber}`;
+    return { date, turnPhase: `${turn} \xB7 ${args.strategicPhaseLabel}` };
+  }
+
+  // src/shared/topBarSides.ts
+  var READY_CHECK_COLOR = "#86EFAC";
+  function buildTopBarSideChips(seats, statuses, viewerSeatId2) {
+    const ordered = [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+    const chips = ordered.map((seat) => chipFor(seat, statuses));
+    if (viewerSeatId2 === null) return { observing: true, lead: null, chips };
+    const lead = chips.find((chip) => chip.seatId === viewerSeatId2) ?? null;
+    if (!lead) return { observing: true, lead: null, chips };
+    return { observing: false, lead: { ...lead, label: fullName(ordered, lead.seatId) }, chips: chips.filter((chip) => chip.seatId !== viewerSeatId2) };
+  }
+  function chipFor(seat, statuses) {
+    const palette = SEAT_PALETTES[seat.seatOrder - 1] ?? SEAT_PALETTES[0];
+    const status = statuses.find((row) => row.seatId === seat.seatId)?.status ?? null;
+    const knockedOut = seat.outTurn !== null;
+    const statusIcon2 = knockedOut || status === null || status === "no_model" || status === "timed_out" || status === "out" ? null : status;
+    return {
+      seatId: seat.seatId,
+      label: shortSideName(seat.homeRegion),
+      dotColor: palette.map,
+      statusIcon: statusIcon2,
+      statusColor: statusIcon2 === "planning" ? palette.text : statusIcon2 === "ready" ? READY_CHECK_COLOR : null,
+      outTurn: seat.outTurn
+    };
+  }
+  function fullName(seats, seatId) {
+    return seats.find((seat) => seat.seatId === seatId)?.homeRegion ?? "";
   }
 
   // src/shared/topBarStats.ts
   function computeTopBarStats(input, isNeutralBorder = isNeutralBorderHex) {
+    const viewer = input.viewerSeatId === void 0 ? HUMAN_SEAT_ID : input.viewerSeatId;
     const control = input.strategicControl ?? [];
-    const humanHexes = new Set(control.filter((row) => row.controllerPlayerId === "human").map((row) => row.h3Index));
-    const productionPerTurn = (input.strategicInfrastructure ?? []).filter((row) => humanHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index)).reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
-    const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), "human");
+    const heldHexes = new Set(
+      viewer === null ? [] : control.filter((row) => row.controllerPlayerId === viewer).map((row) => row.h3Index)
+    );
+    const productionPerTurn = (input.strategicInfrastructure ?? []).filter((row) => heldHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index)).reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
+    const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), viewer ?? "");
     const capByType = getMaxUnitsPerType(parseGameSize(input.gameSize));
     const unitsFielded = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + fieldedByType[unitType], 0);
     const unitCap = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + capByType[unitType], 0);
-    const controlRows = Array.from(control);
-    const humanHome = countControlledHexesInRegion(controlRows, input.humanHomeRegionHexes, "human");
-    const opponentHome = countControlledHexesInRegion(controlRows, input.aiHomeRegionHexes, "human");
+    const turnLimit = input.victory?.rule === "most_city_hexes_at_turn_limit" ? input.victory.turnLimit : null;
     return {
       productionPerTurn,
       fieldedByType,
       capByType,
       unitsFielded,
       unitCap,
-      humanHome: { held: humanHome.controlled, total: humanHome.total },
-      opponentHome: { held: opponentHome.controlled, total: opponentHome.total }
+      yourHome: viewer === null ? null : holdOf(input, viewer, homeHexesOf(input, viewer)),
+      enemyHomes: viewer === null || turnLimit !== null ? null : holdOf(input, viewer, enemyHomeHexesOf(input, viewer)),
+      cities: turnLimit === null ? null : citiesReadout(input, viewer, turnLimit)
     };
+  }
+  function holdOf(input, viewer, hexes) {
+    const hold = countControlledHexesInRegion(Array.from(input.strategicControl ?? []), hexes, viewer);
+    return { held: hold.controlled, total: hold.total };
+  }
+  function homeHexesOf(input, viewer) {
+    return input.homeRegionHexesBySeat?.[viewer] ?? [];
+  }
+  function enemyHomeHexesOf(input, viewer) {
+    const enemies = (input.seats ?? []).filter((seat) => seat.seatId !== viewer && seat.outTurn === null);
+    return enemies.flatMap((seat) => input.homeRegionHexesBySeat?.[seat.seatId] ?? []);
+  }
+  function citiesReadout(input, viewer, turnLimit) {
+    const active2 = (input.seats ?? []).filter((seat) => seat.outTurn === null);
+    const counts = countCityHexesBySeat(input.strategicControl ?? [], input.strategicInfrastructure ?? []);
+    const places = rankSeatsByCityHexes(
+      active2.map((seat) => seat.seatId),
+      counts
+    );
+    const ranked = [...active2].sort((left, right) => {
+      const byCount = (counts.get(right.seatId) ?? 0) - (counts.get(left.seatId) ?? 0);
+      return byCount !== 0 ? byCount : left.seatOrder - right.seatOrder;
+    });
+    const lines = ranked.map((seat) => {
+      const you = viewer !== null && seat.seatId === viewer ? " (you)" : "";
+      return `${seat.homeRegion}${you} ${counts.get(seat.seatId) ?? 0}`;
+    });
+    const tooltip = `City hexes held. Most at the end of turn ${turnLimit} wins. A tie leaves no single winner. ${lines.join("; ")}`;
+    if (viewer === null) return { summary: null, tooltip };
+    const held = counts.get(viewer) ?? 0;
+    const place = places.get(viewer) ?? active2.length;
+    return { summary: `${formatCount(held)} \xB7 ${place} of ${active2.length}`, tooltip };
   }
   function formatCount(value) {
     return value.toLocaleString("en-US");
@@ -26021,10 +27574,12 @@ ${bonuses}`;
       production: `+${formatCount(stats.productionPerTurn)}`,
       forces: formatCount(stats.unitsFielded),
       forcesCap: `/${formatCount(stats.unitCap)}`,
-      humanHome: formatCount(stats.humanHome.held),
-      humanHomeTotal: `/${formatCount(stats.humanHome.total)}`,
-      opponentHome: formatCount(stats.opponentHome.held),
-      opponentHomeTotal: `/${formatCount(stats.opponentHome.total)}`
+      humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : "\u2014",
+      humanHomeTotal: stats.yourHome ? `/${formatCount(stats.yourHome.total)}` : "",
+      enemyHome: stats.enemyHomes ? formatCount(stats.enemyHomes.held) : "\u2014",
+      enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : "",
+      cities: stats.cities?.summary ?? "",
+      citiesTooltip: stats.cities?.tooltip ?? ""
     };
   }
   function formatForcesBreakdown(stats) {
@@ -26034,9 +27589,9 @@ ${bonuses}`;
   }
 
   // src/shared/battleForceCounts.ts
-  function countBattleForces(subUnits) {
-    const human = subUnits.filter((sub) => sub.player === "human").length;
-    const opponent = subUnits.length - human;
+  function countBattleForces(subUnits, opposingPartyId) {
+    const human = subUnits.filter((sub) => sub.player === HUMAN_SEAT_ID).length;
+    const opponent = subUnits.filter((sub) => sub.player === opposingPartyId).length;
     const total = human + opponent;
     return { human, opponent, humanShare: total > 0 ? human / total : 0.5 };
   }
@@ -26050,7 +27605,8 @@ ${bonuses}`;
   }
   function formatBattleHeaderStatus(input) {
     const beatLine = formatBattleBeatLine(input.beat, input.beatPlaybackActive);
-    return input.dateLabel.length > 0 ? `${beatLine} \xB7 ${input.dateLabel}` : beatLine;
+    const dated = input.dateLabel.length > 0 ? `${beatLine} \xB7 ${input.dateLabel}` : beatLine;
+    return input.garrisonDefendsInPlace ? `${dated} \xB7 The garrison defends in place` : dated;
   }
 
   // src/shared/orderTargetHexCode.ts
@@ -26091,17 +27647,29 @@ ${bonuses}`;
     if (!bar) return;
     if (rendererSharedState.resolutionMoveAnimation != null && bar.dataset.battleId === battle.battleId) return;
     bar.dataset.battleId = battle.battleId;
-    const counts = countBattleForces(battle.subUnits);
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const opposingId = battle.opposingPartyId ?? battle.subUnits.find((unit) => unit.player !== HUMAN_SEAT_ID)?.player ?? null;
+    const counts = countBattleForces(battle.subUnits, opposingId ?? "");
     const humanCount = document.getElementById("battle-force-human-count");
     if (humanCount) humanCount.textContent = counts.human.toLocaleString("en-US");
-    const opponentCount = document.getElementById("battle-force-opponent-count");
+    const opponentCount = document.getElementById("battle-force-enemy-count");
     if (opponentCount) opponentCount.textContent = counts.opponent.toLocaleString("en-US");
+    const opposingSeat = seats.find((seat) => seat.seatId === opposingId);
+    const nameEl = document.getElementById("battle-force-enemy-name");
+    if (nameEl) nameEl.textContent = opposingId != null && isNeutralOwnerId(opposingId) ? "Neutral" : shortSideName(opposingSeat?.homeRegion ?? "Enemy");
+    const dot = document.getElementById("battle-force-enemy-dot");
+    const enemyPalette = paletteForOwner(opposingId, seats);
+    if (dot) dot.style.background = enemyPalette?.map ?? "#9D174D";
+    const humanPalette = paletteForOwner(HUMAN_SEAT_ID, seats);
     const fill = document.getElementById("battle-force-human-fill");
     if (fill) {
       fill.style.width = `${(counts.humanShare * 100).toFixed(1)}%`;
       const sidesMeet = counts.humanShare > 0 && counts.humanShare < 1;
       fill.style.borderRightWidth = sidesMeet ? "" : "0";
+      if (humanPalette) fill.style.background = humanPalette.forceBar;
     }
+    const track = bar.querySelector(".battle-force-track");
+    if (track instanceof HTMLElement && enemyPalette) track.style.background = enemyPalette.forceBar;
   }
   function renderBattleHeader(state, battle) {
     const inBattle = state != null && battle != null;
@@ -26120,7 +27688,8 @@ ${bonuses}`;
       statusEl.textContent = formatBattleHeaderStatus({
         beat: battle.tacticalTurnNumber,
         beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null,
-        dateLabel: state.currentDateLabel ?? ""
+        dateLabel: state.currentDateLabel ?? "",
+        garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId)
       });
       if (battle.weather) statusEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
     }
@@ -26129,6 +27698,7 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/topBar.ts
+  var SVG_NS = "http://www.w3.org/2000/svg";
   function formatStrategicPhaseLabel(phase) {
     if (!phase) return phase;
     return phase.charAt(0).toUpperCase() + phase.slice(1).toLowerCase();
@@ -26137,31 +27707,149 @@ ${bonuses}`;
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   }
+  function setHostHidden(id, hidden) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = hidden;
+  }
+  function viewerSeatId(state) {
+    const seats = state.seats ?? [];
+    if (seats.length === 0) return void 0;
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+  }
   function renderTopBarSides(state) {
-    setText("topbar-human-side", state?.humanHomeRegion || "\u2014");
-    setText("topbar-opponent-side", state?.aiHomeRegion || "\u2014");
+    const host = document.getElementById("topbar-sides");
+    if (!host) return;
+    host.replaceChildren();
+    if (!state?.seats?.length) {
+      host.append(sideName("topbar-human-side", "\u2014"), vsLabel(), sideName("topbar-second-side", "\u2014"));
+      return;
+    }
+    const resolved = viewerSeatId(state);
+    const viewer = resolved === void 0 ? HUMAN_SEAT_ID : resolved;
+    paintSides(host, buildTopBarSideChips(state.seats, commanderPoolStatuses(), viewer));
+  }
+  function paintSides(host, block) {
+    if (block.observing) host.append(observingLabel());
+    if (block.lead) host.append(chipElement(block.lead, "topbar-human-side"));
+    if (!block.observing) host.append(vsLabel());
+    block.chips.forEach((chip, index) => {
+      host.append(chipElement(chip, chipNameId(block.observing, index)));
+    });
+  }
+  function chipNameId(observing, index) {
+    if (observing && index === 0) return "topbar-human-side";
+    if (index === 0 || observing && index === 1) return "topbar-second-side";
+    return void 0;
+  }
+  function vsLabel() {
+    const vs = document.createElement("span");
+    vs.className = "topbar-vs";
+    vs.textContent = "vs";
+    return vs;
+  }
+  function observingLabel() {
+    const label = document.createElement("span");
+    label.className = "topbar-observing";
+    const eye = document.createElementNS(SVG_NS, "svg");
+    eye.setAttribute("viewBox", "0 0 16 16");
+    eye.setAttribute("class", "topbar-status-icon");
+    eye.setAttribute("aria-hidden", "true");
+    const outline = document.createElementNS(SVG_NS, "path");
+    outline.setAttribute("d", "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z");
+    outline.setAttribute("fill", "none");
+    outline.setAttribute("stroke", "currentColor");
+    outline.setAttribute("stroke-width", "1.4");
+    const pupil = document.createElementNS(SVG_NS, "circle");
+    pupil.setAttribute("cx", "8");
+    pupil.setAttribute("cy", "8");
+    pupil.setAttribute("r", "1.6");
+    pupil.setAttribute("fill", "currentColor");
+    eye.append(outline, pupil);
+    const text = document.createElement("span");
+    text.textContent = "Observing";
+    label.append(eye, text);
+    return label;
+  }
+  function chipElement(chip, nameId) {
+    const row = document.createElement("span");
+    row.className = chip.outTurn === null ? "topbar-side-chip" : "topbar-side-chip is-out";
+    const dot = document.createElement("span");
+    dot.className = "topbar-side-mark";
+    dot.style.background = chip.dotColor;
+    dot.setAttribute("aria-hidden", "true");
+    row.append(dot, sideName(nameId, chip.label));
+    if (chip.outTurn !== null) {
+      const out = document.createElement("span");
+      out.className = "topbar-side-out";
+      out.textContent = `out T${chip.outTurn}`;
+      row.append(out);
+    }
+    const icon = statusIcon(chip);
+    if (icon) row.append(icon);
+    return row;
+  }
+  function sideName(id, label) {
+    const name = document.createElement("span");
+    name.className = "topbar-side-name";
+    if (id) name.id = id;
+    name.textContent = label;
+    return name;
+  }
+  function statusIcon(chip) {
+    if (!chip.statusIcon || !chip.statusColor) return null;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("class", "topbar-status-icon");
+    svg.setAttribute("aria-label", chip.statusIcon === "planning" ? "Planning" : "Orders ready");
+    if (chip.statusIcon === "planning") {
+      const arc = document.createElementNS(SVG_NS, "circle");
+      arc.setAttribute("cx", "8");
+      arc.setAttribute("cy", "8");
+      arc.setAttribute("r", "5.2");
+      arc.setAttribute("fill", "none");
+      arc.setAttribute("stroke", chip.statusColor);
+      arc.setAttribute("stroke-width", "2");
+      arc.setAttribute("stroke-dasharray", "18 12");
+      arc.setAttribute("stroke-linecap", "round");
+      svg.append(arc);
+      return svg;
+    }
+    const check = document.createElementNS(SVG_NS, "path");
+    check.setAttribute("d", "M3.2 8.4l3 3.1 6.6-7");
+    check.setAttribute("fill", "none");
+    check.setAttribute("stroke", chip.statusColor);
+    check.setAttribute("stroke-width", "2");
+    check.setAttribute("stroke-linecap", "round");
+    check.setAttribute("stroke-linejoin", "round");
+    svg.append(check);
+    return svg;
   }
   function renderTopBarDateBlock(state) {
     const text = formatTopBarDateBlock({
       hasGameState: state != null,
       dateLabel: state?.currentDateLabel ?? "",
       turnNumber: state?.turnNumber ?? 0,
-      strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : ""
+      strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : "",
+      turnLimit: state?.victory?.rule === "most_city_hexes_at_turn_limit" ? state.victory.turnLimit : null
     });
     setText("topbar-date", text.date);
     setText("topbar-turn-phase", text.turnPhase);
   }
   function renderTopBarStats(state) {
     if (!state) {
-      for (const id of ["topbar-stat-production", "topbar-stat-forces", "topbar-stat-human-home", "topbar-stat-opponent-home"]) {
+      for (const id of ["topbar-stat-production", "topbar-stat-forces", "topbar-stat-human-home", "topbar-stat-enemy-home", "topbar-stat-cities"]) {
         setText(id, "\u2014");
       }
-      for (const id of ["topbar-stat-production-suffix", "topbar-stat-forces-cap", "topbar-stat-human-home-total", "topbar-stat-opponent-home-total"]) {
+      for (const id of ["topbar-stat-production-suffix", "topbar-stat-forces-cap", "topbar-stat-human-home-total", "topbar-stat-enemy-home-total"]) {
         setText(id, "");
       }
+      setHostHidden("topbar-stat-human-home-host", false);
+      setHostHidden("topbar-stat-enemy-home-host", false);
+      setHostHidden("topbar-stat-cities-host", true);
       return;
     }
-    const stats = computeTopBarStats(state);
+    const viewer = readoutViewerSeatId(state.seats ?? [], rendererSharedState.viewAs);
+    const stats = computeTopBarStats(viewer === void 0 ? state : { ...state, viewerSeatId: viewer });
     const parts = formatTopBarStatParts(stats);
     setText("topbar-stat-production", parts.production);
     setText("topbar-stat-production-suffix", "/turn");
@@ -26169,16 +27857,25 @@ ${bonuses}`;
     setText("topbar-stat-forces-cap", parts.forcesCap);
     setText("topbar-stat-human-home", parts.humanHome);
     setText("topbar-stat-human-home-total", parts.humanHomeTotal);
-    setText("topbar-stat-opponent-home", parts.opponentHome);
-    setText("topbar-stat-opponent-home-total", parts.opponentHomeTotal);
+    setText("topbar-stat-enemy-home", parts.enemyHome);
+    setText("topbar-stat-enemy-home-total", parts.enemyHomeTotal);
+    setText("topbar-stat-cities", parts.cities || "\u2014");
+    setHostHidden("topbar-stat-human-home-host", stats.yourHome === null);
+    setHostHidden("topbar-stat-enemy-home-host", stats.enemyHomes === null);
+    setHostHidden("topbar-stat-cities-host", stats.cities === null);
+    document.getElementById("topbar-stat-cities-host")?.setAttribute("data-control-tooltip", parts.citiesTooltip);
     document.getElementById("topbar-stat-forces-host")?.setAttribute("data-control-tooltip", forcesStatTooltipText(formatForcesBreakdown(stats)));
   }
   function renderTopBarStatus(state) {
+    syncObserveChrome();
     renderTopBarSides(state);
     renderTopBarStats(state);
     renderTopBarDateBlock(state);
     renderBattleHeader(state, rendererSharedState.tacticalBattleSnapshot);
   }
+  subscribeCommanderPool(() => {
+    renderTopBarSides(rendererSharedState.gameState);
+  });
 
   // src/renderer/chrome/gameMenu.ts
   var GAME_MENU_ID = "game-menu";
@@ -26257,7 +27954,7 @@ ${bonuses}`;
   }
   function consoleTabIdForLiveMatchLaunch(match) {
     if (match == null || match.hexCount === 0 || match.gameOver) return null;
-    return "console-tab-opponent";
+    return "console-tab-commanders";
   }
   function nextConsoleTabState(current, clickedTabId) {
     if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
@@ -26311,10 +28008,10 @@ ${bonuses}`;
     { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders", subtitle: ordersSubtitle },
     { tabId: "console-tab-reports", panelId: "console-panel-reports", title: "Reports", subtitle: () => "this match" },
     {
-      tabId: "console-tab-opponent",
-      panelId: "console-panel-opponent",
-      title: "Opponent",
-      subtitle: () => rendererSharedState.gameState?.aiHomeRegion ?? "",
+      tabId: "console-tab-commanders",
+      panelId: "console-panel-commanders",
+      title: "Commanders",
+      subtitle: commandersSubtitle,
       onShow: scrollOpenRouterLogToEnd
     }
   ]);
@@ -26326,6 +28023,14 @@ ${bonuses}`;
       rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber : null
     );
   }
+  function commandersSubtitle() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const humanPlaying = seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
+    if (!humanPlaying && seats.length > 0) return `${seats.length} sides, observing`;
+    const opponents = seats.filter((seat) => seat.kind === "ai").length || 1;
+    const word = opponents === 1 ? "opponents".slice(0, -1) : "opponents";
+    return `${opponents} ${word}`;
+  }
   function setRailBadge(badgeId, count) {
     const badge = document.getElementById(badgeId);
     if (!badge) return;
@@ -26333,11 +28038,20 @@ ${bonuses}`;
     badge.hidden = count <= 0;
   }
   function refreshConsoleHeader() {
+    const orders = document.getElementById("console-tab-orders");
+    const observing = observeModeControls(rendererSharedState.gameState?.seats ?? []).observing;
+    if (orders instanceof HTMLButtonElement) orders.disabled = observing;
+    if (observing && consoleState.activeTabId === "console-tab-orders") {
+      consoleState = expandedConsoleTabState("console-tab-commanders");
+      applyConsoleState();
+      return;
+    }
     const active2 = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
     const subtitle = document.getElementById("console-subtitle");
     if (subtitle) subtitle.textContent = active2 ? active2.subtitle() : "";
     setRailBadge("console-tab-orders-badge", queuedOrderCount());
     setRailBadge("console-tab-reports-badge", unreadConsoleReportCount());
+    refreshReportSenderFilter();
   }
   function applyConsoleState() {
     selectTabPanel(consoleState.activeTabId, CONSOLE_TABS);
@@ -26363,6 +28077,7 @@ ${bonuses}`;
     onConsoleReportsChanged(refreshConsoleHeader);
     for (const tab of CONSOLE_TABS) {
       document.getElementById(tab.tabId)?.addEventListener("click", () => {
+        if (tab.tabId === "console-tab-orders" && observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return;
         consoleState = nextConsoleTabState(consoleState, tab.tabId);
         applyConsoleState();
       });
@@ -26467,7 +28182,7 @@ ${bonuses}`;
     if (selected.length === 0) return null;
     const panelHex = selected[0].h3Index;
     const selectedHere = selected.filter((unit) => unit.h3Index === panelHex).length;
-    const selectableHere = units.filter((unit) => unit.h3Index === panelHex && unit.player === "human" && isSelectable(unit.id)).length;
+    const selectableHere = units.filter((unit) => unit.h3Index === panelHex && unit.player === HUMAN_SEAT_ID && isSelectable(unit.id)).length;
     return {
       panelHex,
       countText: `${selectedHere} selected of ${Math.max(selectableHere, selectedHere)}`,
@@ -26487,8 +28202,9 @@ ${bonuses}`;
     if (input.productionPerTurn != null && input.productionPerTurn > 0) {
       chips.push({ kind: "production", html: escapeHtmlText(`$${input.productionPerTurn.toLocaleString("en-US")}/turn`) });
     }
-    if (input.homeSide === "human") chips.push({ kind: "home", html: "Home" });
-    if (input.homeSide === "opponent") chips.push({ kind: "enemy-home", html: "Enemy home" });
+    if (input.homeChip) {
+      chips.push({ kind: input.homeChip.kind, html: escapeHtmlText(input.homeChip.text) });
+    }
     return chips;
   }
 
@@ -26571,8 +28287,10 @@ ${bonuses}`;
     const height = img.naturalHeight * iconScale;
     const drawX = centerX - width / 2;
     const drawY = centerY - height / 2;
-    const shouldFlip = flipForOpponent && unitPlayer === "opponent";
+    const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== "" && unitPlayer !== HUMAN_SEAT_ID;
+    const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
     ctx.save();
+    if (neutralGlyph) ctx.filter = "brightness(0.85)";
     if (shouldFlip) {
       ctx.translate(centerX, centerY);
       ctx.scale(-1, 1);
@@ -26612,7 +28330,7 @@ ${bonuses}`;
     }
     ctx.save();
     if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : "#fff";
     ctx.font = "bold 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -26646,8 +28364,10 @@ ${bonuses}`;
       const players = new Set(hexUnits.map((u) => u.player));
       const mixedType = types.size > 1;
       const multiPlayer = players.size > 1;
-      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : PLAYER_COLORS[hexUnits[0].player] ?? "#333";
-      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : "#fff";
+      const ownerId = hexUnits[0].player;
+      const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
+      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId)?.map ?? "#333";
+      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : "#fff";
       const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
       const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
       drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
@@ -26670,8 +28390,13 @@ ${bonuses}`;
     }
   }
   function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
+    const viewer = staleIntelViewer(state.playerPerspective);
+    if (viewer === null) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+      return;
+    }
     const hasFogData = Array.isArray(state.visibleHexes);
-    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== "human");
+    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
     const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
     for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
       if (currentlyVisibleEnemyIds.has(unitId)) continue;
@@ -26734,10 +28459,15 @@ ${bonuses}`;
       if (alpha <= 0) continue;
       const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
       const label = types.size === 1 ? [...types][0] : "*";
+      const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+      const ownerId = owners.size === 1 ? [...owners][0] : null;
+      const mixedOwners = owners.size > 1;
+      const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
+      const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : "#fff";
       const { x, y } = hexCenterPx(h3Index);
       ctx.save();
       ctx.globalAlpha = alpha;
-      drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, "#fff", "opponent");
+      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
       ctx.restore();
     }
   }
@@ -26964,13 +28694,19 @@ ${bonuses}`;
     const row = state?.hexes.find((h) => h.h3Index === hex);
     const baselineUrban = baselineUrbanHexCountForStrategicHex(hex);
     const urban = state?.strategicInfrastructure?.find((r) => r.h3Index === hex)?.urbanHexCount ?? 0;
-    const homeSide = state?.humanHomeRegionHexes?.includes(hex) ? "human" : state?.aiHomeRegionHexes?.includes(hex) ? "opponent" : null;
+    const seats = state?.seats ?? [];
+    const controller = state?.strategicControl?.find((row2) => row2.h3Index === hex)?.controllerPlayerId ?? null;
     return {
       terrainKind: row?.terrainKind ?? null,
       weather: row?.weather ?? null,
       techLevel: state?.techBonusEnabled === true && baselineUrban > 0 ? techLevelFromUrbanHexCount(baselineUrban) : null,
       productionPerTurn: isNeutralBorderHex(hex) ? null : Math.max(0, Math.trunc(urban)),
-      homeSide
+      homeChip: state ? formatHomeChip({
+        homeSeatIds: homeSeatIdsAtHex(hex, state),
+        controllerId: controller,
+        viewerSeatId: viewerSeatIdForRoster(seats),
+        seats
+      }) : null
     };
   }
   function battleChipInput(cell, battle) {
@@ -26979,7 +28715,7 @@ ${bonuses}`;
       weather: battle.weatherBonusEnabled === true ? battle.weather ?? null : null,
       techLevel: null,
       productionPerTurn: null,
-      homeSide: null
+      homeChip: null
     };
   }
   function renderSelectionPanelChips(panelHex, battle) {
@@ -27038,9 +28774,32 @@ ${bonuses}`;
     item.append(createOrderChip(row.unitId, unitName));
     return item;
   }
+  function renderObservedHexPanel(panel) {
+    const hex = rendererSharedState.selectedHexIndex;
+    panel.hidden = hex == null;
+    if (!hex) {
+      settleSelectionPanelSlide();
+      return;
+    }
+    const line = document.getElementById("sidebar-selected-unit");
+    if (line) {
+      const code = document.createElement("strong");
+      code.textContent = `(${orderTargetHexCode(hex, null) ?? "?"})`;
+      line.replaceChildren(code);
+    }
+    renderSelectionPanelCaption(hex, null);
+    renderSelectionPanelChips(hex, null);
+    document.getElementById("selection-panel-units")?.replaceChildren();
+    const hint = document.getElementById("selection-panel-hint");
+    if (hint) hint.textContent = "";
+  }
   function renderSelectionPanel(deps) {
     const panel = document.getElementById("selection-panel");
     if (!panel) return;
+    if (observeModeControls(rendererSharedState.gameState?.seats ?? []).hexOnlySelection) {
+      renderObservedHexPanel(panel);
+      return;
+    }
     const battle = rendererSharedState.tacticalBattleSnapshot;
     const units = battle ? battle.subUnits : rendererSharedState.gameState?.units ?? [];
     const summary = summarizeSelectionPanel(rendererSharedState.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
@@ -27085,7 +28844,7 @@ ${bonuses}`;
     if (container) {
       for (const child of container.children) {
         const id = child.id;
-        if (id === "tactical-annihilation-overlay") continue;
+        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
@@ -27135,14 +28894,16 @@ ${bonuses}`;
       repaintNewGameMapPreview();
       void (async () => {
         await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+        refreshNewGameSides({ reset: true });
         await refreshNewGameMapPreview();
       })();
     }
     syncGameSizeCapPreview();
     setMainUIControlsEnabled(false);
     if (gameOver) {
-      showGameOverBanner(state.winner === "human" ? "You win!" : "You lose.");
+      showGameOverBanner(renderGameOverStandings(state));
     } else {
+      hideGameOverStandings();
       showNewGameBanner("startup", selectedNewGameTab());
     }
     if (newGameBtn) {
@@ -27272,10 +29033,6 @@ ${bonuses}`;
     hit: "#86efac",
     miss: "#8aa0b8"
   });
-  var PLAYER_TOKEN_STROKES = Object.freeze({
-    human: "#7dcec8",
-    opponent: "#f0b4c8"
-  });
   var INFRASTRUCTURE_LABELS = Object.freeze({
     urban: "City",
     airport: "Airport",
@@ -27345,11 +29102,12 @@ ${bonuses}`;
   }
   function paintMiniToken(ctx, centerX, centerY, segment) {
     const player = segment.player ?? "";
+    const palette = paletteForCurrentOwner(player);
     ctx.beginPath();
     ctx.arc(centerX, centerY, CHIP_LAYOUT.tokenRadius, 0, Math.PI * 2);
-    ctx.fillStyle = PLAYER_COLORS[player] ?? "#333";
+    ctx.fillStyle = palette?.map ?? "#333";
     ctx.fill();
-    ctx.strokeStyle = PLAYER_TOKEN_STROKES[player] ?? CHIP_COLORS.border;
+    ctx.strokeStyle = palette?.text ?? CHIP_COLORS.border;
     ctx.lineWidth = 1;
     ctx.stroke();
     const unitType = segment.unitType ?? "";
@@ -27422,8 +29180,8 @@ ${bonuses}`;
     rendererSharedState.lastTacticalEntryLayerKey = null;
   }
   function isContestedStrategicHex(state, h3Index) {
-    const here = state.units.filter((u) => u.h3Index === h3Index);
-    return here.some((u) => u.player === "human") && here.some((u) => u.player === "opponent");
+    const owners = new Set(state.units.filter((unit) => unit.h3Index === h3Index).map((unit) => unit.player));
+    return owners.has(HUMAN_SEAT_ID) && owners.size === 2;
   }
   function syncTacticalEntryButton(deps) {
     const layer = document.getElementById("tactical-entry-layer");
@@ -27431,7 +29189,7 @@ ${bonuses}`;
       if (layer) hideTacticalEntryLayer(layer, false);
       return;
     }
-    if (rendererSharedState.gameState.phase !== "planning" || rendererSharedState.tacticalBattleSnapshot) {
+    if (rendererSharedState.gameState.phase !== "planning" || rendererSharedState.tacticalBattleSnapshot || !observeModeControls(rendererSharedState.gameState.seats ?? []).magnifierEnabled) {
       hideTacticalEntryLayer(layer);
       return;
     }
@@ -27645,113 +29403,16 @@ ${bonuses}`;
     }
   }
 
-  // src/renderer/openRouter/resolutionPlaybackDeferral.ts
-  var playbackCompleteNotifyQueue = [];
-  function enqueueResolutionPlaybackCompleteNotify(fn) {
-    playbackCompleteNotifyQueue.length = 0;
-    playbackCompleteNotifyQueue.push(fn);
-  }
-  function dropQueuedResolutionPlaybackCompleteNotifies() {
-    playbackCompleteNotifyQueue.length = 0;
-  }
-  function flushResolutionPlaybackCompleteNotifyCallbacks() {
-    const queue = [...playbackCompleteNotifyQueue];
-    playbackCompleteNotifyQueue.length = 0;
-    for (const fn of queue) {
-      try {
-        fn();
-      } catch (err) {
-        console.error("resolutionPlaybackDeferral: notify callback failed", err);
-      }
-    }
-  }
-
-  // src/shared/abortError.ts
-  function isLikelyAbortError(err) {
-    if (err instanceof Error && err.name === "AbortError") return true;
-    const msg = String(err);
-    return msg.includes("AbortError") || msg.toLowerCase().includes("abort");
-  }
-
-  // src/renderer/openRouter/precomputedAiState.ts
-  function createEmptyTacticalOpponentDraft() {
-    return {
-      movementOrders: [],
-      rangedAttacks: [],
-      airStrikes: [],
-      ferryOrders: [],
-      embarkOrders: []
-    };
-  }
-  var EMPTY_TACTICAL_OPPONENT_DRAFT = createEmptyTacticalOpponentDraft();
-  function resetPrecomputedAiState(mode) {
-    if (mode === "empty") {
-      rendererSharedState.precomputedAiOrders = [];
-      rendererSharedState.precomputedAiRangedOrders = [];
-      rendererSharedState.precomputedAiEmbarkOrders = [];
-    } else {
-      rendererSharedState.precomputedAiOrders = null;
-      rendererSharedState.precomputedAiRangedOrders = null;
-      rendererSharedState.precomputedAiEmbarkOrders = null;
-    }
-    rendererSharedState.precomputedAiStrategy = null;
-    rendererSharedState.precomputedAiMessage = null;
-    rendererSharedState.precomputedToolInvocationCounts = null;
-  }
-  function unblockPrecomputedAiPlanningAfterBackgroundFailure() {
-    resetPrecomputedAiState("empty");
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-      rendererSharedState.tacticalOpponentDraft = EMPTY_TACTICAL_OPPONENT_DRAFT;
-    }
-  }
-  function applySuccessfulPrecomputedAiResult(result) {
-    if (result.tacticalOpponentPlan) {
-      rendererSharedState.precomputedAiOrders = null;
-      rendererSharedState.precomputedAiRangedOrders = [];
-      rendererSharedState.precomputedAiEmbarkOrders = [];
-    } else {
-      rendererSharedState.precomputedAiOrders = result.orders;
-      rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-      rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
-    }
-    rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
-    rendererSharedState.precomputedAiMessage = result.message ?? null;
-    if (result.tacticalBattle) {
-      rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
-    }
-    if (result.tacticalOpponentPlan) {
-      const replacedPriorDraft = rendererSharedState.tacticalOpponentDraft !== null;
-      if (replacedPriorDraft) {
-        console.debug("[agent-wars] tactical opponent draft replaced by newer AI plan (D5)", {
-          movementCount: result.tacticalOpponentPlan.movementOrders.length,
-          rangedCount: result.tacticalOpponentPlan.rangedAttacks.length,
-          airCount: result.tacticalOpponentPlan.airStrikes.length
-        });
-      }
-      rendererSharedState.tacticalOpponentDraft = result.tacticalOpponentPlan;
-    }
-  }
-
   // src/renderer/openRouter/openRouterRuntime.ts
-  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
-  var backgroundAiRequestSequence = 0;
   function invalidateBackgroundAiRequest() {
-    backgroundAiRequestSequence += 1;
-    rendererSharedState.backgroundRequestInFlight = false;
+    void stopCommanderPlanningFromScreen("battle_exit");
   }
   async function stopOpponentPlanning(reason) {
-    invalidateBackgroundAiRequest();
-    try {
-      await window.gameApi?.cancelRequestAiOrders?.({ reason });
-    } catch (err) {
-      console.error("stopOpponentPlanning failed", reason, err);
-    }
+    await stopCommanderPlanningFromScreen(reason);
   }
   var openRouterRuntimeDepsRef = null;
   function cancelInFlightBackgroundAiRequestForRendererTeardown() {
     invalidateBackgroundAiRequest();
-    void window.gameApi?.cancelRequestAiOrders?.({ reason: "battle_exit" });
-    unblockPrecomputedAiPlanningAfterBackgroundFailure();
     openRouterRuntimeDepsRef?.updateReadyButtonState();
   }
   function cancelTacticalScopedBackgroundPrefetchForSessionTeardown() {
@@ -27760,134 +29421,13 @@ ${bonuses}`;
   function syncEventDrivenFromTools() {
     rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
   }
-  function strategicPhaseAllowsBackgroundAi() {
-    if (rendererSharedState.gameState?.phase === "planning") return true;
-    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
-  }
   function startBackgroundRequestIfAllowed(deps) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
-    if (isNewGameOverlayOpen()) return;
-    if (isDeferredResolutionPlaybackConsultPending()) return;
-    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
     openRouterRuntimeDepsRef = deps;
-    const keyPromise = window.gameApi?.openRouter?.getKey?.();
-    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
-    if (!keyPromise || !modelPromise) return;
-    const requestSequence = ++backgroundAiRequestSequence;
-    rendererSharedState.backgroundRequestInFlight = true;
-    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
-      if (requestSequence !== backgroundAiRequestSequence) return;
-      if (!keyResult?.hasKey || !modelId?.trim()) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.appendOpenRouterLog("Run is on but API key or model not set.", true);
-        deps.updateReadyButtonState();
-        return;
-      }
-      if (!rendererSharedState.runButtonOn || !window.gameApi?.requestAiOrders) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.updateReadyButtonState();
-        return;
-      }
-      const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
-      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
-      let timeoutId;
-      const timeoutPromise = new Promise((_resolve, reject) => {
-        timeoutId = setTimeout(
-          () => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)),
-          BACKGROUND_AI_REQUEST_TIMEOUT_MS
-        );
-      });
-      const settleTimer = () => {
-        if (timeoutId !== void 0) clearTimeout(timeoutId);
-      };
-      Promise.race([requestPromise, timeoutPromise]).then((result) => {
-        settleTimer();
-        if (requestSequence !== backgroundAiRequestSequence) return;
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
-          rendererSharedState.eventDrivenInitialConsultationDone = true;
-        }
-        if (rendererSharedState.runButtonOn && result.success) {
-          if (!rendererSharedState.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
-            deps.appendOpenRouterLog("Discarded tactical prefetch (tactical session no longer active).", false);
-            deps.updateReadyButtonState();
-            return;
-          }
-          applySuccessfulPrecomputedAiResult(result);
-          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
-            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
-          }
-          if (result.tacticalBattle) {
-            deps.requestRedraw?.();
-          }
-          if (result.toolInvocationCounts) {
-            rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
-            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
-              rendererSharedState.toolInvocationCounts[groupId] = count;
-            }
-            deps.updateOpenRouterToolCountLabels();
-          } else {
-            rendererSharedState.precomputedToolInvocationCounts = null;
-          }
-          if (result.cost !== void 0) {
-            rendererSharedState.openRouterGameCost += result.cost;
-            deps.updateOpenRouterCostLabel();
-          }
-        } else if (!result.success) {
-          if (result.error === "Cancelled") {
-            startBackgroundRequestIfAllowed(deps);
-            if (!rendererSharedState.backgroundRequestInFlight) {
-              if (rendererSharedState.runButtonOn) {
-                deps.appendOpenRouterLog(
-                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
-                  true
-                );
-              }
-              unblockPrecomputedAiPlanningAfterBackgroundFailure();
-            }
-          } else {
-            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
-            deps.showSidebarError(result.error ?? "Background AI request failed");
-            unblockPrecomputedAiPlanningAfterBackgroundFailure();
-          }
-        }
-        deps.updateReadyButtonState();
-      }).catch((err) => {
-        settleTimer();
-        if (requestSequence !== backgroundAiRequestSequence) return;
-        const msg = String(err);
-        const isAbort = isLikelyAbortError(err);
-        if (!isAbort) {
-          void stopOpponentPlanning("teardown");
-        }
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (isAbort && rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-          deps.appendOpenRouterLog("Tactical AI prefetch aborted.", false);
-          deps.updateReadyButtonState();
-          if (isWaitingForPrecomputedAiOrders()) {
-            startBackgroundRequestIfAllowed(deps);
-          }
-          return;
-        }
-        deps.appendOpenRouterLog(`Background planning request rejected: ${msg}`, true);
-        deps.showSidebarError(msg);
-        unblockPrecomputedAiPlanningAfterBackgroundFailure();
-        deps.updateReadyButtonState();
-      });
-    }).catch((err) => {
-      if (requestSequence !== backgroundAiRequestSequence) return;
-      rendererSharedState.backgroundRequestInFlight = false;
-      deps.showSidebarError(String(err));
-      unblockPrecomputedAiPlanningAfterBackgroundFailure();
-      deps.updateReadyButtonState();
-    });
+    void startCommanderPlanningIfAllowed();
   }
-  function handleEventDrivenModeTransition(deps, wasEventDriven) {
+  function handleEventDrivenModeTransition(_deps, wasEventDriven) {
     if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
-    void stopOpponentPlanning("teardown");
-    resetPrecomputedAiState("null");
-    rendererSharedState.eventDrivenInitialConsultationDone = false;
-    startBackgroundRequestIfAllowed(deps);
+    void stopOpponentPlanning("teardown").then(() => startCommanderPlanningIfAllowed());
   }
   function renderOpenRouterToolsList(deps) {
     const container = document.getElementById("openrouter-tools-list");
@@ -28071,7 +29611,6 @@ ${bonuses}`;
     rendererSharedState.pendingFerryOrders = [];
     rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.tacticalPendingMarches = [];
-    rendererSharedState.tacticalOpponentDraft = null;
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
   }
@@ -28155,11 +29694,11 @@ ${bonuses}`;
   function buildTacticalRangedRangeSet(battle, subUnits, footprint2) {
     const out = /* @__PURE__ */ new Set();
     for (const u of subUnits) {
-      const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
-      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor);
+      const anchor2 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor2);
       if (range < 1) continue;
       try {
-        for (const h of gridDisk(anchor, range)) {
+        for (const h of gridDisk(anchor2, range)) {
           if (footprint2.has(h)) out.add(h);
         }
       } catch {
@@ -28754,7 +30293,7 @@ ${bonuses}`;
       pathH3Indexes: null
     });
     const sub = args.battle.subUnits.find((u) => u.id === args.unitId);
-    if (!sub || sub.player !== "human") {
+    if (!sub || sub.player !== HUMAN_SEAT_ID) {
       return invalid({ valid: false, showInvalidMarker: false, invalidReason: "Not a human tactical sub-unit", segments: [] });
     }
     const origin = tacticalMarchCommittedOriginH3(args.battle, args.unitId);
@@ -28898,7 +30437,7 @@ ${bonuses}`;
   function buildTacticalMarchHoverPreview(battle, unitIds, hoveredH3Index) {
     const tacticalSet = new Set(battle.tacticalChildH3Indexes);
     const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
-    const selectedHuman = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === "human")).filter((u) => !!u);
+    const selectedHuman = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID)).filter((u) => !!u);
     if (!hoveredH3Index || selectedHuman.length === 0) {
       return {
         validForAll: false,
@@ -28941,7 +30480,7 @@ ${bonuses}`;
     const capByOrigin = /* @__PURE__ */ new Map();
     for (const id of selectedUnitIds) {
       const u = battle.subUnits.find((s) => s.id === id);
-      if (!u || u.player !== "human") continue;
+      if (!u || u.player !== HUMAN_SEAT_ID) continue;
       const segments = previews.find((p) => p.unitId === id)?.preview.segments ?? [];
       const moveType = hoveredH3Index ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : u.unitType;
       const edges = segments.length > 0 ? firstBeatEdgeCount(segments) : effectiveTacticalMovementPointBudgetForMarchLeg(battle, u, battle.subUnits, moveType);
@@ -29002,7 +30541,7 @@ ${bonuses}`;
   }
   function buildTacticalFerryHoverPreview(battle, unitIds, hoveredH3Index, ferryValidation) {
     const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
-    const selectedAir = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === "human" && u.unitType === "air")).filter((u) => !!u);
+    const selectedAir = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID && u.unitType === "air")).filter((u) => !!u);
     if (!hoveredH3Index || selectedAir.length === 0) {
       return {
         validForAll: false,
@@ -29214,12 +30753,12 @@ ${bonuses}`;
   function targetCoverPlace(hoveredH3Index) {
     const battle = rendererSharedState.tacticalBattleSnapshot;
     if (battle) {
-      const enemyHere2 = battle.subUnits.some((unit) => unit.player !== "human" && unit.h3Index === hoveredH3Index);
+      const enemyHere2 = battle.subUnits.some((unit) => unit.player !== HUMAN_SEAT_ID && unit.h3Index === hoveredH3Index);
       return enemyHere2 ? tacticalCellCoverPlace(battle, hoveredH3Index) : null;
     }
     const state = rendererSharedState.gameState;
     if (!state) return null;
-    const enemyHere = state.units.some((unit) => unit.player !== "human" && unit.h3Index === hoveredH3Index);
+    const enemyHere = state.units.some((unit) => unit.player !== HUMAN_SEAT_ID && unit.h3Index === hoveredH3Index);
     if (!enemyHere) return null;
     const hex = state.hexes.find((row) => row.h3Index === hoveredH3Index);
     return {
@@ -29234,7 +30773,7 @@ ${bonuses}`;
     const battle = rendererSharedState.tacticalBattleSnapshot;
     if (battle) {
       const selected2 = battle.subUnits.filter(
-        (unit) => unit.player === "human" && rendererSharedState.selectedUnitIds.includes(unit.id)
+        (unit) => unit.player === HUMAN_SEAT_ID && rendererSharedState.selectedUnitIds.includes(unit.id)
       );
       if (selected2.length > 0 && selected2.every((unit) => unit.unitType === "air")) return "tacticalFerry";
       return "tacticalMarch";
@@ -29246,7 +30785,7 @@ ${bonuses}`;
   function effectsUnits(kind) {
     const battle = rendererSharedState.tacticalBattleSnapshot;
     if (battle && kind !== "strategicMarch" && kind !== "strategicFerry") {
-      return battle.subUnits.filter((unit) => unit.player === "human" && rendererSharedState.selectedUnitIds.includes(unit.id)).map((unit) => ({
+      return battle.subUnits.filter((unit) => unit.player === HUMAN_SEAT_ID && rendererSharedState.selectedUnitIds.includes(unit.id)).map((unit) => ({
         unitType: unit.unitType,
         originWeather: battle.weather ?? null,
         weatherTags: unit.weatherTags ?? []
@@ -29260,7 +30799,7 @@ ${bonuses}`;
   }
   function strategicSelection() {
     const ids = new Set(rendererSharedState.selectedUnitIds);
-    return (rendererSharedState.gameState?.units ?? []).filter((unit) => unit.player === "human" && ids.has(unit.id));
+    return (rendererSharedState.gameState?.units ?? []).filter((unit) => unit.player === HUMAN_SEAT_ID && ids.has(unit.id));
   }
   function weatherAtHex(h3Index) {
     return rendererSharedState.gameState?.hexes.find((hex) => hex.h3Index === h3Index)?.weather ?? null;
@@ -29426,7 +30965,7 @@ ${bonuses}`;
           validation,
           supportKind: "ranged",
           originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
-          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index,
+          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
           allowBlockingOrderTooltip
         });
         return;
@@ -29450,12 +30989,12 @@ ${bonuses}`;
           validation,
           supportKind: "air",
           originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
-          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index,
+          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
           allowBlockingOrderTooltip
         });
         return;
       }
-      const selectedHumanTactical = unitIds.map((id) => tb.subUnits.find((s) => s.id === id && s.player === "human")).filter((u) => !!u);
+      const selectedHumanTactical = unitIds.map((id) => tb.subUnits.find((s) => s.id === id && s.player === HUMAN_SEAT_ID)).filter((u) => !!u);
       const tacticalHasAir = selectedHumanTactical.some((u) => u.unitType === "air");
       const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== "air");
       if (tacticalHasAir && tacticalHasNonAir) {
@@ -29502,7 +31041,7 @@ ${bonuses}`;
         validation,
         supportKind: "ranged",
         originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
-        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index,
+        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip
       });
       return;
@@ -29526,7 +31065,7 @@ ${bonuses}`;
         validation,
         supportKind: "air",
         originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
-        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index,
+        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip
       });
       return;
@@ -29740,7 +31279,6 @@ ${bonuses}`;
     if (cancelOpponentPlanning) cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
     rendererSharedState.tacticalBattleSnapshot = null;
-    rendererSharedState.tacticalOpponentDraft = null;
     rendererSharedState.tacticalPhasePlanning = true;
     clearPendingTacticalOrders();
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
@@ -29765,7 +31303,6 @@ ${bonuses}`;
       closeTacticalAnnihilationOutcomeDialog();
       cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
       rendererSharedState.tacticalBattleSnapshot = null;
-      rendererSharedState.tacticalOpponentDraft = null;
       rendererSharedState.tacticalPhasePlanning = true;
       rendererSharedState.tacticalPendingMarches = [];
       rendererSharedState.pendingEmbarkOrders = [];
@@ -29933,6 +31470,9 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/pathDrawing.ts
+  function orderColorForOwner(ownerId) {
+    return paletteForCurrentOwner(ownerId)?.map ?? "#333";
+  }
   function drawLineArrow(ctx, from, to, color) {
     drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS), { color, width: ORDER_LINE_WIDTH });
   }
@@ -29956,7 +31496,7 @@ ${bonuses}`;
     if (options?.globalAlpha !== void 0) {
       ctx.globalAlpha = options.globalAlpha;
     }
-    drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
+    drawOrderLine(ctx, { runs, arrow }, { color: orderColorForOwner(HUMAN_SEAT_ID), width: ORDER_LINE_WIDTH });
     ctx.restore();
   }
   function drawStandingOrderLines(ctx, orders, units, excludeUnitIds, options) {
@@ -29964,7 +31504,7 @@ ${bonuses}`;
     const originH3ByUnitId = options?.originH3ByUnitId;
     for (const order of orders) {
       if (excludeUnitIds?.has(order.unitId)) continue;
-      const unit = units.find((u) => u.id === order.unitId && u.player === "human");
+      const unit = units.find((u) => u.id === order.unitId && u.player === HUMAN_SEAT_ID);
       if (!unit) continue;
       const originH3 = originH3ByUnitId?.[order.unitId];
       if (!originH3 && order.destinationH3Index && unit.h3Index === order.destinationH3Index) continue;
@@ -29976,7 +31516,7 @@ ${bonuses}`;
             ctx,
             hexCenterPx(fromH3),
             hexCenterPxRelativeTo(fromH3, order.destinationH3Index),
-            ORDER_LINE_COLOR
+            orderColorForOwner(HUMAN_SEAT_ID)
           );
         }
         continue;
@@ -29988,7 +31528,7 @@ ${bonuses}`;
     if (pendingMarches.length === 0) return;
     ctx.save();
     for (const row of pendingMarches) {
-      const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === "human");
+      const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === HUMAN_SEAT_ID);
       if (!sub) continue;
       const fromH3 = sub.h3Index;
       const toH3 = row.destinationH3Index;
@@ -30010,9 +31550,9 @@ ${bonuses}`;
     const map = getMainLeafletMap();
     const L = getLeafletGlobal();
     for (const move of moves) {
-      const isHumanMove = move.player === "human";
+      const isHumanMove = move.player === HUMAN_SEAT_ID;
       const withArrow = !isHumanMove || includeArrowForHuman;
-      const style = { color: isHumanMove ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH };
+      const style = { color: orderColorForOwner(move.player), width: ORDER_LINE_WIDTH };
       const path = move.pathH3Indexes;
       if (path && path.length >= 2 && map) {
         const points = path.map((h) => {
@@ -30071,7 +31611,7 @@ ${bonuses}`;
         lng = lng0 + progress * (lng1Aligned - lng0);
       }
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-      const color = PLAYER_COLORS[move.player] ?? "#333";
+      const color = orderColorForOwner(move.player);
       const label = group.unitTypes.size > 1 ? "*" : UNIT_TYPE_LABELS[move.unitType] ?? "?";
       drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff", move.player);
       if (group.count > 1) {
@@ -31258,6 +32798,20 @@ ${bonuses}`;
     setLoadedStrategicFootprint(state.hexes.map((hex) => hex.h3Index), roles);
   }
 
+  // src/renderer/gameplay/observeIntent.ts
+  var watchTheRest = false;
+  function chooseWatchTheRest() {
+    watchTheRest = true;
+    rendererSharedState.autoAdvance = true;
+    rendererSharedState.viewAs = "all";
+    syncObserveChrome();
+  }
+  function clearObserveAfterKnockout() {
+    watchTheRest = false;
+    rendererSharedState.autoAdvance = false;
+    rendererSharedState.viewAs = "all";
+  }
+
   // src/shared/startMatchAiChoice.ts
   function chooseStartMatchAi(input) {
     if (input.autoStartChecked && input.runEnabled) {
@@ -31287,38 +32841,11 @@ ${bonuses}`;
     if (runButton) runButton.setAttribute("aria-pressed", choice.runOn ? "true" : "false");
     deps.updateReadyButtonState();
     if (choice.runOn) deps.startPlanning();
-    if (choice.openOpponentTab) showConsoleTab("console-tab-opponent");
-  }
-
-  // src/renderer/core/matchEpoch.ts
-  var rendererMatchEpoch = 0;
-  function advanceRendererMatchEpoch() {
-    rendererMatchEpoch += 1;
-    return rendererMatchEpoch;
-  }
-  function currentRendererMatchEpoch() {
-    return rendererMatchEpoch;
-  }
-  function rendererMatchEpochCurrent(captured) {
-    return captured === rendererMatchEpoch;
+    if (choice.openOpponentTab) showConsoleTab("console-tab-commanders");
   }
 
   // src/renderer/gameplay/newGame.ts
   function registerRegionRandomizeButtons() {
-    document.getElementById("new-game-human-region-randomize")?.addEventListener("click", () => {
-      randomizeScenarioRegionSelect("new-game-human-region-select");
-      void refreshNewGameMapPreview();
-    });
-    document.getElementById("new-game-ai-region-randomize")?.addEventListener("click", () => {
-      randomizeScenarioRegionSelect("new-game-ai-region-select");
-      void refreshNewGameMapPreview();
-    });
-    document.getElementById("new-game-human-region-select")?.addEventListener("change", () => {
-      void refreshNewGameMapPreview();
-    });
-    document.getElementById("new-game-ai-region-select")?.addEventListener("change", () => {
-      void refreshNewGameMapPreview();
-    });
     document.getElementById("new-game-start-month-randomize")?.addEventListener("click", () => {
       randomizeNewGameStartMonth();
       repaintNewGameMapPreview();
@@ -31341,12 +32868,9 @@ ${bonuses}`;
     if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
       tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
     }
-    resetPrecomputedAiState("null");
     rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-    rendererSharedState.backgroundRequestInFlight = false;
     rendererSharedState.readyRequestInFlight = false;
-    rendererSharedState.eventDrivenInitialConsultationDone = false;
   }
   function registerNewGameButton(deps) {
     document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
@@ -31358,25 +32882,26 @@ ${bonuses}`;
     });
     registerRegionRandomizeButtons();
     registerNewGameMapControls();
+    bindNewGameSides();
     registerGameSizeSelect();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
       if (!window.gameApi?.newGame) return;
-      if (regionalStartBlocked()) {
-        showMapToast("This map has no two sides.");
+      const seatsStart = readNewGameSeatsStart();
+      if (seatsStart.blocked) {
+        showMapToast(seatsStart.blocked);
         return;
       }
       const matchEpoch = advanceRendererMatchEpoch();
       stopMatchWaitingUnderNewGame();
       const cameraHold = holdNewGameMapPreviewCamera();
       try {
-        const selectedRegions = getSelectedScenarioRegions();
         const state = await window.gameApi.newGame({
           ...readNewGameOptionChoices(),
           startMonth: readNewGameStartMonth(),
-          humanHomeRegion: selectedRegions.humanHomeRegion,
-          aiHomeRegion: selectedRegions.aiHomeRegion,
           ...readNewGameMapChoice(),
+          seats: seatsStart.seats,
+          turnLimit: seatsStart.turnLimit,
           gameSize: readSelectedGameSizeFromDocument()
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -31385,6 +32910,7 @@ ${bonuses}`;
         rendererSharedState.gameState = state;
         rendererSharedState.strategicScenarioInitialLeafletView = null;
         tacticalReleaseRendererSessionForNewStrategicMatch(state);
+        clearObserveAfterKnockout();
         clearRememberedUnitOrigins();
         deps.rebuildUnitDisplayNameLookup(state);
         deps.reconcileSelectionToCurrentState();
@@ -31408,12 +32934,8 @@ ${bonuses}`;
         rendererSharedState.gestureSelectionSnapshotAtMs = 0;
         rendererSharedState.selectedHexIndex = null;
         deps.hideStackCallout();
-        resetPrecomputedAiState("null");
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-        rendererSharedState.backgroundRequestInFlight = false;
-        rendererSharedState.eventDrivenInitialConsultationDone = false;
-        rendererSharedState.openRouterGameCost = 0;
         clearOpenRouterLog();
         clearConsoleReports();
         deps.updateOpenRouterCostLabel();
@@ -31452,6 +32974,7 @@ ${bonuses}`;
     resetNewGameOptionControls();
     void (async () => {
       await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+      refreshNewGameSides({ reset: true });
       await refreshNewGameMapPreview();
     })();
     syncGameSizeCapPreview();
@@ -31488,7 +33011,7 @@ ${bonuses}`;
     let human = 0;
     let opponent = 0;
     for (const u of subUnits) {
-      if (u.player === "human") human += 1;
+      if (u.player === HUMAN_SEAT_ID) human += 1;
       else opponent += 1;
     }
     if (human > 0 && opponent > 0) return null;
@@ -31526,7 +33049,6 @@ ${bonuses}`;
     tacticalBattleExitTeardownTransientRendererState();
     session.setBattleSnapshot(null);
     closeTacticalAnnihilationOutcomeDialog();
-    rendererSharedState.tacticalOpponentDraft = null;
     session.setPhasePlanning(true);
     exitTacticalMapView();
     tacticalApplyStrategicSidebarForTacticalMode(false);
@@ -31689,15 +33211,15 @@ ${bonuses}`;
     if (labels.length === 2) return `${labels[0]} and ${labels[1]}${suffix}`;
     return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}${suffix}`;
   }
-  function buildQueueTemplateFromSnapshot(snapshot) {
-    return snapshot.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
+  function buildQueueTemplateFromSnapshot(snapshot2) {
+    return snapshot2.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
   }
   function unionAvailableBuildUnitTypes(snapshots) {
-    const available = new Set(snapshots.flatMap((snapshot) => snapshot.availableUnitTypes));
+    const available = new Set(snapshots.flatMap((snapshot2) => snapshot2.availableUnitTypes));
     return ALL_BUILD_UNIT_TYPES.filter((unitType) => available.has(unitType));
   }
   function countEligibleBuildHexes(snapshots, unitType) {
-    return snapshots.filter((snapshot) => snapshot.availableUnitTypes.includes(unitType)).length;
+    return snapshots.filter((snapshot2) => snapshot2.availableUnitTypes.includes(unitType)).length;
   }
   function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
     const typeLabel = unitType.charAt(0).toUpperCase() + unitType.slice(1);
@@ -31707,8 +33229,8 @@ ${bonuses}`;
     if (eligibleCount === 1) return `${typeLabel} (1 hex)`;
     return `${typeLabel} (${Math.max(0, eligibleCount)} hexes)`;
   }
-  function filterTemplateForBuildHex(template, snapshot) {
-    const available = new Set(snapshot.availableUnitTypes);
+  function filterTemplateForBuildHex(template, snapshot2) {
+    const available = new Set(snapshot2.availableUnitTypes);
     return template.filter((entry) => available.has(entry.unitType));
   }
   function templateEntriesForTurnEstimate(template) {
@@ -31721,14 +33243,14 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/buildQueueKeepBuilding.ts
-  function canArmKeepBuilding(snapshot) {
-    return snapshot.entries.length > 0 || snapshot.keepBuilding && snapshot.keepBuildingUnitType !== null;
+  function canArmKeepBuilding(snapshot2) {
+    return snapshot2.entries.length > 0 || snapshot2.keepBuilding && snapshot2.keepBuildingUnitType !== null;
   }
   function areAllKeepBuildingArmed(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot) => snapshot.keepBuilding);
+    return snapshots.length > 0 && snapshots.every((snapshot2) => snapshot2.keepBuilding);
   }
   function canArmKeepBuildingForAll(snapshots) {
-    return snapshots.length > 0 && snapshots.every((snapshot) => canArmKeepBuilding(snapshot));
+    return snapshots.length > 0 && snapshots.every((snapshot2) => canArmKeepBuilding(snapshot2));
   }
   function appendKeepBuildingCheckbox(args) {
     const row = document.createElement("div");
@@ -31765,7 +33287,7 @@ ${bonuses}`;
         }
       })
     );
-    return snapshots.filter((snapshot) => snapshot !== null);
+    return snapshots.filter((snapshot2) => snapshot2 !== null);
   }
   function copyBuildQueueTemplate(template) {
     return template.map((row) => ({ ...row }));
@@ -31780,8 +33302,8 @@ ${bonuses}`;
     const seedHex = rendererSharedState.selectedBuildHexH3s[0];
     const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
     if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
-    const snapshot = snapshots[0];
-    rendererSharedState.buildQueueTemplate = snapshot ? buildQueueTemplateFromSnapshot(snapshot) : previousTemplate;
+    const snapshot2 = snapshots[0];
+    rendererSharedState.buildQueueTemplate = snapshot2 ? buildQueueTemplateFromSnapshot(snapshot2) : previousTemplate;
     return true;
   }
   async function commitEditedTemplate(deps, nextTemplate) {
@@ -31800,10 +33322,10 @@ ${bonuses}`;
     if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
     const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
     const turns = snapshots.map(
-      (snapshot) => estimateTurnsToCompleteQueuedProduction(
-        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot)),
-        snapshot.storedPoints,
-        snapshot.urbanHexCount
+      (snapshot2) => estimateTurnsToCompleteQueuedProduction(
+        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot2)),
+        snapshot2.storedPoints,
+        snapshot2.urbanHexCount
       )
     );
     const numericTurns = turns.filter((turn) => turn !== null);
@@ -31878,7 +33400,7 @@ ${bonuses}`;
       techSpacer.style.height = "0.5em";
       section.appendChild(techSpacer);
     }
-    const totalProduction = snapshots.reduce((sum, snapshot) => sum + snapshot.urbanHexCount, 0);
+    const totalProduction = snapshots.reduce((sum, snapshot2) => sum + snapshot2.urbanHexCount, 0);
     const pointsLine = document.createElement("div");
     pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
     section.appendChild(pointsLine);
@@ -32107,17 +33629,17 @@ ${bonuses}`;
       }
       if (!window.gameApi?.getHexBuildQueue) return;
       const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
-      let snapshot = null;
+      let snapshot2 = null;
       let namingCaption = null;
       try {
-        snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
+        snapshot2 = await window.gameApi.getHexBuildQueue({ h3Index });
         if (window.gameApi.getHexNamingTooltipLine) {
           namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
         }
       } catch (err) {
         console.error("getHexBuildQueue failed:", err);
       }
-      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot || rendererSharedState.buildPopupHexH3 !== h3Index) return;
+      if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot2 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
       mount.innerHTML = "";
       const closeRow = document.createElement("div");
       closeRow.className = "build-popup-close-row";
@@ -32160,7 +33682,7 @@ ${bonuses}`;
         section.appendChild(techSpacer);
       }
       const pointsLine = document.createElement("div");
-      const productionCapacity = snapshot.urbanHexCount;
+      const productionCapacity = snapshot2.urbanHexCount;
       const productionDetail = productionCapacity > 0 ? `$${productionCapacity.toLocaleString()} / turn` : "(none)";
       pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
@@ -32168,13 +33690,13 @@ ${bonuses}`;
       productionQueueSpacer.style.height = "0.5em";
       section.appendChild(productionQueueSpacer);
       const queueSummaryLine = document.createElement("div");
-      const queueTotalCost = sumQueuedProductionCost(snapshot.entries);
-      if (snapshot.entries.length === 0) {
+      const queueTotalCost = sumQueuedProductionCost(snapshot2.entries);
+      if (snapshot2.entries.length === 0) {
         queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
       } else {
         const queueTurns = estimateTurnsToCompleteQueuedProduction(
-          snapshot.entries,
-          snapshot.storedPoints,
+          snapshot2.entries,
+          snapshot2.storedPoints,
           productionCapacity
         );
         const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
@@ -32185,14 +33707,14 @@ ${bonuses}`;
       const productionSpacer = document.createElement("div");
       productionSpacer.style.height = "0.5em";
       section.appendChild(productionSpacer);
-      if (!snapshot.controlledByRequester) {
+      if (!snapshot2.controlledByRequester) {
         mount.appendChild(section);
         return;
       }
-      if (!snapshot.buildSectionVisible) {
+      if (!snapshot2.buildSectionVisible) {
         const noUrban = document.createElement("div");
         noUrban.className = "build-no-urban";
-        noUrban.textContent = snapshot.noBuildReason ?? "This hex cannot build units.";
+        noUrban.textContent = snapshot2.noBuildReason ?? "This hex cannot build units.";
         section.appendChild(noUrban);
         mount.appendChild(section);
         return;
@@ -32223,8 +33745,8 @@ ${bonuses}`;
       section.appendChild(head);
       const list = document.createElement("div");
       list.className = "build-queue-list";
-      const options = snapshot.availableUnitTypes;
-      for (const entry of snapshot.entries) {
+      const options = snapshot2.availableUnitTypes;
+      for (const entry of snapshot2.entries) {
         const row = document.createElement("div");
         row.className = "build-queue-row";
         const typeSelect = document.createElement("select");
@@ -32312,8 +33834,8 @@ ${bonuses}`;
       section.appendChild(list);
       appendKeepBuildingCheckbox({
         section,
-        checked: snapshot.keepBuilding,
-        disabled: !canArmKeepBuilding(snapshot),
+        checked: snapshot2.keepBuilding,
+        disabled: !canArmKeepBuilding(snapshot2),
         tooltipText: keepBuildingTooltipText,
         onChange: async (keepBuilding) => {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
@@ -32488,7 +34010,7 @@ ${bonuses}`;
     const held = [];
     for (const order of orders) {
       if (!order.destinationH3Index) continue;
-      const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === "human");
+      const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === HUMAN_SEAT_ID);
       if (!unit || unit.h3Index !== order.destinationH3Index) continue;
       const move = moves.find(
         (candidate) => candidate.unitId === order.unitId && candidate.fromH3Index !== order.destinationH3Index
@@ -32528,15 +34050,10 @@ ${bonuses}`;
     if (payload2.kind !== "tactical") return;
     if (payload2.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) return;
     if (payload2.attachTacticalOpponentPlanToIpc) {
-      const { draft, startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload2.tacticalOpponentPlan);
-      rendererSharedState.tacticalOpponentDraft = draft;
-      if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
-    } else {
-      rendererSharedState.tacticalOpponentDraft = null;
-      const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-      if (rendererSharedState.runButtonOn && oppAlive) {
-        deps.startBackgroundRequestIfAllowed();
-      }
+      const { startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload2.tacticalOpponentPlan);
+      if (startBackgroundPrefetch && tacticalBattleHasAiSide()) deps.startBackgroundRequestIfAllowed();
+    } else if (rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
+      deps.startBackgroundRequestIfAllowed();
     }
     deps.showAiStrategyToast({ message: payload2.aiMessage, strategy: payload2.aiStrategy });
     if (payload2.toolInvocationCounts) {
@@ -32544,12 +34061,16 @@ ${bonuses}`;
       deps.updateOpenRouterToolCountLabels();
     }
     if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
-      rendererSharedState.openRouterGameCost += payload2.cost;
-      updateOpenRouterCostLabel();
+      void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
     }
     deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
     deps.redraw();
     deps.updateReadyButtonState();
+  }
+  function tacticalBattleHasAiSide() {
+    const units = rendererSharedState.tacticalBattleSnapshot?.subUnits;
+    if (!units) return false;
+    return units.some((unit) => isAiSeatId(unit.player));
   }
 
   // src/shared/marchPathHelpers.ts
@@ -32647,13 +34168,18 @@ ${bonuses}`;
     const unitType = normalizeUnitType(meta.unitType);
     if (!unitType) return null;
     const player = meta.player;
-    const visible = player === "human" || !args.isVictimVisible || args.isVictimVisible(victimId, player);
+    const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
+    const visible = player === alwaysVisiblePlayer || !args.isVictimVisible || args.isVictimVisible(victimId, player);
     if (!visible) return null;
     const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
     return { unitType, displayName, unitId: victimId };
   }
   function bucketForPlayer(summary, player) {
-    return player === "human" ? summary.human : summary.ai;
+    const existing = summary.byOwner[player];
+    if (existing) return existing;
+    const created = emptyPlayerLossSummary();
+    summary.byOwner[player] = created;
+    return created;
   }
   function pushToBucket(summary, player, bucket, unit) {
     bucketForPlayer(summary, player)[bucket].push(unit);
@@ -32709,7 +34235,7 @@ ${bonuses}`;
       const unit = resolveLostUnit(victimId, snapshots, args);
       if (!unit) return;
       const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
-      const player = meta?.player ?? "opponent";
+      const player = meta?.player ?? AI_SEAT_IDS[0];
       pushToBucket(summary, player, cause, unit);
       claimed.add(victimId);
     };
@@ -32751,6 +34277,145 @@ ${bonuses}`;
     return unknownContinentNames;
   }
 
+  // src/shared/turnReportLines.ts
+  var TYPE_ORDER = ["infantry", "armor", "naval", "air"];
+  function buildTurnReportLines(input) {
+    const lines = [
+      ...hexLines(input),
+      ...viewerLossLines(input),
+      ...seenLines(input),
+      ...input.otherLines
+    ];
+    return lines;
+  }
+  function ownerName(ownerId, seats) {
+    if (isNeutralOwnerId(ownerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === ownerId);
+    return seat ? shortSideName(seat.homeRegion) : ownerId;
+  }
+  function compareOwners(left, right, seats) {
+    const rank = (ownerId) => {
+      if (isNeutralOwnerId(ownerId)) return 1e4;
+      return seats.find((row) => row.seatId === ownerId)?.seatOrder ?? 9e3;
+    };
+    return rank(left) - rank(right) || left.localeCompare(right);
+  }
+  function joinNames(names) {
+    if (names.length <= 1) return names[0] ?? "";
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  }
+  function typeList(types) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const unitType of types) counts.set(unitType, (counts.get(unitType) ?? 0) + 1);
+    const parts = [];
+    for (const unitType of TYPE_ORDER) {
+      const count = counts.get(unitType) ?? 0;
+      if (count === 0) continue;
+      parts.push(typePhrase(unitType, count));
+    }
+    return joinNames(parts);
+  }
+  function typePhrase(unitType, count) {
+    if (unitType === "infantry") return `${count} infantry`;
+    if (unitType === "armor") return count === 1 ? "1 armored unit" : `${count} armored units`;
+    if (unitType === "naval") return count === 1 ? "1 naval unit" : `${count} naval units`;
+    return count === 1 ? "1 air unit" : `${count} air units`;
+  }
+  function hexLines(input) {
+    const viewer = input.viewerSeatId;
+    if (viewer === null) return [];
+    const taken = /* @__PURE__ */ new Map();
+    const lost = /* @__PURE__ */ new Map();
+    for (const row of input.transitions) {
+      if (row.to === viewer && row.from !== null && row.from !== viewer) taken.set(row.from, (taken.get(row.from) ?? 0) + 1);
+      if (row.from === viewer && row.to !== null && row.to !== viewer) lost.set(row.to, (lost.get(row.to) ?? 0) + 1);
+    }
+    const lines = [];
+    for (const ownerId of [...taken.keys()].sort((left, right) => compareOwners(left, right, input.seats))) {
+      const count = taken.get(ownerId) ?? 0;
+      const hexWord = count === 1 ? "hex" : "hexes";
+      lines.push(`You took ${count} ${hexWord} from ${ownerName(ownerId, input.seats)}.`);
+    }
+    for (const ownerId of [...lost.keys()].sort((left, right) => compareOwners(left, right, input.seats))) {
+      const count = lost.get(ownerId) ?? 0;
+      lines.push(`${ownerName(ownerId, input.seats)} took ${count} of your hexes.`);
+    }
+    return lines;
+  }
+  function viewerLossLines(input) {
+    const viewer = input.viewerSeatId;
+    if (viewer === null) return [];
+    const lines = [];
+    const lostGroups = groupLosses(input.losses.filter((row) => row.victimOwnerId === viewer), (row) => `${row.killerOwnerId ?? ""}|${row.hexLabel}`);
+    for (const group of sortGroups(lostGroups, input.seats, (row) => row.killerOwnerId ?? "")) {
+      const killer = group[0]?.killerOwnerId;
+      const hex = group[0]?.hexLabel ?? "";
+      const toSide = killer && killer !== viewer ? ` to ${ownerName(killer, input.seats)}` : "";
+      lines.push(`You lost ${typeList(group.map((row) => row.unitType))}${toSide} at (${hex}).`);
+    }
+    const destroyed = groupLosses(
+      input.losses.filter((row) => row.killerOwnerId === viewer && row.victimOwnerId !== viewer),
+      (row) => `${row.victimOwnerId}|${row.hexLabel}`
+    );
+    for (const group of sortGroups(destroyed, input.seats, (row) => row.victimOwnerId)) {
+      const victim = group[0]?.victimOwnerId ?? "";
+      const hex = group[0]?.hexLabel ?? "";
+      lines.push(`You destroyed ${typeList(group.map((row) => row.unitType))} of ${ownerName(victim, input.seats)} at (${hex}).`);
+    }
+    return lines;
+  }
+  function seenLines(input) {
+    const byHex = groupLosses(input.losses, (row) => row.hexLabel);
+    const lines = [];
+    for (const hex of [...byHex.keys()].sort((left, right) => left.localeCompare(right))) {
+      const rows = byHex.get(hex) ?? [];
+      const parties = fightParties(rows);
+      if (input.viewerSeatId !== null && parties.includes(input.viewerSeatId)) continue;
+      if (parties.length < 2) continue;
+      const ordered = [...parties].sort((left, right) => compareOwners(left, right, input.seats));
+      const names = ordered.map((ownerId) => ownerName(ownerId, input.seats));
+      const lists = ordered.map((ownerId) => typeList(rows.filter((row) => row.victimOwnerId === ownerId).map((row) => row.unitType)));
+      const fought = `Seen: ${joinNames(names)} fought at (${hex}).`;
+      if (ordered.length === 2 && lists[0] && lists[0] === lists[1]) {
+        lines.push(`${fought} Each lost ${lists[0]}.`);
+        continue;
+      }
+      const clauses = ordered.flatMap((ownerId, index) => {
+        const list = lists[index];
+        if (!list) return [];
+        return [`${ownerName(ownerId, input.seats)} lost ${list}`];
+      });
+      lines.push(clauses.length > 0 ? `${fought} ${clauses.join("; ")}.` : fought);
+    }
+    return lines;
+  }
+  function fightParties(rows) {
+    const ids = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      ids.add(row.victimOwnerId);
+      if (row.killerOwnerId) ids.add(row.killerOwnerId);
+    }
+    return [...ids];
+  }
+  function groupLosses(rows, keyOf) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      const key = keyOf(row);
+      const list = groups.get(key);
+      if (list) list.push(row);
+      else groups.set(key, [row]);
+    }
+    return groups;
+  }
+  function sortGroups(groups, seats, ownerOf) {
+    return [...groups.values()].sort((left, right) => {
+      const owner = compareOwners(ownerOf(left[0]), ownerOf(right[0]), seats);
+      if (owner !== 0) return owner;
+      return (left[0]?.hexLabel ?? "").localeCompare(right[0]?.hexLabel ?? "");
+    });
+  }
+
   // src/shared/consolidatedTurnUpdateToast.ts
   var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
   var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
@@ -32770,7 +34435,7 @@ ${bonuses}`;
     return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} ${noun} deployed`;
   }
   function formatDeploymentCapReachedLine(cappedTypes, player) {
-    if (player !== "human") return null;
+    if (player !== HUMAN_SEAT_ID) return null;
     if (!cappedTypes || cappedTypes.length === 0) return null;
     const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
     if (ordered.length === 0) return null;
@@ -32783,7 +34448,7 @@ ${bonuses}`;
     const lines = [];
     const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
     if (deployedLine) lines.push(deployedLine);
-    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
+    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
     if (deploymentCapLine) lines.push(deploymentCapLine);
     const hexesLost = readyResult.humanHexesLostCount ?? 0;
     if (hexesLost > 0) {
@@ -32794,19 +34459,12 @@ ${bonuses}`;
   function stripLeadingBullet(line) {
     return line.replace(/^\u2022\s*/, "");
   }
-  function appendLossSection(out, header, summary) {
-    if (!playerHasAnyLoss(summary)) return;
-    out.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${header}`);
-    for (const line of formatPlayerLossLinesMultiline(summary)) {
-      out.push(`${line.causeLabel}: ${line.text}`);
-    }
-  }
   function buildConsolidatedTurnUpdateToastMessage(args) {
-    const { readyResult, turnLossSummary, combatFallbackBullets } = args;
+    const { readyResult, combatFallbackBullets, turnReport } = args;
     const sections = [];
-    appendLossSection(sections, "Human Losses", turnLossSummary.human);
-    appendLossSection(sections, "AI Losses", turnLossSummary.ai);
-    const hasLossSections = playerHasAnyLoss(turnLossSummary.human) || playerHasAnyLoss(turnLossSummary.ai);
+    const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
+    sections.push(...reportLines);
+    const hasLossSections = reportLines.length > 0;
     let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
     if (!hasLossSections && otherLines.length === 0) {
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
@@ -32820,43 +34478,34 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/readyResolutionAnnouncements.ts
-  function deriveCombatVisibilityClassification(readyResult, visibleHexes) {
+  function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
     const allKills = readyResult.kills ?? [];
-    const anyCombatResolved = (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.airStrikeCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0 || allKills.length > 0 || (readyResult.removedUnits?.length ?? 0) > 0;
-    if (anyCombatResolved) {
-      const knownVictimIds2 = /* @__PURE__ */ new Set([
-        ...allKills.map((k) => k.victimId),
-        ...(readyResult.removedUnits ?? []).map((u) => u.id)
-      ]);
-      return {
-        unknownCombatHexes: [],
-        unknownCasualtyHexes: [],
-        knownVictimIds: knownVictimIds2,
-        unknownVictimIds: []
-      };
-    }
+    const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
+    const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
     const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
     const friendlyInvolvedKillVictimIds = new Set(
       allKills.filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => unitIdOwnerFromId(id) === "human");
-        const victimIsFriendly = victim?.player === "human";
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(unitIdOwnerFromId(id)));
+        const victimIsFriendly = viewerInvolved(victim?.player);
         return killerIsFriendly || victimIsFriendly;
       }).map((k) => k.victimId)
     );
     const friendlyInvolvedCombatHexes = new Set(
       [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
     );
-    const friendlyPlannedCombatHexes = /* @__PURE__ */ new Set([
-      ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
-      ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
-      ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
-      ...(readyResult.airStrikeMoves ?? []).filter((move) => move.player === "human").flatMap((move) => [move.fromH3Index, move.targetH3Index]),
-      ...(readyResult.removedUnits ?? []).filter((unit) => unit.player === "human").map((unit) => unit.h3Index)
-    ]);
+    const friendlyPlannedCombatHexes = new Set(
+      viewerIsHuman ? [
+        ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+        ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
+        ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
+        ...(readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+        ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index)
+      ] : []
+    );
     for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
     const knownHumanAirStrikeTargetHexes = new Set(
-      (readyResult.airStrikeMoves ?? []).filter((move) => move.player === "human").map((move) => move.targetH3Index)
+      (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
     );
     const unknownCombatHexes = [
       ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
@@ -32872,12 +34521,12 @@ ${bonuses}`;
     ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
     const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
     for (const removed of readyResult.removedUnits ?? []) {
-      if (removed.player === "human") knownVictimIds.add(removed.id);
+      if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
     }
     for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
     const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
       const removed = removedById.get(id);
-      if (removed?.player === "human") return false;
+      if (viewerInvolved(removed?.player)) return false;
       return !friendlyInvolvedKillVictimIds.has(id);
     }).filter((id) => {
       const removed = removedById.get(id);
@@ -32896,7 +34545,7 @@ ${bonuses}`;
     const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
     const airStrikeRemovedUnits = removedAll.filter((u) => {
       if (airStrikeVictimIds.has(u.id)) return true;
-      if (u.player === "human" && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
+      if (u.player === HUMAN_SEAT_ID && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
       return false;
     });
     return {
@@ -32940,7 +34589,7 @@ ${bonuses}`;
         return formatUnitName(id);
       },
       resolveUnitMeta: (id) => metaMap.get(id),
-      isVictimVisible: (_id, player) => player === "human" || knownVictimIds.has(_id)
+      isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
     });
   }
   function formatHexCount(label, count) {
@@ -32956,6 +34605,42 @@ ${bonuses}`;
     if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
     return bullets;
   }
+  function reportViewerSeatId() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
+    return viewer ?? null;
+  }
+  function turnReportLosses(readySlice, knownVictimIds, extraKills) {
+    const removed = [...readySlice.removedUnits ?? [], ...readySlice.airStrikeRemovedUnits ?? []];
+    const killerByVictim = /* @__PURE__ */ new Map();
+    const edges = [
+      ...readySlice.kills ?? [],
+      ...readySlice.killsByDirectFire ?? [],
+      ...readySlice.killsByReturnFire ?? [],
+      ...extraKills
+    ];
+    for (const edge of edges) {
+      const killerId = edge.killerIds?.[0];
+      killerByVictim.set(edge.victimId, killerId ? unitIdOwnerFromId(killerId) : null);
+    }
+    const losses = [];
+    for (const unit of removed) {
+      if (!knownVictimIds.has(unit.id)) continue;
+      const unitType = reportUnitType(unit.unitType);
+      if (!unitType) continue;
+      losses.push({
+        victimOwnerId: unit.player,
+        killerOwnerId: killerByVictim.get(unit.id) ?? null,
+        hexLabel: getStrategicHexCode(unit.h3Index) ?? unit.h3Index,
+        unitType
+      });
+    }
+    return losses;
+  }
+  function reportUnitType(unitType) {
+    if (unitType === "infantry" || unitType === "armor" || unitType === "naval" || unitType === "air") return unitType;
+    return null;
+  }
   async function announceResolutionTurnUpdate(args, deps) {
     const { readySlice, visibility, killToastFormatter, extraKills, reportTag } = args;
     const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
@@ -32966,10 +34651,24 @@ ${bonuses}`;
       ...extraKills !== void 0 ? extraKills : {}
     });
     const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
+    const seats = (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      homeRegion: seat.homeRegion
+    }));
     const updateText = buildConsolidatedTurnUpdateToastMessage({
       readyResult: readySlice,
       turnLossSummary,
-      combatFallbackBullets
+      combatFallbackBullets,
+      turnReport: {
+        viewerSeatId: reportViewerSeatId(),
+        seats,
+        transitions: readySlice.controlTransitions ?? [],
+        losses: turnReportLosses(readySlice, knownVictimIds, [
+          ...extraKills?.killsByMelee ?? [],
+          ...extraKills?.killsByAirStrike ?? []
+        ])
+      }
     });
     if (updateText) {
       const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
@@ -32996,6 +34695,7 @@ ${bonuses}`;
     } else {
       dropQueuedResolutionPlaybackCompleteNotifies();
       send();
+      notifyResolutionPlaybackFinished();
     }
   }
 
@@ -33107,7 +34807,17 @@ ${bonuses}`;
     for (const row of tacticalSubUnitsForKillLabels ?? []) {
       displayNameById.set(row.id, row.displayName);
     }
-    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatDisplayUnitName = (unitId) => {
+      const baseName = displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+      const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+      if (!ownerId) return baseName;
+      return formatUnitNameForViewer({
+        baseName,
+        ownerId,
+        viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
+        seats: rendererSharedState.gameState?.seats ?? []
+      });
+    };
     const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
     return { formatUnitName: formatDisplayUnitName, formatKillLine };
   }
@@ -33164,8 +34874,8 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/readyTacticalCommit.ts
-  function rollbackReadyToolCounts(deps, snapshot) {
-    rendererSharedState.toolInvocationCounts = snapshot;
+  function rollbackReadyToolCounts(deps, snapshot2) {
+    rendererSharedState.toolInvocationCounts = snapshot2;
     deps.updateOpenRouterToolCountLabels();
   }
   async function runTacticalReadyCommit(context) {
@@ -33194,7 +34904,6 @@ ${bonuses}`;
       airStrikes: [...rendererSharedState.pendingAirStrikes],
       ferryOrders: [...rendererSharedState.pendingFerryOrders],
       embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
-      ...rendererSharedState.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(rendererSharedState.tacticalOpponentDraft) ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
       useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
       aiPlanningRunEnabled: rendererSharedState.runButtonOn
     });
@@ -33252,9 +34961,6 @@ ${bonuses}`;
       deps.syncTacticalExitButton?.();
     }
     reconcileSelectionToCurrentState();
-    if ("committedOpponentTacticalDraft" in commitResult) {
-      rendererSharedState.tacticalOpponentDraft = null;
-    }
     if (commitResult.tacticalPostBeatConsultDeferred) {
       rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
       rendererSharedState.deferredResolutionConsultNotifySent = false;
@@ -33262,8 +34968,9 @@ ${bonuses}`;
     if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
       applyTacticalPostBeatConsultSideEffects(commitResult, deps);
     } else if (!commitResult.tacticalPostBeatConsultDeferred) {
-      if ("tacticalOpponentPlan" in commitResult) {
-        rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      const plan = "tacticalOpponentPlan" in commitResult ? commitResult.tacticalOpponentPlan : null;
+      if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
+        deps.startBackgroundRequestIfAllowed();
       }
       deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
     }
@@ -33284,29 +34991,27 @@ ${bonuses}`;
     rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
-    if (window.gameApi?.getGameState) {
-      try {
-        const refreshedStrategic = await window.gameApi.getGameState();
-        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-        await deps.applyGameStateSnapshot(refreshedStrategic, {
-          refreshStandingOrders: false,
-          updateGameStateSidebarUi: false,
-          updateSelectionUi: false,
-          updateGameOverUi: false,
-          updateReadyButton: false,
-          refreshBuildPopup: true,
-          redraw: false
-        });
-        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-      } catch (err) {
-        console.error("tactical commit: failed to refresh strategic game state snapshot", err);
-        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-      }
+    try {
+      const refreshedStrategic = await fetchMatchSnapshot();
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+      await deps.applyGameStateSnapshot(refreshedStrategic, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: false,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: true,
+        redraw: false
+      });
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    } catch (err) {
+      console.error("tactical commit: failed to refresh strategic game state snapshot", err);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
     }
     if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
       const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
       const visibleHexes = deps.getVisibleHexSet(rendererSharedState.gameState);
-      const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
+      const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
       const killToastFormatter = deps.buildKillToastFormatterBundle(
         rendererSharedState.gameState,
         tacticalReadySlice.removedUnits,
@@ -33357,17 +35062,162 @@ ${bonuses}`;
         scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
       }
     }
-    if (rendererSharedState.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
-      const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-      if (oppAlive) deps.startBackgroundRequestIfAllowed();
-    }
     deps.updateReadyButtonState();
     return true;
   }
 
+  // src/shared/knockoutNotice.ts
+  var REASON_ORDER = ["home_control", "no_city_hexes", "home_cities_destroyed"];
+  function formatKnockoutNotice(input) {
+    const sentences = [input.victimIsHuman ? "You are out of the match." : `${input.victimName} is out of the match.`];
+    const held = new Set(input.reasons);
+    for (const reason of REASON_ORDER) {
+      if (!held.has(reason)) continue;
+      if (reason === "home_control") {
+        const outBy = input.outByName ?? "A side";
+        sentences.push(
+          input.globalHome ? `${outBy} holds all of its home.` : `${outBy} holds ${input.controlShareLabel} of its home's cities.`
+        );
+      } else if (reason === "no_city_hexes") sentences.push("It holds no city hexes.");
+      else sentences.push("Its home has no cities left.");
+    }
+    sentences.push("Its land is now neutral and its cities stop building.");
+    if (input.remainingUnits > 0) {
+      sentences.push(`Its last ${input.remainingUnits} units hold their hexes as neutral garrisons and fire on any unit in range.`);
+    }
+    return sentences.join(" ");
+  }
+
+  // src/renderer/gameplay/knockoutNotices.ts
+  function announceKnockouts(knockouts, before, afterSeats, removedUnitIdsBySeat) {
+    if (knockouts.length === 0) return;
+    const notices = knockouts.map((row) => noticeText(row, before, afterSeats, removedUnitIdsBySeat));
+    const tag = currentConsoleReportTag();
+    for (const notice of notices) {
+      const body = document.createElement("p");
+      body.textContent = notice;
+      recordConsoleReport("notice", tag, body);
+    }
+    showMapToast(notices.join("\n\n"), { isError: false, report: { kind: "notice", tag }, skipReport: true });
+  }
+  function noticeText(row, before, afterSeats, removedUnitIdsBySeat) {
+    const seats = afterSeats ?? before?.seats ?? [];
+    const victim = seats.find((seat) => seat.seatId === row.seatId);
+    const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
+    const removed = new Set(removedUnitIdsBySeat?.[row.seatId] ?? []);
+    const remaining = (before?.units ?? []).filter((unit) => unit.player === row.seatId && !removed.has(unit.id)).length;
+    const share = activeGameMap().controlWinMinUrbanShare;
+    return formatKnockoutNotice({
+      victimName: victim?.homeRegion ?? row.seatId,
+      victimIsHuman: victim?.kind === HUMAN_SEAT_ID,
+      outByName: outBy?.homeRegion ?? null,
+      reasons: row.reasons,
+      globalHome: share === null,
+      controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`,
+      remainingUnits: remaining
+    });
+  }
+
+  // src/shared/knockoutDialogCopy.ts
+  var REASON_ORDER2 = ["home_control", "no_city_hexes", "home_cities_destroyed"];
+  function formatHumanKnockoutDialog(input) {
+    const outByName = input.outByName?.trim() ? input.outByName.trim() : null;
+    return {
+      title: "You're out",
+      lead: outByName ? `${outByName} knocked you out on turn ${input.turnNumber}.` : reasonLead(input),
+      placeLine: `You placed ${ordinal2(input.place)} of ${input.seatCount}.`
+    };
+  }
+  function reasonLead(input) {
+    const held = new Set(input.reasons);
+    const sentences = [];
+    for (const reason of REASON_ORDER2) {
+      if (!held.has(reason)) continue;
+      if (reason === "home_control") {
+        sentences.push(
+          input.globalHome ? "A side holds all of your home." : `A side holds ${input.controlShareLabel} of your home's cities.`
+        );
+      } else if (reason === "no_city_hexes") sentences.push("You hold no city hexes.");
+      else sentences.push("Your home has no cities left.");
+    }
+    return sentences.join(" ") || "You are out of the match.";
+  }
+  function ordinal2(place) {
+    const mod100 = place % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
+    switch (place % 10) {
+      case 1:
+        return `${place}st`;
+      case 2:
+        return `${place}nd`;
+      case 3:
+        return `${place}rd`;
+      default:
+        return `${place}th`;
+    }
+  }
+
+  // src/renderer/gameplay/knockoutDialog.ts
+  var pending = null;
+  async function offerHumanKnockoutChoice(state, knockouts, endMatch, applyEndedMatch, showError) {
+    const row = (knockouts ?? []).find((knockout) => isHumanSeatId(knockout.seatId));
+    if (!row || state.gameOver) return "continue";
+    const seats = state.seats ?? [];
+    const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
+    const share = activeGameMap().controlWinMinUrbanShare;
+    const choice = await openHumanKnockoutDialog(formatHumanKnockoutDialog({
+      outByName: outBy?.homeRegion ?? (row.outBy ? "A side" : null),
+      turnNumber: state.turnNumber,
+      place: row.place,
+      seatCount: Math.max(seats.length, 1),
+      reasons: row.reasons,
+      globalHome: share === null,
+      controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`
+    }));
+    if (choice === "watch") {
+      chooseWatchTheRest();
+      return "continue";
+    }
+    try {
+      const ended = await endMatch();
+      await applyEndedMatch(ended);
+      return "ended";
+    } catch (err) {
+      console.error("endMatch failed", err);
+      showError("Could not end the match.");
+      return "continue";
+    }
+  }
+  function openHumanKnockoutDialog(copy) {
+    const dialog = document.getElementById("knockout-dialog");
+    const title = document.getElementById("knockout-dialog-title");
+    const lead = document.getElementById("knockout-dialog-lead");
+    const place = document.getElementById("knockout-dialog-place");
+    if (!dialog || !title || !lead || !place) return Promise.resolve("watch");
+    title.textContent = copy.title;
+    lead.textContent = copy.lead;
+    place.textContent = copy.placeLine;
+    dialog.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
+    return new Promise((resolve) => {
+      pending = resolve;
+    });
+  }
+  function closeHumanKnockoutDialog(choice) {
+    document.getElementById("knockout-dialog")?.classList.add("hidden");
+    if (choice === "watch") setMainUIControlsEnabled(true);
+    const resolve = pending;
+    pending = null;
+    resolve?.(choice);
+  }
+  if (typeof document !== "undefined") {
+    document.getElementById("knockout-dialog-watch")?.addEventListener("click", () => closeHumanKnockoutDialog("watch"));
+    document.getElementById("knockout-dialog-end")?.addEventListener("click", () => closeHumanKnockoutDialog("end"));
+  }
+
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
-    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
+    const { enabledToolGroupsPayload, useEventDriven, aiPlanningRunEnabled } = args;
     const base = {
       enabledToolGroups: enabledToolGroupsPayload,
       aiPlanningRunEnabled: aiPlanningRunEnabled ?? rendererSharedState.runButtonOn
@@ -33375,12 +35225,6 @@ ${bonuses}`;
     if (useEventDriven) {
       base.useEventDrivenConsultation = true;
     }
-    if (!usePrecomputed) return base;
-    base.precomputedAiOrders = rendererSharedState.precomputedAiOrders ?? [];
-    base.precomputedAiRangedOrders = rendererSharedState.precomputedAiRangedOrders ?? [];
-    base.precomputedAiEmbarkOrders = rendererSharedState.precomputedAiEmbarkOrders ?? [];
-    base.precomputedAiStrategy = rendererSharedState.precomputedAiStrategy ?? void 0;
-    base.precomputedAiMessage = rendererSharedState.precomputedAiMessage ?? void 0;
     return base;
   }
   async function handleReadyButtonClick(deps) {
@@ -33404,7 +35248,7 @@ ${bonuses}`;
       if (isWaitingForPrecomputedAiOrders()) {
         rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.startBackgroundRequestIfAllowed();
-        deps.showMapToast("AI planning is still running. Ready will unlock once precomputed orders are available.", { isError: false });
+        deps.showMapToast("AI planning is still running. Ready will unlock when it finishes.", { isError: false });
         deps.updateReadyButtonState();
         return;
       }
@@ -33425,19 +35269,19 @@ ${bonuses}`;
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!submitResult.success) {
-          deps.showSidebarError(submitResult.reason ?? "Submit failed");
+          const reason = submitResult.reason ?? "Submit failed";
+          stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+          deps.showSidebarError(reason);
           deps.updateReadyButtonState();
           return;
         }
       }
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
-      const usePrecomputed = rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders !== null;
       const cachedPrecomputedToolCounts = cachedPrecomputedToolCountsAtReadyStart ?? (rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null);
       const readyPayload = buildReadyPayload({
         enabledToolGroupsPayload,
         useEventDriven,
-        usePrecomputed,
         aiPlanningRunEnabled: rendererSharedState.runButtonOn
       });
       const visibleHexesBeforeTurn = deps.getVisibleHexSet(rendererSharedState.gameState);
@@ -33446,7 +35290,9 @@ ${bonuses}`;
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
         rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-        deps.showSidebarError(readyResult.reason ?? "Ready failed");
+        const reason = readyResult.reason ?? "Ready failed";
+        stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+        deps.showSidebarError(reason);
         deps.updateReadyButtonState();
         return;
       }
@@ -33458,7 +35304,7 @@ ${bonuses}`;
           return;
         }
         await deps.refreshTacticalTerrainOverridesForRenderer();
-        const pausedState = await window.gameApi.getGameState();
+        const pausedState = await fetchMatchSnapshot();
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         await deps.applyGameStateSnapshot(pausedState, {
           refreshStandingOrders: false,
@@ -33484,18 +35330,20 @@ ${bonuses}`;
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!resolveResult.success) {
           rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-          deps.showSidebarError(resolveResult.reason ?? "Melee resolve failed");
+          const reason = resolveResult.reason ?? "Melee resolve failed";
+          stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+          deps.showSidebarError(reason);
           deps.updateReadyButtonState();
           return;
         }
         readyResult = resolveResult;
         resolutionPlaybackNotifyKind = "melee";
       }
-      resetPrecomputedAiState("null");
       const humanMoves = readyResult.humanMoves ?? [];
       await deps.refreshTacticalTerrainOverridesForRenderer();
-      const nextState = await window.gameApi.getGameState();
+      const nextState = await fetchMatchSnapshot();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      announceKnockouts(readyResult.knockouts ?? [], rendererSharedState.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
       const state = nextState;
       await deps.applyGameStateSnapshot(state, {
         refreshStandingOrders: false,
@@ -33515,12 +35363,9 @@ ${bonuses}`;
       applyToolInvocationCountsAfterReady({
         fromResult: readyResult.toolInvocationCounts,
         cachedPrecomputed: cachedPrecomputedToolCounts,
-        allowPrecomputedFallback: usePrecomputed
+        allowPrecomputedFallback: cachedPrecomputedToolCounts != null
       });
-      if (readyResult.cost !== void 0) {
-        rendererSharedState.openRouterGameCost += readyResult.cost;
-        deps.updateOpenRouterCostLabel();
-      }
+      deps.updateOpenRouterCostLabel();
       if (readyResult.aiConsulted === false) {
         deps.appendOpenRouterLog("AI executing standing orders (no event fired).");
         deps.showMapToast("AI: standing orders only (no consultation).", {
@@ -33533,7 +35378,7 @@ ${bonuses}`;
       const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
       const hasAirStrikeResolution = (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
       const visibleHexes = deps.getVisibleHexSet(state);
-      const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes);
+      const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
       const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
       const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
       if (readyResult.postResolutionConsultDeferred === true) {
@@ -33605,6 +35450,26 @@ ${bonuses}`;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       deps.updateGameOverUI(state);
       deps.updateReadyButtonState();
+      const knockoutChoice = await offerHumanKnockoutChoice(
+        state,
+        readyResult.knockouts,
+        () => {
+          if (!window.gameApi) throw new Error("endMatch is unavailable");
+          return window.gameApi.endMatch();
+        },
+        (ended) => deps.applyGameStateSnapshot(ended, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: true,
+          updateSelectionUi: true,
+          updateGameOverUi: true,
+          updateReadyButton: true,
+          refreshBuildPopup: false,
+          redraw: true
+        }),
+        deps.showSidebarError
+      );
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      if (knockoutChoice === "ended") return;
       if (rendererSharedState.runButtonOn && !rendererSharedState.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
       deps.redraw();
       if (readyResult.tacticalAutoStartH3Index) {
@@ -33614,12 +35479,17 @@ ${bonuses}`;
       }
     } catch (err) {
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      stopObserveAutoAdvance(String(err), deps.appendOpenRouterLog);
       deps.showSidebarError(String(err));
       deps.updateReadyButtonState();
     } finally {
       if (rendererMatchEpochCurrent(matchEpoch)) {
         rendererSharedState.readyRequestInFlight = false;
+        void readCommanderPoolAndApply(true);
         deps.updateReadyButtonState();
+        setTimeout(() => {
+          void maybeObserveAutoAdvance();
+        }, 0);
       }
     }
   }
@@ -33648,7 +35518,7 @@ ${bonuses}`;
   async function refreshGameStateFromMain(deps, applyOptions, failureMessage) {
     if (!window.gameApi?.getGameState) return;
     try {
-      const nextState = await window.gameApi.getGameState();
+      const nextState = await fetchMatchSnapshot();
       await deps.applyGameStateSnapshot(nextState, applyOptions);
     } catch (err) {
       console.error(failureMessage, err);
@@ -33725,30 +35595,43 @@ ${bonuses}`;
     if (options.refreshBuildPopup) deps.refreshBuildPopupIfOpen();
   }
   function updateClientStaleEnemyIntel(previousState, state) {
+    const viewer = staleIntelViewer(state.playerPerspective);
+    if (viewer === null) {
+      rendererSharedState.lastObservedEnemyByUnitId.clear();
+      rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+      return;
+    }
+    const comparablePrevious = previousState && staleIntelViewer(previousState.playerPerspective) === viewer ? previousState : null;
+    if (previousState && comparablePrevious === null) {
+      rendererSharedState.lastObservedEnemyByUnitId.clear();
+      rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    }
     const currentTurn = state.turnNumber;
     const hasFogData = Array.isArray(state.visibleHexes);
     const visibleHexes = hasFogData ? new Set(state.visibleHexes) : /* @__PURE__ */ new Set();
-    const visibleEnemiesNow = state.units.filter((u) => u.player !== "human");
-    const visibleEnemyIdsNow = new Set(visibleEnemiesNow.map((u) => u.id));
-    const visibleEnemyHexesNow = new Set(visibleEnemiesNow.map((u) => u.h3Index));
+    const visibleEnemiesNow = state.units.filter((unit) => unit.player !== viewer);
+    const visibleEnemyIdsNow = new Set(visibleEnemiesNow.map((unit) => unit.id));
+    const visibleEnemyHexesNow = new Set(visibleEnemiesNow.map((unit) => unit.h3Index));
     for (const enemy of visibleEnemiesNow) {
       rendererSharedState.lastObservedEnemyByUnitId.set(enemy.id, { h3Index: enemy.h3Index, lastSeenTurn: currentTurn });
       rendererSharedState.clientStaleEnemyIntelByUnitId.delete(enemy.id);
     }
-    if (previousState) {
-      const previousVisibleEnemies = previousState.units.filter((u) => u.player !== "human");
+    if (comparablePrevious) {
+      const previousVisibleEnemies = comparablePrevious.units.filter((unit) => unit.player !== viewer);
       for (const enemy of previousVisibleEnemies) {
         if (visibleEnemyIdsNow.has(enemy.id)) continue;
         rendererSharedState.lastObservedEnemyByUnitId.set(enemy.id, {
           h3Index: enemy.h3Index,
-          lastSeenTurn: previousState.turnNumber
+          lastSeenTurn: comparablePrevious.turnNumber
         });
         if (!hasFogData || !visibleHexes.has(enemy.h3Index)) {
           rendererSharedState.clientStaleEnemyIntelByUnitId.set(enemy.id, {
             unitId: enemy.id,
             lastKnownH3Index: enemy.h3Index,
-            lastSeenTurn: previousState.turnNumber,
-            staleUntilTurn: previousState.turnNumber + 2
+            lastSeenTurn: comparablePrevious.turnNumber,
+            staleUntilTurn: comparablePrevious.turnNumber + 2
           });
         }
       }
@@ -34000,7 +35883,15 @@ ${bonuses}`;
     }
   }
   function formatUnitDisplayName2(unitId) {
-    return rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const baseName = rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const ownerId = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+    if (!ownerId) return baseName;
+    return formatUnitNameForViewer({
+      baseName,
+      ownerId,
+      viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState?.seats ?? []),
+      seats: rendererSharedState.gameState?.seats ?? []
+    });
   }
   function formatUnknownBattleAnnouncement(continentNames) {
     const clean = continentNames.map((s) => s.trim()).filter((s) => s.length > 0).filter((name, idx, arr) => arr.indexOf(name) === idx);
@@ -34132,8 +36023,6 @@ ${bonuses}`;
           rendererSharedState.runButtonOn = false;
           runBtn.setAttribute("aria-pressed", "false");
           void stopOpponentPlanning("run_off");
-          resetPrecomputedAiState("null");
-          rendererSharedState.eventDrivenInitialConsultationDone = false;
           updateReadyButtonState();
         }
       }
@@ -34152,53 +36041,6 @@ ${bonuses}`;
       );
       runBtn.removeAttribute("title");
     }
-  }
-
-  // src/shared/openRouterReasoningEffort.ts
-  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
-    "max",
-    "xhigh",
-    "high",
-    "medium",
-    "low",
-    "minimal",
-    "none"
-  ]);
-  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
-    ["none", "None"],
-    ["minimal", "Min"],
-    ["low", "Low"],
-    ["medium", "Med"],
-    ["high", "High"],
-    ["xhigh", "Xhigh"],
-    ["max", "Max"]
-  ]);
-  function capitalizeReasoningEffortName(effort) {
-    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
-  }
-  function abbreviateReasoningEffort(effort) {
-    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
-  }
-  function sortReasoningEffortsAscending(efforts) {
-    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
-    return [...efforts].sort((a, b) => rank(b) - rank(a));
-  }
-  function listSelectableReasoningEfforts(model) {
-    const reasoning = model?.reasoning;
-    if (!reasoning || reasoning.supported_efforts === void 0) return [];
-    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
-    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
-  }
-  function resolveDefaultReasoningEffort(model) {
-    const defaultEffort = model?.reasoning?.default_effort;
-    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
-  }
-  function resolveRequestedReasoningEffort(model, persistedEffort) {
-    const trimmed = persistedEffort.trim();
-    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
-  }
-  function isReasoningEffortSelectable(model) {
-    return listSelectableReasoningEfforts(model).length >= 2;
   }
 
   // src/shared/openRouterModelDisplay.ts
@@ -34254,6 +36096,20 @@ ${bonuses}`;
   }
   function formatModelOptionLabel(model) {
     return `${model.name ?? model.id}${formatModelOptionSuffix(model)}`;
+  }
+
+  // src/renderer/openRouter/commanderMessagesToast.ts
+  function showCommanderMessagesToast(lines) {
+    if (lines.length === 0) return;
+    showFilledAiStrategyToast((target) => {
+      appendMapToastSectionHeader(target, `Messages (${lines.length})`);
+      for (const line of lines) {
+        const span = document.createElement("span");
+        span.style.display = "block";
+        span.textContent = line;
+        target.appendChild(span);
+      }
+    }, false);
   }
 
   // src/renderer/openRouter/modelDescriptionTooltip.ts
@@ -34369,35 +36225,6 @@ ${bonuses}`;
     return { clear };
   }
 
-  // src/renderer/openRouter/reasoningEffortSelect.ts
-  function formatReasoningEffortOptionLabel(effort, isDefault) {
-    const label = capitalizeReasoningEffortName(effort);
-    return isDefault ? `${label} (default)` : label;
-  }
-  function attachReasoningEffortSelect(args) {
-    const { select, onEffortChange } = args;
-    let currentDefault = null;
-    select.addEventListener("change", () => {
-      onEffortChange(select.value === currentDefault ? "" : select.value);
-    });
-    return {
-      showForModel(model, persistedEffort) {
-        const efforts = listSelectableReasoningEfforts(model);
-        const defaultEffort = resolveDefaultReasoningEffort(model);
-        currentDefault = defaultEffort;
-        select.replaceChildren();
-        if (efforts.length === 0 || defaultEffort === null) {
-          select.appendChild(new Option(capitalizeReasoningEffortName("model default"), ""));
-        }
-        efforts.forEach((effort) => {
-          select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));
-        });
-        select.value = resolveRequestedReasoningEffort(model, persistedEffort) ?? defaultEffort ?? "";
-        select.disabled = !isReasoningEffortSelectable(model);
-      }
-    };
-  }
-
   // src/renderer/openRouter/openRouterControls.ts
   function startTacticalOpponentPlanAfterStrategicConsult(deps) {
     if (!rendererSharedState.tacticalBattleSnapshot || !rendererSharedState.tacticalPhasePlanning) return;
@@ -34428,11 +36255,9 @@ ${bonuses}`;
         deps.updateOpenRouterToolCountLabels();
       }
       if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
-        rendererSharedState.openRouterGameCost += payload2.cost;
-        updateOpenRouterCostLabel();
+        void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
       }
       deps.appendOpenRouterLog("Post-resolution consultation applied.", false);
-      if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = true;
       deps.requestRedraw();
       startTacticalOpponentPlanAfterStrategicConsult(deps);
       deps.updateReadyButtonState();
@@ -34468,22 +36293,32 @@ ${bonuses}`;
   function applyAbandonedDeferredConsultRecovery(kind, deps) {
     if (kind === "tactical") {
       rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-      rendererSharedState.tacticalOpponentDraft = null;
-      const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-      if (rendererSharedState.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
+      if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
     } else {
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-      rendererSharedState.eventDrivenInitialConsultationDone = false;
       if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
     }
     deps.requestRedraw();
     deps.updateReadyButtonState();
   }
   function initOpenRouterUI(deps) {
+    bindCommanderPoolScreen({
+      showCommanderMessages: showCommanderMessagesToast,
+      fileCommanderMessage: (dispatch) => {
+        const body = document.createElement("div");
+        recordConsoleReport("message", currentConsoleReportTag(), body, {
+          senderSeatId: dispatch.seatId,
+          modelLabel: dispatch.modelLabel,
+          messageText: dispatch.message ?? "",
+          strategyText: dispatch.strategy ?? void 0
+        });
+      },
+      updateReadyButtonState: deps.updateReadyButtonState
+    });
     initDeferredResolutionPlaybackPushListeners(deps);
     const api = window.gameApi?.openRouter;
     if (!api) return;
-    window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
+    window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false, p.seatId));
     deps.updateOpenRouterCostLabel();
     (async () => {
       try {
@@ -34514,11 +36349,10 @@ ${bonuses}`;
     let modelRefreshInFlight = false;
     let startupModelRetryTimer = null;
     let startupModelRetryConsumed = false;
-    const modelsById = /* @__PURE__ */ new Map();
     const modelDescriptionTooltip = modelSelect ? attachModelDescriptionTooltip({
       select: modelSelect,
       getDescriptionForModelId: (modelId) => {
-        const description = modelsById.get(modelId)?.description;
+        const description = openRouterModelById(modelId)?.description;
         if (typeof description !== "string") return null;
         const trimmed = description.trim();
         return trimmed || null;
@@ -34537,7 +36371,7 @@ ${bonuses}`;
       }
     }) : null;
     function showReasoningEffortForSelectedModel() {
-      reasoningEffortSelect?.showForModel(modelsById.get(modelSelect?.value ?? ""), persistedReasoningEffort);
+      reasoningEffortSelect?.showForModel(openRouterModelById(modelSelect?.value ?? ""), persistedReasoningEffort);
     }
     function clearStartupModelRetryTimer() {
       if (startupModelRetryTimer !== null) {
@@ -34567,7 +36401,7 @@ ${bonuses}`;
         if (!modelSelect) return;
         const kept = modelSelect.value;
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
-        modelsById.clear();
+        clearOpenRouterModelCatalog();
         modelDescriptionTooltip?.clear();
         if ("error" in result && result.error) {
           deps.appendOpenRouterLog(`Models: ${result.error}`, true);
@@ -34577,8 +36411,8 @@ ${bonuses}`;
           return;
         }
         const models = "models" in result ? result.models ?? [] : [];
+        replaceOpenRouterModelCatalog(models);
         for (const m of models) {
-          modelsById.set(m.id, m);
           const opt = document.createElement("option");
           opt.value = m.id;
           opt.textContent = formatModelOptionLabel(m);
@@ -34592,7 +36426,7 @@ ${bonuses}`;
         clearStartupModelRetryTimer();
         void deps.syncOpenRouterRunToggleInteractable();
       }).catch((err) => {
-        modelsById.clear();
+        clearOpenRouterModelCatalog();
         modelDescriptionTooltip?.clear();
         const message = String(err);
         deps.appendOpenRouterLog(`Models: ${message}`, true);
@@ -34675,7 +36509,7 @@ ${bonuses}`;
             showReasoningEffortForSelectedModel();
             if (modelSelect.value) deps.hideMapToast();
             else modelDescriptionTooltip?.clear();
-            if (rendererSharedState.runButtonOn && (rendererSharedState.backgroundRequestInFlight || isDeferredResolutionPlaybackConsultPending())) {
+            if (rendererSharedState.runButtonOn && (anyCommanderIsPlanning() || isDeferredResolutionPlaybackConsultPending())) {
               await stopOpponentPlanning("model_changed");
               deps.startBackgroundRequestIfAllowed();
             }
@@ -34702,17 +36536,10 @@ ${bonuses}`;
         rendererSharedState.runButtonOn = !rendererSharedState.runButtonOn;
         runBtn.setAttribute("aria-pressed", rendererSharedState.runButtonOn ? "true" : "false");
         if (rendererSharedState.runButtonOn) {
-          resetPrecomputedAiState("null");
-          if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();
           deps.startBackgroundRequestIfAllowed();
         } else {
           void stopOpponentPlanning("run_off");
-          resetPrecomputedAiState("null");
-          rendererSharedState.precomputedAiEmbarkOrders = null;
-          rendererSharedState.precomputedAiStrategy = null;
-          rendererSharedState.precomputedAiMessage = null;
-          rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();
         }
       });
@@ -34929,11 +36756,16 @@ ${bonuses}`;
       frame.className = "melee-intercept-frame";
       const panel = document.createElement("div");
       panel.className = "melee-intercept-panel";
+      const eligible = args.candidates.filter((row) => row.tacticalEligible);
+      const worldMapRows = args.candidates.filter((row) => !row.tacticalEligible);
       const title = document.createElement("div");
-      const n = args.candidates.length;
-      title.textContent = `Tactical Battles (${n})`;
+      title.textContent = `Tactical Battles (${eligible.length})`;
       title.style.cssText = "font-weight:600;margin-bottom:8px;flex-shrink:0;";
       panel.appendChild(title);
+      const intro = document.createElement("p");
+      intro.className = "melee-intercept-intro";
+      intro.textContent = "Choose one battle to fight. The others resolve on the world map.";
+      panel.appendChild(intro);
       const tableScroll = document.createElement("div");
       tableScroll.className = "melee-intercept-scroll";
       const table = document.createElement("table");
@@ -34947,7 +36779,7 @@ ${bonuses}`;
       table.appendChild(colgroup);
       const thead = document.createElement("thead");
       const hr = document.createElement("tr");
-      for (const label of ["", "Hex", "Human", "AI"]) {
+      for (const label of ["", "Hex", "Yours", "Enemy"]) {
         const th = document.createElement("th");
         th.textContent = label;
         hr.appendChild(th);
@@ -34958,6 +36790,7 @@ ${bonuses}`;
       table.appendChild(tbody);
       tableScroll.appendChild(table);
       panel.appendChild(tableScroll);
+      if (worldMapRows.length > 0) panel.appendChild(worldMapSection(worldMapRows));
       let selectedH3 = null;
       const radios = [];
       const fightBtn = document.createElement("button");
@@ -35008,7 +36841,7 @@ ${bonuses}`;
       });
       fightBtn.addEventListener("click", () => finishFight());
       ignoreBtn.addEventListener("click", () => finishIgnore());
-      for (const row of args.candidates) {
+      for (const row of eligible) {
         const tr = document.createElement("tr");
         const tdRadio = document.createElement("td");
         const radio = document.createElement("input");
@@ -35023,21 +36856,15 @@ ${bonuses}`;
         tdRadio.appendChild(radio);
         tr.appendChild(tdRadio);
         const tdHex = document.createElement("td");
+        tdHex.append(hexCell(row.h3Index));
         tr.appendChild(tdHex);
-        void args.buildHexPopupHtml(row.h3Index).then(
-          (html) => {
-            tdHex.innerHTML = html;
-            paintTerrainSwatches(tdHex);
-          },
-          () => {
-            tdHex.textContent = row.h3Index;
-          }
-        );
+        const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
+        const enemy = row.parties.find((party) => party.ownerId !== HUMAN_SEAT_ID);
         const tdHuman = document.createElement("td");
-        tdHuman.textContent = row.humanUnitSummary || "\u2014";
+        tdHuman.textContent = human?.unitSummary || "\u2014";
         tr.appendChild(tdHuman);
         const tdAi = document.createElement("td");
-        tdAi.textContent = row.aiUnitSummary || "\u2014";
+        tdAi.append(enemy ? enemyCell(enemy.ownerId, enemy.unitSummary) : document.createTextNode("\u2014"));
         tr.appendChild(tdAi);
         tbody.appendChild(tr);
       }
@@ -35051,13 +36878,99 @@ ${bonuses}`;
       radios[0]?.focus();
     });
   }
+  function hexCell(h3Index) {
+    const wrap = document.createElement("div");
+    const code = document.createElement("div");
+    const hexCode = getStrategicHexCode(h3Index);
+    code.textContent = hexCode ? `(${hexCode})` : h3Index;
+    const detail = document.createElement("div");
+    detail.className = "melee-intercept-muted";
+    detail.textContent = hexDetailLine(h3Index);
+    wrap.append(code, detail);
+    return wrap;
+  }
+  function hexDetailLine(h3Index) {
+    const state = rendererSharedState.gameState;
+    const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
+    const viewer = seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null)?.seatId ?? null;
+    const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
+    const control = formatHexControlLabel({
+      controllerId: controller,
+      homeSeatIds: homeSeatIdsAtHex(h3Index, {
+        homeRegionHexesBySeat: state?.homeRegionHexesBySeat
+      }),
+      viewerSeatId: viewer,
+      seats
+    });
+    const hex = state?.hexes.find((row) => row.h3Index === h3Index);
+    const terrain = formatTerrainKindLabel(hex?.terrainKind ?? null);
+    const weather = hex?.weather ? ` \xB7 Weather: ${formatWeatherLabel(hex.weather)}` : "";
+    return `Control: ${control} \xB7 Terrain: ${terrain}${weather}`;
+  }
+  function enemyCell(ownerId, unitSummary) {
+    const wrap = document.createElement("div");
+    const line = document.createElement("div");
+    line.className = "melee-party-line";
+    line.append(ownerDot(ownerId), document.createTextNode(partyName(ownerId)));
+    const summary = document.createElement("div");
+    summary.className = "melee-intercept-muted";
+    const garrison = isNeutralOwnerId(ownerId);
+    summary.textContent = garrison ? `${unitSummary}, defends in place` : unitSummary;
+    wrap.append(line, summary);
+    return wrap;
+  }
+  function worldMapSection(rows) {
+    const section = document.createElement("section");
+    section.className = "melee-world-section";
+    const heading = document.createElement("h3");
+    heading.textContent = "Resolve on the world map this turn";
+    section.append(heading);
+    for (const row of rows) {
+      const line = document.createElement("div");
+      line.className = "melee-world-row";
+      const hex = document.createElement("span");
+      const code = getStrategicHexCode(row.h3Index);
+      hex.textContent = code ? `(${code})` : row.h3Index;
+      line.append(hex, document.createTextNode(" "), worldMapParties(row));
+      section.append(line);
+    }
+    return section;
+  }
+  function worldMapParties(row) {
+    const wrap = document.createElement("span");
+    wrap.className = "melee-party-line";
+    const human = row.parties.some((party) => party.ownerId === HUMAN_SEAT_ID);
+    if (human && row.parties.length >= 3) {
+      wrap.append(document.createTextNode("Three sides: you"));
+      for (const party of row.parties.filter((item) => item.ownerId !== HUMAN_SEAT_ID)) {
+        wrap.append(document.createTextNode(", "), ownerDot(party.ownerId), document.createTextNode(partyName(party.ownerId)));
+      }
+      return wrap;
+    }
+    row.parties.forEach((party, index) => {
+      if (index > 0) wrap.append(document.createTextNode(" vs "));
+      wrap.append(ownerDot(party.ownerId), document.createTextNode(partyName(party.ownerId)));
+    });
+    return wrap;
+  }
+  function partyName(ownerId) {
+    if (isNeutralOwnerId(ownerId)) return "Neutral";
+    const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === ownerId);
+    return seat ? shortSideName(seat.homeRegion) : ownerId;
+  }
+  function ownerDot(ownerId) {
+    const dot = document.createElement("span");
+    dot.className = "melee-party-dot";
+    dot.style.background = paletteForOwner(ownerId, rendererSharedState.gameState?.seats ?? [])?.map ?? "#9D174D";
+    return dot;
+  }
 
   // src/renderer/wiredEntryCallbacks.ts
   function getUnitAtHex(h3Index) {
     if (rendererSharedState.tacticalBattleSnapshot) {
       const atHex = rendererSharedState.tacticalBattleSnapshot.subUnits.filter((u) => u.h3Index === h3Index);
       if (atHex.length === 0) return null;
-      const tacticalUnit = atHex.find((u) => u.player === "human") ?? atHex[0];
+      const tacticalUnit = atHex.find((u) => u.player === HUMAN_SEAT_ID) ?? atHex[0];
       return {
         id: tacticalUnit.id,
         player: tacticalUnit.player,
@@ -35269,8 +37182,8 @@ ${bonuses}`;
   var showTimer = null;
   var lastPointer = { x: 0, y: 0 };
   var anchorWatch = null;
-  function anchorStillVisible(anchor) {
-    return anchor.isConnected && anchor.getClientRects().length > 0;
+  function anchorStillVisible(anchor2) {
+    return anchor2.isConnected && anchor2.getClientRects().length > 0;
   }
   function stopAnchorWatch() {
     if (anchorWatch === null) return;
@@ -35315,8 +37228,8 @@ ${bonuses}`;
   }
   function showForActiveAnchor() {
     showTimer = null;
-    const anchor = activeAnchor;
-    const text = anchor && anchorStillVisible(anchor) ? anchor.dataset.unitOriginTooltip : void 0;
+    const anchor2 = activeAnchor;
+    const text = anchor2 && anchorStillVisible(anchor2) ? anchor2.dataset.unitOriginTooltip : void 0;
     const el = getTooltipEl2();
     if (!text || !el) {
       hideUnitOriginTooltip();
@@ -35329,9 +37242,9 @@ ${bonuses}`;
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
   }
-  function beginHover(anchor) {
+  function beginHover(anchor2) {
     hideUnitOriginTooltip();
-    activeAnchor = anchor;
+    activeAnchor = anchor2;
     showTimer = setTimeout(showForActiveAnchor, HEX_DETAILS_TOOLTIP_DELAY_MS);
     watchAnchor();
   }
@@ -35377,8 +37290,8 @@ ${bonuses}`;
     installed2 = true;
     document.addEventListener("pointerover", (event) => {
       trackPointer(event);
-      const anchor = findAnchor(event.target);
-      if (anchor && anchor !== activeAnchor) beginHover(anchor);
+      const anchor2 = findAnchor(event.target);
+      if (anchor2 && anchor2 !== activeAnchor) beginHover(anchor2);
     });
     document.addEventListener("pointerout", (event) => {
       if (!activeAnchor || findAnchor(event.target) !== activeAnchor) return;
@@ -35444,7 +37357,7 @@ ${bonuses}`;
         rendererSharedState.hoverRoutePreview.hoveredH3Index ?? null
       ) : /* @__PURE__ */ new Map();
       if (!tb && state) {
-        const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+        const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID);
         for (const unit of selectedHumanUnits) {
           const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
           const movementRange = strategicMovementHexesFor({
@@ -35512,7 +37425,7 @@ ${bonuses}`;
           }
           ctx.save();
           ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
-          drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
+          drawOrderLine(ctx, { runs, arrow }, { color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? "#115E59", width: ORDER_LINE_WIDTH });
           ctx.restore();
         }
       }
@@ -35524,7 +37437,7 @@ ${bonuses}`;
       ctx.lineTo(at.x + 8, at.y + 8);
       ctx.moveTo(at.x + 8, at.y - 8);
       ctx.lineTo(at.x - 8, at.y + 8);
-      ctx.strokeStyle = ORDER_LINE_COLOR;
+      ctx.strokeStyle = paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? "#115E59";
       ctx.lineWidth = ORDER_LINE_WIDTH;
       ctx.lineCap = "round";
       ctx.stroke();
@@ -35648,7 +37561,7 @@ ${bonuses}`;
 
   // src/shared/soleSelectableHumanUnit.ts
   function soleSelectableHumanUnitId(units, isEmbarkedLandUnit) {
-    const selectable = units.filter((unit) => unit.player === "human" && !isEmbarkedLandUnit(unit.id));
+    const selectable = units.filter((unit) => unit.player === HUMAN_SEAT_ID && !isEmbarkedLandUnit(unit.id));
     const only = selectable[0];
     return selectable.length === 1 && only != null ? only.id : null;
   }
@@ -35662,6 +37575,7 @@ ${bonuses}`;
   }
   async function handleMainMapDoubleClick(event, deps) {
     if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
+    if (observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return;
     clearDeferredHumanUnitSingleSelectTimer();
     rendererSharedState.gestureSelectionSnapshotAtMs = 0;
     const state = rendererSharedState.gameState;
@@ -35920,14 +37834,14 @@ ${bonuses}`;
     function getSelectedHumanUnitsAtMouseDown(state) {
       const tb = rendererSharedState.tacticalBattleSnapshot;
       if (tb) {
-        return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => tb.subUnits.find((u) => u.id === id)).filter((u) => !!u && u.player === "human").map((u) => ({
+        return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => tb.subUnits.find((u) => u.id === id)).filter((u) => !!u && u.player === HUMAN_SEAT_ID).map((u) => ({
           id: u.id,
           h3Index: u.h3Index,
-          player: "human",
+          player: HUMAN_SEAT_ID,
           unitType: u.unitType
         }));
       }
-      return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+      return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID);
     }
     function primarySelectedUnitHex(state) {
       const primaryId = deps.getPrimarySelectedUnitId();
@@ -36179,6 +38093,13 @@ ${bonuses}`;
         return;
       }
       rendererSharedState.selectedHexIndex = hit;
+      if (observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) {
+        deps.replaceSelection([]);
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      }
       const { unitsToDraw, movingIds } = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
       if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
@@ -36194,7 +38115,7 @@ ${bonuses}`;
       }
       const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
       const unitIconHit = hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
-      const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === "human" ? unitsAtHit[0] : void 0;
+      const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === HUMAN_SEAT_ID ? unitsAtHit[0] : void 0;
       const humanUnitIconSelectionDeps = {
         replaceSelection: deps.replaceSelection,
         toggleUnitSelection: deps.toggleUnitSelection,
@@ -36270,14 +38191,14 @@ ${bonuses}`;
       deps.hideStackCallout();
       if (hit) {
         const unit = deps.getUnitAtHex(hit);
-        if (unit?.player === "human" && unitIconHit) {
+        if (unit?.player === HUMAN_SEAT_ID && unitIconHit) {
           applyHumanUnitIconClickSelectionPolicy({
             shiftKey: e.shiftKey,
             unitId: unit.id,
             suppressSelectionRetarget: suppressIconRetargetOnNextClick,
             deps: humanUnitIconSelectionDeps
           });
-        } else if (unit?.player === "human" && !unitIconHit) {
+        } else if (unit?.player === HUMAN_SEAT_ID && !unitIconHit) {
           clearDeferredHumanUnitSingleSelectTimer();
         } else if (deps.getPrimarySelectedUnitId() && rendererSharedState.gameState && hit !== primarySelectedUnitHex(rendererSharedState.gameState)) {
           clearDeferredHumanUnitSingleSelectTimer();
@@ -36469,7 +38390,7 @@ ${bonuses}`;
       } else if (rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         const state = rendererSharedState.gameState;
         const tb = rendererSharedState.tacticalBattleSnapshot;
-        const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human") : rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+        const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID) : rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID);
         const mode = selectionSupportButtonMode(
           selectedUnits.map((unit) => unit.unitType),
           !!tb
@@ -36492,7 +38413,7 @@ ${bonuses}`;
       }
     });
     if (window.gameApi) {
-      window.gameApi.getGameState().then(async (raw) => {
+      fetchMatchSnapshot().then(async (raw) => {
         const state = raw;
         if (!state) throw new Error("getGameState returned no snapshot");
         await deps.applyGameStateSnapshot(state, {
@@ -36766,7 +38687,7 @@ ${bonuses}`;
       );
       rows.push({
         h3: hx.h3Index,
-        label: formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, "human"),
+        label: formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, HUMAN_SEAT_ID),
         left: Math.round(center.x),
         top: Math.round(textY),
         hasCapacity: true,
@@ -36810,7 +38731,7 @@ ${bonuses}`;
       const explored = isHexExploredByPlayer(hx.h3Index);
       if (!explored && !overlayContext.productionDetailShown) continue;
       const controller = getControllerForHex(rendererSharedState.gameState, hx.h3Index);
-      const controlledByHuman = controller === "human";
+      const controlledByHuman = controller === HUMAN_SEAT_ID;
       const capacityPerTurn = getUrbanProductionCapacityForHex2(hx.h3Index);
       if (!overlayContext.productionDetailShown) {
         const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx) || controlledByHuman;
@@ -36868,7 +38789,7 @@ ${bonuses}`;
       },
       refreshStrategicSnapshotAfterExit: async () => {
         if (!window.gameApi?.getGameState) return;
-        const nextState = await window.gameApi.getGameState();
+        const nextState = await fetchMatchSnapshot();
         await applyGameStateSnapshot2(nextState, {
           refreshStandingOrders: false,
           updateGameStateSidebarUi: false,
@@ -36939,6 +38860,18 @@ ${bonuses}`;
     });
     installUnitOriginTooltip();
     wireConsoleFrame();
+    wireObserveMode({
+      applySnapshot: (state) => applyGameStateSnapshot2(state, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: false,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: true
+      }),
+      pressReady: () => handleReadyButtonClick(createReadyHandlerDeps())
+    });
     wireSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName2 });
     wireGameMenu();
     wireInitCore({

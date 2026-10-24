@@ -12,6 +12,39 @@
 /** Holds deferred playback-complete hooks until `flushResolutionPlaybackCompleteNotifyCallbacks` drains them. */
 const playbackCompleteNotifyQueue: Array<() => void> = [];
 
+/** Listeners that run after playback finishes, including a turn that had nothing to animate. */
+const playbackFinishedListeners: Array<() => void> = [];
+
+/**
+ * Runs `listener` whenever resolution playback finishes.
+ *
+ * Purpose: Auto-advance waits for the animation, then looks again at the commander pool.
+ * When to use: Once, from the watch screen's startup.
+ * Expected outcome: The listener runs after the one-shot consult notify, and after a turn with nothing to animate.
+ * Exceptions: None. A listener that throws is logged and does not stop the others.
+ */
+export function onResolutionPlaybackFinished(listener: () => void): void {
+  playbackFinishedListeners.push(listener);
+}
+
+/**
+ * Tells playback-finished listeners that the animation is done.
+ *
+ * Purpose: The one-shot consult queue and the watch share the same moment.
+ * When to use: From the flush, and when a turn had nothing to animate.
+ * Expected outcome: Each listener runs once.
+ * Exceptions: Logs a listener error and continues.
+ */
+export function notifyResolutionPlaybackFinished(): void {
+  for (const listener of playbackFinishedListeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.error('resolutionPlaybackDeferral: playback-finished listener failed', err);
+    }
+  }
+}
+
 /**
  * Registers a callback to run once resolution playback reaches completion (or immediately when flushed without animation).
  *
@@ -56,4 +89,5 @@ export function flushResolutionPlaybackCompleteNotifyCallbacks(): void {
       console.error('resolutionPlaybackDeferral: notify callback failed', err);
     }
   }
+  notifyResolutionPlaybackFinished();
 }

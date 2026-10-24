@@ -5,6 +5,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
+import { isSeatId } from '../../shared/seatIds';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -97,13 +98,13 @@ function getPlanningPhaseSessionMetrics(): { turnNumber: number; created: number
  *
  * Purpose: Standing orders and human march preview do not move units until resolution, so maps stay valid.
  * When to use: Gate reuse in `createPathfindingSession` when no land-mass override is supplied.
- * Expected outcome: True only in `planning` for `human` or `opponent` perspective.
+ * Expected outcome: True only in `planning` when the perspective is a seat id.
  * Exceptions: None.
  */
 function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean {
   return (
     state.phase === 'planning' &&
-    (state.playerPerspective === 'human' || state.playerPerspective === 'opponent')
+    isSeatId(state.playerPerspective ?? '')
   );
 }
 

@@ -129,10 +129,10 @@ Each row states what is omitted and why the model must not be given it.
 Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
-2. **Strategy**, the same three doctrine lines as strategic.
+2. **Strategy**, the same three lines as strategic. Balanced is those lines alone. Aggressive and Cautious add the same doctrine block strategic adds, immediately after the strategy list.
 3. **Message guidance**, identical to strategic.
 
-**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, or any claim about what the human player is doing.
+**Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing.
 
 ### 2.9 `# Air Operations Status`
 

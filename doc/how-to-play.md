@@ -8,12 +8,13 @@ Agent Wars is a WEGO game ("we go"), where neither player can see what the other
 
 I'm a geographer by training, so Agent Wars focuses more on geospatial features than nationality. Players start with home regions made up of real-world countries, provinces, or states, but those are mostly labels. What really matters is on the ground: the size and placement of cities, and how terrain and coastlines shape what players can do. Unit origins, terrain familiarity, technology levels, and weather still matter, but not as much.
 
-Accordingly, the game ends when one player:
+A side is knocked out when another side holds its home, when it holds no city hex anywhere, or when its own home has no cities left. On a global map, holding a home means every hex of that home. On a regional map, it means home hexes that hold at least 75% of that home's original urban cells. Bombing doesn't change the target. A home that started with no urban cells is taken by holding every hex. A knocked-out side's land and units become neutral.
 
-  1. Captures some or all of the other player's home region (depending on the game type)
-  2. Or destroys all of their home region's production capacity
+The last side still in the match wins. When every side would be knocked out on the same turn, none of them is, and the side holding the most city hexes wins. Several sides with that same count leave no single winner. The result screen lists every side. When you played and one side won, the header says your place, such as "You placed 2nd of 4." When you were only watching, it names the winner. When several sides share first, the header says "No side won." and the result line names each of them in seat order. Two names read "{A} and {B} share first place with {n} city hexes each." Three or more read "{A}, {B}, and {C} share first place with {n} city hexes each." A global match also ends after the turn limit you picked, while sides remain, and that same count decides it. A regional match has no turn limit. A side with no units left can still build until a knockout or that limit. If you are knocked out and the match goes on, a dialog says who knocked you out and your place. Watch the rest keeps the match going: you see every side, with no fog, and the next turn starts on its own once every commander is ready. You can turn that off, or look through one side's fog, from View as. A match you started with Observe only does not advance on its own until you check "Start the next turn when every commander is ready". End game opens the result screen. Details are in [region-vs-region.md](region-vs-region.md).
 
 ## Starting the game
+
+The setup screen lists two to four sides. Each side needs its own home. Observe only lets an AI commander play every side. A global match also picks a turn limit of 20, 30, 40, or 50 turns. The pictures below show an earlier two-side layout.
 
 *New global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.*
 
@@ -26,7 +27,7 @@ Accordingly, the game ends when one player:
 |                                         | Global game                                                    | Regional game                                                                                          |
 | --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Map                                     | The whole world, 842 strategic hexes at H3 resolution 1        | One of 23 maps drawn from UN subregions, with 257 to 352 strategic hexes                               |
-| Sides                                   | Each side picks a home region, and both may pick the same one. | Each side picks a different group of countries, provinces, or states, grouped by production capacity.  |
+| Sides                                   | Two to four sides. Each picks a different UN subregion. Observe only gives every side to an AI commander. The match ends at the chosen turn limit: 20, 30, 40, or 50 turns, usually 30. | Two to four sides, up to the number of groups on that map. Each picks a different group of countries, provinces, or states, grouped by production capacity. Observe only gives every side to an AI commander. The match ends when one side remains. |
 | Unit scale                              | WW2-style field armies, air wings, and naval fleets            | WW2-style divisions, air groups, and naval task forces                                                 |
 | Turn length                             | One month                                                      | One week                                                                                               |
 | Weather changes                         | Every turn                                                     | Roughly every four turns                                                                               |
@@ -35,7 +36,7 @@ Accordingly, the game ends when one player:
 | Map edges                               | None                                                           | A few maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units. |
 | Winning by control                      | Hold every hex of the enemy home region.                       | Hold enemy-home hexes with at least 75% of that home's original urban cells. Bombing doesn't change the target. A home that started with none is won by holding every hex. |
 
-The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: $N+ hexes` line. You don't win by control when the enemy meets the same rule on your home. On either map, you can also win by destroying every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
+The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: $N+ hexes` line.
 
 ## Playing a turn
 
@@ -58,7 +59,7 @@ The dialog shows the selected map's price beside each unit type, and its tech cu
 3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. A gold ring replaces the white border of each token in a hex that holds a selected unit, including both tokens of a stack. The selection panel at the map's bottom-left opens as a bar that names the hex and the selection, with a hint for what a double-click does next; its **×** clears the selection. Click the chevron at the bar's left edge to show the hex's terrain and each selected unit's orders, and click it again to hide them. While they show, drag the panel's corner grip to resize it. The panel's state and size last until you close the app.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
 5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. When the selection cannot fire, the reticle is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
-6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
+6. **Ready:** Click **Ready** to submit orders and resolve the turn. That resolution can end the match (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
 The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).
@@ -66,7 +67,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 ## How a turn resolves
 
 - Both sides give orders for the same turn, and the engine resolves them together.
-- You can plan your turn while the AI opponent plans its own. Moving, aiming, and building all work while it thinks. Only Ready waits for its plan.
+- You can plan your turn while the commanders plan theirs. Moving, aiming, and building all work while they think. Only Ready waits for their plans.
 - The order is fixed: air strikes, then ranged fire, then movement, then melee.
 - Strikes and ranged fire use positions from before anyone moves, so they land where you aimed.
 - Melee happens wherever enemy units share a hex after movement.
@@ -302,16 +303,17 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 ## Things that may surprise you
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
-- **Reasoning costs more:** a higher reasoning level in the Opponent tab's Commander section makes each consult slower and dearer.
-- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the line above it reads **Opponent planning…**. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
-- **Not every turn:** with **Events** on (the default) in the Opponent tab's Tool groups, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
+- **Reasoning costs more:** a higher reasoning level on a commander's card makes that consult slower and dearer.
+- **Waiting on the AI:** while a commander plans, Ready shows **AI:**, a timer, and how many are still planning, and the line above it reads **Commanders planning**. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
+- **Not every turn:** with **Events** on (the default) in the Commanders tab's Tool groups, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
 - **Every turn, if you like:** turn **Events** off to consult the model every turn, at more cost.
 - **The opponent nearly always shoots:** unless the model told it to hold fire, each enemy unit that can fire picks a legal target on its own when the model gives it none.
 - **Your units wait for orders:** they fire only when you aim them. There are no player defend or hold-fire orders.
 - **Return fire is automatic:** a unit that's shot at fires back when it could have aimed at the shooter's hex.
-- **Fog fades:** an enemy you lose sight of stays at its last known spot for 2 turns, then disappears.
+- **Fog fades:** an enemy you lose sight of stays at its last known spot for 2 turns, then disappears. While you watch a seat, those markers are that seat's enemies. All sides shows none.
 - **Your home stays visible:** both home outlines show through fog, and your own home hexes are always visible.
 - **Playback blocks orders:** while a turn plays back, you can pan, zoom, and read tooltips, but not give orders.
+- **Reading the turn report:** after Ready, the map toast and the Reports tab name who took hexes and who lost units. "You" is your side. A fight you were not in starts with "Seen:". While no human side is still playing, the report has only those "Seen:" lines.
 - **No save slots yet:** the app keeps the match in progress and reopens it, but there's no load list. Opening **New game** from the menu leaves that match running. Close the screen to come back, or start a match to replace it.
 
 ## Where messages appear
@@ -322,6 +324,6 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 | Message area      | Where                                                                                     | What it shows                                                                                                    | How long it stays                                                                                                         |
 | ----------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Map toast         | Top/right of the map, whether the console is open or collapsed    | Errors, rejected orders, turn-loss summaries, and unknown-battle announcements                                   | Until you click its ×, a fixed interval passes, or a newer message replaces it. Also listed in the Reports tab. |
-| AI strategy toast | Top/right of the map, above the map toast                                                       | The opponent's Message and Strategy after a consultation                                                        | It dismisses and times out like the map toast. Also listed in the Reports tab.                                                   |
-| Activity log      | Console, Opponent tab, at the bottom                                                      | AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update | Until you start a new match                                                                       |
+| Map toast         | Top/right of the map, whether the console is open or collapsed, above the Messages toast | Errors, rejected orders, turn reports, and unknown-battle announcements | Until you click its ×, a fixed interval passes, or a newer message replaces it. Also listed in the Reports tab. |
+| AI strategy toast | Top/right of the map, below the map toast | One consult's Message and Strategy after Ready, or "Messages (n)" when several commanders finish together | It dismisses and times out like the map toast. A Ready consult is listed in the Reports tab. The Messages list is filed one entry per commander. |
+| Activity log      | Console, Commanders tab, at the bottom                                                      | AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update | Until you start a new match                                                                       |

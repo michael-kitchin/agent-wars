@@ -1,5 +1,6 @@
 import { logDebug } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
+import { type SeatId } from '../../../shared/seatIds';
 import { formatStrategicUnitId } from '../../../shared/unitIds';
 import type { UnitOrigin } from '../../../shared/unitOriginTypes';
 import { insertUnitRow } from '../unitInsert';
@@ -22,10 +23,10 @@ export type PlannedUnitPlan = {
  *
  * Purpose: Matches the `units.player` column and compact player codes `h1` / `a1`.
  * When to use: Insert deps and `insertPlannedUnitsForPlayer`.
- * Expected outcome: `'human'` or `'opponent'`.
+ * Expected outcome: Any seat id. The human seat uses `h1`. AI seats use `a1` through `a4`.
  * Exceptions: None.
  */
-export type PlannedUnitOwner = 'human' | 'opponent';
+export type PlannedUnitOwner = SeatId;
 
 /**
  * Database operations required to persist a planned spawn list.

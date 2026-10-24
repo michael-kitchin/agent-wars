@@ -1,4 +1,5 @@
 import type { HumanStandingOrderSnapshot } from './ipc/humanOrderPreviewTypes';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /**
  * The settled hex of one unit after resolution.
@@ -114,7 +115,7 @@ export function ordersHeldUntilMovementEnds(
   const held: HumanStandingOrderSnapshot[] = [];
   for (const order of orders) {
     if (!order.destinationH3Index) continue;
-    const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === 'human');
+    const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === HUMAN_SEAT_ID);
     if (!unit || unit.h3Index !== order.destinationH3Index) continue;
     const move = moves.find(
       (candidate) => candidate.unitId === order.unitId && candidate.fromH3Index !== order.destinationH3Index

@@ -39,34 +39,6 @@ export const SELECTION_RING_COLOR = '#f2c14e';
  */
 export const SELECTION_RING_WIDTH = 3;
 /**
- * Documents the module-scope binding `PLAYER_COLORS` (PLAYER_COLORS: Record<string, string>).
-
- * Purpose: Supports maintainability by documenting why `PLAYER_COLORS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export const PLAYER_COLORS: Record<string, string> = {
-    /**
-   * Documents the object literal property `human` (human: '#115e59').
-
-   * Purpose: Supports maintainability by documenting why `human` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-human: '#115e59',
-    /**
-   * Documents the object literal property `opponent` (opponent: '#9d174d').
-
-   * Purpose: Supports maintainability by documenting why `opponent` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-opponent: '#9d174d',
-};
-/**
  * Documents the module-scope binding `UNIT_TYPE_LABELS` (UNIT_TYPE_LABELS: Record<string, string>).
 
  * Purpose: Supports maintainability by documenting why `UNIT_TYPE_LABELS` exists.
@@ -114,15 +86,6 @@ air: 'S',
 };
 
 /**
- * Documents the module-scope binding `ORDER_LINE_COLOR` (ORDER_LINE_COLOR).
-
- * Purpose: Supports maintainability by documenting why `ORDER_LINE_COLOR` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export const ORDER_LINE_COLOR = PLAYER_COLORS.human;
-/**
  * Documents the module-scope binding `ORDER_LINE_WIDTH` (ORDER_LINE_WIDTH).
 
  * Purpose: Supports maintainability by documenting why `ORDER_LINE_WIDTH` exists.
@@ -140,15 +103,6 @@ export const ORDER_LINE_WIDTH = 2.5;
  * Exceptions: None.
  */
 export const ORDER_ARROW_SIZE = 10;
-/**
- * Documents the module-scope binding `AI_ORDER_LINE_COLOR` (AI_ORDER_LINE_COLOR).
-
- * Purpose: Supports maintainability by documenting why `AI_ORDER_LINE_COLOR` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
 /**
  * The pale outline drawn under every order line, in CSS color.
  *
@@ -311,9 +265,9 @@ export const TOAST_DURATION_MS = 24_000;
 export const READY_REQUEST_TIMEOUT_MS = 120_000;
 
 /**
- * Poll interval while waiting for `S.backgroundRequestInFlight` to clear after a tactical advance turn.
+ * Poll interval while a tactical advance waits for commander planning to leave the planning status.
  *
- * Purpose: Keeps the renderer responsive while milestone-2.1 tactical “resolution” waits on background `requestAiOrders`.
+ * Purpose: Keeps the renderer responsive while a tactical advance waits on commander planning.
  * When to use: Only from `performTacticalAdvanceTurn` while tactical mode is active and Run may trigger AI.
  * Expected outcome: Small sleeps between checks until the in-flight flag clears or timeout elapses.
  * Exceptions: None.
@@ -324,7 +278,7 @@ export const TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS = 50;
  * Upper bound for waiting on background AI after advancing the tactical turn counter.
  *
  * Purpose: Stays a few seconds past `AI_CONSULTATION_WAIT_TIMEOUT_MS` so a tactical advance waiter does not give up before the background consult timer.
- * When to use: Paired with `TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS` when tactical advance resolution waits on background `requestAiOrders`.
+ * When to use: Paired with `TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS` when a tactical advance waits on commander planning.
  * Expected outcome: The waiter outlives one legal consultation by 5 seconds.
  * Exceptions: None.
  */

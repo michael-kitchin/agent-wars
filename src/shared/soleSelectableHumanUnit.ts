@@ -1,3 +1,5 @@
+import { HUMAN_SEAT_ID } from './seatIds';
+
 /**
  * Returns the id of the only selectable human unit in `units`.
  *
@@ -10,7 +12,7 @@ export function soleSelectableHumanUnitId(
   units: readonly { id: string; player: string }[],
   isEmbarkedLandUnit: (unitId: string) => boolean
 ): string | null {
-  const selectable = units.filter((unit) => unit.player === 'human' && !isEmbarkedLandUnit(unit.id));
+  const selectable = units.filter((unit) => unit.player === HUMAN_SEAT_ID && !isEmbarkedLandUnit(unit.id));
   const only = selectable[0];
   return selectable.length === 1 && only != null ? only.id : null;
 }

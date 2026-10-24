@@ -47,3 +47,17 @@ export function formatConsoleReportTag(turnNumber: number | null, battleBeat: nu
   if (turnNumber != null) return `T${turnNumber}`;
   return '';
 }
+
+/**
+ * Whether one Reports entry stays visible for the sender filter.
+ *
+ * Purpose: The filter hides other sides' messages and leaves turn reports and notices on screen.
+ * When to use: When the Reports filter changes, and when an entry is filed.
+ * Expected outcome: An empty filter shows every entry. A seat filter hides messages from other seats.
+ * Exceptions: None.
+ */
+export function consoleReportVisible(kind: ConsoleReportKind, senderSeatId: string | null, filterSeatId: string): boolean {
+  if (filterSeatId === '') return true;
+  if (kind !== 'message') return true;
+  return senderSeatId === filterSeatId;
+}

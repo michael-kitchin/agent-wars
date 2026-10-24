@@ -68,7 +68,6 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(
   if (cancelOpponentPlanning) cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
   S.pendingDeferredTacticalPostBeatConsult = false;
   S.tacticalBattleSnapshot = null;
-  S.tacticalOpponentDraft = null;
   S.tacticalPhasePlanning = true;
   // `clearPendingTacticalOrders` replaces manual tactical march/embark clears and aligns with voluntary tactical exit.
   clearPendingTacticalOrders();
@@ -121,7 +120,6 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
     closeTacticalAnnihilationOutcomeDialog();
     cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
     S.tacticalBattleSnapshot = null;
-    S.tacticalOpponentDraft = null;
     S.tacticalPhasePlanning = true;
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];

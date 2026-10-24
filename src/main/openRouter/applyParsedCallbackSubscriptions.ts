@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import type { AiSeatId } from '../../shared/seatIds';
 import {
   clearSubscriptions,
   replaceSubscriptions,
@@ -23,25 +24,27 @@ import { filterCallbackSubscriptionsForTacticalBattleRoster } from './tacticalCa
  * Expected outcome: Returns the number of subscriptions stored (0 when the list is omitted, empty, or fully cleared).
  * Exceptions: None.
  */
-export function applyParsedOpponentCallbackSubscriptions(args: {
+export function applyParsedCallbackSubscriptions(args: {
+  seatId: AiSeatId;
   callbacks: CallbackSubscription[] | undefined;
   turnNumber: number;
   battleSubUnitIds: ReadonlySet<string> | null;
   battleId?: string;
 }): number {
-  const { callbacks, turnNumber, battleSubUnitIds, battleId } = args;
-  logDebug('applyParsedOpponentCallbackSubscriptions', {
+  const { seatId, callbacks, turnNumber, battleSubUnitIds, battleId } = args;
+  logDebug('applyParsedCallbackSubscriptions', {
+    seatId,
     inputCount: callbacks?.length ?? 0,
     tactical: battleSubUnitIds != null,
     battleId: battleId ?? null,
   });
   if (!callbacks?.length) {
-    clearSubscriptions('opponent');
+    clearSubscriptions(seatId);
     return 0;
   }
 
   if (battleSubUnitIds == null) {
-    replaceSubscriptions('opponent', callbacks, turnNumber);
+    replaceSubscriptions(seatId, callbacks, turnNumber);
     return callbacks.length;
   }
 
@@ -50,13 +53,13 @@ export function applyParsedOpponentCallbackSubscriptions(args: {
     battleSubUnitIds
   );
   if (droppedCount > 0) {
-    logDebug('applyParsedOpponentCallbackSubscriptions: dropped invalid tactical callback entries', {
+    logDebug('applyParsedCallbackSubscriptions: dropped invalid tactical callback entries', {
       battleId: battleId ?? null,
       droppedCount,
       keptCount: kept.length,
     });
   }
-  if (kept.length > 0) replaceSubscriptions('opponent', kept, turnNumber);
-  else clearSubscriptions('opponent');
+  if (kept.length > 0) replaceSubscriptions(seatId, kept, turnNumber);
+  else clearSubscriptions(seatId);
   return kept.length;
 }

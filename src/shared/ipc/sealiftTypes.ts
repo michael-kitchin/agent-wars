@@ -168,7 +168,7 @@ hasEmbarkedUnitsInStack: boolean;
     /**
    * Whether manual debark is permitted at this hex for the human player (coastal or controlled water seaport).
 
-   * Contract: Mirrors `canManualDebarkFromHex(h3Index, 'human')` on stack state responses.
+   * Contract: Mirrors `canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID)` on stack state responses.
    * When to use: Renderer decides whether debark buttons may appear at water seaports.
    * Expected outcome: True when debark IPC may succeed; false on open ocean.
    * Exceptions: None.

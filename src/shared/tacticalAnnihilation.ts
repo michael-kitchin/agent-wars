@@ -3,6 +3,7 @@
  */
 
 import type { TacticalBattlePlayerId } from './tacticalBattleTypes';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /**
  * Describes how a tactical roster ended when at least one side has zero sub-units.
@@ -17,9 +18,9 @@ export type TacticalAnnihilationOutcomeKind = 'human_win' | 'human_loss' | 'mutu
 /**
  * Returns the annihilation outcome for the current roster, or null while both sides retain sub-units.
  *
- * Contract: Counts `player` on `subUnits` only; treats `human` and `opponent` as the two sides.
+ * Contract: Counts `player` on `subUnits` only. The human seat is one side. Every other owner counts as the other side.
  * When to use: Renderer annihilation dialog and any logic that needs win/loss/draw-style messaging after combat.
- * Expected outcome: `null` iff both human and opponent counts are positive; otherwise the appropriate terminal outcome.
+ * Expected outcome: `null` when the human and at least one other owner both still have a sub-unit; otherwise the terminal outcome.
  * Exceptions: None.
  */
 export function getTacticalAnnihilationOutcome(
@@ -28,7 +29,7 @@ export function getTacticalAnnihilationOutcome(
   let human = 0;
   let opponent = 0;
   for (const u of subUnits) {
-    if (u.player === 'human') human += 1;
+    if (u.player === HUMAN_SEAT_ID) human += 1;
     else opponent += 1;
   }
   if (human > 0 && opponent > 0) return null;

@@ -2,6 +2,7 @@ const eslint = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const orientingComments = require('./eslint-rules/orienting-comments-plugin.cjs');
 const namingConventions = require('./eslint-rules/naming-conventions-plugin.cjs');
+const seatIdLiterals = require('./eslint-rules/seat-id-literals-plugin.cjs');
 
 module.exports = tseslint.config(
   eslint.configs.recommended,
@@ -37,6 +38,16 @@ module.exports = tseslint.config(
         { selector: 'objectLiteralProperty', format: null },
         { selector: 'typeProperty', format: null },
       ],
+    },
+  },
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['**/seatIds.ts', '**/*.test.ts', '**/testSupport/**'],
+    plugins: {
+      'seat-id-literals': seatIdLiterals,
+    },
+    rules: {
+      'seat-id-literals/no-seat-id-literals': 'error',
     },
   }
 );

@@ -96,6 +96,12 @@ const SCENES = Object.freeze({
   gameOverReopened: 'game-over-reopened',
   gameOverHidden: 'game-over-hidden',
   gameOverSmallWindow: 'game-over-small-window',
+  newGameFourSides: 'new-game-four-sides',
+  newGameThreeSides: 'new-game-three-sides',
+  matchKnockoutReports: 'match-knockout-reports',
+  matchFourCommanders: 'match-four-commanders',
+  standingsFour: 'standings-four',
+  matchObserve: 'match-observe',
 });
 
 /**
@@ -105,7 +111,8 @@ const SCENES = Object.freeze({
  * When to use: The `scenes` list of a check that applies only while the overlay is open.
  * Expected outcome: The first scene, the game menu opened on it, the choices hidden, the panel moved by its grip, the
  *   overlay opened from a match, its Regional tab, that tab with the choices hidden, and the finished match reopened,
- *   with the choices hidden, then at the 800 x 600 minimum.
+ *   with the choices hidden, then at the 800 x 600 minimum. Also the four-side regional setup, the three-side global
+ *   setup, and the standings of a finished four-side match.
  * Exceptions: None.
  */
 const NEW_GAME_SCENES = Object.freeze([
@@ -119,6 +126,9 @@ const NEW_GAME_SCENES = Object.freeze([
   SCENES.gameOverReopened,
   SCENES.gameOverHidden,
   SCENES.gameOverSmallWindow,
+  SCENES.newGameFourSides,
+  SCENES.newGameThreeSides,
+  SCENES.standingsFour,
 ]);
 
 /**

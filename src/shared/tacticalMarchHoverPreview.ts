@@ -34,6 +34,7 @@ import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
 import { cellAllowsTerrainBonusStop } from './tacticalMarchStepCost';
 import { TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON } from './marchInvalidReasons';
 import { tacticalDestinationBlocksMarch } from './tacticalMarchDestinationBlock';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /** Renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
@@ -139,7 +140,7 @@ function buildPreviewForSubUnit(args: {
     pathH3Indexes: null,
   });
   const sub = args.battle.subUnits.find((u) => u.id === args.unitId);
-  if (!sub || sub.player !== 'human') {
+  if (!sub || sub.player !== HUMAN_SEAT_ID) {
     return invalid({ valid: false, showInvalidMarker: false, invalidReason: 'Not a human tactical sub-unit', segments: [] });
   }
   const origin = tacticalMarchCommittedOriginH3(args.battle, args.unitId);
@@ -308,7 +309,7 @@ export function buildTacticalMarchHoverPreview(
   const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
   const selectedHuman = uniqueIds
-    .map((id) => battle.subUnits.find((u) => u.id === id && u.player === 'human'))
+    .map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID))
     .filter((u): u is NonNullable<typeof u> => !!u);
   if (!hoveredH3Index || selectedHuman.length === 0) {
     return {
@@ -382,7 +383,7 @@ export function tacticalHoverSolidEdgeCapByOriginH3(
   const capByOrigin = new Map<string, number>();
   for (const id of selectedUnitIds) {
     const u = battle.subUnits.find((s) => s.id === id);
-    if (!u || u.player !== 'human') continue;
+    if (!u || u.player !== HUMAN_SEAT_ID) continue;
     const segments = previews.find((p) => p.unitId === id)?.preview.segments ?? [];
     const moveType = hoveredH3Index ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : u.unitType;
     const edges =

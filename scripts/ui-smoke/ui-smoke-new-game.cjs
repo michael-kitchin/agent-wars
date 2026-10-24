@@ -49,13 +49,14 @@ const REGIONAL_SCENARIO = Object.freeze({
  *
  * Purpose: Both the first start and a new game opened from the match end on this overlay.
  * When to use: After launch, and after opening the overlay from the match.
- * Expected outcome: Resolves once `#game-over-overlay` is in the page without the `hidden` class.
+ * Expected outcome: Resolves once `#game-over-overlay` is in the page without the `hidden` class and the side list has at least two rows.
  * Exceptions: Throws a Playwright timeout after 60 seconds.
  */
 async function waitForNewGameOverlay(page) {
   await page.waitForFunction(() => {
     const overlay = document.getElementById('game-over-overlay');
-    return overlay !== null && !overlay.classList.contains('hidden');
+    return overlay !== null && !overlay.classList.contains('hidden')
+      && document.querySelectorAll('#new-game-side-rows .new-game-side-row').length >= 2;
   }, null, { timeout: 60000 });
 }
 
@@ -65,8 +66,8 @@ async function waitForNewGameOverlay(page) {
  * Purpose: One click for both matches. The button is the same element in the footer and in the collapsed header.
  * When to use: After the scenario's choices are set, whether or not the choices are hidden.
  * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map. The console is then on
- *   Orders. A start in this profile has no API key, so Auto-start AI opens the Opponent tab; the scenes after this
- *   click measure Orders, and a later click on Opponent must open that tab rather than collapse it.
+ *   Orders. A live match opens the Commanders tab; the scenes after this click measure Orders, so the click selects
+ *   Orders. A later click on Commanders must open that tab rather than collapse it.
  * Exceptions: Throws a Playwright timeout when the overlay does not close within `timeoutMs`.
  */
 async function clickStartGame(page, timeoutMs) {
@@ -87,20 +88,20 @@ async function clickStartGame(page, timeoutMs) {
  */
 async function startScenarioMatch(page) {
   await page.waitForFunction((region) => {
-    const select = document.getElementById('new-game-human-region-select');
-    return select !== null && Array.from(select.options).some((o) => o.value === region || o.textContent.trim() === region);
+    const select = document.querySelector('select[aria-label="You home"]');
+    return select !== null && Array.from(select.options).some((option) => option.value === region || option.textContent.trim() === region);
   }, SCENARIO.humanRegion, { timeout: 60000 });
   // The overlay draws random homes and a random month after its lists load; let that finish first.
   await page.waitForTimeout(SETTLE_MS.overlay);
   await page.click('#new-game-tab-global');
-  await page.selectOption('#new-game-human-region-select', SCENARIO.humanRegion);
-  await page.selectOption('#new-game-ai-region-select', SCENARIO.aiRegion);
+  await setSideHome(page, 'You', SCENARIO.humanRegion);
+  await setSideHome(page, 'Opponent 1', SCENARIO.aiRegion);
   await page.selectOption('#new-game-start-month', SCENARIO.startMonth);
   await page.selectOption('#new-game-size-select', SCENARIO.gameSize);
   await page.waitForTimeout(SETTLE_MS.click);
   const chosen = await page.evaluate(() => ({
-    human: document.getElementById('new-game-human-region-select').value,
-    ai: document.getElementById('new-game-ai-region-select').value,
+    human: document.querySelector('select[aria-label="You home"]').value,
+    ai: document.querySelector('select[aria-label="Opponent 1 home"]').value,
     month: document.getElementById('new-game-start-month').value,
     size: document.getElementById('new-game-size-select').value,
   }));
@@ -138,20 +139,90 @@ async function chooseRegionalScenario(page) {
   await page.click('#new-game-tab-regional');
   await page.waitForTimeout(SETTLE_MS.click);
   await page.selectOption('#new-game-region-select', REGIONAL_SCENARIO.region);
+  await page.waitForFunction((side) => {
+    const select = document.querySelector('select[aria-label="You home"]');
+    return select !== null && Array.from(select.options).some((option) => option.value === side);
+  }, REGIONAL_SCENARIO.humanSide, { timeout: 60000 });
   await page.waitForTimeout(SETTLE_MS.click);
-  await page.selectOption('#new-game-human-side-select', REGIONAL_SCENARIO.humanSide);
-  await page.selectOption('#new-game-ai-side-select', REGIONAL_SCENARIO.aiSide);
+  await setSideHome(page, 'You', REGIONAL_SCENARIO.humanSide);
+  await setSideHome(page, 'Opponent 1', REGIONAL_SCENARIO.aiSide);
   await page.selectOption('#new-game-start-month', REGIONAL_SCENARIO.startMonth);
   await page.selectOption('#new-game-size-select', REGIONAL_SCENARIO.gameSize);
   await page.waitForTimeout(SETTLE_MS.click);
   const chosen = await page.evaluate(() => ({
     region: document.getElementById('new-game-region-select').value,
-    human: document.getElementById('new-game-human-side-select').value,
-    ai: document.getElementById('new-game-ai-side-select').value,
+    human: document.querySelector('select[aria-label="You home"]').value,
+    ai: document.querySelector('select[aria-label="Opponent 1 home"]').value,
   }));
   if (chosen.region !== REGIONAL_SCENARIO.region || chosen.human !== REGIONAL_SCENARIO.humanSide || chosen.ai !== REGIONAL_SCENARIO.aiSide) {
     throw new Error(`regional choices did not hold: ${JSON.stringify(chosen)}`);
   }
 }
 
-module.exports = { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay };
+/**
+ * Sets one side's home, moving another side off it first when that home is taken.
+ *
+ * Purpose: The rows start on random homes, and a taken home cannot be selected.
+ * When to use: While the side rows are on screen. `label` is the row's visible name, such as "You".
+ * Expected outcome: The row's home select shows `value`.
+ * Exceptions: Throws when the home is not in the list, or no other home is free to receive the side that held it.
+ */
+async function setSideHome(page, label, value) {
+  const selector = `select[aria-label="${label} home"]`;
+  await page.waitForSelector(selector);
+  const ready = () => page.$eval(selector, (el, wanted) => {
+    const option = [...el.options].find((entry) => entry.value === wanted);
+    return { current: el.value, exists: Boolean(option), enabled: Boolean(option) && !option.disabled };
+  }, value);
+  const state = await ready();
+  if (state.current === value) return;
+  if (!state.exists) throw new Error(`${label} has no home "${value}"`);
+  if (!state.enabled) {
+    const holders = await page.$$eval('#new-game-side-rows select', (els, wanted) => els
+      .filter((el) => el.value === wanted)
+      .map((el) => el.getAttribute('aria-label')), value);
+    const holder = holders.find((name) => name && name !== `${label} home`);
+    if (!holder) throw new Error(`${value} is not free for ${label}`);
+    const holderSelector = `select[aria-label="${holder}"]`;
+    const swap = await page.$eval(holderSelector, (el, wanted) => {
+      const option = [...el.options].find((entry) => !entry.disabled && entry.value !== wanted);
+      return option ? option.value : '';
+    }, value);
+    if (!swap) throw new Error(`no free home to move ${holder} off ${value}`);
+    await page.selectOption(holderSelector, swap);
+    await page.waitForTimeout(SETTLE_MS.click);
+  }
+  await page.selectOption(selector, value);
+  await page.waitForTimeout(SETTLE_MS.click);
+  const after = await page.$eval(selector, (el) => el.value);
+  if (after !== value) throw new Error(`${label} home is "${after}", expected "${value}"`);
+}
+
+/**
+ * Starts a match and waits until Observe is on screen.
+ *
+ * Purpose: An Observe start must not select Orders, because that tab is disabled.
+ * When to use: After Observe is checked and the sides are chosen.
+ * Expected outcome: The overlay is closed, the top bar says Observing, and View as is shown.
+ * Exceptions: Throws a Playwright timeout when the match does not start within `timeoutMs`.
+ */
+async function startObservedMatch(page, timeoutMs) {
+  await page.click('#new-game-btn');
+  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: timeoutMs });
+  await page.waitForFunction(() => {
+    const sides = document.getElementById('topbar-sides');
+    const view = document.getElementById('topbar-view-as');
+    return sides !== null && (sides.textContent || '').includes('Observing') && view !== null && !view.hidden;
+  }, null, { timeout: timeoutMs });
+  await page.waitForTimeout(SETTLE_MS.start);
+}
+
+module.exports = {
+  chooseRegionalScenario,
+  clickStartGame,
+  openNewGameOverlay,
+  setSideHome,
+  startObservedMatch,
+  startScenarioMatch,
+  waitForNewGameOverlay,
+};

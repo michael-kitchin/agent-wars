@@ -1,8 +1,7 @@
 /**
- * Guards the ordering contract that lets a deliberately cancelled AI planning request (Events toggle and similar) restart before the Ready latch is released.
+ * Guards the match screen's planning contract: it starts and stops the commander pool and does not run its own consultation.
  *
- * The renderer is not compiled into `dist`, so these assert against its source text the same way
- * `rendererSourceAssertions.ts` does.
+ * The renderer is not compiled into `dist`, so these assert against its source text.
  * Run: `node dist/main/tacticalPrefetchRestartContract.test.js`
  */
 
@@ -26,9 +25,8 @@ function readRendererSource(...segments: string[]): string {
 /**
  * Returns the balanced `{...}` block that follows the first occurrence of `marker`.
  *
- * Purpose: Lets assertions scope to one branch or function body instead of matching the whole file,
- * so unrelated occurrences elsewhere cannot mask a regression.
- * When to use: With a marker unique enough to identify the branch under test.
+ * Purpose: Lets assertions scope to one function body instead of matching the whole file.
+ * When to use: With a marker unique enough to identify the function under test.
  * Expected outcome: The block text including its outer braces.
  * Exceptions: Throws when the marker is absent or the block never closes.
  */
@@ -46,21 +44,20 @@ function extractBalancedBlockAfter(source: string, marker: string): string {
   throw new Error(`unterminated block after ${marker}`);
 }
 
-test('a cancelled prefetch restarts before the Ready latch is released', () => {
-  const source = readRendererSource('openRouter', 'openRouterRuntime.ts');
-  const branch = extractBalancedBlockAfter(source, "if (result.error === 'Cancelled')");
-  const restartIndex = branch.indexOf('startBackgroundRequestIfAllowed(deps)');
-  const unblockIndex = branch.indexOf('unblockPrecomputedAiPlanningAfterBackgroundFailure()');
-  assert.ok(restartIndex >= 0, 'a cancelled prefetch must attempt a replacement request');
-  assert.ok(unblockIndex >= 0, 'Ready must still be released when no replacement request starts');
-  assert.ok(
-    restartIndex < unblockIndex,
-    'releasing the latch first installs an empty tactical draft, which makes the restart decline and leaves the beat with no opponent orders'
+test('the match screen starts and stops the commander pool', () => {
+  const client = readRendererSource('openRouter', 'commanderPoolClient.ts');
+  assert.match(client, /window\.gameApi\.startCommanderPlanning/);
+  assert.match(client, /window\.gameApi\?\.stopCommanderPlanning/);
+  assert.match(client, /window\.gameApi\.readCommanderPool/);
+  const runtime = readRendererSource('openRouter', 'openRouterRuntime.ts');
+  assert.doesNotMatch(runtime, /requestAiOrders/);
+  assert.match(
+    extractBalancedBlockAfter(runtime, 'export function startBackgroundRequestIfAllowed'),
+    /startCommanderPlanningIfAllowed/
   );
   assert.match(
-    branch,
-    /if \(!S\.backgroundRequestInFlight\)/,
-    'the latch may only be released when no replacement request actually started'
+    extractBalancedBlockAfter(runtime, 'export async function stopOpponentPlanning'),
+    /stopCommanderPlanningFromScreen/
   );
 });
 
@@ -83,17 +80,10 @@ test('a finished strategic consult starts the battle opponent plan it had been h
   );
 });
 
-test('releasing the Ready latch is what would suppress a restart', () => {
+test('Ready waits while a commander is planning', () => {
   const waiting = readRendererSource('openRouter', 'aiPlanningState.ts');
   assert.match(
     extractBalancedBlockAfter(waiting, 'export function isWaitingForPrecomputedAiOrders'),
-    /S\.tacticalOpponentDraft === null/,
-    'the tactical prefetch gate keys off a null opponent draft'
-  );
-  const precomputed = readRendererSource('openRouter', 'precomputedAiState.ts');
-  assert.match(
-    extractBalancedBlockAfter(precomputed, 'export function unblockPrecomputedAiPlanningAfterBackgroundFailure'),
-    /S\.tacticalOpponentDraft = EMPTY_TACTICAL_OPPONENT_DRAFT/,
-    'releasing the latch replaces that null draft, so it must not run before a restart attempt'
+    /anyCommanderIsPlanning\(\)/
   );
 });

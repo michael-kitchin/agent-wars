@@ -5,7 +5,7 @@
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattlePlayerId, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
 import {
@@ -13,6 +13,7 @@ import {
   tacticalInfrastructureStrikeStaysOnEnclosingHex,
 } from '../tacticalBattle/tacticalSnapshotGuards';
 import { logDebug } from '../logger';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Validates one or more human air sub-units striking a tactical target with airport and payload rules aligned to strategic `validateAirStrikeOrder`, but **without** the strategic grid-distance cap — any tactical cell in the tactical footprint is in range.
@@ -28,9 +29,9 @@ export function validateTacticalHumanAirStrikeGroup(
   targetH3Index: string,
   targetType: AirStrikeTargetType,
   /**
-   * Which tactical player owns the striking air sub-units (`human` for human drafts, `opponent` for buffered AI plans).
+   * Which owner the striking air sub-units belong to. Human drafts use the human seat. The other party's plans use that party.
    */
-  attackerPlayer: 'human' | 'opponent' = 'human'
+  attackerPlayer: TacticalBattlePlayerId = HUMAN_SEAT_ID
 ): { success: true } | { success: false; reason: string } {
   logDebug('tacticalHumanAirStrikeValidation validateTacticalHumanAirStrikeGroup', {
     unitCount: unitIds.length,

@@ -3,12 +3,17 @@
  */
 
 import { dbGetOne } from '../gameDb';
+import { buildLatLngCoordinateMap } from '../mapData';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { createCombatRng, runMeleePhase } from '../combatResolution';
 import { logDebug, logError } from '../logger';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
 import { finalizeReadyTurnAfterMelee } from './meleeInterceptReadyFinalize';
-import { clearMeleeInterceptPendingSnapshot, peekMeleeInterceptPendingSnapshot } from './meleeInterceptPendingState';
+import {
+  clearMeleeInterceptPendingSnapshot,
+  peekMeleeInterceptPendingSnapshot,
+  traversalRecordToSets,
+} from './meleeInterceptPendingState';
 import { failIfDatabaseNotReady, failIfTacticalBattleActive } from './readyStrategicGuards';
 
 /**
@@ -68,13 +73,15 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     combatUnitsAfter: pending.combatUnitsAfter,
     combatUnitsBefore: pending.combatUnitsBefore,
     humanMoves: pending.humanMoves,
+    aiMoves: pending.aiMoves,
     embarkedFollowMoves: pending.embarkedFollowMoves,
     resolvedFerryMoves: pending.resolvedFerryMoves,
-    traversedHexesByPlayer: pending.traversedHexesByPlayer,
-    opponentHadStrategicMarchResolution: pending.opponentHadStrategicMarchResolution,
+    traversedHexesByPlayer: traversalRecordToSets(pending.traversedHexesByPlayer),
+    hadStrategicMarchResolutionBySeat: pending.hadStrategicMarchResolutionBySeat,
     turnNumber: pending.turnNumber,
     allRanged: pending.allRanged,
     aiRangedOrders: pending.aiRangedOrders,
+    knockoutCoordinates: buildLatLngCoordinateMap(pending.hexList),
   });
   if (!baseResult.success) {
     return baseResult;

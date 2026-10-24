@@ -1,6 +1,7 @@
 /**
  * Counts for the battle header's force bar: each side's sub-units in a battle and the player's share of them.
  */
+import { HUMAN_SEAT_ID } from './seatIds';
 import type { TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 
 /**
@@ -21,15 +22,18 @@ export type BattleForceCounts = {
  * Counts each side's sub-units in a battle and works out the player's share.
  *
  * Purpose: The player sees at a glance how the two sides compare in the fight.
- * When to use: With the battle snapshot's `subUnits`. A battle has no fog of war, so the snapshot lists every enemy
- *   sub-unit.
- * Expected outcome: Every sub-unit is counted for its side, including one carried by a ship. `humanShare` is the
- *   player's count over both counts, or 0.5 when neither side has any.
+ * When to use: With the battle snapshot's `subUnits` and `opposingPartyId`. A battle has no fog of war, so the snapshot
+ *   lists every enemy sub-unit.
+ * Expected outcome: Human sub-units versus the named party, including one carried by a ship. Other owners are not counted.
+ *   `humanShare` is the player's count over both counts, or 0.5 when neither side has any.
  * Exceptions: None.
  */
-export function countBattleForces(subUnits: readonly Pick<TacticalSubUnitSnapshot, 'player'>[]): BattleForceCounts {
-  const human = subUnits.filter((sub) => sub.player === 'human').length;
-  const opponent = subUnits.length - human;
+export function countBattleForces(
+  subUnits: readonly Pick<TacticalSubUnitSnapshot, 'player'>[],
+  opposingPartyId: string
+): BattleForceCounts {
+  const human = subUnits.filter((sub) => sub.player === HUMAN_SEAT_ID).length;
+  const opponent = subUnits.filter((sub) => sub.player === opposingPartyId).length;
   const total = human + opponent;
   return { human, opponent, humanShare: total > 0 ? human / total : 0.5 };
 }

@@ -42,6 +42,7 @@ export const GAME_DB_REQUIRED_TABLES = [
   'res_s_infrastructure',
   'res_t_feature_overrides',
   'turn_notes_history',
+  'seats',
 ] as const;
 
 /**

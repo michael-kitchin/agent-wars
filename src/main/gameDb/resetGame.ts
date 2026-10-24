@@ -1,5 +1,6 @@
+import { clearAttackMixOnNewGame } from '../attackMixReset';
 import { logDebug, logError } from '../logger';
-import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions, resolveSideGroupHomeNames } from '../regionScenario';
+import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { persistGameSize } from './gameSizeConfig';
 import { persistOriginBonusSettings } from './originBonusConfig';
@@ -7,13 +8,19 @@ import { parseBonusLevel, type BonusLevel } from '../../shared/bonusLevel';
 import { parseGameSize, type GameSize } from '../../shared/gameSize';
 import { originBonusSettingsFromLevels } from '../../shared/originBonusRules';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
-import { persistRegionVsRegionScenarioState } from './scenarioState';
+import { persistRegionVsRegionScenarioId } from './scenarioState';
+import { replaceSeatRoster } from './seatRosterStore';
+import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolution';
+import { createSeededRng } from '../seededRng';
+import { DEFAULT_DOCTRINE, DOCTRINES, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
+import { victorySettingsForMapKind } from '../../shared/victoryRules';
+import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
-  assertRegionalSideGroupsDistinct,
   ensureGameMapLoaded,
   loadedGameMapId,
   requireGameMapId,
 } from '../gameMap/loadGameMap';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Documents the `ResetGameDeps` interface as a named contract surface (interface ResetGameDeps extends GuardedDbRunAndGetAllOps).
@@ -124,39 +131,28 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function seedInitialHexControlFromHomeRegions(
-  deps: ResetGameDeps,
-  options: { humanHomeRegion: string; aiHomeRegion: string }
-): void {
+function seedInitialHexControlFromHomeRegions(deps: ResetGameDeps, seats: readonly SeatRecord[]): void {
   const { run } = deps;
-  const humanHomeHexes = new Set(getScenarioHomeRegionHexes(options.humanHomeRegion));
-  const aiHomeHexes = new Set(getScenarioHomeRegionHexes(options.aiHomeRegion));
-  let forcedHumanControlCount = 0;
-  let forcedOpponentControlCount = 0;
-  let intersectingHexCount = 0;
-
-  for (const h3Index of humanHomeHexes) {
-    if (aiHomeHexes.has(h3Index)) {
-      intersectingHexCount += 1;
+  logDebug('gameDb seedInitialHexControlFromHomeRegions', { seatCount: seats.length });
+  const ownersByHex = new Map<string, string[]>();
+  for (const seat of seats) {
+    for (const h3Index of getScenarioHomeRegionHexes(seat.homeRegion)) {
+      const owners = ownersByHex.get(h3Index) ?? [];
+      owners.push(seat.seatId);
+      ownersByHex.set(h3Index, owners);
+    }
+  }
+  let forcedControlCount = 0;
+  let sharedHexCount = 0;
+  for (const [h3Index, owners] of ownersByHex) {
+    if (owners.length !== 1) {
+      sharedHexCount += 1;
       continue;
     }
-    run('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
-    forcedHumanControlCount += 1;
+    run('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, owners[0]]);
+    forcedControlCount += 1;
   }
-  for (const h3Index of aiHomeHexes) {
-    if (humanHomeHexes.has(h3Index)) continue;
-    run('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'opponent']);
-    forcedOpponentControlCount += 1;
-  }
-  logDebug('gameDb seedInitialHexControlFromHomeRegions', {
-    humanHomeRegion: options.humanHomeRegion,
-    aiHomeRegion: options.aiHomeRegion,
-    humanHomeHexCount: humanHomeHexes.size,
-    aiHomeHexCount: aiHomeHexes.size,
-    forcedHumanControlCount,
-    forcedOpponentControlCount,
-    intersectingHexCount,
-  });
+  logDebug('gameDb seedInitialHexControlFromHomeRegions: done', { forcedControlCount, sharedHexCount });
 }
 
 /**
@@ -178,23 +174,23 @@ export interface ResetGameForNewMatchOptions {
    */
   readonly fogOfWarEnabled?: boolean;
   /**
-   * Requested human home region name.
+   * Requested length of a global match.
    *
-   * Contract: Resolved by `resolveScenarioHomeRegions`; missing or unknown picks a default.
-   * When to use: The new-game dialog's region selector.
-   * Expected outcome: Persisted in scenario state.
+   * Contract: Used only when the map is global. A value outside 20, 30, 40, and 50 becomes 30.
+   * When to use: The new-game dialog's turn-limit control.
+   * Expected outcome: Stored as `turn_limit`. A regional match stores no turn limit.
    * Exceptions: None.
    */
-  readonly humanHomeRegion?: string;
+  readonly turnLimit?: number;
   /**
-   * Requested AI home region name.
+   * Match seed to store instead of a random one.
    *
-   * Contract: Resolved by `resolveScenarioHomeRegions`; missing or unknown picks a default.
-   * When to use: The new-game dialog's region selector.
-   * Expected outcome: Persisted in scenario state.
+   * Contract: A finite number is stored as `game_seed` before units are seeded. Omitted keeps the random seed.
+   * When to use: When a start must repeat a doctrine draw. Combat uses the same stored seed.
+   * Expected outcome: `seedGameSeedIfMissing` leaves the stored value in place. Each random commander draws from it.
    * Exceptions: None.
    */
-  readonly aiHomeRegion?: string;
+  readonly gameSeed?: number;
   /**
    * Match size that scales unit caps.
    *
@@ -259,23 +255,110 @@ export interface ResetGameForNewMatchOptions {
    */
   readonly gameMapId?: string;
   /**
-   * Human side group on a regional map.
+   * One entry per side, in row order.
    *
-   * Contract: Required when `gameMapId` is regional. Ignored for the global map.
-   * When to use: The Regional tab's human side selector.
-   * Expected outcome: Resolved to that group's display name.
+   * Contract: Each entry is a human or AI seat. Blank homes take the first free listed home.
+   * When to use: A start that names two to four sides.
+   * Expected outcome: Those sides are the roster. Absent builds one human seat and one AI seat.
    * Exceptions: None.
    */
-  readonly humanSideGroupId?: string;
-  /**
-   * AI side group on a regional map.
-   *
-   * Contract: Required when `gameMapId` is regional, and different from the human group.
-   * When to use: The Regional tab's AI side selector.
-   * Expected outcome: Resolved to that group's display name.
-   * Exceptions: None.
-   */
-  readonly aiSideGroupId?: string;
+  readonly seats?: readonly NewGameSeatInput[];
+}
+
+/**
+ * A human seat and one AI seat when the start did not name sides.
+ *
+ * Purpose: A reset with no seat list still starts two sides on homes that can hold the opening army.
+ * When to use: `resetGameForNewMatch` when `options.seats` is absent.
+ * Expected outcome: Global homes are the first two listed regions other than Antarctica. A regional map ignores those names and takes the first two side groups.
+ * Exceptions: None. An empty region list leaves the names blank for the resolver.
+ */
+function defaultTwoSeatInputs(): NewGameSeatInput[] {
+  const names = listScenarioHomeRegions();
+  const preferred = names.filter((name) => name.trim().toLowerCase() !== 'antarctica');
+  const humanHome = preferred[0] ?? names[0] ?? '';
+  const aiHome = preferred.find((name) => name !== humanHome)
+    ?? names.find((name) => name !== humanHome)
+    ?? humanHome;
+  logDebug('gameDb defaultTwoSeatInputs', { humanHome, aiHome });
+  return [
+    { kind: HUMAN_SEAT_ID, homeRegion: humanHome },
+    { kind: 'ai', homeRegion: aiHome },
+  ];
+}
+
+/**
+ * Doctrine drawn for one random commander.
+ *
+ * Purpose: The same match seed and seat order always pick the same doctrine.
+ * When to use: After `game_seed` has been stored, once per AI seat whose choice is random.
+ * Expected outcome: One of `DOCTRINES`. Balanced is included; the choice stays `'random'`.
+ * Exceptions: None.
+ */
+export function drawDoctrineForSeat(gameSeed: number, seatOrder: number): Doctrine {
+  const rng = createSeededRng((gameSeed + seatOrder * 104729) >>> 0);
+  const doctrine = DOCTRINES[Math.floor(rng() * DOCTRINES.length)] ?? DEFAULT_DOCTRINE;
+  logDebug('gameDb drawDoctrineForSeat', { seatOrder, doctrine });
+  return doctrine;
+}
+
+/**
+ * Stores the drawn doctrine of every random commander.
+ *
+ * Purpose: The prompt teaches the draw. The choice stays random so the snapshot can hide it until the match is over.
+ * When to use: `resetGameForNewMatch`, after the match seed exists.
+ * Expected outcome: Each random AI seat's `doctrine` column is the draw. Named choices are left as stored.
+ * Exceptions: None. A missing seed draws from 0.
+ */
+function drawRandomDoctrines(deps: ResetGameDeps): void {
+  const rows = deps.getAll<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
+  const parsed = Number.parseInt(rows[0]?.value ?? '', 10);
+  const gameSeed = Number.isNaN(parsed) ? 0 : parsed;
+  const seats = deps.getAll<{ seat_id: string; seat_order: number; doctrine_choice: string }>(
+    'SELECT seat_id, seat_order, doctrine_choice FROM seats WHERE kind = ? AND doctrine_choice = ?',
+    ['ai', 'random']
+  );
+  logDebug('gameDb drawRandomDoctrines', { gameSeed, count: seats.length });
+  for (const seat of seats) {
+    const doctrine = drawDoctrineForSeat(gameSeed, seat.seat_order);
+    deps.run('UPDATE seats SET doctrine = ? WHERE seat_id = ?', [doctrine, seat.seat_id]);
+  }
+}
+
+/**
+ * Stores the commander for one new AI seat.
+ *
+ * Purpose: A missing commander stays Balanced with no model. Random stays a choice and plays Balanced until a draw replaces it.
+ * When to use: While turning a resolved seat into a roster row.
+ * Expected outcome: A `SeatCommander`. The human seat does not call this.
+ * Exceptions: None.
+ */
+function commanderForNewAiSeat(input: NewGameSeatInput['commander'] | null): SeatCommander {
+  if (!input) {
+    return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: DEFAULT_DOCTRINE };
+  }
+  return {
+    modelId: input.modelId,
+    reasoningEffort: input.reasoningEffort,
+    doctrineChoice: input.doctrineChoice,
+    doctrine: input.doctrineChoice === 'random' ? DEFAULT_DOCTRINE : input.doctrineChoice,
+  };
+}
+
+/**
+ * Copies a resolved seat into the row that is stored.
+ *
+ * Purpose: The human row has no commander. Each AI row gets the commander from the input.
+ * When to use: After `resolveNewMatchSeats`.
+ * Expected outcome: A `SeatRecord` whose outcome fields are still empty.
+ * Exceptions: None.
+ */
+function seatRecordFromResolved(seat: ResolvedNewMatchSeat): SeatRecord {
+  const { commanderInput, ...stored } = seat;
+  return {
+    ...stored,
+    commander: seat.kind === HUMAN_SEAT_ID ? null : commanderForNewAiSeat(commanderInput),
+  };
 }
 
 /**
@@ -298,6 +381,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     startMonth: options?.startMonth,
     tech: parseBonusLevel(options?.techBonusLevel, 'off'),
   });
+  clearAttackMixOnNewGame();
   logDebug('gameDb resetGameForNewMatch', {
     fogOfWarEnabled,
     gameSize,
@@ -306,30 +390,48 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   });
   if (!deps.hasDb()) return;
   const mapId = requireGameMapId(options?.gameMapId);
-  if (mapId !== 'global') {
-    assertRegionalSideGroupsDistinct(mapId, options?.humanSideGroupId, options?.aiSideGroupId);
-  }
   const previousMapId = loadedGameMapId();
   ensureGameMapLoaded(mapId);
   const { run } = deps;
+  let began = false;
   try {
+  const mapKind = mapId === 'global' ? 'global' : 'regional';
+  const resolved = resolveNewMatchSeats({
+    mapKind,
+    seats: options?.seats ?? defaultTwoSeatInputs(),
+  }).map(seatRecordFromResolved);
+  logDebug('gameDb resetGameForNewMatch: map', {
+    mapId,
+    previousMapId,
+    seatIds: resolved.map((seat) => seat.seatId),
+  });
   run('BEGIN');
-  const homes = mapId === 'global'
-    ? resolveScenarioHomeRegions(options)
-    : resolveSideGroupHomeNames(options?.humanSideGroupId ?? '', options?.aiSideGroupId ?? '');
-  logDebug('gameDb resetGameForNewMatch: map', { mapId, ...homes, previousMapId });
+  began = true;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['game_map_id', mapId]);
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
+  const victory = victorySettingsForMapKind(mapKind, options?.turnLimit);
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['victory_rule', victory.rule]);
+  if (victory.turnLimit === null) {
+    run("DELETE FROM game_config WHERE key = 'turn_limit'");
+  } else {
+    run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['turn_limit', String(victory.turnLimit)]);
+  }
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
-  persistRegionVsRegionScenarioState({ run }, homes);
+  persistRegionVsRegionScenarioId({ run });
+  run('DELETE FROM seats');
+  replaceSeatRoster({ run }, resolved);
   run("DELETE FROM game_config WHERE key = 'game_seed'");
+  if (typeof options?.gameSeed === 'number' && Number.isFinite(options.gameSeed)) {
+    run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(options.gameSeed >>> 0)]);
+  }
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
   // Identifier ordinals may restart at 1 because `DELETE FROM units` already ran above.
   run("DELETE FROM game_config WHERE key LIKE 'unit_id_sequence_%'");
   deps.seedGameSeedIfMissing();
+  drawRandomDoctrines(deps);
   deps.seedHexesFromTerrainMetadata();
   deps.seedInfrastructureStateFromMetadata();
   deps.seedUnits();
@@ -340,13 +442,13 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM unit_transport_assignments');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   deps.clearGameOver();
-  run('DELETE FROM game_config WHERE key = ?', ['ai_tool_limit_exceeded_last_turn']);
+  run("DELETE FROM game_config WHERE key LIKE 'ai_tool_limit_exceeded_last_turn_%'");
   run('DELETE FROM ai_callback_subscriptions');
   run('DELETE FROM ai_pending_orders');
   run('DELETE FROM ai_combat_since_consultation');
   run('DELETE FROM ai_loss_events_since_consultation');
-  run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
-  run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
+  run("DELETE FROM game_config WHERE key LIKE 'ai_last_consultation_turn_%'");
+  run("DELETE FROM game_config WHERE key LIKE 'fog_new_contacts_%'");
   run("DELETE FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');
@@ -356,15 +458,20 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM res_s_build_queue');
   run('DELETE FROM res_s_build_progress');
   seedInitialHexControlFromUnitOccupancy(deps);
-  seedInitialHexControlFromHomeRegions(deps, homes);
-  logHomeRegionControlParity(deps, new Set(getScenarioHomeRegionHexes(homes.humanHomeRegion)), new Set(getScenarioHomeRegionHexes(homes.aiHomeRegion)));
+  seedInitialHexControlFromHomeRegions(deps, resolved);
+  logHomeRegionControlParity(deps, resolved.map((seat) => ({
+    seatId: seat.seatId,
+    hexes: new Set(getScenarioHomeRegionHexes(seat.homeRegion)),
+  })));
   deps.refreshFogOfWarIntelFromCurrentState();
   run('COMMIT');
   } catch (err) {
-    try {
-      run('ROLLBACK');
-    } catch (rollbackErr) {
-      logError('gameDb resetGameForNewMatch: rollback failed', rollbackErr);
+    if (began) {
+      try {
+        run('ROLLBACK');
+      } catch (rollbackErr) {
+        logError('gameDb resetGameForNewMatch: rollback failed', rollbackErr);
+      }
     }
     logError('gameDb resetGameForNewMatch: failed after map load', err);
     if (previousMapId && previousMapId !== mapId) {

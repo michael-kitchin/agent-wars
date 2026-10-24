@@ -3,9 +3,16 @@
  */
 
 import type { MeleeCandidateRow } from '../../shared/ipcTypes';
-import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
-import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
+import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
+import { paletteForOwner } from '../../shared/seatPalette';
+import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
+import { shortSideName } from '../../shared/seatRoster';
+import { formatHexControlLabel, homeSeatIdsAtHex } from '../../shared/sideLabels';
+import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
+import { formatWeatherLabel } from '../../shared/weatherBonusRules';
 import { fightTooltipText, ignoreTooltipText } from '../chrome/controlTooltipText';
+import { rendererSharedState as S } from '../core/state';
+import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
 
 /**
  * Arguments for opening the melee intercept modal.
@@ -88,11 +95,16 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     const panel = document.createElement('div');
     panel.className = 'melee-intercept-panel';
 
+    const eligible = args.candidates.filter((row) => row.tacticalEligible);
+    const worldMapRows = args.candidates.filter((row) => !row.tacticalEligible);
     const title = document.createElement('div');
-    const n = args.candidates.length;
-    title.textContent = `Tactical Battles (${n})`;
+    title.textContent = `Tactical Battles (${eligible.length})`;
     title.style.cssText = 'font-weight:600;margin-bottom:8px;flex-shrink:0;';
     panel.appendChild(title);
+    const intro = document.createElement('p');
+    intro.className = 'melee-intercept-intro';
+    intro.textContent = 'Choose one battle to fight. The others resolve on the world map.';
+    panel.appendChild(intro);
 
     const tableScroll = document.createElement('div');
     tableScroll.className = 'melee-intercept-scroll';
@@ -110,7 +122,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     table.appendChild(colgroup);
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['', 'Hex', 'Human', 'AI']) {
+    for (const label of ['', 'Hex', 'Yours', 'Enemy']) {
       const th = document.createElement('th');
       th.textContent = label;
       hr.appendChild(th);
@@ -121,6 +133,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     table.appendChild(tbody);
     tableScroll.appendChild(table);
     panel.appendChild(tableScroll);
+    if (worldMapRows.length > 0) panel.appendChild(worldMapSection(worldMapRows));
 
     let selectedH3: string | null = null;
     const radios: HTMLInputElement[] = [];
@@ -183,7 +196,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     fightBtn.addEventListener('click', () => finishFight());
     ignoreBtn.addEventListener('click', () => finishIgnore());
 
-    for (const row of args.candidates) {
+    for (const row of eligible) {
       const tr = document.createElement('tr');
       const tdRadio = document.createElement('td');
       const radio = document.createElement('input');
@@ -199,23 +212,17 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       tr.appendChild(tdRadio);
 
       const tdHex = document.createElement('td');
+      tdHex.append(hexCell(row.h3Index));
       tr.appendChild(tdHex);
-      void args.buildHexPopupHtml(row.h3Index).then(
-        (html) => {
-          tdHex.innerHTML = html;
-          paintTerrainSwatches(tdHex);
-        },
-        () => {
-          tdHex.textContent = row.h3Index;
-        }
-      );
 
+      const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
+      const enemy = row.parties.find((party) => party.ownerId !== HUMAN_SEAT_ID);
       const tdHuman = document.createElement('td');
-      tdHuman.textContent = row.humanUnitSummary || '—';
+      tdHuman.textContent = human?.unitSummary || '—';
       tr.appendChild(tdHuman);
 
       const tdAi = document.createElement('td');
-      tdAi.textContent = row.aiUnitSummary || '—';
+      tdAi.append(enemy ? enemyCell(enemy.ownerId, enemy.unitSummary) : document.createTextNode('—'));
       tr.appendChild(tdAi);
 
       tbody.appendChild(tr);
@@ -231,4 +238,153 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     detachFrame = attachFrameToVisibleMap(frame);
     radios[0]?.focus();
   });
+}
+
+/**
+ * The hex code and the muted control, terrain, and weather line.
+ *
+ * Purpose: The choice row names the hex without the full tooltip.
+ * When to use: Each eligible row.
+ * Expected outcome: The code, then "Control: … · Terrain: …", and weather when the hex has it.
+ * Exceptions: None. A missing snapshot shows the hex id.
+ */
+function hexCell(h3Index: string): HTMLElement {
+  const wrap = document.createElement('div');
+  const code = document.createElement('div');
+  const hexCode = getStrategicHexCode(h3Index);
+  code.textContent = hexCode ? `(${hexCode})` : h3Index;
+  const detail = document.createElement('div');
+  detail.className = 'melee-intercept-muted';
+  detail.textContent = hexDetailLine(h3Index);
+  wrap.append(code, detail);
+  return wrap;
+}
+
+/**
+ * Control, terrain, and weather for one world hex.
+ *
+ * Purpose: The muted line uses the same control words as the map, with short side names.
+ * When to use: `hexCell`.
+ * Expected outcome: A single line. Weather is omitted when the hex has none.
+ * Exceptions: None.
+ */
+function hexDetailLine(h3Index: string): string {
+  const state = S.gameState;
+  const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
+  const viewer = seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null)?.seatId ?? null;
+  const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
+  const control = formatHexControlLabel({
+    controllerId: controller,
+    homeSeatIds: homeSeatIdsAtHex(h3Index, {
+      homeRegionHexesBySeat: state?.homeRegionHexesBySeat,
+    }),
+    viewerSeatId: viewer,
+    seats,
+  });
+  const hex = state?.hexes.find((row) => row.h3Index === h3Index);
+  const terrain = formatTerrainKindLabel(hex?.terrainKind ?? null);
+  const weather = hex?.weather ? ` · Weather: ${formatWeatherLabel(hex.weather)}` : '';
+  return `Control: ${control} · Terrain: ${terrain}${weather}`;
+}
+
+/**
+ * The enemy's dot, short name, and unit summary.
+ *
+ * Purpose: The Enemy cell names one other party.
+ * When to use: An eligible row.
+ * Expected outcome: Neutral reads "Neutral" and the summary ends ", defends in place".
+ * Exceptions: None.
+ */
+function enemyCell(ownerId: string, unitSummary: string): HTMLElement {
+  const wrap = document.createElement('div');
+  const line = document.createElement('div');
+  line.className = 'melee-party-line';
+  line.append(ownerDot(ownerId), document.createTextNode(partyName(ownerId)));
+  const summary = document.createElement('div');
+  summary.className = 'melee-intercept-muted';
+  const garrison = isNeutralOwnerId(ownerId);
+  summary.textContent = garrison ? `${unitSummary}, defends in place` : unitSummary;
+  wrap.append(line, summary);
+  return wrap;
+}
+
+/**
+ * The world-map section under the choice rows.
+ *
+ * Purpose: Contested hexes that cannot be fought still get named.
+ * When to use: When any row is not eligible.
+ * Expected outcome: A heading and one line per hex, with dots. A human plus two others reads "Three sides: you, …". Two other sides read "{A} vs {B}".
+ * Exceptions: None.
+ */
+function worldMapSection(rows: readonly MeleeCandidateRow[]): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'melee-world-section';
+  const heading = document.createElement('h3');
+  heading.textContent = 'Resolve on the world map this turn';
+  section.append(heading);
+  for (const row of rows) {
+    const line = document.createElement('div');
+    line.className = 'melee-world-row';
+    const hex = document.createElement('span');
+    const code = getStrategicHexCode(row.h3Index);
+    hex.textContent = code ? `(${code})` : row.h3Index;
+    line.append(hex, document.createTextNode(' '), worldMapParties(row));
+    section.append(line);
+  }
+  return section;
+}
+
+/**
+ * The party phrase for a world-map hex.
+ *
+ * Purpose: The player sees who meets there without a choice control.
+ * When to use: `worldMapSection`.
+ * Expected outcome: "Three sides: you, {A}, {B}" when the human seat is one of three. Otherwise "{A} vs {B}".
+ * Exceptions: None.
+ */
+function worldMapParties(row: MeleeCandidateRow): HTMLElement {
+  const wrap = document.createElement('span');
+  wrap.className = 'melee-party-line';
+  const human = row.parties.some((party) => party.ownerId === HUMAN_SEAT_ID);
+  if (human && row.parties.length >= 3) {
+    wrap.append(document.createTextNode('Three sides: you'));
+    for (const party of row.parties.filter((item) => item.ownerId !== HUMAN_SEAT_ID)) {
+      wrap.append(document.createTextNode(', '), ownerDot(party.ownerId), document.createTextNode(partyName(party.ownerId)));
+    }
+    return wrap;
+  }
+  row.parties.forEach((party, index) => {
+    if (index > 0) wrap.append(document.createTextNode(' vs '));
+    wrap.append(ownerDot(party.ownerId), document.createTextNode(partyName(party.ownerId)));
+  });
+  return wrap;
+}
+
+/**
+ * A short name for a party.
+ *
+ * Purpose: The dialog uses the same short names as the top bar.
+ * When to use: Enemy cells and world-map lines.
+ * Expected outcome: "Neutral", or the seat's short home name.
+ * Exceptions: None. An unknown id is shown as itself.
+ */
+function partyName(ownerId: string): string {
+  if (isNeutralOwnerId(ownerId)) return 'Neutral';
+  const seat = S.gameState?.seats?.find((row) => row.seatId === ownerId);
+  return seat ? shortSideName(seat.homeRegion) : ownerId;
+}
+
+/**
+ * A color dot for one owner.
+ *
+ * Purpose: The dialog uses the seat palette.
+ * When to use: Beside a party name.
+ * Expected outcome: An 8px dot in that owner's map color.
+ * Exceptions: None.
+ */
+function ownerDot(ownerId: string): HTMLElement {
+  const dot = document.createElement('span');
+  dot.className = 'melee-party-dot';
+  dot.style.background = paletteForOwner(ownerId, S.gameState?.seats ?? [])?.map ?? '#9D174D';
+  return dot;
 }

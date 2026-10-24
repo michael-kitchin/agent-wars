@@ -1,3 +1,4 @@
+import { type SeatId } from '../../shared/seatIds';
 import { dbGetAll, dbGetOne } from '../gameDb';
 
 /**
@@ -200,14 +201,14 @@ function buildInfrastructureSignature(): string {
 }
 
 /**
- * Defines the `buildIntelSignature` function shape (function buildIntelSignature(playerId: 'human' | 'opponent'): string).
+ * Defines the `buildIntelSignature` function shape (function buildIntelSignature(playerId: SeatId): string).
 
  * Purpose: Supports maintainability by documenting why `buildIntelSignature` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildIntelSignature(playerId: 'human' | 'opponent'): string {
+function buildIntelSignature(playerId: SeatId): string {
   const hexIntel = dbGetOne<{ c: number; lastSeen: number }>(
     `SELECT COUNT(*) AS c, COALESCE(SUM(last_seen_turn), 0) AS lastSeen
      FROM player_hex_intel
@@ -274,14 +275,14 @@ function buildOccupancySignature(): string {
 }
 
 /**
- * Defines the `buildEnvironmentSignature` function shape (export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): string).
+ * Defines the `buildEnvironmentSignature` function shape (export function buildEnvironmentSignature(playerId: SeatId): string).
 
  * Purpose: Supports maintainability by documenting why `buildEnvironmentSignature` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): string {
+export function buildEnvironmentSignature(playerId: SeatId): string {
   return [
     buildTurnPhaseSignature(),
     buildInfrastructureSignature(),
@@ -292,7 +293,7 @@ export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): strin
 }
 
 /**
- * Defines the `buildHoverSessionCacheKey` function shape (export function buildHoverSessionCacheKey(payload: { playerId: 'human' | 'opponent'; selectionSignature: string; selectedPositionsSignature: string;).
+ * Defines the `buildHoverSessionCacheKey` function shape (export function buildHoverSessionCacheKey(payload: { playerId: SeatId; selectionSignature: string; selectedPositionsSignature: string;).
 
  * Purpose: Supports maintainability by documenting why `buildHoverSessionCacheKey` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -300,7 +301,7 @@ export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): strin
  * Exceptions: None.
  */
 export function buildHoverSessionCacheKey(payload: {
-  playerId: 'human' | 'opponent';
+  playerId: SeatId;
   selectionSignature: string;
   selectedPositionsSignature: string;
   environmentSignature: string;

@@ -73,8 +73,6 @@ import {
   validateRangedAttack,
 } from './strategicOrderValidation';
 
-export { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
-
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 export type { HexBuildQueueEntryView, HexBuildQueueView } from './buildQueue';
 export type {
@@ -454,26 +452,26 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
 
 
 /**
- * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView).
+ * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): HexBuildQueueView).
 
  * Purpose: Supports maintainability by documenting why `getHexBuildQueue` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView {
+export function getHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): HexBuildQueueView {
   return readHexBuildQueue(h3Index, requestingPlayerId);
 }
 
 /**
- * Defines the `addHexBuildQueueEntry` function shape (export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): { success: boolean; reason?: string; queue?: HexBuildQueu).
+ * Defines the `addHexBuildQueueEntry` function shape (export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): { success: boolean; reason?: string; queue?: HexBuildQueu).
 
  * Purpose: Supports maintainability by documenting why `addHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): {
+export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): {
   success: boolean;
   reason?: string;
   queue?: HexBuildQueueView;
@@ -494,13 +492,13 @@ export function updateHexBuildQueueEntry(
   entryId: number,
   unitType: BuildUnitType,
   count: number,
-  requestingPlayerId = HUMAN_PLAYER_ID
+  requestingPlayerId: string = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   return executeUpdateHexBuildQueueEntry(h3Index, entryId, unitType, count, requestingPlayerId);
 }
 
 /**
- * Defines the `removeHexBuildQueueEntry` function shape (export function removeHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId = HUMAN_PLAYER_ID ): { success: boolean; reason?: strin).
+ * Defines the `removeHexBuildQueueEntry` function shape (export function removeHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId: string = HUMAN_PLAYER_ID ): { success: boolean; reason?: strin).
 
  * Purpose: Supports maintainability by documenting why `removeHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -510,7 +508,7 @@ export function updateHexBuildQueueEntry(
 export function removeHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
-  requestingPlayerId = HUMAN_PLAYER_ID
+  requestingPlayerId: string = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   return executeRemoveHexBuildQueueEntry(h3Index, entryId, requestingPlayerId);
 }
@@ -526,7 +524,7 @@ export function removeHexBuildQueueEntry(
 export function applyBuildQueueTemplateToHexes(
   h3Indexes: string[],
   entries: BuildQueueTemplateEntry[],
-  requestingPlayerId = HUMAN_PLAYER_ID
+  requestingPlayerId: string = HUMAN_PLAYER_ID
 ): ApplyBuildQueueTemplateResult {
   return executeApplyBuildQueueTemplateToHexes(h3Indexes, entries, requestingPlayerId);
 }
@@ -542,7 +540,7 @@ export function applyBuildQueueTemplateToHexes(
 export function setHexesKeepBuilding(
   h3Indexes: string[],
   keepBuilding: boolean,
-  requestingPlayerId = HUMAN_PLAYER_ID
+  requestingPlayerId: string = HUMAN_PLAYER_ID
 ): SetHexesKeepBuildingResult {
   return executeSetHexesKeepBuilding(h3Indexes, keepBuilding, requestingPlayerId);
 }

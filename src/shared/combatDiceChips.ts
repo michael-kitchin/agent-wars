@@ -6,6 +6,7 @@
  * Expected outcome: Plain data; no DOM, canvas, or logging.
  * Exceptions: None.
  */
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
 import type { CombatDicePlaybackFields, CombatDiceRoll, CombatDiceRollKind } from './ipc/combatDiceTypes';
 import type { ResolutionPlaybackPhase } from './resolutionPlaybackPhase';
 
@@ -121,10 +122,10 @@ const KIND_ORDER: readonly CombatDiceRollKind[] = [
  *
  * Purpose: Stable row order when both sides roll the same kind.
  * When to use: Sorting rows within a chip.
- * Expected outcome: Human rows before opponent rows.
+ * Expected outcome: Human, then each AI seat in seat order, then Neutral. Unknown players and infrastructure sort last.
  * Exceptions: None.
  */
-const PLAYER_ORDER: readonly string[] = ['human', 'opponent'];
+const PLAYER_ORDER: readonly string[] = [HUMAN_SEAT_ID, ...AI_SEAT_IDS, NEUTRAL_OWNER_ID];
 
 /**
  * Row order by unit type; unknown types sort last.
@@ -334,7 +335,7 @@ function orderIndex(order: readonly string[], value: string | null): number {
 /**
  * Compares two chip rows for display order.
  *
- * Purpose: Attack rows before responses; then human before opponent; then unit type; then the easier hit number first.
+ * Purpose: Attack rows before responses; then human, AI seats in seat order, and Neutral; then unit type; then the easier hit number first.
  * When to use: Sorting rows within one chip.
  * Expected outcome: Negative, zero, or positive like `Array.prototype.sort` comparators.
  * Exceptions: None.

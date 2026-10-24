@@ -59,9 +59,11 @@ test('a maghreb start snapshot matches the manifest hex count', (t) => {
   try {
     resetGameForNewMatch({
       gameMapId: 'maghreb',
-      humanSideGroupId: human.id,
-      aiSideGroupId: ai.id,
       fogOfWarEnabled: false,
+      seats: [
+        { kind: 'human', sideGroupId: human.id },
+        { kind: 'ai', sideGroupId: ai.id },
+      ],
     });
     assert.equal(getGameState().hexes.length, manifest.hexes.length);
   } finally {

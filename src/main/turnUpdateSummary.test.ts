@@ -9,31 +9,32 @@ import {
   MAP_TOAST_UPDATES_SECTION_TITLE,
 } from '../shared/consolidatedTurnUpdateToast';
 import { emptyTurnLossSummary } from '../shared/lossSummary';
+import { HUMAN_SEAT_ID } from '../shared/seatIds';
 
 /**
  * Verifies section order and suppression when all sections empty.
  *
  * Purpose: Guards popup consolidation contract.
  * When to use: After changing `buildConsolidatedTurnUpdateToastMessage`.
- * Expected outcome: Human before AI before Other; null when nothing to show.
+ * Expected outcome: The turn-report sentence comes before Updates; null when nothing to show.
  * Exceptions: None.
  */
 function testSectionOrderAndEmptySuppression(): void {
-  const summary = emptyTurnLossSummary();
-  summary.human.ranged.push({ unitType: 'infantry', displayName: 'Alpha' });
-  summary.ai.melee.push({ unitType: 'armor', displayName: 'Bravo' });
   const text = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true, deployedUnitsByType: { infantry: 2 } },
-    turnLossSummary: summary,
+    turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
+    turnReport: {
+      viewerSeatId: HUMAN_SEAT_ID,
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
+      losses: [],
+    },
   });
   assert.ok(text);
-  const humanIdx = text!.indexOf(`${MAP_TOAST_SECTION_HEADER_PREFIX}Human Losses`);
-  const aiIdx = text!.indexOf(`${MAP_TOAST_SECTION_HEADER_PREFIX}AI Losses`);
+  const took = text!.indexOf('You took 1 hex from E. Turkey.');
   const otherIdx = text!.indexOf(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
-  assert.ok(humanIdx >= 0 && aiIdx > humanIdx && otherIdx > aiIdx);
-  assert.ok(text!.includes('Ranged attack: Alpha'));
-  assert.ok(text!.includes('Melee attack: Bravo'));
+  assert.ok(took >= 0 && otherIdx > took);
   const empty = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },
     turnLossSummary: emptyTurnLossSummary(),

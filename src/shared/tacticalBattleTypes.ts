@@ -3,6 +3,7 @@
  * Kept renderer/main aligned via IPC payloads.
  */
 
+import type { OwnerId } from './seatIds';
 import type { ActiveBonusLevel } from './bonusLevel';
 import type { UnitOrigin } from './unitOriginTypes';
 import type { TechLevel } from './techBonusTypes';
@@ -11,12 +12,12 @@ import type { WeatherState } from './weatherBonusTypes';
 /**
  * Identifies which player owns a tactical sub-unit for rendering and rules parity.
  *
- * Contract: Restricts tactical ownership labels to the two strategic players in milestone 2.1.
+ * Contract: The same owner ids as strategic units, including Neutral.
  * When to use: On every tactical sub-unit snapshot and placement rule that branches on controller.
- * Expected outcome: Only `human` or `opponent` values appear in tactical payloads.
+ * Expected outcome: A seat id or Neutral.
  * Exceptions: None.
  */
-export type TacticalBattlePlayerId = 'human' | 'opponent';
+export type TacticalBattlePlayerId = OwnerId;
 
 /**
  * One tactical sub-unit placed on a tactical hex; ephemeral and not part of strategic unit caps.
@@ -50,7 +51,7 @@ export interface TacticalSubUnitSnapshot {
    *
    * Contract: Same meaning as strategic unit `player` but narrowed to tactical players.
    * When to use: Tinting, stacking rules, and combat eligibility in tactical view.
-   * Expected outcome: Either `human` or `opponent`.
+   * Expected outcome: A seat id or Neutral.
    * Exceptions: None.
    */
   player: TacticalBattlePlayerId;
@@ -137,6 +138,15 @@ export interface TacticalBattleSnapshot {
    * Exceptions: None.
    */
   battleId: string;
+  /**
+   * The one owner in the hex that is not the human seat.
+   *
+   * Contract: Set when the battle starts. Neutral is allowed. A battle has exactly one other owner.
+   * When to use: Tempo sweep, draft orders, and any check that used to assume the other party is the first AI seat.
+   * Expected outcome: An `OwnerId` other than the human seat. Absent only on a fixture built before the field existed.
+   * Exceptions: None.
+   */
+  opposingPartyId?: OwnerId;
   /**
    * Strategic strategic hex enclosing this tactical battle.
    *

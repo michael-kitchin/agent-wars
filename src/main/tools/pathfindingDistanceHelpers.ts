@@ -7,6 +7,7 @@ import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { terrainIsPassableForDomain } from '../pathfinding';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
@@ -311,9 +312,6 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
   return retried;
 }
 
-/** Player id of the AI commander, whose own units supply `check_distance` weather tags first. */
-const CHECK_DISTANCE_AI_PLAYER_ID = 'opponent';
-
 /**
  * Picks the unit whose weather tags `check_distance` uses for one start cell.
  *
@@ -326,9 +324,14 @@ const CHECK_DISTANCE_AI_PLAYER_ID = 'opponent';
  */
 export function checkDistanceTagSourceUnit<
   T extends { readonly player: string; readonly h3Index: string; readonly unitType: string },
->(units: readonly T[], fromH3: string, unitType: string): T | undefined {
+>(
+  units: readonly T[],
+  fromH3: string,
+  unitType: string,
+  ownPlayerId: string = AI_SEAT_IDS[0]
+): T | undefined {
   const here = units.filter((u) => u.h3Index === fromH3 && u.unitType === unitType);
-  const picked = here.find((u) => u.player === CHECK_DISTANCE_AI_PLAYER_ID) ?? here[0];
+  const picked = here.find((u) => u.player === ownPlayerId) ?? here[0];
   logTrace('pathfindingDistanceHelpers checkDistanceTagSourceUnit', {
     fromH3,
     unitType,

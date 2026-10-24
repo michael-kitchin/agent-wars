@@ -1,6 +1,6 @@
 # Modes and Transitions
 
-The desktop UI is in one primary mode at a time. A few conditions, such as waiting on the AI opponent, change a control inside a mode without replacing the mode.
+The desktop UI is in one primary mode at a time. A few conditions, such as waiting on the commanders, change a control inside a mode without replacing the mode.
 
 ## Purpose
 
@@ -10,15 +10,15 @@ Name the modes a player can be in, what starts and ends each one, and what plann
 
 ### New game
 
-The player sees the new-game overlay. The message is "Start the global game when ready." or "Start the regional game when ready." when no match is loaded, and "Start a new global game when ready." or "Start a new regional game when ready." when the player opened the overlay from the game menu during a match. The sentence follows the selected tab. A win or loss does not. The button reads "Start game". The body has three sections: Map, Forces, and Rules. Map holds the Global and Regional tabs. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Forces holds the Advanced tech line, game size, and each unit type's cap and price. Rules holds a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, a starting month, fog of war, and Auto-start AI. The console and the selection panel are not on screen. The top bar is the new-game bar: the game menu button, the title "New game", Load game…, Settings, and Help, and the game menu works with New game… disabled. The setup panel floats 12 px in from the map's top-left corner, and the map fills the window under the top bar. Drag and the wheel pan and zoom the preview, and the + and − buttons zoom it, with the choices showing or hidden, and a click, double-click, or right-click on the map itself does not select, order, or change the selection. A successful Start turns opponent planning on when Auto-start AI was checked and Run was enabled, and otherwise releases Run and opens the Opponent tab. A failed start leaves Run and the console unchanged. Hiding the choices leaves only the header bar, where Start game takes the place of the message. Ready is disabled. The map shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The minimap panel and the terrain legend are hidden. This mode ends when Start game succeeds and a match is loaded. While it was opened over a live match, Close ends it and returns to the mode the player left, with that match as it was.
+The player sees the new-game overlay. The message is "Start the global game when ready." or "Start the regional game when ready." when no match is loaded, and "Start a new global game when ready." or "Start a new regional game when ready." when the player opened the overlay from the game menu during a match. The sentence follows the selected tab. Game over does not. The button reads "Start game". The body has three sections: Map, Forces, and Rules. Map holds the Global and Regional tabs. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Forces holds the Advanced tech line, game size, and each unit type's cap and price. Rules holds a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, a starting month, fog of war, and Auto-start AI. The console and the selection panel are not on screen. The top bar is the new-game bar: the game menu button, the title "New game", Load game…, Settings, and Help, and the game menu works with New game… disabled. The setup panel floats 12 px in from the map's top-left corner, and the map fills the window under the top bar. Drag and the wheel pan and zoom the preview, and the + and − buttons zoom it, with the choices showing or hidden, and a click, double-click, or right-click on the map itself does not select, order, or change the selection. A successful Start turns opponent planning on when Auto-start AI was checked and Run was enabled, and otherwise releases Run and opens the Commanders tab. A failed start leaves Run and the console unchanged. Hiding the choices leaves only the header bar, where Start game takes the place of the message. Ready is disabled. The map shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The minimap panel and the terrain legend are hidden. This mode ends when Start game succeeds and a match is loaded. While it was opened over a live match, Close ends it and returns to the mode the player left, with that match as it was.
 
 ### Strategic planning
 
-The player sees the top bar, the strategic world map, and the console. The top bar's date block shows the date and "Turn N · Planning". The player can pan and zoom, select units, draft orders, open build and stack popups, and press Ready when it is enabled. Strategic planning is blocked while the new-game overlay, the game-over overlay, or the tactical annihilation dialog is open, and it is replaced while a tactical battle is active or the tactical battles list is open.
+The player sees the top bar, the strategic world map, and the console. The top bar's date block shows the date and "Turn N · Planning". The player can pan and zoom, select units, draft orders, open build and stack popups, and press Ready when it is enabled. Strategic planning is blocked while the new-game overlay, the game-over overlay, the knocked-out dialog, or the tactical annihilation dialog is open, and it is replaced while a tactical battle is active or the tactical battles list is open.
 
-While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. The footer status line reads "Opponent planning…" for that same wait. See [console.md](console.md). That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. Turning Run off stops the wait, and Ready can end the turn without a precomputed plan. After a failed AI planning request, Ready becomes usable again with an empty opponent plan. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
+While any commander is planning, Ready is disabled and its label becomes "AI:" plus the longest current consult's elapsed time. The footer status line reads "Commanders planning · {ready} of {active} ready" for that same wait. See [console.md](console.md). That wait is a consult the screen started, and a deferred consult after playback once the pool reports it. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. Turning Run off stops the wait, and Ready can end the turn. A failed consult leaves the seat ready, so Ready becomes usable again and that turn uses standing orders. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
 
-Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready stays disabled until that consultation finishes, including after the player turns Run off. Its label is "Ready" during playback, then "AI:" plus an elapsed time while the consultation runs and Run stays on. The footer status line stays "Opponent planning on" during that playback and reads "Opponent planning…" while the consultation runs. Turning Run off stops that consultation, returns the label to "Ready", and the footer status line reads "Opponent planning off". See [Resolution playback](#resolution-playback).
+Later event-driven turns do not start a new strategic consult at Ready. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready stays disabled while a deferred consultation is still outstanding. Its label is "Ready" during playback, then "AI:" plus an elapsed time while a commander is planning and Run stays on. Before the pool reports that planning, the label can use a local clock. The footer status line stays "Commanders ready" during playback and reads "Commanders planning · {ready} of {active} ready" while a commander is planning. Turning Run off stops that consultation, returns the label to "Ready", and the footer status line reads "Commanders off". See [Resolution playback](#resolution-playback).
 
 While a Ready request is in flight, Ready stays disabled and keeps the label "Ready". A failed Ready request shows the reason on the map toast and returns the player to strategic planning.
 
@@ -34,7 +34,7 @@ The player sees units and combat results animate on the current map, with dice c
 
 Playback does not replace the underlying match. On the world map, the top bar's date block can already show the next planning turn while the animation is still running. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends. Until the animation ends, map gestures that change orders or the selection are ignored. Pan, zoom, hex tooltips, and right-click still work, the selection panel's close control still clears the selection, and the console keeps its own rules. Details are in [resolution-playback.md](resolution-playback.md). Starting a tactical battle cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback.
 
-Ready stays disabled while a deferred opponent consultation is still outstanding after playback was scheduled. The label stays "Ready" until the animation ends, and the footer status line stays "Opponent planning on". Ready then shows "AI:" plus an elapsed time until the consultation's result arrives, and the status line reads "Opponent planning…". Log lines, including error lines, do not stop that timer.
+Ready stays disabled while a deferred opponent consultation is still outstanding after playback was scheduled. The label stays "Ready" until the animation ends, and the footer status line stays "Commanders ready". Ready then shows "AI: {m:ss} · {k} planning" while a commander is planning, and the status line reads "Commanders planning · {ready} of {active} ready". Log lines, including error lines, do not stop that timer.
 
 ### Tactical planning
 
@@ -44,7 +44,7 @@ Clicks outside the battle area show an error toast and do not issue an order. Th
 
 Tactical planning ends when the player exits, when the battle is reconciled away because the strategic turn no longer matches, or when annihilation opens.
 
-While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning, and the footer status line reads "Opponent planning…". As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning. Turning Run off, or leaving the battle, stops that wait. Entering from Fight holds that request while the strategic post-resolution consult is still running. The battle request starts when that consult's result is applied, and when the push is discarded because the turn no longer matches. Ready keeps the AI wait label until the battle plan is buffered or the player stops that planning.
+While a commander is planning inside a battle, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning, and the footer status line reads "Commanders planning · {ready} of {active} ready". Editing the tactical draft during that wait does not cancel or restart opponent planning. Turning Run off stops that wait. Leaving the battle stops the tactical consult and leaves a strategic one running. Entering from Fight holds the battle consult while the strategic post-resolution consult is still running. The battle consult starts when that consult's result is applied, and when the push is discarded because the turn no longer matches. Ready keeps the AI wait label while that consult is planning.
 
 ### Tactical annihilation
 
@@ -52,7 +52,19 @@ The player sees an overlay with "You win!", "You lose.", or "All units destroyed
 
 ### Game over
 
-The player sees the same overlay as New game. The message is "You win!" or "You lose." The button reads "New game". The console and the selection panel are not on screen, and the top bar is the same new-game bar. The map follows the same show and hide rules as New game, and Ready is disabled. The map shows the same preview as New game. The setup panel, its expand control, and the hidden minimap panel and legend match New game. The panel can still be collapsed to the header bar, where New game takes the place of the win or loss message. There is no close control. Starting a new match leaves this mode for strategic planning.
+The player sees the same overlay as New game. The message is the standings heading: "You placed {ordinal} of {n}." when a human seat played and one side won, "{Winner} wins." when the match had no human seat, and "No side won." when first place is shared. The Result section under that heading lists every seat, the result line, and the model cost, as in [new-game-dialog.md](new-game-dialog.md). The button reads "New game". The console and the selection panel are not on screen, and the top bar is the same new-game bar. The map follows the same show and hide rules as New game, and Ready is disabled. The map shows the same preview as New game. The setup panel, its expand control, and the hidden minimap panel and legend match New game. The panel can still be collapsed to the header bar, where New game takes the place of the heading. There is no close control. Starting a new match leaves this mode for strategic planning.
+
+### Knocked out
+
+When Ready knocks out the human seat and the match goes on, the player sees a dialog titled "You're out". The first sentence is "{OutBy} knocked you out on turn {N}." when a side is credited, and otherwise the reason: a side holds the home, the player holds no city hexes, or the home has no cities left. The next sentence is "You placed {ordinal} of {n}." Watch the rest closes the dialog and switches to Observe, with View as on "All sides, no fog" and auto-advance on. End game calls `game:endMatch`, which ranks the seats still active and opens Game over. The map, the top bar, the console, and the selection panel do not accept input while the dialog is open. A match that ends on the same turn shows Game over and does not open this dialog.
+
+### Observe
+
+A match with no active human seat. That is a match started as Observe only, and a match after Watch the rest. The world map and the console stay up. The top bar says "Observing" and lists every seat. View as, beside the seats, offers "All sides, no fog" and then each seat's full home name. A knocked-out seat's entry is disabled. All sides shows every hex and every unit, with no stale ghosts. Choosing a seat shows that seat's fog when fog is on. Last-known enemy markers are that seat's (`staleIntelViewer` in `src/shared/observeModeControls.ts`). Switching the view, or choosing All sides, drops the markers from the view before it. The home readout, Cities, and the turn-report lines then use that seat. The chip row stays "Observing" either way.
+
+The Orders tab is disabled. If it was selected, the console moves to Commanders. Build and Forces stay disabled. A click selects the hex only, and the selection panel shows that hex without its units. A double-click does not queue an order. Magnifiers stay hidden, and Ready does not offer a tactical battle.
+
+The footer checkbox reads "Start the next turn when every commander is ready". It starts off. Watch the rest turns it on. While it is on, Ready presses once playback has finished and no commander is planning. If Ready fails, the checkbox turns off and the reason is logged. While it is off, Ready is manual. A new match turns the checkbox off and sets View as back to All sides.
 
 ## Transitions
 
@@ -128,6 +140,7 @@ On the map, tactical play limits orders to the battle area and shows the battle 
 - Unchecking Offer tactical battles never opens the tactical battles list. Melee resolves as Ignore.
 - Strategic draft orders are not discarded merely by entering a tactical battle. They return when the battle ends, except for units that no longer exist. A successful exit then runs Ready.
 - A click outside the battle area during tactical planning never issues a strategic order.
+- Observe never selects a unit, never queues an order, and never shows a magnifier. View as changes which fog is drawn. It does not change the match.
 
 ## Open Questions
 
@@ -136,7 +149,7 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#game-over-overlay`, `#tactical-annihilation-overlay`, `#tactical-exit-btn`, `#ready-btn`)
-- `src/renderer/map/initCore.ts` (`wireInitCore`, which opens the loaded match and, when that match has hexes and is not over, the Opponent tab)
+- `src/renderer/map/initCore.ts` (`wireInitCore`, which opens the loaded match and, when that match has hexes and is not over, the Commanders tab)
 - `src/shared/consoleTabState.ts` (`consoleTabIdForLiveMatchLaunch`)
 - `src/renderer/core/uiState.ts`
 - `src/renderer/gameplay/newGame.ts`
@@ -151,6 +164,15 @@ None.
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/rendering/resolutionPlayback.ts`
 - `src/renderer/tactical/tacticalAnnihilationDialog.ts`
+- `src/renderer/gameplay/knockoutDialog.ts`
+- `src/renderer/gameplay/observeIntent.ts`
+- `src/shared/observeModeControls.ts` (`observeModeControls`, `resolveMatchView`)
+- `src/renderer/gameplay/observeChrome.ts` (`syncObserveChrome`, `maybeObserveAutoAdvance`)
+- `src/main/ipc/matchViewSnapshot.ts` (`readMatchSnapshot`)
+- `static/index.html` (`#topbar-view-as`, `#observe-auto-advance`)
+- `src/shared/knockoutDialogCopy.ts` (`formatHumanKnockoutDialog`)
+- `src/main/ipc/endMatchIpcHandler.ts` (`game:endMatch`)
+- `static/index.html` (`#knockout-dialog`)
 - `src/renderer/tactical/tacticalEntryFlow.ts`
 - `src/renderer/tactical/tacticalExitFlow.ts`
 - `src/renderer/tactical/tacticalIpcHandlers.ts`

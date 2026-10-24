@@ -6,7 +6,7 @@ import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logInfo, logTrace } from '../logger';
-import { ENEMY_PLAYER, FRIENDLY_PLAYER } from './possibleUnitActionsTableAssembly';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 
 /**
  * Infrastructure counts on one world hex.
@@ -76,6 +76,15 @@ export interface PossibleActionsIndexedState {
    */
   readonly controlByHex: Map<string, string | null>;
   /**
+   * Seat treated as friendly for this index.
+   *
+   * Contract: Matches `briefingOwnSeatId` for the snapshot that built the index.
+   * When to use: Enemy-control checks that must not treat another seat's land as friendly.
+   * Expected outcome: That seat's id.
+   * Exceptions: None.
+   */
+  readonly ownSeatId: string;
+  /**
    * The human's units, which the AI sees as enemies, keyed by hex.
    *
    * Contract: Only units the snapshot lists, so fog has already been applied.
@@ -110,8 +119,8 @@ export interface PossibleActionsIndexedState {
  * Purpose: Allows callers to build once per AI request and pass into `collectAggregatedPossibleActionRows`.
  * When to use: From `requestOrdersFlow` before briefing/operational-map assembly, and inside
  *   `collectAggregatedPossibleActionRows` when no prebuilt state is passed.
- * Expected outcome: One pass over infrastructure, control, units, and hexes. Units of players other than the human
- *   and the AI are ignored.
+ * Expected outcome: One pass over infrastructure, control, units, and hexes. The briefing seat's units are friendly;
+ *   every other owner, including Neutral, is an enemy.
  * Exceptions: None.
  */
 export function buildPossibleActionsIndexedState(state: GameStateSnapshot): PossibleActionsIndexedState {
@@ -127,25 +136,25 @@ export function buildPossibleActionsIndexedState(state: GameStateSnapshot): Poss
   for (const row of state.strategicControl ?? []) {
     controlByHex.set(row.h3Index, row.controllerPlayerId ?? null);
   }
+  const ownSeatId = briefingOwnSeatId(state);
   const enemyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
   const friendlyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
   for (const unit of state.units) {
-    let bucket: Map<string, Array<{ id: string; unitType: string }>> | null = null;
-    if (unit.player === ENEMY_PLAYER) bucket = enemyUnitsByHex;
-    else if (unit.player === FRIENDLY_PLAYER) bucket = friendlyUnitsByHex;
-    if (!bucket) continue;
+    const bucket = unit.player === ownSeatId ? friendlyUnitsByHex : enemyUnitsByHex;
     const list = bucket.get(unit.h3Index) ?? [];
     list.push({ id: unit.id, unitType: unit.unitType });
     bucket.set(unit.h3Index, list);
   }
   logDebug('possibleUnitActions buildPossibleActionsIndexedState', {
     turnNumber: state.turnNumber,
+    ownSeatId,
     enemyOccupiedHexCount: enemyUnitsByHex.size,
     friendlyOccupiedHexCount: friendlyUnitsByHex.size,
   });
   return {
     infraByHex,
     controlByHex,
+    ownSeatId,
     enemyUnitsByHex,
     friendlyUnitsByHex,
     hexSet: new Set(state.hexes.map((h) => h.h3Index)),

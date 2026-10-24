@@ -2,6 +2,7 @@
  * Builds a minimal GameStateSnapshot for OpenRouter order validation and plan_route during an active tactical battle.
  */
 
+import { briefingSeatForBattle } from '../briefing/briefingPerspective';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -65,6 +66,6 @@ export function buildTacticalAiPlanState(
     hexes: tacticalHexes,
     units: tacticalUnits,
     fogOfWarEnabled: false,
-    playerPerspective: 'opponent',
+    playerPerspective: briefingSeatForBattle(tactical),
   };
 }

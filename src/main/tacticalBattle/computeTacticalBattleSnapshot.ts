@@ -35,6 +35,7 @@ import { hashStringToUint32 } from '../../shared/stableHash';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { loadedStrategicTerrainKindByH3 } from '../gameDb/mapHexRead';
 import { isStrategicCell } from '../../shared/h3Resolutions';
+import { HUMAN_SEAT_ID, isOwnerId } from '../../shared/seatIds';
 import { tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
 
 /**
@@ -142,11 +143,11 @@ export function tacticalSnapshotHasPlacedUnitsForBothSides(
 ): boolean {
   tacticalLogQuery('tacticalSnapshotHasPlacedUnitsForBothSides', { count: subUnits.length });
   let human = false;
-  let opponent = false;
+  let other = false;
   for (const u of subUnits) {
-    if (u.player === 'human') human = true;
-    else if (u.player === 'opponent') opponent = true;
-    if (human && opponent) return true;
+    if (u.player === HUMAN_SEAT_ID) human = true;
+    else other = true;
+    if (human && other) return true;
   }
   return false;
 }
@@ -403,11 +404,16 @@ export function computeTacticalBattleSnapshot(
       ? displayWeatherForHex(enclosingStrategicH3Index, turnRow.turn_number, parseStartMonth(weatherSettings.startMonth))
       : undefined;
     const inHex = allUnits.filter((u) => u.h3Index === enclosingStrategicH3Index);
-    const hasHuman = inHex.some((u) => u.player === 'human');
-    const hasOpponent = inHex.some((u) => u.player === 'opponent');
-    if (!hasHuman || !hasOpponent) {
-      return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Hex is not contested by both sides.' };
+    const owners = [...new Set(inHex.map((unit) => unit.player))];
+    const otherOwners = owners.filter((owner) => owner !== HUMAN_SEAT_ID);
+    if (!owners.includes(HUMAN_SEAT_ID) || otherOwners.length !== 1) {
+      return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Hex is not contested by exactly two sides.' };
     }
+    const opposingOwner = otherOwners[0];
+    if (!opposingOwner || !isOwnerId(opposingOwner)) {
+      return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Hex is not contested by exactly two sides.' };
+    }
+    const opposingPartyId = opposingOwner;
     const parentLookup = buildUnitDisplayNameLookup(allUnits);
     const tacticalRows = getTacticalTerrainOverridesForRendererFromGame();
     const tacticalUrbanByH3 = new Map<string, boolean>();
@@ -494,7 +500,7 @@ export function computeTacticalBattleSnapshot(
       const parentName = parentLookup.get(parent.id) ?? parent.id;
       let placed = 0;
       let cellCursor = 0;
-      const placingSide: InitialPlacementSide = parent.player === 'human' ? 'human' : 'opponent';
+      const placingSide: InitialPlacementSide = parent.player === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : opposingPartyId;
       while (placed < n) {
         const next = takeNextOpeningCell({
           orderedCells: orderedForParent,
@@ -557,6 +563,7 @@ export function computeTacticalBattleSnapshot(
     const tacticalCountryNameByH3 = tacticalCountryNamesForCells(children);
     const snapshot: TacticalBattleSnapshot = {
       battleId,
+      opposingPartyId,
       enclosingStrategicH3Index,
       tacticalChildH3Indexes: [...children],
       coreChildH3Indexes: coreChildren,

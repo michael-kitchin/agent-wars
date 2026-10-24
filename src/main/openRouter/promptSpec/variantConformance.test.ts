@@ -31,7 +31,7 @@ import {
   SECTION_TITLE_STANDING_ORDER_STATUS,
   SECTION_TITLE_STRATEGIC_MEMORY,
 } from './sectionHeadings';
-import { buildHumanUnitsPromptLine } from '../promptText';
+import { buildEnemyUnitsPromptLine } from '../promptText';
 import {
   GENERIC_OBJECTIVE_SENTENCE,
   buildRegionVsRegionScenarioObjectiveBlock,
@@ -242,7 +242,7 @@ test('roster: no naval omits the section and sealift actions', () => {
 });
 
 test('roster: no observed enemy uses the empty-roster phrasing and scouting coaching', () => {
-  const line = buildHumanUnitsPromptLine('');
+  const line = buildEnemyUnitsPromptLine([]);
   assert.match(line, /currently observed\): none/i);
   assert.match(line, /out of view/i);
   const coaching = buildCoachingBullets(strategicCoaching({ hasObservedEnemy: false })).join('\n');
@@ -264,8 +264,6 @@ test('scenarios: region-versus-region keeps the objective section; absent and un
   const recognised: GameStateSnapshot = {
     ...rosterState([{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '810ebffffffffff' }]),
     scenarioId: 'region_vs_region',
-    aiHomeRegion: 'Eastern Europe',
-    humanHomeRegion: 'Northern America',
   };
   const objective = buildRegionVsRegionScenarioObjectiveBlock(recognised);
   assert.ok(objective.includes(SECTION_TITLE_SCENARIO_OBJECTIVE));
@@ -276,7 +274,7 @@ test('scenarios: region-versus-region keeps the objective section; absent and un
   assert.equal(buildWinConditionReminderClause({}), GENERIC_OBJECTIVE_SENTENCE);
   assert.equal(buildWinConditionReminderClause({ scenarioId: 'unknown_pack' }), GENERIC_OBJECTIVE_SENTENCE);
   const coaching = buildCoachingBullets(strategicCoaching({ includeScenarioWinPaths: false })).join('\n');
-  assert.doesNotMatch(coaching, /all enemy home region hexes/i);
+  assert.doesNotMatch(coaching, /last side standing/i);
 });
 
 test('game size: printed caps come from getMaxUnitsPerType and unrecognised size is smallest', () => {

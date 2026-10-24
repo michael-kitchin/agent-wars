@@ -5,6 +5,7 @@
  * The panel replaces the Orders tab's "Selected unit" line. The bar's first line keeps the id `sidebar-selected-unit`.
  */
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import { observeModeControls } from '../../shared/observeModeControls';
 import { formatHexNamingCaptionHtml } from '../../shared/hexNamingCaption';
 import { orderTargetHexCode } from '../../shared/orderTargetHexCode';
 import { selectionElsewhereText } from '../../shared/selectionBarText';
@@ -16,6 +17,7 @@ import {
   type SelectionPanelSummary,
 } from '../../shared/selectionPanelSummary';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { formatHomeChip, homeSeatIdsAtHex, viewerSeatIdForRoster } from '../../shared/sideLabels';
 import { techLevelFromUrbanHexCount } from '../../shared/techBonusRules';
 import { isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
@@ -130,17 +132,21 @@ function worldChipInput(hex: string): SelectionPanelChipInput {
   const row = state?.hexes.find((h) => h.h3Index === hex);
   const baselineUrban = baselineUrbanHexCountForStrategicHex(hex);
   const urban = state?.strategicInfrastructure?.find((r) => r.h3Index === hex)?.urbanHexCount ?? 0;
-  const homeSide = state?.humanHomeRegionHexes?.includes(hex)
-    ? 'human'
-    : state?.aiHomeRegionHexes?.includes(hex)
-      ? 'opponent'
-      : null;
+  const seats = state?.seats ?? [];
+  const controller = state?.strategicControl?.find((row) => row.h3Index === hex)?.controllerPlayerId ?? null;
   return {
     terrainKind: row?.terrainKind ?? null,
     weather: row?.weather ?? null,
     techLevel: state?.techBonusEnabled === true && baselineUrban > 0 ? techLevelFromUrbanHexCount(baselineUrban) : null,
     productionPerTurn: isNeutralBorderHex(hex) ? null : Math.max(0, Math.trunc(urban)),
-    homeSide,
+    homeChip: state
+      ? formatHomeChip({
+          homeSeatIds: homeSeatIdsAtHex(hex, state),
+          controllerId: controller,
+          viewerSeatId: viewerSeatIdForRoster(seats),
+          seats,
+        })
+      : null,
   };
 }
 
@@ -159,7 +165,7 @@ function battleChipInput(cell: string, battle: TacticalBattleSnapshot): Selectio
     weather: battle.weatherBonusEnabled === true ? battle.weather ?? null : null,
     techLevel: null,
     productionPerTurn: null,
-    homeSide: null,
+    homeChip: null,
   };
 }
 
@@ -256,9 +262,42 @@ function createUnitRow(row: SelectionPanelRow, battle: TacticalBattleSnapshot | 
  *   bar's hint and border follow targeting and playback. During a battle the panel describes battle cells.
  * Exceptions: None; missing elements are skipped.
  */
+/**
+ * Shows the clicked hex without its units.
+ *
+ * Purpose: A watch can inspect a hex and cannot select a unit.
+ * When to use: `renderSelectionPanel` while `hexOnlySelection` is set.
+ * Expected outcome: The bar names the hex code. The caption and chips describe the hex. The unit list is empty.
+ *   No hex hides the panel.
+ * Exceptions: None. Missing elements are skipped.
+ */
+function renderObservedHexPanel(panel: HTMLElement): void {
+  const hex = S.selectedHexIndex;
+  panel.hidden = hex == null;
+  if (!hex) {
+    settleSelectionPanelSlide();
+    return;
+  }
+  const line = document.getElementById('sidebar-selected-unit');
+  if (line) {
+    const code = document.createElement('strong');
+    code.textContent = `(${orderTargetHexCode(hex, null) ?? '?'})`;
+    line.replaceChildren(code);
+  }
+  renderSelectionPanelCaption(hex, null);
+  renderSelectionPanelChips(hex, null);
+  document.getElementById('selection-panel-units')?.replaceChildren();
+  const hint = document.getElementById('selection-panel-hint');
+  if (hint) hint.textContent = '';
+}
+
 export function renderSelectionPanel(deps: SelectionPanelDeps): void {
   const panel = document.getElementById('selection-panel');
   if (!panel) return;
+  if (observeModeControls(S.gameState?.seats ?? []).hexOnlySelection) {
+    renderObservedHexPanel(panel);
+    return;
+  }
   const battle = S.tacticalBattleSnapshot;
   const units = battle ? battle.subUnits : S.gameState?.units ?? [];
   const summary = summarizeSelectionPanel(S.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));

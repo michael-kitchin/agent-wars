@@ -253,11 +253,12 @@ async function selectHumanStack(page) {
  *
  * Purpose: A march into an empty home hex next door is always a legal short order in the scenario.
  * When to use: Choosing where to send a selected land unit.
- * Expected outcome: Neighbor indexes that hold no unit, are in the human home region, and are not water.
+ * Expected outcome: Neighbor indexes that hold no unit, are in the human seat's home, and are not water.
  * Exceptions: None.
  */
 function marchDestinations(state, fromHex) {
-  const home = new Set(state.humanHomeRegionHexes || []);
+  const humanId = (state.seats || []).find((seat) => seat.kind === 'human' && seat.outTurn == null)?.seatId;
+  const home = new Set(humanId ? (state.homeRegionHexesBySeat || {})[humanId] || [] : []);
   const occupied = new Set(state.units.map((u) => u.h3Index));
   const kindByHex = new Map(state.hexes.map((hex) => [hex.h3Index, hex.terrainKind]));
   return h3.gridDisk(fromHex, 1).filter((hex) => hex !== fromHex && home.has(hex) && !occupied.has(hex) && kindByHex.get(hex) !== 'water');

@@ -1,35 +1,32 @@
 import { logDebug, logError, logTrace } from '../logger';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import type { GuardedDbOps } from './dbOps';
 
 /**
- * Documents the module-scope binding `AI_TOOL_LIMIT_EXCEEDED_KEY` (AI_TOOL_LIMIT_EXCEEDED_KEY).
-
- * Purpose: Supports maintainability by documenting why `AI_TOOL_LIMIT_EXCEEDED_KEY` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Config key for one seat's tool-limit flag.
+ *
+ * Purpose: Each commander has its own flag so one seat's overflow does not mark the others.
+ * When to use: Reading or writing `ai_tool_limit_exceeded_last_turn_<seatId>`.
+ * Expected outcome: A `game_config` key that includes the seat id.
  * Exceptions: None.
  */
-const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
+function toolLimitKey(seatId: AiSeatId): string {
+  return `ai_tool_limit_exceeded_last_turn_${seatId}`;
+}
+
 /**
- * Documents the module-scope binding `AI_LAST_CONSULTATION_TURN_KEY` (AI_LAST_CONSULTATION_TURN_KEY).
-
- * Purpose: Supports maintainability by documenting why `AI_LAST_CONSULTATION_TURN_KEY` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Config key for one seat's last consultation turn.
+ *
+ * Purpose: Each commander records the turn it last planned, separately from the others.
+ * When to use: Reading or writing `ai_last_consultation_turn_<seatId>`.
+ * Expected outcome: A `game_config` key that includes the seat id.
  * Exceptions: None.
  */
-const AI_LAST_CONSULTATION_TURN_KEY = 'ai_last_consultation_turn';
-/**
- * Documents the module-scope binding `OPPONENT_ID` (OPPONENT_ID).
-
- * Purpose: Supports maintainability by documenting why `OPPONENT_ID` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const OPPONENT_ID = 'opponent';
+function lastConsultationKey(seatId: AiSeatId): string {
+  return `ai_last_consultation_turn_${seatId}`;
+}
 
 /**
  * Documents the `AiLossEventSinceConsultation` interface as a named contract surface (export interface AiLossEventSinceConsultation).
@@ -191,9 +188,10 @@ function encodeAiPendingOrdersExtra(payload: AiPendingOrdersExtraPayload): strin
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiToolLimitExceededLastTurn(ops: AiStateDbOps): void {
+export function setAiToolLimitExceededLastTurn(ops: AiStateDbOps, seatId: AiSeatId): void {
+  logDebug('gameDb setAiToolLimitExceededLastTurn', { seatId });
   if (!ops.hasDb()) return;
-  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES (?, '1')", [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES (?, '1')", [toolLimitKey(seatId)]);
 }
 
 /**
@@ -204,10 +202,12 @@ export function setAiToolLimitExceededLastTurn(ops: AiStateDbOps): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps): boolean {
+export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps, seatId: AiSeatId): boolean {
+  logDebug('gameDb getAndClearAiToolLimitExceededLastTurn', { seatId });
   if (!ops.hasDb()) return false;
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
-  ops.run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  const key = toolLimitKey(seatId);
+  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
+  ops.run('DELETE FROM game_config WHERE key = ?', [key]);
   return row?.value === '1';
 }
 
@@ -219,10 +219,10 @@ export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps): boole
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiLastConsultationTurn(ops: AiStateDbOps): number {
-  logTrace('gameDb getAiLastConsultationTurn');
+export function getAiLastConsultationTurn(ops: AiStateDbOps, seatId: AiSeatId): number {
+  logTrace('gameDb getAiLastConsultationTurn', { seatId });
   if (!ops.hasDb()) return 0;
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_LAST_CONSULTATION_TURN_KEY]);
+  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [lastConsultationKey(seatId)]);
   if (!row) return 0;
   const n = parseInt(row.value, 10);
   return Number.isNaN(n) ? 0 : n;
@@ -236,15 +236,15 @@ export function getAiLastConsultationTurn(ops: AiStateDbOps): number {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiLastConsultationTurn(ops: AiStateDbOps, turn: number): void {
+export function setAiLastConsultationTurn(ops: AiStateDbOps, seatId: AiSeatId, turn: number): void {
   if (!ops.hasDb()) return;
-  const existing = getAiLastConsultationTurn(ops);
+  const existing = getAiLastConsultationTurn(ops, seatId);
   if (existing === turn) {
-    logTrace('gameDb setAiLastConsultationTurn: unchanged', { turn });
+    logTrace('gameDb setAiLastConsultationTurn: unchanged', { seatId, turn });
     return;
   }
-  logDebug('gameDb setAiLastConsultationTurn', { turn });
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [AI_LAST_CONSULTATION_TURN_KEY, String(turn)]);
+  logDebug('gameDb setAiLastConsultationTurn', { seatId, turn });
+  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [lastConsultationKey(seatId), String(turn)]);
 }
 
 /**
@@ -255,12 +255,12 @@ export function setAiLastConsultationTurn(ops: AiStateDbOps, turn: number): void
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getOpponentUnitsInCombatSinceConsultation(ops: AiStateDbOps): string[] {
-  logTrace('gameDb getOpponentUnitsInCombatSinceConsultation');
+export function getCombatSinceConsultation(ops: AiStateDbOps, seatId: AiSeatId): string[] {
+  logTrace('gameDb getCombatSinceConsultation', { seatId });
   if (!ops.hasDb()) return [];
   const rows = ops.getAll<{ unit_id: string }>(
     'SELECT unit_id FROM ai_combat_since_consultation WHERE player_id = ?',
-    [OPPONENT_ID]
+    [seatId]
   );
   return rows.map((r) => r.unit_id);
 }
@@ -273,11 +273,11 @@ export function getOpponentUnitsInCombatSinceConsultation(ops: AiStateDbOps): st
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function addOpponentCombatParticipants(ops: AiStateDbOps, unitIds: string[]): void {
-  logDebug('gameDb addOpponentCombatParticipants', { count: unitIds.length });
+export function addCombatSinceConsultation(ops: AiStateDbOps, seatId: AiSeatId, unitIds: string[]): void {
+  logDebug('gameDb addCombatSinceConsultation', { seatId, count: unitIds.length });
   if (!ops.hasDb() || unitIds.length === 0) return;
   for (const id of unitIds) {
-    ops.run('INSERT OR IGNORE INTO ai_combat_since_consultation (player_id, unit_id) VALUES (?, ?)', [OPPONENT_ID, id]);
+    ops.run('INSERT OR IGNORE INTO ai_combat_since_consultation (player_id, unit_id) VALUES (?, ?)', [seatId, id]);
   }
 }
 
@@ -289,14 +289,14 @@ export function addOpponentCombatParticipants(ops: AiStateDbOps, unitIds: string
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearOpponentCombatSinceConsultation(ops: AiStateDbOps): void {
-  logDebug('gameDb clearOpponentCombatSinceConsultation');
+export function clearCombatSinceConsultation(ops: AiStateDbOps, seatId: AiSeatId): void {
+  logDebug('gameDb clearCombatSinceConsultation', { seatId });
   if (!ops.hasDb()) return;
-  ops.run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [OPPONENT_ID]);
+  ops.run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [seatId]);
 }
 
 /**
- * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( ops: AiStateDbOps, playerId: string, turnNumber: number, removedUnits: { id: string; player: strin).
+ * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( ops: AiStateDbOps, playerId: AiSeatId, turnNumber: number, removedUnits: { id: string; player: strin).
 
  * Purpose: Supports maintainability by documenting why `addAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -305,7 +305,7 @@ export function clearOpponentCombatSinceConsultation(ops: AiStateDbOps): void {
  */
 export function addAiLossEventsSinceConsultation(
   ops: AiStateDbOps,
-  playerId: string,
+  playerId: AiSeatId,
   turnNumber: number,
   removedUnits: { id: string; player: string }[],
   kills: KillEdge[],
@@ -353,14 +353,14 @@ export function addAiLossEventsSinceConsultation(
 }
 
 /**
- * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): AiLossEventSinceConsultation[]).
+ * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: AiSeatId): AiLossEventSinceConsultation[]).
 
  * Purpose: Supports maintainability by documenting why `getAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): AiLossEventSinceConsultation[] {
+export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: AiSeatId): AiLossEventSinceConsultation[] {
   logTrace('gameDb getAiLossEventsSinceConsultation', { playerId });
   if (!ops.hasDb()) return [];
   const rows = ops.getAll<{
@@ -395,21 +395,21 @@ export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: st
 }
 
 /**
- * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): void).
+ * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: AiSeatId): void).
 
  * Purpose: Supports maintainability by documenting why `clearAiLossEventsSinceConsultation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): void {
+export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: AiSeatId): void {
   logDebug('gameDb clearAiLossEventsSinceConsultation', { playerId });
   if (!ops.hasDb()) return;
   ops.run('DELETE FROM ai_loss_events_since_consultation WHERE player_id = ?', [playerId]);
 }
 
 /**
- * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders( ops: AiStateDbOps, playerId: string ): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[];).
+ * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders( ops: AiStateDbOps, playerId: AiSeatId ): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[];).
 
  * Purpose: Supports maintainability by documenting why `getAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -418,7 +418,7 @@ export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: 
  */
 export function getAiPendingOrders(
   ops: AiStateDbOps,
-  playerId: string
+  playerId: AiSeatId
 ): {
   movementOrders: MovementOrder[];
   rangedOrders: RangedAttackOrder[];
@@ -445,7 +445,7 @@ export function getAiPendingOrders(
 }
 
 /**
- * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( ops: AiStateDbOps, playerId: string, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airS).
+ * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( ops: AiStateDbOps, playerId: AiSeatId, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airS).
 
  * Purpose: Supports maintainability by documenting why `setAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -454,7 +454,7 @@ export function getAiPendingOrders(
  */
 export function setAiPendingOrders(
   ops: AiStateDbOps,
-  playerId: string,
+  playerId: AiSeatId,
   movementOrders: MovementOrder[],
   rangedOrders: RangedAttackOrder[],
   airStrikeOrders: AirStrikeOrder[] = [],
@@ -478,14 +478,14 @@ export function setAiPendingOrders(
 }
 
 /**
- * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(ops: AiStateDbOps, playerId: string): void).
+ * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId): void).
 
  * Purpose: Supports maintainability by documenting why `clearAiPendingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function clearAiPendingOrders(ops: AiStateDbOps, playerId: string): void {
+export function clearAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId): void {
   logDebug('gameDb clearAiPendingOrders', { playerId });
   if (!ops.hasDb()) return;
   ops.run('DELETE FROM ai_pending_orders WHERE player_id = ?', [playerId]);

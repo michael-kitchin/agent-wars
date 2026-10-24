@@ -8,6 +8,7 @@ import {
   collectTacticalLegalRangedTargetHexes,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { logDebug, logTrace } from '../logger';
 
@@ -169,11 +170,12 @@ export function collectTacticalTempoAttacks(args: TacticalTempoAttackArgs): {
 export function withTacticalTempoAttacks(
   preBattle: TacticalBattleSnapshot,
   draft: TacticalOpponentPlanPayload | undefined,
-  holdFireParentUnitIds: ReadonlySet<string>
+  holdFireParentUnitIds: ReadonlySet<string>,
+  playerId: string = AI_SEAT_IDS[0]
 ): TacticalOpponentPlanPayload | undefined {
   const sweep = collectTacticalTempoAttacks({
     battle: preBattle,
-    playerId: 'opponent',
+    playerId,
     alreadyAttackingSubUnitIds: new Set([
       ...(draft?.rangedAttacks ?? []).map((r) => r.unitId),
       ...(draft?.airStrikes ?? []).map((s) => s.unitId),

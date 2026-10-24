@@ -25,7 +25,7 @@ Dice chips show every die rolled in air combat, ranged combat, and melee combat.
 
 - Each chip hangs just below the stack it belongs to, and is pulled back inside the map near the edges. Ranged and return-fire rolls sit under the stack that fired. Air strike, anti-air, and infrastructure counter-fire rolls sit under the struck hex. Melee attack and defense rolls sit under the contested hex.
 - Each row shows a tag, then who rolled, then the faces, then the hit number. The tag is ATK for attacks, DEF for melee defense, RET for return fire, and AA for anti-air and infrastructure counter-fire. Who rolled is a small token in the player's color with the unit glyph, or City, Airport, or Port for infrastructure. A face at or below the hit number is a hit and is drawn in green; a miss is drawn in gray-blue. The hit number is shown as `≤N`.
-- Attack rows come first, then return fire, melee defense, and anti-air. Within a kind, the player's rows come before the AI's, then infantry, armor, naval, and air. Where chips overlap, the lower chip on screen is drawn on top.
+- Attack rows come first, then return fire, melee defense, and anti-air. Within a kind, rows follow seat order: the human seat, then each AI seat, then Neutral. Unknown owners sort last. Within a side, infantry, then armor, naval, and air. Where chips overlap, the lower chip on screen is drawn on top.
 - Rolls of the same kind, player, unit type, and hit number share a row. A row with more than three rolls shows a tally such as `2/5 ≤3` (hits, then rolls) instead of each face.
 - A chip shows at most four lines. When it has more rows, it shows three of them and a final `+N more` line.
 
@@ -49,6 +49,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 - When playback was scheduled together with a deferred opponent consultation, Ready stays disabled until that consultation is released, including after the animation ends. The label stays "Ready" during the animation. When the animation ends and the consultation starts, the label switches to the AI wait label. Turning Run off stops the consultation, stores no orders from that call, and the label returns to "Ready". Otherwise the label returns to "Ready" when the consultation's result arrives, unless a battle is already in planning. In that case the battle's opponent-plan request starts at the same moment, and the AI wait label continues until that plan is buffered. A discarded push whose turn no longer matches starts that battle request as well. A consultation that ends with standing orders and no model call shows the strategic wait only briefly. Log lines, including error lines, never stop that timer. A finished strategic consultation is the opponent plan for the next turn. It does not start another strategic planning request.
 - When there is nothing to animate, a waiting consultation is released immediately.
+- While Observe's checkbox "Start the next turn when every commander is ready" is on, Ready presses once the animation has finished and no commander is planning. A Ready failure turns the checkbox off and logs the reason. The checkbox starts off. Watch the rest turns it on. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## States
 
@@ -105,6 +106,7 @@ None.
 - `src/shared/combatDiceChips.ts`
 - `src/main/combatDiceRecording.ts`
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
+- `src/renderer/gameplay/observeChrome.ts` (`maybeObserveAutoAdvance`)
 - `src/renderer/gameplay/readyHandler.ts`
 - `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/readyResolutionAnnouncements.ts`

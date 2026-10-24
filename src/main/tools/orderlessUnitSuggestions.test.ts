@@ -79,7 +79,7 @@ function testBlindUnitOutsideHomeMarchesToNearestHomeHex(): void {
       chain,
       units: [{ id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! }],
     }),
-    humanHomeRegionHexes: [chain[4]!, chain[2]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
   };
 
   const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
@@ -108,7 +108,7 @@ function testBlindUnitInsideHomeMarchesToNearestUnexploredHomeHex(): void {
       chain,
       units: [{ id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! }],
     }),
-    humanHomeRegionHexes: [chain[0]!, chain[1]!, chain[4]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[0]!, chain[1]!, chain[4]!] },
     exploredHexes: [chain[0]!, chain[1]!],
   };
 
@@ -137,7 +137,7 @@ function testBlindUnitInsideHomeIsOmittedWhenEveryOtherHomeHexIsExplored(): void
       chain,
       units: [{ id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! }],
     }),
-    humanHomeRegionHexes: [chain[0]!, chain[1]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[0]!, chain[1]!] },
     exploredHexes: [chain[0]!, chain[1]!],
   };
 
@@ -166,12 +166,12 @@ function testBlindUnitIsOmittedWhenHomeListIsMissingOrEmpty(): void {
   const missing = suggestApproachDestinationsForOrderlessUnits('opponent', base, ['opponent-inf-idle']);
   const empty = suggestApproachDestinationsForOrderlessUnits(
     'opponent',
-    { ...base, humanHomeRegionHexes: [] },
+    { ...base, seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [] } },
     ['opponent-inf-idle']
   );
   const offSnapshot = suggestApproachDestinationsForOrderlessUnits(
     'opponent',
-    { ...base, humanHomeRegionHexes: ['not-a-snapshot-hex'] },
+    { ...base, seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: ['not-a-snapshot-hex'] } },
     ['opponent-inf-idle']
   );
 
@@ -323,7 +323,7 @@ function testUnitAlreadyOnTheEnemyIsOmitted(): void {
         { id: 'human-inf-here', player: 'human', unitType: 'infantry', h3Index: chain[0]! },
       ],
     }),
-    humanHomeRegionHexes: [chain[4]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!] },
   };
 
   const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
@@ -356,7 +356,7 @@ function testObservedEnemyBeatsTheHomeRegionGoal(): void {
         { id: 'human-inf-adj', player: 'human', unitType: 'infantry', h3Index: chain[1]! },
       ],
     }),
-    humanHomeRegionHexes: [chain[4]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!] },
   };
 
   const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
@@ -389,18 +389,18 @@ function testNavalBlindMarchUsesWaterOrCoastalHomeHexesOnly(): void {
     hexes: base.hexes.map((hex) =>
       hex.h3Index === chain[2] ? { ...hex, terrain: 'water' } : hex
     ),
-    humanHomeRegionHexes: [chain[4]!, chain[2]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
   };
   const inlandOnly = {
     ...base,
-    humanHomeRegionHexes: [chain[4]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!] },
   };
   const foggedWater = {
     ...base,
     hexes: base.hexes.map((hex) =>
       hex.h3Index === chain[2] ? { ...hex, terrain: 'unknown', terrainKind: 'unknown' } : hex
     ),
-    humanHomeRegionHexes: [chain[2]!],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[2]!] },
   };
 
   const waterSuggestion = suggestApproachDestinationsForOrderlessUnits('opponent', withWater, [
@@ -498,11 +498,11 @@ function testBlindLandMarchRequiresASharedLandmass(): void {
   const units = [{ id: 'opponent-inf-idle', player: 'opponent' as const, unitType: 'infantry', h3Index: split.origin }];
   const both = {
     ...buildLandChainState({ chain: [split.origin, split.shared, split.foreign], units }),
-    humanHomeRegionHexes: [split.foreign, split.shared],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [split.foreign, split.shared] },
   };
   const foreignOnly = {
     ...buildLandChainState({ chain: [split.origin, split.foreign], units }),
-    humanHomeRegionHexes: [split.foreign],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [split.foreign] },
   };
 
   const chosen = suggestApproachDestinationsForOrderlessUnits('opponent', both, ['opponent-inf-idle']);
@@ -576,11 +576,11 @@ function testBlindLandMarchSkipsAHomeHexTheRouteCannotEnter(): void {
   const units = [{ id: 'opponent-inf-idle', player: 'opponent' as const, unitType: 'infantry', h3Index: fixture.origin }];
   const both = {
     ...buildLandChainState({ chain: [fixture.origin, fixture.wet, fixture.dry], units }),
-    humanHomeRegionHexes: [fixture.wet, fixture.dry],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [fixture.wet, fixture.dry] },
   };
   const wetOnly = {
     ...buildLandChainState({ chain: [fixture.origin, fixture.wet], units }),
-    humanHomeRegionHexes: [fixture.wet],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [fixture.wet] },
   };
 
   const chosen = suggestApproachDestinationsForOrderlessUnits('opponent', both, ['opponent-inf-idle']);

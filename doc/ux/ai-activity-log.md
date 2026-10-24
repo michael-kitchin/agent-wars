@@ -1,6 +1,6 @@
 # AI Activity Log
 
-The log of AI interactions and errors on the console's Opponent tab.
+The log of AI interactions and errors on the console's Commanders tab.
 
 ## Purpose
 
@@ -8,11 +8,12 @@ Give the player a running record of opponent consultations, model-list failures,
 
 ## Availability
 
-Shown at the bottom of the console's Opponent tab, under an "Activity log" heading below the [Tool groups](opponent-tab-tool-groups.md) section, filling the height that is left, in every mode where the console is visible and expanded. While the tactical battles list is open, the log stays visible while the console is expanded and does not receive pointer input. The log itself has no mode of its own. The log is absent in New game and Game over because the console is absent.
+Shown at the bottom of the console's Commanders tab, under an "Activity log" heading below the [Tool groups](opponent-tab-tool-groups.md) section, filling the height that is left, in every mode where the console is visible and expanded. While the tactical battles list is open, the log stays visible while the console is expanded and does not receive pointer input. The log itself has no mode of its own. The log is absent in New game and Game over because the console is absent.
 
 ## Information Displayed
 
-- One line per event, prefixed with the local time.
+- A filter, "All commanders" or one AI seat by its full name. It shows that seat's lines. Lines with no seat stay hidden while a seat is selected.
+- One line per event, prefixed with the local time. A consult line also starts with the turn tag and the seat's short name, such as "T7 E. Turkey".
 - Error lines use the light-red chrome error text from the [UI style guide](../ui-style-guide.md). Ordinary lines use the chrome text.
 - Lines include consultation results, ignored stale consultations, model-list failures, failures to load or save the reasoning effort, standing-order notices, and a one-line copy of a turn-update toast. That copy is plain text and has no origin flags.
 - An ordinary line, not an error line, appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, on their first request that carries the schema (normally the first request after the model's first tool call), because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits.
@@ -37,7 +38,7 @@ The log does not show the API key.
 
 ### Other
 
-- A new line is appended at the end, and the log scrolls to that line while it is shown. Showing the Opponent tab, or expanding the console on it, scrolls the log to its newest line, so lines added while it was hidden are in view.
+- A new line is appended at the end, and the log scrolls to that line while it is shown. Showing the Commanders tab, or expanding the console on it, scrolls the log to its newest line, so lines added while it was hidden are in view.
 - Lines are not removed during a match.
 - When a new match starts, from startup, New game, or game over, the log clears, together with the cost readout reset in the [Commander](opponent-tab-commander.md) section and on the footer status line, and the [Reports tab](reports-tab.md).
 

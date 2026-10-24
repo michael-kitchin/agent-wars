@@ -4,6 +4,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { buildRecentTurnNotesSection } from '../briefing/recentTurnNotesSection';
 import { buildTacticalOperationalMapSectionMarkdown } from '../briefing/map/briefingMapSection';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -78,18 +79,20 @@ export function formatTacticalBriefing(args: {
   sections.push('\n\n' + markdownHeading1(SECTION_TITLE_OPERATIONAL_MAP));
   sections.push(operational.trim());
 
+  const ownSeat = briefingOwnSeatId(planState);
   const recentTurnNotes = buildRecentTurnNotesSection({
     scope: 'tactical',
     battleId: tacticalBattle.battleId,
     currentTurnNumber: tacticalBattle.tacticalTurnNumber,
     heading: SECTION_TITLE_RECENT_TURN_NOTES,
+    seatId: ownSeat,
   });
   if (recentTurnNotes.trim().length > 0) {
     sections.push('\n\n' + recentTurnNotes.trim());
   }
 
   sections.push(markdownHeading2(SECTION_TITLE_ACTIVE_CALLBACKS));
-  sections.push(buildActiveCallbacksSection(getSubscriptions('opponent'), coordCtx));
+  sections.push(buildActiveCallbacksSection(getSubscriptions(ownSeat), coordCtx));
 
   return sections.join('');
 }

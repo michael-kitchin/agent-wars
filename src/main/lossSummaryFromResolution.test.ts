@@ -45,8 +45,8 @@ function testAirPrecedenceOverDirect(): void {
     resolveDisplayName: (id) => id,
     resolveUnitMeta: meta,
   });
-  assert.strictEqual(summary.ai.ranged.length, 0);
-  assert.strictEqual(summary.ai.airStrike.length, 1);
+  assert.strictEqual(summary.byOwner.opponent?.ranged.length, 0);
+  assert.strictEqual(summary.byOwner.opponent?.airStrike.length, 1);
 }
 
 /**
@@ -64,8 +64,8 @@ function testHumanAiSplit(): void {
     resolveDisplayName: (id) => id,
     resolveUnitMeta: meta,
   });
-  assert.strictEqual(summary.human.ranged.length, 1);
-  assert.strictEqual(summary.ai.ranged.length, 1);
+  assert.strictEqual(summary.byOwner.human?.ranged.length, 1);
+  assert.strictEqual(summary.byOwner.opponent?.ranged.length, 1);
 }
 
 /**
@@ -85,8 +85,8 @@ function testFogFiltersOpponentOnly(): void {
     resolveUnitMeta: meta,
     isVictimVisible: (id, player) => player === 'human' || visible.has(id),
   });
-  assert.strictEqual(summary.human.ranged.length, 1);
-  assert.strictEqual(summary.ai.ranged.length, 0);
+  assert.strictEqual(summary.byOwner.human?.ranged.length, 1);
+  assert.strictEqual(summary.byOwner.opponent?.ranged.length ?? 0, 0);
 }
 
 /**
@@ -103,8 +103,8 @@ function testOtherCatchAllWithoutKillEdge(): void {
     resolveDisplayName: (id) => id,
     resolveUnitMeta: meta,
   });
-  assert.strictEqual(summary.human.other.length, 1);
-  assert.strictEqual(summary.human.ranged.length, 0);
+  assert.strictEqual(summary.byOwner.human?.other.length, 1);
+  assert.strictEqual(summary.byOwner.human?.ranged.length, 0);
 }
 
 /**
@@ -132,10 +132,10 @@ function testAirStrikerCounterFireIsReturnFire(): void {
             ? { player: 'opponent', unitType: 'naval' }
             : undefined,
   });
-  assert.strictEqual(summary.human.returnFire.length, 1);
-  assert.strictEqual(summary.human.airStrike.length, 0);
-  assert.strictEqual(summary.ai.airStrike.length, 1);
-  assert.strictEqual(summary.ai.returnFire.length, 0);
+  assert.strictEqual(summary.byOwner.human?.returnFire.length, 1);
+  assert.strictEqual(summary.byOwner.human?.airStrike.length, 0);
+  assert.strictEqual(summary.byOwner.opponent?.airStrike.length, 1);
+  assert.strictEqual(summary.byOwner.opponent?.returnFire.length, 0);
 }
 
 /**
@@ -153,8 +153,8 @@ function testAttackerLossFromStrikeMovesIsReturnFire(): void {
     resolveDisplayName: (id) => id,
     resolveUnitMeta: (id) => (id === 'h-air' ? { player: 'human', unitType: 'air' } : undefined),
   });
-  assert.strictEqual(summary.human.returnFire.length, 1);
-  assert.strictEqual(summary.human.airStrike.length, 0);
+  assert.strictEqual(summary.byOwner.human?.returnFire.length, 1);
+  assert.strictEqual(summary.byOwner.human?.airStrike.length, 0);
 }
 
 /**

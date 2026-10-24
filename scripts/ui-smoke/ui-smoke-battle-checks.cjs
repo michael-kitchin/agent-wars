@@ -99,13 +99,13 @@ const BATTLE_CHECKS = Object.freeze([
   {
     name: 'force-bar-counts',
     scenes: BATTLE_SCENES,
-    needs: ['#battle-force-bar', '#battle-force-human-count', '#battle-force-opponent-count', '#battle-force-bar .battle-force-track', '#battle-force-human-fill'],
+    needs: ['#battle-force-bar', '#battle-force-human-count', '#battle-force-enemy-count', '#battle-force-bar .battle-force-track', '#battle-force-human-fill'],
     run: (p, el) => {
       if (!el('#battle-force-bar').shown) return 'the force bar is not shown';
       const human = Number(el('#battle-force-human-count').text);
-      const opponent = Number(el('#battle-force-opponent-count').text);
+      const opponent = Number(el('#battle-force-enemy-count').text);
       if (!Number.isInteger(human) || !Number.isInteger(opponent)) {
-        return `the counts read "${el('#battle-force-human-count').text}" and "${el('#battle-force-opponent-count').text}"`;
+        return `the counts read "${el('#battle-force-human-count').text}" and "${el('#battle-force-enemy-count').text}"`;
       }
       const share = human + opponent > 0 ? human / (human + opponent) : 0.5;
       const track = el('#battle-force-bar .battle-force-track');
@@ -145,7 +145,7 @@ const BATTLE_CHECKS = Object.freeze([
     needs: ['#topbar-turn-phase', '#tactical-exit-btn'],
     run: (p, el) => {
       const turn = el('#topbar-turn-phase').text;
-      if (!/^Turn \d+ · Planning$/.test(turn)) return `the top bar reads "${turn}", expected world-map planning`;
+      if (!/^Turn \d+(?: of \d+)? · Planning$/.test(turn)) return `the top bar reads "${turn}", expected world-map planning`;
       return el('#tactical-exit-btn').shown ? 'Exit Battle still shows on the world map' : null;
     },
   },

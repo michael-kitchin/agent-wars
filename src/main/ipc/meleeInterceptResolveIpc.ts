@@ -9,6 +9,8 @@
  */
 
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { commanderModelId } from '../gameDb';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
 import type { ReadyDeps, ReadyResultMinimal } from '../gameIpcHandlers';
 import { logHybridPipelineBoundary } from '../hybridTurnPipeline';
@@ -63,7 +65,8 @@ export async function handleResolveMeleeIntercept(
   }
   const state = deps.getGameState();
   logHybridPipelineBoundary('handleResolveMeleeIntercept', { turnNumber: state.turnNumber, phase: state.phase });
-  const modelId = deps.getSelectedModel();
+  const fromSeat = commanderModelId(AI_SEAT_IDS[0]);
+  const modelId = fromSeat === null ? deps.getSelectedModel() : fromSeat;
   const enabledGroupIds =
     payload?.enabledToolGroups && payload.enabledToolGroups.length > 0
       ? payload.enabledToolGroups
@@ -97,7 +100,7 @@ export async function handleResolveMeleeIntercept(
       useEventDrivenConsultation,
       resolutionSuccess: resolveResult.success,
       aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer('opponent'),
+      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
       resolution: resolveResult,
       modelId: modelId ?? '',
       enabledToolNames,
@@ -111,7 +114,7 @@ export async function handleResolveMeleeIntercept(
       useEventDrivenConsultation,
       resolutionSuccess: resolveResult.success,
       aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer('opponent'),
+      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
       resolution: resolveResult,
       modelId: modelId ?? '',
       enabledToolNames,
@@ -138,8 +141,8 @@ export async function handleResolveMeleeIntercept(
     success: true,
     ...pickReadyResolutionIpcMirrorFields(resolveResult),
     humanMoves: resolveResult.humanMoves,
-    opponentCombatParticipantUnitIds: resolveResult.opponentCombatParticipantUnitIds,
-    removedOpponentUnitIds: resolveResult.removedOpponentUnitIds,
+    combatParticipantUnitIdsBySeat: resolveResult.combatParticipantUnitIdsBySeat,
+    removedUnitIdsBySeat: resolveResult.removedUnitIdsBySeat,
     tacticalAutoStartH3Index: resolveResult.tacticalAutoStartH3Index,
     aiStrategy,
     aiMessage,

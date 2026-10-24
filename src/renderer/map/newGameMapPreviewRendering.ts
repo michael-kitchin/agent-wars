@@ -6,9 +6,10 @@ import {
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
 } from '../../shared/inspectionStatusIconLine';
-import { previewHexIsDrawn, previewHomeBorder, previewTechIcon, previewWeatherIcon } from '../../shared/newGameMapPreviewCore';
+import { previewHexIsDrawn, previewHomeSeatOrders, previewTechIcon, previewWeatherIcon } from '../../shared/newGameMapPreviewCore';
+import { SEAT_PALETTES } from '../../shared/seatPalette';
 import type { NewGameMapPreview } from '../../shared/newGameMapPreviewTypes';
-import { TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION, TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION } from '../core/constants';
+import { MULTI_PLAYER_FILL, MULTI_PLAYER_STROKE, TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION, TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION } from '../core/constants';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { readNewGameOptionChoices, readNewGameStartMonth } from '../gameplay/newGameOptionsUi';
 import { getMainLeafletMapForProjection } from './leafletMainMapProjection';
@@ -130,6 +131,22 @@ export function storeNewGameMapPreview(next: NewGameMapPreview): boolean {
 }
 
 /**
+ * Ring colors for one preview hex from the seat orders that claim it.
+ *
+ * Purpose: Preview colors follow row order. The loaded match's roster must not recolor them.
+ * When to use: A hex claimed by at least one home.
+ * Expected outcome: One order uses that seat's map color for both rings. Two or more use the shared gray outer ring and the dark inner ring.
+ * Exceptions: None.
+ */
+function previewRingColors(orders: readonly number[]): { readonly outer: string; readonly inner: string } {
+  if (orders.length === 1) {
+    const color = SEAT_PALETTES[orders[0]! - 1]?.map ?? MULTI_PLAYER_FILL;
+    return { outer: color, inner: color };
+  }
+  return { outer: MULTI_PLAYER_FILL, inner: MULTI_PLAYER_STROKE };
+}
+
+/**
  * Paints the new-game map: terrain, home borders, and weather and tech icons.
  *
  * Purpose: While the overlay is open the canvas shows this instead of the loaded match.
@@ -152,14 +169,13 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
   const weatherBonusLevel = choices.weatherBonusLevel;
   const techBonusLevel = choices.techBonusLevel;
   const startMonth = readNewGameStartMonth();
-  const humanHomes = new Set(payload.humanHomeRegionHexes);
-  const aiHomes = new Set(payload.aiHomeRegionHexes);
+  const homesBySeat = payload.homeRegionHexesBySeatOrder;
   const icons: StatusIconPlacement[] = [];
   for (const hex of payload.hexes) {
-    const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
+    const orders = previewHomeSeatOrders(hex.h3Index, homesBySeat);
     const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
     if (pts.length === 0) continue;
-    if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity, inspectionHeld)) {
+    if (previewHexIsDrawn(payload.gameMapId, orders.length > 0 ? { kind: 'shared' } : null, inspectionHeld)) {
       const drawClosedPath = (): void => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -170,7 +186,7 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
         ctx.closePath();
       };
       fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
-      if (border.homeOwnerIdentity == null) {
+      if (orders.length === 0) {
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.width * zoomStrokeScale;
         drawClosedPath();
@@ -180,10 +196,13 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
         ctx.lineWidth = stroke.width * zoomStrokeScale;
         drawClosedPath();
         ctx.stroke();
+        const rings = previewRingColors(orders);
         drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
-          controllerPlayerId: border.controllerPlayerId,
-          homeOwnerIdentity: border.homeOwnerIdentity,
+          controllerPlayerId: null,
+          homeOwnerIdentity: { kind: 'shared' },
           ownershipLineWidth,
+          outerColor: rings.outer,
+          innerColor: rings.inner,
         });
       }
     }

@@ -8,6 +8,7 @@
  * Exceptions: Logs at error on restore failures without throwing across IPC.
  */
 
+import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import {
   clearSubscriptions,
   getSubscriptions,
@@ -20,6 +21,7 @@ import {
   clearTacticalCallbackStashFromGameConfig,
   readTacticalCallbackStashFromGameConfig,
   writeTacticalCallbackStashToGameConfig,
+  type TacticalCallbackStash,
 } from '../tacticalBattle/tacticalCallbackStashPersistence';
 
 /**
@@ -37,10 +39,10 @@ const UNIT_ID_SCOPED_CALLBACK_EVENTS = new Set(['unit_engaged', 'unit_arrived', 
  *
  * Purpose: Fast restore without re-reading SQLite when the process never restarted.
  * When to use: Set by stash/hydrate; cleared after restore completes. `null` means no stash was captured in this process.
- * Expected outcome: Deep-copied rows, including an empty array when the opponent had no subscriptions at battle start.
+ * Expected outcome: The battle's AI seat and a deep copy of its rows, or a null seat when the other party is not an AI seat.
  * Exceptions: None.
  */
-let stashedOpponentSubscriptions: CallbackSubscription[] | null = null;
+let stashedOpponentSubscriptions: TacticalCallbackStash | null = null;
 
 /**
  * Legacy tactical sub-unit ids persisted as `${parentUnitId}:${twoDigitSlot}`.
@@ -84,17 +86,19 @@ function cloneSubscriptions(rows: readonly CallbackSubscription[]): CallbackSubs
 /**
  * Snapshots opponent callback subscriptions at tactical battle start into memory and `game_config`.
  *
- * Purpose: Preserves strategic (or prior) subscriptions so sub-unit tactical callbacks can be discarded on battle end.
- * When to use: Immediately after a successful `startTacticalBattleForEnclosingStrategicHex` installs the session.
- * Expected outcome: In-memory stash overwritten with a deep copy; durable key written (including empty list).
+ * Purpose: Preserves that seat's strategic subscriptions so sub-unit tactical callbacks can be discarded on battle end.
+ * When to use: Immediately after a successful `startTacticalBattleForEnclosingStrategicHex` installs the session. Pass null when the other party is not an AI seat.
+ * Expected outcome: In-memory stash overwritten; durable key written. A null seat records that restore must not touch any seat.
  * Exceptions: None.
  */
-export function stashOpponentCallbackSubscriptionsForTacticalBattle(): void {
-  const current = getSubscriptions('opponent');
-  stashedOpponentSubscriptions = cloneSubscriptions(current);
+export function stashOpponentCallbackSubscriptionsForTacticalBattle(seatId: AiSeatId | null = AI_SEAT_IDS[0]): void {
+  stashedOpponentSubscriptions = seatId === null
+    ? { seatId: null, subscriptions: [] }
+    : { seatId, subscriptions: cloneSubscriptions(getSubscriptions(seatId)) };
   writeTacticalCallbackStashToGameConfig(stashedOpponentSubscriptions);
   logDebug('tacticalCallbackSubscriptionLifecycle stashOpponentCallbackSubscriptionsForTacticalBattle', {
-    count: stashedOpponentSubscriptions.length,
+    seatId,
+    count: stashedOpponentSubscriptions.subscriptions.length,
   });
 }
 
@@ -108,10 +112,13 @@ export function stashOpponentCallbackSubscriptionsForTacticalBattle(): void {
  */
 export function hydrateOpponentCallbackStashFromGameConfig(): void {
   const fromDisk = readTacticalCallbackStashFromGameConfig();
-  stashedOpponentSubscriptions = fromDisk === null ? null : cloneSubscriptions(fromDisk);
+  stashedOpponentSubscriptions = fromDisk === null
+    ? null
+    : { seatId: fromDisk.seatId, subscriptions: cloneSubscriptions(fromDisk.subscriptions) };
   logDebug('tacticalCallbackSubscriptionLifecycle hydrateOpponentCallbackStashFromGameConfig', {
     hydrated: fromDisk !== null,
-    count: fromDisk?.length ?? 0,
+    seatId: fromDisk?.seatId ?? null,
+    count: fromDisk?.subscriptions.length ?? 0,
   });
 }
 
@@ -178,12 +185,12 @@ export function filterCallbackSubscriptionsForTacticalBattleRoster(
  * Removes live opponent subscriptions whose `unitId` or `side` looks like a tactical sub-unit id.
  *
  * Purpose: Upgrade / missing-stash end path that must not wipe strategic callbacks.
- * When to use: Battle end when no in-memory or persisted stash is available.
- * Expected outcome: Strategic and non-sub-unit rows remain; `parent:slot` unit-scoped rows are removed.
+ * When to use: Battle end when no in-memory or persisted stash is available. Defaults to the first AI seat.
+ * Expected outcome: That seat's strategic and non-sub-unit rows remain; `parent:slot` unit-scoped rows are removed.
  * Exceptions: None.
  */
-export function clearTacticalLookingOpponentCallbackSubscriptions(): void {
-  const current = getSubscriptions('opponent');
+export function clearTacticalLookingOpponentCallbackSubscriptions(seatId: AiSeatId = AI_SEAT_IDS[0]): void {
+  const current = getSubscriptions(seatId);
   const kept = current.filter((s) => {
     const unitId = typeof s.params?.unitId === 'string' ? s.params.unitId : '';
     const side = typeof s.params?.side === 'string' ? s.params.side : '';
@@ -202,11 +209,12 @@ export function clearTacticalLookingOpponentCallbackSubscriptions(): void {
     current.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ??
     0;
   if (kept.length === 0) {
-    clearSubscriptions('opponent');
+    clearSubscriptions(seatId);
   } else {
-    replaceSubscriptions('opponent', kept, turn);
+    replaceSubscriptions(seatId, kept, turn);
   }
   logDebug('tacticalCallbackSubscriptionLifecycle clearTacticalLookingOpponentCallbackSubscriptions', {
+    seatId,
     before: current.length,
     after: kept.length,
   });
@@ -217,7 +225,7 @@ export function clearTacticalLookingOpponentCallbackSubscriptions(): void {
  *
  * Purpose: Removes ephemeral sub-unit callbacks after tactical exit without losing pre-battle strategic subscriptions when a stash exists.
  * When to use: `endTacticalBattleSessionCore` on every teardown path.
- * Expected outcome: Full clear+restore when stash (memory or disk) exists; otherwise only `parent:slot` unitId/side rows are removed. Safe on double-end.
+ * Expected outcome: Restores the stashed AI seat. A null seat leaves every seat alone. A missing stash removes only sub-unit rows from the first AI seat. Safe on double-end.
  * Exceptions: Logs and continues if restore fails after clear.
  */
 export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void {
@@ -228,16 +236,25 @@ export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void 
   stashedOpponentSubscriptions = null;
   try {
     if (snapshot !== null) {
-      clearSubscriptions('opponent');
-      if (snapshot.length > 0) {
+      if (snapshot.seatId === null) {
+        clearTacticalCallbackStashFromGameConfig();
+        logDebug('tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle', {
+          mode: 'no_ai_party',
+        });
+        return;
+      }
+      const seatId = snapshot.seatId;
+      clearSubscriptions(seatId);
+      if (snapshot.subscriptions.length > 0) {
         const turn =
-          snapshot.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ?? 0;
-        replaceSubscriptions('opponent', snapshot, turn);
+          snapshot.subscriptions.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ?? 0;
+        replaceSubscriptions(seatId, [...snapshot.subscriptions], turn);
       }
       clearTacticalCallbackStashFromGameConfig();
       logDebug('tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle', {
         mode: 'full_restore',
-        restoredCount: snapshot.length,
+        seatId,
+        restoredCount: snapshot.subscriptions.length,
       });
       return;
     }

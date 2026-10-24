@@ -47,8 +47,18 @@
 }
 .game-over-overlay.hidden { display: none; }
 /* Stacks above tactical HUD (6600) for annihilation results. */
-.tactical-annihilation-overlay.game-over-overlay {
+.tactical-annihilation-overlay.game-over-overlay,
+.knockout-dialog.game-over-overlay {
   z-index: 7010;
+}
+.knockout-dialog-copy {
+  font-weight: 400;
+  font-size: 14px;
+}
+.knockout-dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 .game-over-box {
   background: var(--chrome-bg);

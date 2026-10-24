@@ -17,7 +17,7 @@ import {
 } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { safeGridHexDistance } from './assessUnitProximity';
-import { collectTempoRuleAttacks, mergeOpponentAttackOrders } from './tempoRuleAttacks';
+import { collectTempoRuleAttacks, mergeCommanderAttackOrders } from './tempoRuleAttacks';
 
 /**
  * A shooter of the requested type with an enemy planted one hex away.
@@ -211,7 +211,8 @@ function testModelOrderOutranksStandingOrderAndSweep(): void {
     }
     const modelChosenTarget = staged.enemyH3;
     const standingChoseElsewhere = staged.shooter.h3Index;
-    const merged = mergeOpponentAttackOrders({
+    const merged = mergeCommanderAttackOrders({
+      seatId: 'opponent',
       state: staged.state,
       standingOrderRanged: [{ unitId: staged.shooter.id, targetH3Index: standingChoseElsewhere }],
       standingOrderAirStrikes: [

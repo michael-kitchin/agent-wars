@@ -84,12 +84,14 @@ const grids = new Map<string, CachedPreviewGrid>();
  * Exceptions: Throws when the map, the pack files, or a side group is unknown, or when a footprint hex has no terrain kind.
  */
 export function buildNewGameMapPreview(request: NewGameMapPreviewRequest): NewGameMapPreview {
+  const homeKeys = request.homeKeys ?? [];
   logDebug('newGameMapPreview buildNewGameMapPreview', {
     scope: request.scope,
     gameMapId: request.scope === 'regional' ? request.gameMapId : 'global',
+    homeCount: homeKeys.length,
   });
-  if (request.scope === 'global') return buildGlobalPreview(request.humanHomeRegion, request.aiHomeRegion);
-  return buildRegionalPreview(request.gameMapId, request.humanSideGroupId, request.aiSideGroupId);
+  if (request.scope === 'global') return buildGlobalPreview(homeKeys);
+  return buildRegionalPreview(request.gameMapId, homeKeys);
 }
 
 /**
@@ -120,7 +122,7 @@ function cachedGrid(mapId: string, build: () => CachedPreviewGrid): CachedPrevie
  * Expected outcome: 842 hexes and extent `'world'`.
  * Exceptions: Throws when a world file or a footprint kind is missing.
  */
-function buildGlobalPreview(humanHomeRegion: string, aiHomeRegion: string): NewGameMapPreview {
+function buildGlobalPreview(homeKeys: readonly string[]): NewGameMapPreview {
   const grid = cachedGrid('global', () => {
     const indexes = globalStrategicIndexes();
     return gridFromFiles({
@@ -133,14 +135,14 @@ function buildGlobalPreview(humanHomeRegion: string, aiHomeRegion: string): NewG
       urbanOverlayMaxScalerank: GLOBAL_GAME_MAP.scaleranks.urbanOverlay,
     });
   });
+  const homes = homeKeys.map((key) => (key ? globalScenarioHomeRegionHexes(key) : []));
   return {
     gameMapId: 'global',
     strategicResolution: grid.strategicResolution,
     advancedMinUrbanCells: GLOBAL_GAME_MAP.rules.advancedMinUrbanCells,
     extent: 'world',
     hexes: grid.hexes,
-    humanHomeRegionHexes: globalScenarioHomeRegionHexes(humanHomeRegion),
-    aiHomeRegionHexes: globalScenarioHomeRegionHexes(aiHomeRegion),
+    homeRegionHexesBySeatOrder: homes,
   };
 }
 
@@ -152,7 +154,7 @@ function buildGlobalPreview(humanHomeRegion: string, aiHomeRegion: string): NewG
  * Expected outcome: One row per manifest hex and a regional extent box.
  * Exceptions: Throws when the id, the pack, the resolutions, or a side group is unknown.
  */
-function buildRegionalPreview(gameMapId: string, humanSideGroupId: string, aiSideGroupId: string): NewGameMapPreview {
+function buildRegionalPreview(gameMapId: string, homeKeys: readonly string[]): NewGameMapPreview {
   const catalog = regionalCatalog(gameMapId);
   const directory = regionPackDirectory(gameMapId);
   if (!directory) {
@@ -173,14 +175,14 @@ function buildRegionalPreview(gameMapId: string, humanSideGroupId: string, aiSid
       urbanOverlayMaxScalerank: manifest.scaleranks.urbanOverlay,
     })
   );
+  const homes = homeKeys.map((key) => (key ? sideGroupLand(manifest, key) : []));
   return {
     gameMapId,
     strategicResolution: grid.strategicResolution,
     advancedMinUrbanCells: manifest.rules.advancedMinUrbanCells,
     extent: regionalExtent(grid.hexes.map((hex) => hex.h3Index)),
     hexes: grid.hexes,
-    humanHomeRegionHexes: sideGroupLand(manifest, humanSideGroupId),
-    aiHomeRegionHexes: sideGroupLand(manifest, aiSideGroupId),
+    homeRegionHexesBySeatOrder: homes,
   };
 }
 

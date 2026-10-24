@@ -3,6 +3,14 @@
  */
 
 import type { BuildUnitType } from '../productionRules';
+import {
+  DEFAULT_TURN_LIMIT,
+  GAME_END_REASONS,
+  TURN_LIMIT_OPTIONS,
+  VICTORY_RULES,
+  type GameEndReason,
+  type VictorySettings,
+} from '../../shared/victoryRules';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
@@ -122,30 +130,78 @@ export function getGameSeedWithOps(ops: GameConfigKvDbOps): number {
 }
 
 /**
- * Persists game-over flag and winner id into `game_config` for snapshot readers.
+ * Reads the win rule and turn limit stored for the current match.
  *
- * Purpose: Extracted from `setGameOver` with identical SQL statements.
- * When to use: Region control and victory resolution paths in the main process.
- * Expected outcome: `game_over` and `winner` keys are upserted.
+ * Purpose: The snapshot and the end-of-turn check need the settings written at the start of the match.
+ * When to use: `getGameStateSnapshot` and any later reader of `victory_rule`.
+ * Expected outcome: The stored rule. An unknown or missing rule is last-side-standing with no turn limit.
  * Exceptions: None.
  */
-export function setGameOverWithOps(ops: GameConfigKvDbOps, winner: string): void {
-  logDebug('gameDb setGameOverWithOps', { winner });
-  if (ops.hasDb && !ops.hasDb()) return;
-  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('game_over', '1')");
-  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('winner', ?)", [winner]);
+export function readVictorySettings(ops: GameConfigKvDbOps): VictorySettings {
+  logTrace('gameConfigKv readVictorySettings');
+  if (ops.hasDb && !ops.hasDb()) return { rule: 'last_side_standing', turnLimit: null };
+  const ruleRaw = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'victory_rule'")?.value;
+  const rule = VICTORY_RULES.find((item) => item === ruleRaw);
+  if (!rule) {
+    logError('readVictorySettings found no known win rule', { ruleRaw: ruleRaw ?? null });
+    return { rule: 'last_side_standing', turnLimit: null };
+  }
+  if (rule === 'last_side_standing') return { rule, turnLimit: null };
+  const parsed = Number.parseInt(
+    ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'turn_limit'")?.value ?? '',
+    10
+  );
+  const turnLimit = (TURN_LIMIT_OPTIONS as readonly number[]).includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
+  logTrace('gameConfigKv readVictorySettings result', { rule, turnLimit });
+  return { rule, turnLimit };
 }
 
 /**
  * Clears persisted game-over keys so a new match starts from a clean config namespace.
  *
- * Purpose: Extracted from `clearGameOver` with identical SQL.
+ * Purpose: A new match must not inherit the previous winner or end reason.
  * When to use: `resetGameForNewMatch` and similar full resets.
- * Expected outcome: `game_over` and `winner` rows removed when present.
- * Exceptions: None.
+ * Expected outcome: `game_over`, `winner`, and `game_end_reason` rows are removed when present.
+ * Exceptions: None. A closed database returns without writing.
  */
 export function clearGameOverWithOps(ops: GameConfigKvDbOps): void {
   logDebug('gameDb clearGameOverWithOps', {});
   if (ops.hasDb && !ops.hasDb()) return;
-  ops.run("DELETE FROM game_config WHERE key IN ('game_over', 'winner')");
+  ops.run("DELETE FROM game_config WHERE key IN ('game_over', 'winner', 'game_end_reason')");
+}
+
+/**
+ * Records that the match is over, who won, and why.
+ *
+ * Purpose: A tie stores an empty winner. The end reason distinguishes last side standing, the turn limit, a mutual wipe, and the human ending the match.
+ * When to use: `recordEndOfTurnOutcome` when `gameOver` is true.
+ * Expected outcome: `game_over` is 1, `winner` is the seat id or empty, and `game_end_reason` is the reason.
+ * Exceptions: None. A closed database returns without writing.
+ */
+export function setGameOutcomeWithOps(
+  ops: GameConfigKvDbOps,
+  outcome: { winnerSeatId: string | null; endReason: GameEndReason }
+): void {
+  logDebug('gameConfigKv setGameOutcomeWithOps', { winnerSeatId: outcome.winnerSeatId, endReason: outcome.endReason });
+  if (ops.hasDb && !ops.hasDb()) return;
+  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('game_over', '1')");
+  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('winner', ?)", [outcome.winnerSeatId ?? '']);
+  ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('game_end_reason', ?)", [outcome.endReason]);
+}
+
+/**
+ * Reads why the current match ended.
+ *
+ * Purpose: The snapshot shows the stored reason, including a match the human ended.
+ * When to use: `getGameStateSnapshot`.
+ * Expected outcome: A known reason, or undefined when the match is still going or the stored value is unknown.
+ * Exceptions: None.
+ */
+export function readGameEndReason(ops: GameConfigKvDbOps): GameEndReason | undefined {
+  logTrace('gameConfigKv readGameEndReason');
+  if (ops.hasDb && !ops.hasDb()) return undefined;
+  const raw = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_end_reason'")?.value;
+  const reason = GAME_END_REASONS.find((item) => item === raw);
+  if (raw && !reason) logError('readGameEndReason found an unknown reason', { raw });
+  return reason;
 }

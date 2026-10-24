@@ -85,6 +85,18 @@ function testCompactIdsUseRomanNumeralsForAiAndOrdinalsForHuman(): void {
   ]);
   assert.strictEqual(lookup.get('a1-t1'), 'I Armored');
   assert.strictEqual(lookup.get('h1-t1'), '1st Armored');
+  const aiSeat = buildUnitDisplayNameLookup([
+    { id: 'a3-t2', unitType: 'armor', displayOrder: 2, player: 'opponent3' },
+  ]);
+  const neutralFromAi = buildUnitDisplayNameLookup([
+    { id: 'a3-t2', unitType: 'armor', displayOrder: 2, player: 'neutral' },
+  ]);
+  const neutralFromHuman = buildUnitDisplayNameLookup([
+    { id: 'h1-i4', unitType: 'infantry', displayOrder: 4, player: 'neutral' },
+  ]);
+  assert.strictEqual(aiSeat.get('a3-t2'), 'II Armored');
+  assert.strictEqual(neutralFromAi.get('a3-t2'), 'II Armored');
+  assert.strictEqual(neutralFromHuman.get('h1-i4'), '4th Infantry');
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { KillEdge } from './ipc/combatResultTypes';
+import { isAiSeatId, isSeatId, type SeatId } from './seatIds';
 import { parseStrategicUnitId, unitIdOwnerFromId } from './unitIds';
 
 /**
@@ -40,7 +41,7 @@ displayOrder?: number;
     /**
      * Owning side used to keep human and opponent formation sequences independent.
      *
-     * Contract: `human` or `opponent` when known; omitted rows fall back to the `human-` / `opponent-` id prefix.
+     * Contract: A seat id when known; omitted rows fall back to the id prefix. Neutral uses the prefix so a former seat keeps its numeral style.
      * When to use: Snapshot and kill-roster rows should pass the DB player so labels stay correct if the id shape varies.
      * Expected outcome: Opponent rows use roman numerals on their own 1-based sequence; human rows use ordinals on theirs.
      * Exceptions: Unknown values are ignored and the id prefix is used instead.
@@ -177,11 +178,11 @@ function toRomanNumeral(value: number): string {
  *
  * Purpose: `player` is the DB source of truth; id prefixes cover rows that omit it.
  * When to use: Sequence grouping and `formatUnitNumberLabel`.
- * Expected outcome: `human`, `opponent`, or `other` when neither player nor prefix identifies a side.
+ * Expected outcome: A seat id, or `other` when neither the player column nor the id prefix identifies a seat.
  * Exceptions: None.
  */
-function unitDisplayOwner(unit: Pick<UnitDisplayIdentity, 'id' | 'player'>): 'human' | 'opponent' | 'other' {
-  if (unit.player === 'human' || unit.player === 'opponent') return unit.player;
+function unitDisplayOwner(unit: Pick<UnitDisplayIdentity, 'id' | 'player'>): SeatId | 'other' {
+  if (unit.player !== undefined && isSeatId(unit.player)) return unit.player;
   return unitIdOwnerFromId(unit.id) ?? 'other';
 }
 
@@ -190,7 +191,7 @@ function unitDisplayOwner(unit: Pick<UnitDisplayIdentity, 'id' | 'player'>): 'hu
  *
  * Purpose: Human formations use `1st`/`2nd`; opponent formations use `I`/`II`, using the same owner as sequence grouping.
  * When to use: Inside lookup and id-only fallback after the formation number is known.
- * Expected outcome: Opponent owner yields roman numerals; any other owner yields locale ordinals.
+ * Expected outcome: An AI seat yields roman numerals. The human seat, Neutral resolved as human, and `other` yield ordinals.
  * Exceptions: None.
  */
 function formatUnitNumberLabel(
@@ -198,7 +199,8 @@ function formatUnitNumberLabel(
   value: number,
   locale?: Intl.LocalesArgument
 ): string {
-  return unitDisplayOwner(unit) === 'opponent' ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  const owner = unitDisplayOwner(unit);
+  return owner !== 'other' && isAiSeatId(owner) ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
 }
 
 /**

@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import type { Doctrine } from '../../../shared/seatRoster';
 import type { PromptCoordinateMode } from './promptCoordinateMode';
 
 /**
@@ -126,4 +127,31 @@ export interface CoachingGates {
    * Exceptions: None.
    */
   readonly controlWinMinUrbanShare?: number | null;
+  /**
+   * How many sides the match has, including knocked-out seats.
+   *
+   * Contract: Three or more selects the free-for-all bullet. Absent means a two-sided match.
+   * When to use: Set from the roster length while building strategic coaching.
+   * Expected outcome: The free-for-all bullet is present only when this is at least 3.
+   * Exceptions: None.
+   */
+  readonly seatCount?: number;
+  /**
+   * Whether the match ends on a turn limit by most city hexes.
+   *
+   * Contract: True appends the turn-limit sentence to the win-path bullet.
+   * When to use: Set from `victory.rule`. Absent on a regional match.
+   * Expected outcome: The extra sentence is absent when this is false or omitted.
+   * Exceptions: None.
+   */
+  readonly turnLimitVictory?: boolean;
+  /**
+   * Stored doctrine of the commander being briefed.
+   *
+   * Contract: `'balanced'` and absent add no block. `'aggressive'` and `'cautious'` add theirs after the strategy list.
+   * When to use: Set from the seat's stored doctrine. A hidden random draw is read from the roster, not from the snapshot.
+   * Expected outcome: The context block matches a prompt with no doctrine field when this is balanced or omitted.
+   * Exceptions: None.
+   */
+  readonly doctrine?: Doctrine;
 }

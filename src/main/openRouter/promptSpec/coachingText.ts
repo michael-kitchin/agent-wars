@@ -41,6 +41,6 @@ export function buildCoachingBullets(gates: CoachingGates): readonly string[] {
 export function buildContextCoaching(gates: CoachingGates): string {
   logDebug('promptSpec buildContextCoaching', { coordinateMode: gates.coordinateMode });
   return gates.coordinateMode === 'tactical'
-    ? buildTacticalContextCoaching()
+    ? buildTacticalContextCoaching(gates)
     : buildStrategicContextCoaching(gates);
 }

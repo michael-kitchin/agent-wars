@@ -3,16 +3,25 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { strategicOverlayBandOffsetPx } from '../../shared/inspectionStatusIconLine';
 import {
   isHexOwnershipVisibleToPerspective,
+  ownershipPerspective,
   resolveHomeRegionOwnerIdentity,
   resolveOwnershipBorderStyle,
-  type HomeRegionOwnerIdentity,
   type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { drawBattleFootprintInfrastructureGlyphs, paintBattleFootprintTerrain } from './tacticalBattleTerrainPaint';
-import { MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS } from '../core/constants';
+import { OWNERSHIP_BORDER_ALPHA } from '../core/constants';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import {
+  drawOutlinedHomeRegionOwnershipBorders,
+  ownershipStyleIsOutlined,
+  resolveOwnershipBorderColor,
+} from './homeRegionBorderDrawing';
+
+export { drawOutlinedHomeRegionOwnershipBorders };
+import { paletteForCurrentOwner } from './ownerColors';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapHelpers';
 import {
   projectHexBoundaryToContainerPoints,
@@ -119,127 +128,6 @@ function buildControlByHex(state: GameStateSnapshot): Map<string, string | null>
   return new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 }
 
-/**
- * Maps current hex control to the outer solid ownership border color.
- *
- * Purpose: Home-region hexes use controller color on the outside edge, independent of home-region membership.
- * When to use: Outlined home borders and any caller that needs control-only coloring.
- * Expected outcome: Human/opponent player colors; uncontrolled hexes use neutral multi-player gray.
- * Exceptions: None.
- */
-function resolveControllerBorderColor(controllerPlayerId: string | null | undefined): string {
-  if (controllerPlayerId === 'human') return PLAYER_COLORS.human;
-  if (controllerPlayerId === 'opponent') return PLAYER_COLORS.opponent;
-  return MULTI_PLAYER_FILL;
-}
-
-/**
- * Maps home-region owner identity to the inner dashed border color.
- *
- * Purpose: Inner home borders show declared home-region ownership, not current control.
- * When to use: Outlined home-region border pass after `resolveHomeRegionOwnerIdentity`.
- * Expected outcome: Human/opponent colors for exclusive home hexes; intersection hexes use neutral gray.
- * Exceptions: None.
- */
-function resolveHomeRegionOwnerBorderColor(identity: HomeRegionOwnerIdentity): string | null {
-  if (identity === 'human') return PLAYER_COLORS.human;
-  if (identity === 'opponent') return PLAYER_COLORS.opponent;
-  if (identity === 'both') return MULTI_PLAYER_FILL;
-  return null;
-}
-
-/**
- * Draws dual-line home-region ownership borders: solid outer (controller) and dashed inner (home owner).
- *
- * Purpose: Implements the split-color home border contract without duplicating path/inset logic.
- * When to use: Whenever `resolveOwnershipBorderStyle` returns an `outlined*` token.
- * Expected outcome: Outer ring uses controller color; inset dashed ring uses home-region owner color.
- * Exceptions: None.
- */
-export function drawOutlinedHomeRegionOwnershipBorders(
-  ctx: CanvasRenderingContext2D,
-  pts: readonly { x: number; y: number }[],
-  args: {
-    controllerPlayerId: string | null | undefined;
-    homeOwnerIdentity: HomeRegionOwnerIdentity;
-    ownershipLineWidth: number;
-  }
-): void {
-  ctx.save();
-  ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
-  const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
-  const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
-  const drawClosedPath = (points: readonly { x: number; y: number }[]): void => {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i]!;
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-  };
-  drawClosedPath(pts);
-  ctx.strokeStyle = outerColor;
-  ctx.lineWidth = args.ownershipLineWidth;
-  ctx.setLineDash([]);
-  ctx.stroke();
-  const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
-  const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
-  drawClosedPath(innerPts);
-  ctx.strokeStyle = innerColor;
-  ctx.lineWidth = innerLineWidth;
-  ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
-}
-
-/**
- * Maps a shared ownership border style token to a concrete render color for normal (non-home) borders.
- *
- * Purpose: Keeps border-color mapping centralized so non-home ownership rendering remains consistent.
- * When to use: Strategic border rendering for hexes that use normal single-line ownership styles.
- * Expected outcome: Human/opponent styles map to player colors and neutral maps to mixed-player gray.
- * Exceptions: `none` returns null.
- */
-function resolveOwnershipBorderColor(style: OwnershipBorderStyle): string | null {
-  if (style === 'normalControlledByHuman') return PLAYER_COLORS.human;
-  if (style === 'normalControlledByOpponent') return PLAYER_COLORS.opponent;
-  if (style === 'outlinedNeutral') return MULTI_PLAYER_FILL;
-  return null;
-}
-
-/**
- * Builds an inward-offset polygon approximation for drawing inner home-region ownership lines.
- *
- * Purpose: Supports home-border dual-line styling by moving each vertex toward centroid by a fixed screen-pixel inset.
- * When to use: After drawing the primary home ownership border when an inner parallel line is required.
- * Expected outcome: Returns a same-vertex-count polygon inset toward center; falls back to original vertices for degenerate points.
- * Exceptions: None.
- */
-function buildInsetPolygonPoints(
-  pts: readonly { x: number; y: number }[],
-  insetPx: number
-): { x: number; y: number }[] {
-  if (pts.length === 0 || insetPx <= 0) return [...pts];
-  let sumX = 0;
-  let sumY = 0;
-  for (const p of pts) {
-    sumX += p.x;
-    sumY += p.y;
-  }
-  const cx = sumX / pts.length;
-  const cy = sumY / pts.length;
-  return pts.map((p) => {
-    const dx = cx - p.x;
-    const dy = cy - p.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist <= 0.0001) return { x: p.x, y: p.y };
-    const appliedInset = Math.min(insetPx, dist * 0.35);
-    const t = appliedInset / dist;
-    return { x: p.x + dx * t, y: p.y + dy * t };
-  });
-}
 
 /**
  * Draws the world map's hexes: terrain fill, the grid stroke, and the borders that mark who controls each hex.
@@ -265,7 +153,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   const L = getLeafletGlobal();
   const visibleHexes = S.gameState.visibleHexes ? new Set(S.gameState.visibleHexes) : new Set(S.gameState.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(S.gameState);
-  const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const perspective = ownershipPerspective(S.gameState.playerPerspective);
   const controlBordersShown = areControlBordersShown();
   for (const hx of S.gameState.hexes) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
@@ -300,8 +188,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
       h3Index: hx.h3Index,
       playerPerspective: perspective,
       visibleHexes,
-      humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+      homeRegionHexesBySeat: S.gameState.homeRegionHexesBySeat,
       intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
     });
     const ownershipStyle: OwnershipBorderStyle = controlBordersShown
@@ -309,25 +196,23 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
           h3Index: hx.h3Index,
           controllerPlayerId: controlByHex.get(hx.h3Index),
           isOwnershipVisible: ownershipVisible,
-          humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-          aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+          homeRegionHexesBySeat: S.gameState.homeRegionHexesBySeat,
           intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
         })
-      : 'none';
+      : { kind: 'none' };
     const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
-    ctx.strokeStyle = ownershipStyle.startsWith('outlined') ? 'rgba(0, 0, 0, 0)' : stroke.color;
+    ctx.strokeStyle = ownershipStyleIsOutlined(ownershipStyle) ? 'rgba(0, 0, 0, 0)' : stroke.color;
     ctx.lineWidth = stroke.width * zoomStrokeScale;
     drawClosedPath();
     ctx.stroke();
-    if (ownershipStyle !== 'none') {
+    if (ownershipStyle.kind !== 'none') {
       const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
-      if (ownershipStyle.startsWith('outlined')) {
+      if (ownershipStyleIsOutlined(ownershipStyle)) {
         drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
           controllerPlayerId: controlByHex.get(hx.h3Index),
           homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
             h3Index: hx.h3Index,
-            humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-            aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+            homeRegionHexesBySeat: S.gameState.homeRegionHexesBySeat,
             intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
           }),
           ownershipLineWidth,
@@ -344,7 +229,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
     }
     if (S.selectedHexIndex === hx.h3Index) {
       drawClosedPath();
-      ctx.strokeStyle = PLAYER_COLORS.human;
+      ctx.strokeStyle = paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? '#115E59';
       ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
       ctx.stroke();
     }
@@ -436,14 +321,14 @@ export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: Te
 export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
   const state = S.gameState;
   if (!state || !areControlBordersShown()) return;
-  const homeRegionHexes = [...new Set([...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])];
+  const homeRegionHexes = [...new Set(Object.values(state.homeRegionHexesBySeat ?? {}).flat())];
   if (homeRegionHexes.length === 0) return;
   if (!shouldRenderTacticalHexes()) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number }; getZoom?: () => number } | null;
   if (!map) return;
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
-  const perspective = state.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const perspective = ownershipPerspective(state.playerPerspective);
   const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(state);
   for (const h3Index of homeRegionHexes) {
@@ -451,19 +336,17 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       h3Index,
       playerPerspective: perspective,
       visibleHexes,
-      humanHomeRegionHexes: state.humanHomeRegionHexes,
-      aiHomeRegionHexes: state.aiHomeRegionHexes,
+      homeRegionHexesBySeat: state.homeRegionHexesBySeat,
       intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
     });
     const style = resolveOwnershipBorderStyle({
       h3Index,
       controllerPlayerId: controlByHex.get(h3Index),
       isOwnershipVisible: ownershipVisible,
-      humanHomeRegionHexes: state.humanHomeRegionHexes,
-      aiHomeRegionHexes: state.aiHomeRegionHexes,
+      homeRegionHexesBySeat: state.homeRegionHexesBySeat,
       intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
     });
-    if (style === 'none') continue;
+    if (style.kind === 'none') continue;
     const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
     const pts = boundary.map(([lat, lng]: [number, number]) => {
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
@@ -474,8 +357,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       controllerPlayerId: controlByHex.get(h3Index),
       homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
         h3Index,
-        humanHomeRegionHexes: state.humanHomeRegionHexes,
-        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        homeRegionHexesBySeat: state.homeRegionHexesBySeat,
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
       }),
       ownershipLineWidth,

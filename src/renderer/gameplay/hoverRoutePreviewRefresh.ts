@@ -20,6 +20,7 @@ import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGrou
 import { hoverRoutePreviewAsyncContextStillValid } from './hoverRoutePreviewStale';
 import type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import type { TacticalOrderDeps } from './tacticalOrderDeps';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Publishes `S.hoverRoutePreview` and synchronizes the transient “Blocked: …” hover hint for invalid march/ranged targets.
@@ -181,7 +182,7 @@ export async function refreshHoverRoutePreview(
         validation,
         supportKind: 'ranged',
         originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
-        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index,
+        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip,
       });
       return;
@@ -205,13 +206,13 @@ export async function refreshHoverRoutePreview(
         validation,
         supportKind: 'air',
         originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
-        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index,
+        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip,
       });
       return;
     }
     const selectedHumanTactical = unitIds
-      .map((id) => tb.subUnits.find((s) => s.id === id && s.player === 'human'))
+      .map((id) => tb.subUnits.find((s) => s.id === id && s.player === HUMAN_SEAT_ID))
       .filter((u): u is NonNullable<typeof u> => !!u);
     const tacticalHasAir = selectedHumanTactical.some((u) => u.unitType === 'air');
     const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== 'air');
@@ -260,7 +261,7 @@ export async function refreshHoverRoutePreview(
       validation,
       supportKind: 'ranged',
       originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
-      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
       allowBlockingOrderTooltip,
     });
     return;
@@ -284,7 +285,7 @@ export async function refreshHoverRoutePreview(
       validation,
       supportKind: 'air',
       originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
-      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
       allowBlockingOrderTooltip,
     });
     return;

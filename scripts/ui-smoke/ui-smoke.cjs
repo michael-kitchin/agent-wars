@@ -1,6 +1,7 @@
 /**
  * UI smoke run: starts the built app in Electron, plays fixed scenarios over three sessions, and records screenshots
- * plus layout checks.
+ * plus layout checks. The first three sessions play one global match, reopen it for a battle, and reopen the regional
+ * match that follows as lost. A later pass, on the same folder, records several sides, a knockout, standings, and Observe.
  *
  * Purpose: Lets a layout change be verified the same way every time, with a report a reviewer can read and
  *   screenshots a person can compare.
@@ -10,10 +11,10 @@
  * Exceptions: Exits 1 when the app cannot start, the scenario cannot be set up, or a check fails.
  *
  * The run uses a fresh, temporary Electron user-data folder (`AGENT_WARS_USER_DATA_DIR`), so it never reads or
- * changes the player's saved match, API key, or model choice, and it never calls a model. The three sessions share
- * that folder: the first plays a new global match, the second reopens it with a hex both sides hold, plays the first
- * beat of a battle there, hides the new-game choices, and starts a regional match from the header button, and the
- * third reopens that match after the run marks it as lost.
+ * changes the player's saved match, API key, or model choice, and it never calls a model. The first three sessions
+ * share that folder: the first plays a new global match, the second reopens it with a hex both sides hold, plays the
+ * first beat of a battle there, hides the new-game choices, and starts a regional match from the header button, and
+ * the third reopens that match after the run marks it as lost. The later pass starts further matches in the same folder.
  */
 'use strict';
 
@@ -23,6 +24,7 @@ const path = require('path');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
+const { runMultiCommanderScenes } = require('./ui-smoke-multi.cjs');
 const {
   LAND_UNIT_TYPES,
   captureMainMap,
@@ -139,7 +141,7 @@ async function recordScene(page, report, outDir, sceneName) {
  * Purpose: A played turn can offer the tactical battles list; the run never fights from it, so it chooses Ignore,
  *   which resolves the fight as a player's Ignore does.
  * When to use: After Ready on the world map, and after leaving a battle.
- * Expected outcome: The battle header is gone, the top bar reads "Turn N · Planning", and Ready can be clicked.
+ * Expected outcome: The battle header is gone, the top bar reads a world-map planning line, and Ready can be clicked.
  * Exceptions: Throws a Playwright timeout when planning does not return within `SETTLE_MS.turn`.
  */
 async function waitForWorldPlanning(page) {
@@ -148,7 +150,7 @@ async function waitForWorldPlanning(page) {
   while (Date.now() < deadline) {
     // In a battle the date block is hidden but still names the world-map turn, so the battle header must be gone too.
     const planning = await page.evaluate(() => !document.getElementById('app-topbar')?.classList.contains('topbar-battle')
-      && /^Turn \d+ · Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || '')
+      && /^Turn \d+(?: of \d+)? · Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || '')
       && document.getElementById('ready-btn')?.disabled === false);
     if (planning) return;
     if (await page.isVisible(battlesList)) await page.click(`${battlesList} button:has-text("Ignore")`);
@@ -235,7 +237,7 @@ async function runFirstSession(app, page, report, outDir) {
   await setViewport(app, page, first);
   await page.waitForTimeout(SETTLE_MS.resize);
 
-  await page.click('#console-tab-opponent');
+  await page.click('#console-tab-commanders');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.opponentTab);
@@ -410,6 +412,8 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await page.waitForFunction(() => document.getElementById('game-over-overlay')?.classList.contains('hidden')
     && /· Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || ''), null, { timeout: 60000 });
   await page.waitForTimeout(SETTLE_MS.start);
+  await page.click('#console-tab-orders');
+  await page.waitForTimeout(SETTLE_MS.click);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.matchReopened);
 
@@ -560,6 +564,19 @@ async function main() {
 
     session = await launchApp(userDataDir, report);
     await runFinishedMatchSession(session.app, session.page, report, outDir);
+    const opened = session;
+    session = null;
+    await runMultiCommanderScenes({
+      app: opened.app,
+      page: opened.page,
+      userDataDir,
+      report,
+      outDir,
+      viewport: VIEWPORTS[0],
+      recordScene,
+      setViewport,
+      parkPointer,
+    });
     exitCode = printReport(report, outDir);
   } catch (err) {
     report.notes.push(`run stopped: ${err && err.stack ? err.stack : String(err)}`);

@@ -7,20 +7,11 @@
  * Exceptions: Propagates unexpected errors to the caller for outer `try/catch` handling.
  */
 
-import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getSeatRoster, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from '../combatResolution';
-import { logDebug } from '../logger';
-import type {
-  AirStrikeOrder,
-  EmbarkOrder,
-  FerryAnimationMove,
-  FerryOrder,
-  MovementOrder,
-  RangedAttackOrder,
-  ReadyResult,
-  AirStrikeTargetType,
-} from '../../shared/ipcTypes';
+import { logDebug, logError } from '../logger';
+import type { FerryAnimationMove, ReadyResult, AirStrikeTargetType } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
@@ -34,7 +25,7 @@ import { createStrategicTerrainCoverLookup } from '../terrainCover/terrainCoverL
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportOutcomeForRemovedStrategicUnits,
-  autoDebarkOpponentLandUnitIfMovingIndependently,
+  autoDebarkNonHumanLandUnitIfMovingIndependently,
   isEmbarkedLandUnitOnWater,
   shouldSkipEmbarkedLandIndependentMove,
   syncEmbarkedLandUnitPositionsWithNaval,
@@ -49,9 +40,20 @@ import {
 import {
   newMeleeDecisionToken,
   setMeleeInterceptPendingSnapshot,
+  traversalSetsToRecord,
   type MeleeInterceptReadyPauseSnapshot,
 } from './meleeInterceptPendingState';
 import { collectTraversedHexesByPlayer } from './controlAndProduction';
+import { activeAiSeats } from '../../shared/seatRoster';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, isAiSeatId, NEUTRAL_OWNER_ID, type OwnerId } from '../../shared/seatIds';
+import { findHumanSeat, isSeatActive } from '../../shared/seatRoster';
+import {
+  keepOrdersOfOwnedUnits,
+  listsInResolutionOrder,
+  ownersInResolutionOrder,
+  type TurnOrdersByOwner,
+} from './ownerTurnOrders';
+import { buildNeutralTurnOrders, prepareNeutralTransportsForTurn } from './neutralTurn';
 import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { isWithinAirFerryGridRange } from './gridRange';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
@@ -66,7 +68,7 @@ import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
  * Exceptions: None.
  */
 export type ReadyStrategicPlanningConstants = {
-  humanPlayerId: 'human' | 'opponent';
+  humanPlayerId: typeof HUMAN_SEAT_ID;
   validPhase: string;
   /**
    * Strategic turn index captured while `turn_state.phase` was still `validPhase` (planning).
@@ -118,25 +120,15 @@ function dbBackedStateSnapshot(): {
  * Exceptions: Unexpected throws bubble to `gameActions.ready` catch.
  */
 export function executeReadyStrategicTurn(
-  aiOrders: MovementOrder[],
-  aiRangedOrders: RangedAttackOrder[],
-  aiAirStrikeOrders: AirStrikeOrder[],
-  aiFerryOrders: FerryOrder[],
-  aiEmbarkOrders: EmbarkOrder[],
+  ordersByOwner: TurnOrdersByOwner,
   constants: ReadyStrategicPlanningConstants
 ): ReadyResult {
-  logDebug('executeReadyStrategicTurn', {
-    aiOrderCount: aiOrders.length,
-    aiRangedCount: aiRangedOrders.length,
-    aiAirStrikeCount: aiAirStrikeOrders.length,
-    aiFerryCount: aiFerryOrders.length,
-    aiEmbarkCount: aiEmbarkOrders.length,
-    turnNumber: constants.turnNumber,
-  });
+  logDebug('executeReadyStrategicTurn', { ownerCount: ordersByOwner.size, turnNumber: constants.turnNumber });
 
   dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
   const hexList = getOrderedHexList();
+  prepareNeutralTransportsForTurn(buildLatLngCoordinateMap(hexList));
   const unitsBeforeMove = listUnitsForSnapshot();
   const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map((u) => ({
     id: u.id,
@@ -145,6 +137,17 @@ export function executeReadyStrategicTurn(
     h3Index: u.h3Index,
     displayOrder: u.displayOrder,
   }));
+  const unitOwnerById = new Map(unitsBeforeMove.map((unit) => [unit.id, unit.player]));
+  const ordersForOwners = new Map<OwnerId, ReturnType<typeof keepOrdersOfOwnedUnits>>();
+  for (const [owner, orders] of ordersByOwner) {
+    if (owner === HUMAN_SEAT_ID) continue;
+    if (owner === NEUTRAL_OWNER_ID) {
+      logError('executeReadyStrategicTurn ignored Neutral orders from the caller', { owner });
+      continue;
+    }
+    ordersForOwners.set(owner, keepOrdersOfOwnedUnits(owner, orders, unitOwnerById));
+  }
+  const firstAiOrders = ordersForOwners.get(AI_SEAT_IDS[0]);
 
   const humanRanged = dbGetAll<{ unit_id: string; target_h3_index: string }>(
     'SELECT unit_id, target_h3_index FROM pending_ranged_orders ORDER BY unit_id, target_h3_index'
@@ -180,9 +183,17 @@ export function executeReadyStrategicTurn(
     targetH3Index: strike.targetH3Index,
     targetType: strike.targetType,
   }));
-  const allAirStrikes = [...mergedHumanAirStrikes, ...aiAirStrikeOrders];
+  const neutralOrders = buildNeutralTurnOrders({ latLngByH3, resolveToH3 });
+  if (
+    neutralOrders.movementOrders.length > 0
+    || neutralOrders.rangedOrders.length > 0
+    || neutralOrders.airStrikeOrders.length > 0
+  ) {
+    ordersForOwners.set(NEUTRAL_OWNER_ID, keepOrdersOfOwnedUnits(NEUTRAL_OWNER_ID, neutralOrders, unitOwnerById));
+  }
+  const allAirStrikes = listsInResolutionOrder(mergedHumanAirStrikes, ordersForOwners, (orders) => orders.airStrikeOrders);
   const strikeUnitIds = new Set(allAirStrikes.map((s) => s.unitId));
-  const mergedFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
+  const mergedFerryOrders = listsInResolutionOrder(humanFerryOrders, ordersForOwners, (orders) => orders.ferryOrders);
   const allFerryOrders = mergedFerryOrders.filter((f) => !strikeUnitIds.has(f.unitId));
   const droppedFerryForStrikeCount = mergedFerryOrders.length - allFerryOrders.length;
   if (droppedFerryForStrikeCount > 0) {
@@ -191,8 +202,13 @@ export function executeReadyStrategicTurn(
       strikeUnitCount: strikeUnitIds.size,
     });
   }
-  applyEmbarkOrdersForPlayer(aiEmbarkOrders, 'opponent');
-  const allRanged = [...mergedHumanRangedOrders, ...aiRangedOrders];
+  for (const owner of ownersInResolutionOrder(ordersForOwners)) {
+    const embarkOrders = ordersForOwners.get(owner)?.embarkOrders ?? [];
+    if (embarkOrders.length === 0) continue;
+    applyEmbarkOrdersForPlayer([...embarkOrders], owner);
+  }
+  const allRanged = listsInResolutionOrder(mergedHumanRangedOrders, ordersForOwners, (orders) => orders.rangedOrders);
+  const aiRangedOrders = [...(firstAiOrders?.rangedOrders ?? [])];
 
   const turnNumber = constants.turnNumber;
   const gameSeed = getGameSeed();
@@ -268,10 +284,8 @@ export function executeReadyStrategicTurn(
       return { unitId, fromH3Index, toH3Index };
     })
     .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null);
-  const allOrders = [
-    ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
-    ...aiOrders,
-  ];
+  const humanMovementOrders = Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index }));
+  const allOrders = listsInResolutionOrder(humanMovementOrders, ordersForOwners, (orders) => orders.movementOrders);
   const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
   const movingNavalUnitIds = allOrders
     .filter((order) => unitsBeforeMove.find((unit) => unit.id === order.unitId)?.unitType === 'naval')
@@ -305,14 +319,23 @@ export function executeReadyStrategicTurn(
     unitType: u.unitType,
   }));
   const traversedHexesByPlayer = collectTraversedHexesByPlayer(allOrders, unitsBeforeMovementAfterCombat);
-  const opponentHadStrategicMarchResolution =
-    traversedHexesByPlayer.opponent.size > 0 ||
-    aiOrders.some((o) => {
-      const u = unitsBeforeMove.find((x) => x.id === o.unitId);
-      return u?.player === 'opponent' && u.h3Index !== o.toH3Index;
+  const hadStrategicMarchResolutionBySeat: Record<string, boolean> = {};
+  for (const seat of activeAiSeats(getSeatRoster())) {
+    if (!isAiSeatId(seat.seatId)) continue;
+    const traversed = (traversedHexesByPlayer.get(seat.seatId)?.size ?? 0) > 0;
+    const marched = allOrders.some((order) => {
+      const unit = unitsBeforeMove.find((candidate) => candidate.id === order.unitId);
+      return unit?.player === seat.seatId && unit.h3Index !== order.toH3Index;
     });
+    hadStrategicMarchResolutionBySeat[seat.seatId] = traversed || marched;
+  }
+  const aiMoves = allOrders.flatMap((order) => {
+    const unit = unitsBeforeMove.find((candidate) => candidate.id === order.unitId);
+    if (!unit || unit.player === HUMAN_SEAT_ID || unit.h3Index === order.toH3Index) return [];
+    return [{ unitId: order.unitId, fromH3Index: unit.h3Index, toH3Index: order.toH3Index }];
+  });
   for (const order of allOrders) {
-    autoDebarkOpponentLandUnitIfMovingIndependently(order.unitId, order.toH3Index);
+    autoDebarkNonHumanLandUnitIfMovingIndependently(order.unitId, order.toH3Index);
     if (shouldSkipEmbarkedLandIndependentMove(order.unitId, order.toH3Index)) {
       logDebug('readyStrategicResolutionPipeline skip embarked independent move', {
         unitId: order.unitId,
@@ -384,12 +407,22 @@ export function executeReadyStrategicTurn(
   ), techHitBonusAt);
 
   const rawMeleeHexes = listMeleeCandidateHexes(combatUnitsAfter, hexList);
-  const candidateHexes = filterMeleeCandidateHexesWithTacticalEntry(rawMeleeHexes, {
-    allowDuringStrategicResolution: true,
-  });
-  if (candidateHexes.length > 0) {
+  const human = findHumanSeat(getSeatRoster());
+  const observing = human == null || !isSeatActive(human);
+  const visibleHexes = observing ? new Set<string>() : new Set(getGameStateForPlayer(HUMAN_SEAT_ID).visibleHexes ?? []);
+  const seenHexes = observing ? [] : rawMeleeHexes.filter((hex) => visibleHexes.has(hex));
+  const partySeats = getSeatRoster().map((seat) => ({ seatId: seat.seatId, seatOrder: seat.seatOrder }));
+  let meleeInterceptCandidates = buildMeleeInterceptCandidateRows(seenHexes, combatUnitsAfter, partySeats);
+  const placeable = new Set(filterMeleeCandidateHexesWithTacticalEntry(
+    meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index),
+    { allowDuringStrategicResolution: true }
+  ));
+  meleeInterceptCandidates = meleeInterceptCandidates.map((row) =>
+    row.tacticalEligible && !placeable.has(row.h3Index) ? { ...row, tacticalEligible: false } : row
+  );
+  const candidateHexes = meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index);
+  if (!observing && candidateHexes.length > 0) {
     const decisionToken = newMeleeDecisionToken();
-    const meleeInterceptCandidates = buildMeleeInterceptCandidateRows(candidateHexes, combatUnitsAfter);
     const snapshot: MeleeInterceptReadyPauseSnapshot = {
       decisionToken,
       turnNumber,
@@ -403,13 +436,11 @@ export function executeReadyStrategicTurn(
       airStrikeTransportLosses,
       rangedTransportLosses,
       humanMoves: [...humanMoves],
+      aiMoves: [...aiMoves],
       embarkedFollowMoves: [...embarkedFollowMoves],
       resolvedFerryMoves: [...resolvedFerryMoves],
-      traversedHexesByPlayer: {
-        human: new Set(traversedHexesByPlayer.human),
-        opponent: new Set(traversedHexesByPlayer.opponent),
-      },
-      opponentHadStrategicMarchResolution,
+      traversedHexesByPlayer: traversalSetsToRecord(traversedHexesByPlayer),
+      hadStrategicMarchResolutionBySeat,
       allRanged: [...allRanged],
       aiRangedOrders: [...aiRangedOrders],
       candidateHexes: [...candidateHexes],
@@ -439,12 +470,14 @@ export function executeReadyStrategicTurn(
     combatUnitsAfter,
     combatUnitsBefore,
     humanMoves,
+    aiMoves,
     embarkedFollowMoves,
     resolvedFerryMoves,
     traversedHexesByPlayer,
-    opponentHadStrategicMarchResolution,
+    hadStrategicMarchResolutionBySeat,
     turnNumber,
     allRanged,
     aiRangedOrders,
+    knockoutCoordinates: { latLngByH3, resolveToH3 },
   });
 }

@@ -1,6 +1,7 @@
 import type { PreviewHomeBorder, PreviewTechIconInput, PreviewWeatherIconInput } from './newGameMapPreviewTypes';
 import type { TechLevel } from './techBonusTypes';
 import { gameDateForTurn } from './gameCalendar';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
 import type { WeatherState } from './weatherBonusTypes';
 
 /**
@@ -12,6 +13,22 @@ import type { WeatherState } from './weatherBonusTypes';
  * Exceptions: None.
  */
 const WEATHER_STATES: ReadonlySet<string> = new Set<WeatherState>(['mild', 'rain', 'snow', 'heat']);
+
+/**
+ * Seat orders, starting at 1, whose homes include this hex.
+ *
+ * Purpose: The preview paints rings from row order, not from the match that may still be loaded.
+ * When to use: Once per preview hex, with `homeRegionHexesBySeatOrder`.
+ * Expected outcome: An empty list when no row claims the hex. Shared homes list every claiming order.
+ * Exceptions: None.
+ */
+export function previewHomeSeatOrders(h3Index: string, homesBySeatOrder: readonly (readonly string[])[]): number[] {
+  const orders: number[] = [];
+  homesBySeatOrder.forEach((hexes, index) => {
+    if (hexes.includes(h3Index)) orders.push(index + 1);
+  });
+  return orders;
+}
 
 /**
  * Chooses the home-border colors for one preview hex.
@@ -28,9 +45,16 @@ export function previewHomeBorder(
 ): PreviewHomeBorder {
   const inHuman = humanHomeHexes.has(h3Index);
   const inAi = aiHomeHexes.has(h3Index);
-  if (inHuman && inAi) return { controllerPlayerId: null, homeOwnerIdentity: 'both' };
-  if (inHuman) return { controllerPlayerId: 'human', homeOwnerIdentity: 'human' };
-  if (inAi) return { controllerPlayerId: 'opponent', homeOwnerIdentity: 'opponent' };
+  if (inHuman && inAi) return { controllerPlayerId: null, homeOwnerIdentity: { kind: 'shared' } };
+  if (inHuman) {
+    return { controllerPlayerId: HUMAN_SEAT_ID, homeOwnerIdentity: { kind: 'single', seatId: HUMAN_SEAT_ID } };
+  }
+  if (inAi) {
+    return {
+      controllerPlayerId: AI_SEAT_IDS[0],
+      homeOwnerIdentity: { kind: 'single', seatId: AI_SEAT_IDS[0] },
+    };
+  }
   return { controllerPlayerId: null, homeOwnerIdentity: null };
 }
 

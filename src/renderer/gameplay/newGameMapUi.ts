@@ -1,7 +1,7 @@
 import type { GameMapListEntry, GameMapListSideGroup } from '../../shared/gameMapList';
-import { formatAdvancedTechLine, formatUnitCostLabel, pickDistinctIndexes, pickIndexExcept } from '../../shared/gameMapList';
+import { formatAdvancedTechLine, formatUnitCostLabel } from '../../shared/gameMapList';
+import type { HomeOption } from '../../shared/newGameSides';
 import { selectTabPanel, type TabPanelBinding } from '../chrome/selectTabPanel';
-import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { refreshNewGameMapPreview } from './newGameMapPreviewUi';
 import { syncNewGameBannerToTab } from './newGameBanner';
@@ -40,6 +40,40 @@ let loadedMaps: GameMapListEntry[] = [];
 let controlsRegistered = false;
 
 /**
+ * Told when the tab or the regional map changes.
+ *
+ * Purpose: The side rows live in another module, and this file must not import it.
+ * When to use: `setNewGameHomesChangedListener` from the side-row module.
+ * Expected outcome: Called after the tab or region changes, before the preview refresh that follows.
+ * Exceptions: None.
+ */
+let onHomesChanged: (() => void) | null = null;
+
+/**
+ * Registers the side-row refresh.
+ *
+ * Purpose: A tab or region change has to rebuild homes without a circular import.
+ * When to use: Once, when the side rows are wired.
+ * Expected outcome: Later tab and region changes call `listener`.
+ * Exceptions: None.
+ */
+export function setNewGameHomesChangedListener(listener: () => void): void {
+  onHomesChanged = listener;
+}
+
+/**
+ * Homes on the regional map that is selected.
+ *
+ * Purpose: Each side row picks one group.
+ * When to use: While the Regional tab is showing.
+ * Expected outcome: One option per side group, id then display name.
+ * Exceptions: None.
+ */
+export function regionalHomeOptions(): readonly HomeOption[] {
+  return selectedSideGroups().map((group) => ({ key: group.id, label: group.displayName }));
+}
+
+/**
  * Wires the Global and Regional tabs and the regional randomize buttons.
  *
  * Purpose: Those controls stay live for the whole session. The map list loads when the overlay opens.
@@ -52,10 +86,12 @@ export function registerNewGameMapControls(): void {
   controlsRegistered = true;
   document.getElementById('new-game-tab-global')?.addEventListener('click', () => {
     selectNewGameTab('global');
+    onHomesChanged?.();
     void refreshNewGameMapPreview();
   });
   document.getElementById('new-game-tab-regional')?.addEventListener('click', () => {
     selectNewGameTab('regional');
+    onHomesChanged?.();
     void refreshNewGameMapPreview();
   });
   document.getElementById('new-game-region-select')?.addEventListener('change', () => {
@@ -64,14 +100,6 @@ export function registerNewGameMapControls(): void {
   document.getElementById('new-game-region-randomize')?.addEventListener('click', () => {
     randomizeSelectedRegion();
   });
-  document.getElementById('new-game-human-side-select')?.addEventListener('change', () => {
-    void refreshNewGameMapPreview();
-  });
-  document.getElementById('new-game-ai-side-select')?.addEventListener('change', () => {
-    void refreshNewGameMapPreview();
-  });
-  document.getElementById('new-game-human-side-randomize')?.addEventListener('click', () => randomizeOneRegionalSide('human'));
-  document.getElementById('new-game-ai-side-randomize')?.addEventListener('click', () => randomizeOneRegionalSide('ai'));
 }
 
 /**
@@ -101,35 +129,15 @@ export async function prepareNewGameMapPanel(): Promise<void> {
  * Expected outcome: Regional fields are omitted on the Global tab.
  * Exceptions: None. Empty strings when a select is missing.
  */
-export function readNewGameMapChoice(): {
-  gameMapId?: string;
-  humanSideGroupId?: string;
-  aiSideGroupId?: string;
-} {
+export function readNewGameMapChoice(): { gameMapId?: string } {
   if (!regionalTabSelected()) return {};
-  return {
-    gameMapId: selectValue('new-game-region-select'),
-    humanSideGroupId: selectValue('new-game-human-side-select'),
-    aiSideGroupId: selectValue('new-game-ai-side-select'),
-  };
-}
-
-/**
- * Reports whether Start should be refused.
- *
- * Purpose: A regional map without two sides cannot be seeded.
- * When to use: The Start click, before `newGame`.
- * Expected outcome: True only on the Regional tab when the selected map has fewer than two groups.
- * Exceptions: None.
- */
-export function regionalStartBlocked(): boolean {
-  return regionalTabSelected() && selectedSideGroups().length < 2;
+  return { gameMapId: selectValue('new-game-region-select') };
 }
 
 /**
  * Shows one new-game tab and refreshes the price after each unit type.
  *
- * Purpose: Prices belong to the tab, and Start is available only when the regional map has two sides.
+ * Purpose: Prices belong to the tab that is showing.
  * When to use: A tab click and the overlay open.
  * Expected outcome: The other panel is hidden. Costs and the Advanced line match the visible tab.
  * Exceptions: None.
@@ -137,7 +145,6 @@ export function regionalStartBlocked(): boolean {
 function selectNewGameTab(which: 'global' | 'regional'): void {
   selectTabPanel(which === 'regional' ? 'new-game-tab-regional' : 'new-game-tab-global', NEW_GAME_TABS);
   applyVisibleCosts();
-  syncStartEnabled();
   syncNewGameBannerToTab(which);
 }
 
@@ -162,16 +169,15 @@ function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
 }
 
 /**
- * Picks a random regional map and then two different sides.
+ * Picks a random regional map.
  *
- * Purpose: Opening the overlay must not leave both sides on the same group.
+ * Purpose: Opening the overlay should not always land on the first region.
  * When to use: `prepareNewGameMapPanel`.
- * Expected outcome: The region changes, then both side selectors change.
+ * Expected outcome: The region selector changes. Side rows refresh from the homes listener.
  * Exceptions: None.
  */
 function randomizeRegionalMap(): void {
   pickRandomRegionIndex();
-  applySelectedRegionSides(true);
 }
 
 /**
@@ -179,7 +185,7 @@ function randomizeRegionalMap(): void {
  *
  * Purpose: The region randomize button matches the home-region buttons. Setting the index does not fire `change`.
  * When to use: The region randomize button.
- * Expected outcome: Sides, prices, the Advanced line, Start, and the map preview follow the drawn region.
+ * Expected outcome: Prices, the Advanced line, the side rows, and the map preview follow the drawn region.
  * Exceptions: None. An empty list leaves the selectors as they are.
  */
 function randomizeSelectedRegion(): void {
@@ -205,57 +211,14 @@ function pickRandomRegionIndex(): boolean {
 /**
  * Applies the region now shown in the selector.
  *
- * Purpose: The dropdown and the randomize button must leave sides, prices, Start, and the preview on that region.
+ * Purpose: The dropdown and the randomize button must leave prices and the preview on that region.
  * When to use: The region selector's `change` event and `randomizeSelectedRegion`.
- * Expected outcome: Two different sides when the region has two groups. Start disables when it has fewer. The preview refits.
+ * Expected outcome: Costs refresh, the side rows hear the change, and the preview refits.
  * Exceptions: None.
  */
 function onRegionalRegionChanged(): void {
-  applySelectedRegionSides(true);
   if (regionalTabSelected()) applyVisibleCosts();
-  syncStartEnabled();
-  void refreshNewGameMapPreview();
-}
-
-/**
- * Fills both side selectors from the selected region and optionally draws two different groups.
- *
- * Purpose: A region change replaces the previous region's groups.
- * When to use: The region selector's change event, and after a random region pick.
- * Expected outcome: When `randomize` is true and two groups exist, the selected indexes differ.
- * Exceptions: None.
- */
-function applySelectedRegionSides(randomize: boolean): void {
-  const groups = selectedSideGroups();
-  fillSideSelect('new-game-human-side-select', groups);
-  fillSideSelect('new-game-ai-side-select', groups);
-  if (!randomize) return;
-  const picked = pickDistinctIndexes(groups.length);
-  const human = document.getElementById('new-game-human-side-select') as HTMLSelectElement | null;
-  const ai = document.getElementById('new-game-ai-side-select') as HTMLSelectElement | null;
-  if (!picked || !human || !ai) return;
-  human.selectedIndex = picked.first;
-  ai.selectedIndex = picked.second;
-}
-
-/**
- * Redraws one side onto any group except the other side's current group.
- *
- * Purpose: Each randomize button belongs to one selector.
- * When to use: The human or AI side randomize button.
- * Expected outcome: That selector changes. The other selector stays. Fewer than two groups leaves both as they are.
- * Exceptions: None.
- */
-function randomizeOneRegionalSide(which: 'human' | 'ai'): void {
-  const groups = selectedSideGroups();
-  const human = document.getElementById('new-game-human-side-select') as HTMLSelectElement | null;
-  const ai = document.getElementById('new-game-ai-side-select') as HTMLSelectElement | null;
-  if (!human || !ai) return;
-  const target = which === 'human' ? human : ai;
-  const otherIndex = which === 'human' ? ai.selectedIndex : human.selectedIndex;
-  const next = pickIndexExcept(groups.length, otherIndex);
-  if (next === null) return;
-  target.selectedIndex = next;
+  onHomesChanged?.();
   void refreshNewGameMapPreview();
 }
 
@@ -304,22 +267,6 @@ function setAdvancedTechLine(text: string): void {
 function setCost(id: string, cost: number): void {
   const el = document.getElementById(id);
   if (el) el.textContent = formatUnitCostLabel(cost);
-}
-
-/**
- * Disables Start when the regional map cannot field two sides.
- *
- * Purpose: The player sees why Start will not run.
- * When to use: After a tab change, and after the regional region changes.
- * Expected outcome: Start is enabled on Global and on a regional map with two groups. Otherwise it is disabled and a toast names the problem.
- * Exceptions: None.
- */
-function syncStartEnabled(): void {
-  const button = document.getElementById('new-game-btn') as HTMLButtonElement | null;
-  if (!button) return;
-  const blocked = regionalStartBlocked();
-  button.disabled = blocked;
-  if (blocked) showMapToast('This map has no two sides.');
 }
 
 /**
@@ -381,24 +328,4 @@ export function selectedNewGameTab(): 'global' | 'regional' {
  */
 function selectValue(id: string): string {
   return (document.getElementById(id) as HTMLSelectElement | null)?.value ?? '';
-}
-
-/**
- * Replaces the options of one side selector.
- *
- * Purpose: Human and AI lists stay the same groups.
- * When to use: After the selected region changes.
- * Expected outcome: One option per group, using the group id as the value.
- * Exceptions: None.
- */
-function fillSideSelect(id: string, groups: readonly GameMapListSideGroup[]): void {
-  const select = document.getElementById(id) as HTMLSelectElement | null;
-  if (!select) return;
-  select.innerHTML = '';
-  for (const group of groups) {
-    const option = document.createElement('option');
-    option.value = group.id;
-    option.textContent = group.displayName;
-    select.appendChild(option);
-  }
 }

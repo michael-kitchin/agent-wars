@@ -1,5 +1,6 @@
 import type { BonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
+import type { DoctrineChoice, SeatKind } from '../seatRoster';
 
 export interface MovementOrder {
     /**
@@ -317,6 +318,91 @@ ferryOrders?: FerryOrder[];
 }
 
 /**
+ * The model and doctrine for one AI side on a new match.
+ *
+ * Purpose: The human side has no commander. Each AI side may name one.
+ * When to use: A seat entry on `game:newGame`.
+ * Expected outcome: A missing commander means standing orders and Balanced.
+ * Exceptions: None.
+ */
+export interface NewGameCommanderInput {
+  /**
+   * Model id, or null for standing orders only.
+   *
+   * Contract: Null skips the model. A string is stored on the seat.
+   * When to use: When the screen has chosen a model.
+   * Expected outcome: Stored as `model_id`.
+   * Exceptions: None.
+   */
+  readonly modelId: string | null;
+  /**
+   * Reasoning effort, or null for the model default.
+   *
+   * Contract: Null means the model default.
+   * When to use: When the screen has chosen an effort.
+   * Expected outcome: Stored as `reasoning_effort`.
+   * Exceptions: None.
+   */
+  readonly reasoningEffort: string | null;
+  /**
+   * Doctrine the human picked, including Random.
+   *
+   * Contract: One of `DOCTRINE_CHOICES`. Random is a choice, not a prompt block.
+   * When to use: The doctrine control for this side.
+   * Expected outcome: Stored as `doctrine_choice`. Random plays Balanced until a draw replaces it.
+   * Exceptions: None.
+   */
+  readonly doctrineChoice: DoctrineChoice;
+}
+
+/**
+ * One side of a new match, in the order the screen listed it.
+ *
+ * Purpose: A match starts from this list when the screen sends one. The older home fields are ignored then.
+ * When to use: `seats` on `game:newGame`.
+ * Expected outcome: Two to four entries. At most one has kind `HUMAN_SEAT_ID`.
+ * Exceptions: None.
+ */
+export interface NewGameSeatInput {
+  /**
+   * Whether this side is the human or an AI.
+   *
+   * Contract: `HUMAN_SEAT_ID` or `'ai'`. At most one human.
+   * When to use: Every seat entry.
+   * Expected outcome: The human entry becomes the human seat. AI entries become AI seats in row order.
+   * Exceptions: None.
+   */
+  readonly kind: SeatKind;
+  /**
+   * Home on the global map, a UN subregion name.
+   *
+   * Contract: Ignored on a regional map. A missing or unknown name takes the first listed region that an earlier row did not take.
+   * When to use: Global matches.
+   * Expected outcome: Stored as that seat's `homeRegion` when the name is listed.
+   * Exceptions: None.
+   */
+  readonly homeRegion?: string;
+  /**
+   * Home on a regional map, a side group id.
+   *
+   * Contract: Ignored on the global map. A missing id takes the first installed group that an earlier row did not take.
+   * When to use: Regional matches.
+   * Expected outcome: The group's display name becomes `homeRegion`.
+   * Exceptions: None.
+   */
+  readonly sideGroupId?: string;
+  /**
+   * This AI side's model and doctrine.
+   *
+   * Contract: Optional. Ignored on a human seat.
+   * When to use: When this side should not stay on the Balanced standing-orders commander.
+   * Expected outcome: Stored on that AI seat.
+   * Exceptions: None.
+   */
+  readonly commander?: NewGameCommanderInput;
+}
+
+/**
  * Documents the `NewGameIpcPayload` interface as a named contract surface (export interface NewGameIpcPayload).
 
  * Purpose: Supports maintainability by documenting why `NewGameIpcPayload` exists.
@@ -334,24 +420,6 @@ export interface NewGameIpcPayload {
    * Exceptions: None.
    */
 fogOfWarEnabled?: boolean;
-    /**
-   * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion?: string;).
-
-   * Contract: Describes stable behavior for callers of `humanHomeRegion` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-humanHomeRegion?: string;
-    /**
-   * Specifies the contract for the `aiHomeRegion` member (aiHomeRegion?: string;).
-
-   * Contract: Describes stable behavior for callers of `aiHomeRegion` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-aiHomeRegion?: string;
     /**
    * Specifies the contract for the `gameSize` member (gameSize?: GameSize;).
 
@@ -416,23 +484,23 @@ techBonusLevel?: BonusLevel;
    */
 gameMapId?: string;
     /**
-   * Human side group.
+   * Requested length of a global match.
    *
-   * Contract: Required with a regional `gameMapId`. Ignored for the global map.
-   * When to use: The Regional tab.
-   * Expected outcome: That group's land hexes become the human home.
+   * Contract: Used only for the global map. A value outside 20, 30, 40, and 50 becomes 30.
+   * When to use: The new-game dialog's turn-limit control.
+   * Expected outcome: Stored as `turn_limit`. A regional start ignores it.
    * Exceptions: None.
    */
-humanSideGroupId?: string;
+turnLimit?: number;
     /**
-   * AI side group.
+   * One entry per side, in row order.
    *
-   * Contract: Required with a regional `gameMapId`, and different from the human group.
-   * When to use: The Regional tab.
-   * Expected outcome: That group's land hexes become the AI home.
+   * Contract: Each entry is a human or AI seat. Blank homes take the first free listed home.
+   * When to use: A start that names two to four sides.
+   * Expected outcome: Those sides are the roster. Absent builds one human seat and one AI seat.
    * Exceptions: None.
    */
-aiSideGroupId?: string;
+seats?: readonly NewGameSeatInput[];
 }
 
 /**

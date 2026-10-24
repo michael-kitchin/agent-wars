@@ -2,7 +2,9 @@ import { isNeutralBorderHex } from './h3Resolutions';
 import { getMaxUnitsPerType, parseGameSize } from './gameSize';
 import { countControlledHexesInRegion } from './homeRegionRules';
 import { ALL_BUILD_UNIT_TYPES, type BuildUnitType } from './ipc/productionTypes';
+import { HUMAN_SEAT_ID, type SeatId } from './seatIds';
 import { getPlayerUnitCountsByType } from './unitCountsByType';
+import { countCityHexesBySeat, rankSeatsByCityHexes, type VictorySettings } from './victoryRules';
 
 /**
  * The parts of a game-state snapshot that the top-bar readouts read.
@@ -50,23 +52,88 @@ export interface TopBarStatsInput {
    */
   readonly strategicInfrastructure?: ReadonlyArray<{ readonly h3Index: string; readonly urbanHexCount: number }>;
   /**
-   * The human home region's hexes.
+   * The seat the readouts are for.
    *
-   * Contract: May repeat a hex; repeats count once.
-   * When to use: Pass `state.humanHomeRegionHexes`.
-   * Expected outcome: The total for Your home.
+   * Contract: A seat id, null when the match has no active human seat, or omitted to mean the human seat.
+   * When to use: Pass null while observing. Omit it for a two-seat snapshot that has no roster.
+   * Expected outcome: Null omits Your home and Enemy homes.
    * Exceptions: None.
    */
-  readonly humanHomeRegionHexes?: readonly string[];
+  readonly viewerSeatId?: string | null;
   /**
-   * The opponent home region's hexes.
+   * Seats in the match.
    *
-   * Contract: May repeat a hex; repeats count once.
-   * When to use: Pass `state.aiHomeRegionHexes`.
-   * Expected outcome: The total for Enemy home.
+   * Contract: Optional. Each row names its home and whether it is out.
+   * When to use: Pass `state.seats`.
+   * Expected outcome: Enemy homes use the active seats other than the viewer.
    * Exceptions: None.
    */
-  readonly aiHomeRegionHexes?: readonly string[];
+  readonly seats?: readonly TopBarSeatRow[];
+  /**
+   * Home hexes keyed by seat id.
+   *
+   * Contract: Optional. Missing keys count as no hexes.
+   * When to use: Pass `state.homeRegionHexesBySeat`.
+   * Expected outcome: Home readouts use these lists when they are present.
+   * Exceptions: None.
+   */
+  readonly homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * The match's win rule.
+   *
+   * Contract: Optional. A turn limit shows Cities and hides Enemy homes.
+   * When to use: Pass `state.victory`.
+   * Expected outcome: Absent means last side standing.
+   * Exceptions: None.
+   */
+  readonly victory?: VictorySettings;
+}
+
+/**
+ * One roster row the home and city readouts need.
+ *
+ * Purpose: The top bar does not need a commander's model.
+ * When to use: `TopBarStatsInput.seats`.
+ * Expected outcome: Enough to tell homes apart and to skip a knocked-out seat.
+ * Exceptions: None.
+ */
+export interface TopBarSeatRow {
+  /**
+   * The seat id.
+   *
+   * Contract: A `SeatId`.
+   * When to use: Matching homes and city counts.
+   * Expected outcome: Unique in the list.
+   * Exceptions: None.
+   */
+  readonly seatId: SeatId;
+  /**
+   * List order, from 1.
+   *
+   * Contract: Unique in the roster.
+   * When to use: Breaking a city-hex tie.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  readonly seatOrder: number;
+  /**
+   * Home name.
+   *
+   * Contract: The side-group display name, or the UN subregion name.
+   * When to use: The Cities tooltip.
+   * Expected outcome: A non-empty name.
+   * Exceptions: None.
+   */
+  readonly homeRegion: string;
+  /**
+   * The turn the seat was knocked out, or null while it plays.
+   *
+   * Contract: Null means the seat is active.
+   * When to use: Enemy homes and the city ranking skip a knocked-out seat.
+   * Expected outcome: A turn number, or null.
+   * Exceptions: None.
+   */
+  readonly outTurn: number | null;
 }
 
 /**
@@ -160,16 +227,25 @@ export interface TopBarStats {
    * Expected outcome: See `HomeHold`.
    * Exceptions: None.
    */
-  readonly humanHome: HomeHold;
+  readonly yourHome: HomeHold | null;
   /**
-   * The human player's hold on the opponent's home region.
+   * The viewer's hold on every active enemy home, taken together.
    *
-   * Contract: Human control only.
-   * When to use: The Enemy home readout.
-   * Expected outcome: See `HomeHold`.
+   * Contract: Null when the viewer is null, or when the match ends on a turn limit.
+   * When to use: The Enemy homes readout.
+   * Expected outcome: A knocked-out enemy's home is left out of both numbers.
    * Exceptions: None.
    */
-  readonly opponentHome: HomeHold;
+  readonly enemyHomes: HomeHold | null;
+  /**
+   * The viewer's city hexes and place in a turn-limit match.
+   *
+   * Contract: Null unless the win rule is the turn limit. `summary` is null when the viewer is null.
+   * When to use: The Cities readout.
+   * Expected outcome: The tooltip lists every active seat, highest first, and marks the viewer with "(you)" when there is one.
+   * Exceptions: None.
+   */
+  readonly cities: { readonly summary: string | null; readonly tooltip: string } | null;
 }
 
 /**
@@ -177,36 +253,109 @@ export interface TopBarStats {
  *
  * Purpose: Display-only totals derived in the renderer; nothing here changes game state.
  * When to use: On every top-bar refresh with a snapshot. Pass `isNeutralBorder` only in tests.
- * Expected outcome: Production sums `urbanHexCount` (truncated, at least zero) over hexes the human controls,
- *   skipping neutral-border hexes, as the per-turn credit does. Forces counts human units against the size caps.
- *   Each home readout counts the region's hexes the human controls.
- * Exceptions: None; missing lists count as empty.
+ * Expected outcome: Production and forces are the viewer's. Your home is the viewer's own home.
+ *   Enemy homes are the active enemies' homes taken together. A turn-limit match shows Cities instead.
+ * Exceptions: None; missing lists count as empty. A null viewer does not throw.
  */
 export function computeTopBarStats(
   input: TopBarStatsInput,
   isNeutralBorder: (h3Index: string) => boolean = isNeutralBorderHex
 ): TopBarStats {
+  const viewer = input.viewerSeatId === undefined ? HUMAN_SEAT_ID : input.viewerSeatId;
   const control = input.strategicControl ?? [];
-  const humanHexes = new Set(control.filter((row) => row.controllerPlayerId === 'human').map((row) => row.h3Index));
+  const heldHexes = new Set(
+    viewer === null ? [] : control.filter((row) => row.controllerPlayerId === viewer).map((row) => row.h3Index)
+  );
   const productionPerTurn = (input.strategicInfrastructure ?? [])
-    .filter((row) => humanHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index))
+    .filter((row) => heldHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index))
     .reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
-  const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), 'human');
+  const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), viewer ?? '');
   const capByType = getMaxUnitsPerType(parseGameSize(input.gameSize));
   const unitsFielded = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + fieldedByType[unitType], 0);
   const unitCap = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + capByType[unitType], 0);
-  const controlRows = Array.from(control);
-  const humanHome = countControlledHexesInRegion(controlRows, input.humanHomeRegionHexes, 'human');
-  const opponentHome = countControlledHexesInRegion(controlRows, input.aiHomeRegionHexes, 'human');
+  const turnLimit = input.victory?.rule === 'most_city_hexes_at_turn_limit' ? input.victory.turnLimit : null;
   return {
     productionPerTurn,
     fieldedByType,
     capByType,
     unitsFielded,
     unitCap,
-    humanHome: { held: humanHome.controlled, total: humanHome.total },
-    opponentHome: { held: opponentHome.controlled, total: opponentHome.total },
+    yourHome: viewer === null ? null : holdOf(input, viewer, homeHexesOf(input, viewer)),
+    enemyHomes: viewer === null || turnLimit !== null ? null : holdOf(input, viewer, enemyHomeHexesOf(input, viewer)),
+    cities: turnLimit === null ? null : citiesReadout(input, viewer, turnLimit),
   };
+}
+
+/**
+ * Counts the hexes of a list that the viewer controls.
+ *
+ * Purpose: Your home and Enemy homes share the same hold shape.
+ * When to use: `computeTopBarStats`.
+ * Expected outcome: Both numbers are zero when the list is empty.
+ * Exceptions: None.
+ */
+function holdOf(input: TopBarStatsInput, viewer: string, hexes: readonly string[]): HomeHold {
+  const hold = countControlledHexesInRegion(Array.from(input.strategicControl ?? []), hexes, viewer);
+  return { held: hold.controlled, total: hold.total };
+}
+
+/**
+ * The viewer's own home hexes.
+ *
+ * Purpose: Your home reads the viewer's list from the seat map.
+ * When to use: Your home.
+ * Expected outcome: An empty list when the viewer has no home.
+ * Exceptions: None.
+ */
+function homeHexesOf(input: TopBarStatsInput, viewer: string): readonly string[] {
+  return input.homeRegionHexesBySeat?.[viewer] ?? [];
+}
+
+/**
+ * Every active enemy home, as one list.
+ *
+ * Purpose: A knocked-out enemy's home leaves both the held count and the total.
+ * When to use: Enemy homes, and only when the match is not on a turn limit.
+ * Expected outcome: The hexes of every other active seat. Empty when the seat map is absent.
+ * Exceptions: None.
+ */
+function enemyHomeHexesOf(input: TopBarStatsInput, viewer: string): readonly string[] {
+  const enemies = (input.seats ?? []).filter((seat) => seat.seatId !== viewer && seat.outTurn === null);
+  return enemies.flatMap((seat) => input.homeRegionHexesBySeat?.[seat.seatId] ?? []);
+}
+
+/**
+ * The Cities readout and its tip.
+ *
+ * Purpose: The place comes from the same ranking the match uses at the turn limit.
+ * When to use: A turn-limit match.
+ * Expected outcome: A null viewer still gets the tip, with no "(you)", and no summary number.
+ * Exceptions: None.
+ */
+function citiesReadout(
+  input: TopBarStatsInput,
+  viewer: string | null,
+  turnLimit: number
+): { readonly summary: string | null; readonly tooltip: string } {
+  const active = (input.seats ?? []).filter((seat) => seat.outTurn === null);
+  const counts = countCityHexesBySeat(input.strategicControl ?? [], input.strategicInfrastructure ?? []);
+  const places = rankSeatsByCityHexes(
+    active.map((seat) => seat.seatId),
+    counts
+  );
+  const ranked = [...active].sort((left, right) => {
+    const byCount = (counts.get(right.seatId) ?? 0) - (counts.get(left.seatId) ?? 0);
+    return byCount !== 0 ? byCount : left.seatOrder - right.seatOrder;
+  });
+  const lines = ranked.map((seat) => {
+    const you = viewer !== null && seat.seatId === viewer ? ' (you)' : '';
+    return `${seat.homeRegion}${you} ${counts.get(seat.seatId) ?? 0}`;
+  });
+  const tooltip = `City hexes held. Most at the end of turn ${turnLimit} wins. A tie leaves no single winner. ${lines.join('; ')}`;
+  if (viewer === null) return { summary: null, tooltip };
+  const held = counts.get(viewer) ?? 0;
+  const place = places.get(viewer as SeatId) ?? active.length;
+  return { summary: `${formatCount(held)} · ${place} of ${active.length}`, tooltip };
 }
 
 /**
@@ -267,20 +416,38 @@ export interface TopBarStatParts {
    * Enemy home held, such as "3".
    *
    * Contract: Digits only.
-   * When to use: `#topbar-stat-opponent-home`.
+   * When to use: `#topbar-stat-enemy-home`.
    * Expected outcome: Never negative.
    * Exceptions: None.
    */
-  readonly opponentHome: string;
+  readonly enemyHome: string;
   /**
    * Enemy home total suffix, such as "/24".
    *
    * Contract: Starts with "/".
-   * When to use: `#topbar-stat-opponent-home-total`.
+   * When to use: `#topbar-stat-enemy-home-total`.
    * Expected outcome: The region's hex count.
    * Exceptions: None.
    */
-  readonly opponentHomeTotal: string;
+  readonly enemyHomeTotal: string;
+  /**
+   * The Cities value, such as "4 · 2 of 3".
+   *
+   * Contract: Empty when the match is not on a turn limit, or when there is no viewer.
+   * When to use: `#topbar-stat-cities`.
+   * Expected outcome: The place is a number, shared when two seats hold the same count.
+   * Exceptions: None.
+   */
+  readonly cities: string;
+  /**
+   * The Cities tip.
+   *
+   * Contract: Empty when the match is not on a turn limit.
+   * When to use: The Cities readout's tooltip.
+   * Expected outcome: Names every active seat, highest first.
+   * Exceptions: None.
+   */
+  readonly citiesTooltip: string;
 }
 
 /**
@@ -308,10 +475,12 @@ export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {
     production: `+${formatCount(stats.productionPerTurn)}`,
     forces: formatCount(stats.unitsFielded),
     forcesCap: `/${formatCount(stats.unitCap)}`,
-    humanHome: formatCount(stats.humanHome.held),
-    humanHomeTotal: `/${formatCount(stats.humanHome.total)}`,
-    opponentHome: formatCount(stats.opponentHome.held),
-    opponentHomeTotal: `/${formatCount(stats.opponentHome.total)}`,
+    humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : '—',
+    humanHomeTotal: stats.yourHome ? `/${formatCount(stats.yourHome.total)}` : '',
+    enemyHome: stats.enemyHomes ? formatCount(stats.enemyHomes.held) : '—',
+    enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : '',
+    cities: stats.cities?.summary ?? '',
+    citiesTooltip: stats.cities?.tooltip ?? '',
   };
 }
 

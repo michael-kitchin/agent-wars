@@ -9,6 +9,7 @@ import { buildSealiftSlotsByNavalId, normalizeSealiftSlots } from '../gameAction
 import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../gameActions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Returns sealift UI state for one tactical stack hex from the committed tactical snapshot (human sub-units only).
@@ -37,7 +38,7 @@ export function getTacticalSealiftStackStateForHex(h3Index: string): SealiftStac
  * Exceptions: None.
  */
 export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleSnapshot, h3Index: string): SealiftStackState {
-  const at = snap.subUnits.filter((u) => u.h3Index === h3Index && u.player === 'human');
+  const at = snap.subUnits.filter((u) => u.h3Index === h3Index && u.player === HUMAN_SEAT_ID);
   const navalSubs = at.filter((u) => u.unitType === 'naval').sort((a, b) => a.id.localeCompare(b.id));
   const landSubs = at.filter((u) => u.unitType === 'infantry' || u.unitType === 'armor');
   const landOptions: SealiftLandUnitOption[] = landSubs
@@ -63,7 +64,7 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
   const slotsByNavalId = buildSealiftSlotsByNavalId(navalIds, assignments);
   normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   const contextMode = getSealiftStackContextModeForHex(h3Index);
-  const debarkAllowed = canManualDebarkFromHex(h3Index, 'human');
+  const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
   const navalRows: SealiftNavalRow[] = navalIds.map((navalUnitId) => {
     const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
     const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';

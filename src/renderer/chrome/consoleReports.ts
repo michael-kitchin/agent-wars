@@ -6,12 +6,72 @@
  */
 import {
   CONSOLE_REPORT_KIND_LABELS,
+  consoleReportVisible,
   formatConsoleReportTag,
   MAX_CONSOLE_REPORTS,
   type ConsoleReportKind,
 } from '../../shared/consoleReportLog';
+import { paletteForOwner } from '../../shared/seatPalette';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+
+/**
+ * Extra facts a message entry can name.
+ *
+ * Purpose: The Reports row shows who sent it and which model, without parsing the toast text.
+ * When to use: The fourth argument of `recordConsoleReport`.
+ * Expected outcome: A message with `messageText` is drawn as a sender line. Other entries ignore this.
+ * Exceptions: None.
+ */
+export interface ConsoleReportMeta {
+  /**
+   * The seat that sent the message.
+   *
+   * Contract: A seat id, or omitted for a notice that is not from a seat.
+   * When to use: Message entries and the sender filter.
+   * Expected outcome: The filter can hide the entry.
+   * Exceptions: None.
+   */
+  readonly senderSeatId?: string;
+  /**
+   * The model label shown at the right of the head.
+   *
+   * Contract: Plain text, or omitted.
+   * When to use: A message from a consult.
+   * Expected outcome: Shown on the head.
+   * Exceptions: None.
+   */
+  readonly modelLabel?: string;
+  /**
+   * The message, without quotes.
+   *
+   * Contract: Plain text. When set, the entry body is built from this instead of `body`.
+   * When to use: A commander message.
+   * Expected outcome: Shown in quotes after the sender's name.
+   * Exceptions: None.
+   */
+  readonly messageText?: string;
+  /**
+   * Strategy prose.
+   *
+   * Contract: Plain text, or omitted.
+   * When to use: Observe mode only.
+   * Expected outcome: A muted "Strategy:" line. Hidden while a human seat is playing.
+   * Exceptions: None.
+   */
+  readonly strategyText?: string;
+}
+
+/**
+ * The Reports sender filter. Empty means everyone.
+ *
+ * Purpose: The select and the list share one value.
+ * When to use: `setReportSenderFilter`.
+ * Expected outcome: A seat id, or empty.
+ * Exceptions: None.
+ */
+let reportSenderFilter = '';
 
 /**
  * Entries filed while the Reports tab was not on screen.
@@ -44,6 +104,92 @@ let reportsVisible = false;
 const listeners: Array<() => void> = [];
 
 /**
+ * The sender line for a message entry.
+ *
+ * Purpose: The row names the side and quotes the message. Strategy shows only while observing.
+ * When to use: `recordConsoleReport` when `messageText` is set.
+ * Expected outcome: A dot, the full name, the message in quotes, and a strategy line while observing.
+ * Exceptions: None.
+ */
+function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
+  const wrap = document.createElement('div');
+  const line = document.createElement('div');
+  line.className = 'console-report-sender';
+  const dot = document.createElement('span');
+  dot.className = 'console-report-dot';
+  const seats = S.gameState?.seats ?? [];
+  const seat = seats.find((row) => row.seatId === meta.senderSeatId);
+  dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? '#9D174D';
+  const name = document.createElement('span');
+  name.textContent = `${seat?.homeRegion ?? 'Commander'} "${meta.messageText ?? ''}"`;
+  line.append(dot, name);
+  wrap.append(line);
+  const observing = seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+  if (observing && meta.strategyText) {
+    const strategy = document.createElement('p');
+    strategy.className = 'console-report-strategy';
+    strategy.textContent = `Strategy: ${meta.strategyText}`;
+    wrap.append(strategy);
+  }
+  return wrap;
+}
+
+/**
+ * Fills the Reports sender filter from the roster.
+ *
+ * Purpose: The select lists every side by its full name.
+ * When to use: When the console header refreshes.
+ * Expected outcome: "Everyone", then each seat. The current choice is kept.
+ * Exceptions: None.
+ */
+export function refreshReportSenderFilter(): void {
+  const select = document.getElementById('reports-sender-filter');
+  if (!(select instanceof HTMLSelectElement)) return;
+  if (!select.dataset.bound) {
+    select.dataset.bound = 'true';
+    select.addEventListener('change', () => setReportSenderFilter(select.value));
+  }
+  const current = select.value;
+  select.replaceChildren(filterOption('Everyone', ''));
+  for (const seat of S.gameState?.seats ?? []) select.append(filterOption(seat.homeRegion, seat.seatId));
+  if ([...select.options].some((row) => row.value === current)) select.value = current;
+}
+
+/**
+ * One option for the Reports filter.
+ *
+ * Purpose: The list is rebuilt from the roster.
+ * When to use: `refreshReportSenderFilter`.
+ * Expected outcome: A labeled option.
+ * Exceptions: None.
+ */
+function filterOption(label: string, value: string): HTMLOptionElement {
+  const row = document.createElement('option');
+  row.value = value;
+  row.textContent = label;
+  return row;
+}
+
+/**
+ * Hides messages from other sides.
+ *
+ * Purpose: Turn reports and notices stay. Messages follow the select.
+ * When to use: When the select changes.
+ * Expected outcome: Each entry's `hidden` flag matches `consoleReportVisible`.
+ * Exceptions: None.
+ */
+export function setReportSenderFilter(seatId: string): void {
+  reportSenderFilter = seatId;
+  document.querySelectorAll('#reports-list .console-report').forEach((entry) => {
+    if (!(entry instanceof HTMLElement)) return;
+    const kind = (entry.dataset.reportKind ?? 'notice') as ConsoleReportKind;
+    entry.hidden = !consoleReportVisible(kind, entry.dataset.senderSeatId ?? null, reportSenderFilter);
+  });
+  const list = document.getElementById('reports-list');
+  if (list) syncReportsEmptyState(list);
+}
+
+/**
  * Runs every listener.
  *
  * Purpose: One place that announces a change.
@@ -60,11 +206,12 @@ function notifyReportsChanged(): void {
  *
  * Purpose: An empty Reports tab says so instead of showing a blank panel.
  * When to use: After entries are added or cleared.
- * Expected outcome: `#reports-empty` is hidden exactly when `#reports-list` has an entry.
+ * Expected outcome: `#reports-empty` is hidden exactly when a visible entry remains. A filter that hides every entry shows the empty sentence.
  * Exceptions: None.
  */
 function syncReportsEmptyState(list: HTMLElement): void {
-  document.getElementById('reports-empty')?.toggleAttribute('hidden', list.childElementCount > 0);
+  const anyVisible = [...list.querySelectorAll('.console-report')].some((entry) => entry instanceof HTMLElement && !entry.hidden);
+  document.getElementById('reports-empty')?.toggleAttribute('hidden', anyVisible);
 }
 
 /**
@@ -107,17 +254,21 @@ export function currentConsoleReportTag(): string {
  * Purpose: Keeps what a toast showed after the toast hides.
  * When to use: Right after a map toast or the AI strategy toast is filled. `body` is the toast's text element;
  *   it is copied, not moved.
- * Expected outcome: A new first entry with the tag, the kind, and a copy of the toast's text. A turn report also
- *   gets a disabled Replay placeholder. The entry is marked new until the player next leaves the Reports tab, and
- *   counts as unread unless the tab is on screen. Past `MAX_CONSOLE_REPORTS` the oldest entry is dropped.
+ * Expected outcome: A new first entry with the tag and the kind. Without `messageText`, the body is a copy of the toast.
+ *   With `messageText`, the body is the sender's name and the quoted message, plus a strategy line while observing.
+ *   A message can show a model label. A turn report also gets a disabled Replay placeholder. The entry is marked new
+ *   until the player next leaves the Reports tab, and counts as unread unless the tab is on screen. Past
+ *   `MAX_CONSOLE_REPORTS` the oldest entry is dropped. A sender filter hides a new message from another seat.
  * Exceptions: None; a missing list files nothing.
  */
-export function recordConsoleReport(kind: ConsoleReportKind, tag: string, body: HTMLElement): void {
+export function recordConsoleReport(kind: ConsoleReportKind, tag: string, body: HTMLElement, meta?: ConsoleReportMeta): void {
   const list = document.getElementById('reports-list');
   if (!list) return;
   const entry = document.createElement('li');
   entry.className = `console-report console-report-${kind}`;
   entry.dataset.fresh = 'true';
+  entry.dataset.reportKind = kind;
+  if (meta?.senderSeatId) entry.dataset.senderSeatId = meta.senderSeatId;
   const head = document.createElement('div');
   head.className = 'console-report-head';
   if (tag) {
@@ -130,11 +281,19 @@ export function recordConsoleReport(kind: ConsoleReportKind, tag: string, body: 
   kindEl.className = 'console-report-kind';
   kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
   head.append(kindEl);
+  if (meta?.modelLabel) {
+    const model = document.createElement('span');
+    model.className = 'console-report-model';
+    model.textContent = meta.modelLabel;
+    head.append(model);
+  }
   if (kind === 'turn') head.append(createReplayPlaceholder());
   const content = document.createElement('div');
   content.className = 'console-report-body';
-  content.append(...Array.from(body.cloneNode(true).childNodes));
+  if (meta?.messageText !== undefined) content.append(messageReportBody(meta));
+  else content.append(...Array.from(body.cloneNode(true).childNodes));
   entry.append(head, content);
+  entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
   list.prepend(entry);
   while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
   syncReportsEmptyState(list);

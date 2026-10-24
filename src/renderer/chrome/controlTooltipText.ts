@@ -6,42 +6,6 @@
  */
 
 /**
- * Purpose: Says what the choice does and that the opponent may share it.
- * When to use: `#new-game-human-region-select`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const humanRegionSelectTooltipText =
-  "Pick your side's home region. The opponent may start in the same region.";
-
-/**
- * Purpose: Says the draw can repeat the region already shown.
- * When to use: `#new-game-human-region-randomize`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const humanRegionRandomizeTooltipText =
-  'Pick one of the listed regions at random for your side, including the region already shown.';
-
-/**
- * Purpose: Says the opponent region may match the player's.
- * When to use: `#new-game-ai-region-select`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const aiRegionSelectTooltipText =
-  "Pick the opponent's home region. It may be the same as yours.";
-
-/**
- * Purpose: Says the draw can repeat the region already shown.
- * When to use: `#new-game-ai-region-randomize`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const aiRegionRandomizeTooltipText =
-  'Pick one of the listed regions at random for the opponent, including the region already shown.';
-
-/**
  * Purpose: Says which caps change and that the map and starting forces do not.
  * When to use: `#new-game-size-select`.
  * Expected outcome: The control tip shows this sentence.
@@ -102,7 +66,7 @@ export const fogCheckboxTooltipText =
  * Exceptions: None.
  */
 export const autoStartCheckboxTooltipText =
-  'Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off.';
+  'Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Command tab with planning off.';
 
 /**
  * Purpose: Says a global turn is a month, a regional turn is a week, and a battle stays on the current date.
@@ -237,7 +201,7 @@ export const refreshModelsTooltipText =
  * Exceptions: None.
  */
 export const runDisabledTooltipText =
-  'Turn opponent planning on or off. Enter an API key and choose a model first.';
+  'Turn planning on or off for every commander. Enter an API key and choose a commander\'s model first.';
 
 /**
  * Run's tip while it can be clicked.
@@ -248,7 +212,7 @@ export const runDisabledTooltipText =
  * Exceptions: None.
  */
 export const runEnabledTooltipText =
-  'Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.';
+  'Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.';
 
 /**
  * Purpose: Run's tip changes when a key and model become available.

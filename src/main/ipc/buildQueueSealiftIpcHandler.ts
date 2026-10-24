@@ -19,6 +19,7 @@ import {
   parseBuildQueueUpdatePayload,
   parseSetHexesKeepBuildingPayload,
 } from '../ipcPayloadGuards';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Raw sealift slot edit payload as it arrives from the renderer.
@@ -77,11 +78,11 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
   logDebug('registerBuildQueueSealiftIpcHandler');
   ipcMain.handle(IPC_GAME.getHexBuildQueue, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') return null;
-    return getHexBuildQueue(payload.h3Index, 'human');
+    return getHexBuildQueue(payload.h3Index, HUMAN_SEAT_ID);
   });
   ipcMain.handle(IPC_GAME.addHexBuildQueueEntry, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') return { success: false, reason: 'Invalid build-queue payload' };
-    return addHexBuildQueueEntry(payload.h3Index, 'human');
+    return addHexBuildQueueEntry(payload.h3Index, HUMAN_SEAT_ID);
   });
   ipcMain.handle(
     IPC_GAME.updateHexBuildQueueEntry,
@@ -90,14 +91,14 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
       if (!parsed) {
         return { success: false, reason: 'Invalid build-queue payload' };
       }
-      return updateHexBuildQueueEntry(parsed.h3Index, parsed.entryId, parsed.unitType, parsed.count, 'human');
+      return updateHexBuildQueueEntry(parsed.h3Index, parsed.entryId, parsed.unitType, parsed.count, HUMAN_SEAT_ID);
     }
   );
   ipcMain.handle(IPC_GAME.removeHexBuildQueueEntry, (_event, payload: { h3Index?: string; entryId?: number }) => {
     if (typeof payload?.h3Index !== 'string' || typeof payload?.entryId !== 'number') {
       return { success: false, reason: 'Invalid build-queue payload' };
     }
-    return removeHexBuildQueueEntry(payload.h3Index, payload.entryId, 'human');
+    return removeHexBuildQueueEntry(payload.h3Index, payload.entryId, HUMAN_SEAT_ID);
   });
   ipcMain.handle(IPC_GAME.applyBuildQueueTemplateToHexes, (_event, payload: unknown) => {
     const parsed = parseBuildQueueTemplatePayload(payload);
@@ -110,7 +111,7 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
         reason: 'Invalid build-queue template payload',
       };
     }
-    return applyBuildQueueTemplateToHexes(parsed.h3Indexes, parsed.entries, 'human');
+    return applyBuildQueueTemplateToHexes(parsed.h3Indexes, parsed.entries, HUMAN_SEAT_ID);
   });
   ipcMain.handle(IPC_GAME.setHexesKeepBuilding, (_event, payload: unknown) => {
     const parsed = parseSetHexesKeepBuildingPayload(payload);
@@ -122,7 +123,7 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
         reason: 'Invalid Keep building payload',
       };
     }
-    return setHexesKeepBuilding(parsed.h3Indexes, parsed.keepBuilding, 'human');
+    return setHexesKeepBuilding(parsed.h3Indexes, parsed.keepBuilding, HUMAN_SEAT_ID);
   });
   ipcMain.handle(IPC_GAME.getSealiftStackState, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') {

@@ -13,6 +13,9 @@ import { ensureGameMapLoaded, setGameMapLoadError } from './gameMap/loadGameMap'
 import { REGIONAL_RULES_BY_ID, type RegionalGameMapId } from '../shared/regionalRulesCatalog';
 import { installedSideGroups } from './regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID, type ScenarioStateSnapshot } from './gameDb/scenarioState';
+import { readSeatRoster } from './gameDb/seatRosterStore';
+import type { SeatRecord } from '../shared/seatRoster';
+import { type AiSeatId, type SeatId, HUMAN_SEAT_ID } from '../shared/seatIds';
 import type { GameMapId } from '../shared/gameMapTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { closeDbHandle, gameDbOps, getAll, getOne, hasDbHandle, run, setDbHandle } from './gameDb/dbConnection';
@@ -62,7 +65,6 @@ import {
   clearGameOverWithOps,
   getGameSeedWithOps,
   seedGameSeedIfMissingWithOps,
-  setGameOverWithOps,
 } from './gameDb/gameConfigKv';
 import { resetGameForNewMatch as resetGameForNewMatchFromModule, type ResetGameForNewMatchOptions } from './gameDb/resetGame';
 import {
@@ -99,16 +101,16 @@ export {
 } from './gameDb/controlInfrastructureAccess';
 export {
   addAiLossEventsSinceConsultation,
-  addOpponentCombatParticipants,
+  addCombatSinceConsultation,
   clearAiLossEventsSinceConsultation,
   clearAiPendingOrders,
-  clearOpponentCombatSinceConsultation,
+  clearCombatSinceConsultation,
   clearTacticalTurnNotes,
   getAiLastConsultationTurn,
   getAiLossEventsSinceConsultation,
   getAiPendingOrders,
   getAndClearAiToolLimitExceededLastTurn,
-  getOpponentUnitsInCombatSinceConsultation,
+  getCombatSinceConsultation,
   getRecentTurnNotes,
   setAiLastConsultationTurn,
   setAiPendingOrders,
@@ -125,7 +127,7 @@ export {
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 21;
+export const EXPECTED_USER_VERSION = 23;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -338,15 +340,16 @@ function loadStoredGameMap(): boolean {
  * Exceptions: Throws when a stored home matches neither an installed id nor a display name.
  */
 export function assertStoredSideGroupsExist(
-  readScenario: () => Pick<ScenarioStateSnapshot, 'scenarioId' | 'humanHomeRegion' | 'aiHomeRegion'> = () =>
-    loadScenarioState({ getOne: dbGetOne })
+  readScenario: () => Pick<ScenarioStateSnapshot, 'scenarioId'> = () =>
+    loadScenarioState({ getOne: dbGetOne }),
+  readHomes: () => readonly string[] = () => readSeatRoster({ getAll: dbGetAll }).map((seat) => seat.homeRegion)
 ): void {
   logDebug('gameDb assertStoredSideGroupsExist');
   const groups = installedSideGroups();
   if (!groups) return;
   const scenario = readScenario();
   if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return;
-  const stored = [scenario.humanHomeRegion, scenario.aiHomeRegion];
+  const stored = readHomes();
   const missing = stored.filter((name) => !groups.some((group) => group.id === name || group.displayName === name));
   if (missing.length === 0) return;
   const err = new Error(
@@ -587,20 +590,20 @@ function getFogDeps() {
  * Exceptions: None.
  */
 export function refreshFogOfWarIntelFromCurrentState(options?: {
-  traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>>;
+  traversedHexesByPlayer?: Readonly<Partial<Record<SeatId, readonly string[]>>>;
 }): void {
   refreshFogOfWarIntelFromCurrentStateFromModule(getFogDeps(), options);
 }
 
 /**
- * Defines the `consumeFogNewContactsForPlayer` function shape (export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): string[]).
+ * Defines the `consumeFogNewContactsForPlayer` function shape (export function consumeFogNewContactsForPlayer(playerId: SeatId): string[]).
 
  * Purpose: Supports maintainability by documenting why `consumeFogNewContactsForPlayer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): string[] {
+export function consumeFogNewContactsForPlayer(playerId: SeatId): string[] {
   return consumeFogNewContactsForPlayerFromModule(
     gameDbOps,
     playerId
@@ -629,11 +632,11 @@ export function getGameState(): GameStateSnapshot {
  * Exceptions: None.
  */
 export function getGameStateForPlayer(
-  playerId: 'human' | 'opponent',
+  playerId: SeatId,
   options?: { maskUnexploredTerrain?: boolean }
 ): GameStateSnapshot {
   let base = getGameStateForPlayerFromModule(getFogDeps(), playerId, options);
-  if (playerId === 'human') {
+  if (playerId === HUMAN_SEAT_ID) {
     base = mergeMeleeCandidateHexesIntoHumanFogSnapshot(base);
   }
   return mergeActiveTacticalSessionIntoGameStateSnapshot(base, { scope: 'getGameStateForPlayer', playerId });
@@ -676,6 +679,39 @@ export function dbGetAll<T extends Record<string, unknown>>(sql: string, params:
 }
 
 /**
+ * Reads the stored roster in seat order.
+ *
+ * Purpose: Callers outside this module ask who is playing without writing SQL.
+ * When to use: After the database is open.
+ * Expected outcome: The rows `readSeatRoster` returns. An empty table returns an empty array.
+ * Exceptions: Propagates SQLite errors.
+ */
+export function getSeatRoster(): SeatRecord[] {
+  logTrace('gameDb getSeatRoster');
+  return readSeatRoster({ getAll: dbGetAll });
+}
+
+/**
+ * The model id stored for one AI seat.
+ *
+ * Purpose: Consults follow the seat, not the Opponent tab, once a roster exists.
+ * When to use: Before starting a consult for that seat.
+ * Expected outcome: The stored id, or `''` when the seat has no model. `null` when the seat is missing or the roster cannot be read, so the caller can keep its previous fallback.
+ * Exceptions: Logs and returns null when the database is closed.
+ */
+export function commanderModelId(seatId: AiSeatId): string | null {
+  logTrace('gameDb commanderModelId', { seatId });
+  try {
+    const seat = getSeatRoster().find((row) => row.seatId === seatId);
+    if (!seat?.commander) return null;
+    return seat.commander.modelId?.trim() ?? '';
+  } catch (err) {
+    logError('gameDb commanderModelId', { seatId, err });
+    return null;
+  }
+}
+
+/**
  * Defines the `listUnitsForSnapshot` function shape (export function listUnitsForSnapshot(): GameStateSnapshot['units']).
 
  * Purpose: Supports maintainability by documenting why `listUnitsForSnapshot` exists.
@@ -698,18 +734,6 @@ export function listUnitsForSnapshot(): GameStateSnapshot['units'] {
  */
 export function isDbReady(): boolean {
   return hasDbHandle();
-}
-
-/**
- * Defines the `setGameOver` function shape (export function setGameOver(winner: string): void).
-
- * Purpose: Supports maintainability by documenting why `setGameOver` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setGameOver(winner: string): void {
-  setGameOverWithOps(gameDbOps, winner);
 }
 
 /**

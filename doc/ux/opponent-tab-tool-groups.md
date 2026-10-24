@@ -1,6 +1,6 @@
-# Opponent Tab Tool Groups
+# Commanders Tab Tool Groups
 
-The Tool groups section of the console's Opponent tab: the tool groups the opponent's model may use.
+The Tool groups section of the console's Commanders tab: the tool groups the commanders' models may use.
 
 ## Purpose
 
@@ -8,16 +8,16 @@ Let the player turn tool groups on or off and see how many times each group was 
 
 ## Availability
 
-Shown while the console's Opponent tab is selected and the console is expanded, below the [Status and Commander](opponent-tab-commander.md) sections and above the [AI activity log](ai-activity-log.md). While the tactical battles list is open, the section stays visible while the console is expanded and does not receive pointer input. See [console.md](console.md). In New game and Game over the console is absent, so this section is absent with it.
+Shown while the console's Commanders tab is selected and the console is expanded, below the [Status and Commander](opponent-tab-commander.md) sections and above the [AI activity log](ai-activity-log.md). While the tactical battles list is open, the section stays visible while the console is expanded and does not receive pointer input. See [console.md](console.md). In New game and Game over the console is absent, so this section is absent with it.
 
 ## Information Displayed
 
-- A "Tool groups" heading, with "uses since last Ready" beside it.
+- A "Tool groups" heading, with "uses since last Ready, all" beside it.
 - One cell per tool group, in two columns. A cell shows a count of uses since the counters were reset, then the group's label.
 - The group list comes from the app. If that list has no Events group, Events is added.
 - What the groups do is described in [AI tools](../ai-tools.md).
 - Control tips for these cells are in [control-tooltips.md](control-tooltips.md).
-- The first consult after a new game, after Run is turned on, or after Events is turned on is still a background request. Later event-driven turns do not start another one. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
+- The first consult after a new game, after Run is turned on, or after Events is turned on is started through the commander pool. Later event-driven turns do not start another strategic one at Ready. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
 
 ## Inputs and Responses
 

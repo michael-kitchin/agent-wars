@@ -18,6 +18,7 @@ import {
   buildTacticalSealiftStackStateFromSnapshot,
 } from './tacticalSealiftStackState';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 type SealiftSlots = SealiftSlotPair;
 
@@ -31,7 +32,7 @@ type SealiftSlots = SealiftSlotPair;
  */
 function clearHumanLandEmbarksAtHex(snap: TacticalBattleSnapshot, h3Index: string): TacticalBattleSnapshot {
   const subUnits = snap.subUnits.map((u) => {
-    if (u.h3Index !== h3Index || u.player !== 'human') return u;
+    if (u.h3Index !== h3Index || u.player !== HUMAN_SEAT_ID) return u;
     if (u.unitType !== 'infantry' && u.unitType !== 'armor') return u;
     return { ...u, embarkedOnSubUnitId: undefined };
   });
@@ -91,10 +92,10 @@ export function projectTacticalSealiftSlotChange(
   }
   const isDebark = args.landUnitId === null;
   if (isDebark) {
-    if (!canManualDebarkFromHex(args.h3Index, 'human')) {
+    if (!canManualDebarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, 'human', snap.enclosingStrategicH3Index)) {
+  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, HUMAN_SEAT_ID, snap.enclosingStrategicH3Index)) {
     const atSea = baseState.contextMode === 'water';
     return {
       success: false,
@@ -143,7 +144,7 @@ export function projectTacticalSealiftSlotChange(
     if (!checked.valid) {
       return { success: false, reason: checked.reason };
     }
-    acc = applyTacticalEmbarkPhaseOnBattle(acc, [e], 'human');
+    acc = applyTacticalEmbarkPhaseOnBattle(acc, [e], HUMAN_SEAT_ID);
   }
   acc = tacticalBattleWithSyncedEmbarkCargo(acc);
   const state = buildTacticalSealiftStackStateFromSnapshot(acc, args.h3Index);

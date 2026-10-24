@@ -110,6 +110,7 @@ pendingOrders: [],
  */
 function testAssignOrderUnitNotFound(): void {
   const result = executeStandingOrders(
+    'opponent',
     'assign_order',
     { unitId: 'nonexistent', order: { type: 'hold_fire' } },
     emptyState,
@@ -135,6 +136,7 @@ function testAssignOrderPursueTargetNotFound(): void {
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
   const result = executeStandingOrders(
+    'opponent',
     'assign_order',
     { unitId: 'opponent-armor-1', order: { type: 'pursue', targetUnitId: 'human-armor-99' } },
     stateWithUnit,
@@ -163,6 +165,7 @@ function testAssignOrderPatrolTooFewWaypoints(): void {
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
   const result = executeStandingOrders(
+    'opponent',
     'assign_order',
     { unitId: 'opponent-armor-1', order: { type: 'patrol', waypoints: [[0, 0]] } },
     stateWithUnit,
@@ -202,7 +205,8 @@ function testAssignOrderAirUnitRejectsMovementOrders(): void {
     { type: 'pursue', targetUnitId: 'human-armor-1' },
   ];
   for (const order of movementOrders) {
-    const result = executeStandingOrders('assign_order', { unitId: 'opponent-air-1', order }, stateWithAirUnit, emptyMap, resolve);
+    const result = executeStandingOrders(
+    'opponent','assign_order', { unitId: 'opponent-air-1', order }, stateWithAirUnit, emptyMap, resolve);
     assert.strictEqual(result.status, 'error', `air ${order.type} should be rejected`);
     const message = (result as { error?: string }).error ?? '';
     assert.ok(message.includes('Air units cannot take'), `unexpected message for ${order.type}: ${message}`);
@@ -219,7 +223,8 @@ function testAssignOrderAirUnitRejectsMovementOrders(): void {
  * Exceptions: None.
  */
 function testQueryOrdersRequiresUnitIdOrAll(): void {
-  const result = executeStandingOrders('query_orders', {}, emptyState, emptyMap, noopResolve);
+  const result = executeStandingOrders(
+    'opponent','query_orders', {}, emptyState, emptyMap, noopResolve);
   assert.strictEqual(result.status, 'error');
   assert.ok((result as { error?: string }).error?.includes('query_orders requires'));
 }
@@ -234,6 +239,7 @@ function testQueryOrdersRequiresUnitIdOrAll(): void {
  */
 function testCancelOrderWhenNoOrder(): void {
   const result = executeStandingOrders(
+    'opponent',
     'cancel_order',
     { unitId: 'opponent-armor-1' },
     emptyState,

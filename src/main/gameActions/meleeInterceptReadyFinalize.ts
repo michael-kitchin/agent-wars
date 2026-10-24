@@ -7,8 +7,8 @@ import {
   saveDatabase,
   refreshFogOfWarIntelFromCurrentState,
   addAiLossEventsSinceConsultation,
+  getSeatRoster,
   listUnitsForSnapshot,
-  setGameOver,
 } from '../gameDb';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { processProductionAfterControlResolution, resolveStrategicControlAfterCombatAndMovement } from './controlAndProduction';
@@ -18,10 +18,33 @@ import { combatDicePlaybackFields } from '../combatDiceRecording';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
 import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../shared/ipcTypes';
-import { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
+import { evaluateEndOfTurnOutcome, recordEndOfTurnOutcome } from './endOfTurnOutcome';
+import type { EndOfTurnOutcome } from './endOfTurnOutcomeRules';
+import { applyKnockout, type KnockoutCoordinates } from './knockoutConsequences';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 import { logDebug } from '../logger';
+import type { BuildUnitType } from '../../shared/ipc/productionTypes';
+import { HUMAN_SEAT_ID, isAiSeatId, isSeatId, type OwnerId, type SeatId } from '../../shared/seatIds';
+import { activeAiSeats } from '../../shared/seatRoster';
 import { buildKillLabelUnitRoster } from '../../shared/unitDisplayNames';
+
+/**
+ * AI seats that reached a deployment cap this turn.
+ *
+ * Purpose: Post-resolution consultation reads one list per seat instead of the first AI seat only.
+ * When to use: The ready result after production is applied.
+ * Expected outcome: Seats with an empty cap list are omitted.
+ * Exceptions: None.
+ */
+function deploymentCapsBySeat(caps: ReadonlyMap<SeatId, BuildUnitType[]>): Record<string, readonly BuildUnitType[]> {
+  const out: Record<string, readonly BuildUnitType[]> = {};
+  for (const [seatId, types] of caps) {
+    if (!isAiSeatId(seatId) || types.length === 0) continue;
+    out[seatId] = types;
+  }
+  logDebug('meleeInterceptReadyFinalize deploymentCapsBySeat', { seatCount: Object.keys(out).length });
+  return out;
+}
 
 export interface FinalizeReadyAfterMeleeArgs {
     /**
@@ -97,6 +120,15 @@ combatUnitsBefore: CombatUnit[];
    */
 humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
     /**
+   * Movement of every owner other than the human seat.
+   *
+   * Contract: Each move names the unit that marched.
+   * When to use: The ready result's non-human move list.
+   * Expected outcome: May be empty.
+   * Exceptions: None.
+   */
+aiMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
+    /**
    * Specifies the contract for the `embarkedFollowMoves` member (embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 
    * Contract: Embarked land units that moved with their naval transports.
@@ -115,14 +147,14 @@ embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[
    */
 resolvedFerryMoves: FerryAnimationMove[];
     /**
-   * Specifies the contract for the `traversedHexesByPlayer` member (traversedHexesByPlayer: Record<'human' | 'opponent', Set<string>>).
+   * Specifies the contract for the `traversedHexesByPlayer` member (traversedHexesByPlayer: Record<SeatId, Set<string>>).
 
    * Contract: Fog refresh input after the turn ends.
    * When to use: `refreshFogOfWarIntelFromCurrentState` and control resolution.
    * Expected outcome: Same structure as `collectTraversedHexesByPlayer` output.
    * Exceptions: None.
    */
-traversedHexesByPlayer: Record<'human' | 'opponent', Set<string>>;
+traversedHexesByPlayer: Map<OwnerId, Set<string>>;
     /**
    * Whether opponent units had resolving march activity this turn (including air), for post-resolution LLM idle detection.
    *
@@ -131,7 +163,7 @@ traversedHexesByPlayer: Record<'human' | 'opponent', Set<string>>;
    * Expected outcome: True when any opponent march order changed `h3_index`; ferry success remains in `resolvedFerryMoves`.
    * Exceptions: None.
    */
-opponentHadStrategicMarchResolution: boolean;
+hadStrategicMarchResolutionBySeat: Readonly<Record<string, boolean>>;
     /**
    * Specifies the contract for the `turnNumber` member (turnNumber: number;).
 
@@ -159,6 +191,15 @@ allRanged: RangedAttackOrder[];
    * Exceptions: None.
    */
 aiRangedOrders: RangedAttackOrder[];
+    /**
+   * Hex centers and the lookup that turns a center back into a hex.
+   *
+   * Contract: The same pair built for standing orders on this turn.
+   * When to use: Defend orders for units that just became Neutral.
+   * Expected outcome: Each remaining unit's hex has a center.
+   * Exceptions: None.
+   */
+knockoutCoordinates: KnockoutCoordinates;
 }
 
 /**
@@ -170,7 +211,7 @@ aiRangedOrders: RangedAttackOrder[];
  *   recorded dice rolls (omitted when that phase rolled nothing).
  * Exceptions: Propagates DB errors to the caller try/catch.
  */
-export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): ReadyResult {
+export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): ReadyResult & { endOfTurnOutcome: EndOfTurnOutcome } {
   const diceFields = combatDicePlaybackFields(
     args.airStrikeResult.diceRolls,
     args.rangedResult.diceRolls ?? [],
@@ -192,13 +233,13 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     combatUnitsAfter,
     combatUnitsBefore,
     humanMoves,
+    aiMoves,
     embarkedFollowMoves,
     resolvedFerryMoves,
     traversedHexesByPlayer,
-    opponentHadStrategicMarchResolution,
+    hadStrategicMarchResolutionBySeat,
     turnNumber,
     allRanged,
-    aiRangedOrders,
   } = args;
 
   for (const id of meleeResult.removedUnitIds) {
@@ -243,29 +284,34 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     });
   }
   const productionSummary = processProductionAfterControlResolution();
-  const deployedUnitsByType = productionSummary.deployedByPlayer.human;
+  const deployedUnitsByType = productionSummary.deployedByPlayer.get(HUMAN_SEAT_ID) ?? {};
   const finalUnits = listUnitsForSnapshot();
   const humanHexesLost = controlTransitions.filter(
-    (t) => t.fromControllerPlayerId === 'human' && t.toControllerPlayerId === 'opponent'
+    (transition) => transition.fromControllerPlayerId === HUMAN_SEAT_ID
+      && transition.toControllerPlayerId !== null
+      && transition.toControllerPlayerId !== HUMAN_SEAT_ID
   );
   const controlLossLightningHexes = humanHexesLost
-    .filter((t) => !finalUnits.some((u) => u.player === 'human' && u.h3Index === t.h3Index))
+    .filter((t) => !finalUnits.some((u) => u.player === HUMAN_SEAT_ID && u.h3Index === t.h3Index))
     .map((t) => t.h3Index);
 
-  const regionWinner = evaluateRegionControlWinnerAtEndOfTurn();
-  if (regionWinner) setGameOver(regionWinner);
+  const endOfTurnOutcome = evaluateEndOfTurnOutcome(turnNumber);
+  recordEndOfTurnOutcome(endOfTurnOutcome, turnNumber);
+  for (const knockout of endOfTurnOutcome.knockouts) {
+    applyKnockout(knockout.seatId, args.knockoutCoordinates);
+  }
 
   dbRun('DELETE FROM pending_orders');
   dbRun('DELETE FROM pending_ranged_orders');
   dbRun('DELETE FROM pending_air_orders');
   dbRun('DELETE FROM pending_ferry_orders');
   dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', ['planning', turnNumber + 1]);
-  refreshFogOfWarIntelFromCurrentState({
-    traversedHexesByPlayer: {
-      human: [...traversedHexesByPlayer.human],
-      opponent: [...traversedHexesByPlayer.opponent],
-    },
-  });
+  const traversedForFog: Partial<Record<SeatId, readonly string[]>> = {};
+  for (const [owner, hexes] of traversedHexesByPlayer) {
+    if (!isSeatId(owner)) continue;
+    traversedForFog[owner] = [...hexes];
+  }
+  refreshFogOfWarIntelFromCurrentState({ traversedHexesByPlayer: traversedForFog });
 
   saveDatabase();
   const allRemovedIds = [
@@ -295,27 +341,39 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     ...baseLossRemovedAir.map((u) => u.h3Index),
   ];
 
-  const opponentRangedAttackers = aiRangedOrders.map((o) => o.unitId);
-  const defenderHexes = new Set(allRanged.map((o) => o.targetH3Index));
-  const opponentRangedDefenders = combatUnitsBefore
-    .filter((u) => u.player === 'opponent' && defenderHexes.has(u.h3Index))
-    .map((u) => u.id);
+  const defenderHexes = new Set(allRanged.map((order) => order.targetH3Index));
   const meleeHexSet = new Set(meleeResult.combatHexes);
-  const opponentMeleeParticipants = combatUnitsAfter
-    .filter((u) => u.player === 'opponent' && meleeHexSet.has(u.h3Index))
-    .map((u) => u.id);
-  const opponentCombatParticipantUnitIds = [
-    ...new Set([...opponentRangedAttackers, ...opponentRangedDefenders, ...opponentMeleeParticipants]),
-  ];
-  const removedOpponentUnitIds = allRemovedUnits.filter((u) => u.player === 'opponent').map((u) => u.id);
-  addAiLossEventsSinceConsultation(
-    'opponent',
-    turnNumber,
-    allRemovedUnits.map((u) => ({ id: u.id, player: u.player })),
-    allKills,
-    rangedResult.killsByDirectFire,
-    rangedResult.killsByReturnFire
-  );
+  const participantsFor = (seatId: string): string[] => {
+    const attackers = allRanged
+      .filter((order) => combatUnitsBefore.some((unit) => unit.id === order.unitId && unit.player === seatId))
+      .map((order) => order.unitId);
+    const defenders = combatUnitsBefore
+      .filter((unit) => unit.player === seatId && defenderHexes.has(unit.h3Index))
+      .map((unit) => unit.id);
+    const meleeParticipants = combatUnitsAfter
+      .filter((unit) => unit.player === seatId && meleeHexSet.has(unit.h3Index))
+      .map((unit) => unit.id);
+    return [...new Set([...attackers, ...defenders, ...meleeParticipants])];
+  };
+  const removedFor = (seatId: string): string[] => allRemovedUnits.filter((unit) => unit.player === seatId).map((unit) => unit.id);
+  const combatParticipantUnitIdsBySeat: Record<string, readonly string[]> = {};
+  const removedUnitIdsBySeat: Record<string, readonly string[]> = {};
+  for (const seat of activeAiSeats(getSeatRoster())) {
+    if (!isAiSeatId(seat.seatId)) continue;
+    combatParticipantUnitIdsBySeat[seat.seatId] = participantsFor(seat.seatId);
+    removedUnitIdsBySeat[seat.seatId] = removedFor(seat.seatId);
+  }
+  for (const seat of activeAiSeats(getSeatRoster())) {
+    if (!isAiSeatId(seat.seatId)) continue;
+    addAiLossEventsSinceConsultation(
+      seat.seatId,
+      turnNumber,
+      allRemovedUnits.filter((unit) => unit.player === seat.seatId).map((unit) => ({ id: unit.id, player: unit.player })),
+      allKills,
+      rangedResult.killsByDirectFire,
+      rangedResult.killsByReturnFire
+    );
+  }
 
   const killLabelKillEdges = [
     ...allKills,
@@ -347,6 +405,15 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
 
   return {
     success: true,
+    knockouts: endOfTurnOutcome.knockouts.length > 0
+      ? endOfTurnOutcome.knockouts.map((knockout) => ({
+          seatId: knockout.seatId,
+          outBy: knockout.outBy,
+          reasons: knockout.reasons,
+          place: knockout.place,
+        }))
+      : undefined,
+    endOfTurnOutcome,
     combatHexes: allCombatHexes.length > 0 ? allCombatHexes : undefined,
     removedUnitIds: allRemovedIds.length > 0 ? allRemovedIds : undefined,
     casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
@@ -378,16 +445,24 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
     meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
     humanMoves: humanMoves.length + embarkedFollowMoves.length > 0 ? [...humanMoves, ...embarkedFollowMoves] : undefined,
+    aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
     deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,
     humanHexesLostCount: humanHexesLost.length > 0 ? humanHexesLost.length : undefined,
+    controlTransitions: controlTransitions.length > 0
+      ? controlTransitions.map((transition) => ({
+          h3Index: transition.h3Index,
+          from: transition.fromControllerPlayerId,
+          to: transition.toControllerPlayerId,
+        }))
+      : undefined,
     controlLossLightningHexes: controlLossLightningHexes.length > 0 ? controlLossLightningHexes : undefined,
-    humanDeploymentCapReachedUnitTypes:
-      productionSummary.capReachedByPlayer.human.length > 0 ? productionSummary.capReachedByPlayer.human : undefined,
-    opponentDeploymentCapReachedUnitTypes:
-      productionSummary.capReachedByPlayer.opponent.length > 0 ? productionSummary.capReachedByPlayer.opponent : undefined,
-    opponentCombatParticipantUnitIds,
-    removedOpponentUnitIds,
-    opponentHadStrategicMarchResolution,
+    humanDeploymentCapReachedUnitTypes: (productionSummary.capReachedByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
+      ? productionSummary.capReachedByPlayer.get(HUMAN_SEAT_ID)
+      : undefined,
+    deploymentCapReachedUnitTypesBySeat: deploymentCapsBySeat(productionSummary.capReachedByPlayer),
+    combatParticipantUnitIdsBySeat,
+    removedUnitIdsBySeat,
+    hadStrategicMarchResolutionBySeat,
     ...diceFields,
   };
 }

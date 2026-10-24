@@ -1,5 +1,8 @@
+import { briefingOwnSeatId, enemyHomeHexes, ownHomeHexes } from '../briefing/briefingPerspective';
+import { isNeutralOwnerId, type SeatId } from '../../shared/seatIds';
+import { findSeat, isSeatActive, sortSeatsByOrder, type Doctrine } from '../../shared/seatRoster';
 import type { GameStateSnapshot } from '../gameDb';
-import { getAndClearAiToolLimitExceededLastTurn } from '../gameDb';
+import { getAndClearAiToolLimitExceededLastTurn, getSeatRoster } from '../gameDb';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
@@ -14,7 +17,8 @@ import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import {
   buildAdjacentCellsFallbackBlock,
   formatControlProgressLine,
-  buildHumanUnitsPromptLine,
+  buildEnemyUnitsPromptLine,
+  type EnemyRosterGroup,
   buildLatLngPreamble,
   buildTacticalLatLngPreamble,
   buildProductionSubmitClause,
@@ -30,7 +34,8 @@ import {
 } from '../navalMovementMessages';
 import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
-import { getRegionHomeControlProgressForPrompt } from '../gameActions/regionControlWinner';
+import { homeControlProgressForSeat } from '../gameActions/endOfTurnOutcome';
+import { buildSidesPromptBlock, type SidesPromptSeat } from './promptSpec/sidesBlock';
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
@@ -84,11 +89,11 @@ export function buildSystemPromptForTools(
   });
   const { latLngByH3, format, resolveToH3 } = coordMap;
   const formatLatLng = (ll: [number, number]) => formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
-  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
-  const humanUnits = state.units.filter((u) => u.player === 'human');
+  const ownSeat = briefingOwnSeatId(state);
+  const opponentUnits = state.units.filter((u) => u.player === ownSeat);
   const flags = getToolFlags(enabledToolNames);
 
-  const limitExceededLastTurn = getAndClearAiToolLimitExceededLastTurn();
+  const limitExceededLastTurn = getAndClearAiToolLimitExceededLastTurn(ownSeat);
   const showLimitWarning = limitExceededLastTurn && (flags.planningEnabled || flags.ordersEnabled);
   const warning = showLimitWarning ? buildToolBudgetExceededWarning() : '';
 
@@ -96,11 +101,7 @@ export function buildSystemPromptForTools(
     .filter((u) => latLngByH3.has(u.h3Index))
     .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
     .join('; ');
-  const humanRoster = humanUnits
-    .filter((u) => latLngByH3.has(u.h3Index))
-    .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
-    .join('; ');
-
+  const enemyGroups = observedEnemyGroups(state, ownSeat, latLngByH3, format);
   const tacticalBattleActive = coordinateContext.mode === 'tactical';
   const filtered = getFilteredToolMetadata(enabledToolNames, coordinateContext.mode);
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
@@ -108,20 +109,25 @@ export function buildSystemPromptForTools(
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const hasBestOptionsTable =
     hasPrecomputedBriefing && (briefingOverride ?? '').includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN);
+  const enemyHomes = coordinateContext.mode === 'tactical' ? [] : enemyHomesForPrompt(state);
   const homePartitions =
-    state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical'
-      ? computeHomeRegionHexPartitionsForPrompting(state.aiHomeRegionHexes, state.humanHomeRegionHexes)
+    state.scenarioId === 'region_vs_region' && enemyHomes.length === 1
+      ? computeHomeRegionHexPartitionsForPrompting(ownHomeHexes(state), enemyHomes[0]?.hexes ?? [])
       : null;
-  let homeControl: ReturnType<typeof getRegionHomeControlProgressForPrompt> = null;
+  const sharedHomeHexes = homePartitions
+    ? homePartitions.intersection
+    : hexesInMoreThanOneHome([ownHomeHexes(state), ...enemyHomes.map((home) => home.hexes)]);
+  let homeControl: ReturnType<typeof homeControlProgressForSeat> = null;
   if (coordinateContext.mode !== 'tactical') {
     try {
-      homeControl = getRegionHomeControlProgressForPrompt();
+      homeControl = homeControlProgressForSeat(ownSeat);
     } catch (err) {
       logError('openRouterBuildSystemPrompt: home control progress failed', err);
       homeControl = null;
     }
   }
   const controlWinMinUrbanShare = homeControl?.controlWinMinUrbanShare;
+  const seatCount = state.seats && state.seats.length > 0 ? state.seats.length : 2;
   const coachingGates: CoachingGates = {
     coordinateMode: coordinateContext.mode,
     planningEnabled: flags.planningEnabled,
@@ -131,10 +137,13 @@ export function buildSystemPromptForTools(
     hasAirUnits: hasAir,
     hasNavalUnits: hasNaval,
     hasBestOptionsTable,
-    homeRegionsOverlap: (homePartitions?.intersection.length ?? 0) > 0,
-    hasObservedEnemy: humanRoster.length > 0,
+    homeRegionsOverlap: state.scenarioId === 'region_vs_region' && sharedHomeHexes.length > 0,
+    hasObservedEnemy: enemyGroups.some((group) => group.roster.length > 0),
     includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
     controlWinMinUrbanShare: controlWinMinUrbanShare ?? null,
+    seatCount,
+    turnLimitVictory: state.victory?.rule === 'most_city_hexes_at_turn_limit',
+    doctrine: doctrineForPrompt(state),
   };
   const toolPromptLines = filtered.map((m) => {
     let line = m.promptLine;
@@ -204,7 +213,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';
 
-  const humanUnitsLine = buildHumanUnitsPromptLine(humanRoster);
+  const humanUnitsLine = buildEnemyUnitsPromptLine(enemyGroups);
   const ownUnitsLine =
     hasPrecomputedBriefing
       ? ''
@@ -217,36 +226,37 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     : state.hexes.map((hex) => hex.h3Index);
   const exploredLandHexes = exploredHexesRaw.filter((h3Index) => landHexSet.has(h3Index)).length;
   const controlledLandHexes = (state.strategicControl ?? []).filter(
-    (row) => row.controllerPlayerId === 'opponent' && landHexSet.has(row.h3Index)
+    (row) => row.controllerPlayerId === ownSeat && landHexSet.has(row.h3Index)
   ).length;
-  const ownHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], state.aiHomeRegionHexes, 'opponent');
-  const opponentHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], state.humanHomeRegionHexes, 'opponent');
+  const ownHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], ownHomeHexes(state), ownSeat);
   let regionHomeProgressAndHexBullets = '';
-  if (homePartitions) {
+  if (state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical' && enemyHomes.length > 0) {
     const lineOwn = formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total);
-    const lineEnemyHome = formatControlProgressLine(
-      "Your control of the enemy's home region",
-      opponentHomeRegionControl.controlled,
-      opponentHomeRegionControl.total
-    );
-    const p = homePartitions;
-    const aiHexLine =
-      !p.equalAsSets && p.aiExclusive.length > 0
-        ? `\n- Your home region hexes are: ${formatHomeRegionHexCodesForPrompt(p.aiExclusive)}`
+    const ownExclusive = homePartitions
+      ? (!homePartitions.equalAsSets ? homePartitions.aiExclusive : [])
+      : ownHomeHexes(state).filter((hex) => !sharedHomeHexes.includes(hex));
+    const aiHexLine = ownExclusive.length > 0
+      ? `\n- Your home region hexes are: ${formatHomeRegionHexCodesForPrompt(ownExclusive)}`
+      : '';
+    const enemyLines = enemyHomes.map((home) => {
+      const counts = countControlledHexesInRegion(state.strategicControl ?? [], home.hexes, ownSeat);
+      const controlLine = formatControlProgressLine(`Your control of ${home.name}'s home region`, counts.controlled, counts.total);
+      const exclusive = homePartitions
+        ? (!homePartitions.equalAsSets ? homePartitions.humanExclusive : [])
+        : home.hexes.filter((hex) => !sharedHomeHexes.includes(hex));
+      const hexLine = exclusive.length > 0
+        ? `\n- ${home.name} home region hexes are: ${formatHomeRegionHexCodesForPrompt(exclusive)}`
         : '';
-    const humanHexLine =
-      !p.equalAsSets && p.humanExclusive.length > 0
-        ? `\n- Your enemy's home region hexes are: ${formatHomeRegionHexCodesForPrompt(p.humanExclusive)}`
-        : '';
-    const overlapLine =
-      p.intersection.length > 0
-        ? `\n- These hexes are in both home regions: ${formatHomeRegionHexCodesForPrompt(p.intersection)}`
-        : '';
+      return `\n${controlLine}${hexLine}`;
+    }).join('');
+    const overlapLine = sharedHomeHexes.length > 0
+      ? `\n- These hexes are in more than one home region: ${formatHomeRegionHexCodesForPrompt(sharedHomeHexes)}`
+      : '';
     const territorySentence =
       typeof controlWinMinUrbanShare === 'number'
         ? '\n- Those hex counts are territory, and the control win is the urban-cell share in the scenario objective.'
         : '';
-    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}\n${lineEnemyHome}${humanHexLine}${overlapLine}${territorySentence}`;
+    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}${enemyLines}${overlapLine}${territorySentence}`;
   }
 
   const contextCoaching = buildContextCoaching(coachingGates);
@@ -264,15 +274,26 @@ ${contextCoaching}
   const scenarioObjectiveBlock =
     coordinateContext.mode === 'tactical'
       ? ''
-      : typeof controlWinMinUrbanShare === 'number' && homeControl
-        ? buildRegionVsRegionScenarioObjectiveBlock(state, {
-            controlWinMinUrbanShare,
-            progress: { ai: homeControl.ai, human: homeControl.human },
-          })
-        : buildRegionVsRegionScenarioObjectiveBlock(state);
+      : buildRegionVsRegionScenarioObjectiveBlock(state, {
+          controlWinMinUrbanShare,
+          enemyProgress: homeControl?.pairs.map((pair) => ({
+            name: pair.enemyName,
+            ownAgainstEnemy: pair.ownAgainstEnemy,
+            enemyAgainstOwn: pair.enemyAgainstOwn,
+          })),
+        });
+  const sidesBlock = coordinateContext.mode === 'tactical'
+    ? ''
+    : buildSidesPromptBlock({
+        ownSeatId: ownSeat,
+        seats: sidesSeatsForPrompt(state, ownSeat),
+        includeNeutral: state.units.some((unit) => isNeutralOwnerId(unit.player)),
+      });
+  const sidesPrefix = sidesBlock.length > 0 ? `${sidesBlock}\n\n` : '';
+  const scenarioPrefix = scenarioObjectiveBlock.length > 0 ? `${scenarioObjectiveBlock}\n\n` : '';
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
   const finalJsonContract = buildFinalJsonContractInstruction({
@@ -296,17 +317,18 @@ ${contextCoaching}
   const scoutingDirective =
     coordinateContext.mode === 'tactical'
       ? ''
-      : humanRoster.length === 0
-        ? '\n\nNo human units are currently observed. Enemy forces may be out of view.'
+      : enemyGroups.every((group) => group.roster.length === 0)
+        ? '\n\nNo enemy units are currently observed. Enemy forces may be out of view.'
         : '';
   const winConditionReminder =
     coordinateContext.mode === 'tactical'
       ? buildTacticalBattleGoalClause()
-      : buildWinConditionReminderClause(
-          typeof controlWinMinUrbanShare === 'number'
-            ? { scenarioId: state.scenarioId, controlWinMinUrbanShare }
-            : { scenarioId: state.scenarioId }
-        );
+      : buildWinConditionReminderClause({
+          scenarioId: state.scenarioId,
+          controlWinMinUrbanShare: typeof controlWinMinUrbanShare === 'number' ? controlWinMinUrbanShare : null,
+          victoryRule: state.victory?.rule ?? null,
+          turnLimit: state.victory?.turnLimit ?? null,
+        });
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
@@ -329,7 +351,7 @@ ${contextCoaching}
     coordinateContext.mode === 'tactical'
       ? `Strategic turn: ${state.turnNumber}${dateClause}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
       : `Current turn: ${state.turnNumber}${dateClause}, phase: ${state.phase}.`;
-  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. ${turnPhaseHeader}
+  const prompt = `You command ${commandedSideName(state)} in a WEGO (simultaneous movement) hex wargame with ${seatCount} sides. Every other side is your enemy, and so are neutral garrisons. ${turnPhaseHeader}
 
 ${winConditionReminder}${scoutingDirective}${warning}
 
@@ -343,4 +365,136 @@ ${finalJsonContract}
 
 ${finalJsonExample}`;
   return prompt;
+}
+
+/**
+ * Stored doctrine of the commander being briefed.
+ *
+ * Purpose: A random draw is hidden on the snapshot until the match is over, and the prompt still has to teach it.
+ * When to use: The coaching gates for this consultation.
+ * Expected outcome: The roster's stored doctrine when a database is open. Otherwise the snapshot's doctrine, or Balanced.
+ * Exceptions: A closed database is caught and the snapshot is used. The drawn value is not written to a player-facing log.
+ */
+function doctrineForPrompt(state: GameStateSnapshot): Doctrine {
+  try {
+    const stored = findSeat(getSeatRoster(), briefingOwnSeatId(state))?.commander?.doctrine;
+    if (stored === 'aggressive' || stored === 'cautious' || stored === 'balanced') return stored;
+  } catch (err) {
+    logError('openRouterBuildSystemPrompt: doctrine lookup failed', err);
+  }
+  const fromSnapshot = state.seats?.find((seat) => seat.seatId === briefingOwnSeatId(state))?.commander?.doctrine;
+  if (fromSnapshot === 'aggressive' || fromSnapshot === 'cautious' || fromSnapshot === 'balanced') return fromSnapshot;
+  return 'balanced';
+}
+
+/**
+ * Home display name of the commander being briefed.
+ *
+ * Purpose: The identity sentence names the side, not a generic enemy commander.
+ * When to use: The opening line of `buildSystemPromptForTools`.
+ * Expected outcome: The roster home when a roster is present, otherwise `your side`.
+ * Exceptions: None.
+ */
+function commandedSideName(state: GameStateSnapshot): string {
+  const seats = state.seats ?? [];
+  if (seats.length > 0) {
+    const name = seats.find((seat) => seat.seatId === briefingOwnSeatId(state))?.homeRegion.trim() ?? '';
+    if (name.length > 0) return name;
+  }
+  return 'your side';
+}
+
+/**
+ * Seat rows for the Sides table.
+ *
+ * Purpose: A roster supplies the rows.
+ * When to use: Strategic prompts. Tactical prompts omit the table.
+ * Expected outcome: Roster rows. One placeholder row when the roster is absent.
+ * Exceptions: None.
+ */
+function sidesSeatsForPrompt(state: GameStateSnapshot, ownSeatId: SeatId): SidesPromptSeat[] {
+  if (state.seats && state.seats.length > 0) {
+    return state.seats.map((seat) => ({
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      homeRegion: seat.homeRegion,
+      outTurn: seat.outTurn,
+    }));
+  }
+  return [{ seatId: ownSeatId, seatOrder: 1, homeRegion: commandedSideName(state), outTurn: null }];
+}
+
+/**
+ * Active enemy homes in seat order.
+ *
+ * Purpose: Home-control lines are one per enemy, using that enemy's own hex list.
+ * When to use: Strategic prompts.
+ * Expected outcome: Names and hex lists. One fallback row when the roster or the hex map is absent.
+ * Exceptions: None.
+ */
+function enemyHomesForPrompt(state: GameStateSnapshot): { name: string; hexes: readonly string[] }[] {
+  const seats = state.seats ?? [];
+  const homes = state.homeRegionHexesBySeat;
+  if (seats.length > 0 && homes) {
+    const own = briefingOwnSeatId(state);
+    return sortSeatsByOrder(seats)
+      .filter((seat) => seat.seatId !== own && isSeatActive(seat))
+      .map((seat) => ({ name: seat.homeRegion, hexes: homes[seat.seatId] ?? [] }));
+  }
+  return [{ name: 'the enemy', hexes: enemyHomeHexes(state) }];
+}
+
+/**
+ * Hexes that appear in at least two of the given home lists.
+ *
+ * Purpose: The shared-cell line covers every overlap, including two enemy homes.
+ * When to use: When there is more than one enemy and the two-set partition does not apply.
+ * Expected outcome: Hexes whose membership count is greater than one. Order follows first appearance.
+ * Exceptions: None.
+ */
+function hexesInMoreThanOneHome(lists: readonly (readonly string[])[]): string[] {
+  const counts = new Map<string, number>();
+  for (const list of lists) {
+    for (const hex of new Set(list)) counts.set(hex, (counts.get(hex) ?? 0) + 1);
+  }
+  return [...counts.keys()].filter((hex) => (counts.get(hex) ?? 0) > 1);
+}
+
+/**
+ * Observed enemy units grouped by side, then Neutral.
+ *
+ * Purpose: The roster line names the side that owns each observed unit.
+ * When to use: Strategic and tactical system prompts. Groups with an empty roster are kept so the line helper can drop them.
+ * Expected outcome: Active enemies in seat order, then a Neutral group when a neutral unit is located. Without a roster, one group uses the human home name.
+ * Exceptions: None.
+ */
+function observedEnemyGroups(
+  state: GameStateSnapshot,
+  ownSeat: SeatId,
+  latLngByH3: Map<string, [number, number]>,
+  format: (h3: string) => string
+): EnemyRosterGroup[] {
+  const located = state.units.filter((unit) => unit.player !== ownSeat && latLngByH3.has(unit.h3Index));
+  const summary = (unit: { id: string; unitType: string; h3Index: string }): string =>
+    `${unit.id} (${unit.unitType}) at ${format(unit.h3Index)}`;
+  const groups: EnemyRosterGroup[] = [];
+  const seats = state.seats ?? [];
+  if (seats.length > 0) {
+    for (const seat of sortSeatsByOrder(seats)) {
+      if (seat.seatId === ownSeat || !isSeatActive(seat)) continue;
+      groups.push({
+        name: seat.homeRegion,
+        roster: located.filter((unit) => unit.player === seat.seatId).map(summary).join('; '),
+      });
+    }
+  } else {
+    const name = 'Enemy';
+    groups.push({
+      name,
+      roster: located.filter((unit) => !isNeutralOwnerId(unit.player)).map(summary).join('; '),
+    });
+  }
+  const neutralRoster = located.filter((unit) => isNeutralOwnerId(unit.player)).map(summary).join('; ');
+  if (neutralRoster.length > 0) groups.push({ name: 'Neutral', roster: neutralRoster });
+  return groups;
 }

@@ -83,6 +83,25 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   min-width: 0;
   padding: 0 14px;
 }
+.topbar-view-as {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding-right: 14px;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.topbar-view-as[hidden] { display: none !important; }
+.topbar-view-as select {
+  max-width: 180px;
+  color: var(--chrome-text);
+  font: inherit;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+}
 .topbar-side-name {
   min-width: 0;
   max-width: 220px;
@@ -108,6 +127,44 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 .topbar-side-mark-opponent {
   background: var(--player-opponent);
   box-shadow: 0 0 0 2px var(--chrome-opponent-edge);
+}
+.topbar-side-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.topbar-side-chip .topbar-side-mark {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16);
+}
+.topbar-side-chip.is-out .topbar-side-mark {
+  opacity: 0.45;
+}
+.topbar-side-chip.is-out .topbar-side-name {
+  color: var(--chrome-muted);
+  text-decoration: line-through;
+}
+.topbar-side-out {
+  color: var(--chrome-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.topbar-observing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.topbar-status-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.topbar-stat[hidden] {
+  display: none !important;
 }
 .topbar-stat {
   display: flex;
@@ -174,6 +231,7 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 /* While a battle is open, battleHeader.ts puts .topbar-battle on the bar: the match status hides, and the battle's title, beat, and controls show in its place. */
 #app-topbar:not(.topbar-battle) .battle-header-only,
 #app-topbar.topbar-battle .topbar-sides,
+#app-topbar.topbar-battle .topbar-view-as,
 #app-topbar.topbar-battle .topbar-stat,
 #app-topbar.topbar-battle .topbar-spacer,
 #app-topbar.topbar-battle .topbar-date-block {
@@ -245,6 +303,13 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   display: flex;
   align-items: baseline;
   gap: 5px;
+}
+.battle-force-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
 }
 .battle-force-count {
   font-size: 13px;
@@ -436,11 +501,11 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 .console-panel[hidden] {
   display: none;
 }
-#console-panel-opponent:not([hidden]) {
+#console-panel-commanders:not([hidden]) {
   display: flex;
   flex-direction: column;
 }
-#console-panel-opponent .openrouter-log {
+#console-panel-commanders .openrouter-log {
   min-height: 120px;
 }
 .console-rail {
@@ -505,6 +570,16 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   border-left: 1px solid var(--chrome-border);
   background: var(--chrome-bg-deep);
 }
+.observe-auto-advance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.observe-auto-advance[hidden] { display: none !important; }
+#sidebar.console[data-collapsed="true"] .observe-auto-advance { display: none; }
 .console-footer > .control-tooltip-host {
   display: flex;
   width: 100%;
@@ -549,7 +624,7 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   padding: 6px;
 }
 /* The rail is too narrow for the opponent status line; Ready stays. */
-#sidebar.console[data-collapsed="true"] .opponent-status-line {
+#sidebar.console[data-collapsed="true"] .commander-status-line {
   display: none;
 }
 /* The rail is too narrow for "AI:" and the time on one line, so that label wraps at the space. */

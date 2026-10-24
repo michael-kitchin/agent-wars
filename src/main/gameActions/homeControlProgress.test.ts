@@ -3,6 +3,7 @@
  * Run: `npm run build:main` then `node dist/main/gameActions/homeControlProgress.test.js`
  */
 
+import { type SeatId } from '../../shared/seatIds';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { computeHomeControlProgress } from './homeControlProgress';
@@ -15,7 +16,7 @@ import { computeHomeControlProgress } from './homeControlProgress';
  * Expected outcome: Held hexes map to the controller. Other hexes are absent.
  * Exceptions: None.
  */
-function controlOf(controller: 'human' | 'opponent', held: readonly string[]): Map<string, string> {
+function controlOf(controller: SeatId, held: readonly string[]): Map<string, string> {
   return new Map(held.map((hex) => [hex, controller]));
 }
 

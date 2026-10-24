@@ -12,6 +12,7 @@ import type { CombatDiceRoll } from '../shared/ipc/combatDiceTypes';
 import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
+import { resolveMultiSideMeleeEngagement } from './multiSideMelee';
 import type { RangedAttackOrder } from './gameActions';
 import type { CombatUnit } from './combatUnitTypes';
 import {
@@ -626,8 +627,9 @@ export function runRangedPhase(
  * Purpose: Single strategic/tactical combat entry for the melee phase, after movement.
  * When to use: Strategic Ready and tactical beats, with post-move unit positions; `skipMeleeHexes` excludes hexes
  *   chosen for a tactical battle.
- * Expected outcome: Casualties applied per contested hex; `diceRolls` always set, in roll order, anchored on the
- *   melee hex or cell.
+ * Expected outcome: A two-side hex uses one attack side and one defense side and does not draw a number to pick a
+ *   target. A hex with three or more sides rolls every unit once, then assigns hits across the other sides. `diceRolls`
+ *   stays in roll order, anchored on the melee hex or cell.
  * Exceptions: None.
  */
 export function runMeleePhase(
@@ -712,44 +714,23 @@ export function runMeleePhase(
         });
       }
     } else {
-      for (let k = 0; k < sidesOrdered.length; k++) {
-        const attackerSide = sidesOrdered[k]!;
-        const defenderSide = sidesOrdered[(k + 1) % sidesOrdered.length]!;
-        const atkUnits = getUnitsAtHex(hex).filter((u) => u.player === attackerSide);
-        const defUnits = getUnitsAtHex(hex).filter((u) => u.player === defenderSide);
-        if (atkUnits.length === 0 || defUnits.length === 0) continue;
-        const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(
-          atkUnits,
-          defUnits,
-          rollDie,
-          diceLog.sink
-        );
-        const atkUnitIds = atkUnits.map((u) => u.id);
-        const defUnitIds = defUnits.map((u) => u.id);
-        for (const id of defenderRemovedIds) {
-          const u = defUnits.find((x) => x.id === id)!;
-          recordRemovedUnit({
-            removed,
-            removedUnits,
-            casualtyHexSet,
-            kills,
-            victim: u,
-            casualtyHex: hex,
-            killerIds: atkUnitIds,
-          });
-        }
-        for (const id of attackerRemovedIds) {
-          const u = atkUnits.find((x) => x.id === id)!;
-          recordRemovedUnit({
-            removed,
-            removedUnits,
-            casualtyHexSet,
-            kills,
-            victim: u,
-            casualtyHex: hex,
-            killerIds: defUnitIds,
-          });
-        }
+      const multi = resolveMultiSideMeleeEngagement({
+        sidesOrdered,
+        unitsHere,
+        rollDie,
+        next,
+        onRoll: diceLog.sink,
+      });
+      for (const removal of multi.removals) {
+        recordRemovedUnit({
+          removed,
+          removedUnits,
+          casualtyHexSet,
+          kills,
+          victim: removal.victim,
+          casualtyHex: hex,
+          killerIds: [...removal.killerIds],
+        });
       }
     }
   }

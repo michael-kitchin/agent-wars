@@ -23,6 +23,7 @@ import {
   shouldDismissStackCalloutForHoverPlanning,
 } from '../rendering/canvasPreviewPolicy';
 import type { GameStateSnapshot, SealiftStackState } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Entry-module callbacks the stack popup still calls by their original names.
@@ -557,7 +558,7 @@ export function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitId
  * Exceptions: None.
  */
 export function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['units']): string[] {
-  return units.filter((u) => u.player === 'human' && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
+  return units.filter((u) => u.player === HUMAN_SEAT_ID && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
 }
 
 /**
@@ -865,7 +866,7 @@ export function showStackCallout(
   });
   header.appendChild(closeBtn);
 
-  const humanIds = sorted.filter((u) => u.player === 'human').map((u) => u.id);
+  const humanIds = sorted.filter((u) => u.player === HUMAN_SEAT_ID).map((u) => u.id);
   if (humanIds.length > 0 && !S.shiftKeyActive) {
     const selectAllBtn = document.createElement('button');
     selectAllBtn.type = 'button';
@@ -901,7 +902,7 @@ export function showStackCallout(
     label.className = 'unit-label';
     setUnitNameContent(label, u.id, formatUnitDisplayName(u.id));
     li.appendChild(label);
-    if (u.player === 'human') {
+    if (u.player === HUMAN_SEAT_ID) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'unit-select stack-unit-toggle';

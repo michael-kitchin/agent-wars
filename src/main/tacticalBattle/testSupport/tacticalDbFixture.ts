@@ -3,6 +3,7 @@
  */
 
 import { afterEach } from 'node:test';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../../shared/seatIds';
 import { dbGetOne, dbRun } from '../../gameDb';
 import { clearStrategicPreviousHexMemory } from '../../strategicUnitPreviousHex';
 import { withTempGameDb } from '../../testSupport/withTempGameDb';
@@ -61,9 +62,10 @@ export function tacticalDbFixtureLoadDefaultHumanOpponentPlacement(): {
   humanStrategicH3: string;
 } {
   const human = dbGetOne<{ id: string; h3Index: string }>(
-    `SELECT id, h3_index AS h3Index FROM units WHERE player = 'human' LIMIT 1`
+    'SELECT id, h3_index AS h3Index FROM units WHERE player = ? LIMIT 1',
+    [HUMAN_SEAT_ID]
   );
-  const opponent = dbGetOne<{ id: string }>(`SELECT id FROM units WHERE player = 'opponent' LIMIT 1`);
+  const opponent = dbGetOne<{ id: string }>('SELECT id FROM units WHERE player = ? LIMIT 1', [AI_SEAT_IDS[0]]);
   if (!human || !opponent) {
     throw new Error('tacticalDbFixtureLoadDefaultHumanOpponentPlacement: missing seed human or opponent unit');
   }

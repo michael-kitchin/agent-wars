@@ -7,6 +7,7 @@
 import { strategicCellAt, tacticalCellAt } from '../shared/h3Resolutions';
 
 import type { GameStateSnapshot } from './gameDb';
+import { briefingOwnSeatId } from './briefing/briefingPerspective';
 import { buildRecentTurnNotesSection } from './briefing/recentTurnNotesSection';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
@@ -160,8 +161,9 @@ export function buildStrategicNarrative(
    */
   standingOrdersActive = true
 ): string {
-  const aiUnits = state.units.filter((u) => u.player === 'opponent');
-  const humanUnits = state.units.filter((u) => u.player === 'human');
+  const ownSeat = briefingOwnSeatId(state);
+  const aiUnits = state.units.filter((u) => u.player === ownSeat);
+  const humanUnits = state.units.filter((u) => u.player !== ownSeat);
   const inContact = unitAssessments.filter(
     (a) => (a.result.threats?.length ?? 0) > 0 && a.result.nearbyEnemies?.some((e) => e.inRangedRange || e.inMeleeRange)
   ).length;
@@ -175,8 +177,8 @@ export function buildStrategicNarrative(
   }).length;
   const observedEnemySentence =
     humanUnits.length > 0
-      ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: ${humanUnits.length}.`
-      : `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: 0. Enemy forces may still be out of view, so scout and preserve contact.`;
+      ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed enemy units: ${humanUnits.length}.`
+      : `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed enemy units: 0. Enemy forces may still be out of view, so scout and preserve contact.`;
   const hasAir = aiUnits.some((u) => u.unitType === 'air');
   logDebug('briefingFormatter buildStrategicNarrative', {
     turnNumber: state.turnNumber,
@@ -865,7 +867,7 @@ export function formatBriefing(
   }
   const orderlessAction = standingOrdersActive
     ? collectOrderlessMissionContext({
-        playerId: 'opponent',
+        playerId: briefingOwnSeatId(state),
         state,
         orderlessUnitIds: precomputed.unitAssessments
           .filter((assessment) => assessment.result.unit?.currentStandingOrder == null)
@@ -901,6 +903,7 @@ export function formatBriefing(
     battleId: '',
     currentTurnNumber: state.turnNumber,
     heading: SECTION_TITLE_RECENT_TURN_NOTES,
+    seatId: briefingOwnSeatId(state),
   });
   if (recentTurnNotes.trim().length > 0) {
     sections.push('\n\n' + recentTurnNotes);

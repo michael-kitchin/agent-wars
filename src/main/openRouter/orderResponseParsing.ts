@@ -5,8 +5,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
+import { coordinateContextSeatId, HEX_CODE_PATTERN, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { codeToH3, codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/pathfinding';
@@ -618,7 +617,7 @@ function processProductionOrdersArray(
       continue;
     }
     const args = { hex: hexLatLng, unitType: order.unitType, count: order.count };
-    const result = executeProductionTools(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
+    const result = executeProductionTools(coordinateContextSeatId(context), order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
     if (result.status === 'ok') {
       appliedCount += 1;
       continue;

@@ -15,6 +15,7 @@ import {
   tacticalLandEnterCostRule,
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
+import { buildDoctrineBlock } from './doctrineText';
 import { MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET, STRATEGY_BLOCK } from './coachingTextStrategic';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 
@@ -23,13 +24,15 @@ import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
  *
  * Purpose: Battle prompts keep a single engage priority instead of the five strategic goals.
  * When to use: `buildContextCoaching` in tactical mode.
- * Expected outcome: Existing `- Your priority is:` / strategy / message wording.
+ * Expected outcome: The priority, the strategy list, an aggressive or cautious block when that doctrine is set, and the message. Balanced adds nothing between the strategy list and the message.
  * Exceptions: None.
  */
-export function buildTacticalContextCoaching(): string {
-  logTrace('promptSpec buildTacticalContextCoaching', {});
+export function buildTacticalContextCoaching(gates: CoachingGates): string {
+  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced');
+  logTrace('promptSpec buildTacticalContextCoaching', { doctrineBlock: doctrine.length > 0 });
+  const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${TACTICAL_PRIORITY_BLOCK}
-${STRATEGY_BLOCK}
+${STRATEGY_BLOCK}${doctrineLine}
 ${MESSAGE_BLOCK}`;
 }
 

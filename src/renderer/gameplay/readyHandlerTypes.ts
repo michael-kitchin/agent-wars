@@ -140,14 +140,14 @@ hideAiStrategyToast: () => void;
    */
 updateOpenRouterCostLabel: () => void;
     /**
-   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean) => void;).
+   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;).
 
    * Contract: Describes stable behavior for callers of `appendOpenRouterLog` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-appendOpenRouterLog: (line: string, isError?: boolean) => void;
+appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;
     /**
    * Shows the lower-right map toast.
    *

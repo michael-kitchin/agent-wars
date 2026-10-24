@@ -4,6 +4,8 @@
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
+import { isAiSeatId } from '../../shared/seatIds';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, terrainIsPassableForDomain } from '../pathfinding';
@@ -121,7 +123,7 @@ function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
  * Exceptions: None.
  */
 function shouldIncludeStaleEnemyIntel(state: GameStateSnapshot): boolean {
-  return state.playerPerspective !== 'opponent';
+  return !isAiSeatId(state.playerPerspective ?? '');
 }
 
 /**
@@ -566,7 +568,7 @@ function executeAssessHex(
     .filter((u) => u.h3Index === hexH3)
     .map((u) => ({ unitId: u.id, type: u.unitType, position: h3ToLatLng(u.h3Index, latLngByH3, 'cellCenter') as LatLng }));
 
-  const aiPlayerId = 'opponent';
+  const aiPlayerId = briefingOwnSeatId(state);
   const enemies = state.units.filter((u) => u.player !== aiPlayerId);
   const rangedRange1: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
   const rangedRange2: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];

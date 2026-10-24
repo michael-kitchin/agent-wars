@@ -1,11 +1,11 @@
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from './ordersTypes';
 
 /**
- * Normalized opponent tactical orders buffered in the renderer until tactical Ready; mirrors strategic “AI orders held until ready” scheduling.
+ * Opponent tactical orders for one battle beat.
  *
- * Purpose: Single IPC shape for `tacticalOpponentPlan` on `requestAiOrders` and optional `opponentTacticalDraft` on tactical commit payloads.
- * When to use: Renderer state after a successful tactical AI consultation; echoed back on `commitHumanTacticalDraftOrders` for the combined beat.
- * Expected outcome: Arrays are always present (possibly empty); movement uses tactical sub-unit ids.
+ * Purpose: The commander pool stores this shape, and a tactical commit may still send it.
+ * When to use: Reading a stored battle plan, or building the commit payload.
+ * Expected outcome: Arrays are always present (possibly empty). Movement uses tactical sub-unit ids.
  * Exceptions: None.
  */
 export type TacticalOpponentPlanPayload = {
@@ -21,7 +21,8 @@ export type TacticalOpponentPlanPayload = {
  *
  * Purpose: Single shape for opponent draft refresh, optional strategy toast, and tool-count telemetry after `afterTacticalBeatResolution`.
  * When to use: Main attaches to successful `commitHumanTacticalDraftOrders` when event-driven Run consult completes; renderer matches `battleId` to `S.tacticalBattleSnapshot`.
- * Expected outcome: When `attachTacticalOpponentPlanToIpc` is true, `tacticalOpponentPlan` may be null or empty to clear draft and trigger prefetch; when false, the consumed Ready draft is cleared and prefetch may refill for the next beat.
+ * Expected outcome: An empty attached plan lets the screen start another battle consult. A non-empty plan stays stored.
+ * When nothing was attached, another consult starts only while Run is on and an AI side remains.
  * Exceptions: None.
  */
 export type TacticalPostBeatConsultFields = {

@@ -1,10 +1,13 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { NEUTRAL_PALETTE } from '../../shared/seatPalette';
+import { staleIntelViewer } from '../../shared/observeModeControls';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
+import { unitIdOwnerFromId } from '../../shared/unitIds';
 import {
   COUNT_BADGE_OFFSET,
   MULTI_PLAYER_FILL,
   MULTI_PLAYER_GLYPH_FILTER,
   MULTI_PLAYER_STROKE,
-  PLAYER_COLORS,
   SELECTION_RING_COLOR,
   SELECTION_RING_WIDTH,
   STACK_OFFSET_X,
@@ -12,6 +15,7 @@ import {
   UNIT_RADIUS,
   UNIT_TYPE_LABELS,
 } from '../core/constants';
+import { paletteForCurrentOwner } from './ownerColors';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -173,9 +177,11 @@ function drawUnitSvgIcon(
   const height = img.naturalHeight * iconScale;
   const drawX = centerX - width / 2;
   const drawY = centerY - height / 2;
-  const shouldFlip = flipForOpponent && unitPlayer === 'opponent';
+  const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== '' && unitPlayer !== HUMAN_SEAT_ID;
+  const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
 
   ctx.save();
+  if (neutralGlyph) ctx.filter = 'brightness(0.85)';
   if (shouldFlip) {
     ctx.translate(centerX, centerY);
     ctx.scale(-1, 1);
@@ -265,7 +271,7 @@ export function drawOneUnitMarker(
   }
   ctx.save();
   if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : '#fff';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -323,8 +329,12 @@ export function drawUnits(
     const players = new Set(hexUnits.map((u) => u.player));
     const mixedType = types.size > 1;
     const multiPlayer = players.size > 1;
-    const fillColor = multiPlayer ? MULTI_PLAYER_FILL : (PLAYER_COLORS[hexUnits[0]!.player] ?? '#333');
-    const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : '#fff';
+    const ownerId = hexUnits[0]!.player;
+    const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
+    const fillColor = multiPlayer
+      ? MULTI_PLAYER_FILL
+      : (paletteForCurrentOwner(ownerId)?.map ?? '#333');
+    const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : '#fff';
     const label = mixedType ? '*' : (UNIT_TYPE_LABELS[hexUnits[0]!.unitType] ?? '?');
     const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
     drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0]!.player);
@@ -360,8 +370,13 @@ export function drawStaleEnemyIntel(
   state: GameStateSnapshot,
   inferUnitTypeLabelFromId: (unitId: string) => string
 ): void {
+  const viewer = staleIntelViewer(state.playerPerspective);
+  if (viewer === null) {
+    S.lastRenderedVisibleEnemyByUnitId.clear();
+    return;
+  }
   const hasFogData = Array.isArray(state.visibleHexes);
-  const currentlyVisibleEnemies = state.units.filter((u) => u.player !== 'human');
+  const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
   const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
   for (const [unitId, prevSeen] of S.lastRenderedVisibleEnemyByUnitId) {
     if (currentlyVisibleEnemyIds.has(unitId)) continue;
@@ -428,10 +443,17 @@ export function drawStaleEnemyIntel(
     if (alpha <= 0) continue;
     const types = new Set(rows.map((r) => inferUnitTypeLabelFromId(r.unitId)));
     const label = types.size === 1 ? [...types][0]! : '*';
+    const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+    const ownerId = owners.size === 1 ? [...owners][0]! : null;
+    const mixedOwners = owners.size > 1;
+    const fillColor = mixedOwners
+      ? MULTI_PLAYER_FILL
+      : (paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? '#333');
+    const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : '#fff';
     const { x, y } = hexCenterPx(h3Index);
     ctx.save();
     ctx.globalAlpha = alpha;
-    drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, '#fff', 'opponent');
+    drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
     ctx.restore();
   }
 }

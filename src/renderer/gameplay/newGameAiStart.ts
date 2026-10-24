@@ -93,5 +93,5 @@ export async function applyStartMatchAiChoice(choice: StartMatchAiChoice, deps: 
   if (runButton) runButton.setAttribute('aria-pressed', choice.runOn ? 'true' : 'false');
   deps.updateReadyButtonState();
   if (choice.runOn) deps.startPlanning();
-  if (choice.openOpponentTab) showConsoleTab('console-tab-opponent');
+  if (choice.openOpponentTab) showConsoleTab('console-tab-commanders');
 }

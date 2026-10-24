@@ -26,6 +26,7 @@ import type {
   SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Documents the `HexBuildQueueEntryView` interface as a named contract surface (export interface HexBuildQueueEntryView).
@@ -343,7 +344,7 @@ function validateBuildQueueMutationContext(args: {
   if (phase !== 'planning') {
     return { valid: false, reason: 'Build queue can only be edited during planning phase.' };
   }
-  if (isTacticalBattleActive() && args.requestingPlayerId === 'human') {
+  if (isTacticalBattleActive() && args.requestingPlayerId === HUMAN_SEAT_ID) {
     return { valid: false, reason: 'Build queue is unavailable during a tactical battle.' };
   }
   const queueView = buildQueueViewForRequester(args.h3Index, args.requestingPlayerId);
@@ -357,27 +358,27 @@ function validateBuildQueueMutationContext(args: {
 }
 
 /**
- * Defines the `readHexBuildQueue` function shape (export function readHexBuildQueue(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView).
+ * Defines the `readHexBuildQueue` function shape (export function readHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): HexBuildQueueView).
 
  * Purpose: Supports maintainability by documenting why `readHexBuildQueue` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function readHexBuildQueue(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView {
+export function readHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): HexBuildQueueView {
   logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
   return buildQueueViewForRequester(h3Index, requestingPlayerId);
 }
 
 /**
- * Defines the `executeAddHexBuildQueueEntry` function shape (export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId = 'human'): { success: boolean; reason?: string; queue?: HexBuildQueueVie).
+ * Defines the `executeAddHexBuildQueueEntry` function shape (export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): { success: boolean; reason?: string; queue?: HexBuildQueueVie).
 
  * Purpose: Supports maintainability by documenting why `executeAddHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId = 'human'): {
+export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): {
   success: boolean;
   reason?: string;
   queue?: HexBuildQueueView;
@@ -420,7 +421,7 @@ export function executeUpdateHexBuildQueueEntry(
   entryId: number,
   unitType: BuildUnitType,
   count: number,
-  requestingPlayerId = 'human'
+  requestingPlayerId: string = HUMAN_SEAT_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   logDebug('gameActions updateHexBuildQueueEntry', { h3Index, entryId, unitType, count, requestingPlayerId });
   try {
@@ -452,7 +453,7 @@ export function executeUpdateHexBuildQueueEntry(
 }
 
 /**
- * Defines the `executeRemoveHexBuildQueueEntry` function shape (export function executeRemoveHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId = 'human' ): { success: boolean; reason?: string; q).
+ * Defines the `executeRemoveHexBuildQueueEntry` function shape (export function executeRemoveHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId: string = HUMAN_SEAT_ID ): { success: boolean; reason?: string; q).
 
  * Purpose: Supports maintainability by documenting why `executeRemoveHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -462,7 +463,7 @@ export function executeUpdateHexBuildQueueEntry(
 export function executeRemoveHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
-  requestingPlayerId = 'human'
+  requestingPlayerId: string = HUMAN_SEAT_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   logDebug('gameActions removeHexBuildQueueEntry', { h3Index, entryId, requestingPlayerId });
   try {
@@ -499,7 +500,7 @@ export function executeRemoveHexBuildQueueEntry(
 export function executeApplyBuildQueueTemplateToHexes(
   h3Indexes: string[],
   entries: BuildQueueTemplateEntry[],
-  requestingPlayerId = 'human'
+  requestingPlayerId: string = HUMAN_SEAT_ID
 ): ApplyBuildQueueTemplateResult {
   logDebug('gameActions applyBuildQueueTemplateToHexes', {
     requestingPlayerId,
@@ -576,7 +577,7 @@ export function executeApplyBuildQueueTemplateToHexes(
 export function executeSetHexesKeepBuilding(
   h3Indexes: string[],
   keepBuilding: boolean,
-  requestingPlayerId = 'human'
+  requestingPlayerId: string = HUMAN_SEAT_ID
 ): SetHexesKeepBuildingResult {
   logDebug('gameActions setHexesKeepBuilding', {
     requestingPlayerId,

@@ -1,4 +1,5 @@
 import { logDebug, logError, logTrace } from '../logger';
+import type { AiSeatId } from '../../shared/seatIds';
 import type { GuardedDbOps } from './dbOps';
 
 /**
@@ -103,12 +104,14 @@ export interface TurnConsultationNoteTexts {
  */
 export function upsertTurnStrategyNote(
   ops: TurnNotesDbOps,
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   turnNumber: number,
   texts: TurnConsultationNoteTexts
 ): void {
   logDebug('turnNotesHistory upsertTurnStrategyNote', {
+    seatId,
     scope,
     battleId,
     turnNumber,
@@ -118,15 +121,15 @@ export function upsertTurnStrategyNote(
   if (!ops.hasDb()) return;
   try {
     ops.run(
-      `INSERT INTO turn_notes_history (scope, battle_id, turn_number, strategy_text, message_text)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(scope, battle_id, turn_number) DO UPDATE SET
+      `INSERT INTO turn_notes_history (seat_id, scope, battle_id, turn_number, strategy_text, message_text)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(seat_id, scope, battle_id, turn_number) DO UPDATE SET
          strategy_text = excluded.strategy_text,
          message_text = excluded.message_text`,
-      [scope, battleId, turnNumber, texts.strategyText ?? null, texts.messageText ?? null]
+      [seatId, scope, battleId, turnNumber, texts.strategyText ?? null, texts.messageText ?? null]
     );
   } catch (err) {
-    logError('turnNotesHistory upsertTurnStrategyNote failed', { scope, battleId, turnNumber, err });
+    logError('turnNotesHistory upsertTurnStrategyNote failed', { seatId, scope, battleId, turnNumber, err });
   }
 }
 
@@ -140,25 +143,26 @@ export function upsertTurnStrategyNote(
  */
 export function upsertTurnLossNote(
   ops: TurnNotesDbOps,
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   turnNumber: number,
-  humanLossJson: string,
-  aiLossJson: string
+  ownLossJson: string,
+  enemyLossJson: string
 ): void {
-  logDebug('turnNotesHistory upsertTurnLossNote', { scope, battleId, turnNumber });
+  logDebug('turnNotesHistory upsertTurnLossNote', { seatId, scope, battleId, turnNumber });
   if (!ops.hasDb()) return;
   try {
     ops.run(
-      `INSERT INTO turn_notes_history (scope, battle_id, turn_number, human_loss_json, ai_loss_json)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(scope, battle_id, turn_number) DO UPDATE SET
-         human_loss_json = excluded.human_loss_json,
-         ai_loss_json = excluded.ai_loss_json`,
-      [scope, battleId, turnNumber, humanLossJson, aiLossJson]
+      `INSERT INTO turn_notes_history (seat_id, scope, battle_id, turn_number, own_loss_json, enemy_loss_json)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(seat_id, scope, battle_id, turn_number) DO UPDATE SET
+         own_loss_json = excluded.own_loss_json,
+         enemy_loss_json = excluded.enemy_loss_json`,
+      [seatId, scope, battleId, turnNumber, ownLossJson, enemyLossJson]
     );
   } catch (err) {
-    logError('turnNotesHistory upsertTurnLossNote failed', { scope, battleId, turnNumber, err });
+    logError('turnNotesHistory upsertTurnLossNote failed', { seatId, scope, battleId, turnNumber, err });
   }
 }
 
@@ -172,34 +176,35 @@ export function upsertTurnLossNote(
  */
 export function getRecentTurnNotes(
   ops: TurnNotesDbOps,
+  seatId: AiSeatId,
   scope: TurnNotesScope,
   battleId: string,
   beforeTurnNumber: number,
   limit = 3
 ): TurnNoteRow[] {
-  logTrace('turnNotesHistory getRecentTurnNotes', { scope, battleId, beforeTurnNumber, limit });
+  logTrace('turnNotesHistory getRecentTurnNotes', { seatId, scope, battleId, beforeTurnNumber, limit });
   if (!ops.hasDb()) return [];
   const rows = ops.getAll<{
     turn_number: number;
     strategy_text: string | null;
     message_text: string | null;
-    human_loss_json: string | null;
-    ai_loss_json: string | null;
+    own_loss_json: string | null;
+    enemy_loss_json: string | null;
   }>(
-    `SELECT turn_number, strategy_text, message_text, human_loss_json, ai_loss_json
+    `SELECT turn_number, strategy_text, message_text, own_loss_json, enemy_loss_json
      FROM turn_notes_history
-     WHERE scope = ? AND battle_id = ? AND turn_number < ?
+     WHERE seat_id = ? AND scope = ? AND battle_id = ? AND turn_number < ?
      ORDER BY turn_number DESC
      LIMIT ?`,
-    [scope, battleId, beforeTurnNumber, limit]
+    [seatId, scope, battleId, beforeTurnNumber, limit]
   );
   return rows
     .map((r) => ({
       turnNumber: r.turn_number,
       strategyText: r.strategy_text,
       messageText: r.message_text,
-      humanLossJson: r.human_loss_json,
-      aiLossJson: r.ai_loss_json,
+      humanLossJson: r.enemy_loss_json,
+      aiLossJson: r.own_loss_json,
     }))
     .reverse();
 }

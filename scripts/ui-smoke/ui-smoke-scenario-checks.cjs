@@ -43,7 +43,7 @@ const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
 const BATTLE_ORDER_DETAIL = /^→ [0-9A-Z]{2}\.[0-9A-Z]{2} · \d+h$/;
 
 /**
- * Reads the turn number from the top bar's turn line, such as "Turn 2 · Planning".
+ * Reads the turn number from the top bar's turn line, such as "Turn 2 · Planning" or "Turn 2 of 30 · Planning".
  *
  * Purpose: The reopened match's turn depends on how far the first session got.
  * When to use: Checks that compare the Orders subtitle with the turn.
@@ -51,7 +51,7 @@ const BATTLE_ORDER_DETAIL = /^→ [0-9A-Z]{2}\.[0-9A-Z]{2} · \d+h$/;
  * Exceptions: None.
  */
 function planningTurnNumber(turnLine) {
-  const match = /^Turn (\d+) · Planning$/.exec(turnLine);
+  const match = /^Turn (\d+)(?: of \d+)? · Planning$/.exec(turnLine);
   return match ? Number(match[1]) : null;
 }
 
@@ -127,7 +127,7 @@ const SCENARIO_CHECKS = Object.freeze([
     run: (p, el) => {
       if (!el('#game-over-overlay').shown) return 'the game-over screen is not shown';
       const message = el('#game-over-message').text;
-      return message === 'You lose.' ? null : `the game-over message reads "${message}", expected "You lose."`;
+      return message === 'The match is over.' ? null : `the game-over message reads "${message}", expected "The match is over."`;
     },
   },
   {
@@ -208,6 +208,44 @@ const SCENARIO_CHECKS = Object.freeze([
     run: (p, el) => {
       const text = el('#reports-list').text;
       return text.includes('Turn report') || text.includes('B1') ? 'entries from the previous match are still listed' : null;
+    },
+  },
+  {
+    name: 'knockout-reports-and-out-mark',
+    scenes: [SCENES.matchKnockoutReports],
+    needs: ['#console-panel-reports', '#console-title', '.topbar-side-out', '#reports-empty'],
+    run: (p, el) => {
+      if (!el('#console-panel-reports').shown) return 'the Reports panel is not shown';
+      if (el('#console-title').text !== 'Reports') return `the console title reads "${el('#console-title').text}"`;
+      const mark = el('.topbar-side-out').text;
+      if (mark !== 'out T1') return `the knockout mark reads "${mark}", expected "out T1"`;
+      return el('#reports-empty').shown ? null : 'the empty reports sentence is hidden';
+    },
+  },
+  {
+    name: 'four-commanders-at-turn-one',
+    scenes: [SCENES.matchFourCommanders],
+    needs: ['#console-title', '#console-subtitle', '#topbar-turn-phase', '.topbar-side-chip'],
+    run: (p, el) => {
+      if (el('#console-title').text !== 'Commanders') return `the console title reads "${el('#console-title').text}"`;
+      if (el('#console-subtitle').text !== '3 opponents') return `the subtitle reads "${el('#console-subtitle').text}", expected "3 opponents"`;
+      if (el('#topbar-turn-phase').text !== 'Turn 1 · Planning') return `the top bar reads "${el('#topbar-turn-phase').text}"`;
+      const chips = el('.topbar-side-chip').allTexts;
+      return chips.length === 4 ? null : `${chips.length} side chips are shown, expected 4`;
+    },
+  },
+  {
+    name: 'observe-view-as',
+    scenes: [SCENES.matchObserve],
+    needs: ['#topbar-sides', '#topbar-view-as', '#topbar-view-as-select', '#observe-auto-advance', '#observe-auto-advance-input', '#console-tab-orders'],
+    run: (p, el) => {
+      if (!el('#topbar-sides').text.includes('Observing')) return `the top bar reads "${el('#topbar-sides').text}"`;
+      if (!el('#topbar-view-as').shown) return 'View as is hidden';
+      const options = el('#topbar-view-as-select').text;
+      if (!options.startsWith('All sides, no fog')) return `View as reads "${options}"`;
+      if (!el('#observe-auto-advance').shown) return 'the auto-advance checkbox is hidden';
+      if (el('#observe-auto-advance-input').checked) return 'auto-advance starts checked';
+      return el('#console-tab-orders').disabled ? null : 'Orders is enabled while observing';
     },
   },
 ]);

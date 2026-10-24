@@ -77,7 +77,7 @@ function testBlindLandUnitWithAHomeHexNeedsAction(): void {
         chain,
         units: [{ id: unitId, player: 'opponent', unitType: 'infantry', h3Index: chain[0]! }],
       }),
-      humanHomeRegionHexes: [chain[2]!],
+      seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[2]!] },
     },
     orderlessUnitIds: [unitId],
   });

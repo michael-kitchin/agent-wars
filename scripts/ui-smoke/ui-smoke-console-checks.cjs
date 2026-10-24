@@ -75,7 +75,7 @@ function toastBandSpace(map, panel, legend) {
  * Expected outcome: The label, the model name, and the match cost, in that order.
  * Exceptions: None.
  */
-const FRESH_STATUS_LINE = Object.freeze(['Opponent planning off', 'No model', '$0.00']);
+const FRESH_STATUS_LINE = Object.freeze(['Commanders off', 'No model', '$0.00']);
 
 /**
  * The Opponent tab's parts, top to bottom.
@@ -89,7 +89,7 @@ const OPPONENT_SECTION_ORDER = Object.freeze([
   '#openrouter-run-btn',
   '#openrouter-model-panel',
   '#openrouter-tools-panel',
-  '#opponent-log-heading',
+  '#commander-log-heading',
   '#openrouter-log',
 ]);
 
@@ -506,12 +506,12 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'opponent-sections',
     scenes: [SCENES.opponentTab],
-    needs: ['#console-subtitle', '#opponent-status-text', ...OPPONENT_SECTION_ORDER],
+    needs: ['#console-subtitle', '#commander-status-text', ...OPPONENT_SECTION_ORDER],
     run: (p, el) => {
       const subtitle = el('#console-subtitle').text;
-      if (subtitle !== 'Northern Africa') return `the Opponent subtitle reads "${subtitle}", expected "Northern Africa"`;
-      const sentence = el('#opponent-status-text').text;
-      if (sentence !== 'Opponent planning is off.') return `the status sentence reads "${sentence}", expected "Opponent planning is off."`;
+      if (subtitle !== '1 opponent') return `the Commanders subtitle reads "${subtitle}", expected "1 opponent"`;
+      const sentence = el('#commander-status-text').text;
+      if (sentence !== 'Planning is off.') return `the status sentence reads "${sentence}", expected "Planning is off."`;
       const hidden = OPPONENT_SECTION_ORDER.filter((selector) => !el(selector).shown);
       if (hidden.length > 0) return `not shown together: ${hidden.join(', ')}`;
       const misplaced = OPPONENT_SECTION_ORDER.slice(1).filter((selector, i) => el(selector).y <= el(OPPONENT_SECTION_ORDER[i]).y);
@@ -532,14 +532,14 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'console-status-line',
     scenes: [SCENES.strategic, SCENES.opponentTab, SCENES.matchReopened, SCENES.battleStart, SCENES.regionalStart],
-    needs: ['#opponent-status-line', '#opponent-status-label', '#opponent-status-model', '#opponent-status-cost', '#ready-btn'],
+    needs: ['#commander-status-line', '#commander-status-label', '#commander-status-model', '#commander-status-cost', '#ready-btn'],
     run: (p, el) => {
-      const line = el('#opponent-status-line');
+      const line = el('#commander-status-line');
       const ready = el('#ready-btn');
       if (!line.shown || !line.ancestorIds.includes('console-footer')) return 'the status line is not shown in the console footer';
       if (line.y + line.h > ready.y + 1) return `the status line ${fmt(line)} is not above Ready ${fmt(ready)}`;
       if (line.h > 24) return `the status line is ${Math.round(line.h)} tall, so it wraps`;
-      const parts = ['#opponent-status-label', '#opponent-status-model', '#opponent-status-cost'].map((selector) => el(selector).text);
+      const parts = ['#commander-status-label', '#commander-status-model', '#commander-status-cost'].map((selector) => el(selector).text);
       return parts.every((text, i) => text === FRESH_STATUS_LINE[i])
         ? null
         : `the status line reads ${JSON.stringify(parts)}, expected ${JSON.stringify(FRESH_STATUS_LINE)}`;
@@ -548,8 +548,8 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'console-status-line-hidden-collapsed',
     scenes: [SCENES.consoleCollapsed],
-    needs: ['#opponent-status-line'],
-    run: (p, el) => (el('#opponent-status-line').shown ? 'the status line shows in the collapsed rail' : null),
+    needs: ['#commander-status-line'],
+    run: (p, el) => (el('#commander-status-line').shown ? 'the status line shows in the collapsed rail' : null),
   },
   {
     name: 'selection-cleared-rows',

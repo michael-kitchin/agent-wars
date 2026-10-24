@@ -10,7 +10,9 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import type { AiSeatId } from '../../shared/seatIds';
 import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefingBlock } from './briefingSections';
@@ -96,6 +98,15 @@ export interface StatusInjectionArgs {
    * Exceptions: None.
    */
   readonly coordinateContext: CoordinateContext;
+  /**
+   * Commander whose memory and standing orders are injected.
+   *
+   * Contract: An AI seat. Omitted uses the snapshot perspective, then the first AI seat.
+   * When to use: The consultation passes its seat. The prompt assembler can omit it when the snapshot already carries that perspective.
+   * Expected outcome: Notes and standing orders belong to this commander.
+   * Exceptions: None.
+   */
+  readonly seatId?: AiSeatId;
 }
 
 /**
@@ -145,16 +156,18 @@ export interface StatusInjectionTexts {
  * Exceptions: None.
  */
 export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInjectionTexts {
+  const seatId = args.seatId ?? briefingOwnSeatId(args.state);
   logDebug('requestOrdersInjection buildStatusInjectionTexts', {
     memoryEnabled: args.memoryEnabled,
     ordersEnabled: args.ordersEnabled,
     productionEnabled: args.productionEnabled,
+    seatId,
     turnNumber: args.state.turnNumber,
     mode: args.coordinateContext.mode,
   });
-  const memoryText = args.memoryEnabled ? getInjectionText('opponent', args.state.turnNumber) : '';
+  const memoryText = args.memoryEnabled ? getInjectionText(seatId, args.state.turnNumber) : '';
   const standingOrderText = args.ordersEnabled
-    ? getStandingOrderInjectionText('opponent', args.state, args.coordinateContext)
+    ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext)
     : '';
   const productionText = args.productionEnabled
     ? buildProductionBriefingBlock({

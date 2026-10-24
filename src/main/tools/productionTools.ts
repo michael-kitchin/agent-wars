@@ -23,16 +23,8 @@ import { logDebug, logError, logTrace } from '../logger';
 import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from '../productionCaps';
 import { parseGameSize } from '../../shared/gameSize';
+import type { AiSeatId } from '../../shared/seatIds';
 
-/**
- * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
-
- * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const AI_PLAYER_ID = 'opponent';
 
 /**
  * Documents the module-scope binding `PRODUCTION_TOOL_NAMES` (PRODUCTION_TOOL_NAMES).
@@ -146,12 +138,13 @@ function summarizeQueue(
  * Exceptions: Returns `{ status: 'error' }` when a requested hex cannot be resolved.
  */
 function queryProduction(
+  seatId: AiSeatId,
   args: { hex?: unknown; all?: unknown },
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logTrace('productionTools queryProduction', { hasHex: args.hex !== undefined, all: args.all === true });
+  logTrace('productionTools queryProduction', { seatId, hasHex: args.hex !== undefined, all: args.all === true });
   if (!isTerrainClassificationCacheLoaded()) {
     logDebug('productionTools queryProduction: terrain cache unavailable', { stateTurn: state.turnNumber });
     return {
@@ -161,16 +154,16 @@ function queryProduction(
     };
   }
   const maxedTypes = new Set(
-    getMaxedUnitTypesForPlayer(state.units, AI_PLAYER_ID, parseGameSize(state.gameSize))
+    getMaxedUnitTypesForPlayer(state.units, seatId, parseGameSize(state.gameSize))
   );
   if (args.hex !== undefined) {
     const resolved = resolveHexArgument(args, resolveToH3);
     if (!resolved.ok) return { status: 'error', error: resolved.error };
-    const queue = getHexBuildQueue(resolved.h3Index, AI_PLAYER_ID);
+    const queue = getHexBuildQueue(resolved.h3Index, seatId);
     return { status: 'ok', production: summarizeQueue(queue, latLngByH3, maxedTypes) };
   }
   const snapshots = state.hexes
-    .map((hex) => getHexBuildQueue(hex.h3Index, AI_PLAYER_ID))
+    .map((hex) => getHexBuildQueue(hex.h3Index, seatId))
     .filter((queue) => queue.controlledByRequester)
     .map((queue) => summarizeQueue(queue, latLngByH3, maxedTypes));
   return { status: 'ok', production: { controlledHexQueues: snapshots } };
@@ -185,6 +178,7 @@ function queryProduction(
  * Exceptions: None beyond the returned error payload.
  */
 function setBuildQueue(
+  seatId: AiSeatId,
   args: { hex?: unknown; unitType?: unknown; count?: unknown },
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined,
@@ -213,7 +207,7 @@ function setBuildQueue(
       resolved.h3Index
     );
   }
-  const currentQueue = getHexBuildQueue(resolved.h3Index, AI_PLAYER_ID);
+  const currentQueue = getHexBuildQueue(resolved.h3Index, seatId);
   if (!currentQueue.controlledByRequester) {
     return reject(currentQueue.noBuildReason ?? 'Hex is not controlled by requester.', resolved.h3Index);
   }
@@ -229,7 +223,7 @@ function setBuildQueue(
     );
   }
   const maxedTypes = new Set(
-    getMaxedUnitTypesForPlayer(state.units, AI_PLAYER_ID, parseGameSize(state.gameSize))
+    getMaxedUnitTypesForPlayer(state.units, seatId, parseGameSize(state.gameSize))
   );
   if (shouldRejectCappedQueueType(args.unitType, currentQueue.availableUnitTypes, maxedTypes)) {
     return reject(
@@ -240,13 +234,13 @@ function setBuildQueue(
   const orderedEntries = [...currentQueue.entries].sort((a, b) => a.queueIndex - b.queueIndex);
   if (orderedEntries.length > 0) {
     const entryToKeep = orderedEntries[0]!;
-    const updateResult = updateHexBuildQueueEntry(resolved.h3Index, entryToKeep.id, args.unitType, count, AI_PLAYER_ID);
+    const updateResult = updateHexBuildQueueEntry(resolved.h3Index, entryToKeep.id, args.unitType, count, seatId);
     if (!updateResult.success || !updateResult.queue) {
       return reject(updateResult.reason ?? 'Failed to update primary queue entry.', resolved.h3Index);
     }
     let queueAfter = updateResult.queue;
     for (const entry of orderedEntries.slice(1)) {
-      const removeResult = removeHexBuildQueueEntry(resolved.h3Index, entry.id, AI_PLAYER_ID);
+      const removeResult = removeHexBuildQueueEntry(resolved.h3Index, entry.id, seatId);
       if (!removeResult.success || !removeResult.queue) {
         return reject(removeResult.reason ?? 'Failed to remove obsolete queue entry.', resolved.h3Index);
       }
@@ -255,7 +249,7 @@ function setBuildQueue(
     return { status: 'ok', production: summarizeQueue(queueAfter, latLngByH3, maxedTypes) };
   }
 
-  const addResult = addHexBuildQueueEntry(resolved.h3Index, AI_PLAYER_ID);
+  const addResult = addHexBuildQueueEntry(resolved.h3Index, seatId);
   if (!addResult.success || !addResult.queue) {
     return reject(addResult.reason ?? 'Failed to create build queue entry.', resolved.h3Index);
   }
@@ -263,7 +257,7 @@ function setBuildQueue(
   if (!newEntry) {
     return reject('Failed to identify newly added entry.', resolved.h3Index);
   }
-  const updateResult = updateHexBuildQueueEntry(resolved.h3Index, newEntry.id, args.unitType, count, AI_PLAYER_ID);
+  const updateResult = updateHexBuildQueueEntry(resolved.h3Index, newEntry.id, args.unitType, count, seatId);
   if (!updateResult.success || !updateResult.queue) {
     return reject(updateResult.reason ?? 'Failed to set build queue entry.', resolved.h3Index);
   }
@@ -279,13 +273,14 @@ function setBuildQueue(
  * Exceptions: None beyond the returned error payload.
  */
 export function executeProductionTools(
+  seatId: AiSeatId,
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('productionTools executeProductionTools', { toolName, stateTurn: state.turnNumber });
+  logDebug('productionTools executeProductionTools', { seatId, toolName, stateTurn: state.turnNumber });
   try {
     const request = (args ?? {}) as {
       hex?: unknown;
@@ -293,8 +288,8 @@ export function executeProductionTools(
       count?: unknown;
       all?: unknown;
     };
-    if (toolName === 'query_production') return queryProduction(request, state, latLngByH3, resolveToH3);
-    if (toolName === 'set_build_queue') return setBuildQueue(request, latLngByH3, resolveToH3, state);
+    if (toolName === 'query_production') return queryProduction(seatId, request, state, latLngByH3, resolveToH3);
+    if (toolName === 'set_build_queue') return setBuildQueue(seatId, request, latLngByH3, resolveToH3, state);
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
     logError('productionTools executeProductionTools: exception', toolName, err);

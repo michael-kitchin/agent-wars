@@ -6,6 +6,9 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { countBattleForces } from '../../shared/battleForceCounts';
 import { formatBattleHeaderStatus, formatBattleHeaderTitle } from '../../shared/battleHeaderText';
+import { paletteForOwner } from '../../shared/seatPalette';
+import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
+import { shortSideName } from '../../shared/seatRoster';
 import { formatHexNamingCaptionHtml } from '../../shared/hexNamingCaption';
 import { orderTargetHexCode } from '../../shared/orderTargetHexCode';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
@@ -85,17 +88,29 @@ function renderBattleForceBar(battle: TacticalBattleSnapshot): void {
   if (!bar) return;
   if (S.resolutionMoveAnimation != null && bar.dataset.battleId === battle.battleId) return;
   bar.dataset.battleId = battle.battleId;
-  const counts = countBattleForces(battle.subUnits);
+  const seats = S.gameState?.seats ?? [];
+  const opposingId = battle.opposingPartyId ?? battle.subUnits.find((unit) => unit.player !== HUMAN_SEAT_ID)?.player ?? null;
+  const counts = countBattleForces(battle.subUnits, opposingId ?? '');
   const humanCount = document.getElementById('battle-force-human-count');
   if (humanCount) humanCount.textContent = counts.human.toLocaleString('en-US');
-  const opponentCount = document.getElementById('battle-force-opponent-count');
+  const opponentCount = document.getElementById('battle-force-enemy-count');
   if (opponentCount) opponentCount.textContent = counts.opponent.toLocaleString('en-US');
+  const opposingSeat = seats.find((seat) => seat.seatId === opposingId);
+  const nameEl = document.getElementById('battle-force-enemy-name');
+  if (nameEl) nameEl.textContent = opposingId != null && isNeutralOwnerId(opposingId) ? 'Neutral' : shortSideName(opposingSeat?.homeRegion ?? 'Enemy');
+  const dot = document.getElementById('battle-force-enemy-dot');
+  const enemyPalette = paletteForOwner(opposingId, seats);
+  if (dot) dot.style.background = enemyPalette?.map ?? '#9D174D';
+  const humanPalette = paletteForOwner(HUMAN_SEAT_ID, seats);
   const fill = document.getElementById('battle-force-human-fill');
   if (fill) {
     fill.style.width = `${(counts.humanShare * 100).toFixed(1)}%`;
     const sidesMeet = counts.humanShare > 0 && counts.humanShare < 1;
     fill.style.borderRightWidth = sidesMeet ? '' : '0';
+    if (humanPalette) fill.style.background = humanPalette.forceBar;
   }
+  const track = bar.querySelector('.battle-force-track');
+  if (track instanceof HTMLElement && enemyPalette) track.style.background = enemyPalette.forceBar;
 }
 
 /**
@@ -127,6 +142,7 @@ export function renderBattleHeader(state: GameStateSnapshot | null, battle: Tact
       beat: battle.tacticalTurnNumber,
       beatPlaybackActive: S.resolutionMoveAnimation != null,
       dateLabel: state.currentDateLabel ?? '',
+      garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId),
     });
     if (battle.weather) statusEl.insertAdjacentHTML('beforeend', ` · ${formatWeatherIconHtml(battle.weather)}`);
   }

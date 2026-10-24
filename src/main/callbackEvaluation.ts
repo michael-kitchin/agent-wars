@@ -7,6 +7,8 @@
 import { logDebug } from './logger';
 import { dbGetAll } from './gameDb';
 import type { GameStateSnapshot } from './gameDb';
+import { isSeatId, type AiSeatId } from '../shared/seatIds';
+import { registerAttackMixReset } from './attackMixReset';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { gridHopDistanceBetween } from './tools/assessUnitProximity';
 import { getRange } from './combatConstants';
@@ -351,7 +353,22 @@ hittableHumans: Set<string>;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-let lastAttackMixSnapshot: AttackMixSnapshot | null = null;
+const lastAttackMixBySeat = new Map<AiSeatId, AttackMixSnapshot>();
+
+/**
+ * Drops every commander's attack-mix baseline.
+ *
+ * Purpose: A new match must not inherit the previous match's baselines.
+ * When to use: Match reset, through `clearAttackMixOnNewGame`.
+ * Expected outcome: The map is empty.
+ * Exceptions: None.
+ */
+export function clearAttackMixSnapshots(): void {
+  logDebug('callbackEvaluation clearAttackMixSnapshots', { seats: lastAttackMixBySeat.size });
+  lastAttackMixBySeat.clear();
+}
+
+registerAttackMixReset(clearAttackMixSnapshots);
 
 /**
  * True when `attacker` is close enough to strike `target` right now on the H3 grid.
@@ -381,9 +398,9 @@ function canHitNow(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildAttackMixSnapshot(state: GameStateSnapshot): AttackMixSnapshot {
-  const opponents = state.units.filter((u) => u.player === 'opponent');
-  const humans = state.units.filter((u) => u.player === 'human');
+function buildAttackMixSnapshot(state: GameStateSnapshot, seatId: AiSeatId): AttackMixSnapshot {
+  const opponents = state.units.filter((u) => u.player === seatId);
+  const humans = state.units.filter((u) => isSeatId(u.player) && u.player !== seatId);
   const aiAttackers = new Set<string>();
   const hittableHumans = new Set<string>();
   for (const ai of opponents) {
@@ -425,6 +442,7 @@ function setsEqual(a: Set<string>, b: Set<string>): boolean {
  * Exceptions: None.
  */
 export function evaluateMandatoryOverrides(
+  seatId: AiSeatId,
   state: GameStateSnapshot,
   lastConsultationTurn: number,
   opponentUnitsInCombatSinceConsultation: string[],
@@ -433,7 +451,7 @@ export function evaluateMandatoryOverrides(
   newContactUnitIds: string[]
 ): MandatoryOverrideResult[] {
   const results: MandatoryOverrideResult[] = [];
-  const opponentUnitIds = state.units.filter((u) => u.player === 'opponent').map((u) => u.id);
+  const opponentUnitIds = state.units.filter((u) => u.player === seatId).map((u) => u.id);
   const combatSinceSet = new Set(opponentUnitsInCombatSinceConsultation);
 
   if (lastConsultationTurn === 0) {
@@ -457,7 +475,7 @@ export function evaluateMandatoryOverrides(
 
   const orderRows = dbGetAll<{ unit_id: string; status: string }>(
     'SELECT unit_id, status FROM standing_orders WHERE player_id = ?',
-    ['opponent']
+    [seatId]
   );
   const unitToStatus = new Map(orderRows.map((r) => [r.unit_id, r.status]));
 
@@ -476,9 +494,10 @@ export function evaluateMandatoryOverrides(
 
   // In-memory only: consult when the attack mix changes from one turn to the next.
   // Reset baseline naturally at game start/new game (turn 1) or non-sequential jumps.
-  const currentAttackMix = buildAttackMixSnapshot(state);
+  const currentAttackMix = buildAttackMixSnapshot(state, seatId);
+  const lastAttackMixSnapshot = lastAttackMixBySeat.get(seatId);
   if (state.turnNumber <= 1) {
-    lastAttackMixSnapshot = currentAttackMix;
+    lastAttackMixBySeat.set(seatId, currentAttackMix);
   } else if (lastAttackMixSnapshot && lastAttackMixSnapshot.turnNumber === state.turnNumber - 1) {
     if (
       !setsEqual(lastAttackMixSnapshot.aiAttackers, currentAttackMix.aiAttackers) ||
@@ -492,13 +511,13 @@ export function evaluateMandatoryOverrides(
         hittableHumansAfter: currentAttackMix.hittableHumans.size,
       });
     }
-    lastAttackMixSnapshot = currentAttackMix;
+    lastAttackMixBySeat.set(seatId, currentAttackMix);
   } else {
-    lastAttackMixSnapshot = currentAttackMix;
+    lastAttackMixBySeat.set(seatId, currentAttackMix);
   }
 
   if (results.length > 0) {
-    logDebug('callbackEvaluation evaluateMandatoryOverrides', { turnNumber: state.turnNumber, count: results.length, types: results.map((r) => r.type) });
+    logDebug('callbackEvaluation evaluateMandatoryOverrides', { seatId, turnNumber: state.turnNumber, count: results.length, types: results.map((r) => r.type) });
   }
   return results;
 }
@@ -532,6 +551,7 @@ export function evaluateTacticalMandatoryOverrides(ctx: ResolutionContext): Mand
  * Exceptions: None.
  */
 export function evaluateSubscriptionEvents(
+  seatId: AiSeatId,
   state: GameStateSnapshot,
   subscriptions: CallbackSubscription[],
   ctx: ResolutionContext
@@ -542,7 +562,7 @@ export function evaluateSubscriptionEvents(
 
   const orderRows = dbGetAll<{ unit_id: string; status: string }>(
     'SELECT unit_id, status FROM standing_orders WHERE player_id = ?',
-    ['opponent']
+    [seatId]
   );
   const unitStatus = new Map(orderRows.map((r) => [r.unit_id, r.status]));
 

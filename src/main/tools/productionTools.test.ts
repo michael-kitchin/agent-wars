@@ -101,6 +101,7 @@ function testSetBuildQueueRejectsCappedTypeWhenAlternativeExists(): void {
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
     const armorResult = executeProductionTools(
+      'opponent',
       'set_build_queue',
       { hex, unitType: 'armor', count: 1 },
       state,
@@ -111,6 +112,7 @@ function testSetBuildQueueRejectsCappedTypeWhenAlternativeExists(): void {
     assert.match(String(armorResult.error ?? ''), /deployment cap/);
     assert.equal(getHexBuildQueue(h3Index, 'opponent').entries.length, 0);
     const infantryResult = executeProductionTools(
+      'opponent',
       'set_build_queue',
       { hex, unitType: 'infantry', count: 1 },
       state,
@@ -143,6 +145,7 @@ function testSetBuildQueueAllowsCappedTypeWhenNoAlternative(): void {
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
     const result = executeProductionTools(
+      'opponent',
       'set_build_queue',
       { hex, unitType: 'infantry', count: 1 },
       state,
@@ -172,6 +175,7 @@ function testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed(): void {
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
     const result = executeProductionTools(
+      'opponent',
       'set_build_queue',
       { hex, unitType: 'armor', count: 1 },
       state,
@@ -203,6 +207,7 @@ function testOpponentBuildQueueAppliesDuringTacticalBattle(): void {
       assert.equal(human.success, false);
       assert.match(human.reason ?? '', /tactical battle/);
       const opponent = executeProductionTools(
+      'opponent',
         'set_build_queue',
         { hex, unitType: 'infantry', count: 1 },
         state,

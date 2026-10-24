@@ -13,6 +13,7 @@
  */
 
 import type { WebContents } from 'electron';
+import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
@@ -55,7 +56,7 @@ export type DeferredStrategicResolutionConsultArgs = {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
+    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
@@ -82,6 +83,7 @@ export type DeferredTacticalBeatConsultArgs = {
     state: GameStateSnapshot,
     modelId: string,
     options: {
+      seatId: AiSeatId;
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
@@ -124,7 +126,7 @@ export type PendingPlaybackConsult =
  * Exceptions: None.
  */
 function deferredConsultStamp(): { cancelEpoch: number; generationAtStart: number } {
-  return { cancelEpoch: getModelCallCancelEpoch(), generationAtStart: getMatchGeneration() };
+  return { cancelEpoch: getModelCallCancelEpoch(AI_SEAT_IDS[0]), generationAtStart: getMatchGeneration() };
 }
 
 let pendingPlaybackConsult: PendingPlaybackConsult | null = null;
@@ -330,7 +332,7 @@ function abandonDeferredPlaybackConsult(
  * Exceptions: None.
  */
 function skipDeferredConsultBecausePlayerStopped(sender: WebContents, pending: PendingPlaybackConsult): boolean {
-  if (!hasModelCallCancelSince(pending.cancelEpoch)) return false;
+  if (!hasModelCallCancelSince(pending.cancelEpoch, AI_SEAT_IDS[0])) return false;
   pendingPlaybackConsult = null;
   logDebug('handleNotifyResolutionPlaybackComplete: skipped because planning was stopped', { tag: pending.tag });
   if (pending.tag === 'tactical-beat') {

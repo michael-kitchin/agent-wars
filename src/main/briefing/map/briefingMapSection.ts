@@ -7,6 +7,7 @@
  * Exceptions: Returns a short fallback message if no friendly/enemy units exist (strategic map not rendered in that case).
  */
 
+import { briefingOwnSeatId } from '../briefingPerspective';
 import type { GameStateSnapshot } from '../../gameDb';
 import { logDebug } from '../../logger';
 import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openRouter/possibleUnitActions';
@@ -65,11 +66,12 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   ensureStrategicCoordinateRegistryInitialized();
   const context: CoordinateContext = { mode: 'strategic' };
 
-  const aiUnits = args.state.units.filter((u) => u.player === 'opponent').map((u) => {
+  const ownSeat = briefingOwnSeatId(args.state);
+  const aiUnits = args.state.units.filter((u) => u.player === ownSeat).map((u) => {
     const ll = args.latLngByH3.get(u.h3Index);
     return { lat: ll?.[0] ?? 0, lng: ll?.[1] ?? 0 };
   });
-  const enemyUnits = args.state.units.filter((u) => u.player === 'human').map((u) => {
+  const enemyUnits = args.state.units.filter((u) => u.player !== ownSeat).map((u) => {
     const ll = args.latLngByH3.get(u.h3Index);
     return { lat: ll?.[0] ?? 0, lng: ll?.[1] ?? 0 };
   });
@@ -98,7 +100,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   const legend =
     'Each cell: top = hex code, bottom = terrain + overlay.\n' +
     'Terrain: x = land, . = water.\n' +
-    'Overlay: * = your units, ! = enemy units, # = contested, ? = undiscovered intel.\n' +
+    'Overlay: * = your units, ! = enemy units, including neutral garrisons, # = contested, ? = undiscovered intel.\n' +
     'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
@@ -127,9 +129,10 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
 
   const humanUnitsByH3 = new Map<string, number>();
   const aiUnitsByH3 = new Map<string, number>();
+  const ownSeat = briefingOwnSeatId(state);
   for (const u of state.units) {
-    if (u.player === 'human') humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
-    if (u.player === 'opponent') aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
+    if (u.player === ownSeat) aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
+    else humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
   }
 
   const out = new Map<string, HexMapCellState>();
@@ -140,7 +143,7 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
     const isDiscovered = !fog || discovered.has(h3);
     const infra = infraByH3.get(h3) ?? { urban: 0, airports: 0, seaports: 0 };
     const controller = controlByH3.get(h3) ?? null;
-    const controlledByAI = controller === 'opponent';
+    const controlledByAI = controller === briefingOwnSeatId(state);
     const aiUnitCount = aiUnitsByH3.get(h3) ?? 0;
     const visible = !fog || discovered.has(h3);
     const enemyUnitCount = visible ? humanUnitsByH3.get(h3) ?? 0 : 0;
@@ -212,7 +215,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   const legend =
     'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
     'Terrain: x = land, . = water.\n' +
-    'Overlay: * = your units, ! = enemy units, # = contested.\n' +
+    'Overlay: * = your units, ! = enemy units, including neutral garrisons, # = contested.\n' +
     'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
@@ -243,13 +246,14 @@ function buildTacticalHexGameStateMap(
   const fog = state.fogOfWarEnabled === true;
   const humanUnitsByH3 = new Map<string, number>();
   const aiUnitsByH3 = new Map<string, number>();
+  const ownSeat = briefingOwnSeatId(state);
   for (const u of state.units) {
-    if (u.player === 'human') humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
-    if (u.player === 'opponent') aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
+    if (u.player === ownSeat) aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
+    else humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
   }
   const enclosingController =
     (state.strategicControl ?? []).find((r) => r.h3Index === battle.enclosingStrategicH3Index)?.controllerPlayerId ?? null;
-  const controlledByAI = enclosingController === 'opponent';
+  const controlledByAI = enclosingController === briefingOwnSeatId(state);
   const out = new Map<string, HexMapCellState>();
   for (const h3 of mapHexes) {
     const rawTerrain = terrainByH3.get(h3) ?? 'land';

@@ -3,6 +3,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { SeatId } from '../../shared/seatIds';
 import { getActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
 import { logTrace } from '../logger';
 
@@ -16,7 +17,7 @@ import { logTrace } from '../logger';
  */
 export function mergeActiveTacticalSessionIntoGameStateSnapshot(
   base: GameStateSnapshot,
-  trace: { scope: 'getGameState' } | { scope: 'getGameStateForPlayer'; playerId: 'human' | 'opponent' }
+  trace: { scope: 'getGameState' } | { scope: 'getGameStateForPlayer'; playerId: SeatId }
 ): GameStateSnapshot {
   const tactical = getActiveTacticalBattleSnapshotRef();
   if (!tactical) return base;

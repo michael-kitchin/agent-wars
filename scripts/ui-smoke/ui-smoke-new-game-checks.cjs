@@ -38,33 +38,19 @@ const PANEL = Object.freeze({
 });
 
 /**
- * The rows of each map tab: the label of each row, then each row's dropdown and randomize button, top to bottom.
+ * The first two side rows, used to check that their homes share one left edge.
  *
- * Purpose: Both tabs line their dropdowns up on one left edge with one width, and their randomize buttons on the
- *   panel's inner right edge. The left edge is the same fixed inset in both tabs, so it also shows that no label is
- *   wider than its column.
- * When to use: The map rows check.
- * Expected outcome: Matches the rows in `static/index.html`.
+ * Purpose: The default setup has You and Opponent 1. Scenes that add sides check their own labels.
+ * When to use: The map-rows check.
+ * Expected outcome: Selectors for the label, the home, and the randomize button of each of the first two rows.
  * Exceptions: None.
  */
-const MAP_TABS = Object.freeze({
-  global: {
-    panel: '#new-game-panel-global',
-    labels: ['Human', 'AI'],
-    rows: [
-      ['#new-game-human-region-select', '#new-game-human-region-randomize'],
-      ['#new-game-ai-region-select', '#new-game-ai-region-randomize'],
-    ],
-  },
-  regional: {
-    panel: '#new-game-panel-regional',
-    labels: ['Region', 'Your side', 'Opponent'],
-    rows: [
-      ['#new-game-region-select', '#new-game-region-randomize'],
-      ['#new-game-human-side-select', '#new-game-human-side-randomize'],
-      ['#new-game-ai-side-select', '#new-game-ai-side-randomize'],
-    ],
-  },
+const SIDE_ROW = Object.freeze({
+  labels: '.new-game-side-label',
+  firstSelect: '#new-game-side-rows .new-game-side-row:nth-child(1) select',
+  firstRandomize: '#new-game-side-rows .new-game-side-row:nth-child(1) .new-game-randomize',
+  secondSelect: '#new-game-side-rows .new-game-side-row:nth-child(2) select',
+  secondRandomize: '#new-game-side-rows .new-game-side-row:nth-child(2) .new-game-randomize',
 });
 
 /**
@@ -114,6 +100,16 @@ const HIDDEN_CHOICE_SCENES = Object.freeze([SCENES.newGameHidden, SCENES.newGame
 const PANEL_SCENES = Object.freeze(NEW_GAME_SCENES.filter((scene) => !HIDDEN_CHOICE_SCENES.includes(scene) && scene !== SCENES.gameOverHidden));
 
 /**
+ * Setup scenes whose side list is still the default two rows.
+ *
+ * Purpose: The four-side and three-side scenes have their own label checks.
+ * When to use: The map-rows check.
+ * Expected outcome: Every expanded setup scene except those two.
+ * Exceptions: None.
+ */
+const TWO_SIDE_PANEL_SCENES = Object.freeze(PANEL_SCENES.filter((scene) => scene !== SCENES.newGameFourSides && scene !== SCENES.newGameThreeSides));
+
+/**
  * The top bar's parts that the new-game screen shows, and the parts it hides.
  *
  * Purpose: The new-game bar is the menu button, the title, Load game…, Settings, and Help; the match status and the
@@ -124,7 +120,7 @@ const PANEL_SCENES = Object.freeze(NEW_GAME_SCENES.filter((scene) => !HIDDEN_CHO
  */
 const NEW_GAME_BAR = Object.freeze({
   shown: ['#game-menu-btn', '#topbar-new-game-title', '#topbar-load-btn', '#topbar-settings-btn', '#topbar-help-btn'],
-  hidden: ['#app-topbar .topbar-sides', '#app-topbar .topbar-stat', '#app-topbar .topbar-date-block', '#battle-header-place', '#battle-header-center', '#tactical-exit-btn'],
+  hidden: ['#app-topbar .topbar-sides', '#topbar-view-as', '#app-topbar .topbar-stat', '#app-topbar .topbar-date-block', '#battle-header-place', '#battle-header-center', '#tactical-exit-btn'],
 });
 
 /**
@@ -139,14 +135,14 @@ const NEW_GAME_ITEM_HOST = '#game-menu .control-tooltip-host:has(#openrouter-new
 const NEW_GAME_ITEM_OPEN_TIP = 'The new-game screen is already open.';
 
 /**
- * The tip host around the setup panel's Add another opponent placeholder.
+ * The tip host around Add another opponent.
  *
- * Purpose: The placeholder is disabled, so its host carries the tip.
- * When to use: The Add another opponent check.
+ * Purpose: The host carries the reason the button is available, or the limit that blocks it.
+ * When to use: The Add another opponent checks.
  * Expected outcome: Matches the host in `static/index.html`.
  * Exceptions: None.
  */
-const ADD_OPPONENT_HOST = '.control-tooltip-host:has(#new-game-add-opponent-btn)';
+const ADD_OPPONENT_HOST = '.control-tooltip-host:has(#new-game-add-side-btn)';
 
 /**
  * Finds the right edge of a section's content in the panel's body.
@@ -348,42 +344,95 @@ const NEW_GAME_CHECKS = Object.freeze([
   },
   {
     name: 'new-game-map-rows',
-    scenes: PANEL_SCENES,
+    scenes: TWO_SIDE_PANEL_SCENES,
     needs: [
       '#game-over-dialog',
-      ...Object.values(MAP_TABS).flatMap((tab) => [tab.panel, `${tab.panel} label`, ...tab.rows.flat()]),
+      '#new-game-panel-regional',
+      '#new-game-panel-regional label',
+      '#new-game-region-select',
+      '#new-game-region-randomize',
+      SIDE_ROW.labels,
+      SIDE_ROW.firstSelect,
+      SIDE_ROW.firstRandomize,
+      SIDE_ROW.secondSelect,
+      SIDE_ROW.secondRandomize,
     ],
     run: (p, el) => {
-      const tab = el(MAP_TABS.global.panel).shown ? MAP_TABS.global : MAP_TABS.regional;
-      const labels = el(`${tab.panel} label`).allTexts.join(', ');
-      if (labels !== tab.labels.join(', ')) return `the ${tab.panel} labels read "${labels}", expected "${tab.labels.join(', ')}"`;
-      const body = el('#game-over-dialog');
-      const innerRight = sectionInnerRight(body);
-      const selectLeft = body.x + PANEL.rowSelectInset;
-      for (const [selectId, buttonId] of tab.rows) {
-        const select = el(selectId);
-        const button = el(buttonId);
-        if (!near(select.x, selectLeft) || !near(select.x + select.w, button.x - 6)) {
-          return `${selectId} is at ${fmt(select)}, expected from x=${selectLeft} to the randomize button, in either tab`;
-        }
-        if (!near(button.x + button.w, innerRight) || !near(button.h, select.h)) return `${buttonId} is at ${fmt(button)}, expected a square the dropdown's height at the panel's inner right edge`;
+      const labels = el(SIDE_ROW.labels).allTexts.join(', ');
+      if (labels !== 'You, Opponent 1') return `the side labels read "${labels}", expected "You, Opponent 1"`;
+      const first = el(SIDE_ROW.firstSelect);
+      const second = el(SIDE_ROW.secondSelect);
+      if (!near(first.x, second.x) || !near(first.w, second.w)) return 'the side homes do not share a left edge and width';
+      const randomize = el(SIDE_ROW.firstRandomize);
+      const secondRandomize = el(SIDE_ROW.secondRandomize);
+      if (!near(first.x + first.w, randomize.x - 6) || !near(randomize.h, first.h)) {
+        return `the first side's randomize button is at ${fmt(randomize)}, expected a square the dropdown's height, 6 px to its right`;
       }
-      return null;
+      if (!near(secondRandomize.x, randomize.x)) return 'the side randomize buttons do not line up';
+      if (!el('#new-game-panel-regional').shown) return null;
+      const regionLabels = el('#new-game-panel-regional label').allTexts.join(', ');
+      if (regionLabels !== 'Region') return `the regional labels read "${regionLabels}", expected "Region"`;
+      const body = el('#game-over-dialog');
+      const region = el('#new-game-region-select');
+      const regionButton = el('#new-game-region-randomize');
+      const selectLeft = body.x + PANEL.rowSelectInset;
+      if (!near(region.x, selectLeft) || !near(region.x + region.w, regionButton.x - 6)) {
+        return `the region dropdown is at ${fmt(region)}, expected from x=${selectLeft} to the randomize button`;
+      }
+      return near(regionButton.x + regionButton.w, sectionInnerRight(body)) && near(regionButton.h, region.h)
+        ? null
+        : `the region randomize button is at ${fmt(regionButton)}, expected a square the dropdown's height at the panel's inner right edge`;
     },
   },
   {
-    name: 'new-game-add-opponent',
-    scenes: PANEL_SCENES,
-    needs: ['#game-over-dialog', '#new-game-add-opponent-btn', ADD_OPPONENT_HOST],
+    name: 'new-game-add-side',
+    scenes: PANEL_SCENES.filter((scene) => scene !== SCENES.newGameFourSides),
+    needs: ['#game-over-dialog', '#new-game-add-side-btn', ADD_OPPONENT_HOST],
     run: (p, el) => {
       const body = el('#game-over-dialog');
-      const button = el('#new-game-add-opponent-btn');
-      if (!button.disabled) return 'Add another opponent is enabled';
+      const button = el('#new-game-add-side-btn');
+      if (button.disabled) return 'Add another opponent is disabled while a home is free';
       const tip = el(ADD_OPPONENT_HOST).tip;
-      if (tip !== 'Add another opponent is not available in this version.') return `Add another opponent's host tip reads "${tip}"`;
+      if (tip !== 'Add a side on the next free home.') return `Add another opponent's host tip reads "${tip}"`;
       return near(button.x, body.x + PANEL.sectionInset) && near(button.x + button.w, sectionInnerRight(body))
         ? null
         : `Add another opponent is at ${fmt(button)}, expected the section's inner width`;
+    },
+  },
+  {
+    name: 'new-game-four-sides',
+    scenes: [SCENES.newGameFourSides],
+    needs: ['.new-game-side-label', '.commander-popover', '#new-game-add-side-btn', ADD_OPPONENT_HOST],
+    run: (p, el) => {
+      const labels = el('.new-game-side-label').allTexts.join(', ');
+      if (labels !== 'You, Opponent 1, Opponent 2, Opponent 3') return `the side labels read "${labels}"`;
+      if (!el('.commander-popover').shown) return 'the commander popover is not shown';
+      if (!el('#new-game-add-side-btn').disabled) return 'Add another opponent is enabled at four sides';
+      const tip = el(ADD_OPPONENT_HOST).tip;
+      return tip === 'Up to 4 sides' ? null : `Add another opponent's host tip reads "${tip}", expected "Up to 4 sides"`;
+    },
+  },
+  {
+    name: 'new-game-three-sides',
+    scenes: [SCENES.newGameThreeSides],
+    needs: ['.new-game-side-label', 'select[aria-label="You home"]'],
+    run: (p, el) => {
+      const labels = el('.new-game-side-label').allTexts.join(', ');
+      if (labels !== 'You, Opponent 1, Opponent 2') return `the side labels read "${labels}"`;
+      const home = el('select[aria-label="You home"]');
+      return home.optionCount >= 4 ? null : `the home list has ${home.optionCount} entries, expected the region list`;
+    },
+  },
+  {
+    name: 'standings-four-sides',
+    scenes: [SCENES.standingsFour],
+    needs: ['#game-over-message', '#game-over-standings'],
+    run: (p, el) => {
+      const message = el('#game-over-message').text;
+      if (message !== 'You placed 4th of 4.') return `the heading reads "${message}", expected "You placed 4th of 4."`;
+      const section = el('#game-over-standings');
+      if (!section.shown) return 'the standings section is hidden';
+      return section.text.includes('Winner') ? null : `the standings read "${section.text}"`;
     },
   },
   {

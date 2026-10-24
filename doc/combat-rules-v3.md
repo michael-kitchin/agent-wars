@@ -31,7 +31,7 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 
 ## 2. Unit roster (strategic level)
 
-The game has four unit types. Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. See [game-size-unit-caps.md](game-size-unit-caps.md).
+The game has four unit types. A match has two to four sides, and each side is seeded the same way in its own home (`trySeedScenarioRegionVsRegion` in `src/main/gameDb/seeding/regionScenarioSeeding.ts`). Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. See [game-size-unit-caps.md](game-size-unit-caps.md).
 
 | Size | Infantry | Armor | Naval | Air |
 |------|---------|-------|-------|-----|
@@ -158,6 +158,7 @@ Using the **post-movement** positions:
 - Build melee combats: each hex that has ground/naval units from two or more sides is one melee engagement. Air units do **not** participate in melee.
 - If a contested hex is eligible, the engine may **pause** here for a melee-intercept dialog (Fight tactical battle / Ignore and resolve strategically). See §12.1.
 - Resolve remaining same-hex combats in a deterministic order.
+- Two sides in one hex: the side with the lower participant id rolls attack values and the other rolls defense values. Three or more sides: every unit rolls once, the first side in the shuffled order rolling attack values and the others rolling defense values. Each side then assigns its hits one at a time. A hit picks an enemy side at random, weighted by how many of that side's units are not yet casualties, and removes that side's next casualty. Hits left after every enemy unit is gone are lost. One side left holds the hex. Otherwise the hex stays contested.
 
 ### 4.7 Resolution ordering and determinism
 
@@ -179,7 +180,7 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`. For **defense** (melee only), hit if `roll ≤ min(17, defense + origin bonus + tech defense bonus)`. The weather penalty, cover, origin bonus, and tech bonus are each 0 unless the rules below apply (`attackHitThreshold` and `defenseHitThreshold` in `src/main/combatHitThresholds.ts`).
 - **Floor and cap:** The floor of 2 applies after penalties and cover and before the origin and tech bonuses, so a shot keeps at least a 10% chance and a qualifying unit gets its full bonuses. The cap of 17 means a roll of 18, 19, or 20 always misses.
 - **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules. **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check.
-- **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**.
+- **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**. In a hex with three or more sides, those hits are spread across the other sides by the weighted draw in §4.6, and the same order chooses the unit inside the side that was drawn.
 
 #### Origin bonus and terrain bonus (optional)
 
@@ -300,6 +301,8 @@ When a unit is chosen as a casualty (one hit = one unit removed), it is removed 
 
 High-level flow: **embark → air strikes → ranged at pre-move positions → ground/naval movement → cargo sync → ferry → melee at post-move positions** (strategic). Tactical beats swap cargo sync to after ferry and omit production.
 
+Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Neutral ship that is already on a landing hex, or gives one that is not a march toward a landing. `buildNeutralTurnOrders` then adds Neutral's movement, ranged, and air orders from the omniscient snapshot. A caller cannot submit Neutral orders.
+
 ```
 1. Set phase to resolution.
 2. Get current unit positions (before any movement). Assign participant IDs.
@@ -356,7 +359,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 - **Ranged vs. same hex:** A unit with range 1 or 2 can still participate in melee if it is in the same hex as the enemy. Armor in a hex with enemy infantry both (a) can be resolved in ranged phase as attacker against **other** hexes, and (b) participates in melee in its own hex. Each unit rolls at most once per phase for its declared action.
 - **Coastal bombardment:** Naval at range 2 can target land units in hexes within 2. Armor in a land hex may attack naval units in an adjacent water hex (range 1). Infantry (range 0) cannot attack naval on the strategic map.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement. Assign defender return-fire hits to attacker hexes one at a time: most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
-- **Arbitrary number of players:** Participant IDs are assigned once per side; melee with three or more sides uses round-robin sub-engagements. The live match is two sides (`human` / `opponent`).
+- **Arbitrary number of players:** Participant IDs are assigned once per side. Melee with three or more sides follows §4.6. A match has two to four sides.
 - **Line of sight / blocking (strategic):** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range is a valid target.
 - **Cover never blocks:** terrain cover (§4.9) lowers hit numbers but never makes a shot illegal.
 - **Line of sight (tactical):** Mountain along the implicit grid path blocks armor and naval shots. Infantry is exempt. Air strikes and ferry are not blocked by mountains. See §12.5.
@@ -453,7 +456,7 @@ Each land unit has an `embarkedOn` field (strategic: `embarkedOnNavalUnitId`; ta
 
 ### 9.2 Embark and disembark
 
-Embark requires a legal embark hex as above. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. The LLM opponent auto-debarks when issuing independent movement orders (`explicit_move`, `disembark`, or standing-order expansion at Ready); humans must debark manually first.
+Embark requires a legal embark hex as above. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. At Ready, every side other than the human auto-debarks when a movement order leaves the carrier (`autoDebarkNonHumanLandUnitIfMovingIndependently`). The human must debark manually first. A loaded Neutral ship uses the landing rule in §14.1 instead of that auto-debark.
 
 ### 9.3 Embarked unit combat
 
@@ -504,6 +507,8 @@ Two entry paths:
 2. **Melee intercept.** During strategic resolution, if melee is about to resolve in a contested hex, the engine can pause and offer **Fight** (enter tactical) or **Ignore** (continue strategic melee). The enclosing turn remains in `resolution` until the intercept is answered and, if fought, until the battle ends.
 
 The AI opponent does not choose whether to enter. If the human declines, standard strategic resolution applies.
+
+A battle starts only when the hex holds the human and exactly one other owner. That owner may be another seat or Neutral. `opposingPartyId` on the battle snapshot is that owner. Neutral sub-units hold their cells and fire through the tempo sweep. A hex with three or more owners is not a battle, and a match with no human seat does not pause for one.
 
 Both sides must be able to place at least one sub-unit or the battle does not start.
 
@@ -648,9 +653,20 @@ The tactical battle UI displays the battlefield from the opening of §12, with e
 
 ## 14. Win conditions (live scenario)
 
-The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](region-vs-region.md). After combat, production, and control updates, `evaluateRegionControlWinnerAtEndOfTurn` may name a winner:
+The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](region-vs-region.md). After combat, production, and control updates, `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts` knocks out every active seat that meets any of these, and stores every reason that holds:
 
-1. **Control:** On the global map you control every strategic hex in the enemy home, and the enemy does not symmetrically control yours. On a regional map your controlled enemy-home hexes must hold at least 75% of that home's generated urban cells. Bombing does not lower the target. A home with no generated urban cells falls back to every hex. The enemy must not symmetrically meet theirs.
-2. **Urban elimination:** The enemy home's tactical urban count sums to zero, and your home still has at least one urban cell. Mutual zero (scorched earth both homes) is not an urban-only win.
+1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells (`controlWinMinUrbanShare` on the loaded map). Bombing does not lower the target. A home with no generated urban cells falls back to every hex.
+2. **No city hexes.** The seat controls no strategic hex whose current `urbanHexCount` is greater than zero.
+3. **Home cities destroyed.** The current urban sum of the seat's own home is zero.
 
-A side with no remaining strategic units has not lost. The match continues, and that side can still build. Both home-region outlines stay visible on the map regardless of fog.
+Seats knocked out on the same turn share one place: one more than the number of seats still active after those knockouts. When one seat remains, that seat wins (`last_side_standing`). When the knockouts would leave no active seat, none of them are recorded. Those seats are ranked by city hexes (`rankSeatsByCityHexes`). Ties share a place, and several seats in first place leave no single winner. The match ends on both the global and the regional map. The reason is `mutual_elimination`, or `turn_limit` when this turn is also the global turn limit.
+
+A global match ends at its turn limit even when seats remain (`victorySettingsForMapKind` stores `most_city_hexes_at_turn_limit` and one of 20, 30, 40, or 50 turns, default 30). The seats still active are ranked by city hexes. A regional match stores `last_side_standing` and no turn limit. Two-sided matches use these same rules.
+
+A side with no remaining strategic units has not lost by that fact alone. The match continues, and that side can still build, until a knockout or the turn limit. Both home-region outlines stay visible on the map regardless of fog.
+
+### 14.1 Knockout and Neutral
+
+`applyKnockout` in `src/main/gameActions/knockoutConsequences.ts` runs for each seat knocked out on the turn, after the outcome is recorded. That seat's land becomes Neutral and its build queues and progress are cleared. Its units become Neutral and keep their ids. Each receives a `defend` standing order on its current hex, so a garrison holds and fires. A ship that is still loaded keeps that `defend` only until the next turn's landing check. The seat's standing orders, memory, callbacks, pending orders, consultation combat and loss rows, and fog intel are deleted. Neutral does not build, and a Neutral-controlled hex accrues no production.
+
+On later turns, Neutral garrisons hold and fire from those `defend` orders. A loaded ship that is already on a landing hex unloads there: the cargo assignment is removed, and the ship and the cargo each receive `defend` on that hex. A landing hex is one where `canManualDebarkAtHex` is true for Neutral (native coastal, wetlands, a land seaport, or a water seaport Neutral controls). Otherwise the ship marches toward the nearest reachable empty landing hex, or toward an occupied one when no empty landing has a route, with `engageEnRoute`. A ship with no route is deleted with its cargo. Neutral infantry and armor take every empty hex they enter, including a hex they only pass through. A Neutral ship does not take a hex by sailing.

@@ -1,17 +1,16 @@
 # Region vs region
 
-The only persisted scenario id in 2.5.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/gameDb/scenarioState.ts`). A new match writes the two homes to `scenario_region_human` and `scenario_region_ai`. Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
+The only persisted scenario id in 2.5.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/gameDb/scenarioState.ts`). A new match writes that id and stores each home on a row of the `seats` table (`readSeatRoster` in `src/main/gameDb/seatRosterStore.ts`). Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
 
 The engine under `src/` wins if this file drifts.
 
 ## Setup
 
-The player picks the homes in the Map section. On the Global tab:
+The player picks two to four sides in the Sides section (`buildSeatsPayload` in `src/shared/newGameSides.ts`). Each side needs a home, and two sides cannot share one (`startBlockedReason`). Observe only leaves every side to an AI commander.
 
-- Human home region
-- AI home region
+On the Global tab each row stores a home-region name on its `seats` row.
 
-On the Regional tab the player picks one region and two different side groups.
+On the Regional tab the player picks one region, and each row stores a different side group's display name.
 
 In the Forces section the player picks:
 
@@ -24,13 +23,11 @@ In the Rules section the player picks:
 - Tech bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
 - Fog of war (default on), on the line after the starting month, with Auto-start AI to its right. Auto-start AI is checked when the dialog opens. What it does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list. The engine does not store Auto-start AI.
 
-A global match stores the two home-region names in `scenario_region_human` and `scenario_region_ai`. Those two regions may be the same.
-
-A regional match stores the two side groups' display names in those same keys. The groups must differ. Win evaluation, forced visibility, and the home outlines use those side-group hexes. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.
+A global match stores one home-region name on each `seats` row. A regional match stores that side group's display name on the row. Win evaluation, forced visibility, and the home outlines use those hexes. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.
 
 Opening a saved regional match fails when a stored home is not an installed side group's id or display name. The message is "This saved {map} game uses side groups that no longer exist. Start a new game." If that map's urban baseline is not loaded, the regional control win uses every hex.
 
-While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws the two chosen homes and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex, and tech icons sit beside them while that hold lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
+While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws every chosen home and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex, and tech icons sit beside them while that hold lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 
@@ -38,20 +35,23 @@ Global home regions may overlap. Exclusive sets, the intersection, and contested
 
 ## How you win
 
-Evaluated at end of turn after combat, movement, control, and production (`evaluateRegionControlWinnerAtEndOfTurn` in `src/main/gameActions/regionControlWinner.ts`):
+Evaluated at end of turn after combat, movement, control, and production (`decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`). The same rules apply to a two-sided match. An active seat is knocked out when any of these hold, and every reason that holds is stored:
 
-1. **Control.** On the global map you control **every** strategic hex in the **enemy** home, and the enemy does not symmetrically control yours. On a regional map the controlled enemy-home hexes must hold at least 75% of that home's generated urban cells. Bombing does not lower that target. A home with no generated urban cells falls back to every hex. The enemy must not symmetrically meet their own control rule.
-2. **Urban elimination.** Tactical urban count summed across the enemy home is **zero**, and your home still has at least one urban cell. If **both** homes are at zero urban, there is no urban-only winner (play continues until a control win or urban returns).
+1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells. Bombing does not lower that target. A home with no generated urban cells falls back to every hex.
+2. **No city hexes.** The seat controls no strategic hex whose current urban count is greater than zero.
+3. **Home cities destroyed.** The current urban sum of the seat's own home is zero.
 
-Prompt copy for the AI (`scenarioGoals.ts`) states the same two paths. On a regional map the control sentence is the 75% urban-cell share, and the prompt adds two progress lines: enemy-home urban cells in hexes you control, and your-home urban cells in hexes the enemy controls. The hex-count lines remain territory. On the global map the control sentence is still every enemy home hex.
+When those knockouts would leave no active seat, none are recorded. The seats are ranked by city hexes and the match ends. Ties share a place. Several seats in first place leave no single winner. A global match also ends at its stored turn limit and ranks the seats still active the same way. A regional match has no turn limit.
 
-Losing every strategic unit does not end the match. `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyFinalize.ts` calls `setGameOver` only with this function's result, so a side with no units left keeps playing and can still build.
+The goal sentence (`buildWinConditionReminderClause` in `scenarioGoals.ts`) states last side standing, the three knockout conditions, the mutual-wipe sentence, and, on a global match, the turn limit. The Scenario Objective block still lists two paths: controlling the enemy home, and eliminating that home's urban production. On a regional map the control sentence is the 75% urban-cell share. One progress line per enemy follows: that home's urban cells in hexes you control. A second line, your home urban cells in hexes that enemy controls, is included only when that enemy holds any. On the global map the control sentence is every enemy home hex. The hex-count lines in the coaching block remain territory.
+
+Losing every strategic unit does not by itself end the match. `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyFinalize.ts` records the outcome from `evaluateEndOfTurnOutcome`, so a side with no units left keeps playing and can still build until a knockout or the turn limit.
 
 Tactical battles do **not** restate home-region victory. The tactical goal is to engage and defeat forces in the footprint (`buildTacticalBattleGoalClause`).
 
 ## Visibility
 
-`getForcedVisibleHomeRegionHexesForPlayer`: your home hexes **and** the intersection stay visible even under fog. Both outlines are drawn on the map. Air and unit vision disks still apply outside that forced set ([combat-rules-v3.md](combat-rules-v3.md) §6).
+`getForcedVisibleHomeRegionHexesForPlayer`: that seat's home hexes and every hex in more than one home stay visible even under fog. Every home outline is drawn on the map. Air and unit vision disks still apply outside that forced set ([combat-rules-v3.md](combat-rules-v3.md) §6).
 
 ## Related
 

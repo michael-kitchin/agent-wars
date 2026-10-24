@@ -3,6 +3,7 @@
  * Run: `npm run build:main` then `node dist/main/tacticalBattle/tacticalFerryAirportGuards.test.js`
  */
 
+import { type SeatId } from '../../shared/seatIds';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
@@ -35,7 +36,7 @@ function airFerryBattle(args: {
   destAirport: boolean;
   destRubble?: boolean;
   originRubble?: boolean;
-  player: 'human' | 'opponent';
+  player: SeatId;
 }): { battle: TacticalBattleSnapshot; origin: string; dest: string; unitId: string } {
   const strategic = tacticalParentCell(22, 24);
   const origin = tacticalUnderCorner(22, 24);

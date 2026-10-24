@@ -46,9 +46,9 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     gameDb.openGameDatabaseAtPathForTests(dbPath);
 
-    gameDb.upsertTurnStrategyNote('strategic', '', 1, { strategyText: '', messageText: null });
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 1, { strategyText: '', messageText: null });
 
-    gameDb.upsertTurnLossNote(
+    gameDb.upsertTurnLossNote('opponent', 
 
       'strategic',
 
@@ -56,13 +56,13 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
       2,
 
-      '{"ranged":[{"unitType":"infantry","displayName":"I","unitId":"human-inf-1"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}',
+      '{"ranged":[],"melee":[],"returnFire":[],"airStrike":[],"other":[]}',
 
-      '{"ranged":[],"melee":[],"returnFire":[],"airStrike":[],"other":[]}'
+      '{"ranged":[{"unitType":"infantry","displayName":"I","unitId":"human-inf-1"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}'
 
     );
 
-    gameDb.upsertTurnStrategyNote('strategic', '', 3, { strategyText: 'Counterattack', messageText: null });
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 3, { strategyText: 'Counterattack', messageText: null });
 
     const out = buildRecentTurnNotesSection({
 
@@ -86,17 +86,17 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(out.includes('Message: (none)'), 'losses-only turn shows (none) message');
 
-    assert.ok(out.includes('Human Losses: Ranged attack: human-inf-1'));
+    assert.ok(out.includes('Enemy Losses: Ranged attack: human-inf-1'));
 
     assert.ok(!out.includes('Ranged attack: I'), 'prompt losses must not use display names');
 
-    assert.ok(!out.includes('AI Losses:'), 'empty AI loss line suppressed on turn 2');
+    assert.ok(!out.includes('Your Losses:'), 'empty own-loss line suppressed on turn 2');
 
     assert.ok(out.includes('Turn 3:'));
 
     assert.ok(out.includes('Strategy: Counterattack'));
 
-    gameDb.upsertTurnStrategyNote('strategic', '', 4, { strategyText: null, messageText: 'You will not find safety in delay.' });
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 4, { strategyText: null, messageText: 'You will not find safety in delay.' });
 
     const withMessageOnly = buildRecentTurnNotesSection({
 
@@ -116,7 +116,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(withMessageOnly.includes('Strategy: (none)'), 'message-only turn shows (none) strategy');
 
-    gameDb.upsertTurnStrategyNote('tactical', 'tb-x', 1, { strategyText: 'Hold the line', messageText: null });
+    gameDb.upsertTurnStrategyNote('opponent', 'tactical', 'tb-x', 1, { strategyText: 'Hold the line', messageText: null });
 
     const tactical = buildRecentTurnNotesSection({
 
@@ -182,7 +182,7 @@ async function testThreeEntryWindow(): Promise<void> {
 
     for (let turn = 1; turn <= 4; turn += 1) {
 
-      gameDb.upsertTurnStrategyNote('strategic', '', turn, { strategyText: `Plan ${turn}`, messageText: null });
+      gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', turn, { strategyText: `Plan ${turn}`, messageText: null });
 
     }
 

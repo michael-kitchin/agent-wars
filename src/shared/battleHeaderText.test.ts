@@ -27,3 +27,10 @@ test('formatBattleHeaderStatus names tactical resolution while the beat plays ba
 test('formatBattleHeaderStatus leaves out a missing date', () => {
   assert.equal(formatBattleHeaderStatus({ beat: 1, beatPlaybackActive: false, dateLabel: '' }), 'Beat 1 · Tactical planning');
 });
+
+test('formatBattleHeaderStatus names a neutral garrison', () => {
+  assert.equal(
+    formatBattleHeaderStatus({ beat: 1, beatPlaybackActive: false, dateLabel: 'April, Year 1', garrisonDefendsInPlace: true }),
+    'Beat 1 · Tactical planning · April, Year 1 · The garrison defends in place'
+  );
+});

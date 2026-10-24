@@ -1,6 +1,6 @@
 /**
- * Tests for game:requestAiOrders, game:cancelRequestAiOrders, and game:ready precomputed path.
- * Happy path and essential failure cases per WEGO execution plan Phase 2. Run with: node dist/gameIpcHandlers.test.js
+ * Tests for game:ready and melee intercept resolution.
+ * Happy path and essential failure cases.
  */
 
 import * as assert from 'assert';
@@ -9,37 +9,20 @@ import {
   setPendingStrategicReadyConsult,
 } from './ipc/deferredResolutionPlaybackConsult';
 import {
-  handleRequestAiOrders,
-  cancelRequestAiOrders,
   handleGameReady,
   handleResolveMeleeIntercept,
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
 import { advanceMatchGeneration } from './matchGeneration';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult, TacticalOpponentPlanPayload } from '../shared/ipcTypes';
-import { setActiveTacticalBattleSnapshotRef } from './tacticalBattle/activeTacticalBattleRef';
-import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
-
-/** Two-sided tactical roster so `shouldEndTacticalBattleForAnnihilation` is false (IPC tests are not annihilation scenarios). */
-const ipcTestTacticalSubUnits: TacticalBattleSnapshot['subUnits'] = [
-  {
-    id: 'hum-su-1',
-    parentUnitId: 'human-1',
-    player: 'human',
-    unitType: 'infantry',
-    h3Index: '891f1d48b9fffff',
-    displayName: 'H',
-  },
-  {
-    id: 'opp-su-1',
-    parentUnitId: 'opponent-1',
-    player: 'opponent',
-    unitType: 'armor',
-    h3Index: '891f1d48b9fffff',
-    displayName: 'O',
-  },
-];
+import { AI_SEAT_IDS } from '../shared/seatIds';
+import { dbGetAll, dbRun, setAiPendingOrders } from './gameDb';
+import { updateSeatCommander } from './gameDb/seatRosterStore';
+import { withSeatedTempGameDbAsync } from './testSupport/withSeatedTempGameDb';
+import { setCommanderConsultRunnerForTests } from './openRouter/commanderPool';
+import { emptyConsultOutcome } from './openRouter/commanderPoolSupport';
+import type { ReadyResult } from '../shared/ipcTypes';
+import type { TurnOrdersByOwner } from './gameActions/ownerTurnOrders';
 
 /**
  * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
@@ -101,323 +84,6 @@ pendingOrders: [] as { unitId: string; toH3Index: string }[],
 };
 
 /**
- * Documents the module-scope binding `resolutionState` (resolutionState).
-
- * Purpose: Supports maintainability by documenting why `resolutionState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const resolutionState = { ...minimalPlanningState, /**
- * Documents the object literal property `phase` (phase: 'resolution' as const).
-
- * Purpose: Supports maintainability by documenting why `phase` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-phase: 'resolution' as const };
-
-/**
- * Defines the `testRequestAiOrdersNotInPlanningPhase` function shape (async function testRequestAiOrdersNotInPlanningPhase(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNotInPlanningPhase` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function testRequestAiOrdersNotInPlanningPhase(): Promise<void> {
-  const deps = {
-    getGameState: () => resolutionState,
-    getSelectedModel: () => 'test-model',
-    hasKey: () => true,
-    getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-    defaultGroupIds: ['planning', 'assessment', 'estimation'],
-    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
-    controllerRef: { current: null as AbortController | null },
-  };
-  const result = await handleRequestAiOrders({}, deps);
-  assert.strictEqual(result.success, false);
-  assert.strictEqual((result as { error: string }).error, 'Not in planning phase');
-}
-
-/**
- * Defines the `testRequestAiOrdersNoModel` function shape (async function testRequestAiOrdersNoModel(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNoModel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function testRequestAiOrdersNoModel(): Promise<void> {
-  const deps = {
-    getGameState: () => minimalPlanningState,
-    getSelectedModel: () => '',
-    hasKey: () => true,
-    getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-    defaultGroupIds: ['planning', 'assessment', 'estimation'],
-    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
-    controllerRef: { current: null as AbortController | null },
-  };
-  const result = await handleRequestAiOrders({}, deps);
-  assert.strictEqual(result.success, false);
-  assert.strictEqual((result as { error: string }).error, 'No model selected');
-}
-
-/**
- * Defines the `testRequestAiOrdersNoKey` function shape (async function testRequestAiOrdersNoKey(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNoKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function testRequestAiOrdersNoKey(): Promise<void> {
-  const deps = {
-    getGameState: () => minimalPlanningState,
-    getGameStateForPlayer: () => minimalPlanningState,
-    getSelectedModel: () => 'test-model',
-    hasKey: () => false,
-    getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-    defaultGroupIds: ['planning', 'assessment', 'estimation'],
-    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
-    controllerRef: { current: null as AbortController | null },
-  };
-  const result = await handleRequestAiOrders({}, deps);
-  assert.strictEqual(result.success, false);
-  assert.strictEqual((result as { error: string }).error, 'No API key set');
-}
-
-/**
- * Defines the `testRequestAiOrdersSuccess` function shape (async function testRequestAiOrdersSuccess(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testRequestAiOrdersSuccess` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function testRequestAiOrdersSuccess(): Promise<void> {
-  const controllerRef = { current: null as AbortController | null };
-  const deps = {
-    getGameState: () => minimalPlanningState,
-    getGameStateForPlayer: () => minimalPlanningState,
-    getSelectedModel: () => 'test-model',
-    hasKey: () => true,
-    getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-    defaultGroupIds: ['planning', 'assessment', 'estimation'],
-    requestOrders: async (): Promise<RequestAiOrdersResult> => ({
-      success: true,
-      orders: [{ unitId: 'opponent-1', toH3Index: '891f1d48b9fffff' }],
-      strategy: 'hold',
-      message: 'You will not find safety in delay.',
-      toolInvocationCounts: { planning: 1 },
-    }),
-    controllerRef,
-  };
-  const result = await handleRequestAiOrders({}, deps);
-  assert.strictEqual(result.success, true);
-  assert.strictEqual((result as { orders: unknown[] }).orders.length, 1);
-  assert.strictEqual((result as { strategy?: string }).strategy, 'hold');
-  assert.strictEqual((result as { message?: string }).message, 'You will not find safety in delay.');
-}
-
-/**
- * Defines the `testRequestAiOrdersTacticalBuffersOpponentPlan` function shape (async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void>).
-
- * Purpose: Locks Phase 4 tactical scheduling — snapshot is not mutated on the AI callback; opponent rows are returned as `tacticalOpponentPlan`.
- * When to use: Regression when editing `handleRequestAiOrders` tactical branch.
- * Expected outcome: `tacticalBattle` is the same object reference as the active session; `orders` stripped to [] on the IPC result.
- * Exceptions: None.
- */
-async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
-  const tacticalSnap: TacticalBattleSnapshot = {
-    battleId: 'tb-ipc-test',
-    enclosingStrategicH3Index: '891f1d48b9fffff',
-    tacticalChildH3Indexes: ['891f1d48b9fffff'],
-    strategicTurnNumber: 1,
-    tacticalTurnNumber: 1,
-    subUnits: ipcTestTacticalSubUnits,
-  };
-  setActiveTacticalBattleSnapshotRef(tacticalSnap);
-  try {
-    const controllerRef = { current: null as AbortController | null };
-    const deps = {
-      getGameState: () => minimalPlanningState,
-      getGameStateForPlayer: () => minimalPlanningState,
-      getSelectedModel: () => 'test-model',
-      hasKey: () => true,
-      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-      defaultGroupIds: ['planning', 'assessment', 'estimation'],
-      requestOrders: async (): Promise<RequestAiOrdersResult> => ({
-        success: true,
-        orders: [{ unitId: 'opp-su-1', toH3Index: '891f1d48b9fffff' }],
-        rangedAttacks: [{ unitId: 'opp-su-1', targetH3Index: '891f1d48b9fffff' }],
-        strategy: 'probe',
-      }),
-      controllerRef,
-    };
-    const result = await handleRequestAiOrders({}, deps);
-    assert.strictEqual(result.success, true);
-    const ok = result as {
-      orders: unknown[];
-      tacticalBattle?: TacticalBattleSnapshot;
-      tacticalOpponentPlan?: TacticalOpponentPlanPayload;
-    };
-    assert.strictEqual(ok.orders.length, 0);
-    assert.strictEqual(ok.tacticalBattle, tacticalSnap);
-    assert.ok(ok.tacticalOpponentPlan);
-    assert.strictEqual(ok.tacticalOpponentPlan!.movementOrders.length, 1);
-    assert.strictEqual(ok.tacticalOpponentPlan!.rangedAttacks.length, 1);
-    assert.strictEqual(ok.tacticalOpponentPlan!.airStrikes.length, 0);
-  } finally {
-    setActiveTacticalBattleSnapshotRef(null);
-  }
-}
-
-/**
- * Defines the `testRequestAiOrdersTacticalSucceedsDuringStrategicResolution` function shape (async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): Promise<void>).
-
- * Purpose: Tactical battles opened from melee intercept keep `turn_state.phase === 'resolution'` until the tactical
- * session ends; opponent Run consultations must still reach `requestOrders` with `tacticalAiBattle` set.
- * When to use: Regression for renderer/main phase gating parity.
- * Expected outcome: Success with `tacticalOpponentPlan` when an active tactical snapshot exists during resolution.
- * Exceptions: None.
- */
-async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): Promise<void> {
-  const tacticalSnap: TacticalBattleSnapshot = {
-    battleId: 'tb-resolution-phase',
-    enclosingStrategicH3Index: '891f1d48b9fffff',
-    tacticalChildH3Indexes: ['891f1d48b9fffff'],
-    strategicTurnNumber: 1,
-    tacticalTurnNumber: 1,
-    subUnits: ipcTestTacticalSubUnits,
-  };
-  setActiveTacticalBattleSnapshotRef(tacticalSnap);
-  try {
-    const controllerRef = { current: null as AbortController | null };
-    const deps = {
-      getGameState: () => resolutionState,
-      getGameStateForPlayer: () => resolutionState,
-      getSelectedModel: () => 'test-model',
-      hasKey: () => true,
-      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-      defaultGroupIds: ['planning', 'assessment', 'estimation'],
-      requestOrders: async (): Promise<RequestAiOrdersResult> => ({
-        success: true,
-        orders: [{ unitId: 'opp-su-1', toH3Index: '891f1d48b9fffff' }],
-      }),
-      controllerRef,
-    };
-    const result = await handleRequestAiOrders({}, deps);
-    assert.strictEqual(result.success, true);
-    const ok = result as { tacticalOpponentPlan?: TacticalOpponentPlanPayload };
-    assert.ok(ok.tacticalOpponentPlan);
-    assert.strictEqual(ok.tacticalOpponentPlan!.movementOrders.length, 1);
-  } finally {
-    setActiveTacticalBattleSnapshotRef(null);
-  }
-}
-
-/**
- * Defines the `testRequestAiOrdersTacticalAnnihilationBlocksLlm` function shape.
- *
- * Purpose: While the tactical annihilation modal is up, the active snapshot is terminal; `requestAiOrders` must not invoke the model.
- * When to use: Regression when editing `handleRequestAiOrders` tactical gating.
- * Expected outcome: Failure without calling `requestOrders` when one side has zero sub-units.
- * Exceptions: None.
- */
-async function testRequestAiOrdersTacticalAnnihilationBlocksLlm(): Promise<void> {
-  const tacticalSnap: TacticalBattleSnapshot = {
-    battleId: 'tb-annihilation-ipc',
-    enclosingStrategicH3Index: '891f1d48b9fffff',
-    tacticalChildH3Indexes: ['891f1d48b9fffff'],
-    strategicTurnNumber: 1,
-    tacticalTurnNumber: 1,
-    subUnits: [
-      {
-        id: 'hum-su-1',
-        parentUnitId: 'human-1',
-        player: 'human',
-        unitType: 'infantry',
-        h3Index: '891f1d48b9fffff',
-        displayName: 'H',
-      },
-    ],
-  };
-  setActiveTacticalBattleSnapshotRef(tacticalSnap);
-  try {
-    let calls = 0;
-    const controllerRef = { current: null as AbortController | null };
-    const deps = {
-      getGameState: () => minimalPlanningState,
-      getGameStateForPlayer: () => minimalPlanningState,
-      getSelectedModel: () => 'test-model',
-      hasKey: () => true,
-      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
-      defaultGroupIds: ['planning', 'assessment', 'estimation'],
-      requestOrders: async (): Promise<RequestAiOrdersResult> => {
-        calls += 1;
-        return { success: true, orders: [] };
-      },
-      controllerRef,
-    };
-    const result = await handleRequestAiOrders({}, deps);
-    assert.strictEqual(calls, 0);
-    assert.strictEqual(result.success, false);
-    assert.strictEqual(
-      (result as { error: string }).error,
-      'Tactical battle ended; exit to the strategic map before requesting new AI orders.'
-    );
-  } finally {
-    setActiveTacticalBattleSnapshotRef(null);
-  }
-}
-
-/**
- * Defines the `testRequestAiOrdersCancelled` function shape (async function testRequestAiOrdersCancelled(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testRequestAiOrdersCancelled` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function testRequestAiOrdersCancelled(): Promise<void> {
-  const controllerRef = { current: null as AbortController | null };
-  let capturedSignal: AbortSignal | undefined;
-  const deps = {
-    getGameState: () => minimalPlanningState,
-    getGameStateForPlayer: () => minimalPlanningState,
-    getSelectedModel: () => 'test-model',
-    hasKey: () => true,
-    getToolNamesForEnabledGroups: () => ['planning'],
-    defaultGroupIds: ['planning'],
-    requestOrders: async (
-      _state: unknown,
-      _modelId: string,
-      options: { signal?: AbortSignal }
-    ): Promise<RequestAiOrdersResult> => {
-      capturedSignal = options.signal;
-      return new Promise<RequestAiOrdersResult>((resolve) => {
-        if (options.signal?.aborted) {
-          resolve({ success: false, error: 'Cancelled' });
-          return;
-        }
-        options.signal?.addEventListener('abort', () => {
-          resolve({ success: false, error: 'Cancelled' });
-        });
-      });
-    },
-    controllerRef,
-  };
-  const promise = handleRequestAiOrders({}, deps);
-  setTimeout(() => cancelRequestAiOrders(controllerRef), 10);
-  const result = await promise;
-  assert.strictEqual(result.success, false);
-  assert.strictEqual((result as { error: string }).error, 'Cancelled');
-  assert.ok(capturedSignal);
-}
-
-/**
  * Defines the `testGameReadyPrecomputedSkipsRequestOrders` function shape (async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `testGameReadyPrecomputedSkipsRequestOrders` exists.
@@ -436,27 +102,30 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
     defaultGroupIds: ['planning'],
     requestOrders: async (): Promise<RequestAiOrdersResult> => {
       requestOrdersCalled = true;
-      throw new Error('requestOrders should not be called when precomputed is provided');
+      throw new Error('requestOrders should not be called when no consult is running');
     },
-    ready: (
-      aiOrders: { unitId: string; toH3Index: string }[],
-      aiRangedOrders: { unitId: string; targetH3Index: string }[]
-    ): ReadyResultMinimal & { success: boolean } => {
-      assert.strictEqual(aiOrders.length, 0);
-      assert.strictEqual(aiRangedOrders.length, 0);
+    ready: (ordersByOwner: TurnOrdersByOwner): ReadyResultMinimal & { success: boolean } => {
+      const opponent = ordersByOwner.get('opponent');
+      assert.strictEqual(opponent?.movementOrders.length ?? 0, 0);
+      assert.strictEqual(opponent?.rangedOrders.length ?? 0, 0);
       return {
         success: true,
         aiOrderCount: 0,
       };
     },
   };
-  const result = await handleGameReady(
-    { precomputedAiOrders: [], precomputedAiRangedOrders: [] },
-    deps
-  );
-  assert.strictEqual(requestOrdersCalled, false);
-  assert.strictEqual(result.success, true);
-  assert.strictEqual(result.aiOrderCount, 0);
+  try {
+    const result = await handleGameReady(
+      { enabledToolGroups: ['planning'], aiPlanningRunEnabled: true, useEventDrivenConsultation: true },
+      deps
+    );
+    assert.strictEqual(requestOrdersCalled, false);
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.aiOrderCount, 0);
+    assert.strictEqual(result.aiConsulted, false);
+  } finally {
+    clearDeferredPlaybackConsultPending();
+  }
 }
 
 /**
@@ -480,12 +149,8 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
       requestOrdersCalled = true;
       return { success: false, error: 'should not be called' };
     },
-    ready: (
-      aiOrders: { unitId: string; toH3Index: string }[],
-      aiRangedOrders: { unitId: string; targetH3Index: string }[]
-    ): ReadyResultMinimal & { success: boolean } => {
-      void aiOrders;
-      void aiRangedOrders;
+    ready: (ordersByOwner: TurnOrdersByOwner): ReadyResultMinimal & { success: boolean } => {
+      void ordersByOwner;
       return {
         success: true,
         aiOrderCount: 0,
@@ -512,6 +177,8 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   const precomputedOrders = [{ unitId: 'opponent-1', toH3Index: '891f1d48b9fffff' }];
   const precomputedRanged: { unitId: string; targetH3Index: string }[] = [];
   let requestOrdersCalled = false;
+  await withSeatedTempGameDbAsync('aw-ready-pending-', { fogOfWarEnabled: false }, async () => {
+  setAiPendingOrders(AI_SEAT_IDS[0], precomputedOrders, precomputedRanged, [], [], []);
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,
@@ -523,12 +190,9 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
       requestOrdersCalled = true;
       return { success: false, error: 'should not be called' };
     },
-    ready: (
-      aiOrders: { unitId: string; toH3Index: string }[],
-      aiRangedOrders: { unitId: string; targetH3Index: string }[]
-    ): ReadyResultMinimal & { success: boolean } => {
-      assert.deepStrictEqual(aiOrders, precomputedOrders);
-      assert.strictEqual(aiRangedOrders.length, 0);
+    ready: (ordersByOwner: TurnOrdersByOwner): ReadyResultMinimal & { success: boolean } => {
+      assert.deepStrictEqual(ordersByOwner.get('opponent')?.movementOrders, precomputedOrders);
+      assert.strictEqual(ordersByOwner.get('opponent')?.rangedOrders.length ?? 0, 0);
       return {
         success: true,
         aiOrderCount: 1,
@@ -536,13 +200,19 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
       };
     },
   };
-  const result = await handleGameReady(
-    { precomputedAiOrders: precomputedOrders, precomputedAiRangedOrders: precomputedRanged },
-    deps
-  );
-  assert.strictEqual(requestOrdersCalled, false);
-  assert.strictEqual(result.success, true);
-  assert.strictEqual(result.aiOrderCount, 1);
+  try {
+    const result = await handleGameReady(
+      { enabledToolGroups: ['planning'], aiPlanningRunEnabled: true, useEventDrivenConsultation: true },
+      deps
+    );
+    assert.strictEqual(requestOrdersCalled, false);
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.aiOrderCount, 1);
+    assert.strictEqual(result.aiConsulted, true);
+  } finally {
+    clearDeferredPlaybackConsultPending();
+  }
+  });
 }
 
 /**
@@ -554,6 +224,11 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
  * Exceptions: None.
  */
 async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void> {
+  const airStrikes = [{ unitId: 'opponent-air-1', targetH3Index: '891f1d48b9fffff', targetType: 'units' as const }];
+  const ferryOrders = [{ unitId: 'opponent-air-2', destinationH3Index: '891f1d48b9fffff' }];
+  const embarkOrders = [{ unitId: 'opponent-inf-1', navalUnitId: 'opponent-naval-1' }];
+  await withSeatedTempGameDbAsync('aw-ready-extra-', { fogOfWarEnabled: false }, async () => {
+  setAiPendingOrders(AI_SEAT_IDS[0], [], [], airStrikes, ferryOrders, embarkOrders);
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,
@@ -562,26 +237,16 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({
-      success: true,
-      orders: [],
-      airStrikes: [
-        { unitId: 'opponent-air-1', targetH3Index: '891f1d48b9fffff', targetType: 'units' },
-      ],
-      ferryOrders: [{ unitId: 'opponent-air-2', destinationH3Index: '891f1d48b9fffff' }],
-      embarkOrders: [{ unitId: 'opponent-inf-1', navalUnitId: 'opponent-naval-1' }],
+      success: false,
+      error: 'should not be called',
     }),
-    ready: (
-      aiOrders: { unitId: string; toH3Index: string }[],
-      aiRangedOrders: { unitId: string; targetH3Index: string }[],
-      aiAirStrikeOrders?: AirStrikeOrder[],
-      aiFerryOrders?: FerryOrder[],
-      aiEmbarkOrders?: EmbarkOrder[]
-    ): ReadyResultMinimal & { success: boolean } => {
-      assert.strictEqual(aiOrders.length, 0);
-      assert.strictEqual(aiRangedOrders.length, 0);
-      assert.strictEqual(aiAirStrikeOrders?.length ?? 0, 1);
-      assert.strictEqual(aiFerryOrders?.length ?? 0, 1);
-      assert.strictEqual(aiEmbarkOrders?.length ?? 0, 1);
+    ready: (ordersByOwner: TurnOrdersByOwner): ReadyResultMinimal & { success: boolean } => {
+      const opponent = ordersByOwner.get('opponent');
+      assert.strictEqual(opponent?.movementOrders.length ?? 0, 0);
+      assert.strictEqual(opponent?.rangedOrders.length ?? 0, 0);
+      assert.strictEqual(opponent?.airStrikeOrders.length ?? 0, 1);
+      assert.strictEqual(opponent?.ferryOrders.length ?? 0, 1);
+      assert.strictEqual(opponent?.embarkOrders.length ?? 0, 1);
       return { success: true, aiOrderCount: 0 };
     },
   };
@@ -590,6 +255,7 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
     deps
   );
   assert.strictEqual(result.success, true);
+  });
 }
 
 /**
@@ -614,7 +280,7 @@ async function testGameReadyAwaitingMeleeDecisionSurfacesFields(): Promise<void>
       awaitingMeleeDecision: true,
       meleeDecisionToken: 'decision-token-1',
       meleeInterceptCandidates: [
-        { h3Index: '891f1d48b9fffff', humanUnitSummary: '1 infantry', aiUnitSummary: '1 armor' },
+        { h3Index: '891f1d48b9fffff', parties: [{ ownerId: 'human', unitSummary: '1 infantry' }, { ownerId: 'opponent', unitSummary: '1 armor' }], tacticalEligible: true },
       ],
     }),
   };
@@ -783,6 +449,16 @@ async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): 
  */
 async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> {
   let readyCalled = false;
+  await withSeatedTempGameDbAsync('aw-ready-generation-', { fogOfWarEnabled: false }, async () => {
+  updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
+    modelId: 'model-a',
+    reasoningEffort: null,
+    doctrineChoice: 'balanced',
+  });
+  setCommanderConsultRunnerForTests(async () => {
+    advanceMatchGeneration('new_game');
+    return emptyConsultOutcome();
+  });
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,
@@ -790,10 +466,7 @@ async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> 
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
     defaultGroupIds: ['planning'],
-    requestOrders: async (): Promise<RequestAiOrdersResult> => {
-      advanceMatchGeneration('new_game');
-      return { success: false, error: 'Cancelled' };
-    },
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     ready: (): ReadyResultMinimal & { success: boolean } => {
       readyCalled = true;
       return { success: true, aiOrderCount: 0 };
@@ -803,21 +476,12 @@ async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> 
   assert.strictEqual(readyCalled, false);
   assert.strictEqual(result.success, false);
   assert.strictEqual(result.reason, 'A new game started before this turn finished.');
+  setCommanderConsultRunnerForTests(null);
+  });
 }
 
 async function runAll(): Promise<void> {
   const tests: { name: string; fn: () => void | Promise<void> }[] = [
-    { name: 'requestAiOrders not in planning phase', fn: testRequestAiOrdersNotInPlanningPhase },
-    { name: 'requestAiOrders no model', fn: testRequestAiOrdersNoModel },
-    { name: 'requestAiOrders no key', fn: testRequestAiOrdersNoKey },
-    { name: 'requestAiOrders success', fn: testRequestAiOrdersSuccess },
-    { name: 'requestAiOrders tactical buffers opponent plan', fn: testRequestAiOrdersTacticalBuffersOpponentPlan },
-    {
-      name: 'requestAiOrders tactical succeeds during strategic resolution',
-      fn: testRequestAiOrdersTacticalSucceedsDuringStrategicResolution,
-    },
-    { name: 'requestAiOrders tactical annihilation blocks LLM', fn: testRequestAiOrdersTacticalAnnihilationBlocksLlm },
-    { name: 'requestAiOrders cancelled', fn: testRequestAiOrdersCancelled },
     { name: 'game:ready precomputed skips requestOrders', fn: testGameReadyPrecomputedSkipsRequestOrders },
     {
       name: 'game:ready Run off skips LLM (non-event-driven)',

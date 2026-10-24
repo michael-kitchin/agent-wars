@@ -6,6 +6,11 @@
 import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
+import { AI_SEAT_IDS, isAiSeatId, isSeatId, type SeatId } from '../shared/seatIds';
+import { DOCTRINE_CHOICES, toSeatSnapshot, type DoctrineChoice } from '../shared/seatRoster';
+import { updateSeatCommander } from './gameDb/seatRosterStore';
+import { cancelModelCalls } from './openRouter/modelCallControl';
+import { readMatchSnapshot } from './ipc/matchViewSnapshot';
 import {
   initDatabase,
   getGameState,
@@ -13,6 +18,10 @@ import {
   resetGameForNewMatch,
   getTacticalTerrainOverridesForRendererFromGame,
   listScenarioHomeRegions,
+  commanderModelId,
+  dbGetAll,
+  dbRun,
+  getSeatRoster,
 } from './gameDb';
 import { listGameMaps } from './gameMap/listGameMaps';
 import { buildNewGameMapPreview } from './gameMap/newGameMapPreview';
@@ -50,9 +59,13 @@ import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
 import { registerLoggedIpcHandler } from './ipc/loggedIpcHandler';
 import { registerBuildQueueSealiftIpcHandler } from './ipc/buildQueueSealiftIpcHandler';
 import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
+import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
+import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
+import { resetCommanderPool } from './openRouter/commanderPool';
 import {
   hasKey,
   requestOrders,
+  applyAppWideCommanderToLegacySeat,
   getSelectedModel,
   getToolNamesForEnabledGroups,
   TOOL_GROUP_REGISTRY,
@@ -70,8 +83,6 @@ import {
   getTacticalTransportVectorOverlaysForRenderer,
 } from './terrainClassificationCache';
 import {
-  handleRequestAiOrders,
-  cancelRequestAiOrders,
   handleGameReady,
   handleResolveMeleeIntercept,
   POST_RESOLUTION_CONSULT_TIMEOUT_MS,
@@ -89,29 +100,10 @@ import type {
   SubmitOrdersPayload,
   ReadyResult,
   GameReadyIpcPayload,
-  RequestAiOrdersResult,
   NewGameIpcPayload,
   NewGameMapPreviewRequest,
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
-
-/**
- * Documents the module-scope binding `requestAiOrdersControllerRef` (requestAiOrdersControllerRef: { current: AbortController | null }).
-
- * Purpose: Supports maintainability by documenting why `requestAiOrdersControllerRef` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const requestAiOrdersControllerRef: { current: AbortController | null } = { /**
- * Documents the object literal property `current` (current: null).
-
- * Purpose: Supports maintainability by documenting why `current` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-current: null };
 
 /**
  * Documents the module-scope binding `mainWindow` (mainWindow: BrowserWindow | null).
@@ -231,9 +223,13 @@ function requestOrdersWithLog(
   options?: Parameters<typeof requestOrders>[2]
 ): ReturnType<typeof requestOrders> {
   const onLog = (line: string, isError?: boolean) => {
-    mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: !!isError });
+    mainWindow?.webContents?.send(IPC_OPENROUTER.log, {
+      line,
+      isError: !!isError,
+      seatId: options?.seatId ?? AI_SEAT_IDS[0],
+    });
   };
-  return requestOrders(state, modelId, { ...options, onLog });
+  return requestOrders(state, modelId, { ...options, seatId: options?.seatId ?? AI_SEAT_IDS[0], onLog });
 }
 
 /**
@@ -241,7 +237,7 @@ function requestOrdersWithLog(
  *
  * Purpose: Prevents drift when consultation hooks gain new fields — both paths stay aligned.
  * When to use: Only from `registerIpcHandlers` when binding ready and melee-intercept handlers.
- * Expected outcome: An `Omit<ReadyDeps, 'ready'>` suitable for spreading with the action-specific entrypoint.
+ * Expected outcome: An `Omit<ReadyDeps, 'ready'>` suitable for spreading with the action-specific entrypoint. Every AI seat's snapshot keeps real terrain; the human snapshot masks unexplored hexes.
  * Exceptions: None.
  */
 function buildSharedHumanReadyConsultationDeps(
@@ -249,8 +245,8 @@ function buildSharedHumanReadyConsultationDeps(
 ): Omit<ReadyDeps, 'ready'> {
   return {
     getGameState,
-    getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
-      getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
+    getGameStateForPlayer: (playerId: SeatId) =>
+      getGameStateForPlayer(playerId, { maskUnexploredTerrain: !isAiSeatId(playerId) }),
     getSelectedModel,
     hasKey,
     getToolNamesForEnabledGroups,
@@ -268,7 +264,7 @@ function buildSharedHumanReadyConsultationDeps(
  * Exceptions: None.
  */
 function registerIpcHandlers(): void {
-  ipcMain.handle(IPC_GAME.getState, () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
+  ipcMain.handle(IPC_GAME.getState, (_event, viewAs: unknown) => readMatchSnapshot(viewAs));
   ipcMain.handle(IPC_GAME.getTacticalTerrainOverrides, () => getTacticalTerrainOverridesForRendererFromGame());
   registerLoggedIpcHandler(
     ipcMain,
@@ -337,30 +333,51 @@ function registerIpcHandlers(): void {
       weatherBonusLevel,
       techBonusLevel,
       startMonth,
-      requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
-      requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
       gameMapId: payload?.gameMapId ?? null,
-      humanSideGroupId: payload?.humanSideGroupId ?? null,
-      aiSideGroupId: payload?.aiSideGroupId ?? null,
+      seatCount: payload?.seats?.length ?? null,
+      turnLimit: payload?.turnLimit ?? null,
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
       gameSize,
-      humanHomeRegion: payload?.humanHomeRegion,
-      aiHomeRegion: payload?.aiHomeRegion,
       originBonusLevel,
       terrainBonusLevel,
       weatherBonusLevel,
       techBonusLevel,
       startMonth,
       gameMapId: payload?.gameMapId,
-      humanSideGroupId: payload?.humanSideGroupId,
-      aiSideGroupId: payload?.aiSideGroupId,
+      seats: payload?.seats,
+      turnLimit: payload?.turnLimit,
     });
+    if (!payload?.seats) applyAppWideCommanderToLegacySeat();
+    resetCommanderPool(getSeatRoster());
     clearDeferredPlaybackConsultPending();
     clearStrategicPreviousHexMemory();
     endTacticalBattleSession();
-    return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
+    return readMatchSnapshot(undefined);
+  });
+  ipcMain.handle(IPC_GAME.setSeatCommander, (_event, seatId: unknown, commander: unknown) => {
+    if (typeof seatId !== 'string' || !isSeatId(seatId) || !isAiSeatId(seatId)) {
+      throw new Error(`Cannot update a commander for ${String(seatId)}`);
+    }
+    if (!commander || typeof commander !== 'object') throw new Error('Invalid commander update');
+    const patch = commander as { modelId?: unknown; reasoningEffort?: unknown; doctrineChoice?: unknown };
+    if (patch.modelId !== null && typeof patch.modelId !== 'string') throw new Error('Invalid commander model');
+    if (patch.reasoningEffort !== null && typeof patch.reasoningEffort !== 'string') throw new Error('Invalid commander effort');
+    if (!(DOCTRINE_CHOICES as readonly string[]).includes(String(patch.doctrineChoice))) {
+      throw new Error('Invalid commander doctrine');
+    }
+    const before = getSeatRoster().find((row) => row.seatId === seatId);
+    const updated = updateSeatCommander({ run: dbRun, getAll: dbGetAll }, seatId, {
+      modelId: patch.modelId,
+      reasoningEffort: patch.reasoningEffort,
+      doctrineChoice: patch.doctrineChoice as DoctrineChoice,
+    });
+    const modelChanged = (before?.commander?.modelId ?? null) !== patch.modelId;
+    const effortChanged = (before?.commander?.reasoningEffort ?? null) !== patch.reasoningEffort;
+    if (modelChanged || effortChanged) cancelModelCalls('model_changed', 'all', seatId);
+    logDebug('main game:setSeatCommander', { seatId, modelChanged, effortChanged });
+    return toSeatSnapshot(updated, getGameState().gameOver === true);
   });
   ipcMain.handle(IPC_GAME.submitOrders, (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = normalizeSubmitOrdersPayload(payload);
@@ -435,13 +452,14 @@ function registerIpcHandlers(): void {
     ) {
       return result;
     }
-    const modelId = getSelectedModel();
+    const fromSeat = commanderModelId(AI_SEAT_IDS[0]);
+    const modelId = fromSeat === null ? getSelectedModel() : fromSeat;
     const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
     const battleId = result.tacticalBattle.battleId;
     const consultArgs = {
       useEventDrivenConsultation: v.useEventDrivenConsultation,
       aiPlanningRunEnabled: v.aiPlanningRunEnabled,
-      opponentState: getGameStateForPlayer('opponent', { maskUnexploredTerrain: false }),
+      opponentState: getGameStateForPlayer(AI_SEAT_IDS[0], { maskUnexploredTerrain: false }),
       tacticalBattle: result.tacticalBattle,
       tacticalResolutionPlayback: result.tacticalResolutionPlayback,
       modelId: modelId ?? '',
@@ -521,38 +539,17 @@ function registerIpcHandlers(): void {
     return handleNotifyResolutionPlaybackComplete(event.sender, payload);
   });
 
-  ipcMain.handle(
-    IPC_GAME.requestAiOrders,
-    async (
-      _event,
-      payload?: { enabledToolGroups?: string[] }
-    ): Promise<RequestAiOrdersResult> => {
-      const state = getGameState();
-      logDebug('main game:requestAiOrders', { turnNumber: state.turnNumber, phase: state.phase });
-      const result = await handleRequestAiOrders(payload, {
-        getGameState: () => getGameStateForPlayer('opponent', { maskUnexploredTerrain: false }),
-        getSelectedModel,
-        hasKey,
-        getToolNamesForEnabledGroups,
-        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
-        requestOrders: requestOrdersWithLog,
-        controllerRef: requestAiOrdersControllerRef,
-      });
-      logDebug('main game:requestAiOrders result', { success: result.success });
-      return result;
-    }
-  );
-
   ipcMain.handle(IPC_GAME.cancelRequestAiOrders, (_event, payload?: { reason?: string }) => {
     const reason = parseModelCallCancelReason(payload?.reason);
     logDebug('main game:cancelRequestAiOrders', { reason });
     stopModelWork(reason, (line) => {
       mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
     });
-    cancelRequestAiOrders(requestAiOrdersControllerRef);
   });
 
   registerOpenRouterIpcHandler(ipcMain);
+  registerCommanderPoolIpcHandler(ipcMain);
+  registerEndMatchIpcHandler(ipcMain);
 }
 
 applyVersionedAppName();

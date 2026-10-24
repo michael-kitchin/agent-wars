@@ -2,6 +2,7 @@
  * Tests for tactical main-process session helpers. Run with: node dist/main/tacticalBattle/tacticalBattleSession.test.js
  */
 
+import { type SeatId } from '../../shared/seatIds';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dbGetOne } from '../gameDb';
@@ -34,10 +35,10 @@ test('endTacticalBattleSession keeps tactical session inactive when none exists'
  * Expected outcome: Returns a parent id and tactical unit type from the active snapshot.
  * Exceptions: Throws when no matching parent exists.
  */
-function pickParentForTest(player: 'human' | 'opponent', minTheoreticalBaseline = 2): { parentUnitId: string; unitType: string } {
+function pickParentForTest(player: SeatId, minTheoreticalBaseline = 2): { parentUnitId: string; unitType: string } {
   const snap = getActiveTacticalBattleSnapshot();
   if (!snap) throw new Error('pickParentForTest: expected active tactical snapshot');
-  const byParent = new Map<string, { unitType: string; player: 'human' | 'opponent' }>();
+  const byParent = new Map<string, { unitType: string; player: SeatId }>();
   for (const sub of snap.subUnits) {
     if (sub.player !== player) continue;
     if (!byParent.has(sub.parentUnitId)) byParent.set(sub.parentUnitId, { unitType: sub.unitType, player: sub.player });
@@ -58,7 +59,7 @@ function pickParentForTest(player: 'human' | 'opponent', minTheoreticalBaseline 
  * Expected outcome: Returns a matching parent id and unit type.
  * Exceptions: Throws when no even-baseline parent exists for the requested player.
  */
-function pickEvenBaselineParentForTest(player: 'human' | 'opponent'): { parentUnitId: string; unitType: string } {
+function pickEvenBaselineParentForTest(player: SeatId): { parentUnitId: string; unitType: string } {
   const snap = getActiveTacticalBattleSnapshot();
   if (!snap) throw new Error('pickEvenBaselineParentForTest: expected active tactical snapshot');
   const seen = new Set<string>();

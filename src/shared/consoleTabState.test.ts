@@ -17,8 +17,8 @@ test('nextConsoleTabState collapses when the active tab is clicked', () => {
 });
 
 test('expandedConsoleTabState shows the named tab expanded', () => {
-  assert.deepEqual(expandedConsoleTabState('console-tab-opponent'), {
-    activeTabId: 'console-tab-opponent',
+  assert.deepEqual(expandedConsoleTabState('console-tab-commanders'), {
+    activeTabId: 'console-tab-commanders',
     collapsed: false,
   });
   assert.deepEqual(expandedConsoleTabState('console-tab-orders'), {
@@ -28,7 +28,7 @@ test('expandedConsoleTabState shows the named tab expanded', () => {
 });
 
 test('consoleTabIdForLiveMatchLaunch opens Opponent only for a live match', () => {
-  assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: false }), 'console-tab-opponent');
+  assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: false }), 'console-tab-commanders');
   assert.equal(consoleTabIdForLiveMatchLaunch(null), null);
   assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 0, gameOver: false }), null);
   assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: true }), null);

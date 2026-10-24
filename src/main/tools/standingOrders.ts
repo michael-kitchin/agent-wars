@@ -5,6 +5,8 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { LatLng } from './pathfinding';
 import { logDebug, logTrace } from '../logger';
 import {
@@ -15,25 +17,6 @@ import {
 } from './standingOrdersCore';
 import { getInjectionText } from './standingOrdersInjectionText';
 import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
-
-/**
- * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
-
- * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const AI_PLAYER_ID = 'opponent';
-/**
- * Documents the module-scope binding `HUMAN_PLAYER_ID` (HUMAN_PLAYER_ID).
-
- * Purpose: Supports maintainability by documenting why `HUMAN_PLAYER_ID` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const HUMAN_PLAYER_ID = 'human';
 
 export {
   executeStandingOrderActionForPlayer,
@@ -72,7 +55,7 @@ export function assignHumanMarchStandingOrder(
 ): Record<string, unknown> {
   logDebug('standingOrders assignHumanMarchStandingOrder', { unitId, destination });
   return executeStandingOrderActionForPlayer(
-    HUMAN_PLAYER_ID,
+    HUMAN_SEAT_ID,
     'assign_order',
     { unitId, order: { type: 'march', destination } },
     state,
@@ -95,7 +78,7 @@ export function queryHumanStandingOrders(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
   logTrace('standingOrders queryHumanStandingOrders');
-  return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'query_orders', { all: true }, state, latLngByH3, resolveToH3);
+  return executeStandingOrderActionForPlayer(HUMAN_SEAT_ID, 'query_orders', { all: true }, state, latLngByH3, resolveToH3);
 }
 
 /**
@@ -113,7 +96,7 @@ export function cancelHumanStandingOrder(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
   logDebug('standingOrders cancelHumanStandingOrder', { unitId });
-  return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+  return executeStandingOrderActionForPlayer(HUMAN_SEAT_ID, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
 }
 
 /**
@@ -125,15 +108,16 @@ export function cancelHumanStandingOrder(
  * Exceptions: None.
  */
 export function executeStandingOrders(
+  seatId: AiSeatId,
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('standingOrders executeStandingOrders', { toolName, stateTurn: state.turnNumber });
+  logDebug('standingOrders executeStandingOrders', { seatId, toolName, stateTurn: state.turnNumber });
   if (toolName !== 'assign_order' && toolName !== 'query_orders' && toolName !== 'cancel_order') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   }
-  return executeStandingOrderActionForPlayer(AI_PLAYER_ID, toolName, args, state, latLngByH3, resolveToH3);
+  return executeStandingOrderActionForPlayer(seatId, toolName, args, state, latLngByH3, resolveToH3);
 }

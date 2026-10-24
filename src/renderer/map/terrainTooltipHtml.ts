@@ -13,11 +13,8 @@ import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/
 import { getLlmHexLocationParenLabelForNamingTarget, getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { tacticalBattleHexCode } from '../../shared/tacticalBattleFootprint';
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
-import {
-  formatHomeRegionAssignmentControlSuffix,
-  isHexOwnershipVisibleToPerspective,
-  resolveHomeRegionOwnerIdentity,
-} from '../../shared/homeRegionRules';
+import { isHexOwnershipVisibleToPerspective, ownershipPerspective } from '../../shared/homeRegionRules';
+import { formatHexControlLabel, homeSeatIdsAtHex, viewerSeatIdForRoster } from '../../shared/sideLabels';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
@@ -94,7 +91,7 @@ function resolveStrategicHexForControlLine(namingTarget: NamingLookupTarget | nu
  *
  * Purpose: Shows perspective-aware ownership (`Human`/`AI`) while respecting hidden ownership as unknown.
  * When to use: Tooltip HTML formatting and cache-key derivation for strategic/tactical terrain popups.
- * Expected outcome: `Human`, `AI`, or `Unknown`, plus a home-region suffix when the hex has one. Hidden ownership is `Unknown`.
+ * Expected outcome: The roster's control line, or `Unknown` when the hex is hidden and is not a home.
  * Exceptions: None. Missing game state returns `Unknown`.
  */
 function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string {
@@ -102,30 +99,27 @@ function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string
   const strategicHex = resolveStrategicHexForControlLine(namingTarget);
   if (!strategicHex) return 'Unknown';
   const controller = (S.gameState.strategicControl ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
-  const ownerLabel = controller === 'human' ? 'Human' : controller === 'opponent' ? 'AI' : 'Unknown';
-  const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
-    h3Index: strategicHex,
-    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
-    intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+  const homeSeatIds = homeSeatIdsAtHex(strategicHex, S.gameState);
+  const label = formatHexControlLabel({
+    controllerId: controller,
+    homeSeatIds,
+    viewerSeatId: viewerSeatIdForRoster(S.gameState.seats ?? []),
+    seats: S.gameState.seats ?? [],
   });
-  if (homeRegionIdentity != null) {
-    return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
-  }
+  if (homeSeatIds.length > 0) return label;
   const visibleHexes = Array.isArray(S.gameState.visibleHexes)
     ? new Set(S.gameState.visibleHexes)
     : new Set(S.gameState.hexes.map((h) => h.h3Index));
-  const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const perspective = ownershipPerspective(S.gameState.playerPerspective);
   const ownershipVisible = isHexOwnershipVisibleToPerspective({
     h3Index: strategicHex,
     playerPerspective: perspective,
     visibleHexes,
-    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+    homeRegionHexesBySeat: S.gameState.homeRegionHexesBySeat,
     intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
   });
   if (!ownershipVisible) return 'Unknown';
-  return ownerLabel;
+  return label;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
@@ -71,7 +72,7 @@ interface SubmitOrdersDeps {
    */
 validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid: false; reason: string };
     /**
-   * Specifies the contract for the `validateRangedAttack` member (validateRangedAttack: ( unitId: string, targetH3Index: string, options?: { allowedPlayer?: 'human' | 'opponent'; displayLabelForUnit?: (unitId: string) => string } ) => { valid: true } | { val).
+   * Specifies the contract for the `validateRangedAttack` member (validateRangedAttack: ( unitId: string, targetH3Index: string, options?: { allowedPlayer?: SeatId; displayLabelForUnit?: (unitId: string) => string } ) => { valid: true } | { val).
 
    * Contract: Describes stable behavior for callers of `validateRangedAttack` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -81,7 +82,7 @@ validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid:
 validateRangedAttack: (
     unitId: string,
     targetH3Index: string,
-    options?: { allowedPlayer?: 'human' | 'opponent'; displayLabelForUnit?: (unitId: string) => string }
+    options?: { allowedPlayer?: SeatId; displayLabelForUnit?: (unitId: string) => string }
   ) => { valid: true } | { valid: false; reason: string };
     /**
    * Specifies the contract for the `displayLabelForUnit` member (displayLabelForUnit: UnitDisplayLabelFn;).
@@ -172,7 +173,7 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
     const keptRanged: typeof ranged = [];
     for (const r of ranged) {
       const result = deps.validateRangedAttack(r.unitId, r.targetH3Index, {
-        allowedPlayer: 'human',
+        allowedPlayer: HUMAN_SEAT_ID,
         displayLabelForUnit: deps.displayLabelForUnit,
       });
       if (!result.valid) {

@@ -11,6 +11,7 @@
 
 import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
+import { observeModeControls } from '../../shared/observeModeControls';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import {
   mapSelectionComposition,
@@ -134,6 +135,7 @@ export async function handleMainMapDoubleClick(
   deps: MainMapDoubleClickDeps
 ): Promise<void> {
   if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
+  if (observeModeControls(S.gameState?.seats ?? []).observing) return;
   clearDeferredHumanUnitSingleSelectTimer();
   S.gestureSelectionSnapshotAtMs = 0;
 

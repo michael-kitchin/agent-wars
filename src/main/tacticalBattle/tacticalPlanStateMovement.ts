@@ -3,6 +3,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Returns a snapshot copy whose unit rows reflect applied march orders and embarked-cargo hex sync.
@@ -22,7 +23,7 @@ export function applyMovementOrdersToPlanState(
     const to = orderTo.get(u.id);
     if (to === undefined) return { ...u };
     const debarkingIndependently =
-      u.player === 'opponent' &&
+      u.player !== HUMAN_SEAT_ID &&
       !!u.embarkedOnSubUnitId &&
       (u.unitType === 'infantry' || u.unitType === 'armor') &&
       to !== u.h3Index;

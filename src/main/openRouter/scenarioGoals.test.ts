@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   GENERIC_OBJECTIVE_SENTENCE,
@@ -22,23 +23,27 @@ test('region_vs_region reminder uses home-region wording', () => {
 
 test('a 75 percent share replaces the every-hex reminder', () => {
   const text = buildWinConditionReminderClause({ scenarioId: 'region_vs_region', controlWinMinUrbanShare: 0.75 });
-  assert.match(text, /at least 75%/);
-  assert.equal(text.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), false);
+  assert.match(text, /see the share below/);
+  assert.ok(text.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE));
+  assert.match(text, /no single side wins/);
 });
 
 test('the objective block can name both progress lines', () => {
   const state = {
     scenarioId: 'region_vs_region',
-    aiHomeRegion: 'North',
-    humanHomeRegion: 'South',
-  } as GameStateSnapshot;
+    playerPerspective: AI_SEAT_IDS[0],
+    seats: [
+      { seatId: HUMAN_SEAT_ID, seatOrder: 1, kind: 'human', homeRegion: 'South', outTurn: null, commander: null },
+      { seatId: AI_SEAT_IDS[0], seatOrder: 2, kind: 'ai', homeRegion: 'North', outTurn: null, commander: null },
+    ],
+  } as unknown as GameStateSnapshot;
   const progress = {
     ai: { heldUrbanCells: 90, totalUrbanCells: 100, neededUrbanCells: 75, controlWinMet: true },
     human: { heldUrbanCells: 10, totalUrbanCells: 80, neededUrbanCells: 60, controlWinMet: false },
   };
   const withProgress = buildRegionVsRegionScenarioObjectiveBlock(state, { controlWinMinUrbanShare: 0.75, progress });
-  assert.match(withProgress, /Enemy home urban cells in hexes you control: 90 of 100 \(you need 75\)/);
-  assert.match(withProgress, /Your home urban cells in hexes the enemy controls: 10 of 80 \(they need 60\)/);
+  assert.match(withProgress, /South home urban cells in hexes you control: 90 of 100 \(you need 75\)/);
+  assert.match(withProgress, /Your home urban cells in hexes South controls: 10 of 80 \(they need 60\)/);
   const plain = buildRegionVsRegionScenarioObjectiveBlock(state);
   assert.equal(plain, buildRegionVsRegionScenarioObjectiveBlock(state, {}));
   assert.ok(plain.includes(REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET));

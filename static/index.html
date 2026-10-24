@@ -22,13 +22,16 @@
       <span id="battle-header-status" class="battle-header-status">—</span>
     </div>
     <span id="topbar-new-game-title" class="topbar-new-game-title new-game-only">New game</span>
-    <div class="topbar-sides">
-      <span class="topbar-side-mark topbar-side-mark-human" aria-hidden="true"></span>
+    <div id="topbar-sides" class="topbar-sides">
       <span id="topbar-human-side" class="topbar-side-name">—</span>
       <span class="topbar-vs">vs</span>
-      <span class="topbar-side-mark topbar-side-mark-opponent" aria-hidden="true"></span>
-      <span id="topbar-opponent-side" class="topbar-side-name">—</span>
+      <span id="topbar-second-side" class="topbar-side-name">—</span>
     </div>
+    <label id="topbar-view-as" class="topbar-view-as" hidden>
+      <span class="topbar-view-as-label">View as</span>
+      <span id="topbar-view-as-dot" class="topbar-side-mark" hidden></span>
+      <select id="topbar-view-as-select" aria-label="View as"></select>
+    </label>
     <div class="topbar-stat" data-control-tooltip="The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.">
       <span class="topbar-stat-caption">Production</span>
       <span class="topbar-stat-value"><span id="topbar-stat-production">—</span><span id="topbar-stat-production-suffix" class="topbar-stat-suffix"></span></span>
@@ -37,13 +40,17 @@
       <span class="topbar-stat-caption">Forces</span>
       <span class="topbar-stat-value"><span id="topbar-stat-forces">—</span><span id="topbar-stat-forces-cap" class="topbar-stat-suffix"></span></span>
     </div>
-    <div class="topbar-stat" data-control-tooltip="Hexes of your home region that you hold, out of all its hexes.">
+    <div id="topbar-stat-human-home-host" class="topbar-stat" data-control-tooltip="Hexes of your home region that you hold, out of all its hexes.">
       <span class="topbar-stat-caption">Your home</span>
       <span class="topbar-stat-value"><span id="topbar-stat-human-home">—</span><span id="topbar-stat-human-home-total" class="topbar-stat-suffix"></span></span>
     </div>
-    <div class="topbar-stat" data-control-tooltip="Hexes of the opponent's home region that you hold, out of all its hexes.">
-      <span class="topbar-stat-caption">Enemy home</span>
-      <span class="topbar-stat-value"><span id="topbar-stat-opponent-home">—</span><span id="topbar-stat-opponent-home-total" class="topbar-stat-suffix"></span></span>
+    <div id="topbar-stat-enemy-home-host" class="topbar-stat" data-control-tooltip="Hexes of every active enemy home that you hold, out of all of those hexes. A knocked-out side's home is left out.">
+      <span class="topbar-stat-caption">Enemy homes</span>
+      <span class="topbar-stat-value"><span id="topbar-stat-enemy-home">—</span><span id="topbar-stat-enemy-home-total" class="topbar-stat-suffix"></span></span>
+    </div>
+    <div id="topbar-stat-cities-host" class="topbar-stat" hidden>
+      <span class="topbar-stat-caption">Cities</span>
+      <span class="topbar-stat-value"><span id="topbar-stat-cities">—</span></span>
     </div>
     <div class="topbar-spacer"></div>
     <div class="topbar-date-block">
@@ -55,7 +62,7 @@
         <div class="battle-force-labels">
           <span class="battle-force-side"><span id="battle-force-human-count" class="battle-force-count">—</span><span class="battle-force-word">yours</span></span>
           <span class="battle-force-caption">Sub-units in battle</span>
-          <span class="battle-force-side"><span class="battle-force-word">enemy</span><span id="battle-force-opponent-count" class="battle-force-count">—</span></span>
+          <span class="battle-force-side"><span id="battle-force-enemy-dot" class="battle-force-dot"></span><span id="battle-force-enemy-name" class="battle-force-word">enemy</span><span id="battle-force-enemy-count" class="battle-force-count">—</span></span>
         </div>
         <div class="battle-force-track" aria-hidden="true"><div id="battle-force-human-fill" class="battle-force-fill"></div></div>
       </div>
@@ -88,36 +95,39 @@
       <button type="button" id="new-game-dialog-close" class="new-game-panel-close" aria-label="Close the new-game screen" data-control-tooltip="Close this screen and go back to the match in progress." hidden><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"></path></svg></button>
     </div>
     <div class="new-game-panel-body" id="game-over-dialog">
+      <section id="game-over-standings" class="new-game-section game-over-standings" hidden></section>
       <section class="new-game-section" aria-labelledby="new-game-section-map">
         <h2 id="new-game-section-map" class="new-game-section-title">Map</h2>
         <div class="openrouter-tab-bar new-game-tabs" role="tablist">
-          <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map and pick a home region for each side.">Global</button>
-          <button type="button" id="new-game-tab-regional" role="tab" aria-selected="false" aria-controls="new-game-panel-regional" data-control-tooltip="Start on one region and pick a different side group for each player.">Regional</button>
+          <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map. Each side picks a different home region.">Global</button>
+          <button type="button" id="new-game-tab-regional" role="tab" aria-selected="false" aria-controls="new-game-panel-regional" data-control-tooltip="Start on one region. Each side picks a different home.">Regional</button>
         </div>
-        <div id="new-game-panel-global" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="new-game-tab-global">
-          <div class="new-game-rows">
-            <label for="new-game-human-region-select">Human</label>
-            <select id="new-game-human-region-select" data-control-tooltip="Pick your side's home region. The opponent may start in the same region."></select>
-            <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize human home region" data-control-tooltip="Pick one of the listed regions at random for your side, including the region already shown.">↻</button>
-            <label for="new-game-ai-region-select">AI</label>
-            <select id="new-game-ai-region-select" data-control-tooltip="Pick the opponent's home region. It may be the same as yours."></select>
-            <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn new-game-randomize" aria-label="Randomize AI home region" data-control-tooltip="Pick one of the listed regions at random for the opponent, including the region already shown.">↻</button>
-          </div>
-        </div>
+        <div id="new-game-panel-global" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="new-game-tab-global"></div>
         <div id="new-game-panel-regional" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="new-game-tab-regional" hidden>
           <div class="new-game-rows">
             <label for="new-game-region-select">Region</label>
-            <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
+            <select id="new-game-region-select" data-control-tooltip="Pick the region. Changing it draws a new home for each side."></select>
             <button type="button" id="new-game-region-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize region" data-control-tooltip="Pick one of the listed regions at random, including the region already shown.">↻</button>
-            <label for="new-game-human-side-select">Your side</label>
-            <select id="new-game-human-side-select" data-control-tooltip="Pick your side. It stays different from the opponent's side."></select>
-            <button type="button" id="new-game-human-side-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize human side" data-control-tooltip="Pick one of the other sides at random for your side.">↻</button>
-            <label for="new-game-ai-side-select">Opponent</label>
-            <select id="new-game-ai-side-select" data-control-tooltip="Pick the opponent's side. It stays different from yours."></select>
-            <button type="button" id="new-game-ai-side-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn new-game-randomize" aria-label="Randomize AI side" data-control-tooltip="Pick one of the other sides at random for the opponent.">↻</button>
           </div>
         </div>
-        <span class="control-tooltip-host new-game-add-opponent-host" data-control-tooltip="Add another opponent is not available in this version."><button type="button" id="new-game-add-opponent-btn" class="new-game-add-opponent" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>Add another opponent</button></span>
+      </section>
+      <section class="new-game-section" aria-labelledby="new-game-section-sides">
+        <h2 id="new-game-section-sides" class="new-game-section-title">Sides</h2>
+        <p id="new-game-sides-caption" class="new-game-sides-caption"></p>
+        <label class="new-game-check" for="new-game-observe-only"><input type="checkbox" id="new-game-observe-only" data-control-tooltip="Leave this checked to watch. An AI commander plays every side, including the first." /> Observe only: an AI commander plays every side</label>
+        <div id="new-game-side-rows"></div>
+        <span class="control-tooltip-host new-game-add-side-host" data-control-tooltip="Add a side on the next free home."><button type="button" id="new-game-add-side-btn" class="new-game-add-side"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>Add another opponent</button></span>
+      </section>
+      <section class="new-game-section" aria-labelledby="new-game-section-victory">
+        <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>
+        <div class="new-game-rows">
+          <label for="new-game-victory-select">Rule</label>
+          <select id="new-game-victory-select" data-control-tooltip="Regional matches end when one side remains. Global matches end at the turn limit, and the side holding the most city hexes wins."></select>
+        </div>
+        <div id="new-game-turn-limit-row" class="new-game-rows">
+          <label for="new-game-turn-limit-select">Turn limit</label>
+          <select id="new-game-turn-limit-select" data-control-tooltip="The global match ends after this many turns. 30 is the usual length."></select>
+        </div>
       </section>
       <section class="new-game-section" aria-labelledby="new-game-section-forces">
         <div class="new-game-section-head">
@@ -187,7 +197,7 @@
         </div>
         <div class="new-game-checks">
           <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
-          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off." /> Auto-start AI</label>
+          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Command tab with planning off." /> Auto-start AI</label>
         </div>
       </section>
     </div>
@@ -236,14 +246,31 @@
         <button type="button" id="tactical-annihilation-exit-btn" data-control-tooltip="Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.">Exit Battle</button>
       </div>
     </div>
-    <div id="map-toast-band" class="map-toast-band">
-      <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
-        <p id="ai-strategy-toast-text"></p>
-        <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
+    <div
+      id="knockout-dialog"
+      class="game-over-overlay knockout-dialog hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="knockout-dialog-title"
+    >
+      <div class="game-over-box knockout-dialog-box">
+        <p id="knockout-dialog-title">You're out</p>
+        <p id="knockout-dialog-lead" class="knockout-dialog-copy"></p>
+        <p id="knockout-dialog-place" class="knockout-dialog-copy"></p>
+        <div class="knockout-dialog-actions">
+          <button type="button" id="knockout-dialog-watch">Watch the rest</button>
+          <button type="button" id="knockout-dialog-end">End game</button>
+        </div>
       </div>
+    </div>
+    <div id="map-toast-band" class="map-toast-band">
       <div id="map-toast" class="map-toast hidden" aria-live="polite">
         <p id="map-toast-text"></p>
         <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
+      </div>
+      <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
+        <p id="ai-strategy-toast-text"></p>
+        <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
       </div>
     </div>
     <section id="selection-panel" class="selection-panel" aria-label="Selected units" data-state="compact" hidden>
@@ -296,48 +323,49 @@
         </div>
       </section>
       <section id="console-panel-reports" class="console-panel" role="tabpanel" aria-labelledby="console-tab-reports" hidden>
+        <label class="opponent-section-note" for="reports-sender-filter">Show reports from <select id="reports-sender-filter"><option value="">Everyone</option></select></label>
         <p id="reports-empty" class="chrome-muted">No reports yet this match.</p>
         <ol id="reports-list" class="console-report-list"></ol>
       </section>
-      <section id="console-panel-opponent" class="console-panel" role="tabpanel" aria-labelledby="console-tab-opponent" hidden>
+      <section id="console-panel-commanders" class="console-panel" role="tabpanel" aria-labelledby="console-tab-commanders" hidden>
         <div class="opponent-section opponent-status">
-          <span class="control-tooltip-host" data-control-tooltip="Turn opponent planning on or off. Enter an API key and choose a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
-          <p id="opponent-status-text" class="opponent-status-text">Opponent planning is off.</p>
+          <span class="control-tooltip-host" data-control-tooltip="Turn planning on or off for every commander. Enter an API key first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
+          <p id="commander-status-text" class="commander-status-text">Planning is off.</p>
         </div>
-        <section id="openrouter-model-panel" class="opponent-section" aria-labelledby="opponent-commander-heading">
-          <h3 id="opponent-commander-heading" class="console-group-heading">Commander</h3>
+        <section id="openrouter-model-panel" class="opponent-section" aria-labelledby="commander-cards-heading">
           <div class="opponent-field">
             <label for="openrouter-key">API key</label>
             <div class="openrouter-key-row">
               <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" data-control-tooltip="Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key." />
-              <span id="openrouter-cost" class="openrouter-cost">$0.00</span>
-            </div>
-          </div>
-          <div class="opponent-field">
-            <label for="openrouter-model">Model</label>
-            <div class="opponent-model-row">
-              <select id="openrouter-model">
-                <option value="">— Select model —</option>
-              </select>
               <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" aria-label="Refresh model list" data-control-tooltip="Load the model list again. If that fails, the message appears in the AI activity log."></button>
             </div>
           </div>
-          <div class="opponent-field">
-            <label for="openrouter-reasoning-effort">Reasoning</label>
-            <span class="control-tooltip-host" data-control-tooltip="Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two."><select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
+          <div id="openrouter-model-store" hidden>
+            <select id="openrouter-model" aria-hidden="true">
+              <option value="">— Select model —</option>
+            </select>
+            <select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
               <option value="">Model default</option>
-            </select></span>
+            </select>
           </div>
-        </section>
-        <section id="openrouter-tools-panel" class="opponent-section" aria-labelledby="opponent-tools-heading">
           <div class="opponent-section-head">
-            <h3 id="opponent-tools-heading" class="console-group-heading">Tool groups</h3>
-            <span class="opponent-section-note">uses since last Ready</span>
+            <h3 id="commander-cards-heading" class="console-group-heading">Commanders</h3>
+            <span class="opponent-section-note">cost this match</span>
+          </div>
+          <div id="commander-cards"></div>
+        </section>
+        <section id="openrouter-tools-panel" class="opponent-section" aria-labelledby="commander-tools-heading">
+          <div class="opponent-section-head">
+            <h3 id="commander-tools-heading" class="console-group-heading">Tool groups</h3>
+            <span class="opponent-section-note">uses since last Ready, all</span>
           </div>
           <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
         </section>
-        <section class="opponent-section opponent-log-section" aria-labelledby="opponent-log-heading">
-          <h3 id="opponent-log-heading" class="console-group-heading">Activity log</h3>
+        <section class="opponent-section opponent-log-section" aria-labelledby="commander-log-heading">
+          <div class="opponent-section-head">
+            <h3 id="commander-log-heading" class="console-group-heading">Activity log</h3>
+            <label class="opponent-section-note" for="commander-log-filter">Show <select id="commander-log-filter"><option value="">All commanders</option></select></label>
+          </div>
           <div id="openrouter-log" class="openrouter-log" aria-label="AI interactions and errors"></div>
         </section>
       </section>
@@ -345,17 +373,21 @@
     <nav id="console-rail" class="console-rail" role="tablist" aria-orientation="vertical" aria-label="Console tabs">
       <button type="button" id="console-tab-orders" class="console-tab" role="tab" aria-selected="true" aria-controls="console-panel-orders" data-control-tooltip="Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"></path></svg><span>Orders</span><span id="console-tab-orders-badge" class="console-tab-badge" hidden></span></button>
       <button type="button" id="console-tab-reports" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-reports" data-control-tooltip="Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 9.5l2-6h9l2 6v4h-13zM1.5 9.5h4l1 1.5h3l1-1.5h4"></path></svg><span>Reports</span><span id="console-tab-reports-badge" class="console-tab-badge" hidden></span></button>
-      <button type="button" id="console-tab-opponent" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-opponent" data-control-tooltip="Show whether the opponent is planning, its model, its tools, and the AI activity log. Click the selected tab to hide the console and widen the map."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Opponent</span></button>
+      <button type="button" id="console-tab-commanders" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-commanders" data-control-tooltip="Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Command</span></button>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Build is not available in this version."><button type="button" id="console-tab-build" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14V7l4 2.2V7l4 2.2V3.5h4.5V14z"></path></svg><span>Build</span></button></span>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Forces is not available in this version."><button type="button" id="console-tab-forces" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.3-5.2 6.3-3-1-5.2-3.3-5.2-6.3V3.8z"></path></svg><span>Forces</span></button></span>
     </nav>
     <div id="console-footer" class="console-footer">
-      <p id="opponent-status-line" class="opponent-status-line" data-status="off">
-        <span class="opponent-status-dot" aria-hidden="true"></span>
-        <span id="opponent-status-label" class="opponent-status-label">Opponent planning off</span>
-        <span id="opponent-status-model" class="opponent-status-model">No model</span>
-        <span id="opponent-status-cost" class="opponent-status-cost">$0.00</span>
+      <p id="commander-status-line" class="commander-status-line" data-status="off">
+        <span class="commander-status-dot" aria-hidden="true"></span>
+        <span id="commander-status-label" class="commander-status-label">Commanders off</span>
+        <span id="commander-status-model" class="commander-status-model">No model</span>
+        <span id="commander-status-cost" class="commander-status-cost">$0.00</span>
       </p>
+      <label id="observe-auto-advance" class="observe-auto-advance" hidden>
+        <input type="checkbox" id="observe-auto-advance-input" />
+        Start the next turn when every commander is ready
+      </label>
       <span class="control-tooltip-host" data-control-tooltip="End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running."><button type="button" id="ready-btn" class="ready-btn"><svg class="chrome-icon ready-btn-check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8"></path></svg><span class="ready-btn-label">Ready</span></button></span>
     </div>
   </aside>

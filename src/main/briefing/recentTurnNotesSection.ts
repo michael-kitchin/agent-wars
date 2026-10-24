@@ -7,6 +7,7 @@ import {
   parsePlayerLossSummaryJson,
   playerHasAnyLoss,
 } from '../../shared/lossSummary';
+import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { getRecentTurnNotes, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
 import { logTrace } from '../logger';
 import { subHeading } from '../openRouter/promptSpec/sectionHeadings';
@@ -51,6 +52,15 @@ export interface BuildRecentTurnNotesSectionArgs {
    * Exceptions: None.
    */
   heading: string;
+  /**
+   * Commander whose notes are read.
+   *
+   * Contract: An AI seat id. Omitted callers still read the first AI seat.
+   * When to use: Briefings for a seat other than the first AI seat.
+   * Expected outcome: Only that seat's rows are included.
+   * Exceptions: None.
+   */
+  seatId?: AiSeatId;
 }
 
 /**
@@ -99,8 +109,8 @@ function formatTurnBlock(row: TurnNoteRow): string {
   const ai = parsePlayerLossSummaryJson(row.aiLossJson);
   const humanInline = formatPlayerLossInline(human);
   const aiInline = formatPlayerLossInline(ai);
-  if (humanInline.length > 0) lines.push(`- Human Losses: ${humanInline}`);
-  if (aiInline.length > 0) lines.push(`- AI Losses: ${aiInline}`);
+  if (humanInline.length > 0) lines.push(`- Enemy Losses: ${humanInline}`);
+  if (aiInline.length > 0) lines.push(`- Your Losses: ${aiInline}`);
   return lines.join('\n');
 }
 
@@ -118,7 +128,13 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
     battleId: args.battleId,
     currentTurnNumber: args.currentTurnNumber,
   });
-  const rows = getRecentTurnNotes(args.scope, args.battleId, args.currentTurnNumber, 3).filter(rowHasPromptContent);
+  const rows = getRecentTurnNotes(
+    args.seatId ?? AI_SEAT_IDS[0],
+    args.scope,
+    args.battleId,
+    args.currentTurnNumber,
+    3
+  ).filter(rowHasPromptContent);
   if (rows.length === 0) return '';
   const blocks = rows.map((row) => formatTurnBlock(row));
   return `${subHeading(args.heading)}\n\n${blocks.join('\n\n')}`;

@@ -1,6 +1,7 @@
 import * as assert from 'assert';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../shared/seatIds';
 import {
-  formatHomeRegionAssignmentControlSuffix,
+  computeIntersectingHomeRegionHexes,
   getForcedVisibleHomeRegionHexesForPlayer,
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
@@ -17,15 +18,16 @@ import {
  */
 function testOwnershipVisibilityUsesHomeExceptions(): void {
   const visibleHexes = new Set<string>([]);
-  const humanHomeRegionHexes = ['home-h', 'shared'];
-  const aiHomeRegionHexes = ['home-a', 'shared'];
+  const homeRegionHexesBySeat = {
+    [HUMAN_SEAT_ID]: ['home-h', 'shared'],
+    [AI_SEAT_IDS[0]]: ['home-a', 'shared'],
+  };
   assert.strictEqual(
     isHexOwnershipVisibleToPerspective({
       h3Index: 'home-h',
       playerPerspective: 'human',
       visibleHexes,
-      humanHomeRegionHexes,
-      aiHomeRegionHexes,
+      homeRegionHexesBySeat,
       intersectingHomeRegionHexes: ['shared'],
     }),
     true
@@ -35,8 +37,7 @@ function testOwnershipVisibilityUsesHomeExceptions(): void {
       h3Index: 'shared',
       playerPerspective: 'human',
       visibleHexes,
-      humanHomeRegionHexes,
-      aiHomeRegionHexes,
+      homeRegionHexesBySeat,
       intersectingHomeRegionHexes: ['shared'],
     }),
     true
@@ -46,8 +47,7 @@ function testOwnershipVisibilityUsesHomeExceptions(): void {
       h3Index: 'home-a',
       playerPerspective: 'human',
       visibleHexes,
-      humanHomeRegionHexes,
-      aiHomeRegionHexes,
+      homeRegionHexesBySeat,
       intersectingHomeRegionHexes: ['shared'],
     }),
     false
@@ -69,8 +69,10 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
       h3Index: 'normal-visible',
       playerPerspective: 'human',
       visibleHexes,
-      humanHomeRegionHexes: ['home-h'],
-      aiHomeRegionHexes: ['home-a'],
+      homeRegionHexesBySeat: {
+        [HUMAN_SEAT_ID]: ['home-h'],
+        [AI_SEAT_IDS[0]]: ['home-a'],
+      },
     }),
     true
   );
@@ -79,8 +81,10 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
       h3Index: 'normal-hidden',
       playerPerspective: 'human',
       visibleHexes,
-      humanHomeRegionHexes: ['home-h'],
-      aiHomeRegionHexes: ['home-a'],
+      homeRegionHexesBySeat: {
+        [HUMAN_SEAT_ID]: ['home-h'],
+        [AI_SEAT_IDS[0]]: ['home-a'],
+      },
     }),
     false
   );
@@ -94,34 +98,38 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
  * Expected outcome: Exclusive lists return one side; intersection returns `both`; non-home returns null.
  * Exceptions: None.
  */
-function testFormatHomeRegionAssignmentControlSuffixContract(): void {
-  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('human'), '(Human Home Region)');
-  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('opponent'), '(AI Home Region)');
-  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('both'), '(Human & AI Home Region)');
-}
-
 function testResolveHomeRegionOwnerIdentityContract(): void {
   const sharedInputs = {
-    humanHomeRegionHexes: ['home-h', 'shared'],
-    aiHomeRegionHexes: ['home-a', 'shared'],
+    homeRegionHexesBySeat: {
+      [HUMAN_SEAT_ID]: ['home-h', 'shared'],
+      [AI_SEAT_IDS[0]]: ['home-a', 'shared'],
+    },
     intersectingHomeRegionHexes: ['shared'],
   };
-  assert.strictEqual(
-    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-h' }),
-    'human'
-  );
-  assert.strictEqual(
-    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-a' }),
-    'opponent'
-  );
-  assert.strictEqual(
-    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'shared' }),
-    'both'
-  );
-  assert.strictEqual(
-    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'normal-visible' }),
-    null
-  );
+  assert.deepStrictEqual(resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-h' }), {
+    kind: 'single',
+    seatId: HUMAN_SEAT_ID,
+  });
+  assert.deepStrictEqual(resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-a' }), {
+    kind: 'single',
+    seatId: AI_SEAT_IDS[0],
+  });
+  assert.deepStrictEqual(resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'shared' }), {
+    kind: 'shared',
+  });
+  assert.strictEqual(resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'normal-visible' }), null);
+  const threeHomes = {
+    homeRegionHexesBySeat: {
+      [HUMAN_SEAT_ID]: ['h-only'],
+      [AI_SEAT_IDS[0]]: ['a-only', 'share'],
+      [AI_SEAT_IDS[1]]: ['b-only', 'share'],
+    },
+  };
+  assert.deepStrictEqual(resolveHomeRegionOwnerIdentity({ ...threeHomes, h3Index: 'b-only' }), {
+    kind: 'single',
+    seatId: AI_SEAT_IDS[1],
+  });
+  assert.deepStrictEqual(resolveHomeRegionOwnerIdentity({ ...threeHomes, h3Index: 'share' }), { kind: 'shared' });
 }
 
 /**
@@ -134,54 +142,73 @@ function testResolveHomeRegionOwnerIdentityContract(): void {
  */
 function testResolveOwnershipBorderStyleContract(): void {
   const sharedInputs = {
-    humanHomeRegionHexes: ['home-h', 'shared'],
-    aiHomeRegionHexes: ['home-a', 'shared'],
+    homeRegionHexesBySeat: {
+      [HUMAN_SEAT_ID]: ['home-h', 'shared'],
+      [AI_SEAT_IDS[0]]: ['home-a', 'shared'],
+    },
     intersectingHomeRegionHexes: ['shared'],
   };
-  assert.strictEqual(
+  assert.deepStrictEqual(
     resolveOwnershipBorderStyle({
       ...sharedInputs,
       h3Index: 'home-h',
       controllerPlayerId: 'human',
       isOwnershipVisible: true,
     }),
-    'outlinedControlledByHuman'
+    { kind: 'outlined', ownerId: HUMAN_SEAT_ID }
   );
-  assert.strictEqual(
+  assert.deepStrictEqual(
     resolveOwnershipBorderStyle({
       ...sharedInputs,
       h3Index: 'shared',
       controllerPlayerId: 'human',
       isOwnershipVisible: true,
     }),
-    'outlinedControlledByHuman'
+    { kind: 'outlined', ownerId: HUMAN_SEAT_ID }
   );
-  assert.strictEqual(
+  assert.deepStrictEqual(
     resolveOwnershipBorderStyle({
       ...sharedInputs,
       h3Index: 'shared',
       controllerPlayerId: null,
       isOwnershipVisible: true,
     }),
-    'outlinedNeutral'
+    { kind: 'outlinedNeutral' }
   );
-  assert.strictEqual(
+  assert.deepStrictEqual(
     resolveOwnershipBorderStyle({
       ...sharedInputs,
       h3Index: 'normal-visible',
       controllerPlayerId: 'opponent',
       isOwnershipVisible: true,
     }),
-    'normalControlledByOpponent'
+    { kind: 'normal', ownerId: AI_SEAT_IDS[0] }
   );
-  assert.strictEqual(
+  assert.deepStrictEqual(
     resolveOwnershipBorderStyle({
       ...sharedInputs,
       h3Index: 'normal-hidden',
       controllerPlayerId: 'human',
       isOwnershipVisible: false,
     }),
-    'none'
+    { kind: 'none' }
+  );
+  assert.deepStrictEqual(
+    resolveOwnershipBorderStyle({
+      homeRegionHexesBySeat: { [AI_SEAT_IDS[1]]: ['b-only'] },
+      h3Index: 'b-only',
+      controllerPlayerId: AI_SEAT_IDS[1],
+      isOwnershipVisible: true,
+    }),
+    { kind: 'outlined', ownerId: AI_SEAT_IDS[1] }
+  );
+  assert.deepStrictEqual(
+    resolveOwnershipBorderStyle({
+      h3Index: 'held',
+      controllerPlayerId: NEUTRAL_OWNER_ID,
+      isOwnershipVisible: true,
+    }),
+    { kind: 'outlinedNeutral' }
   );
 }
 
@@ -196,8 +223,10 @@ function testResolveOwnershipBorderStyleContract(): void {
 function testForcedVisibleHomeHexesNoScenarioGate(): void {
   const forced = getForcedVisibleHomeRegionHexesForPlayer(
     {
-      humanHomeRegionHexes: ['home-h', 'shared'],
-      aiHomeRegionHexes: ['home-a', 'shared'],
+      homeRegionHexesBySeat: {
+        [HUMAN_SEAT_ID]: ['home-h', 'shared'],
+        [AI_SEAT_IDS[0]]: ['home-a', 'shared'],
+      },
       intersectingHomeRegionHexes: ['shared'],
     },
     'human',
@@ -214,10 +243,25 @@ function testForcedVisibleHomeHexesNoScenarioGate(): void {
  * Expected outcome: All assertions pass and emits a success marker line.
  * Exceptions: Throws on any failing assertion.
  */
+/**
+ * A hex shared by two of three homes is listed once.
+ *
+ * Purpose: Intersection counts homes, not copies inside one home list.
+ * When to use: After `computeIntersectingHomeRegionHexes` takes every home.
+ * Expected outcome: The shared hex is the only result.
+ * Exceptions: None.
+ */
+function testSharedHexAcrossThreeHomesIsListedOnce(): void {
+  assert.deepStrictEqual(
+    computeIntersectingHomeRegionHexes([['shared', 'only-a'], ['shared', 'only-b'], ['only-c', 'shared', 'shared']]),
+    ['shared']
+  );
+}
+
 function run(): void {
   testOwnershipVisibilityUsesHomeExceptions();
+  testSharedHexAcrossThreeHomesIsListedOnce();
   testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes();
-  testFormatHomeRegionAssignmentControlSuffixContract();
   testResolveHomeRegionOwnerIdentityContract();
   testResolveOwnershipBorderStyleContract();
   testForcedVisibleHomeHexesNoScenarioGate();

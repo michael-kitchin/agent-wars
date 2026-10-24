@@ -16,6 +16,10 @@ import type {
   SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
+import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
+import type { ModelCallCancelReason } from './modelCallCancelTypes';
+import type { AiSeatId } from '../seatIds';
+import type { DoctrineChoice, SeatSnapshot } from '../seatRoster';
 import type { GameMapListEntry } from '../gameMapList';
 import type { NewGameMapPreview, NewGameMapPreviewRequest } from '../newGameMapPreviewTypes';
 import type {
@@ -33,7 +37,7 @@ import type {
   TacticalTerrainOverrideRow,
 } from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
-import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
+import type { OpenRouterModel } from './openRouterTypes';
 import type { GameReadyIpcPayload, ReadyResult } from './readyTypes';
 import type { TacticalCommitResolutionPlayback } from './tacticalPlaybackTypes';
 import type {
@@ -113,14 +117,15 @@ export type CommitHumanTacticalDraftOrdersIpcPayload = {
  */
 export interface GameApi {
     /**
-   * Specifies the contract for the `getGameState` member (getGameState: () => Promise<GameStateSnapshot>;).
+   * Specifies the contract for the `getGameState` member (getGameState: (viewAs?: string) => Promise<GameStateSnapshot>;).
 
-   * Contract: Describes stable behavior for callers of `getGameState` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Contract: Omit `viewAs` for the human seat while one is active, and for every side when none is.
+   *   Pass `'all'` or a seat id only while watching.
+   * When to use: Refreshing the match on screen, including after View as changes.
+   * Expected outcome: The human snapshot while that seat is active. A watch returns every hex, or that seat's fog.
+   * Exceptions: A view sent while the human seat is active is ignored. An unknown seat falls back to every side.
    */
-getGameState: () => Promise<GameStateSnapshot>;
+getGameState: (viewAs?: string) => Promise<GameStateSnapshot>;
     /**
    * Specifies the contract for the `getTacticalTerrainOverrides` member (getTacticalTerrainOverrides: () => Promise<TacticalTerrainOverrideRow[]>;).
 
@@ -220,6 +225,54 @@ listGameMaps: () => Promise<GameMapListEntry[]>;
    * Exceptions: None.
    */
 newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
+  /**
+   * Saves one AI seat's model, effort, and doctrine choice.
+   *
+   * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset.
+   * When to use: The commander popover.
+   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's in-flight consult.
+   * Exceptions: Rejects when the seat is human, missing, or knocked out.
+   */
+  setSeatCommander: (
+    seatId: AiSeatId,
+    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice }
+  ) => Promise<SeatSnapshot>;
+  /**
+   * Ends the match by ranking the seats that are still active.
+   *
+   * Contract: A match that is already over is returned unchanged.
+   * When to use: The knocked-out dialog's End game button.
+   * Expected outcome: The snapshot with `gameOver` set and `gameEndReason` `ended_by_human`.
+   * Exceptions: Rejects when the database write fails.
+   */
+  endMatch: () => Promise<GameStateSnapshot>;
+  /**
+   * Starts commander planning for every eligible AI seat, or for the active battle.
+   *
+   * Contract: `mode` `strategic` starts each active AI seat that has a model. `tactical` starts the active battle's opposing AI seat.
+   * When to use: Before the match screen is switched onto the pool. Nothing in the screen calls this yet.
+   * Expected outcome: The snapshot after the starts have been kicked off.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  startCommanderPlanning: (request: { mode: CommanderPlanningMode }) => Promise<CommanderPoolSnapshot>;
+  /**
+   * Stops every in-flight commander consult.
+   *
+   * Contract: A missing reason is teardown.
+   * When to use: When model work should stop for every seat.
+   * Expected outcome: Planning seats return to ready without a new plan.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  stopCommanderPlanning: (reason?: ModelCallCancelReason) => Promise<void>;
+  /**
+   * Reads commander status and, when asked, takes the queued prose.
+   *
+   * Contract: `drain` true returns dispatches and clears them. False leaves them stored.
+   * When to use: Status polling and toasts.
+   * Expected outcome: One row per AI seat, in seat order.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readCommanderPool: (drain: boolean) => Promise<CommanderPoolSnapshot>;
     /**
    * Specifies the contract for the `submitOrders` member (submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;).
 
@@ -498,15 +551,6 @@ updateSealiftSlot: (payload: {
     landUnitId: string | null;
   }) => Promise<{ success: boolean; reason?: string; state?: SealiftStackState }>;
     /**
-   * Specifies the contract for the `requestAiOrders` member (requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;).
-
-   * Contract: Describes stable behavior for callers of `requestAiOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
-    /**
    * Specifies the contract for the `startTacticalBattle` member (startTacticalBattle: (payload: { enclosingStrategicH3Index: string }) => Promise<StartTacticalBattleIpcResult>;).
 
    * Contract: Starts a milestone-2.1 tactical battle for a contested strategic hex during strategic planning; fails if prerequisites are not met.
@@ -541,7 +585,7 @@ cancelRequestAiOrders: (payload?: { reason?: import('./modelCallCancelTypes').Mo
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-  registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
+  registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean; seatId?: string }) => void) => void;
     /**
    * Specifies the contract for the `openRouter` member (openRouter?: { getKey: () => Promise<{ hasKey: boolean }>; getSelectedModel: () => Promise<string>; setKey: (key: string) => Promise<void>;).
 

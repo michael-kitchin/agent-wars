@@ -120,7 +120,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 
 | Field | Type | Presence | Meaning |
 | --- | --- | --- | --- |
-| `message` | string | required, first | One in-character line addressed to the human player |
+| `message` | string | required, first | One in-character line addressed to your enemies |
 | `strategy` | string | required, second | One line summarising this period's plan |
 | `orders` | array | required, third | Per-unit actions, processed in list order |
 | `airStrikes` | array | present when the opponent has air units | Strike actions |

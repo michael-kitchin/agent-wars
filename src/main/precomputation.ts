@@ -18,6 +18,7 @@ import { weatherAttackPenalty, weatherBonusLevelOf } from '../shared/weatherBonu
 import type { WeatherState } from '../shared/weatherBonusTypes';
 import type { OriginBonusSource, OriginHitBonus } from '../shared/originBonusTypes';
 import { logDebug, logError, logTrace } from './logger';
+import { briefingOwnSeatId } from './briefing/briefingPerspective';
 import { compareUnitIdsNaturally } from '../shared/unitIds';
 
 /**
@@ -382,8 +383,9 @@ export function runUnitAssessments(
   coordMap: PrecomputationCoordMap
 ): UnitAssessmentResult[] {
   const { latLngByH3, resolveToH3 } = coordMap;
+  const ownSeat = briefingOwnSeatId(state);
   const opponentUnits = state.units
-    .filter((u) => u.player === 'opponent')
+    .filter((u) => u.player === ownSeat)
     .sort((a, b) => compareUnitIdsNaturally(a.id, b.id));
   const representativeH3 = state.hexes[0]?.h3Index ?? opponentUnits[0]?.h3Index ?? '';
   logDebug('precomputation runUnitAssessments', {
@@ -485,7 +487,7 @@ function runHexAssessments(
 ): HexAssessmentEntry[] {
   logDebug('precomputation runHexAssessments', { turnNumber: state.turnNumber });
   const { latLngByH3, resolveToH3 } = coordMap;
-  const humanUnits = state.units.filter((u) => u.player === 'human');
+  const humanUnits = state.units.filter((u) => u.player !== briefingOwnSeatId(state));
   const hexesWithHuman = [...new Set(humanUnits.map((u) => u.h3Index))];
   const results: HexAssessmentEntry[] = [];
   for (const h3 of hexesWithHuman) {

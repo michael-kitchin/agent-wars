@@ -4,7 +4,7 @@
  * Purpose: Keep identifiers short for LLM token cost while still encoding owner and type.
  * When to use: Seeding, production, tactical snapshot construction, and any parser that
  * must understand compact ids without assuming they are the only on-disk format.
- * Expected outcome: Formatters emit `h1-i1` / `a1-t3-s2` shapes; parsers return `null`
+ * Expected outcome: Formatters emit `h1-i1` / `a1-t3` / `a4-i2` shapes; parsers return `null`
  * for legacy ids so existing saves keep working as opaque strings.
  * Exceptions: None. **Logging:** this module does not import `src/main/logger`; do not
  * add `logTrace` here (shared layer). Callers that introduce new behavior may log at
@@ -12,17 +12,7 @@
  */
 
 import { type BuildUnitType } from './ipc/productionTypes';
-
-/**
- * Owning side encoded in compact identifiers.
- *
- * Purpose: Shared-layer stand-in for the main-process `PlannedUnitOwner` union so the
- * renderer bundle never imports seeding code.
- * When to use: Formatter arguments and parse results.
- * Expected outcome: `'human'` or `'opponent'` only; additional AI players are out of scope.
- * Exceptions: None.
- */
-export type UnitIdOwner = 'human' | 'opponent';
+import { type SeatId, aiIndexForSeatId, aiSeatIdForIndex, isHumanSeatId, AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
 
 /**
  * Parsed compact strategic identifier.
@@ -33,7 +23,7 @@ export type UnitIdOwner = 'human' | 'opponent';
  * Exceptions: None.
  */
 export type StrategicUnitIdParts = {
-  readonly player: UnitIdOwner;
+  readonly player: SeatId;
   readonly unitType: BuildUnitType;
   readonly ordinal: number;
 };
@@ -73,7 +63,8 @@ export const UNIT_TYPE_ID_CODES: Readonly<Record<BuildUnitType, string>> = {
  * Purpose: Single source for the strategic grammar so call sites do not inline regexes.
  * When to use: `parseStrategicUnitId` only.
  * Expected outcome: Captures player letter, player index, type code, and ordinal digits.
- * Exceptions: Leading zeros and player indexes other than 1 are rejected after the match.
+ * Exceptions: Leading zeros are rejected after the match. Human indexes other than 1,
+ * and AI indexes outside 1 to 4, are rejected by the parser.
  */
 const STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
 
@@ -138,13 +129,18 @@ function hasForbiddenLeadingZero(digits: string): boolean {
 /**
  * Maps a DB `player` value to the compact player-code segment.
  *
- * Purpose: Keep `h1` / `a1` construction in one place for the current two-side game.
+ * Purpose: Keep `h1` / `a1` through `a4` construction in one place.
  * When to use: `formatStrategicUnitId` and any caller that needs the prefix alone.
- * Expected outcome: `'human'` → `'h1'`, `'opponent'` → `'a1'`.
- * Exceptions: None.
+ * Expected outcome: The human seat → `'h1'`. AI index 1 → `'a1'`. AI index 4 → `'a4'`.
+ * Exceptions: Throws when an AI seat id has no index. A `SeatId` that passed `isHumanSeatId` does not take that path.
  */
-export function playerIdCodeFor(player: UnitIdOwner): string {
-  return player === 'human' ? 'h1' : 'a1';
+export function playerIdCodeFor(player: SeatId): string {
+  if (isHumanSeatId(player)) return 'h1';
+  const aiIndex = aiIndexForSeatId(player);
+  if (aiIndex === null) {
+    throw new Error(`Cannot format a player code for ${player}`);
+  }
+  return `a${aiIndex}`;
 }
 
 /**
@@ -183,8 +179,8 @@ export function formatTacticalSubUnitId(parentUnitId: string, slot: number): str
  * Purpose: Display fallbacks and type inference for compact ids; returns `null` for
  * every legacy shape so old saves stay opaque.
  * When to use: When a caller has only the id string and needs structured parts.
- * Expected outcome: Parts for `h1-i1` / `a1-t14`; `null` for legacy ids, padding,
- * and player indexes other than 1 (the multi-AI-player extension point).
+ * Expected outcome: Parts for `h1-i1` / `a1-t14` / `a4-t2`; `null` for legacy ids, padding,
+ * a human index other than 1, and an AI index outside 1 to 4.
  * Exceptions: None; never throws.
  */
 export function parseStrategicUnitId(unitId: string): StrategicUnitIdParts | null {
@@ -195,13 +191,17 @@ export function parseStrategicUnitId(unitId: string): StrategicUnitIdParts | nul
   const typeCode = match[3]!;
   const ordinalDigits = match[4]!;
   if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-  if (playerIndexDigits !== '1') return null;
+  const playerIndex = Number.parseInt(playerIndexDigits, 10);
   const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
   if (!unitType) return null;
   const ordinal = Number.parseInt(ordinalDigits, 10);
   if (!isPositiveInteger(ordinal)) return null;
-  const player: UnitIdOwner = playerLetter === 'h' ? 'human' : 'opponent';
-  return { player, unitType, ordinal };
+  if (playerLetter === 'h') {
+    if (playerIndex !== 1) return null;
+    return { player: HUMAN_SEAT_ID, unitType, ordinal };
+  }
+  if (playerIndex < 1 || playerIndex > 4) return null;
+  return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal };
 }
 
 /**
@@ -252,11 +252,11 @@ export function unitTypeFromUnitId(unitId: string): BuildUnitType | null {
  * Purpose: Kill attribution and display grouping still have prefix fallbacks when the
  * roster `player` column is missing; compact ids never start with `human-` / `opponent-`.
  * When to use: After a roster lookup miss; prefer the `player` column when present.
- * Expected outcome: Compact `h1-t3` / `h1-t3-s2` and legacy `human-armor-1` / `human-naval-1:01`
- * yield `'human'`; opponent compact and `opponent-*` prefixes yield `'opponent'`; unknown strings yield `null`.
+ * Expected outcome: Compact `h1-t3` and legacy `human-*` yield `HUMAN_SEAT_ID`. Compact `a2-i7`
+ * yields `'opponent2'`. Legacy `opponent-*` yields `the first AI seat`. Unknown strings yield null.
  * Exceptions: None; never throws.
  */
-export function unitIdOwnerFromId(unitId: string): UnitIdOwner | null {
+export function unitIdOwnerFromId(unitId: string): SeatId | null {
   const compact = parseStrategicUnitId(unitId);
   if (compact) return compact.player;
   const sub = parseTacticalSubUnitId(unitId);
@@ -264,8 +264,8 @@ export function unitIdOwnerFromId(unitId: string): UnitIdOwner | null {
     const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
     if (parentOwner) return parentOwner;
   }
-  if (unitId.startsWith('opponent-')) return 'opponent';
-  if (unitId.startsWith('human-')) return 'human';
+  if (unitId.startsWith('opponent-')) return AI_SEAT_IDS[0];
+  if (unitId.startsWith('human-')) return HUMAN_SEAT_ID;
   return null;
 }
 

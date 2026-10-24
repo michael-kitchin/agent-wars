@@ -16,6 +16,11 @@ import {
   type DeferredTacticalBeatConsultArgs,
 } from './deferredResolutionPlaybackConsult';
 import { cancelModelCalls, modelCallsBegun } from '../openRouter/modelCallControl';
+import { resetCommanderPool } from '../openRouter/commanderPool';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
+import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
+import { listGameMaps } from '../gameMap/listGameMaps';
+import { withSeatedTempGameDbAsync } from '../testSupport/withSeatedTempGameDb';
 import { advanceMatchGeneration } from '../matchGeneration';
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
 import { DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG } from '../../shared/ipc/deferredPlaybackConsultAbandoned';
@@ -146,7 +151,7 @@ async function testCancelBeforeNotifySkipsConsult(): Promise<void> {
     hasKey: () => true,
     modelId: 'm',
   });
-  cancelModelCalls('run_off', 'all');
+  cancelModelCalls('run_off', 'all', 'all');
   const result = await handleNotifyResolutionPlaybackComplete(sender as never, {
     kind: 'strategic',
     planningTurnNumber: 9,
@@ -182,11 +187,56 @@ async function testLateTacticalCompletionLeavesNewerStrategicPending(): Promise<
   assert.strictEqual(peekPendingPlaybackConsult(), null);
 }
 
+/**
+ * One deferred slot consults every active AI seat.
+ *
+ * Purpose: Playback completion runs each commander's post-resolution consult, not only the first seat.
+ * When to use: This file's runner.
+ * Expected outcome: Both seats' requestOrders calls finish, and the mutex clears.
+ * Exceptions: None. The installed regional map has at least two side groups.
+ */
+async function testDeferredConsultFinishesTwoSeats(): Promise<void> {
+  const map = listGameMaps().find((entry) => entry.sideGroups.length >= 2);
+  assert.ok(map, 'a regional map with two side groups is installed');
+  const seats: NewGameSeatInput[] = [0, 1].map((index) => ({
+    kind: 'ai',
+    sideGroupId: map.sideGroups[index]?.id ?? '',
+    commander: { modelId: 'model-a', reasoningEffort: null, doctrineChoice: 'balanced' },
+  }));
+  const called: string[] = [];
+  await withSeatedTempGameDbAsync('aw-deferred-two-', { gameMapId: map.id, fogOfWarEnabled: false, seats }, async () => {
+    clearDeferredPlaybackConsultPending();
+    setPendingStrategicReadyConsult(4, {
+      ...minimalConsultArgs(),
+      useEventDrivenConsultation: true,
+      resolutionSuccess: true,
+      aiPlanningRunEnabled: true,
+      hasKey: () => true,
+      modelId: 'model-a',
+      timeoutMs: 15000,
+      requestOrders: async (_state, _modelId, options) => {
+        called.push(options.seatId);
+        return { success: true, orders: [] };
+      },
+    });
+    const { sender } = createCaptureSender();
+    const result = await handleNotifyResolutionPlaybackComplete(sender as never, {
+      kind: 'strategic',
+      planningTurnNumber: 4,
+    });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(hasDeferredPlaybackConsultPending(), false);
+    assert.deepStrictEqual(called.slice().sort(), [AI_SEAT_IDS[0], AI_SEAT_IDS[1]].slice().sort());
+    resetCommanderPool([]);
+  });
+}
+
 async function runAll(): Promise<void> {
   await testNotifyClearsMutexStrategic();
   await testMismatchedNotifyAbandonsPendingMeleeConsult();
   await testCancelBeforeNotifySkipsConsult();
   await testLateTacticalCompletionLeavesNewerStrategicPending();
+  await testDeferredConsultFinishesTwoSeats();
   console.log('OK deferredResolutionPlaybackConsult tests');
 }
 

@@ -222,7 +222,12 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
     assert.ok(regions.length > 0, 'expected at least one scenario home region');
     const humanRegion = regions[0]!;
     const aiRegion = regions[1] ?? regions[0]!;
-    gameDb.resetGameForNewMatch({ humanHomeRegion: humanRegion, aiHomeRegion: aiRegion });
+    gameDb.resetGameForNewMatch({
+      seats: [
+        { kind: 'human', homeRegion: humanRegion },
+        { kind: 'ai', homeRegion: aiRegion },
+      ],
+    });
     const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string; terrainKind: string; id: string }>(
       `SELECT u.id AS id, u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain, h.terrain_kind AS terrainKind
        FROM units u
@@ -249,10 +254,10 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
     }
     const humanState = gameDb.getGameStateForPlayer('human', { maskUnexploredTerrain: false });
     assert.strictEqual(humanState.scenarioId, 'region_vs_region');
-    assert.strictEqual(humanState.humanHomeRegion, humanRegion);
-    assert.strictEqual(humanState.aiHomeRegion, aiRegion);
-    assert.deepStrictEqual(humanState.humanHomeRegionHexes, gameDb.getScenarioHomeRegionHexes(humanRegion));
-    assert.deepStrictEqual(humanState.aiHomeRegionHexes, gameDb.getScenarioHomeRegionHexes(aiRegion));
+    assert.strictEqual(humanState.seats?.find((seat) => seat.kind === 'human')?.homeRegion, humanRegion);
+    assert.strictEqual(humanState.seats?.find((seat) => seat.kind === 'ai')?.homeRegion, aiRegion);
+    assert.deepStrictEqual(humanState.homeRegionHexesBySeat?.human, gameDb.getScenarioHomeRegionHexes(humanRegion));
+    assert.deepStrictEqual(humanState.homeRegionHexesBySeat?.opponent, gameDb.getScenarioHomeRegionHexes(aiRegion));
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -289,14 +294,17 @@ function testResetNormalizesInvalidScenarioHomeRegions(gameDb: typeof import('./
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch({
-      humanHomeRegion: 'not-a-real-region',
-      aiHomeRegion: '',
+      seats: [
+        { kind: 'human', homeRegion: 'not-a-real-region' },
+        { kind: 'ai', homeRegion: '' },
+      ],
     });
     const state = gameDb.getGameStateForPlayer('human', { maskUnexploredTerrain: false });
     const regionOptions = gameDb.listScenarioHomeRegions();
+    const homes = (state.seats ?? []).map((seat) => seat.homeRegion);
     assert.strictEqual(state.scenarioId, 'region_vs_region');
-    assert.ok(typeof state.humanHomeRegion === 'string' && regionOptions.includes(state.humanHomeRegion), 'expected normalized human home region');
-    assert.ok(typeof state.aiHomeRegion === 'string' && regionOptions.includes(state.aiHomeRegion), 'expected normalized AI home region');
+    assert.ok(homes.length === 2 && homes.every((name) => regionOptions.includes(name)), 'expected normalized home regions');
+    assert.notStrictEqual(homes[0], homes[1]);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -363,18 +371,20 @@ function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof impor
     gameDb.openGameDatabaseAtPathForTests(p);
     const regions = gameDb.listScenarioHomeRegions();
     assert.ok(regions.length > 1, 'expected at least two scenario home regions for control-ownership contract checks');
-    const humanHomeRegion = regions[0]!;
-    const aiHomeRegion = regions[1]!;
+    const firstHome = regions[0]!;
+    const secondHome = regions[1]!;
     gameDb.resetGameForNewMatch({
       fogOfWarEnabled: true,
-      humanHomeRegion,
-      aiHomeRegion,
+      seats: [
+        { kind: 'human', homeRegion: firstHome },
+        { kind: 'ai', homeRegion: secondHome },
+      ],
     });
 
     const humanState = gameDb.getGameStateForPlayer('human');
     const opponentState = gameDb.getGameStateForPlayer('opponent');
-    const humanHomeHexes = new Set(humanState.humanHomeRegionHexes ?? []);
-    const aiHomeHexes = new Set(humanState.aiHomeRegionHexes ?? []);
+    const humanHomeHexes = new Set(humanState.homeRegionHexesBySeat?.human ?? []);
+    const aiHomeHexes = new Set(humanState.homeRegionHexesBySeat?.opponent ?? []);
     const intersectingHexes = new Set(humanState.intersectingHomeRegionHexes ?? []);
     const humanVisible = new Set(humanState.visibleHexes ?? []);
     const opponentVisible = new Set(opponentState.visibleHexes ?? []);

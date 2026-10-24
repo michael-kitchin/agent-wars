@@ -45,14 +45,14 @@ export function expandedConsoleTabState(tabId: string): ConsoleTabState {
  *
  * Purpose: A live match should show the Opponent tab. A launch that shows the new-game dialog should leave the console on its start tab.
  * When to use: Once, after the launch snapshot is applied. Null is not a live match. A missing snapshot is the caller's failure, not a value to pass here.
- * Expected outcome: `'console-tab-opponent'` when the match has hexes and is not over. Null otherwise, so the caller leaves the start tab.
+ * Expected outcome: `'console-tab-commanders'` when the match has hexes and is not over. Null otherwise, so the caller leaves the start tab.
  * Exceptions: None.
  */
 export function consoleTabIdForLiveMatchLaunch(
   match: { readonly hexCount: number; readonly gameOver: boolean } | null
 ): string | null {
   if (match == null || match.hexCount === 0 || match.gameOver) return null;
-  return 'console-tab-opponent';
+  return 'console-tab-commanders';
 }
 
 /**

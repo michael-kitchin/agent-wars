@@ -3,7 +3,7 @@
  *
  * Purpose: The sentence follows the selected tab, and a win or loss does not.
  * When to use: Opening the overlay, switching tabs, and showing game over.
- * Expected outcome: Game over clears the new-game kind so a later tab switch leaves "You win!" or "You lose." alone.
+ * Expected outcome: Game over clears the new-game kind so a later tab switch leaves the standings heading alone.
  * Exceptions: None when the message element is missing.
  */
 

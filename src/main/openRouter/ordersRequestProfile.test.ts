@@ -5,7 +5,9 @@
 
 import assert from 'node:assert/strict';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
-import { BASELINE_ORDERS_REQUEST_PROFILE, resolveOrdersRequestProfile } from './ordersRequestProfile';
+import type { SeatRecord } from '../../shared/seatRoster';
+import { rememberOpenRouterModels, resetOpenRouterModelCapabilitiesForTests } from './openRouterModelCapabilities';
+import { BASELINE_ORDERS_REQUEST_PROFILE, resolveOrdersRequestProfile, resolveSeatOrdersRequestProfile } from './ordersRequestProfile';
 
 /**
  * Base order-flow budget used by every case.
@@ -229,6 +231,44 @@ function testToolSupportFollowsAdvertisedParameters(): void {
  * Expected outcome: Throws on failure; logs pass when all succeed.
  * Exceptions: Propagates assertion errors.
  */
+/**
+ * Two commanders with different models get different request profiles.
+ *
+ * Purpose: The seat, not the app-wide selection, chooses the model and effort.
+ * When to use: After `resolveSeatOrdersRequestProfile` changes.
+ * Expected outcome: Each profile uses that seat's effort and that model's output limit.
+ * Exceptions: None.
+ */
+function testTwoSeatsGetDifferentProfiles(): void {
+  resetOpenRouterModelCapabilitiesForTests();
+  rememberOpenRouterModels([
+    reasoningModel({ id: 'small', top_provider: { max_completion_tokens: 4096 } }),
+    reasoningModel({ id: 'large', top_provider: { max_completion_tokens: 20000 } }),
+  ]);
+  const seatFor = (seatId: 'opponent' | 'opponent2', modelId: string, effort: string): SeatRecord =>
+    ({
+      seatId,
+      seatOrder: 1,
+      kind: 'ai',
+      homeRegion: 'Home',
+      commander: { modelId, reasoningEffort: effort, doctrineChoice: 'balanced', doctrine: 'balanced' },
+      outTurn: null,
+      outBy: null,
+      outReasons: [],
+      place: null,
+      consultationCount: 0,
+      costUsd: 0,
+    }) as SeatRecord;
+  const first = resolveSeatOrdersRequestProfile(seatFor('opponent', 'small', 'minimal'));
+  const second = resolveSeatOrdersRequestProfile(seatFor('opponent2', 'large', 'high'));
+  assert.equal(first.reasoningEffort, 'minimal');
+  assert.equal(first.preferredCompletionMaxTokens, 4096);
+  assert.equal(second.reasoningEffort, 'high');
+  assert.equal(second.preferredCompletionMaxTokens, 20000);
+  assert.notDeepEqual(first, second);
+  resetOpenRouterModelCapabilitiesForTests();
+}
+
 function run(): void {
   testUnknownModelGetsBaseline();
   testEveryEffortUsesAdvertisedOutputLimit();
@@ -237,6 +277,7 @@ function run(): void {
   testStructuredOutputsFollowAdvertisedParameters();
   testEnvironmentFlagDisablesStructuredOutputs();
   testToolSupportFollowsAdvertisedParameters();
+  testTwoSeatsGetDifferentProfiles();
   console.log('ordersRequestProfile.test.ts passed');
 }
 

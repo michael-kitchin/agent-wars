@@ -448,6 +448,33 @@ aside#sidebar.tactical-strategic-suppress {
   vertical-align: top;
   overflow-wrap: anywhere;
 }
+.melee-intercept-intro,
+.melee-intercept-muted,
+.melee-world-section {
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.melee-intercept-intro {
+  margin: 0 0 8px;
+}
+.melee-world-section h3 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.melee-world-row,
+.melee-party-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.melee-party-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
 .melee-intercept-table tr {
   border-bottom: 1px solid var(--chrome-border);
 }

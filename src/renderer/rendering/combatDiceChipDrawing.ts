@@ -13,7 +13,8 @@ import {
   type CombatDicePlaybackPhaseKey,
 } from '../../shared/combatDiceChips';
 import type { CombatDiceInfrastructureType, CombatDiceRoll } from '../../shared/ipcTypes';
-import { PLAYER_COLORS, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import { UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import { paletteForCurrentOwner } from './ownerColors';
 import type { ResolutionMoveAnimationState } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -67,19 +68,6 @@ const CHIP_COLORS = Object.freeze({
   tag: '#b7c4d4',
   hit: '#86efac',
   miss: '#8aa0b8',
-});
-
-/**
- * Mini-token outline color by player.
- *
- * Purpose: Lighter strokes than the token fills, so the two sides stay distinct on the dark chip.
- * When to use: Drawing a row's mini token.
- * Expected outcome: Human `#7dcec8`, opponent `#f0b4c8`; other players fall back to the border color.
- * Exceptions: None.
- */
-const PLAYER_TOKEN_STROKES: Readonly<Record<string, string>> = Object.freeze({
-  human: '#7dcec8',
-  opponent: '#f0b4c8',
 });
 
 /**
@@ -331,11 +319,12 @@ function paintMiniToken(
   segment: Extract<ChipSegment, { type: 'token' }>
 ): void {
   const player = segment.player ?? '';
+  const palette = paletteForCurrentOwner(player);
   ctx.beginPath();
   ctx.arc(centerX, centerY, CHIP_LAYOUT.tokenRadius, 0, Math.PI * 2);
-  ctx.fillStyle = PLAYER_COLORS[player] ?? '#333';
+  ctx.fillStyle = palette?.map ?? '#333';
   ctx.fill();
-  ctx.strokeStyle = PLAYER_TOKEN_STROKES[player] ?? CHIP_COLORS.border;
+  ctx.strokeStyle = palette?.text ?? CHIP_COLORS.border;
   ctx.lineWidth = 1;
   ctx.stroke();
   const unitType = segment.unitType ?? '';

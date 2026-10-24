@@ -6,13 +6,11 @@
 import type {
   GameStateSnapshot,
   HumanStandingOrderSnapshot,
-  MovementOrder,
   RangedAttackOrder,
   AirStrikeOrder,
   EmbarkOrder,
   FerryOrder,
   AirStrikeTargetType,
-  TacticalOpponentPlanPayload,
   TacticalPendingMarchRow,
 } from '../../shared/ipcTypes';
 import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnihilation';
@@ -20,6 +18,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
 import type { HoverRoutePreviewState } from './types';
 import type { BuildQueueTemplateRow } from '../gameplay/buildQueueMultiSelect';
+import type { SeatId } from '../../shared/seatIds';
 import type { ResolutionMoveAnimationState } from './resolutionMoveAnimationTypes';
 
 export type { ResolutionMoveAnimationState } from './resolutionMoveAnimationTypes';
@@ -99,15 +98,6 @@ lastBuildEntryLayerKey: null as string | null,
    */
 tacticalBattleSnapshot: null as TacticalBattleSnapshot | null,
     /**
-   * Documents the object literal property `tacticalOpponentDraft` (tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null).
-
-   * Purpose: Holds the latest buffered opponent tactical plan from `requestAiOrders` until tactical Ready commits it with human drafts.
-   * When to use: Written on successful tactical AI consultation; cleared on successful Ready commit, tactical exit, or session stash.
-   * Expected outcome: Null when no plan buffered yet or after commit; normalized arrays when set.
-   * Exceptions: None.
-   */
-tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null,
-    /**
    * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
 
    * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
@@ -129,7 +119,7 @@ tacticalEntryButtonPointerInside: false,
    * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
 
    * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
-   * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+   * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while a tactical advance is waiting on its commit.
    * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
    * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
    */
@@ -831,60 +821,6 @@ runButtonOn: false,
    */
 useEventDrivenConsultation: true,
     /**
-   * Documents the object literal property `eventDrivenInitialConsultationDone` (eventDrivenInitialConsultationDone: false).
-
-   * Purpose: Event-driven mode consults once up front, then only from post-resolution callbacks. This flag marks that the opening consult finished.
-   * When to use: Set after a successful opening `requestAiOrders` or a successful post-resolution consult. Cleared on new game, Run off, mode switch, and abandoned deferred consult.
-   * Expected outcome: While true, strategic Ready does not wait on a null precompute buffer and does not start a second model call for the same turn.
-   * Exceptions: None.
-   */
-eventDrivenInitialConsultationDone: false,
-    /**
-   * Documents the object literal property `precomputedAiOrders` (precomputedAiOrders: null as MovementOrder[] | null).
-
-   * Purpose: Supports maintainability by documenting why `precomputedAiOrders` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiOrders: null as MovementOrder[] | null,
-    /**
-   * Documents the object literal property `precomputedAiRangedOrders` (precomputedAiRangedOrders: null as { unitId: string; targetH3Index: string }[] | null).
-
-   * Purpose: Supports maintainability by documenting why `precomputedAiRangedOrders` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiRangedOrders: null as { unitId: string; targetH3Index: string }[] | null,
-    /**
-   * Documents the object literal property `precomputedAiEmbarkOrders` (precomputedAiEmbarkOrders: null as EmbarkOrder[] | null).
-
-   * Purpose: Supports maintainability by documenting why `precomputedAiEmbarkOrders` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiEmbarkOrders: null as EmbarkOrder[] | null,
-    /**
-   * Documents the object literal property `precomputedAiStrategy` (precomputedAiStrategy: null as string | null).
-
-   * Purpose: Supports maintainability by documenting why `precomputedAiStrategy` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiStrategy: null as string | null,
-    /**
-   * Documents the object literal property `precomputedAiMessage` (precomputedAiMessage: null as string | null).
-
-   * Purpose: Caches the opponent taunt/threat from background `requestAiOrders` until Ready consumes it.
-   * When to use: Set from a successful prefetch; cleared with the rest of precomputed AI state.
-   * Expected outcome: Copied onto `GameReadyIpcPayload.precomputedAiMessage`.
-   * Exceptions: None.
-   */
-precomputedAiMessage: null as string | null,
-    /**
    * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
 
    * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
@@ -893,15 +829,6 @@ precomputedAiMessage: null as string | null,
    * Exceptions: None.
    */
 precomputedToolInvocationCounts: null as Record<string, number> | null,
-    /**
-   * Documents the object literal property `backgroundRequestInFlight` (backgroundRequestInFlight: false).
-
-   * Purpose: Supports maintainability by documenting why `backgroundRequestInFlight` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-backgroundRequestInFlight: false,
     /**
    * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
    * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
@@ -931,15 +858,6 @@ readyBtnAiWaitStartTime: null as number | null,
    */
 readyBtnAiWaitIntervalId: null as ReturnType<typeof setInterval> | null,
     /**
-   * Documents the object literal property `openRouterGameCost` (openRouterGameCost: 0).
-
-   * Purpose: Supports maintainability by documenting why `openRouterGameCost` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-openRouterGameCost: 0,
-    /**
    * Documents the object literal property `toastHideTimer` (toastHideTimer: null as ReturnType<typeof setTimeout> | null).
 
    * Purpose: Supports maintainability by documenting why `toastHideTimer` exists.
@@ -966,4 +884,22 @@ aiStrategyToastHideTimer: null as ReturnType<typeof setTimeout> | null,
    * Exceptions: None.
    */
 lastAppliedMapInteractionCursor: '',
+  /**
+   * Which side a watch is looking through.
+   *
+   * Purpose: All sides shows every hex. A seat id shows that seat's fog.
+   * When to use: `getGameState` while no human seat is active, and the View as control.
+   * Expected outcome: `'all'` until the player picks a seat. A new match resets it.
+   * Exceptions: None.
+   */
+  viewAs: 'all' as 'all' | SeatId,
+  /**
+   * Whether Ready should press itself once every commander is ready.
+   *
+   * Purpose: A watch can advance without a click. Watch the rest turns it on.
+   * When to use: The footer checkbox, and the press that follows playback.
+   * Expected outcome: False for a new match. True after Watch the rest, until the player turns it off or Ready fails.
+   * Exceptions: None.
+   */
+  autoAdvance: false,
 };

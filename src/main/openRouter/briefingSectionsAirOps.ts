@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
@@ -28,13 +29,15 @@ function countStrikeableEnemyInfrastructure(args: {
   strikeEnvelope: Set<string>;
   infraRows: NonNullable<GameStateSnapshot['strategicInfrastructure']>;
   controllerByHex: Map<string, string | null | undefined>;
+  ownSeatId: string;
 }): { urban: number; airports: number; seaports: number } {
   let urban = 0;
   let airports = 0;
   let seaports = 0;
   for (const row of args.infraRows) {
     if (!args.strikeEnvelope.has(row.h3Index)) continue;
-    if (args.controllerByHex.get(row.h3Index) !== 'human') continue;
+    const controller = args.controllerByHex.get(row.h3Index) ?? null;
+    if (controller === null || controller === args.ownSeatId) continue;
     if (Number(row.urbanHexCount ?? 0) > 0) urban += 1;
     if (Number(row.airportCount ?? 0) > 0) airports += 1;
     if (Number(row.seaportCount ?? 0) > 0) seaports += 1;
@@ -57,9 +60,10 @@ export function buildAirOperationsBriefingBlock(
   mode: 'strategic' | 'tactical' = 'strategic'
 ): string {
   logDebug('briefingSections buildAirOperationsBriefingBlock', { turnNumber: state.turnNumber, mode });
-  const opponentAir = state.units.filter((u) => u.player === 'opponent' && u.unitType === 'air');
-  const humanAir = state.units.filter((u) => u.player === 'human' && u.unitType === 'air');
-  const humanUnits = state.units.filter((u) => u.player === 'human');
+  const ownSeat = briefingOwnSeatId(state);
+  const opponentAir = state.units.filter((u) => u.player === ownSeat && u.unitType === 'air');
+  const humanAir = state.units.filter((u) => u.player !== ownSeat && u.unitType === 'air');
+  const humanUnits = state.units.filter((u) => u.player !== ownSeat);
 
   if (opponentAir.length === 0) return '';
 
@@ -85,14 +89,16 @@ export function buildAirOperationsBriefingBlock(
   const controllerByHex = new Map((state.strategicControl ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByHex = new Map(infraRows.map((r) => [r.h3Index, r]));
   const opponentAirports = infraRows.filter(
-    (r) => Number(r.airportCount ?? 0) > 0 && controllerByHex.get(r.h3Index) === 'opponent'
+    (r) => Number(r.airportCount ?? 0) > 0 && controllerByHex.get(r.h3Index) === ownSeat
   );
-  const humanAirports = infraRows.filter(
-    (r) => Number(r.airportCount ?? 0) > 0 && controllerByHex.get(r.h3Index) === 'human'
-  );
-  const humanSeaports = infraRows.filter(
-    (r) => Number(r.seaportCount ?? 0) > 0 && controllerByHex.get(r.h3Index) === 'human'
-  );
+  const humanAirports = infraRows.filter((r) => {
+    const controller = controllerByHex.get(r.h3Index) ?? null;
+    return Number(r.airportCount ?? 0) > 0 && controller !== null && controller !== ownSeat;
+  });
+  const humanSeaports = infraRows.filter((r) => {
+    const controller = controllerByHex.get(r.h3Index) ?? null;
+    return Number(r.seaportCount ?? 0) > 0 && controller !== null && controller !== ownSeat;
+  });
 
   const lines: string[] = [];
   const rangeEnvelopeCache: RangeEnvelopeCache = new Map();
@@ -113,9 +119,9 @@ export function buildAirOperationsBriefingBlock(
     );
     const baseInfra = infraByHex.get(air.h3Index);
     const baseIntact = Number(baseInfra?.airportCount ?? 0) > 0;
-    const baseControlled = controllerByHex.get(air.h3Index) === 'opponent';
+    const baseControlled = controllerByHex.get(air.h3Index) === ownSeat;
     const targetableEnemyUnits = humanUnits.filter((u) => strikeEnvelope.has(u.h3Index)).length;
-    const strikeable = countStrikeableEnemyInfrastructure({ strikeEnvelope, infraRows, controllerByHex });
+    const strikeable = countStrikeableEnemyInfrastructure({ strikeEnvelope, infraRows, controllerByHex, ownSeatId: ownSeat });
     const ferryDestinations = opponentAirports.filter(
       (ap) =>
         ap.h3Index !== air.h3Index &&

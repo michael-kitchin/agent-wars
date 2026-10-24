@@ -1,7 +1,7 @@
 import type { PostResolutionConsultationPushPayload } from '../../shared/ipcTypes';
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
-import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
+import { clearOpenRouterModelCatalog, openRouterModelById, replaceOpenRouterModelCatalog } from './openRouterModelCatalog';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
@@ -9,9 +9,11 @@ import {
 } from '../gameplay/tacticalBattlePromptPreference';
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { renderOpponentStatus, updateOpenRouterCostLabel } from './openRouterUiHelpers';
+import { showCommanderMessagesToast } from './commanderMessagesToast';
+import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
-import { resetPrecomputedAiState } from './precomputedAiState';
+import { anyCommanderIsPlanning, bindCommanderPoolScreen, refreshCommanderSeatCosts } from './commanderPoolClient';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
@@ -27,14 +29,14 @@ import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
  */
 interface OpenRouterUiDeps {
     /**
-   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean) => void;).
+   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;).
 
    * Contract: Describes stable behavior for callers of `appendOpenRouterLog` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-appendOpenRouterLog: (line: string, isError?: boolean) => void;
+appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;
     /**
    * Specifies the contract for the `updateOpenRouterCostLabel` member (updateOpenRouterCostLabel: () => void;).
 
@@ -151,9 +153,8 @@ syncOpenRouterRunToggleInteractable: () => Promise<void>;
  * Purpose: Entering a battle from melee Fight skips that request while the post-resolution consult is outstanding.
  * When to use: After a strategic consult push clears `pendingDeferredStrategicPostResolutionConsult`, including a stale
  * push that only clears the latch.
- * Expected outcome: No-op outside tactical planning. Inside a battle, `startBackgroundRequestIfAllowed` still declines
- * when a plan is buffered, Run is off, no opponent units remain, another deferred consult is pending, or a request is
- * already in flight. Otherwise one background `requestAiOrders` for the battle.
+ * Expected outcome: No-op outside tactical planning. Inside a battle, planning starts when Run is on and no deferred
+ * consult is still pending.
  * Exceptions: None.
  */
 function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps): void {
@@ -167,8 +168,8 @@ function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps):
  * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
  * When to use: Once from `initOpenRouterUI`.
  * Expected outcome: Push payloads apply strategy toasts and tool counts. A successful strategic consult does not start
- * another strategic `requestAiOrders`; those orders are already pending for the next Ready. When a tactical battle is
- * already in planning, the battle's opponent-plan request starts then, because it was held while this consult ran.
+ * another strategic consult; those orders are already pending for the next Ready. When a tactical battle is
+ * already in planning, that battle's consult starts then, because it was held while this consult ran.
  * Exceptions: Stale `planningTurnNumber` merges log, clear the strategic latch, and still start that battle request.
  * `abandoned` pushes unlatch and resume Run prefetch without applying a plan; the player-visible skip line is sent on
  * `openRouter:log`. While the new-game screen is open with no match waiting under it, a push only clears its latch;
@@ -199,11 +200,9 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
       deps.updateOpenRouterToolCountLabels();
     }
     if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
-      S.openRouterGameCost += payload.cost;
-      updateOpenRouterCostLabel();
+      void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
     }
     deps.appendOpenRouterLog('Post-resolution consultation applied.', false);
-    if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = true;
     deps.requestRedraw();
     startTacticalOpponentPlanAfterStrategicConsult(deps);
     deps.updateReadyButtonState();
@@ -245,19 +244,15 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
  *
  * Purpose: The AI-planning latch must clear even when consultation did not run, or Ready stays disabled.
  * When to use: `abandoned` strategic/melee or tactical consult pushes.
- * Expected outcome: Matching latch false; tactical opponent draft cleared; prefetch starts when Run is on.
- * Strategic abandon also clears `eventDrivenInitialConsultationDone` so that prefetch is not suppressed by the event-driven wait gate.
+ * Expected outcome: Matching latch false. Planning starts again when Run is on.
  * Exceptions: None.
  */
 function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', deps: OpenRouterUiDeps): void {
   if (kind === 'tactical') {
     S.pendingDeferredTacticalPostBeatConsult = false;
-    S.tacticalOpponentDraft = null;
-    const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-    if (S.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
+    if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
   } else {
     S.pendingDeferredStrategicPostResolutionConsult = false;
-    S.eventDrivenInitialConsultationDone = false;
     if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
   }
   deps.requestRedraw();
@@ -273,11 +268,24 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
  * Exceptions: None; a missing OpenRouter API leaves the listeners that were registered and returns.
  */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
+  bindCommanderPoolScreen({
+    showCommanderMessages: showCommanderMessagesToast,
+    fileCommanderMessage: (dispatch) => {
+      const body = document.createElement('div');
+      recordConsoleReport('message', currentConsoleReportTag(), body, {
+        senderSeatId: dispatch.seatId,
+        modelLabel: dispatch.modelLabel,
+        messageText: dispatch.message ?? '',
+        strategyText: dispatch.strategy ?? undefined,
+      });
+    },
+    updateReadyButtonState: deps.updateReadyButtonState,
+  });
   initDeferredResolutionPlaybackPushListeners(deps);
   const api = window.gameApi?.openRouter;
   if (!api) return;
 
-  window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
+  window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false, p.seatId));
   deps.updateOpenRouterCostLabel();
 
   (async () => {
@@ -317,20 +325,11 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   let modelRefreshInFlight = false;
   let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let startupModelRetryConsumed = false;
-  /**
-   * Latest successful model list keyed by id for labels and the description tooltip.
-
-   * Purpose: Lets the closed-select tooltip resolve trimmed descriptions without another IPC round-trip.
-   * When to use: Rebuilt on each successful `listModels`; cleared on refresh errors.
-   * Expected outcome: `get` returns the mapped `OpenRouterModel` for a selected id when known.
-   * Exceptions: None.
-   */
-  const modelsById = new Map<string, OpenRouterModel>();
   const modelDescriptionTooltip = modelSelect
     ? attachModelDescriptionTooltip({
         select: modelSelect,
         getDescriptionForModelId: (modelId) => {
-          const description = modelsById.get(modelId)?.description;
+          const description = openRouterModelById(modelId)?.description;
           if (typeof description !== 'string') return null;
           const trimmed = description.trim();
           return trimmed || null;
@@ -377,7 +376,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
    * Exceptions: None.
    */
   function showReasoningEffortForSelectedModel(): void {
-    reasoningEffortSelect?.showForModel(modelsById.get(modelSelect?.value ?? ''), persistedReasoningEffort);
+    reasoningEffortSelect?.showForModel(openRouterModelById(modelSelect?.value ?? ''), persistedReasoningEffort);
   }
 
   function clearStartupModelRetryTimer(): void {
@@ -411,7 +410,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       if (!modelSelect) return;
       const kept = modelSelect.value;
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
-      modelsById.clear();
+      clearOpenRouterModelCatalog();
       modelDescriptionTooltip?.clear();
       if ('error' in result && result.error) {
         deps.appendOpenRouterLog(`Models: ${result.error}`, true);
@@ -421,8 +420,8 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         return;
       }
       const models = 'models' in result ? result.models ?? [] : [];
+      replaceOpenRouterModelCatalog(models);
       for (const m of models) {
-        modelsById.set(m.id, m);
         const opt = document.createElement('option');
         opt.value = m.id;
         opt.textContent = formatModelOptionLabel(m);
@@ -436,7 +435,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       clearStartupModelRetryTimer();
       void deps.syncOpenRouterRunToggleInteractable();
     }).catch((err) => {
-      modelsById.clear();
+      clearOpenRouterModelCatalog();
       modelDescriptionTooltip?.clear();
       const message = String(err);
       deps.appendOpenRouterLog(`Models: ${message}`, true);
@@ -529,7 +528,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
           showReasoningEffortForSelectedModel();
           if (modelSelect.value) deps.hideMapToast();
           else modelDescriptionTooltip?.clear();
-          if (S.runButtonOn && (S.backgroundRequestInFlight || isDeferredResolutionPlaybackConsultPending())) {
+          if (S.runButtonOn && (anyCommanderIsPlanning() || isDeferredResolutionPlaybackConsultPending())) {
             await stopOpponentPlanning('model_changed');
             deps.startBackgroundRequestIfAllowed();
           }
@@ -559,17 +558,10 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       S.runButtonOn = !S.runButtonOn;
       runBtn.setAttribute('aria-pressed', S.runButtonOn ? 'true' : 'false');
       if (S.runButtonOn) {
-        resetPrecomputedAiState('null');
-        if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();
         deps.startBackgroundRequestIfAllowed();
       } else {
         void stopOpponentPlanning('run_off');
-        resetPrecomputedAiState('null');
-        S.precomputedAiEmbarkOrders = null;
-        S.precomputedAiStrategy = null;
-        S.precomputedAiMessage = null;
-        S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();
       }
     });

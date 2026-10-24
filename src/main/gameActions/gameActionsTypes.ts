@@ -60,7 +60,7 @@ reason?: string;
    *
    * Contract: When present, matches the tactical-only plan shape returned by `afterTacticalBeatResolution` for renderer-side draft hydration.
    * When to use: `commitHumanTacticalDraftOrders` success path after main attached post-beat consultation results.
-   * Expected outcome: Renderer can populate `tacticalOpponentDraft` without a second model round-trip.
+   * Expected outcome: The commander pool holds the plan. The screen does not keep a second copy.
    * Exceptions: Omitted when no post-beat consultation ran; explicit `null` after consultation when the model returned no tactical plan (renderer clears buffer).
    */
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
@@ -95,7 +95,7 @@ reason?: string;
    * Sentinel that the incoming opponent tactical draft was consumed on this Ready.
    *
    * Contract: Present only when the renderer sent `opponentTacticalDraft`; always `null` after consume so the renderer does not resend the same marches next beat.
-   * When to use: Renderer clears `S.tacticalOpponentDraft` when no fresh `tacticalOpponentPlan` merge runs (post-beat consult may refill afterward).
+   * When to use: Present when the commit payload included an opponent draft. The screen does not resend that draft.
    * Expected outcome: Omitted when there was no incoming opponent draft; never echoes applied/sanitized rows back into the buffer.
    * Exceptions: None.
    */

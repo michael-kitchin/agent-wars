@@ -4,6 +4,7 @@
  */
 
 import { cellToLatLng } from 'h3-js';
+import type { SeatId } from '../../../shared/seatIds';
 import { logDebug, logError } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
@@ -142,7 +143,7 @@ function pickPreferredCandidate(candidates: SpawnCandidate[], usedH3: Set<string
 }
 
 /**
- * Defines the `resolveFlexUnitPlacement` function shape (export function resolveFlexUnitPlacement(args: { deps: FlexAirSlotDeps; player: 'human' | 'opponent'; regionHexSet: Set<string>; passableLandCandida).
+ * Defines the `resolveFlexUnitPlacement` function shape (export function resolveFlexUnitPlacement(args: { deps: FlexAirSlotDeps; player: SeatId; regionHexSet: Set<string>; passableLandCandida).
 
  * Purpose: Supports maintainability by documenting why `resolveFlexUnitPlacement` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -151,7 +152,7 @@ function pickPreferredCandidate(candidates: SpawnCandidate[], usedH3: Set<string
  */
 export function resolveFlexUnitPlacement(args: {
   deps: FlexAirSlotDeps;
-  player: 'human' | 'opponent';
+  player: SeatId;
   regionHexSet: Set<string>;
   passableLandCandidates: SpawnCandidate[];
   navalCandidates: SpawnCandidate[];
@@ -209,31 +210,31 @@ export function resolveFlexUnitPlacement(args: {
 /**
  * Defines the `logHomeRegionControlParity` function shape (export function logHomeRegionControlParity().
 
- * Purpose: Supports maintainability by documenting why `logHomeRegionControlParity` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Logs a home hex whose sole owner is not the controller.
+ * When to use: After home-region control is seeded.
+ * Expected outcome: An error log for each exclusive home hex controlled by someone else. Shared homes are skipped.
  * Exceptions: None.
  */
 export function logHomeRegionControlParity(
   deps: FlexAirSlotDeps,
-  humanHomeHexes: Set<string>,
-  aiHomeHexes: Set<string>
+  homes: readonly { readonly seatId: SeatId; readonly hexes: ReadonlySet<string> }[]
 ): void {
   logDebug('initialFlexAirSlot logHomeRegionControlParity', {
-    humanHexCount: humanHomeHexes.size,
-    aiHexCount: aiHomeHexes.size,
+    seats: homes.map((home) => ({ seatId: home.seatId, hexCount: home.hexes.size })),
   });
   const rows = deps.getAll<{ h3_index: string; controller_player_id: string | null }>(
     'SELECT h3_index, controller_player_id FROM res_s_control'
   );
   for (const row of rows) {
-    const h3 = row.h3_index;
-    const c = row.controller_player_id;
-    if (humanHomeHexes.has(h3) && !aiHomeHexes.has(h3) && c !== 'human') {
-      logError('initialFlexAirSlot home region control mismatch (expected human)', { h3Index: h3, controller: c });
-    }
-    if (aiHomeHexes.has(h3) && !humanHomeHexes.has(h3) && c !== 'opponent') {
-      logError('initialFlexAirSlot home region control mismatch (expected opponent)', { h3Index: h3, controller: c });
+    const owners = homes.filter((home) => home.hexes.has(row.h3_index));
+    if (owners.length !== 1) continue;
+    const seatId = owners[0]!.seatId;
+    if (row.controller_player_id !== seatId) {
+      logError('initialFlexAirSlot home region control mismatch', {
+        h3Index: row.h3_index,
+        controller: row.controller_player_id,
+        seatId,
+      });
     }
   }
 }

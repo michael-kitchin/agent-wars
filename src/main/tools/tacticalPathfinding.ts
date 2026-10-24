@@ -6,6 +6,7 @@ import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRang
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
+import { briefingSeatForBattle } from '../briefing/briefingPerspective';
 import { checkDistanceTagSourceUnit } from './pathfindingDistanceHelpers';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import {
@@ -394,7 +395,7 @@ export function executeTacticalCheckDistance(
   if (unitType === 'air') {
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
-  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType);
+  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType, briefingSeatForBattle(battle));
   const mover = { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags, origin: occupant?.origin };
   const toH3Resolved =
     unitType === 'naval'

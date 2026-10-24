@@ -1,5 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import { isLikelyAbortError } from '../../shared/abortError';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
 import { parseOrdersResponse } from './orderResponseParsing';
@@ -85,6 +86,7 @@ export async function requestOrdersFlow(
     formatLatLng,
   } = deps;
 
+  const seatId = options?.seatId ?? AI_SEAT_IDS[0];
   const tacticalBattle = options?.tacticalAiBattle;
   const requestedToolNames = options?.enabledToolNames;
   const signal = options?.signal;
@@ -108,7 +110,9 @@ export async function requestOrdersFlow(
       enabledToolCount: enabledToolNames?.length ?? 0,
     });
   }
-  const planState = tacticalBattle ? buildTacticalAiPlanState(state, tacticalBattle) : state;
+  const planState = tacticalBattle
+    ? buildTacticalAiPlanState(state, tacticalBattle)
+    : { ...state, playerPerspective: seatId };
   resetHexControllerParityCheckDedupForTurn();
   const aiOrderUnitLabel = (unitId: string) =>
     tacticalBattle
@@ -139,14 +143,14 @@ export async function requestOrdersFlow(
     return failRequest('No model selected');
   }
 
-  const opponentUnits = planState.units.filter((u) => u.player === 'opponent');
+  const opponentUnits = planState.units.filter((u) => u.player === seatId);
   if (opponentUnits.length === 0) {
     logDebug('openRouter requestOrders: no opponent units remain, skipping LLM call');
     if (onLog) onLog('No opponent units remain.');
     return { success: true, orders: [] };
   }
 
-  const requestProfile = resolveOrdersRequestProfile?.(modelId) ?? BASELINE_ORDERS_REQUEST_PROFILE;
+  const requestProfile = resolveOrdersRequestProfile?.(modelId, seatId) ?? BASELINE_ORDERS_REQUEST_PROFILE;
   if (!requestProfile.toolCalling && (enabledToolNames === undefined || enabledToolNames.length > 0)) {
     logDebug('openRouter requestOrders: model does not support tool calls; consulting without tools', {
       modelId,
@@ -165,8 +169,9 @@ export async function requestOrdersFlow(
         mode: 'tactical',
         battleId: tacticalBattle.battleId,
         tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
+        seatId,
       }
-    : { mode: 'strategic' };
+    : { mode: 'strategic', seatId };
   ensureStrategicCoordinateRegistryInitialized();
   if (tacticalBattle) {
     initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingStrategicH3Index);
@@ -220,9 +225,9 @@ export async function requestOrdersFlow(
 
   let briefingOverride: string | undefined;
   if (!tacticalBattle) {
-    expireAndUpdateStatus('opponent', state);
+    expireAndUpdateStatus(seatId, planState);
     // Map-first contract: strategic prompts always include the Commander briefing with operational map.
-    const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
+    const precomputed = runPrecomputation(planState, { latLngByH3, resolveToH3 });
     if (usePrecomputation) {
       toolInvocationCounts['precomputation'] =
         precomputed.unitAssessments.length + precomputed.hexAssessments.length;
@@ -231,7 +236,8 @@ export async function requestOrdersFlow(
       memoryEnabled: flags.memoryEnabled,
       ordersEnabled: flags.ordersEnabled,
       productionEnabled: flags.productionEnabled,
-      state,
+      state: planState,
+      seatId,
       latLngByH3,
       resolveToH3,
       formatHexLabel: (ll) => {
@@ -242,11 +248,11 @@ export async function requestOrdersFlow(
     });
     const standingOrderText = injection.standingOrderText;
     const memoryText = injection.memoryText;
-    const subscriptions = getSubscriptions('opponent');
+    const subscriptions = getSubscriptions(seatId);
     const productionBriefing = injection.productionText;
-    const possibleActionsIndexed = buildPossibleActionsIndexedState(state);
+    const possibleActionsIndexed = buildPossibleActionsIndexedState(planState);
     briefingOverride = formatBriefing(
-      state,
+      planState,
       precomputed,
       standingOrderText,
       memoryText,
@@ -361,7 +367,7 @@ export async function requestOrdersFlow(
    */
   const envelopeGates: EnvelopeGates = {
     coordinateMode: coordinateContext.mode,
-    includeAirActions: planState.units.some((u) => u.player === 'opponent' && u.unitType === 'air'),
+    includeAirActions: planState.units.some((u) => u.player === seatId && u.unitType === 'air'),
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
@@ -382,15 +388,15 @@ export async function requestOrdersFlow(
   const wallClockStart = Date.now();
   const usage: RequestOrdersUsageTotals = { requestCost: 0, totalInputTokens: 0, totalOutputTokens: 0 };
   const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void => {
-    setAiLastConsultationTurn(state.turnNumber);
-    clearAiLossEventsSinceConsultation('opponent');
+    setAiLastConsultationTurn(seatId, state.turnNumber);
+    clearAiLossEventsSinceConsultation(seatId);
     if (tacticalBattle) {
-      upsertTurnStrategyNote('tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, {
+      upsertTurnStrategyNote(seatId, 'tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, {
         strategyText,
         messageText,
       });
     } else {
-      upsertTurnStrategyNote('strategic', '', state.turnNumber, { strategyText, messageText });
+      upsertTurnStrategyNote(seatId, 'strategic', '', state.turnNumber, { strategyText, messageText });
     }
   };
   try {
@@ -421,7 +427,7 @@ export async function requestOrdersFlow(
     });
     if (loopResult.kind === 'fail') return failRequest(loopResult.error);
     if (loopResult.kind === 'budgetExceeded') {
-      setAiToolLimitExceededLastTurn();
+      setAiToolLimitExceededLastTurn(seatId);
       markSuccessfulConsultation(null, null);
       if (onLog) {
         onLog(
@@ -520,6 +526,7 @@ export async function requestOrdersFlow(
       usage,
       wallClockStart,
       onLog,
+      seatId,
       markSuccessfulConsultation,
     });
   } catch (err) {

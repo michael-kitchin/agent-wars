@@ -115,10 +115,9 @@ function buildFixtureState(hexes: string[]): {
   exploredHexes: string[];
   strategicControl: { h3Index: string; controllerPlayerId: string | null }[];
   scenarioId: 'region_vs_region';
-  humanHomeRegion: string;
-  aiHomeRegion: string;
-  humanHomeRegionHexes: string[];
-  aiHomeRegionHexes: string[];
+  playerPerspective: string;
+  seats: { seatId: string; seatOrder: number; kind: 'human' | 'ai'; homeRegion: string; outTurn: null; commander: null }[];
+  homeRegionHexesBySeat: Record<string, string[]>;
   intersectingHomeRegionHexes: string[];
   phase: 'planning';
   turnNumber: number;
@@ -138,10 +137,15 @@ function buildFixtureState(hexes: string[]): {
       { h3Index: hexes[2]!, controllerPlayerId: 'human' },
     ],
     scenarioId: 'region_vs_region',
-    humanHomeRegion: 'Northern America',
-    aiHomeRegion: 'Eastern Europe',
-    humanHomeRegionHexes: [hexes[1]!, hexes[2]!],
-    aiHomeRegionHexes: [hexes[0]!, hexes[1]!],
+    playerPerspective: 'opponent',
+    seats: [
+      { seatId: 'human', seatOrder: 1, kind: 'human', homeRegion: 'Northern America', outTurn: null, commander: null },
+      { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Europe', outTurn: null, commander: null },
+    ],
+    homeRegionHexesBySeat: {
+      human: [hexes[1]!, hexes[2]!],
+      opponent: [hexes[0]!, hexes[1]!],
+    },
     intersectingHomeRegionHexes: [hexes[1]!],
     phase: 'planning',
     turnNumber: 7,
@@ -234,7 +238,7 @@ async function run(): Promise<void> {
       requestOrders: (
         state: unknown,
         modelId: string,
-        options: { enabledToolNames: string[]; usePrecomputation: boolean }
+        options: { seatId: 'opponent'; enabledToolNames: string[]; usePrecomputation: boolean }
       ) => Promise<{
         success: boolean;
         airStrikes?: AirStrikeOrder[];
@@ -283,6 +287,7 @@ async function run(): Promise<void> {
       });
 
       const result = await openRouter.requestOrders(state, 'test-model', {
+        seatId: 'opponent',
         enabledToolNames,
         usePrecomputation,
       });
@@ -399,7 +404,7 @@ async function run(): Promise<void> {
         `unfired-shot free-damage claim must not appear for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('You are the enemy commander in a WEGO'),
+        systemPrompt.includes('You command Eastern Europe in a WEGO'),
         `enemy-commander role opening missing for mask=${mask}`
       );
       assert.ok(
@@ -425,7 +430,7 @@ async function run(): Promise<void> {
         `goal (4) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("(5) Degrade or eliminate the enemy home region's urban production capacity"),
+        systemPrompt.includes("(5) Degrade or eliminate enemy home regions' urban production capacity"),
         `goal (5) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
@@ -455,7 +460,7 @@ async function run(): Promise<void> {
         `own-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("- Your control of the enemy's home region: 1 of 2 hexes (50%)"),
+        systemPrompt.includes("- Your control of Northern America's home region: 1 of 2 hexes (50%)"),
         `enemy-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
@@ -463,11 +468,11 @@ async function run(): Promise<void> {
         `AI-exclusive home region hex list missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("Your enemy's home region hexes are:"),
+        systemPrompt.includes('Northern America home region hexes are:'),
         `human-exclusive home region hex list missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('These hexes are in both home regions:'),
+        systemPrompt.includes('These hexes are in more than one home region:'),
         `overlapping home region hex list missing for mask=${mask}`
       );
       assert.ok(
@@ -485,7 +490,7 @@ async function run(): Promise<void> {
         `AI home-region guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('Enemy home region: Northern America'),
+        systemPrompt.includes('Enemy home regions: Northern America'),
         `human home-region guidance missing for mask=${mask}`
       );
       assert.ok(
@@ -549,6 +554,7 @@ async function run(): Promise<void> {
       };
     });
     const strictResult = await openRouter.requestOrders(state, 'test-model', {
+      seatId: 'opponent',
       enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
       usePrecomputation: false,
     });
@@ -587,6 +593,7 @@ async function run(): Promise<void> {
       };
     });
     const airResult = await openRouter.requestOrders(state, 'test-model', {
+      seatId: 'opponent',
       enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
       usePrecomputation: false,
     });
@@ -700,7 +707,7 @@ async function run(): Promise<void> {
       'absent scenarioId uses the generic objective'
     );
     assert.ok(
-      !noScenarioPrompt.includes('Win by controlling all enemy home region hexes'),
+      !noScenarioPrompt.includes('Win by being the last side standing'),
       'absent scenarioId must not teach region-versus-region win-path coaching'
     );
     assert.ok(

@@ -117,6 +117,8 @@ import {
   installUnitOriginTooltip,
 } from './core/unitOriginTooltip';
 import { wireConsoleFrame } from './chrome/consoleFrame';
+import { fetchMatchSnapshot } from './core/matchSnapshotClient';
+import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
@@ -192,6 +194,7 @@ import {
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
 import { wireSelectionPanel } from './gameplay/selectionPanel';
+import { HUMAN_SEAT_ID } from '../shared/seatIds';
 
 /**
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
@@ -340,7 +343,7 @@ function syncBuildEntryButton(): void {
     );
     rows.push({
       h3: hx.h3Index,
-      label: formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, 'human'),
+      label: formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, HUMAN_SEAT_ID),
       left: Math.round(center.x),
       top: Math.round(textY),
       hasCapacity: true,
@@ -412,7 +415,7 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored && !overlayContext.productionDetailShown) continue;
     const controller = getControllerForHex(S.gameState, hx.h3Index);
-    const controlledByHuman = controller === 'human';
+    const controlledByHuman = controller === HUMAN_SEAT_ID;
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
     if (!overlayContext.productionDetailShown) {
       const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;
@@ -494,7 +497,7 @@ async function performTacticalBattleExit(): Promise<void> {
     },
     refreshStrategicSnapshotAfterExit: async () => {
       if (!window.gameApi?.getGameState) return;
-      const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+      const nextState = await fetchMatchSnapshot();
       await applyGameStateSnapshot(nextState, {
         refreshStandingOrders: false,
         updateGameStateSidebarUi: false,
@@ -624,6 +627,18 @@ function init(): void {
   });
   installUnitOriginTooltip();
   wireConsoleFrame();
+  wireObserveMode({
+    applySnapshot: (state) => applyGameStateSnapshot(state, {
+      refreshStandingOrders: false,
+      updateGameStateSidebarUi: true,
+      updateSelectionUi: true,
+      updateGameOverUi: false,
+      updateReadyButton: true,
+      refreshBuildPopup: false,
+      redraw: true,
+    }),
+    pressReady: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
+  });
   wireSelectionPanel({ formatUnitDisplayName });
   wireGameMenu();
   // Contract anchors retained after extraction:

@@ -9,6 +9,8 @@ import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../sh
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { createCombatRng } from '../combatResolution';
 import { getGameSeed } from '../gameDb';
+import { isNeutralOwnerId, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { opposingPartyIdOf } from './opposingParty';
 import { tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
@@ -47,21 +49,24 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
     ferryCount: opts.ferryOrders?.length ?? 0,
     embarkCount: opts.embarkOrders?.length ?? 0,
   });
-  const afterEmbark = applyTacticalEmbarkPhaseOnBattle(battle, opts.embarkOrders, 'opponent');
+  const party = opposingPartyIdOf(battle);
+  const holds = isNeutralOwnerId(party);
+  const afterEmbark = applyTacticalEmbarkPhaseOnBattle(battle, holds ? undefined : opts.embarkOrders, party);
   const seed = (getGameSeed() + battle.strategicTurnNumber * 7919 + battle.tacticalTurnNumber * 104729) >>> 0;
   const next = createCombatRng(seed);
   const airRanged = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     afterEmbark,
     opts.airStrikes,
     opts.rangedAttacks,
-    'opponent',
+    party,
     next
   );
+  const movementOrders = holds ? [] : opts.movementOrders;
   const afterMove =
-    opts.movementOrders.length > 0
-      ? projectTacticalSnapshotAfterOpponentMovementOrders(airRanged.battle, opts.movementOrders)
+    movementOrders.length > 0
+      ? projectTacticalSnapshotAfterOpponentMovementOrders(airRanged.battle, movementOrders)
       : airRanged.battle;
-  const afterFerry = applyTacticalFerryPhaseOnBattle(afterMove, opts.ferryOrders, 'opponent');
+  const afterFerry = applyTacticalFerryPhaseOnBattle(afterMove, holds ? undefined : opts.ferryOrders, party);
   return tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
 }
 
@@ -118,7 +123,7 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     battle,
     opts.airStrikes,
     opts.rangedAttacks,
-    'human',
+    HUMAN_SEAT_ID,
     next
   );
   for (const e of opts.embarkOrders ?? []) {
@@ -127,8 +132,8 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
       throw new TacticalEmbarkValidationRejected(v.reason);
     }
   }
-  const afterEmbark = applyTacticalEmbarkPhaseOnBattle(acc.battle, opts.embarkOrders, 'human');
-  const afterFerry = applyTacticalFerryPhaseOnBattle(afterEmbark, opts.ferryOrders, 'human');
+  const afterEmbark = applyTacticalEmbarkPhaseOnBattle(acc.battle, opts.embarkOrders, HUMAN_SEAT_ID);
+  const afterFerry = applyTacticalFerryPhaseOnBattle(afterEmbark, opts.ferryOrders, HUMAN_SEAT_ID);
   const outBattle = tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
   return {
     battle: outBattle,

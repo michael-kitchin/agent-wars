@@ -1,16 +1,13 @@
 /**
- * Shared consolidated map-toast message builder (Human Losses / AI Losses / Other sections).
+ * Shared consolidated map-toast message builder (turn-report sentences and an Updates section).
  */
 
+import { type SeatId, HUMAN_SEAT_ID } from './seatIds';
 import { ALL_BUILD_UNIT_TYPES } from './ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from './ipcTypes';
-import {
-  formatPlayerLossLinesMultiline,
-  playerHasAnyLoss,
-  type PlayerLossSummary,
-  type TurnLossSummary,
-} from './lossSummary';
+import { type TurnLossSummary } from './lossSummary';
 import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
+import { buildTurnReportLines, type TurnReportInput } from './turnReportLines';
 
 /** Prefix for bold section headers in `#map-toast` consolidated update messages. */
 export const MAP_TOAST_SECTION_HEADER_PREFIX = '## ';
@@ -55,9 +52,9 @@ function formatDeployedUnitsLine(
  */
 function formatDeploymentCapReachedLine(
   cappedTypes: BuildUnitType[] | undefined,
-  player: 'human' | 'opponent'
+  player: SeatId
 ): string | null {
-  if (player !== 'human') return null;
+  if (player !== HUMAN_SEAT_ID) return null;
   if (!cappedTypes || cappedTypes.length === 0) return null;
   const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
   if (ordered.length === 0) return null;
@@ -79,7 +76,7 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   const lines: string[] = [];
   const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
   if (deployedLine) lines.push(deployedLine);
-  const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, 'human');
+  const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
   if (deploymentCapLine) lines.push(deploymentCapLine);
   const hexesLost = readyResult.humanHexesLostCount ?? 0;
   if (hexesLost > 0) {
@@ -119,6 +116,15 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None.
    */
   combatFallbackBullets: string[];
+  /**
+   * Who took hexes and who lost units, for the sentences that replace the two loss sections.
+   *
+   * Contract: The viewer's seat, the roster, transitions, and visible losses. Omit `otherLines`; this builder appends them.
+   * When to use: Strategic Ready and a tactical commit.
+   * Expected outcome: Those sentences lead the toast. A null viewer writes only "Seen:" lines.
+   * Exceptions: None.
+   */
+  turnReport?: Omit<TurnReportInput, 'otherLines'>;
 }
 
 /**
@@ -134,23 +140,7 @@ function stripLeadingBullet(line: string): string {
 }
 
 /**
- * Appends one player loss section (header plus cause sub-lines) when that player lost units.
- *
- * Purpose: Shared helper for Human Losses and AI Losses section assembly.
- * When to use: Inside `buildConsolidatedTurnUpdateToastMessage` for each player bucket.
- * Expected outcome: Section omitted entirely when the player summary has no losses.
- * Exceptions: None.
- */
-function appendLossSection(out: string[], header: string, summary: PlayerLossSummary): void {
-  if (!playerHasAnyLoss(summary)) return;
-  out.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${header}`);
-  for (const line of formatPlayerLossLinesMultiline(summary)) {
-    out.push(`${line.causeLabel}: ${line.text}`);
-  }
-}
-
-/**
- * Builds the consolidated map toast message with Human Losses, AI Losses, and Other sections.
+ * Builds the consolidated map toast message with turn-report sentences and an Updates section.
  *
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
  * When to use: Strategic Ready and tactical commit paths in `readyHandler` before `showMapToast`.
@@ -158,12 +148,11 @@ function appendLossSection(out: string[], header: string, summary: PlayerLossSum
  * Exceptions: None.
  */
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
-  const { readyResult, turnLossSummary, combatFallbackBullets } = args;
+  const { readyResult, combatFallbackBullets, turnReport } = args;
   const sections: string[] = [];
-  appendLossSection(sections, 'Human Losses', turnLossSummary.human);
-  appendLossSection(sections, 'AI Losses', turnLossSummary.ai);
-  const hasLossSections =
-    playerHasAnyLoss(turnLossSummary.human) || playerHasAnyLoss(turnLossSummary.ai);
+  const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
+  sections.push(...reportLines);
+  const hasLossSections = reportLines.length > 0;
   let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
   if (!hasLossSections && otherLines.length === 0) {
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);

@@ -8,7 +8,28 @@ import {
   resetNewGameMapPreviewZoom,
   storeNewGameMapPreview,
 } from '../map/newGameMapPreviewRendering';
-import { getSelectedScenarioRegions } from './newGameRegionUi';
+
+/**
+ * Reads the side-row home keys.
+ *
+ * Purpose: The side rows live in another module. This file must not import it.
+ * When to use: `setPreviewHomeKeyReader` from that module.
+ * Expected outcome: Empty until the side rows are wired.
+ * Exceptions: None.
+ */
+let readHomeKeys: () => readonly string[] = () => [];
+
+/**
+ * Registers the home-key reader.
+ *
+ * Purpose: The preview request follows the side rows.
+ * When to use: Once, when the side rows are wired.
+ * Expected outcome: Later refreshes send those keys.
+ * Exceptions: None.
+ */
+export function setPreviewHomeKeyReader(reader: () => readonly string[]): void {
+  readHomeKeys = reader;
+}
 
 /**
  * One dialog reading that can be sent to the preview builder.
@@ -174,26 +195,14 @@ export async function refreshNewGameMapPreview(): Promise<void> {
  * Exceptions: None.
  */
 function readPreviewDialogRequest(): PreviewDialogRequest | null {
+  const homeKeys = readHomeKeys();
   const regional = document.getElementById('new-game-tab-regional')?.getAttribute('aria-selected') === 'true';
   if (!regional) {
-    const homes = getSelectedScenarioRegions();
-    return {
-      gameMapId: 'global',
-      request: {
-        scope: 'global',
-        humanHomeRegion: homes.humanHomeRegion,
-        aiHomeRegion: homes.aiHomeRegion,
-      },
-    };
+    return { gameMapId: 'global', request: { scope: 'global', homeKeys } };
   }
   const gameMapId = selectValue('new-game-region-select');
-  const humanSideGroupId = selectValue('new-game-human-side-select');
-  const aiSideGroupId = selectValue('new-game-ai-side-select');
-  if (!gameMapId || !humanSideGroupId || !aiSideGroupId) return null;
-  return {
-    gameMapId,
-    request: { scope: 'regional', gameMapId, humanSideGroupId, aiSideGroupId },
-  };
+  if (!gameMapId) return null;
+  return { gameMapId, request: { scope: 'regional', gameMapId, homeKeys } };
 }
 
 /**

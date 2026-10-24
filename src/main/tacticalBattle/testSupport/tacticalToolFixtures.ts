@@ -8,6 +8,7 @@
  * Exceptions: `buildTacticalToolFixture` throws when the line cannot be found, which would mean the H3 library changed.
  */
 
+import { type SeatId } from '../../../shared/seatIds';
 import { cellToCenterChild, cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
@@ -52,7 +53,7 @@ export interface TacticalToolFixtureUnit {
    * Expected outcome: Copied to the snapshot row unchanged.
    * Exceptions: None.
    */
-  readonly player: 'human' | 'opponent';
+  readonly player: SeatId;
   /**
    * Unit type such as `infantry`, `armor`, `naval`, or `air`.
    *

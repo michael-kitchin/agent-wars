@@ -23,8 +23,8 @@ Emitted before `mainBlock`, in this order.
 
 | Content | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
-| `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: {turnNumber}, date: {currentDateLabel}, phase: {phase}.` | `turnPhaseHeader` | always | `, date: …` omitted when `currentDateLabel` is absent |
-| Win-condition reminder | `buildWinConditionReminderClause` (`scenarioGoals.ts`) | `coordinateContext.mode !== 'tactical'` | generic sentence when `scenarioId` is not `region_vs_region` |
+| `You command {home region} in a WEGO (simultaneous movement) hex wargame with {N} sides. Every other side is your enemy, and so are neutral garrisons. Current turn: {turnNumber}, date: {currentDateLabel}, phase: {phase}.` | identity sentence plus `turnPhaseHeader` | always | `, date: …` omitted when `currentDateLabel` is absent. `{N}` is the roster length, or 2 when the roster is absent |
+| Win-condition reminder | `buildWinConditionReminderClause` (`scenarioGoals.ts`) | `coordinateContext.mode !== 'tactical'` | generic sentence when `scenarioId` is not `region_vs_region` and no victory rule is set. A known rule uses the last-side sentence, the mutual-wipe sentence, and, for a turn limit, the turn-limit sentence |
 | Scouting directive | `scoutingDirective` | `humanRoster.length === 0` (strategic only) | omitted |
 | Tool-limit warning | `buildToolBudgetExceededWarning` | `getAndClearAiToolLimitExceededLastTurn()` **and** (`planningEnabled` or `ordersEnabled`) | omitted |
 | Coordinate preamble (two paragraphs) | `buildLatLngPreamble` (`promptText.ts`) | always (strategic) | n/a |
@@ -87,7 +87,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 | `# Air Operations Status` | `buildAirOperationsBriefingBlock` | opponent has at least one air unit | **section omitted** (empty string, no dash row) |
 | `# Naval Transport Status` | `buildSealiftBriefingBlock` | opponent has at least one naval unit | **section omitted** |
 | `# Available Tools` | `toolsSection` + `buildAvailableToolsIntro` + numbered `promptLine`s + `buildToolUsageGuidance` | always | heading plus `No tools available.` |
-| `Human units (currently observed): …` | `buildHumanUnitsPromptLine` | always | empty-roster phrasing from the same helper |
+| `Enemy units (currently observed): …` | `buildEnemyUnitsPromptLine` | always | groups by side in seat order, then Neutral. Empty-roster phrasing from the same helper |
 | Final JSON contract | `buildFinalJsonContractInstruction` | always | n/a |
 | Final JSON example | `getFinalJsonOrdersExampleBlock` | always | n/a |
 

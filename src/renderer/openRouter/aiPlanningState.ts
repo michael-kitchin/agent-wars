@@ -1,4 +1,5 @@
 import { rendererSharedState as S } from '../core/state';
+import { anyCommanderIsPlanning } from './commanderPoolClient';
 
 /**
  * Defines the `isDeferredResolutionPlaybackConsultPending` function shape (export function isDeferredResolutionPlaybackConsultPending(): boolean).
@@ -29,25 +30,11 @@ export function isDeferredResolutionConsultRunning(): boolean {
 /**
  * Defines the `isWaitingForPrecomputedAiOrders` function shape (export function isWaitingForPrecomputedAiOrders(): boolean).
 
- * Purpose: True when Run is on and Ready must wait for AI planning (strategic precompute or tactical opponent draft buffer).
- * When to use: `startBackgroundRequestIfAllowed`, Ready click guard, Ready button disabled styling (with distinct deferred latch).
- * Expected outcome: Every-turn strategic waits while `precomputedAiOrders === null` (initial or post–successful-Ready reset).
- * After a failed background `requestAiOrders`, the renderer uses empty arrays instead of null so Ready is not stuck.
- * Event-driven strategic waits only until the opening consultation (`eventDrivenInitialConsultationDone`). Later turns use
- * pending orders from the post-resolution consult, so a null precompute buffer must not start a second model call.
- * Event-driven post-resolution / post-beat LLM work is deferred until resolution playback completes; readiness for that phase
- * is tracked separately via `isDeferredResolutionPlaybackConsultPending` so prefetch and Ready labeling stay accurate.
- * Tactical waits when Run is on, opponent sub-units remain, and there is no buffered opponent plan (`tacticalOpponentDraft`
- * is null). A background `requestAiOrders` failure still uses an empty typed draft so Ready can recover.
+ * Purpose: Ready stays disabled while any AI seat is still being consulted.
+ * When to use: The Ready click guard and the Ready button label.
+ * Expected outcome: True when the last pool snapshot has a planning seat.
  * Exceptions: None.
  */
 export function isWaitingForPrecomputedAiOrders(): boolean {
-  if (!S.runButtonOn) return false;
-  if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
-    const opponentAlive = S.tacticalBattleSnapshot.subUnits.some((u) => u.player === 'opponent');
-    if (!opponentAlive) return false;
-    return S.tacticalOpponentDraft === null;
-  }
-  if (S.useEventDrivenConsultation && S.eventDrivenInitialConsultationDone) return false;
-  return S.precomputedAiOrders === null;
+  return anyCommanderIsPlanning();
 }

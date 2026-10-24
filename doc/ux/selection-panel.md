@@ -27,7 +27,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
     - The weather, with its icon, while the weather bonus is on and the hex's weather is known.
     - The tech tier of units built there, Basic or Advanced with its icon, while the tech bonus is on and the hex can produce units. Not shown in a battle.
     - The production the hex adds each turn, such as "$94/turn", when it has urban cells and is not on the neutral border. Not shown in a battle.
-    - "Home" in the player's home region, or "Enemy home" in the opponent's. Not shown in a battle.
+    - "Home" in the viewer's home. "{short name} home" in another seat's home, for example "W. Turkey home". "Neutral" on Neutral land that is not a home. Not shown in a battle. The words come from `formatHomeChip` in `src/shared/sideLabels.ts`.
   - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md).
   - The reason a greyed-out reticle cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).

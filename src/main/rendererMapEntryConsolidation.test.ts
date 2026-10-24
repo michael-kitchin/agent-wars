@@ -12,7 +12,7 @@ import { getFunctionSource } from './testSupport/rendererSourceAssertions';
 
  * Purpose: Static regression tests for tactical magnifier visibility rules (planning-only, contested strategic, mirrored vertical offset).
  * When to use: CI guard when refactoring `syncTacticalEntryButton` or overlay layout.
- * Expected outcome: Source encodes planning+tactical-active gate, co-presence contest check, and magnifyTop symmetric offset below the hex midpoint (same distance as overlay text is below center).
+ * Expected outcome: Source encodes a planning, battle, and watch gate, a human-plus-one-other-owner contest check, and magnifyTop symmetric offset below the hex midpoint (same distance as overlay text is below center).
  * Exceptions: None.
  */
 function testTacticalEntryLayerPlanningAndContestedContracts(): void {
@@ -23,8 +23,8 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
     'syncTacticalEntryButton should not reference removed optional magnifier-hide flag'
   );
   assert.ok(
-    /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\)/.test(source),
-    'syncTacticalEntryButton should gate overlays on planning phase OR renderer tactical snapshot in one condition'
+    /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\|\|\s*!observeModeControls\(S\.gameState\.seats \?\? \[\]\)\.magnifierEnabled\s*\)/.test(source),
+    'syncTacticalEntryButton should hide magnifiers outside planning, during a battle, and while watching'
   );
   assert.ok(
     source.includes('if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {'),
@@ -35,8 +35,8 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
     'syncTacticalEntryButton should only place buttons on contested res1 hexes'
   );
   assert.ok(
-    source.includes("u.player === 'human'") && source.includes("u.player === 'opponent'"),
-    'tactical entry eligibility should require both human and opponent parent units in the same hex'
+    source.includes('HUMAN_SEAT_ID') && source.includes('owners.size === 2'),
+    'tactical entry eligibility should require the human seat and exactly one other owner in the same hex'
   );
   assert.ok(
     source.includes('offsetFromCenterToOverlayText') && source.includes('center.y + offsetFromCenterToOverlayText'),

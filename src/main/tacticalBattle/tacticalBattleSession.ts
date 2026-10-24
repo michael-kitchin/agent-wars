@@ -8,7 +8,9 @@ import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
+import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
+import { opposingPartyIdOf } from './opposingParty';
 import { createCombatRng } from '../combatResolution';
 import { getGameSeed, clearTacticalTurnNotes } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
@@ -137,8 +139,8 @@ function tacticalBaselineCountForParentOnHumanVoluntaryBailout(
  * Exceptions: None; caller handles and logs unexpected failures.
  */
 function applyHumanVoluntaryBailoutStrategicParentElimination(snapshot: TacticalBattleSnapshot): void {
-  const hasHuman = snapshot.subUnits.some((u) => u.player === 'human');
-  const hasOpponent = snapshot.subUnits.some((u) => u.player === 'opponent');
+  const hasHuman = snapshot.subUnits.some((u) => u.player === HUMAN_SEAT_ID);
+  const hasOpponent = snapshot.subUnits.some((u) => u.player !== HUMAN_SEAT_ID);
   if (!hasHuman || !hasOpponent) {
     tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination skipped annihilation-state roster', {
       battleId: snapshot.battleId,
@@ -263,7 +265,10 @@ export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: st
     commitActiveTacticalBattle(snapshot);
     clearTacticalTurnNotes();
     captureTacticalTransportBaselineForParentUnitIds([...new Set(snapshot.subUnits.map((u) => u.parentUnitId))]);
-    stashOpponentCallbackSubscriptionsForTacticalBattle();
+    const opposingParty = snapshot.opposingPartyId ?? null;
+    stashOpponentCallbackSubscriptionsForTacticalBattle(
+      opposingParty !== null && isAiSeatId(opposingParty) ? opposingParty : null
+    );
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });
     }
@@ -457,12 +462,16 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'no_active_session' });
       return { success: false, reason: 'No tactical battle is active.' };
     }
+    const party = opposingPartyIdOf(cur);
+    const holds = isNeutralOwnerId(party);
     const marchFail = humanTacticalMarchValidationFailure(cur, args.movementOrders);
     if (marchFail) {
       tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'march_validation', detail: marchFail });
       return { success: false, reason: marchFail };
     }
-    const oppMarchFail = opponentTacticalMarchValidationFailure(cur, opp?.movementOrders ?? []);
+    const oppMarchFail = holds
+      ? null
+      : opponentTacticalMarchValidationFailure(cur, opp?.movementOrders ?? []);
     if (oppMarchFail) {
       tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', {
         reason: 'opponent_march_validation',
@@ -477,14 +486,14 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
         tacticalSubUnitLayoutSeed32(cur.subUnits)) >>>
       0;
     const rawNext = createCombatRng(seed);
-    const afterOpponentEmbark = applyTacticalEmbarkPhaseOnBattle(cur, opp?.embarkOrders, 'opponent');
+    const afterOpponentEmbark = applyTacticalEmbarkPhaseOnBattle(cur, holds ? undefined : opp?.embarkOrders, party);
     const mergedAir = [...(args.airStrikes ?? []), ...(opp?.airStrikes ?? [])];
     const mergedRanged = [...(args.rangedAttacks ?? []), ...(opp?.rangedAttacks ?? [])];
     const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
       afterOpponentEmbark,
       mergedAir,
       mergedRanged,
-      'human',
+      HUMAN_SEAT_ID,
       rawNext,
       'mergedHumanThenOpponent'
     );
@@ -492,7 +501,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       args.movementOrders.length > 0
         ? projectTacticalSnapshotAfterHumanMovementOrders(acc.battle, args.movementOrders)
         : acc.battle;
-    const oppMarch = opp?.movementOrders ?? [];
+    const oppMarch = holds ? [] : (opp?.movementOrders ?? []);
     const bAfterBothMoves =
       oppMarch.length > 0
         ? projectTacticalSnapshotAfterOpponentMovementOrders(bAfterHumanMove, oppMarch)
@@ -504,9 +513,13 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
         return { success: false, reason: emb.reason };
       }
     }
-    const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterBothMoves, args.embarkOrders, 'human');
-    const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, 'human');
-    const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanFerry.battle, opp?.ferryOrders, 'opponent');
+    const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterBothMoves, args.embarkOrders, HUMAN_SEAT_ID);
+    const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, HUMAN_SEAT_ID);
+    const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(
+      bAfterHumanFerry.battle,
+      holds ? undefined : opp?.ferryOrders,
+      party
+    );
     const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry.battle);
     const meleePack = applyTacticalMeleeAfterSupportOrders(bSynced, rawNext);
     const battleAdvancedTurn: TacticalBattleSnapshot = {

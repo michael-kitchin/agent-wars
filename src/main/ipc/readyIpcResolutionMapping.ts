@@ -8,10 +8,12 @@
  * Exceptions: None; callers must only pass successful resolution objects.
  */
 
-import type { GameStateSnapshot } from '../gameDb';
-import { logDebug, logTrace } from '../logger';
-import { afterResolution, afterTacticalBeatResolution } from '../openRouter/afterResolution';
-import { executeAbortableConsult } from './modelConsultAttempt';
+import { AI_SEAT_IDS, isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
+import { commanderModelId, getGameStateForPlayer, getSeatRoster, type GameStateSnapshot } from '../gameDb';
+import { logDebug, logError, logTrace } from '../logger';
+import { afterResolution, afterTacticalBeatResolution, type AfterResolutionResult, type AfterTacticalBeatResolutionResult } from '../openRouter/afterResolution';
+import { launchCommanderConsult, waitForSeatsSettled, type CommanderConsultRunner } from '../openRouter/commanderPool';
+import { emptyConsultOutcome } from '../openRouter/commanderPoolSupport';
 import type {
   ReadyResult,
   RangedAttackOrder,
@@ -109,13 +111,15 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'killsByReturnFire'
   | 'deployedUnitsByType'
   | 'humanDeploymentCapReachedUnitTypes'
-  | 'opponentDeploymentCapReachedUnitTypes'
+  | 'deploymentCapReachedUnitTypesBySeat'
   | 'humanHexesLostCount'
+  | 'controlTransitions'
   | 'controlLossLightningHexes'
   | 'killLabelUnits'
   | 'airStrikeDiceRolls'
   | 'rangedDiceRolls'
   | 'meleeDiceRolls'
+  | 'knockouts'
 >;
 
 /**
@@ -160,13 +164,15 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     killsByReturnFire: source.killsByReturnFire,
     deployedUnitsByType: source.deployedUnitsByType,
     humanDeploymentCapReachedUnitTypes: source.humanDeploymentCapReachedUnitTypes,
-    opponentDeploymentCapReachedUnitTypes: source.opponentDeploymentCapReachedUnitTypes,
+    deploymentCapReachedUnitTypesBySeat: source.deploymentCapReachedUnitTypesBySeat,
     humanHexesLostCount: source.humanHexesLostCount,
+    controlTransitions: source.controlTransitions,
     controlLossLightningHexes: source.controlLossLightningHexes,
     killLabelUnits: source.killLabelUnits,
     airStrikeDiceRolls: source.airStrikeDiceRolls,
     rangedDiceRolls: source.rangedDiceRolls,
     meleeDiceRolls: source.meleeDiceRolls,
+    knockouts: source.knockouts,
   };
 }
 
@@ -239,7 +245,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
+    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
@@ -247,30 +253,40 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
   if (!args.useEventDrivenConsultation || !args.resolutionSuccess || !args.aiPlanningRunEnabled) {
     return {};
   }
-  logDebug('runEventDrivenAfterResolutionConsultation', { timeoutMs: args.timeoutMs });
-  const attempt = await executeAbortableConsult({
-    label: 'post-resolution consult',
-    theater: 'strategic',
-    timeoutMs: args.timeoutMs,
-    fallbackModelId: args.modelId ?? '',
-    errorLogMessage: args.errorLogMessage,
-    run: ({ signal, modelId }) =>
-      afterResolution(args.opponentState, args.resolution, {
+  const seatIds = activeAiSeatIds();
+  logDebug('runEventDrivenAfterResolutionConsultation', { timeoutMs: args.timeoutMs, seatCount: seatIds.length });
+  const results = new Map<AiSeatId, AfterResolutionResult>();
+  await consultSeatsThroughPool(seatIds, 'strategic', null, args.timeoutMs, async (request) => {
+    const modelId = modelIdForSeat(request.seatId, args.modelId);
+    if (!modelId) return emptyConsultOutcome();
+    try {
+      const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });
+      const result = await afterResolution(
+        state,
+        args.resolution,
+        {
+          modelId,
+          enabledToolNames: args.enabledToolNames,
+          hasKey: args.hasKey,
+          signal: request.signal,
+          requestOrders: (orderState, orderModelId, options) =>
+            args.requestOrders(orderState, orderModelId, { ...options, signal: request.signal }),
+        },
+        request.seatId
+      );
+      results.set(request.seatId, result);
+      return emptyConsultOutcome({
+        costUsd: finiteCost(result.cost),
+        message: result.message ?? null,
+        strategy: result.strategy ?? null,
         modelId,
-        enabledToolNames: args.enabledToolNames,
-        hasKey: args.hasKey,
-        signal,
-        requestOrders: (state, orderModelId, options) =>
-          args.requestOrders(state, orderModelId, { ...options, signal }),
-      }),
+      });
+    } catch (err) {
+      logError(args.errorLogMessage, err);
+      return emptyConsultOutcome({ errorMessage: err instanceof Error ? err.message : String(err) });
+    }
   });
-  if (!attempt.ok) return {};
-  const postResolution = attempt.value;
-  return {
-    ...optionalConsultToastFields(postResolution.message, postResolution.strategy),
-    ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
-    ...(typeof postResolution.cost === 'number' && Number.isFinite(postResolution.cost) ? { cost: postResolution.cost } : {}),
-  };
+  return strategicConsultFields(results);
 }
 
 /**
@@ -278,7 +294,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
  *
  * Purpose: Lets the opponent LLM re-plan inside an active tactical session when callbacks or tactical mandatory rules fire.
  * When to use: After tactical beat resolution succeeds: from Electron `game:commitHumanTacticalDraftOrders` (handler awaits this helper before resolving the invoke, mirroring strategic “resolution then consult” ordering) or from tests that call this helper directly.
- * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise empty merge so IPC can preserve the renderer draft.
+ * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise an empty merge and the pool keeps the plan it already stored.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
 export async function runEventDrivenAfterTacticalBeatConsultation(args: {
@@ -294,6 +310,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
     state: GameStateSnapshot,
     modelId: string,
     options: {
+      seatId: AiSeatId;
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
@@ -306,25 +323,51 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
   if (!args.useEventDrivenConsultation || !args.aiPlanningRunEnabled) {
     return {};
   }
-  logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs });
-  const attempt = await executeAbortableConsult({
-    label: 'post-beat consult',
-    theater: 'tactical',
-    timeoutMs: args.timeoutMs,
-    fallbackModelId: args.modelId ?? '',
-    errorLogMessage: args.errorLogMessage,
-    run: ({ signal, modelId }) =>
-      afterTacticalBeatResolution(args.opponentState, args.tacticalBattle, args.tacticalResolutionPlayback, {
+  const opposingParty = args.tacticalBattle.opposingPartyId;
+  if (opposingParty !== undefined && isNeutralOwnerId(opposingParty)) {
+    logDebug('runEventDrivenAfterTacticalBeatConsultation: skip neutral party', {
+      battleId: args.tacticalBattle.battleId,
+    });
+    return {};
+  }
+  const seatId = opposingParty !== undefined && isAiSeatId(opposingParty) ? opposingParty : activeAiSeatIds()[0];
+  if (seatId === undefined) return {};
+  logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs, seatId });
+  let post: AfterTacticalBeatResolutionResult | undefined;
+  await consultSeatsThroughPool([seatId], 'tactical', args.tacticalBattle, args.timeoutMs, async (request) => {
+    const modelId = modelIdForSeat(request.seatId, args.modelId);
+    if (!modelId) return emptyConsultOutcome();
+    try {
+      const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });
+      post = await afterTacticalBeatResolution(
+        state,
+        args.tacticalBattle,
+        args.tacticalResolutionPlayback,
+        {
+          modelId,
+          enabledToolNames: args.enabledToolNames,
+          hasKey: args.hasKey,
+          signal: request.signal,
+          requestOrders: (orderState, orderModelId, options) =>
+            args.requestOrders(orderState, orderModelId, { ...options, signal: request.signal }),
+        },
+        request.seatId
+      );
+      if (!post.tacticalOpponentPlan) {
+        return emptyConsultOutcome({ costUsd: finiteCost(post.cost), modelId });
+      }
+      return emptyConsultOutcome({
+        finished: true,
+        tacticalPlan: post.tacticalOpponentPlan,
+        costUsd: finiteCost(post.cost),
         modelId,
-        enabledToolNames: args.enabledToolNames,
-        hasKey: args.hasKey,
-        signal,
-        requestOrders: (state, orderModelId, options) =>
-          args.requestOrders(state, orderModelId, { ...options, signal }),
-      }),
+      });
+    } catch (err) {
+      logError(args.errorLogMessage, err);
+      return emptyConsultOutcome({ errorMessage: err instanceof Error ? err.message : String(err) });
+    }
   });
-  if (!attempt.ok) return {};
-  const post = attempt.value;
+  if (!post) return {};
   return {
     attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
     tacticalOpponentPlan: post.tacticalOpponentPlan,
@@ -332,5 +375,104 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
     message: post.message,
     toolInvocationCounts: post.toolInvocationCounts,
     ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
+  };
+}
+
+/**
+ * Active AI seats, in seat order.
+ *
+ * Purpose: Post-resolution consults every commander that is still in the match.
+ * When to use: Before launching those consults.
+ * Expected outcome: Seat ids whose kind is AI and whose knockout turn is null.
+ * Exceptions: None.
+ */
+function activeAiSeatIds(): AiSeatId[] {
+  const seatIds = getSeatRoster()
+    .filter((seat) => seat.kind === 'ai' && seat.outTurn === null && isAiSeatId(seat.seatId))
+    .map((seat) => seat.seatId);
+  logTrace('readyIpcResolutionMapping activeAiSeatIds', { seatCount: seatIds.length });
+  return seatIds.filter((seatId): seatId is AiSeatId => isAiSeatId(seatId));
+}
+
+/**
+ * The model a seat consult should call.
+ *
+ * Purpose: A stored model wins. A missing roster row keeps the caller's fallback.
+ * When to use: Inside a pool runner.
+ * Expected outcome: A non-blank model id, or `''` when this seat must not be called.
+ * Exceptions: None.
+ */
+function modelIdForSeat(seatId: AiSeatId, fallback: string): string {
+  const stored = commanderModelId(seatId);
+  const modelId = stored && stored.trim() ? stored : stored === null ? fallback.trim() : '';
+  logTrace('readyIpcResolutionMapping modelIdForSeat', { seatId, hasModel: modelId.length > 0 });
+  return modelId;
+}
+
+/**
+ * A finite dollar amount, or zero.
+ *
+ * Purpose: The pool records only a real cost.
+ * When to use: Copying a consult result onto the outcome.
+ * Expected outcome: The number when it is finite. Otherwise zero.
+ * Exceptions: None.
+ */
+function finiteCost(cost: number | undefined): number {
+  return typeof cost === 'number' && Number.isFinite(cost) ? cost : 0;
+}
+
+/**
+ * Starts every listed seat before waiting for any of them.
+ *
+ * Purpose: The pool's own timers are the deadline. This wait does not start a second, shorter race.
+ * When to use: Post-resolution and post-beat consults.
+ * Expected outcome: Resolves when each launched seat has left `planning`, or when `timeoutMs` elapses.
+ * Exceptions: Does not throw. A seat that cannot launch is omitted from the wait.
+ */
+async function consultSeatsThroughPool(
+  seatIds: readonly AiSeatId[],
+  theater: 'strategic' | 'tactical',
+  battle: TacticalBattleSnapshot | null,
+  timeoutMs: number,
+  runner: CommanderConsultRunner
+): Promise<void> {
+  const launched: AiSeatId[] = [];
+  for (const seatId of seatIds) {
+    if (launchCommanderConsult(seatId, theater, battle, runner)) launched.push(seatId);
+  }
+  logDebug('readyIpcResolutionMapping consultSeatsThroughPool', { theater, launchedCount: launched.length, timeoutMs });
+  if (launched.length === 0) return;
+  await waitForSeatsSettled(launched, timeoutMs);
+}
+
+/**
+ * Toast fields from the first seat that consulted, plus the sum of reported costs.
+ *
+ * Purpose: A two-sided match still returns one strategy and one message. Extra seats add their cost.
+ * When to use: After every post-resolution runner has stored its result.
+ * Expected outcome: Omitted prose stays omitted. Cost is present only when at least one consult reported a finite cost.
+ * Exceptions: None.
+ */
+function strategicConsultFields(
+  results: ReadonlyMap<AiSeatId, AfterResolutionResult>
+): { aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number } {
+  let first: AfterResolutionResult | undefined;
+  let cost = 0;
+  let sawCost = false;
+  for (const seatId of AI_SEAT_IDS) {
+    const result = results.get(seatId);
+    if (!result) continue;
+    if (!first && result.consulted) first = result;
+    if (typeof result.cost === 'number' && Number.isFinite(result.cost)) {
+      cost += result.cost;
+      sawCost = true;
+    }
+  }
+  logTrace('readyIpcResolutionMapping strategicConsultFields', { consulted: Boolean(first), sawCost });
+  if (!first) return sawCost ? { cost } : {};
+  return {
+    ...optionalConsultToastFields(first.message, first.strategy),
+    ...(first.toolInvocationCounts ? { toolInvocationCounts: first.toolInvocationCounts } : {}),
+    ...(sawCost ? { cost } : {}),
   };
 }

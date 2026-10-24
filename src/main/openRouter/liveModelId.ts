@@ -8,9 +8,10 @@
  * Exceptions: None.
  */
 
+import type { AiSeatId } from '../../shared/seatIds';
 import { logDebug, logTrace } from '../logger';
 
-let readSelectedModel: () => string = () => '';
+let readSelectedModel: (seatId: AiSeatId) => string = () => '';
 
 /**
  * Installs the function that reads the saved model id.
@@ -20,7 +21,7 @@ let readSelectedModel: () => string = () => '';
  * Expected outcome: Later `readLiveModelId` calls use `reader`.
  * Exceptions: None.
  */
-export function registerLiveModelIdReader(reader: () => string): void {
+export function registerLiveModelIdReader(reader: (seatId: AiSeatId) => string): void {
   logDebug('liveModelId registerLiveModelIdReader');
   readSelectedModel = reader;
 }
@@ -33,8 +34,8 @@ export function registerLiveModelIdReader(reader: () => string): void {
  * Expected outcome: The reader's string, or `''` when no reader is registered.
  * Exceptions: None.
  */
-export function readLiveModelId(): string {
-  const modelId = readSelectedModel();
-  logTrace('liveModelId readLiveModelId', { hasModelId: modelId.trim().length > 0 });
+export function readLiveModelId(seatId: AiSeatId): string {
+  const modelId = readSelectedModel(seatId);
+  logTrace('liveModelId readLiveModelId', { seatId, hasModelId: modelId.trim().length > 0 });
   return modelId;
 }

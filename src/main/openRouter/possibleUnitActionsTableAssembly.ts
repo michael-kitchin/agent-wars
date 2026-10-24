@@ -224,12 +224,6 @@ export interface RawPossibleActionRow {
   urbanHexCount: number;
 }
 
-/** Player id treated as the briefing subject (enemy to the AI opponent). */
-export const ENEMY_PLAYER = 'human';
-
-/** Player id for friendly units in this briefing (the AI side). */
-export const FRIENDLY_PLAYER = 'opponent';
-
 /** Action label for one-step move/melee destinations in the possible-actions table. */
 export const ACTION_MOVES_MELEE = 'move/melee';
 

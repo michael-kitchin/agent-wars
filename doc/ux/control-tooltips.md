@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Add another opponent on the new-game screen, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -21,25 +21,23 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 
 ## Sentences
 
-- Human home region: Pick your side's home region. The opponent may start in the same region.
-- Randomize human home region: Pick one of the listed regions at random for your side, including the region already shown.
-- Opponent home region: Pick the opponent's home region. It may be the same as yours.
-- Randomize opponent home region: Pick one of the listed regions at random for the opponent, including the region already shown.
-- Global tab: Start on the world map and pick a home region for each side.
-- Regional tab: Start on one region and pick a different side group for each player.
-- Region: Pick the region both sides fight over. Changing it draws two different sides again.
+- Global tab: Start on the world map. Each side picks a different home region.
+- Regional tab: Start on one region. Each side picks a different home.
+- Region: Pick the region. Changing it draws a new home for each side.
 - Randomize region: Pick one of the listed regions at random, including the region already shown.
-- Human side: Pick your side. It stays different from the opponent's side.
-- Randomize human side: Pick one of the other sides at random for your side.
-- Opponent side: Pick the opponent's side. It stays different from yours.
-- Randomize opponent side: Pick one of the other sides at random for the opponent.
+- Observe only: Leave this checked to watch. An AI commander plays every side, including the first.
+- Add another opponent, or Add another side: Add a side on the next free home. While the button is disabled the tip is "Up to 4 sides" or "No free side on this map".
+- Commander button: Change this side's model, reasoning, and doctrine.
+- Victory rule: Regional matches end when one side remains. Global matches end at the turn limit, and the side holding the most city hexes wins.
+- Turn limit: The global match ends after this many turns. 30 is the usual length.
+- Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
 - Origin bonus: Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
-- Auto-start AI: Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off.
+- Auto-start AI: Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Command tab with planning off.
 - Starting month: Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.
 - Randomize starting month: Pick a month at random, including the month already shown.
 - Hide the new game choices: Hide the new game choices to see more of the map.
@@ -56,8 +54,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The reticle while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
 - Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
-- Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log. Click the selected tab to hide the console and widen the map.
-- Settings, Help, Load game, How to play, Add another opponent, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
+- Settings, Help, Load game, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
@@ -72,15 +70,16 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
-- Your home readout: Hexes of your home region that you hold, out of all its hexes.
-- Enemy home readout: Hexes of the opponent's home region that you hold, out of all its hexes.
+- Your home readout: Hexes of your home region that you hold, out of all its hexes. Hidden while observing.
+- Enemy homes readout: Hexes of every active enemy home that you hold, out of all of those hexes. A knocked-out side's home is left out. Hidden while observing, and hidden in a match that ends on a turn limit.
+- Cities readout: City hexes you hold, your place, and how many sides are still playing. The tip lists every active side. Shown only in a match that ends on a turn limit. While observing, the tip has no "(you)".
 - Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
 - Quit: Close Agent Wars.
 - Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
-- Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
-- Run, while it can be clicked: Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.
+- Run, while it cannot be clicked: Turn planning on or off for every commander. Enter an API key and choose a commander's model first.
+- Run, while it can be clicked: Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.
 - New game in the game menu: Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.
 - New game in the game menu while a Ready is resolving, on its tip host: New game is available again once this turn or beat finishes resolving.
 - New-game panel close, shown only while a match is waiting under the screen: Close this screen and go back to the match in progress.

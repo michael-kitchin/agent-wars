@@ -12,7 +12,7 @@ import {
 /**
  * Returns a new tactical snapshot with opponent sub-unit positions updated from validated movement orders.
  *
- * Contract: Only `player === 'opponent'` sub-units move; destinations must lie in `battle.tacticalChildH3Indexes`; reachability uses §12.4 terrain-weighted paths and terrain-adjusted movement-point budgets from `tacticalTerrainCombatModifiers`.
+ * Contract: Only the battle's other party moves, and Neutral never does. Destinations must lie in `battle.tacticalChildH3Indexes`. Reachability uses §12.4 terrain-weighted paths and terrain-adjusted movement-point budgets from `tacticalTerrainCombatModifiers`.
  * When to use: After `requestOrders` returns movement orders for tactical AI, before mutating `activeTacticalBattle` in the main process.
  * Expected outcome: Immutable copy of `battle` with at most one position change per matched order (later duplicate `unitId` entries in `orders` overwrite earlier ones).
  * Exceptions: None; unknown unit ids or invalid destinations are skipped with trace logs.

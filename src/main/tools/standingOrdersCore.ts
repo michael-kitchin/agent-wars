@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { createPathfindingSession, executePlanRouteWithSession } from './pathfinding';
 import type { LatLng } from './pathfinding';
@@ -140,7 +141,7 @@ function assignOrder(
   const createdTurn = state.turnNumber;
   const unitLatLng = latLngByH3.get(unit.h3Index) ?? [0, 0];
   const originHexJson = JSON.stringify(unitLatLng);
-  const defaultAvoidEnemiesForPlayer = playerId !== 'human';
+  const defaultAvoidEnemiesForPlayer = playerId !== HUMAN_SEAT_ID;
 
   let status = 'en_route';
   let computedRouteJson: string | null = null;

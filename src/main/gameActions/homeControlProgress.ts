@@ -57,7 +57,7 @@ export type HomeControlProgress = {
  */
 export function computeHomeControlProgress(args: {
   readonly homeHexes: readonly string[];
-  readonly controller: 'human' | 'opponent';
+  readonly controller: string;
   readonly controlByHex: ReadonlyMap<string, string | null | undefined>;
   readonly baselineUrbanCellsForHex: (h3Index: string) => number;
   readonly minUrbanShare: number | null;

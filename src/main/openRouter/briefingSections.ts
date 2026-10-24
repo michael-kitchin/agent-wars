@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { executeProductionTools } from '../tools/productionTools';
 import {
   getMaxedUnitTypesForPlayer,
@@ -355,7 +356,8 @@ export function buildProductionBriefingBlock(args: {
     turnNumber: args.state.turnNumber,
   });
   if (!args.productionEnabled) return '';
-  const snapshot = executeProductionTools('query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
+  const ownSeat = briefingOwnSeatId(args.state);
+  const snapshot = executeProductionTools(ownSeat, 'query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
     status?: string;
     production?: { controlledHexQueues?: Array<Record<string, unknown>> };
     error?: string;
@@ -368,10 +370,10 @@ export function buildProductionBriefingBlock(args: {
     return `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`;
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
-  const opponentCounts = getPlayerUnitCountsByType(args.state.units, 'opponent');
+  const opponentCounts = getPlayerUnitCountsByType(args.state.units, ownSeat);
   const gameSize = parseGameSize(args.state.gameSize);
   const caps = getMaxUnitsPerType(gameSize);
-  const maxedTypes = getMaxedUnitTypesForPlayer(args.state.units, 'opponent', gameSize);
+  const maxedTypes = getMaxedUnitTypesForPlayer(args.state.units, ownSeat, gameSize);
   const lines: string[] = [];
   lines.push(topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS));
   lines.push('');

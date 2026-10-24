@@ -1,4 +1,5 @@
 import type { BonusLevel } from './bonusLevel';
+import type { SeatId } from './seatIds';
 import type { HomeRegionOwnerIdentity } from './homeRegionRules';
 import type { MapExtentBox } from './mapExtent';
 import type { WeatherState } from './weatherBonusTypes';
@@ -23,23 +24,14 @@ export type NewGameMapPreviewRequest =
        */
       readonly scope: 'global';
       /**
-       * Human home-region name from the Global tab.
+       * Homes in side-row order.
        *
-       * Contract: A UN subregion name, or empty when the control is missing.
-       * When to use: The human home combo.
-       * Expected outcome: Looked up in the global naming cache only.
+       * Contract: UN subregion names. Empty entries are allowed and outline nothing.
+       * When to use: The new-game screen.
+       * Expected outcome: One home list per entry, in the same order.
        * Exceptions: None.
        */
-      readonly humanHomeRegion: string;
-      /**
-       * AI home-region name from the Global tab.
-       *
-       * Contract: A UN subregion name, or empty when the control is missing. It may equal the human name.
-       * When to use: The AI home combo.
-       * Expected outcome: Looked up in the global naming cache only.
-       * Exceptions: None.
-       */
-      readonly aiHomeRegion: string;
+      readonly homeKeys?: readonly string[];
     }
   | {
       /**
@@ -61,23 +53,14 @@ export type NewGameMapPreviewRequest =
        */
       readonly gameMapId: string;
       /**
-       * Human side-group id.
+       * Homes in side-row order.
        *
-       * Contract: A group id on that manifest.
-       * When to use: The human side combo.
-       * Expected outcome: That group's land hexes.
+       * Contract: Side-group ids on that manifest. Empty entries are allowed and outline nothing.
+       * When to use: The new-game screen.
+       * Expected outcome: One home list per entry, in the same order.
        * Exceptions: None.
        */
-      readonly humanSideGroupId: string;
-      /**
-       * AI side-group id.
-       *
-       * Contract: A group id on that manifest. The dialog keeps it different from the human group.
-       * When to use: The AI side combo.
-       * Expected outcome: That group's land hexes.
-       * Exceptions: None.
-       */
-      readonly aiSideGroupId: string;
+      readonly homeKeys?: readonly string[];
     };
 
 /**
@@ -182,23 +165,14 @@ export interface NewGameMapPreview {
    */
   readonly hexes: readonly NewGameMapPreviewHex[];
   /**
-   * Human home hexes at this map's strategic resolution.
+   * Home hexes in side-row order.
    *
-   * Contract: A subset of `hexes`. Empty when the name or group is unknown.
-   * When to use: The human side of `previewHomeBorder`.
-   * Expected outcome: The selected home area.
+   * Contract: One list per requested home.
+   * When to use: Coloring each preview ring by seat order.
+   * Expected outcome: Lists may overlap. An unknown or empty home is an empty list.
    * Exceptions: None.
    */
-  readonly humanHomeRegionHexes: readonly string[];
-  /**
-   * AI home hexes at this map's strategic resolution.
-   *
-   * Contract: A subset of `hexes`. May overlap the human list, including being the same list.
-   * When to use: The AI side of `previewHomeBorder`.
-   * Expected outcome: The selected home area.
-   * Exceptions: None.
-   */
-  readonly aiHomeRegionHexes: readonly string[];
+  readonly homeRegionHexesBySeatOrder: readonly (readonly string[])[];
 }
 
 /**
@@ -218,13 +192,13 @@ export interface PreviewHomeBorder {
    * Expected outcome: Null paints the neutral gray outer ring on a home hex.
    * Exceptions: None.
    */
-  readonly controllerPlayerId: 'human' | 'opponent' | null;
+  readonly controllerPlayerId: SeatId | null;
   /**
    * Declared home owner for the dashed inner ring.
    *
-   * Contract: One side, `both` when the hex is in both homes, or null when it is in neither.
+   * Contract: One seat, shared when the hex is in both homes, or null when it is in neither.
    * When to use: The ownership drawer. Do not resolve the identity again.
-   * Expected outcome: `both` paints the gray inner ring.
+   * Expected outcome: A shared home paints the mixed-stack stroke on the inner ring.
    * Exceptions: None.
    */
   readonly homeOwnerIdentity: HomeRegionOwnerIdentity;

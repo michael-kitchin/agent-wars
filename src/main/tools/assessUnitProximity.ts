@@ -322,7 +322,7 @@ export interface OmniscientProximityUnit {
    *
    * Contract: Any string; inequality vs the assessed unit marks an enemy.
    * When to use: Snapshot `units[].player`.
-   * Expected outcome: `'human'` vs `'opponent'` in production.
+   * Expected outcome: `HUMAN_SEAT_ID` vs the first AI seat in production.
    * Exceptions: None.
    */
   player: string;

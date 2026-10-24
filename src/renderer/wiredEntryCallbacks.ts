@@ -154,6 +154,7 @@ import {
   updateRangedSidebar,
   buildKillToastFormatterBundle,
 } from './entryCallbacks';
+import { HUMAN_SEAT_ID } from '../shared/seatIds';
 
 /**
  * Defines the `getUnitAtHex` function shape (function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null).
@@ -167,7 +168,7 @@ export function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | n
   if (S.tacticalBattleSnapshot) {
     const atHex = S.tacticalBattleSnapshot.subUnits.filter((u) => u.h3Index === h3Index);
     if (atHex.length === 0) return null;
-    const tacticalUnit = atHex.find((u) => u.player === 'human') ?? atHex[0];
+    const tacticalUnit = atHex.find((u) => u.player === HUMAN_SEAT_ID) ?? atHex[0];
     return {
       id: tacticalUnit.id,
       player: tacticalUnit.player,

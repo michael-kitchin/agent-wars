@@ -8,6 +8,7 @@ import {
   resetGameForNewMatch,
   listScenarioHomeRegions,
 } from '../gameDb';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Opens a temporary SQLite game DB and resets a two-region `region_vs_region` match for integration tests.
@@ -23,7 +24,12 @@ export function withRegionVsRegionTempGameDb(runCase: () => void): void {
     openGameDatabaseAtPathForTests(path.join(dir, 't.sqlite'));
     const regions = listScenarioHomeRegions();
     assert.ok(regions.length >= 2, 'tests require at least two distinct scenario home regions');
-    resetGameForNewMatch({ humanHomeRegion: regions[0]!, aiHomeRegion: regions[1]! });
+    resetGameForNewMatch({
+      seats: [
+        { kind: HUMAN_SEAT_ID, homeRegion: regions[0]! },
+        { kind: 'ai', homeRegion: regions[1]! },
+      ],
+    });
     runCase();
   } finally {
     closeGameDatabaseForTests();

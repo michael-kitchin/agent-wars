@@ -10,6 +10,7 @@
    including from a battle. */
 body:not(:has(#game-over-overlay:not(.hidden))) #app-topbar .new-game-only,
 body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-sides,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-view-as,
 body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-stat,
 body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-date-block,
 body:has(#game-over-overlay:not(.hidden)) #app-topbar .battle-header-only {
@@ -262,15 +263,114 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   width: 100%;
   min-width: 0;
 }
+.new-game-sides-caption {
+  margin: 0 0 8px;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.new-game-section .new-game-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+/* Label, home, randomize, and remove. The commander button spans the row. */
+.new-game-side-row {
+  display: grid;
+  grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  gap: 8px 6px;
+  margin-top: 8px;
+}
+.new-game-side-row select {
+  width: 100%;
+  min-width: 0;
+}
+.new-game-side-commander {
+  grid-column: 1 / -1;
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.new-game-side-commander:hover {
+  border-color: var(--chrome-accent-edge);
+}
+.commander-popover {
+  position: fixed;
+  z-index: 7060;
+  width: 280px;
+  padding: 10px;
+  background: var(--chrome-bg, #1b2838);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.commander-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.commander-popover-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.commander-popover-close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  border: 0;
+  font-size: 16px;
+  cursor: pointer;
+}
+.commander-popover-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.commander-popover-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.commander-popover-field select {
+  width: 160px;
+  min-width: 0;
+}
+.commander-popover-doctrine {
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.commander-popover-apply {
+  height: 28px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
 /* Two classes, so the shared tip host's inline display does not win: the slot spans the section. */
-.control-tooltip-host.new-game-add-opponent-host {
+.control-tooltip-host.new-game-add-side-host {
   display: flex;
   width: 100%;
   margin-top: 10px;
 }
-/* A disabled placeholder drawn as a dashed slot, so it reads as room for a later feature rather than a broken button. */
-.new-game-add-opponent,
-.new-game-add-opponent:disabled {
+.new-game-add-side {
   flex: 1 1 auto;
   height: 28px;
   display: inline-flex;
@@ -278,11 +378,22 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   justify-content: center;
   gap: 6px;
   padding: 0;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+}
+.new-game-add-side:hover:not(:disabled) {
+  background: var(--button-bg-hover);
+}
+.new-game-add-side:disabled {
   background: transparent;
   color: var(--chrome-muted);
   border: 1px dashed var(--chrome-border);
-  border-radius: 2px;
-  font-size: 12.5px;
+}
+#new-game-turn-limit-row {
+  margin-top: 8px;
 }
 
 /* ---------- Forces ---------- */
@@ -391,4 +502,66 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   align-items: center;
   gap: 8px;
   margin-top: 0;
+}
+.game-over-standings[hidden] { display: none !important; }
+.game-over-standings-head,
+.game-over-standings-title,
+.game-over-standings-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.game-over-standings-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+.game-over-standings-date,
+.game-over-standings-status,
+.game-over-standings-meta,
+.game-over-standings-knockout {
+  margin: 0;
+  color: var(--chrome-muted);
+}
+.game-over-standings-result {
+  margin: 8px 0 12px;
+}
+.game-over-standings-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.game-over-standings-row {
+  display: grid;
+  grid-template-columns: 1.25rem 8px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.game-over-standings-place {
+  font-variant-numeric: tabular-nums;
+}
+.game-over-standings-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+.game-over-standings-name {
+  font-weight: 600;
+}
+.game-over-standings-meta,
+.game-over-standings-knockout {
+  margin-top: 2px;
+  font-size: 12px;
+}
+.game-over-standings-total {
+  margin: 12px 0 0;
+  font-size: 12px;
 }

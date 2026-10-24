@@ -19,6 +19,7 @@ import type {
   HumanOrderGroupPreviewUnitResult,
   HumanOrderPreviewResult,
 } from './ipc/humanOrderPreviewTypes';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /** User-facing copy when air and non-air units are selected together for movement-style planning. */
 export const MIXED_AIR_NON_AIR_MOVEMENT_MESSAGE = 'Cannot issue grouped movement for mixed air and non-air units.';
@@ -103,7 +104,7 @@ export function buildTacticalFerryHoverPreview(
 ): HumanOrderGroupPreviewResult {
   const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
   const selectedAir = uniqueIds
-    .map((id) => battle.subUnits.find((u) => u.id === id && u.player === 'human' && u.unitType === 'air'))
+    .map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID && u.unitType === 'air'))
     .filter((u): u is NonNullable<typeof u> => !!u);
   if (!hoveredH3Index || selectedAir.length === 0) {
     return {

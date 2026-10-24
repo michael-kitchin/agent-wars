@@ -346,7 +346,7 @@ export function setUnitNameContent(target: HTMLElement, unitId: string, text: st
 export function buildUnitOriginByLossDisplayName(summary: TurnLossSummary): ReadonlyMap<string, LossFlagIdentity> {
   const flagByName = new Map<string, LossFlagIdentity>();
   const ambiguousNames = new Set<string>();
-  const victims = [summary.human, summary.ai].flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
+  const victims = Object.values(summary.byOwner).flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
   for (const victim of victims) {
     const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
     if (!origin || !victim.unitId) continue;

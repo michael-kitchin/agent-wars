@@ -4,8 +4,10 @@ import {
   resolveEffectiveReasoningEffort,
   resolveRequestedReasoningEffort,
 } from '../../shared/openRouterReasoningEffort';
+import type { SeatRecord } from '../../shared/seatRoster';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
 import {
+  getOpenRouterModelCapabilities,
   isStructuredOutputsDisabledByEnvironment,
   supportsStructuredOutputs,
   supportsToolCalling,
@@ -164,4 +166,25 @@ export function resolveOrdersRequestProfile(input: {
     preferredCompletionMaxTokens: profile.preferredCompletionMaxTokens,
   });
   return profile;
+}
+
+/**
+ * Resolves the request profile from one seat's commander.
+ *
+ * Purpose: Each commander uses its own model and effort. An effort the model does not support is dropped by the same rule as the app-wide setting.
+ * When to use: Once per consultation, before the first chat request.
+ * Expected outcome: A seat with no model gets the baseline profile. A known model uses that seat's effort.
+ * Exceptions: None.
+ */
+export function resolveSeatOrdersRequestProfile(seat: SeatRecord): OrdersRequestProfile {
+  const modelId = seat.commander?.modelId?.trim() ?? '';
+  const effort = seat.commander?.reasoningEffort?.trim() ?? '';
+  logDebug('ordersRequestProfile resolveSeatOrdersRequestProfile', { seatId: seat.seatId, hasModel: modelId.length > 0 });
+  if (!modelId) return { ...BASELINE_ORDERS_REQUEST_PROFILE };
+  return resolveOrdersRequestProfile({
+    modelId,
+    model: getOpenRouterModelCapabilities(modelId),
+    persistedReasoningEffort: effort,
+    baseCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+  });
 }

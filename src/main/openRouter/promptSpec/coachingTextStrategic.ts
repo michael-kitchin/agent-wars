@@ -10,6 +10,7 @@
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
 import { logTrace } from '../../logger';
 import { regionalWinPathsBullet } from '../scenarioGoals';
+import { buildDoctrineBlock } from './doctrineText';
 import {
   buildCasualtySortRule,
   buildDestinationOccupancyRule,
@@ -27,9 +28,14 @@ import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
  * Exceptions: None.
  */
 export function buildStrategicContextCoaching(gates: CoachingGates): string {
-  logTrace('promptSpec buildStrategicContextCoaching', { includeScenarioWinPaths: gates.includeScenarioWinPaths });
+  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced');
+  logTrace('promptSpec buildStrategicContextCoaching', {
+    includeScenarioWinPaths: gates.includeScenarioWinPaths,
+    doctrineBlock: doctrine.length > 0,
+  });
+  const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${buildStrategicGoalsBlock(gates)}
-${STRATEGY_BLOCK}
+${STRATEGY_BLOCK}${doctrineLine}
 ${MESSAGE_BLOCK}`;
 }
 
@@ -45,12 +51,12 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
   logTrace('promptSpec buildStrategicCoachingBullets', { ...gates });
   const bullets: string[] = [];
   if (gates.includeScenarioWinPaths) {
-    bullets.push(
-      typeof gates.controlWinMinUrbanShare === 'number'
-        ? regionalWinPathsBullet(gates.controlWinMinUrbanShare)
-        : WIN_PATHS_BULLET
-    );
+    const winPaths = typeof gates.controlWinMinUrbanShare === 'number'
+      ? regionalWinPathsBullet(gates.controlWinMinUrbanShare)
+      : WIN_PATHS_BULLET;
+    bullets.push(gates.turnLimitVictory ? `${winPaths}${TURN_LIMIT_WIN_SENTENCE}` : winPaths);
   }
+  if ((gates.seatCount ?? 0) >= 3) bullets.push(FREE_FOR_ALL_BULLET);
   bullets.push(RESOLUTION_ORDER_BULLET, tempoBullet(gates.hasAirUnits));
   if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
   bullets.push(`- ${buildCasualtySortRule()}`);
@@ -88,7 +94,7 @@ function buildStrategicGoalsBlock(gates: CoachingGates): string {
   const homeRegionGoals = gates.includeScenarioWinPaths
     ? `
     (4) Protect your home region's production capacity
-    (5) Degrade or eliminate the enemy home region's urban production capacity`
+    (5) Degrade or eliminate enemy home regions' urban production capacity`
     : '';
   return `- Your goals are:
     (1) Engage enemy forces to reduce their combat effectiveness
@@ -118,7 +124,7 @@ export const STRATEGY_BLOCK = `- Your strategy is:
  * Exceptions: None.
  */
 export const MESSAGE_BLOCK = `- Your message is:
-    Address the human player in character as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.`;
+    Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.`;
 
 /**
  * Names the two strategic win paths.
@@ -129,7 +135,28 @@ export const MESSAGE_BLOCK = `- Your message is:
  * Exceptions: None.
  */
 const WIN_PATHS_BULLET =
-  '- Win by controlling all enemy home region hexes, or by destroying all enemy home region production capacity. Those are the cells that matter.';
+  '- Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter.';
+
+/**
+ * Free-for-all reminder for a match of three or more seats.
+ *
+ * Purpose: With more than one enemy, a side fighting someone else is not an ally.
+ * When to use: Immediately after the win-path bullet when `seatCount` is at least 3.
+ * Expected outcome: The bullet. Neutral garrisons hold and fire, and a loaded ship still sails, unloads, and holds.
+ * Exceptions: None.
+ */
+const FREE_FOR_ALL_BULLET =
+  '- Every other side is your enemy, and they are enemies of each other. A side busy fighting a third side is exposed; a side about to knock out another may become the strongest. Neutral garrisons hold their hexes and fire on anything in range. A loaded ship sails to a landing, unloads, and then holds.';
+
+/**
+ * Extra win-path sentence for a turn-limit match.
+ *
+ * Purpose: Last-side-standing is not the only ending when a turn limit is stored.
+ * When to use: Appended to the win-path bullet when `turnLimitVictory` is true.
+ * Expected outcome: A leading space and the most-city-hexes sentence.
+ * Exceptions: None.
+ */
+const TURN_LIMIT_WIN_SENTENCE = ' If the turn limit arrives first, the most city hexes wins.';
 
 /**
  * Restates the full turn resolution order.
@@ -235,15 +262,15 @@ const PRODUCTION_BULLET =
   ' When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.';
 
 /**
- * Shared home cells count for both win conditions.
+ * Shared home cells count for every home that lists them.
  *
  * Purpose: Holding the intersection is both defence and attack.
- * When to use: When the home regions intersect.
- * Expected outcome: Mentions that shared cells count toward both win conditions.
+ * When to use: When more than one home region lists the same cells.
+ * Expected outcome: Mentions that shared cells count toward each of those sides.
  * Exceptions: None.
  */
 const SHARED_HOME_BULLET =
-  '- When the home regions intersect, the listed shared cells count toward both win conditions, so holding them serves defence and attack at once.';
+  '- When more than one home region lists the same cells, the listed shared cells count toward each of those sides, so holding them serves defence and attack at once.';
 
 /**
  * Persist intent, not briefing data.

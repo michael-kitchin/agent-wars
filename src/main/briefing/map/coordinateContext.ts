@@ -1,3 +1,6 @@
+import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
+import { logTrace } from '../../logger';
+
 /**
  * Describes which coordinate namespace applies when translating 2-character briefing codes.
  *
@@ -53,6 +56,29 @@ export interface CoordinateContext {
    * Exceptions: None.
    */
   tacticalTurnNumber?: number;
+  /**
+   * The commander whose tools and standing orders this consultation applies.
+   *
+   * Contract: An AI seat. Absent only on contexts built before a seat was chosen.
+   * When to use: Tool execution and envelope writes during `requestOrders`.
+   * Expected outcome: That seat's units are the ones the tools may order.
+   * Exceptions: None.
+   */
+  seatId?: AiSeatId;
+}
+
+/**
+ * The commander this coordinate context is ordering for.
+ *
+ * Purpose: Envelope writes and order tools follow the consultation's seat.
+ * When to use: Standing-order, production, and memory tools inside one `requestOrders` call.
+ * Expected outcome: `seatId` when it was set. Otherwise the first AI seat, the only AI seat of a two-sided match.
+ * Exceptions: None.
+ */
+export function coordinateContextSeatId(context: CoordinateContext): AiSeatId {
+  const seatId = context.seatId ?? AI_SEAT_IDS[0];
+  logTrace('coordinateContext coordinateContextSeatId', { seatId, hadSeat: context.seatId !== undefined });
+  return seatId;
 }
 
 /**

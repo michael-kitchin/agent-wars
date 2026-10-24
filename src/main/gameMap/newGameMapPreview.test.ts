@@ -35,8 +35,7 @@ test('global preview matches the world grid and leaves the active map alone', ()
   const before = activeGameMap().id;
   const preview = buildNewGameMapPreview({
     scope: 'global',
-    humanHomeRegion: 'not-a-region',
-    aiHomeRegion: 'not-a-region',
+    homeKeys: ['not-a-region', 'not-a-region'],
   });
   assert.equal(activeGameMap().id, before);
   assert.equal(preview.gameMapId, 'global');
@@ -44,8 +43,7 @@ test('global preview matches the world grid and leaves the active map alone', ()
   assert.equal(preview.extent, 'world');
   assert.equal(preview.advancedMinUrbanCells, 21);
   assert.equal(preview.hexes.length, 842);
-  assert.deepEqual(preview.humanHomeRegionHexes, []);
-  assert.deepEqual(preview.aiHomeRegionHexes, []);
+  assert.deepEqual(preview.homeRegionHexesBySeatOrder, [[], []]);
   ensureTerrainClassificationCacheLoaded();
   const kinds = getTerrainStrategicKindsFromCache();
   const urbanCounts = new Map(
@@ -69,11 +67,18 @@ test('the same global home name returns equal hex lists', () => {
   assert.ok(name);
   const preview = buildNewGameMapPreview({
     scope: 'global',
-    humanHomeRegion: name!,
-    aiHomeRegion: name!,
+    homeKeys: [name!, name!],
   });
-  assert.deepEqual(preview.humanHomeRegionHexes, preview.aiHomeRegionHexes);
-  assert.ok(preview.humanHomeRegionHexes.length > 0);
+  assert.deepEqual(preview.homeRegionHexesBySeatOrder[0], preview.homeRegionHexesBySeatOrder[1]);
+  assert.ok((preview.homeRegionHexesBySeatOrder[0]?.length ?? 0) > 0);
+});
+
+test('home keys return one list per side, in that order', () => {
+  const names = listScenarioHomeRegions().slice(0, 3);
+  assert.equal(names.length, 3);
+  const preview = buildNewGameMapPreview({ scope: 'global', homeKeys: names });
+  assert.equal(preview.homeRegionHexesBySeatOrder.length, 3);
+  assert.ok(preview.homeRegionHexesBySeatOrder.every((hexes) => hexes.length > 0));
 });
 
 test('regional preview uses that pack and does not replace global weather', (t) => {
@@ -87,16 +92,14 @@ test('regional preview uses that pack and does not replace global weather', (t) 
   assert.ok(human && ai);
   const globalHex = buildNewGameMapPreview({
     scope: 'global',
-    humanHomeRegion: '',
-    aiHomeRegion: '',
+    homeKeys: ['', ''],
   }).hexes[0]!.h3Index;
   const beforeId = activeGameMap().id;
   const beforeWeather = displayWeatherForHex(globalHex, 1, 6);
   const preview = buildNewGameMapPreview({
     scope: 'regional',
     gameMapId: extracted.id,
-    humanSideGroupId: human!.id,
-    aiSideGroupId: ai!.id,
+    homeKeys: [human!.id, ai!.id],
   });
   assert.equal(activeGameMap().id, beforeId);
   assert.equal(displayWeatherForHex(globalHex, 1, 6), beforeWeather);
@@ -114,8 +117,7 @@ test('regional preview uses that pack and does not replace global weather', (t) 
     manifest.hexes
       .filter((hex) => hex.sideGroupId === groupId && (hex.role === 'land' || hex.role === 'member_land'))
       .map((hex) => hex.h3Index);
-  assert.deepEqual(preview.humanHomeRegionHexes, land(human!.id));
-  assert.deepEqual(preview.aiHomeRegionHexes, land(ai!.id));
+  assert.deepEqual(preview.homeRegionHexesBySeatOrder, [land(human!.id), land(ai!.id)]);
 });
 
 test('an unknown regional map throws', () => {
@@ -123,8 +125,7 @@ test('an unknown regional map throws', () => {
     buildNewGameMapPreview({
       scope: 'regional',
       gameMapId: 'not-a-map',
-      humanSideGroupId: 'a',
-      aiSideGroupId: 'b',
+      homeKeys: ['a', 'b'],
     })
   );
 });

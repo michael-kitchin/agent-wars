@@ -8,6 +8,7 @@
  * Exceptions: None; failures are returned as `error` values.
  */
 
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonus } from '../../shared/originBonusTypes';
@@ -17,16 +18,6 @@ import type { CombatEstimationEngagementType, CombatEstimationTheater } from './
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { logDebug, logTrace } from '../logger';
 import { withTargetCover } from '../terrainCover/terrainCoverLookup';
-
-/**
- * Player id of the AI side.
- *
- * Purpose: Assumed attackers belong to the AI, and automatic defenders are every non-AI unit on the target cell.
- * When to use: Building attacker and defender lists.
- * Expected outcome: Matches the `player` value of AI units in both theaters.
- * Exceptions: None.
- */
-const AI_PLAYER_ID = 'opponent';
 
 /**
  * Unit list argument shape for attackers and defenders.
@@ -365,6 +356,15 @@ export interface CombatSideContext {
    * Exceptions: None.
    */
   readonly warnings: string[];
+  /**
+   * Seat whose units are the attackers.
+   *
+   * Contract: Automatic defenders are every other owner on the target cell.
+   * When to use: Set from the snapshot perspective, or from the battle's other party when that party is an AI seat.
+   * Expected outcome: Assumed attackers use this id. Assumed defenders stay the human seat.
+   * Exceptions: None.
+   */
+  readonly ownSeatId: string;
 }
 
 /**
@@ -441,7 +441,7 @@ export function buildAttackers(raw: CombatSideArgs, ctx: CombatSideContext): Att
   const combat: CombatUnit[] = assumed.flatMap(({ type, count }) =>
     Array.from({ length: count }, () => ({
       id: `assumed-attacker-${idx++}`,
-      player: AI_PLAYER_ID,
+      player: ctx.ownSeatId,
       unitType: type,
       h3Index: ctx.targetHexH3,
     }))
@@ -495,7 +495,7 @@ export function buildDefenders(raw: CombatSideArgs | undefined, ctx: CombatSideC
     const combat: CombatUnit[] = raw.assumed.flatMap(({ type, count }) =>
       Array.from({ length: count }, () => ({
         id: `assumed-defender-${idx++}`,
-        player: 'human',
+        player: HUMAN_SEAT_ID,
         unitType: type,
         h3Index: ctx.targetHexH3,
       }))
@@ -503,8 +503,8 @@ export function buildDefenders(raw: CombatSideArgs | undefined, ctx: CombatSideC
     return { combat, summary: combat.map(toSummary), automatic: false };
   }
   const cell = ctx.theater.listUnitsAt(ctx.targetHexH3, ctx.engagementType);
-  const combat = cell.participants.filter((u) => u.player !== AI_PLAYER_ID).map(atTarget);
-  const excludedIds = cell.excluded.filter((u) => u.player !== AI_PLAYER_ID).map((u) => u.id);
+  const combat = cell.participants.filter((u) => u.player !== ctx.ownSeatId).map(atTarget);
+  const excludedIds = cell.excluded.filter((u) => u.player !== ctx.ownSeatId).map((u) => u.id);
   if (excludedIds.length > 0) {
     ctx.warnings.push(`Excluded units that sit out ${ctx.engagementType} combat: ${excludedIds.join(', ')}`);
   }

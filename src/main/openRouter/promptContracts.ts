@@ -102,7 +102,7 @@ export function buildFinalJsonContractInstruction(args: {
     .join(', ')} }.`;
   const periodNoun = coordinateMode === 'tactical' ? 'beat' : 'turn';
   const strictSchemaClause =
-    `Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`;
+    `Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`;
   const airUnitOrderNote = includeAirActions
     ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
     : '';

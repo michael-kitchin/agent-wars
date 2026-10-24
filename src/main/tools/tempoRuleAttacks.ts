@@ -1,5 +1,5 @@
 /**
- * Tempo rule enforcement: makes the opponent take legal shots the model declined to order.
+ * Tempo rule enforcement: makes a commander take legal shots the model declined to order.
  *
  * The strategic prompt tells the model "if a legal ranged_attack or air strike is available this turn, take it",
  * because these resolve from turn-start positions and cost nothing but the shot. A weaker model reads a very large
@@ -16,6 +16,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalTempoAttacks } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { logDebug } from '../logger';
@@ -93,16 +94,25 @@ export function collectTempoRuleAttacks(args: TempoRuleAttackArgs): {
 }
 
 /**
- * Inputs for `mergeOpponentAttackOrders`, kept as one object so the three attack sources stay named at call sites.
+ * Inputs for `mergeCommanderAttackOrders`, kept as one object so the three attack sources stay named at call sites.
  *
  * Contract: `modelRanged` and `modelAirStrikes` must already be deduplicated per unit; this merge only resolves
  * conflicts *between* sources, not within one. Ids must all be in the same namespace: strategic unit ids on a
  * strategic turn, tactical sub-unit ids when `tacticalBattle` is set.
- * When to use: Assembling the opponent's attacks on a consulted turn or beat.
+ * When to use: Assembling one commander's attacks on a consulted turn or beat.
  * Expected outcome: Passing `tacticalBattle` selects the tactical sweep; omitting it selects the strategic sweep.
  * Exceptions: None.
  */
-export type MergeOpponentAttackOrdersArgs = {
+export type MergeCommanderAttackOrdersArgs = {
+  /**
+   * Commander whose idle units the sweep may fire.
+   *
+   * Contract: An AI seat. The sweep and hold-fire list use this seat.
+   * When to use: Every consulted merge.
+   * Expected outcome: Another seat's units are not swept.
+   * Exceptions: None.
+   */
+  seatId: AiSeatId;
   /** Order-generation snapshot, used by the strategic sweep to find targets. */
   state: GameStateSnapshot;
   /**
@@ -128,12 +138,12 @@ export type MergeOpponentAttackOrdersArgs = {
  * outright, standing orders fill units it ignored, and the sweep only reaches units no other source claimed. A unit
  * the model named is dropped from *both* standing-order lists, not just the matching one, so a model-ordered
  * ranged attack cannot be shadowed by an auto air strike for the same unit.
- * When to use: Consulted opponent turns and beats, before the merged attacks go through order validation.
+ * When to use: Consulted turns and beats, before the merged attacks go through order validation.
  * Expected outcome: At most one entry per unit across both lists, with the model's choice preserved wherever it made
  * one.
  * Exceptions: None.
  */
-export function mergeOpponentAttackOrders(args: MergeOpponentAttackOrdersArgs): {
+export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs): {
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   airStrikes: StandingOrderGeneratedAirStrike[];
 } {
@@ -156,17 +166,18 @@ export function mergeOpponentAttackOrders(args: MergeOpponentAttackOrdersArgs): 
   const sweep = args.tacticalBattle
     ? collectTacticalTempoAttacks({
         battle: args.tacticalBattle,
-        playerId: 'opponent',
+        playerId: args.seatId,
         alreadyAttackingSubUnitIds: alreadyAttackingUnitIds,
-        holdFireParentUnitIds: holdFireUnitIdsForPlayer('opponent'),
+        holdFireParentUnitIds: holdFireUnitIdsForPlayer(args.seatId),
       })
     : collectTempoRuleAttacks({
-        playerId: 'opponent',
+        playerId: args.seatId,
         state: args.state,
         alreadyAttackingUnitIds,
       });
   const modelTotal = args.modelRanged.length + args.modelAirStrikes.length;
-  logDebug('tempoRuleAttacks mergeOpponentAttackOrders', {
+  logDebug('tempoRuleAttacks mergeCommanderAttackOrders', {
+    seatId: args.seatId,
     tactical: args.tacticalBattle?.battleId ?? null,
     modelAttacks: modelTotal,
     unitsClaimedByModel: modelClaimedUnitIds.size,

@@ -4,6 +4,7 @@
 
 import type { CombatUnit } from '../combatUnitTypes';
 import type { MeleeCandidateRow } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
 import { logDebug, logTrace } from '../logger';
 import { computeTacticalBattleSnapshot } from '../tacticalBattle/computeTacticalBattleSnapshot';
 
@@ -85,21 +86,83 @@ export function formatMeleeUnitCategorySummary(units: CombatUnit[], playerId: st
 }
 
 /**
- * Builds IPC rows for every melee candidate hex using live combat unit snapshots.
+ * A seat's order, used to name parties from left to right.
  *
- * Purpose: Centralizes row assembly for ready pause and unit tests.
- * When to use: After `listMeleeCandidateHexes` returns a non-empty list.
- * Expected outcome: One `MeleeCandidateRow` per candidate hex with human/AI summaries counting only units **on that hex** (not global totals repeated per row).
+ * Purpose: The row does not read the database.
+ * When to use: `buildMeleeInterceptCandidateRows`.
+ * Expected outcome: `seatOrder` matches the roster.
  * Exceptions: None.
  */
-export function buildMeleeInterceptCandidateRows(candidateHexes: string[], combatUnitsAfter: CombatUnit[]): MeleeCandidateRow[] {
+export interface MeleePartySeat {
+  /**
+   * The seat id.
+   *
+   * Contract: A seat id.
+   * When to use: Matching a unit's owner.
+   * Expected outcome: The roster id.
+   * Exceptions: None.
+   */
+  readonly seatId: string;
+  /**
+   * Seat order, starting at 1.
+   *
+   * Contract: A positive integer.
+   * When to use: Sorting parties after the human seat.
+   * Expected outcome: Lower numbers come first.
+   * Exceptions: None.
+   */
+  readonly seatOrder: number;
+}
+
+/**
+ * Builds one row per contested hex.
+ *
+ * Purpose: The dialog lists every such hex, and marks which ones can be fought.
+ * When to use: After the caller has kept the hexes the human can see.
+ * Expected outcome: Parties are the human seat, then seat order, then Neutral. `tacticalEligible` is true only for the human seat and exactly one other owner. A later probe can clear that flag when a battle cannot be placed.
+ * Exceptions: None.
+ */
+export function buildMeleeInterceptCandidateRows(
+  candidateHexes: readonly string[],
+  combatUnitsAfter: readonly CombatUnit[],
+  seats: readonly MeleePartySeat[]
+): MeleeCandidateRow[] {
   logTrace('buildMeleeInterceptCandidateRows', { candidateCount: candidateHexes.length, unitCount: combatUnitsAfter.length });
   return candidateHexes.map((h3Index) => {
-    const atHex = combatUnitsAfter.filter((u) => u.h3Index === h3Index);
-    return {
-      h3Index,
-      humanUnitSummary: formatMeleeUnitCategorySummary(atHex, 'human'),
-      aiUnitSummary: formatMeleeUnitCategorySummary(atHex, 'opponent'),
-    };
+    const atHex = combatUnitsAfter.filter((unit) => unit.h3Index === h3Index);
+    const parties = partiesAtHex(atHex, seats);
+    const tacticalEligible = parties.length === 2 && parties.some((party) => party.ownerId === HUMAN_SEAT_ID);
+    return { h3Index, parties, tacticalEligible };
   });
+}
+
+/**
+ * Owners on one hex, in display order, with their unit summaries.
+ *
+ * Purpose: The dialog and the tests share one order.
+ * When to use: `buildMeleeInterceptCandidateRows`.
+ * Expected outcome: Human, then seat order, then Neutral. Each summary counts only that owner's units on the hex.
+ * Exceptions: None.
+ */
+function partiesAtHex(units: readonly CombatUnit[], seats: readonly MeleePartySeat[]): MeleeCandidateRow['parties'] {
+  const owners = [...new Set(units.map((unit) => unit.player))];
+  owners.sort((left, right) => partyRank(left, seats) - partyRank(right, seats) || left.localeCompare(right));
+  return owners.map((ownerId) => ({
+    ownerId,
+    unitSummary: formatMeleeUnitCategorySummary([...units], ownerId),
+  }));
+}
+
+/**
+ * Sort rank for one owner.
+ *
+ * Purpose: Neutral stays last even when a seat order is high.
+ * When to use: `partiesAtHex`.
+ * Expected outcome: The human seat is 0. Neutral is last. Other seats use `seatOrder`.
+ * Exceptions: None.
+ */
+function partyRank(ownerId: string, seats: readonly MeleePartySeat[]): number {
+  if (ownerId === HUMAN_SEAT_ID) return 0;
+  if (isNeutralOwnerId(ownerId)) return 1_000_000;
+  return seats.find((seat) => seat.seatId === ownerId)?.seatOrder ?? 900_000;
 }

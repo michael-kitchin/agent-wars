@@ -7,6 +7,7 @@ import {
 } from '../../shared/landTraversalStrategic';
 import { formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from '../../shared/strategicTerrainFlags';
+import type { OwnerId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { getRange } from '../combatConstants';
@@ -31,6 +32,7 @@ import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
 import { isEmbarkedLandUnit, isEmbarkedLandUnitOnWater } from './sealift';
 import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
 import { validateTacticalHumanAirStrikeGroup } from './tacticalHumanAirStrikeValidation';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Defines the `effectiveHexPassabilityTerrain` function shape (function effectiveHexPassabilityTerrain(hex:).
@@ -72,7 +74,7 @@ function getMovementTerrainForH3(h3Index: string): string {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const HUMAN_PLAYER_ID = 'human';
+export const HUMAN_PLAYER_ID = HUMAN_SEAT_ID;
 
 /**
  * Defines the `getUniqueNonEmptyIds` function shape (function getUniqueNonEmptyIds(ids: string[]): string[]).
@@ -149,7 +151,7 @@ export function validateOrder(
 ): { valid: true } | { valid: false; reason: string } {
   logDebug('gameActions validateOrder', { unitId, toH3Index });
   const owned = loadOwnedStrategicUnit(unitId, {
-    allowedPlayer: 'human',
+    allowedPlayer: HUMAN_SEAT_ID,
     displayLabelForUnit,
     wrongOwnerReason: 'Only human units can receive orders',
   });
@@ -241,7 +243,7 @@ export function validateRangedAttack(
   options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): { valid: true } | { valid: false; reason: string } {
   logDebug('gameActions validateRangedAttack', { unitId, targetH3Index, allowedPlayer: options?.allowedPlayer });
-  const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const allowedPlayer = options?.allowedPlayer ?? HUMAN_SEAT_ID;
   const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   const owned = loadOwnedStrategicUnit(unitId, { allowedPlayer, displayLabelForUnit: labelFor });
   if (!owned.ok) return owned.failure;
@@ -315,9 +317,9 @@ function validateGroupTarget(args: {
 export function validateGroupRangedTarget(
   unitIds: string[],
   targetH3Index: string,
-  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
+  opts?: { tacticalAttackerPlayer?: OwnerId }
 ): SubmitOrdersResult {
-  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? HUMAN_SEAT_ID;
   logDebug('gameActions validateGroupRangedTarget', {
     unitCount: unitIds.length,
     targetH3Index,
@@ -354,9 +356,9 @@ export function validateGroupAirStrikeTarget(
   unitIds: string[],
   targetH3Index: string,
   targetType: AirStrikeTargetType,
-  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
+  opts?: { tacticalAttackerPlayer?: OwnerId }
 ): SubmitOrdersResult {
-  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? HUMAN_SEAT_ID;
   logDebug('gameActions validateGroupAirStrikeTarget', {
     unitCount: unitIds.length,
     targetH3Index,
@@ -396,9 +398,9 @@ export function validateGroupAirStrikeTarget(
 export function validateGroupFerryTarget(
   unitIds: string[],
   destinationH3Index: string,
-  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
+  opts?: { tacticalAttackerPlayer?: OwnerId }
 ): SubmitOrdersResult {
-  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? HUMAN_SEAT_ID;
   logDebug('gameActions validateGroupFerryTarget', {
     unitCount: unitIds.length,
     destinationH3Index,

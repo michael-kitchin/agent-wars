@@ -3,14 +3,9 @@ import { rendererSharedState as S } from '../core/state';
 import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
 import { clearOpenRouterLog } from '../openRouter/openRouterUiHelpers';
 import { clearConsoleReports } from '../chrome/consoleReports';
-import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
-import {
-  getSelectedScenarioRegions,
-  initializeScenarioRegionSelectorsOnOverlayOpen,
-  randomizeScenarioRegionSelect,
-} from './newGameRegionUi';
+import { initializeScenarioRegionSelectorsOnOverlayOpen } from './newGameRegionUi';
 import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
 import {
   randomizeNewGameStartMonth,
@@ -30,8 +25,10 @@ import {
   isMatchWaitingUnderNewGame,
 } from './newGameReturn';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
-import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
+import { prepareNewGameMapPanel, readNewGameMapChoice, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
+import { bindNewGameSides, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
 import { showNewGameBanner } from './newGameBanner';
+import { clearObserveAfterKnockout } from './observeIntent';
 import { chooseStartMatchAi } from '../../shared/startMatchAiChoice';
 import { applyStartMatchAiChoice, readStartMatchAiInput } from './newGameAiStart';
 import { advanceRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
@@ -55,20 +52,6 @@ import { showMapToast } from '../openRouter/openRouterUiHelpers';
  * Exceptions: None.
  */
 function registerRegionRandomizeButtons(): void {
-  document.getElementById('new-game-human-region-randomize')?.addEventListener('click', () => {
-    randomizeScenarioRegionSelect('new-game-human-region-select');
-    void refreshNewGameMapPreview();
-  });
-  document.getElementById('new-game-ai-region-randomize')?.addEventListener('click', () => {
-    randomizeScenarioRegionSelect('new-game-ai-region-select');
-    void refreshNewGameMapPreview();
-  });
-  document.getElementById('new-game-human-region-select')?.addEventListener('change', () => {
-    void refreshNewGameMapPreview();
-  });
-  document.getElementById('new-game-ai-region-select')?.addEventListener('change', () => {
-    void refreshNewGameMapPreview();
-  });
   document.getElementById('new-game-start-month-randomize')?.addEventListener('click', () => {
     randomizeNewGameStartMonth();
     repaintNewGameMapPreview();
@@ -285,12 +268,9 @@ function stopMatchWaitingUnderNewGame(): void {
   if (S.tacticalBattleSnapshot && S.gameState) {
     tacticalReleaseRendererSessionForNewStrategicMatch(S.gameState, false);
   }
-  resetPrecomputedAiState('null');
   S.pendingDeferredStrategicPostResolutionConsult = false;
   S.pendingDeferredTacticalPostBeatConsult = false;
-  S.backgroundRequestInFlight = false;
   S.readyRequestInFlight = false;
-  S.eventDrivenInitialConsultationDone = false;
 }
 
 /**
@@ -319,25 +299,26 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   });
   registerRegionRandomizeButtons();
   registerNewGameMapControls();
+  bindNewGameSides();
   registerGameSizeSelect();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
     if (!window.gameApi?.newGame) return;
-    if (regionalStartBlocked()) {
-      showMapToast('This map has no two sides.');
+    const seatsStart = readNewGameSeatsStart();
+    if (seatsStart.blocked) {
+      showMapToast(seatsStart.blocked);
       return;
     }
     const matchEpoch = advanceRendererMatchEpoch();
     stopMatchWaitingUnderNewGame();
     const cameraHold = holdNewGameMapPreviewCamera();
     try {
-      const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
         ...readNewGameOptionChoices(),
         startMonth: readNewGameStartMonth(),
-        humanHomeRegion: selectedRegions.humanHomeRegion,
-        aiHomeRegion: selectedRegions.aiHomeRegion,
         ...readNewGameMapChoice(),
+        seats: seatsStart.seats,
+        turnLimit: seatsStart.turnLimit,
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -346,6 +327,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.gameState = state;
       S.strategicScenarioInitialLeafletView = null;
       tacticalReleaseRendererSessionForNewStrategicMatch(state);
+      clearObserveAfterKnockout();
       clearRememberedUnitOrigins();
       deps.rebuildUnitDisplayNameLookup(state);
       deps.reconcileSelectionToCurrentState();
@@ -369,12 +351,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.gestureSelectionSnapshotAtMs = 0;
       S.selectedHexIndex = null;
       deps.hideStackCallout();
-      resetPrecomputedAiState('null');
       S.pendingDeferredStrategicPostResolutionConsult = false;
       S.pendingDeferredTacticalPostBeatConsult = false;
-      S.backgroundRequestInFlight = false;
-      S.eventDrivenInitialConsultationDone = false;
-      S.openRouterGameCost = 0;
       clearOpenRouterLog();
       clearConsoleReports();
       deps.updateOpenRouterCostLabel();
@@ -430,6 +408,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   resetNewGameOptionControls();
   void (async () => {
     await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+    refreshNewGameSides({ reset: true });
     await refreshNewGameMapPreview();
   })();
   syncGameSizeCapPreview();

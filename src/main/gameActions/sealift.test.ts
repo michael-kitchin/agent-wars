@@ -3,6 +3,7 @@
  * Run with: node dist/main/gameActions/sealift.test.js
  */
 
+import { type SeatId } from '../../shared/seatIds';
 import * as assert from 'assert';
 import { dbGetAll, dbGetOne, dbRun, getGameState } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
@@ -10,7 +11,7 @@ import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportLossForRemovedNavalUnits,
-  autoDebarkOpponentLandUnitIfMovingIndependently,
+  autoDebarkNonHumanLandUnitIfMovingIndependently,
   canManualDebarkFromHex,
   clearEmbarkAssignmentForLandUnit,
   getSealiftStackContextModeForHex,
@@ -49,14 +50,14 @@ function pickHex(index: number): string {
 }
 
 /**
- * Defines the `insertUnit` function shape (function insertUnit(id: string, player: 'human' | 'opponent', unitType: string, h3Index: string): void).
+ * Defines the `insertUnit` function shape (function insertUnit(id: string, player: SeatId, unitType: string, h3Index: string): void).
 
  * Purpose: Supports maintainability by documenting why `insertUnit` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function insertUnit(id: string, player: 'human' | 'opponent', unitType: string, h3Index: string): void {
+function insertUnit(id: string, player: SeatId, unitType: string, h3Index: string): void {
   dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, player, unitType, h3Index]);
 }
 
@@ -73,14 +74,14 @@ function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): 
 }
 
 /**
- * Defines the `setPortControl` function shape (function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void).
+ * Defines the `setPortControl` function shape (function setPortControl(h3Index: string, controllerPlayerId: SeatId, seaportCount = 1): void).
 
  * Purpose: Supports maintainability by documenting why `setPortControl` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void {
+function setPortControl(h3Index: string, controllerPlayerId: SeatId, seaportCount = 1): void {
   dbRun(
     `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
      VALUES (?, 0, 0, ?)
@@ -100,7 +101,7 @@ function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent
  */
 function prepareWaterHex(
   h3Index: string,
-  options: { seaportCount: number; controllerPlayerId?: 'human' | 'opponent' }
+  options: { seaportCount: number; controllerPlayerId?: SeatId }
 ): void {
   dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['water', 'water', h3Index]);
   dbRun(
@@ -681,7 +682,7 @@ function testUpdateSealiftSlotRejectsEmbarkAtEnemyWaterPort(): void {
  * Defines the `testAutoDebarkOpponentAndSkipHumanEmbarkedMoves` function shape (function testAutoDebarkOpponentAndSkipHumanEmbarkedMoves(): void).
 
  * Purpose: LLM/opponent movement auto-debarks at Ready; human embarked independent moves remain blocked.
- * When to use: After edits to `autoDebarkOpponentLandUnitIfMovingIndependently` or `shouldSkipEmbarkedLandIndependentMove`.
+ * When to use: After edits to `autoDebarkNonHumanLandUnitIfMovingIndependently` or `shouldSkipEmbarkedLandIndependentMove`.
  * Expected outcome: Opponent assignment cleared before move; human assignment preserved and move skipped.
  * Exceptions: None.
  */
@@ -707,11 +708,11 @@ function testAutoDebarkOpponentAndSkipHumanEmbarkedMoves(): void {
     assert.strictEqual(shouldSkipEmbarkedLandIndependentMove('hum-inf', hexB), true);
     assert.strictEqual(shouldSkipEmbarkedLandIndependentMove('opp-inf', hexB), false);
 
-    autoDebarkOpponentLandUnitIfMovingIndependently('opp-inf', hexB);
+    autoDebarkNonHumanLandUnitIfMovingIndependently('opp-inf', hexB);
     assert.strictEqual(isEmbarkedLandUnit('opp-inf'), false);
     assert.strictEqual(isEmbarkedLandUnit('hum-inf'), true);
 
-    autoDebarkOpponentLandUnitIfMovingIndependently('hum-inf', hexB);
+    autoDebarkNonHumanLandUnitIfMovingIndependently('hum-inf', hexB);
     assert.strictEqual(isEmbarkedLandUnit('hum-inf'), true);
   });
 }

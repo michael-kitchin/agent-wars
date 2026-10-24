@@ -4,13 +4,15 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
+import type { AiSeatId } from '../shared/seatIds';
+import type { DoctrineChoice, SeatSnapshot } from '../shared/seatRoster';
 import type {
   SubmitOrdersIpcPayload,
   GameReadyIpcPayload,
   GameStateSnapshot,
   ReadyResult,
-  RequestAiOrdersResult,
   OpenRouterModel,
   HumanOrderPreviewResult,
   HumanOrderGroupPreviewResult,
@@ -70,6 +72,11 @@ const IPC_GAME = {
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
+  endMatch: 'game:endMatch',
+  setSeatCommander: 'game:setSeatCommander',
+  startCommanderPlanning: 'game:startCommanderPlanning',
+  stopCommanderPlanning: 'game:stopCommanderPlanning',
+  readCommanderPool: 'game:readCommanderPool',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',
   previewHumanMarchOrder: 'game:previewHumanMarchOrder',
@@ -98,7 +105,6 @@ const IPC_GAME = {
   notifyResolutionPlaybackComplete: 'game:notifyResolutionPlaybackComplete',
   postResolutionConsultation: 'game:postResolutionConsultation',
   postTacticalBeatConsultation: 'game:postTacticalBeatConsultation',
-  requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
 } as const;
 
@@ -130,8 +136,8 @@ const IPC_OPENROUTER = {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
-ipcRenderer.on(IPC_OPENROUTER.log, (_event, payload: { line: string; isError?: boolean }) => {
+let openRouterLogListener: ((payload: { line: string; isError?: boolean; seatId?: string }) => void) | null = null;
+ipcRenderer.on(IPC_OPENROUTER.log, (_event, payload: { line: string; isError?: boolean; seatId?: string }) => {
   openRouterLogListener?.(payload);
 });
 
@@ -177,8 +183,8 @@ const gameApi = {
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getGameState: (): Promise<GameStateSnapshot> =>
-    ipcRenderer.invoke(IPC_GAME.getState),
+getGameState: (viewAs?: string): Promise<GameStateSnapshot> =>
+    ipcRenderer.invoke(IPC_GAME.getState, viewAs),
     /**
    * Documents the object literal property `getTacticalTerrainOverrides` (getTacticalTerrainOverrides: (): Promise<TacticalTerrainOverrideRow[]> => ipcRenderer.invoke('game:getTacticalTerrainOverrides')).
 
@@ -287,6 +293,57 @@ listGameMaps: (): Promise<GameMapListEntry[]> =>
    * Exceptions: None.
    */
 newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload),
+  /**
+   * Saves one AI seat's model, effort, and doctrine choice.
+   *
+   * Purpose: The commander popover writes that seat without changing the other seats.
+   * When to use: When the player changes a commander's model, effort, or doctrine.
+   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult.
+   * Exceptions: Rejects when the seat is human, missing, or knocked out.
+   */
+  setSeatCommander: (
+    seatId: AiSeatId,
+    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice }
+  ): Promise<SeatSnapshot> => ipcRenderer.invoke('game:setSeatCommander', seatId, commander),
+  /**
+   * Ends the match by ranking the seats that are still active.
+   *
+   * Purpose: End game on the knocked-out dialog opens the standings.
+   * When to use: When the player chooses End game.
+   * Expected outcome: The snapshot with the match over. A match that is already over is unchanged.
+   * Exceptions: Rejects when the database write fails.
+   */
+  endMatch: (): Promise<GameStateSnapshot> => ipcRenderer.invoke(IPC_GAME.endMatch),
+  /**
+   * Starts commander planning for every eligible AI seat, or for the active battle.
+   *
+   * Purpose: The match screen will ask the pool to plan. It does not call this yet.
+   * When to use: Strategic planning, or tactical planning while a battle is open.
+   * Expected outcome: The snapshot after the starts have been kicked off. Consults are still in flight.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  startCommanderPlanning: (request: { mode: CommanderPlanningMode }): Promise<CommanderPoolSnapshot> =>
+    ipcRenderer.invoke(IPC_GAME.startCommanderPlanning, request),
+  /**
+   * Stops every in-flight commander consult.
+   *
+   * Purpose: Run off and teardown need one stop for every seat.
+   * When to use: When the player stops model work.
+   * Expected outcome: Planning seats return to ready. Stored orders from an earlier consult stay.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  stopCommanderPlanning: (reason?: ModelCallCancelReason): Promise<void> =>
+    ipcRenderer.invoke(IPC_GAME.stopCommanderPlanning, reason === undefined ? undefined : { reason }),
+  /**
+   * Reads commander status and, when asked, takes the queued prose.
+   *
+   * Purpose: A peek leaves dispatches for a later drain.
+   * When to use: Polling status, or showing toasts.
+   * Expected outcome: AI seats in seat order. Dispatches are cleared only when `drain` is true.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  readCommanderPool: (drain: boolean): Promise<CommanderPoolSnapshot> =>
+    ipcRenderer.invoke(IPC_GAME.readCommanderPool, { drain }),
     /**
    * Documents the object literal property `submitOrders` (submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:submitOrders', payload)).
 
@@ -592,16 +649,6 @@ updateTacticalSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slo
    */
 updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) =>
     ipcRenderer.invoke(IPC_GAME.updateSealiftSlot, payload),
-    /**
-   * Documents the object literal property `requestAiOrders` (requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> => ipcRenderer.invoke('game:requestAiOrders', payload)).
-
-   * Purpose: Supports maintainability by documenting why `requestAiOrders` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
-    ipcRenderer.invoke(IPC_GAME.requestAiOrders, payload),
     /**
    * Documents the object literal property `cancelRequestAiOrders` (cancelRequestAiOrders: (): Promise<void> => ipcRenderer.invoke('game:cancelRequestAiOrders')).
 

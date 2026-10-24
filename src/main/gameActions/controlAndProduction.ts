@@ -10,6 +10,7 @@ import {
   getBuildProgressPointsForHex,
   getKeepBuildingForHex,
   getHexControlMap,
+  getSeatRoster,
   getStrategicInfrastructureForHex,
   listAllHexControls,
   listBuildQueueRowsForHex,
@@ -19,7 +20,8 @@ import {
   setHexController,
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
-import { formatStrategicUnitId, type UnitIdOwner } from '../../shared/unitIds';
+import { isNeutralOwnerId, isSeatId, NEUTRAL_OWNER_ID, type OwnerId, type SeatId } from '../../shared/seatIds';
+import { formatStrategicUnitId } from '../../shared/unitIds';
 import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
 import { readPersistedMaxUnitsPerType } from '../gameDb/gameSizeConfig';
 import type { BasicDbOps } from '../gameDb/dbOps';
@@ -107,31 +109,6 @@ fromControllerPlayerId: string | null; /**
  */
 toControllerPlayerId: string | null };
 /**
- * Documents the `DeploymentCapReachedByPlayer` type alias (type DeploymentCapReachedByPlayer).
-
- * Purpose: Supports maintainability by documenting why `DeploymentCapReachedByPlayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type DeploymentCapReachedByPlayer = { /**
- * Specifies the contract for the `human` member (human: BuildUnitType[];).
-
- * Contract: Describes stable behavior for callers of `human` in this codebase.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-human: BuildUnitType[]; /**
- * Specifies the contract for the `opponent` member (opponent: BuildUnitType[]).
-
- * Contract: Describes stable behavior for callers of `opponent` in this codebase.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-opponent: BuildUnitType[] };
-/**
  * Documents the module-scope binding `CONTROL_UNIT_TYPES` (CONTROL_UNIT_TYPES).
 
  * Purpose: Supports maintainability by documenting why `CONTROL_UNIT_TYPES` exists.
@@ -185,17 +162,18 @@ function spawnProducedUnitsForHex(
   controllerPlayerId: string,
   unitTypes: BuildUnitType[],
   unitCountsByPlayerType: Map<string, number>,
-  capReachedByPlayer: DeploymentCapReachedByPlayer,
+  capReachedByPlayer: Map<SeatId, BuildUnitType[]>,
   maxUnitsPerType: Readonly<Record<BuildUnitType, number>>
 ): BuildUnitType[] {
   if (unitTypes.length === 0) return [];
   const turnNumber = currentPlanningTurnNumber();
-  if (controllerPlayerId !== 'human' && controllerPlayerId !== 'opponent') {
+  if (!isSeatId(controllerPlayerId)) {
     throw new Error(`Cannot spawn produced units: unknown controller ${controllerPlayerId}`);
   }
-  const owner: UnitIdOwner = controllerPlayerId;
+  const owner: SeatId = controllerPlayerId;
   const deployed: BuildUnitType[] = [];
-  const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
+  const capArray = capReachedByPlayer.get(owner) ?? [];
+  capReachedByPlayer.set(owner, capArray);
   const capSet = new Set(capArray);
   for (const unitType of unitTypes) {
     const key = `${controllerPlayerId}:${unitType}`;
@@ -237,11 +215,10 @@ function spawnProducedUnitsForHex(
  * Exceptions: None; propagates database errors from helpers.
  */
 export function resolveStrategicControlAfterCombatAndMovement(
-  traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
+  traversedHexesByPlayer?: Map<OwnerId, Set<string>>
 ): ControlTransition[] {
   logDebug('gameActions resolveRes1ControlAfterCombatAndMovement', {
-    humanTraversedHexes: traversedHexesByPlayer?.human?.size ?? 0,
-    opponentTraversedHexes: traversedHexesByPlayer?.opponent?.size ?? 0,
+    owners: traversedHexesByPlayer ? [...traversedHexesByPlayer.keys()] : [],
   });
   const transitions: ControlTransition[] = [];
   const occupantRows = dbGetAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
@@ -257,7 +234,7 @@ export function resolveStrategicControlAfterCombatAndMovement(
   const allHexes = new Set<string>([
     ...Array.from(occupancyByHex.keys()),
     ...Array.from(currentControlByHex.keys()),
-    ...(traversedHexesByPlayer ? [...traversedHexesByPlayer.human, ...traversedHexesByPlayer.opponent] : []),
+    ...(traversedHexesByPlayer ? [...traversedHexesByPlayer.values()].flatMap((hexes) => [...hexes]) : []),
   ]);
   for (const h3Index of allHexes) {
     const occupied = occupancyByHex.get(h3Index);
@@ -266,11 +243,7 @@ export function resolveStrategicControlAfterCombatAndMovement(
     if (occupied && occupied.distinctPlayers === 1 && occupied.solePlayer) {
       nextController = occupied.solePlayer;
     } else if (!occupied && traversedHexesByPlayer) {
-      const humanTraversed = traversedHexesByPlayer.human.has(h3Index);
-      const opponentTraversed = traversedHexesByPlayer.opponent.has(h3Index);
-      if (humanTraversed !== opponentTraversed) {
-        nextController = humanTraversed ? 'human' : 'opponent';
-      }
+      nextController = emptyHexController(h3Index, traversedHexesByPlayer);
     } else {
       continue;
     }
@@ -302,16 +275,17 @@ export function resolveStrategicControlAfterCombatAndMovement(
  * Exceptions: None (DB/spawn failures surface from callees).
  */
 export function processProductionAfterControlResolution(): {
-  deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType };
-  capReachedByPlayer: DeploymentCapReachedByPlayer;
+  deployedByPlayer: ReadonlyMap<SeatId, DeployedUnitsByType>;
+  capReachedByPlayer: ReadonlyMap<SeatId, BuildUnitType[]>;
 } {
   logDebug('gameActions processProductionAfterControlResolution');
   const maxUnitsPerType = readPersistedMaxUnitsPerType({ run: dbRun, getOne: dbGetOne });
-  const deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType } = {
-    human: {},
-    opponent: {},
-  };
-  const capReachedByPlayer: DeploymentCapReachedByPlayer = { human: [], opponent: [] };
+  const deployedByPlayer = new Map<SeatId, DeployedUnitsByType>();
+  const capReachedByPlayer = new Map<SeatId, BuildUnitType[]>();
+  for (const seat of getSeatRoster()) {
+    deployedByPlayer.set(seat.seatId, {});
+    capReachedByPlayer.set(seat.seatId, []);
+  }
   const unitCountsByPlayerType = new Map<string, number>();
   const unitCountRows = dbGetAll<{ player: string; unitType: BuildUnitType; count: number }>(
     `SELECT player, unit_type AS unitType, COUNT(*) AS count
@@ -324,7 +298,7 @@ export function processProductionAfterControlResolution(): {
   const controls = listAllHexControls().filter((row) => row.controllerPlayerId !== null);
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
-    if (!controllerPlayerId) continue;
+    if (!controllerPlayerId || !isSeatId(controllerPlayerId)) continue;
     const { urbanHexCount, seaportCount, airportCount } = getStrategicInfrastructureForHex(control.h3Index);
     if (urbanHexCount <= 0) continue;
 
@@ -336,7 +310,8 @@ export function processProductionAfterControlResolution(): {
 
     const neutralBorder = isNeutralBorderHex(control.h3Index);
     const storedPoints = getBuildProgressPointsForHex(control.h3Index);
-    const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
+    const capArray = capReachedByPlayer.get(controllerPlayerId) ?? [];
+    capReachedByPlayer.set(controllerPlayerId, capArray);
     const capSet = new Set(capArray);
     const queueWorking = queueRows
       .map((row) => ({
@@ -448,7 +423,8 @@ export function processProductionAfterControlResolution(): {
       capReachedByPlayer,
       maxUnitsPerType
     );
-    const deployedForController = controllerPlayerId === 'opponent' ? deployedByPlayer.opponent : deployedByPlayer.human;
+    const deployedForController = deployedByPlayer.get(controllerPlayerId) ?? {};
+    deployedByPlayer.set(controllerPlayerId, deployedForController);
     for (const unitType of deployedForHex) {
       deployedForController[unitType] = (deployedForController[unitType] ?? 0) + 1;
     }
@@ -481,28 +457,54 @@ export function processProductionAfterControlResolution(): {
 export function collectTraversedHexesByPlayer(
   orders: Array<{ unitId: string; toH3Index: string }>,
   unitsBeforeMove: Array<{ id: string; player: string; h3Index: string; unitType: string }>
-): Record<'human' | 'opponent', Set<string>> {
+): Map<OwnerId, Set<string>> {
   logDebug('gameActions collectTraversedHexesByPlayer', {
     orderCount: orders.length,
     unitCount: unitsBeforeMove.length,
   });
-  const traversed: Record<'human' | 'opponent', Set<string>> = {
-    human: new Set<string>(),
-    opponent: new Set<string>(),
-  };
+  const traversed = new Map<OwnerId, Set<string>>();
   const byId = new Map(unitsBeforeMove.map((u) => [u.id, u]));
   for (const order of orders) {
     const unit = byId.get(order.unitId);
-    if (!unit) continue;
-    if (!CONTROL_UNIT_TYPE_SET.has(unit.unitType)) continue;
-    const player = unit.player === 'opponent' ? 'opponent' : 'human';
+    const owner = unit ? traversalOwner(unit.player, unit.unitType) : null;
+    if (!unit || !owner) continue;
+    const hexes = traversed.get(owner) ?? new Set<string>();
+    traversed.set(owner, hexes);
     const path = computeGridPathCellsPure(unit.h3Index, order.toH3Index);
     if (path === null) {
-      traversed[player].add(unit.h3Index);
-      traversed[player].add(order.toH3Index);
+      hexes.add(unit.h3Index);
+      hexes.add(order.toH3Index);
       continue;
     }
-    for (const h3 of path) traversed[player].add(h3);
+    for (const h3 of path) hexes.add(h3);
   }
   return traversed;
+}
+
+/**
+ * The owner whose movement can capture hexes, or null when this unit cannot.
+ *
+ * Purpose: Seats capture with infantry, armor, and naval. Neutral captures with infantry and armor only.
+ * When to use: While recording one order's path.
+ * Expected outcome: The owner id, or null for air, Neutral naval, and any other owner.
+ * Exceptions: None.
+ */
+function traversalOwner(player: string, unitType: string): OwnerId | null {
+  if (isSeatId(player)) return CONTROL_UNIT_TYPE_SET.has(unitType) ? player : null;
+  if (isNeutralOwnerId(player)) return unitType === 'infantry' || unitType === 'armor' ? NEUTRAL_OWNER_ID : null;
+  return null;
+}
+
+/**
+ * Chooses the controller of an empty hex from who traversed it.
+ *
+ * Purpose: Neutral land capture wins over a seat. Otherwise one seat captures and two seats leave the hex alone.
+ * When to use: After combat, for a hex with no occupant.
+ * Expected outcome: Neutral, the only seat, or null when the hex should keep its controller.
+ * Exceptions: None.
+ */
+function emptyHexController(h3Index: string, traversed: Map<OwnerId, Set<string>>): string | null {
+  if (traversed.get(NEUTRAL_OWNER_ID)?.has(h3Index)) return NEUTRAL_OWNER_ID;
+  const seats = [...traversed.entries()].filter(([owner, hexes]) => owner !== NEUTRAL_OWNER_ID && hexes.has(h3Index));
+  return seats.length === 1 ? seats[0]![0] : null;
 }

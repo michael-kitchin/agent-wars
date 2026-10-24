@@ -39,8 +39,8 @@ const SAVED_MATCH_FILE = /^game-baseline-v\d+\.sqlite$/;
  *
  * Purpose: The game-over scene needs a finished match, and play cannot finish one in a smoke run.
  * When to use: Pass to `editSavedMatch` before the last session.
- * Expected outcome: The reopened match opens on the game-over screen with a loss message. The keys are the ones
- *   `src/main/gameDb/gameConfigKv.ts` writes when a match ends.
+ * Expected outcome: The reopened match opens on the game-over screen. With no end reason stored, the heading is
+ *   "The match is over." The keys are the ones `src/main/gameDb/gameConfigKv.ts` writes when a match ends.
  * Exceptions: None.
  */
 const FINISHED_MATCH_EDIT = Object.freeze([

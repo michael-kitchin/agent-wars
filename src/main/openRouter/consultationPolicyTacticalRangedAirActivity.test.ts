@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import {
-  humanHadTacticalBeatResolutionActions,
-  opponentHadTacticalBeatResolutionActions,
+  enemyHadTacticalBeatResolutionActions,
+  seatHadTacticalBeatResolutionActions,
 } from './consultationPolicy';
 
 const minimalBattle: TacticalBattleSnapshot = {
@@ -43,7 +43,7 @@ test('human ranged/air submission flag counts as beat activity without human mar
     humanMoves: [],
     humanBeatHadSubmittedRangedOrAirOrders: true,
   };
-  assert.equal(humanHadTacticalBeatResolutionActions(playback, minimalBattle), true);
+  assert.equal(enemyHadTacticalBeatResolutionActions(playback, minimalBattle, 'opponent'), true);
 });
 
 test('opponent ranged/air submission flag counts as beat activity without opponent marches', () => {
@@ -51,12 +51,12 @@ test('opponent ranged/air submission flag counts as beat activity without oppone
     humanMoves: [],
     opponentBeatHadSubmittedRangedOrAirOrders: true,
   };
-  assert.equal(opponentHadTacticalBeatResolutionActions(playback, minimalBattle), true);
+  assert.equal(seatHadTacticalBeatResolutionActions(playback, minimalBattle, 'opponent'), true);
 });
 
 test('no moves, no ranged/air flags, and no kills yields no opponent activity', () => {
   const playback: TacticalCommitResolutionPlayback = {
     humanMoves: [],
   };
-  assert.equal(opponentHadTacticalBeatResolutionActions(playback, minimalBattle), false);
+  assert.equal(seatHadTacticalBeatResolutionActions(playback, minimalBattle, 'opponent'), false);
 });

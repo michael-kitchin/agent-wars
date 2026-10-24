@@ -17,7 +17,11 @@ import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { gameMapLoadError } from '../gameMap/loadGameMap';
 import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
+import { readSeatRoster } from './seatRosterStore';
+import { activeSeats, toSeatSnapshot } from '../../shared/seatRoster';
+import type { SeatId } from '../../shared/seatIds';
 import { readPersistedGameSize } from './gameSizeConfig';
+import { readGameEndReason, readVictorySettings } from './gameConfigKv';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { formatGameDateForTurn, gameCalendarKindForMap, parseStartMonth } from '../../shared/gameCalendar';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
@@ -34,15 +38,6 @@ import { strategicMajorityOriginIds, tacticalOriginAreasLoaded } from '../unitOr
  * Exceptions: None.
  */
 export const STALE_INTEL_TURNS = 2;
-/**
- * Documents the module-scope binding `FOG_PLAYERS` (FOG_PLAYERS).
-
- * Purpose: Supports maintainability by documenting why `FOG_PLAYERS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const FOG_PLAYERS = ['human', 'opponent'] as const;
 /**
  * Documents the module-scope binding `FOG_OF_WAR_ENABLED_KEY` (FOG_OF_WAR_ENABLED_KEY).
 
@@ -122,25 +117,25 @@ function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean):
  */
 function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameStateSnapshot {
   const scenario = loadScenarioState(ops);
-  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return snapshot;
-  const humanHomeRegion = scenario.humanHomeRegion;
-  const aiHomeRegion = scenario.aiHomeRegion;
-  const humanHomeRegionHexes = getScenarioHomeRegionHexes(humanHomeRegion);
-  const aiHomeRegionHexes = getScenarioHomeRegionHexes(aiHomeRegion);
-  const intersectingHomeRegionHexes = computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes);
-  const contestedHomeRegionHexes = computeContestedHomeRegionHexes(
-    snapshot.units,
-    [...humanHomeRegionHexes, ...aiHomeRegionHexes]
-  );
+  const roster = readSeatRoster(ops);
+  const seats = roster.map((seat) => toSeatSnapshot(seat, snapshot.gameOver === true));
+  const homeRegionHexesBySeat: Record<string, readonly string[]> = {};
+  for (const seat of roster) {
+    homeRegionHexesBySeat[seat.seatId] = getScenarioHomeRegionHexes(seat.homeRegion);
+  }
+  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) {
+    return { ...snapshot, seats, homeRegionHexesBySeat };
+  }
+  const homeLists = Object.values(homeRegionHexesBySeat);
+  const intersectingHomeRegionHexes = computeIntersectingHomeRegionHexes(homeLists);
+  const contestedHomeRegionHexes = computeContestedHomeRegionHexes(snapshot.units, homeLists.flat());
   return {
     ...snapshot,
     scenarioId: 'region_vs_region',
-    humanHomeRegion,
-    aiHomeRegion,
-    humanHomeRegionHexes,
-    aiHomeRegionHexes,
     intersectingHomeRegionHexes,
     contestedHomeRegionHexes,
+    seats,
+    homeRegionHexesBySeat,
   };
 }
 
@@ -294,6 +289,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     ...(originBonusSettings.terrainBonusEnabled ? { terrainBonusLevel: originBonusSettings.terrainBonusLevel ?? 'low' } : {}),
     ...(techOn ? { techBonusEnabled: true as const, techBonusLevel: originBonusSettings.techBonusLevel ?? 'low' } : {}),
   };
+  const gameEndReason = readGameEndReason(ops);
   const snapshot = {
     hexes: weatherOn
       ? hexRows.map((hex) => ({ ...hex, weather: displayWeatherForHex(hex.h3Index, turnNumber, startMonth) }))
@@ -312,6 +308,8 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     gameOver: gameOver || undefined,
     winner,
     gameSize: readPersistedGameSize(ops),
+    victory: readVictorySettings(ops),
+    ...(gameEndReason ? { gameEndReason } : {}),
     ...originFlags,
     startMonth,
     currentDateLabel,
@@ -336,7 +334,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
 function refreshFogOfWarIntelForPlayer(
   deps: FogDeps,
   state: GameStateSnapshot,
-  playerId: string,
+  playerId: SeatId,
   currentTurn: number,
   traversedHexes: Set<string> | undefined
 ): void {
@@ -344,11 +342,7 @@ function refreshFogOfWarIntelForPlayer(
   logDebug('gameDb refreshFogOfWarIntelForPlayer', { playerId, currentTurn });
   const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
   const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
-  const forcedVisibleHomeHexes = getForcedVisibleHomeRegionHexesForPlayer(
-    state,
-    playerId === 'human' ? 'human' : 'opponent',
-    mapHexSet
-  );
+  const forcedVisibleHomeHexes = getForcedVisibleHomeRegionHexesForPlayer(state, playerId, mapHexSet);
   for (const h3 of forcedVisibleHomeHexes) visibleHexes.add(h3);
   logDebug('gameDb refreshFogOfWarIntelForPlayer: forced home-region visibility', {
     playerId,
@@ -426,7 +420,7 @@ function refreshFogOfWarIntelForPlayer(
 }
 
 /**
- * Defines the `refreshFogOfWarIntelFromCurrentState` function shape (export function refreshFogOfWarIntelFromCurrentState( deps: FogDeps, options?: { traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>>).
+ * Defines the `refreshFogOfWarIntelFromCurrentState` function shape (export function refreshFogOfWarIntelFromCurrentState( deps: FogDeps, options?: { traversedHexesByPlayer?: Partial<Record<SeatId, string[]>>).
 
  * Purpose: Supports maintainability by documenting why `refreshFogOfWarIntelFromCurrentState` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -435,36 +429,44 @@ function refreshFogOfWarIntelForPlayer(
  */
 export function refreshFogOfWarIntelFromCurrentState(
   deps: FogDeps,
-  options?: { traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>> }
+  options?: { traversedHexesByPlayer?: Readonly<Partial<Record<SeatId, readonly string[]>>> }
 ): void {
   const { ops } = deps;
+  const seats = ops.hasDb() ? activeSeats(readSeatRoster(ops)) : [];
   logDebug('gameDb refreshFogOfWarIntelFromCurrentState', {
-    humanTraversed: options?.traversedHexesByPlayer?.human?.length ?? 0,
-    opponentTraversed: options?.traversedHexesByPlayer?.opponent?.length ?? 0,
+    seatIds: seats.map((seat) => seat.seatId),
   });
   if (!ops.hasDb()) return;
   if (!isFogOfWarEnabled(ops)) {
     ops.run('DELETE FROM player_hex_intel');
     ops.run('DELETE FROM player_unit_intel');
-    ops.run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
+    for (const seat of seats) {
+      ops.run('DELETE FROM game_config WHERE key = ?', [`fog_new_contacts_${seat.seatId}`]);
+    }
     return;
   }
   const state = getGameStateSnapshot(deps);
   const currentTurn = getCurrentTurnNumberFromDb(ops);
-  for (const playerId of FOG_PLAYERS) {
-    refreshFogOfWarIntelForPlayer(deps, state, playerId, currentTurn, new Set(options?.traversedHexesByPlayer?.[playerId] ?? []));
+  for (const seat of seats) {
+    refreshFogOfWarIntelForPlayer(
+      deps,
+      state,
+      seat.seatId,
+      currentTurn,
+      new Set(options?.traversedHexesByPlayer?.[seat.seatId] ?? [])
+    );
   }
 }
 
 /**
- * Defines the `consumeFogNewContactsForPlayer` function shape (export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' | 'opponent'): string[]).
+ * Defines the `consumeFogNewContactsForPlayer` function shape (export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: SeatId): string[]).
 
  * Purpose: Supports maintainability by documenting why `consumeFogNewContactsForPlayer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' | 'opponent'): string[] {
+export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: SeatId): string[] {
   logDebug('gameDb consumeFogNewContactsForPlayer', { playerId });
   if (!ops.hasDb()) return [];
   const key = `fog_new_contacts_${playerId}`;
@@ -480,7 +482,7 @@ export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' 
 }
 
 /**
- * Defines the `getGameStateForPlayer` function shape (export function getGameStateForPlayer( deps: FogDeps, playerId: 'human' | 'opponent', options?: { maskUnexploredTerrain?: boolean } ): GameStateSnapsh).
+ * Defines the `getGameStateForPlayer` function shape (export function getGameStateForPlayer( deps: FogDeps, playerId: SeatId, options?: { maskUnexploredTerrain?: boolean } ): GameStateSnapsh).
 
  * Purpose: Supports maintainability by documenting why `getGameStateForPlayer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -489,7 +491,7 @@ export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' 
  */
 export function getGameStateForPlayer(
   deps: FogDeps,
-  playerId: 'human' | 'opponent',
+  playerId: SeatId,
   options?: { maskUnexploredTerrain?: boolean }
 ): GameStateSnapshot {
   const { ops } = deps;

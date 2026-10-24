@@ -35,6 +35,7 @@ import {
   spanForProjectedHex,
 } from '../map/terrainView';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Callbacks the scene already owns.
@@ -267,7 +268,7 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
   try {
     for (const hx of state.hexes) {
       const explored = deps.isHexExploredByPlayer(hx.h3Index);
-      const controlledByHuman = getControllerForHex(state, hx.h3Index) === 'human';
+      const controlledByHuman = getControllerForHex(state, hx.h3Index) === HUMAN_SEAT_ID;
       const humanUrbanProduction = isStrategicHexHumanUrbanProduction(state, hx);
       const surface = strategicProductionLabelSurface({
         tacticalRendered: false,

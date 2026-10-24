@@ -43,6 +43,15 @@ export interface TopBarDateBlockArgs {
    * Exceptions: None.
    */
   readonly strategicPhaseLabel: string;
+  /**
+   * The match's turn limit, or null when the match has none.
+   *
+   * Contract: A positive whole number, null, or omitted.
+   * When to use: Pass `state.victory.turnLimit` only for a turn-limit match.
+   * Expected outcome: The turn line becomes "Turn N of L · Phase".
+   * Exceptions: None.
+   */
+  readonly turnLimit?: number | null;
 }
 
 /**
@@ -80,11 +89,12 @@ export interface TopBarDateBlockText {
  * Purpose: The player reads the date first and the turn and phase second.
  * When to use: Every top-bar refresh. In a battle the block is hidden and the battle header shows the beat; see
  *   `formatBattleHeaderStatus`.
- * Expected outcome: Em dashes with no snapshot. Otherwise the date and "Turn N · Phase".
+ * Expected outcome: Em dashes with no snapshot. Otherwise the date and "Turn N · Phase", or "Turn N of L · Phase" when a limit is set.
  * Exceptions: None.
  */
 export function formatTopBarDateBlock(args: TopBarDateBlockArgs): TopBarDateBlockText {
   if (!args.hasGameState) return { date: '—', turnPhase: '—' };
   const date = args.dateLabel.length > 0 ? args.dateLabel : '—';
-  return { date, turnPhase: `Turn ${args.turnNumber} · ${args.strategicPhaseLabel}` };
+  const turn = args.turnLimit != null ? `Turn ${args.turnNumber} of ${args.turnLimit}` : `Turn ${args.turnNumber}`;
+  return { date, turnPhase: `${turn} · ${args.strategicPhaseLabel}` };
 }

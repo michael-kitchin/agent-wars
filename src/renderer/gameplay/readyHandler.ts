@@ -5,7 +5,7 @@ import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromp
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
-import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
+import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import {
   isDeferredResolutionPlaybackConsultPending,
   isWaitingForPrecomputedAiOrders,
@@ -13,14 +13,19 @@ import {
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
+import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { rollbackReadyToolCounts, runTacticalReadyCommit } from './readyTacticalCommit';
 import {
   announceResolutionTurnUpdate,
   deriveCombatVisibilityClassification,
+  reportViewerSeatId,
   scheduleResolutionPlaybackCompleteNotify,
 } from './readyResolutionAnnouncements';
+import { announceKnockouts } from './knockoutNotices';
+import { offerHumanKnockoutChoice } from './knockoutDialog';
+import { maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
 export type { ReadyHandlerDeps } from './readyHandlerTypes';
 
 /**
@@ -51,15 +56,6 @@ enabledToolGroupsPayload: string[];
    */
 useEventDriven: boolean;
     /**
-   * Specifies the contract for the `usePrecomputed` member (usePrecomputed: boolean;).
-
-   * Contract: Describes stable behavior for callers of `usePrecomputed` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-usePrecomputed: boolean;
-    /**
    * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
 
    * Contract: Mirrors the Run/AI planning toggle into ready and resolve payloads.
@@ -79,7 +75,7 @@ aiPlanningRunEnabled?: boolean;
  * Exceptions: None.
  */
 function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
-  const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
+  const { enabledToolGroupsPayload, useEventDriven, aiPlanningRunEnabled } = args;
   const base: GameReadyIpcPayload = {
     enabledToolGroups: enabledToolGroupsPayload,
     aiPlanningRunEnabled: aiPlanningRunEnabled ?? S.runButtonOn,
@@ -87,12 +83,6 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
   if (useEventDriven) {
     base.useEventDrivenConsultation = true;
   }
-  if (!usePrecomputed) return base;
-  base.precomputedAiOrders = S.precomputedAiOrders ?? [];
-  base.precomputedAiRangedOrders = S.precomputedAiRangedOrders ?? [];
-  base.precomputedAiEmbarkOrders = S.precomputedAiEmbarkOrders ?? [];
-  base.precomputedAiStrategy = S.precomputedAiStrategy ?? undefined;
-  base.precomputedAiMessage = S.precomputedAiMessage ?? undefined;
   return base;
 }
 
@@ -131,7 +121,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (isWaitingForPrecomputedAiOrders()) {
       rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.startBackgroundRequestIfAllowed();
-      deps.showMapToast('AI planning is still running. Ready will unlock once precomputed orders are available.', { isError: false });
+      deps.showMapToast('AI planning is still running. Ready will unlock when it finishes.', { isError: false });
       deps.updateReadyButtonState();
       return;
     }
@@ -156,21 +146,21 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       })) as { success: boolean; reason?: string };
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!submitResult.success) {
-        deps.showSidebarError(submitResult.reason ?? 'Submit failed');
+        const reason = submitResult.reason ?? 'Submit failed';
+        stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+        deps.showSidebarError(reason);
         deps.updateReadyButtonState();
         return;
       }
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;
-    const usePrecomputed = S.runButtonOn && S.precomputedAiOrders !== null;
     const cachedPrecomputedToolCounts =
       cachedPrecomputedToolCountsAtReadyStart ??
       (S.precomputedToolInvocationCounts ? { ...S.precomputedToolInvocationCounts } : null);
     const readyPayload = buildReadyPayload({
       enabledToolGroupsPayload,
       useEventDriven,
-      usePrecomputed,
       aiPlanningRunEnabled: S.runButtonOn,
     });
     const visibleHexesBeforeTurn = deps.getVisibleHexSet(S.gameState);
@@ -179,7 +169,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
       rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-      deps.showSidebarError(readyResult.reason ?? 'Ready failed');
+      const reason = readyResult.reason ?? 'Ready failed';
+      stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+      deps.showSidebarError(reason);
       deps.updateReadyButtonState();
       return;
     }
@@ -192,7 +184,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         return;
       }
       await deps.refreshTacticalTerrainOverridesForRenderer();
-      const pausedState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+      const pausedState = await fetchMatchSnapshot();
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       await deps.applyGameStateSnapshot(pausedState, {
         refreshStandingOrders: false,
@@ -220,7 +212,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!resolveResult.success) {
         rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-        deps.showSidebarError(resolveResult.reason ?? 'Melee resolve failed');
+        const reason = resolveResult.reason ?? 'Melee resolve failed';
+        stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
+        deps.showSidebarError(reason);
         deps.updateReadyButtonState();
         return;
       }
@@ -228,11 +222,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       resolutionPlaybackNotifyKind = 'melee';
     }
 
-    resetPrecomputedAiState('null');
     const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
     await deps.refreshTacticalTerrainOverridesForRenderer();
-    const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+    const nextState = await fetchMatchSnapshot();
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    announceKnockouts(readyResult.knockouts ?? [], S.gameState, nextState.seats, readyResult.removedUnitIdsBySeat);
     const state = nextState;
     await deps.applyGameStateSnapshot(state, {
       refreshStandingOrders: false,
@@ -254,12 +248,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     applyToolInvocationCountsAfterReady({
       fromResult: readyResult.toolInvocationCounts,
       cachedPrecomputed: cachedPrecomputedToolCounts,
-      allowPrecomputedFallback: usePrecomputed,
+      allowPrecomputedFallback: cachedPrecomputedToolCounts != null,
     });
-    if (readyResult.cost !== undefined) {
-      S.openRouterGameCost += readyResult.cost;
-      deps.updateOpenRouterCostLabel();
-    }
+    deps.updateOpenRouterCostLabel();
     if (readyResult.aiConsulted === false) {
       deps.appendOpenRouterLog('AI executing standing orders (no event fired).');
       deps.showMapToast('AI: standing orders only (no consultation).', {
@@ -284,7 +275,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
       (readyResult.baseInvalidAirLossCount ?? 0) > 0;
     const visibleHexes = deps.getVisibleHexSet(state);
-    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes);
+    const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
     const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
     const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
     if (readyResult.postResolutionConsultDeferred === true) {
@@ -360,6 +351,26 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
     deps.updateGameOverUI(state);
     deps.updateReadyButtonState();
+    const knockoutChoice = await offerHumanKnockoutChoice(
+      state,
+      readyResult.knockouts,
+      () => {
+        if (!window.gameApi) throw new Error('endMatch is unavailable');
+        return window.gameApi.endMatch();
+      },
+      (ended) => deps.applyGameStateSnapshot(ended, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: true,
+        updateReadyButton: true,
+        refreshBuildPopup: false,
+        redraw: true,
+      }),
+      deps.showSidebarError
+    );
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    if (knockoutChoice === 'ended') return;
     if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
     if (readyResult.tacticalAutoStartH3Index) {
@@ -369,12 +380,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
   } catch (err) {
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    stopObserveAutoAdvance(String(err), deps.appendOpenRouterLog);
     deps.showSidebarError(String(err));
     deps.updateReadyButtonState();
   } finally {
     if (rendererMatchEpochCurrent(matchEpoch)) {
       S.readyRequestInFlight = false;
+      void readCommanderPoolAndApply(true);
       deps.updateReadyButtonState();
+      setTimeout(() => { void maybeObserveAutoAdvance(); }, 0);
     }
   }
 }

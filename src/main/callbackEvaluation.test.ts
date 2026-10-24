@@ -80,7 +80,7 @@ pendingOrders: [],
  * Exceptions: None.
  */
 function testFirstConsultationFires(): void {
-  const results = evaluateMandatoryOverrides(baseState, 0, [], [], [], []);
+  const results = evaluateMandatoryOverrides('opponent', baseState, 0, [], [], [], []);
   assert.ok(results.some((r) => r.type === 'first_consultation'));
 }
 
@@ -93,7 +93,7 @@ function testFirstConsultationFires(): void {
  * Exceptions: None.
  */
 function testFirstCombatFires(): void {
-  const results = evaluateMandatoryOverrides(
+  const results = evaluateMandatoryOverrides('opponent', 
     baseState,
     5,
     [], // none in combat since consultation
@@ -113,7 +113,7 @@ function testFirstCombatFires(): void {
  * Exceptions: None.
  */
 function testUnitDestroyedFires(): void {
-  const results = evaluateMandatoryOverrides(
+  const results = evaluateMandatoryOverrides('opponent', 
     baseState,
     5,
     [],
@@ -133,7 +133,7 @@ function testUnitDestroyedFires(): void {
  * Exceptions: None.
  */
 function testDeadmanFires(): void {
-  const results = evaluateMandatoryOverrides(
+  const results = evaluateMandatoryOverrides('opponent', 
     { ...baseState, turnNumber: 16 },
     10, // last consultation turn 10, now 16 -> 6 turns
     [],
@@ -153,7 +153,7 @@ function testDeadmanFires(): void {
  * Exceptions: None.
  */
 function testNoFirstCombatWhenAlreadyInSet(): void {
-  const results = evaluateMandatoryOverrides(
+  const results = evaluateMandatoryOverrides('opponent', 
     baseState,
     5,
     ['opponent-armor-1'], // already in set
@@ -195,8 +195,8 @@ function testAttackMixChangedFires(): void {
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: 'not-a-cell' },
     ],
   };
-  evaluateMandatoryOverrides(turn1, 1, [], [], [], []);
-  const results = evaluateMandatoryOverrides(turn2, 1, [], [], [], []);
+  evaluateMandatoryOverrides('opponent', turn1, 1, [], [], [], []);
+  const results = evaluateMandatoryOverrides('opponent', turn2, 1, [], [], [], []);
   assert.ok(results.some((r) => r.type === 'attack_mix_changed'));
 }
 
@@ -231,7 +231,7 @@ function testInfrastructureDestroyedSubscriptionEventFires(): void {
   const subscriptions: CallbackSubscription[] = [
     { event: 'infrastructure_destroyed', params: { targetType: 'airport' }, subscribedTurn: 9 },
   ];
-  const fired = evaluateSubscriptionEvents(baseState, subscriptions, {
+  const fired = evaluateSubscriptionEvents('opponent', baseState, subscriptions, {
     opponentCombatParticipantUnitIds: [],
     removedUnitIds: [],
     removedOpponentUnitIds: [],

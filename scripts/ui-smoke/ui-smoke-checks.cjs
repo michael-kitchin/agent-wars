@@ -76,6 +76,8 @@ function probePage(selectors) {
       collapsed: el.getAttribute('data-collapsed'),
       expanded: el.getAttribute('aria-expanded'),
       pressed: el.getAttribute('aria-pressed'),
+      checked: el instanceof HTMLInputElement ? el.checked : null,
+      optionCount: el instanceof HTMLSelectElement ? el.options.length : null,
       label: el.getAttribute('aria-label'),
       fontSize: getComputedStyle(el).fontSize,
       borderColor: getComputedStyle(el).borderTopColor,
@@ -191,11 +193,11 @@ const FRAME_CHECKS = Object.freeze([
   {
     name: 'topbar-sides',
     scenes: [SCENES.strategic],
-    needs: ['#topbar-human-side', '#topbar-opponent-side'],
+    needs: ['#topbar-human-side', '#topbar-second-side'],
     run: (p, el) => {
       const human = el('#topbar-human-side').text;
-      const opponent = el('#topbar-opponent-side').text;
-      return human === 'Southern Europe' && opponent === 'Northern Africa' ? null : `sides read "${human}" vs "${opponent}"`;
+      const opponent = el('#topbar-second-side').text;
+      return human === 'Southern Europe' && opponent === 'N. Africa' ? null : `sides read "${human}" vs "${opponent}"`;
     },
   },
   {
@@ -205,9 +207,9 @@ const FRAME_CHECKS = Object.freeze([
     run: (p, el) => {
       const date = el('#topbar-date').text;
       const turn = el('#topbar-turn-phase').text;
-      return date === 'September, Year 1' && turn === 'Turn 1 · Planning'
+      return date === 'September, Year 1' && turn === 'Turn 1 of 30 · Planning'
         ? null
-        : `date block reads "${date}" / "${turn}", expected "September, Year 1" / "Turn 1 · Planning"`;
+        : `date block reads "${date}" / "${turn}", expected "September, Year 1" / "Turn 1 of 30 · Planning"`;
     },
   },
   {
@@ -268,10 +270,10 @@ const FRAME_CHECKS = Object.freeze([
   {
     name: 'orders-tab-shows-panel',
     scenes: [SCENES.strategic, SCENES.consoleExpandedAgain],
-    needs: ['#console-panel-orders', '#console-panel-opponent', '#console-title'],
+    needs: ['#console-panel-orders', '#console-panel-commanders', '#console-title'],
     run: (p, el) => {
       if (!el('#console-panel-orders').shown) return 'the Orders panel is not shown';
-      if (el('#console-panel-opponent').shown) return 'the Opponent panel is shown with Orders';
+      if (el('#console-panel-commanders').shown) return 'the Commanders panel is shown with Orders';
       const title = el('#console-title').text;
       return title === 'Orders' ? null : `console title is "${title}"`;
     },
@@ -279,13 +281,13 @@ const FRAME_CHECKS = Object.freeze([
   {
     name: 'opponent-tab-shows-panel',
     scenes: [SCENES.opponentTab],
-    needs: ['#console-panel-orders', '#console-panel-opponent', '#openrouter-log', '#console-title'],
+    needs: ['#console-panel-orders', '#console-panel-commanders', '#openrouter-log', '#console-title'],
     run: (p, el) => {
-      if (!el('#console-panel-opponent').shown) return 'the Opponent panel is not shown';
+      if (!el('#console-panel-commanders').shown) return 'the Commanders panel is not shown';
       if (el('#console-panel-orders').shown) return 'the Orders panel is still shown';
       if (!el('#openrouter-log').shown) return 'the AI activity log is not shown';
       const title = el('#console-title').text;
-      return title === 'Opponent' ? null : `console title is "${title}"`;
+      return title === 'Commanders' ? null : `console title is "${title}"`;
     },
   },
   {
@@ -330,8 +332,9 @@ const FRAME_CHECKS = Object.freeze([
       '#topbar-stat-forces-cap',
       '#topbar-stat-human-home',
       '#topbar-stat-human-home-total',
-      '#topbar-stat-opponent-home',
-      '#topbar-stat-opponent-home-total',
+      '#topbar-stat-enemy-home-host',
+      '#topbar-stat-cities-host',
+      '#topbar-stat-cities',
     ],
     run: (p, el) => {
       const text = (selector) => el(selector).text;
@@ -343,8 +346,9 @@ const FRAME_CHECKS = Object.freeze([
       if (!/^\d+$/.test(text('#topbar-stat-human-home')) || text('#topbar-stat-human-home-total') !== '/15') {
         problems.push(`your home "${text('#topbar-stat-human-home')}${text('#topbar-stat-human-home-total')}" (total should be /15)`);
       }
-      if (!/^\d+$/.test(text('#topbar-stat-opponent-home')) || text('#topbar-stat-opponent-home-total') !== '/24') {
-        problems.push(`enemy home "${text('#topbar-stat-opponent-home')}${text('#topbar-stat-opponent-home-total')}" (total should be /24)`);
+      if (el('#topbar-stat-enemy-home-host').shown) problems.push('enemy homes show on a turn-limit match');
+      if (!el('#topbar-stat-cities-host').shown || !/^\d+ · \d+ of 2$/.test(text('#topbar-stat-cities'))) {
+        problems.push(`cities "${text('#topbar-stat-cities')}"${el('#topbar-stat-cities-host').shown ? '' : ' and the readout is hidden'}`);
       }
       return problems.length === 0 ? null : problems.join('; ');
     },

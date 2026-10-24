@@ -3,7 +3,7 @@
  */
 
 import { logDebug, logError } from '../logger';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattlePlayerId, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   effectiveTacticalRangedMaxRangeForAttacker,
   tacticalMountainLosBlockedState,
@@ -36,7 +36,7 @@ export function validateTacticalGroupRangedTarget(params: {
   snap: TacticalBattleSnapshot;
   uniqueUnitIds: string[];
   targetH3Index: string;
-  tacticalAttackerPlayer: 'human' | 'opponent';
+  tacticalAttackerPlayer: TacticalBattlePlayerId;
 }): TacticalGroupRangedTargetResult {
   const { snap, uniqueUnitIds, targetH3Index, tacticalAttackerPlayer } = params;
   logDebug('tacticalGroupRangedTargetValidation validateTacticalGroupRangedTarget', {

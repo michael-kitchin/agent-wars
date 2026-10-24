@@ -5,12 +5,14 @@
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
 import { expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
+import { observeModeControls } from '../../shared/observeModeControls';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
 import { onQueuedOrdersChanged, queuedOrderCount } from '../gameplay/queuedOrderRows';
 import { scrollOpenRouterLogToEnd } from '../openRouter/openRouterUiHelpers';
-import { onConsoleReportsChanged, setConsoleReportsVisible, unreadConsoleReportCount } from './consoleReports';
+import { onConsoleReportsChanged, refreshReportSenderFilter, setConsoleReportsVisible, unreadConsoleReportCount } from './consoleReports';
 import { selectTabPanel, type TabPanelBinding } from './selectTabPanel';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * One enabled console tab: its button, its panel, the title shown while it is active, and what to refresh on show.
@@ -62,10 +64,10 @@ const CONSOLE_TABS: readonly ConsoleTabBinding[] = Object.freeze([
   { tabId: 'console-tab-orders', panelId: 'console-panel-orders', title: 'Orders', subtitle: ordersSubtitle },
   { tabId: 'console-tab-reports', panelId: 'console-panel-reports', title: 'Reports', subtitle: () => 'this match' },
   {
-    tabId: 'console-tab-opponent',
-    panelId: 'console-panel-opponent',
-    title: 'Opponent',
-    subtitle: () => S.gameState?.aiHomeRegion ?? '',
+    tabId: 'console-tab-commanders',
+    panelId: 'console-panel-commanders',
+    title: 'Commanders',
+    subtitle: commandersSubtitle,
     onShow: scrollOpenRouterLogToEnd,
   },
 ]);
@@ -97,6 +99,23 @@ function ordersSubtitle(): string {
 }
 
 /**
+ * Builds the Commanders tab's subtitle.
+ *
+ * Purpose: Says how many commanders are in the match, and when the player is only watching.
+ * When to use: As that tab's `subtitle`.
+ * Expected outcome: "{n} opponents" while a human seat is playing, or "{n} sides, observing" when none is.
+ * Exceptions: None.
+ */
+function commandersSubtitle(): string {
+  const seats = S.gameState?.seats ?? [];
+  const humanPlaying = seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
+  if (!humanPlaying && seats.length > 0) return `${seats.length} sides, observing`;
+  const opponents = seats.filter((seat) => seat.kind === 'ai').length || 1;
+  const word = opponents === 1 ? 'opponents'.slice(0, -1) : 'opponents';
+  return `${opponents} ${word}`;
+}
+
+/**
  * Shows a count on a rail tab, or hides the count when it is zero.
  *
  * Purpose: Rail badges share one look and one rule.
@@ -115,18 +134,27 @@ function setRailBadge(badgeId: string, count: number): void {
  * Redraws the header subtitle and the rail badges.
  *
  * Purpose: The subtitle and badges change while the tab stays the same: queued orders, the turn or beat, unread
- *   reports, and, on the Opponent tab, the opponent's home region.
+ *   reports, and, on the Commanders tab, how many commanders are playing.
  * When to use: After the queued orders change, after a snapshot or turn or beat changes, and when the tab changes.
  * Expected outcome: `#console-subtitle` shows the active tab's subtitle. The Orders badge shows the number of
  *   queued orders, and the Reports badge the number of unread reports.
  * Exceptions: None; missing elements are skipped.
  */
 export function refreshConsoleHeader(): void {
+  const orders = document.getElementById('console-tab-orders');
+  const observing = observeModeControls(S.gameState?.seats ?? []).observing;
+  if (orders instanceof HTMLButtonElement) orders.disabled = observing;
+  if (observing && consoleState.activeTabId === 'console-tab-orders') {
+    consoleState = expandedConsoleTabState('console-tab-commanders');
+    applyConsoleState();
+    return;
+  }
   const active = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
   const subtitle = document.getElementById('console-subtitle');
   if (subtitle) subtitle.textContent = active ? active.subtitle() : '';
   setRailBadge('console-tab-orders-badge', queuedOrderCount());
   setRailBadge('console-tab-reports-badge', unreadConsoleReportCount());
+  refreshReportSenderFilter();
 }
 
 /**
@@ -183,6 +211,7 @@ export function wireConsoleFrame(): void {
   onConsoleReportsChanged(refreshConsoleHeader);
   for (const tab of CONSOLE_TABS) {
     document.getElementById(tab.tabId)?.addEventListener('click', () => {
+      if (tab.tabId === 'console-tab-orders' && observeModeControls(S.gameState?.seats ?? []).observing) return;
       consoleState = nextConsoleTabState(consoleState, tab.tabId);
       applyConsoleState();
     });

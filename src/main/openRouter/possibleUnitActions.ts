@@ -13,6 +13,7 @@
  * destinations and the per-request destination caches live in `possibleUnitActionsDestinations.ts`.
  */
 
+import { briefingOwnSeatId, enemyHomeHexes } from '../briefing/briefingPerspective';
 import { type GameStateSnapshot, listTacticalFeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalLegalMoveDestinationHexes } from '../../shared/collectTacticalLegalMoveDestinationHexes';
@@ -54,9 +55,7 @@ import {
   ACTION_RANGED,
   aggregateRows,
   BUCKET_TITLES,
-  ENEMY_PLAYER,
   excludeUnitCurrentHex,
-  FRIENDLY_PLAYER,
   groupRowsByBucket,
   markdownTableLines,
   omitThisTurnFerryRowsForStrikingAir,
@@ -86,11 +85,11 @@ export type { PossibleActionTableRow } from './possibleUnitActionsTableAssembly'
  *
  * Purpose: Rows targeting the enemy homeland are grouped into their own bucket.
  * When to use: Once per `collectAggregatedPossibleActionRows` call, passed to `appendRowsForLegalHexes`.
- * Expected outcome: A set of `state.humanHomeRegionHexes`; empty when the snapshot has none.
+ * Expected outcome: A set of the other active seats' home hexes; empty when the snapshot has none.
  * Exceptions: None.
  */
 function enemyHomelandHexSet(state: GameStateSnapshot): Set<string> {
-  return new Set(state.humanHomeRegionHexes ?? []);
+  return new Set(enemyHomeHexes(state));
 }
 
 /**
@@ -232,9 +231,10 @@ export function collectAggregatedPossibleActionRows(args: {
     reusedIndexedState: Boolean(args.indexedState),
   });
   const { state, latLngByH3, tacticalBattle } = args;
+  const ownSeat = briefingOwnSeatId(state);
   const indexed = args.indexedState ?? buildPossibleActionsIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
-  const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => compareUnitIdsNaturally(a.id, b.id));
+  const opponentUnits = state.units.filter((u) => u.player === ownSeat).sort((a, b) => compareUnitIdsNaturally(a.id, b.id));
   const rawRows: RawPossibleActionRow[] = [];
   const thisTurnFilterStats = forThisTurn
     ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0, airStrikeIn: 0, airStrikeOut: 0 }
@@ -253,7 +253,7 @@ export function collectAggregatedPossibleActionRows(args: {
   let tacticalBestOptionsInterest: TacticalBestOptionsInterestContext | undefined;
   if (tacticalBattle) {
     tacticalHumanOccupiedH3 = new Set(
-      tacticalBattle.subUnits.filter((s) => s.player === ENEMY_PLAYER).map((s) => s.h3Index)
+      tacticalBattle.subUnits.filter((s) => s.player !== ownSeat).map((s) => s.h3Index)
     );
     try {
       const foot = new Set(tacticalBattle.tacticalChildH3Indexes);
@@ -267,7 +267,7 @@ export function collectAggregatedPossibleActionRows(args: {
       battle: tacticalBattle,
       humanOccupiedH3: tacticalHumanOccupiedH3,
       friendlyOccupiedH3: new Set(
-        tacticalBattle.subUnits.filter((s) => s.player === FRIENDLY_PLAYER).map((s) => s.h3Index)
+        tacticalBattle.subUnits.filter((s) => s.player === ownSeat).map((s) => s.h3Index)
       ),
       enclosingController: indexed.controlByHex.get(tacticalBattle.enclosingStrategicH3Index) ?? null,
       rowByH3: new Map((tacticalRangedRowsForFootprint ?? []).map((r) => [r.h3Index, r])),
@@ -284,7 +284,7 @@ export function collectAggregatedPossibleActionRows(args: {
     forThisTurn && !tacticalBattle
       ? stayPutFriendlyOccupiedHexes(
           friendlyOccupantsFromHexIndex(indexed.friendlyUnitsByHex),
-          readStandingThisPeriodMoves(FRIENDLY_PLAYER)
+          readStandingThisPeriodMoves(ownSeat)
         )
       : undefined;
   if (stayPutFriendlyH3) {

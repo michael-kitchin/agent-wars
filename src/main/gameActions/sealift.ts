@@ -6,6 +6,7 @@ import { logDebug, logTrace } from '../logger';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import {
   buildSealiftSlotsByNavalId,
   normalizeSealiftSlots,
@@ -180,7 +181,7 @@ function getUnitsAtHex(h3Index: string): UnitRow[] {
  */
 function getHumanNavalIds(unitsAtHex: UnitRow[]): string[] {
   return unitsAtHex
-    .filter((unit) => unit.player === 'human' && unit.unitType === 'naval')
+    .filter((unit) => unit.player === HUMAN_SEAT_ID && unit.unitType === 'naval')
     .map((unit) => unit.id)
     .sort((a, b) => a.localeCompare(b));
 }
@@ -194,7 +195,7 @@ function getHumanNavalIds(unitsAtHex: UnitRow[]): string[] {
  * Exceptions: None.
  */
 function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
-  const land = unitsAtHex.filter((unit) => unit.player === 'human' && (unit.unitType === 'infantry' || unit.unitType === 'armor'));
+  const land = unitsAtHex.filter((unit) => unit.player === HUMAN_SEAT_ID && (unit.unitType === 'infantry' || unit.unitType === 'armor'));
   return land
     .map((unit) => ({ unitId: unit.id, unitType: unit.unitType as 'infantry' | 'armor' }))
     .sort((a, b) => {
@@ -290,7 +291,7 @@ export function getSealiftStackContextModeForHex(h3Index: string): SealiftContex
   logTrace('sealift getSealiftStackContextModeForHex', { h3Index });
   const context = getHexEmbarkContext(h3Index);
   if (!context) return 'unsupported';
-  if (canPlayerEmbarkFromHex(h3Index, 'human')) return 'coastal_port';
+  if (canPlayerEmbarkFromHex(h3Index, HUMAN_SEAT_ID)) return 'coastal_port';
   if (context.normalizedMovementTerrain === 'water') return 'water';
   if (context.normalizedMovementTerrain === 'coastal') return 'coastal_no_port';
   return 'unsupported';
@@ -314,11 +315,11 @@ function loadAssignmentsAtHex(h3Index: string): AssignmentRow[] {
      JOIN units nu ON nu.id = uta.naval_unit_id
      WHERE lu.h3_index = ?
        AND nu.h3_index = ?
-       AND lu.player = 'human'
-       AND nu.player = 'human'
+       AND lu.player = ?
+       AND nu.player = ?
        AND nu.unit_type = 'naval'
        AND lu.unit_type IN ('infantry', 'armor')`,
-    [h3Index, h3Index]
+    [h3Index, h3Index, HUMAN_SEAT_ID, HUMAN_SEAT_ID]
   );
 }
 
@@ -382,7 +383,7 @@ function buildNavalRows(
   landTypeById: Map<string, 'infantry' | 'armor'>
 ): SealiftNavalRow[] {
   const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';
-  const debarkAllowed = canManualDebarkFromHex(h3Index, 'human');
+  const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
   return navalIds.map((navalUnitId) => {
     const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
     const slot1Armor = !!slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor';
@@ -418,7 +419,7 @@ export function readSealiftStackState(h3Index: string): SealiftStackState {
   const navalRows = buildNavalRows(contextMode, h3Index, navalIds, slotsByNavalId, landTypeById);
   const hasEmbarkedUnitsInStack = assignments.length > 0;
   const hasMixedStack = navalIds.length > 0 && landOptions.length > 0;
-  const debarkAllowedAtHex = canManualDebarkFromHex(h3Index, 'human');
+  const debarkAllowedAtHex = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
   return {
     h3Index,
     showSealiftSection: hasMixedStack || hasEmbarkedUnitsInStack,
@@ -457,10 +458,10 @@ export function executeSealiftSlotUpdate(args: {
   if (!navalIds.includes(args.navalUnitId)) return { success: false, reason: 'Selected naval unit is not in this stack.' };
   const isDebark = args.landUnitId === null;
   if (isDebark) {
-    if (!canManualDebarkFromHex(args.h3Index, 'human')) {
+    if (!canManualDebarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (!canPlayerEmbarkFromHex(args.h3Index, 'human')) {
+  } else if (!canPlayerEmbarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
     const atSea = state.contextMode === 'water';
     return {
       success: false,
@@ -605,34 +606,34 @@ export function isEmbarkedLandUnitOnWater(unitId: string): boolean {
 }
 
 /**
- * Clears sealift assignment when an opponent land unit receives an independent movement order off its carrier.
+ * Clears sealift assignment when a non-human land unit receives an independent movement order off its carrier.
  *
- * Purpose: LLM movement actions auto-debark before marching; humans must debark manually instead.
- * When to use: Ready pipeline and LLM order ingest immediately before applying or enqueueing movement.
- * Expected outcome: Assignment row removed when opponent cargo would move independently; no-op for humans, non-embarked units, and stay-aboard orders.
- * Exceptions: None.
+ * Purpose: Commanders auto-debark before marching. The human must debark manually instead.
+ * When to use: Ready pipeline immediately before applying movement.
+ * Expected outcome: Assignment row removed when cargo of any owner other than the human would move independently.
+ * Exceptions: None. Humans, units that are not embarked, and stay-aboard orders are unchanged.
  */
-export function autoDebarkOpponentLandUnitIfMovingIndependently(unitId: string, toH3Index: string): void {
+export function autoDebarkNonHumanLandUnitIfMovingIndependently(unitId: string, toH3Index: string): void {
   const row = dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [unitId]);
-  if (row?.player !== 'opponent') return;
+  if (!row || row.player === HUMAN_SEAT_ID) return;
   if (!isEmbarkedLandUnit(unitId)) return;
   const carrierHex = getEmbarkedNavalH3IndexForLandUnit(unitId);
   if (!carrierHex || toH3Index === carrierHex) return;
-  logDebug('sealift autoDebarkOpponentLandUnitIfMovingIndependently', { unitId, toH3Index, carrierHex });
+  logDebug('sealift autoDebarkNonHumanLandUnitIfMovingIndependently', { unitId, toH3Index, carrierHex, player: row.player });
   clearEmbarkAssignmentForLandUnit(unitId);
 }
 
 /**
  * Returns whether an independent movement order for an embarked human land unit should be skipped at Ready resolution.
  *
- * Purpose: Human cargo cannot march independently until manual debark; opponent cargo is handled by `autoDebarkOpponentLandUnitIfMovingIndependently`.
+ * Purpose: Human cargo cannot march independently until manual debark. Other owners are handled by `autoDebarkNonHumanLandUnitIfMovingIndependently`.
  * When to use: Ready pipeline after opponent auto-debark, before applying `UPDATE units SET h3_index` for each movement order.
  * Expected outcome: True when human cargo would move independently off its carrier; false for opponents, stay-aboard no-ops, and non-embarked units.
  * Exceptions: None.
  */
 export function shouldSkipEmbarkedLandIndependentMove(unitId: string, toH3Index: string): boolean {
   const row = dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [unitId]);
-  if (row?.player !== 'human') return false;
+  if (row?.player !== HUMAN_SEAT_ID) return false;
   if (!isEmbarkedLandUnit(unitId)) return false;
   const carrierHex = getEmbarkedNavalH3IndexForLandUnit(unitId);
   if (!carrierHex) return true;
@@ -666,14 +667,6 @@ export function syncEmbarkedLandUnitPositionsWithNaval(): void {
 }
 
 /**
- * Defines the `applyEmbarkOrdersForPlayer` function shape (export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void).
-
- * Purpose: Supports maintainability by documenting why `applyEmbarkOrdersForPlayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-/**
  * Writes human sealift rows for tactical sub-unit embark orders using strategic parent ids (no tactical hex co-location check).
  *
  * Purpose: Mirrors strategic slot assignment during tactical Ready commits while parent `units.h3_index` may still anchor at strategic; tactical validation already ensured legality on the snapshot.
@@ -700,7 +693,7 @@ export function applyTacticalEmbarkCommittedOrdersToStrategicDb(
       [navalParent]
     );
     if (!land || !naval) continue;
-    if (land.player !== 'human' || naval.player !== 'human') continue;
+    if (land.player !== HUMAN_SEAT_ID || naval.player !== HUMAN_SEAT_ID) continue;
     if (!((land.unitType === 'infantry' || land.unitType === 'armor') && naval.unitType === 'naval')) continue;
     dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [landParent]);
     dbRun(
@@ -730,7 +723,7 @@ export function syncStrategicSealiftFromTacticalHexEmbarkPairs(args: {
   if (!isDbReady()) return;
   const landParents: string[] = [];
   for (const u of args.battle.subUnits) {
-    if (u.h3Index !== args.h3Index || u.player !== 'human') continue;
+    if (u.h3Index !== args.h3Index || u.player !== HUMAN_SEAT_ID) continue;
     if (u.unitType !== 'infantry' && u.unitType !== 'armor') continue;
     landParents.push(u.parentUnitId);
   }
@@ -745,7 +738,16 @@ export function syncStrategicSealiftFromTacticalHexEmbarkPairs(args: {
   });
 }
 
+/**
+ * Stores embark orders for one owner when the land unit and the ship already share a hex.
+ *
+ * Purpose: Ready applies each non-human owner's embark list. The human embarks from the sealift popup, not from this call.
+ * When to use: Once per owner, in seat order, with Neutral last.
+ * Expected outcome: A legal pair is stored in `unit_transport_assignments`. A pair that fails a check is skipped.
+ * Exceptions: Propagates SQLite errors.
+ */
 export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void {
+  logDebug('sealift applyEmbarkOrdersForPlayer', { playerId, orderCount: orders.length });
   if (orders.length <= 0) return;
   for (const order of orders) {
     const land = dbGetOne<{ id: string; player: string; unitType: string; h3Index: string }>(

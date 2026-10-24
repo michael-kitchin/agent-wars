@@ -52,6 +52,7 @@ const noopResolve = (): string | undefined => undefined;
  */
 function testMemoryDeleteMissingKey(): void {
   const result = executeMemory(
+    'opponent',
     'memory_delete',
     { key: 'nonexistent_key' },
     emptyState,
@@ -72,6 +73,7 @@ function testMemoryDeleteMissingKey(): void {
  */
 function testMemoryWriteEmptyContent(): void {
   const result = executeMemory(
+    'opponent',
     'memory_write',
     { key: 'k', content: '' },
     emptyState,
@@ -92,6 +94,7 @@ function testMemoryWriteEmptyContent(): void {
  */
 function testMemoryWriteContentOver500(): void {
   const result = executeMemory(
+    'opponent',
     'memory_write',
     { key: 'k', content: 'x'.repeat(501) },
     emptyState,
@@ -112,6 +115,7 @@ function testMemoryWriteContentOver500(): void {
  */
 function testMemoryWriteInvalidKey(): void {
   const result = executeMemory(
+    'opponent',
     'memory_write',
     { key: 'bad key', content: 'ok' },
     emptyState,
@@ -132,6 +136,7 @@ function testMemoryWriteInvalidKey(): void {
  */
 function testMemoryReadRequiresKeyOrTagsOrTierOrAll(): void {
   const result = executeMemory(
+    'opponent',
     'memory_read',
     {},
     emptyState,
@@ -152,6 +157,7 @@ function testMemoryReadRequiresKeyOrTagsOrTierOrAll(): void {
  */
 function testMemoryDeleteRequiresKey(): void {
   const result = executeMemory(
+    'opponent',
     'memory_delete',
     {},
     emptyState,

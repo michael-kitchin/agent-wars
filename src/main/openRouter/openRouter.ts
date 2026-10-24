@@ -10,7 +10,9 @@ import { getRange } from '../combatConstants';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
-import { dbGetOne, dbRun } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getSeatRoster } from '../gameDb';
+import { updateSeatCommander } from '../gameDb/seatRosterStore';
+import { cancelModelCalls } from './modelCallControl';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalStrategic';
 import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from '../../shared/strategicTerrainFlags';
@@ -20,6 +22,7 @@ import {
 } from '../oneStepMoveDestinations';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
 import { isEmbarkedLandUnit } from '../gameActions/sealift';
@@ -48,7 +51,7 @@ import {
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { buildOpenRouterModelList } from './buildOpenRouterModelList';
 import { getOpenRouterModelCapabilities, rememberOpenRouterModels } from './openRouterModelCapabilities';
-import { resolveOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
+import { resolveOrdersRequestProfile, resolveSeatOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
@@ -291,6 +294,36 @@ export function setSelectedReasoningEffort(effort: string): void {
 }
 
 /**
+ * Copies the Opponent-tab model and effort onto the first AI seat.
+ *
+ * Purpose: A new game that did not name seats still needs a commander on the first AI seat.
+ * When to use: After a new game that did not send seats.
+ * Expected outcome: The first AI seat's model and effort match the tab. Its doctrine choice is left as stored.
+ * A missing roster or a knocked-out seat is left alone.
+ * Exceptions: Logs and swallows a roster error so saving the tab never fails.
+ */
+export function applyAppWideCommanderToLegacySeat(): void {
+  try {
+    const seat = getSeatRoster().find((row) => row.seatId === AI_SEAT_IDS[0]);
+    if (!seat?.commander || seat.outTurn !== null) return;
+    const modelId = getSelectedModel().trim();
+    const effort = getSelectedReasoningEffort().trim();
+    const modelChanged = (seat.commander.modelId ?? '') !== modelId;
+    const effortChanged = (seat.commander.reasoningEffort ?? '') !== effort;
+    if (!modelChanged && !effortChanged) return;
+    updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
+      modelId: modelId || null,
+      reasoningEffort: effort || null,
+      doctrineChoice: seat.commander.doctrineChoice,
+    });
+    cancelModelCalls('model_changed', 'all', AI_SEAT_IDS[0]);
+    logDebug('openRouter applyAppWideCommanderToLegacySeat', { hasModel: modelId.length > 0, effort: effort || '(model default)' });
+  } catch (err) {
+    logError('openRouter applyAppWideCommanderToLegacySeat', err);
+  }
+}
+
+/**
  * Defines the `getSelectedModel` function shape (export function getSelectedModel(): string).
 
  * Purpose: Supports maintainability by documenting why `getSelectedModel` exists.
@@ -380,12 +413,13 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
 function validateAiOrder(
   order: { unitId: string; toH3Index: string },
   state: GameStateSnapshot,
-  opts?: { labelForUnitId?: (unitId: string) => string }
+  opts?: { labelForUnitId?: (unitId: string) => string; seatId?: AiSeatId }
 ): { valid: true } | { valid: false; reason: string } {
   const resolveLabel = opts?.labelForUnitId ?? ((id: string) => buildStrategicUnitDisplayLabelResolver(state.units)(id));
+  const seatId = opts?.seatId ?? AI_SEAT_IDS[0];
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
-  if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can receive AI orders' };
+  if (unit.player !== seatId) return { valid: false, reason: "A commander can order only its own side's units" };
 
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.toH3Index)) return { valid: false, reason: 'Destination not on map' };
@@ -446,22 +480,23 @@ function validateAiOrder(
 function validateAiRangedOrder(
   order: { unitId: string; targetH3Index: string },
   state: GameStateSnapshot,
-  opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot }
+  opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot; seatId?: AiSeatId }
 ): { valid: true } | { valid: false; reason: string } {
   const resolveLabel = opts?.labelForUnitId ?? ((id: string) => buildStrategicUnitDisplayLabelResolver(state.units)(id));
+  const seatId = opts?.seatId ?? AI_SEAT_IDS[0];
   const tactical = opts?.tacticalBattle;
   if (tactical) {
     const t = validateTacticalGroupRangedTarget({
       snap: tactical,
       uniqueUnitIds: [order.unitId],
       targetH3Index: order.targetH3Index,
-      tacticalAttackerPlayer: 'opponent',
+      tacticalAttackerPlayer: seatId,
     });
     return t.success ? { valid: true } : { valid: false, reason: t.reason ?? 'Illegal tactical ranged target' };
   }
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
-  if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can have AI ranged orders' };
+  if (unit.player !== seatId) return { valid: false, reason: "A commander can order only its own side's units" };
   if (getRange(unit.unitType) < 1) return { valid: false, reason: `${unit.unitType} has no ranged attack` };
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.targetH3Index)) return { valid: false, reason: 'Target not on map' };
@@ -499,7 +534,13 @@ function formatLatLng(ll: [number, number]): string {
  * Exceptions: None. A database error while reading the saved choice is logged and the model default is used,
  * so an optional setting never fails a consultation.
  */
-function resolveSelectedModelOrdersRequestProfile(modelId: string): OrdersRequestProfile {
+function resolveSelectedModelOrdersRequestProfile(modelId: string, seatId: AiSeatId): OrdersRequestProfile {
+  try {
+    const seat = getSeatRoster().find((row) => row.seatId === seatId);
+    if (seat?.commander) return resolveSeatOrdersRequestProfile(seat);
+  } catch (err) {
+    logError('openRouter resolveSelectedModelOrdersRequestProfile: roster unreadable', { seatId, err });
+  }
   const model = getOpenRouterModelCapabilities(modelId);
   let persistedReasoningEffort = '';
   if (model !== undefined) {
@@ -556,5 +597,13 @@ export async function requestOrders(
   );
 }
 
-registerLiveModelIdReader(getSelectedModel);
+registerLiveModelIdReader((seatId) => {
+  try {
+    const seat = getSeatRoster().find((row) => row.seatId === seatId);
+    if (seat?.commander) return seat.commander.modelId ?? '';
+  } catch (err) {
+    logError('openRouter readLiveModelId: roster unreadable', { seatId, err });
+  }
+  return getSelectedModel();
+});
 

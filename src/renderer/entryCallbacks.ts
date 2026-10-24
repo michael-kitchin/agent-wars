@@ -7,6 +7,8 @@ import { redraw, requestRedraw, resizeAndRedraw } from './rendering/gameScene';
 import { getMainLeafletMap } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
 import type { GameStateSnapshot, TacticalCityOverlayRow, TacticalRoadRailOverlayRow, TacticalTransportVectorOverlayRow } from '../shared/ipcTypes';
+import { formatUnitNameForViewer, viewerSeatIdForRoster } from '../shared/sideLabels';
+import { unitIdOwnerFromId } from '../shared/unitIds';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../shared/unitDisplayNames';
 
 import { TOOLTIP_OFFSET_PX } from './core/constants';
@@ -27,7 +29,6 @@ import { tacticalReconcileBattleAfterStrategicSnapshot, tacticalSyncTacticalEntr
 import { createBuildQueuePopupHandler } from './gameplay/buildQueuePopup';
 
 import { renderOpenRouterToolsList as renderOpenRouterToolsListFromModule, startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule, stopOpponentPlanning } from './openRouter/openRouterRuntime';
-import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 
 import { clearPendingTacticalOrders, refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule, type RefreshHoverRoutePreviewOptions } from './gameplay/tacticalOrders';
 import { prepareStrategicPlanningUiBeforeTacticalAutoStart, type ReadyHandlerDeps } from './gameplay/readyHandler';
@@ -627,7 +628,15 @@ export async function refreshTacticalTerrainOverridesForRenderer(options?: { rel
  * Exceptions: None.
  */
 export function formatUnitDisplayName(unitId: string): string {
-  return S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+  const baseName = S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+  const ownerId = S.gameState?.units.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+  if (!ownerId) return baseName;
+  return formatUnitNameForViewer({
+    baseName,
+    ownerId,
+    viewerSeatId: viewerSeatIdForRoster(S.gameState?.seats ?? []),
+    seats: S.gameState?.seats ?? [],
+  });
 }
 
 /**
@@ -908,8 +917,6 @@ export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
         S.runButtonOn = false;
         runBtn.setAttribute('aria-pressed', 'false');
         void stopOpponentPlanning('run_off');
-        resetPrecomputedAiState('null');
-        S.eventDrivenInitialConsultationDone = false;
         updateReadyButtonState();
       }
     }

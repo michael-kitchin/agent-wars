@@ -1,38 +1,27 @@
 import type { GameStateSnapshot } from './ipcTypes';
+import { HUMAN_SEAT_ID, type SeatId, isNeutralOwnerId, isSeatId } from './seatIds';
 import { computeRoundedPercentage } from './progressFormatting';
 
 /**
- * Documents the `HomeRegionOutlineState` type alias (export type HomeRegionOutlineState).
-
- * Purpose: Supports maintainability by documenting why `HomeRegionOutlineState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export type HomeRegionOutlineState =
-  | 'intersection'
-  | 'contested'
-  | 'controlledByHuman'
-  | 'controlledByOpponent'
-  | 'unknown';
-
-/**
- * Identifies which side(s) declared a hex as home region for inner dashed border coloring.
+ * Identifies which side or sides declared a hex as home for the inner dashed border.
  *
- * Purpose: Distinguishes home-region ownership from current control when rendering dual-line home borders.
- * When to use: Renderer inner-border pass after confirming the hex is a home-region outlined case.
- * Expected outcome: `human`, `opponent`, `both` (intersection), or `null` for non-home hexes.
+ * Purpose: The inner ring uses one seat's color, or the shared stroke when two homes overlap.
+ * When to use: The renderer inner-border pass after a hex is a home outline.
+ * Expected outcome: One seat, shared, or null when the hex is not a home.
  * Exceptions: None.
  */
-export type HomeRegionOwnerIdentity = 'human' | 'opponent' | 'both' | null;
+export type HomeRegionOwnerIdentity =
+  | { readonly kind: 'single'; readonly seatId: string }
+  | { readonly kind: 'shared' }
+  | null;
 
 /**
  * Defines inputs for resolving which side's home region a strategic hex belongs to.
  *
  * Purpose: Separates home-region ownership (inner dashed border) from current control (outer solid border).
  * When to use: Renderer passes snapshot home-region lists when drawing outlined home hex borders.
- * Expected outcome: Exclusive human-home hexes resolve to `human`, exclusive opponent-home to `opponent`,
- * intersection hexes to `both`, and non-home hexes to `null`.
+ * Expected outcome: One home returns that seat. Two or more homes, or a listed intersection, return shared.
+ * A hex in no home list returns null.
  * Exceptions: None.
  */
 export interface HomeRegionOwnerIdentityInput {
@@ -46,32 +35,23 @@ export interface HomeRegionOwnerIdentityInput {
    */
   h3Index: string;
   /**
-   * Human home-region hex list from snapshot metadata, when present.
+   * Precomputed intersection list; when omitted, derived from the seat map.
    *
-   * Contract: Read-only list of strategic H3 indexes declared as human home region.
-   * When to use: Together with opponent home lists to classify intersection and sole ownership.
-   * Expected outcome: Hexes in this list contribute to human home-region identity when matched.
-   * Exceptions: None.
-   */
-  humanHomeRegionHexes?: readonly string[];
-  /**
-   * Opponent home-region hex list from snapshot metadata, when present.
-   *
-   * Contract: Read-only list of strategic H3 indexes declared as opponent home region.
-   * When to use: Together with human home lists to classify intersection and sole ownership.
-   * Expected outcome: Hexes in this list contribute to opponent home-region identity when matched.
-   * Exceptions: None.
-   */
-  aiHomeRegionHexes?: readonly string[];
-  /**
-   * Precomputed intersection list; when omitted, derived from both home lists.
-   *
-   * Contract: Hexes appearing in both home lists; may be empty when regions do not overlap.
+   * Contract: Hexes appearing in two or more home lists; may be empty when regions do not overlap.
    * When to use: Optional optimization when snapshot already carries intersection metadata.
-   * Expected outcome: Shared home hexes resolve to `both` owner identity without recomputing intersection.
+   * Expected outcome: Shared home hexes resolve to a shared owner identity without recomputing intersection.
    * Exceptions: None.
    */
   intersectingHomeRegionHexes?: readonly string[];
+  /**
+   * Home hexes keyed by seat.
+   *
+   * Contract: Each value is that seat's home hexes. A hex in two or more values is shared.
+   * When to use: Pass `homeRegionHexesBySeat` from the snapshot.
+   * Expected outcome: Identity uses these lists.
+   * Exceptions: None.
+   */
+  homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -80,36 +60,53 @@ export interface HomeRegionOwnerIdentityInput {
  * Purpose: Outer ownership borders reflect current control; inner dashed borders reflect declared home-region
  * ownership so a hex controlled by X in Y's home shows X on the outside and Y on the inside.
  * When to use: Strategic renderer after classifying a hex as a home-region outlined border case.
- * Expected outcome: Intersection hexes return `both` (neutral inner color); exclusive lists return one side.
+ * Expected outcome: Two or more homes, or a listed intersection, return shared. One home returns that seat.
  * Exceptions: None.
  */
 export function resolveHomeRegionOwnerIdentity(input: HomeRegionOwnerIdentityInput): HomeRegionOwnerIdentity {
-  const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
-  const inAi = (input.aiHomeRegionHexes ?? []).includes(input.h3Index);
-  if (!inHuman && !inAi) return null;
+  const owners = declaredHomeSeatIds(input);
+  if (owners.length === 0) return null;
   const intersectionSet = new Set(
     input.intersectingHomeRegionHexes ??
-      computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+      computeIntersectingHomeRegionHexes(homeListsForIntersection(input))
   );
-  if (intersectionSet.has(input.h3Index) || (inHuman && inAi)) return 'both';
-  if (inHuman) return 'human';
-  return 'opponent';
+  if (owners.length >= 2 || intersectionSet.has(input.h3Index)) return { kind: 'shared' };
+  return { kind: 'single', seatId: owners[0]! };
 }
 
 /**
- * Formats the parenthetical home-region assignment suffix for strategic tooltip control lines.
+ * Seat ids that claim one hex as home.
  *
- * Purpose: Distinguishes declared home-region ownership from current hex control in tooltip copy.
- * When to use: After `resolveHomeRegionOwnerIdentity` returns a non-null identity for a strategic hex.
- * Expected outcome: `(Human Home Region)`, `(AI Home Region)`, or `(Human & AI Home Region)`.
- * Exceptions: None — callers must pass a non-null `HomeRegionOwnerIdentity`.
+ * Purpose: Inner-ring color and home detection need every home, not only the first two lists.
+ * When to use: Identity and ownership-border resolution.
+ * Expected outcome: Seat ids whose home list contains the hex. Empty when the map is absent.
+ * Exceptions: None.
  */
-export function formatHomeRegionAssignmentControlSuffix(
-  identity: Exclude<HomeRegionOwnerIdentity, null>
-): string {
-  if (identity === 'both') return '(Human & AI Home Region)';
-  if (identity === 'human') return '(Human Home Region)';
-  return '(AI Home Region)';
+function declaredHomeSeatIds(input: {
+  readonly h3Index: string;
+  readonly homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
+}): string[] {
+  const bySeat = input.homeRegionHexesBySeat;
+  if (!bySeat) return [];
+  return Object.entries(bySeat)
+    .filter(([, hexes]) => hexes.includes(input.h3Index))
+    .map(([seatId]) => seatId);
+}
+
+/**
+ * Home lists used when a caller did not pass a precomputed intersection.
+ *
+ * Purpose: Shared-home detection uses the same lists as seat identity.
+ * When to use: `resolveHomeRegionOwnerIdentity` when the caller did not pass an intersection.
+ * Expected outcome: One list per seat. An absent map yields no lists.
+ * Exceptions: None.
+ */
+function homeListsForIntersection(input: {
+  readonly homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
+}): readonly (readonly string[])[] {
+  const bySeat = input.homeRegionHexesBySeat;
+  if (!bySeat) return [];
+  return Object.values(bySeat);
 }
 
 /**
@@ -123,12 +120,9 @@ export function formatHomeRegionAssignmentControlSuffix(
  * Exceptions: None.
  */
 export type OwnershipBorderStyle =
-  | 'none'
-  | 'normalControlledByHuman'
-  | 'normalControlledByOpponent'
-  | 'outlinedControlledByHuman'
-  | 'outlinedControlledByOpponent'
-  | 'outlinedNeutral';
+  | { readonly kind: 'none' }
+  | { readonly kind: 'normal' | 'outlined'; readonly ownerId: string }
+  | { readonly kind: 'outlinedNeutral' };
 
 /**
  * Documents the `HomeRegionUnitPosition` interface as a named contract surface (export interface HomeRegionUnitPosition).
@@ -185,7 +179,7 @@ export interface OwnershipVisibilityDecisionInput {
    * Expected outcome: Own-home ownership exceptions map to the correct side.
    * Exceptions: None.
    */
-  playerPerspective: 'human' | 'opponent';
+  playerPerspective: 'all' | SeatId;
   /**
    * Supplies currently visible hexes from fog/proximity logic.
    *
@@ -196,25 +190,16 @@ export interface OwnershipVisibilityDecisionInput {
    */
   visibleHexes: ReadonlySet<string>;
   /**
-   * Lists human home-region hexes when scenario metadata exists.
+   * Home hexes keyed by seat.
    *
-   * Contract: Optional home metadata source for own-home ownership exceptions.
-   * When to use: Forward from snapshot metadata when available.
-   * Expected outcome: Human-home membership checks remain deterministic.
+   * Contract: Each value is that seat's home. Omitted means no home metadata.
+   * When to use: Forward `homeRegionHexesBySeat` from the snapshot.
+   * Expected outcome: Own-home checks use the viewer's list.
    * Exceptions: None.
    */
-  humanHomeRegionHexes?: readonly string[];
+  homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
   /**
-   * Lists opponent home-region hexes when scenario metadata exists.
-   *
-   * Contract: Optional home metadata source for cross-side and intersection checks.
-   * When to use: Forward from snapshot metadata when available.
-   * Expected outcome: Opponent-home membership checks remain deterministic.
-   * Exceptions: None.
-   */
-  aiHomeRegionHexes?: readonly string[];
-  /**
-   * Lists intersecting home-region hexes; when omitted, helper derives them from both home sets.
+   * Lists intersecting home-region hexes; when omitted, helper derives them from the seat map.
    *
    * Contract: Optional precomputed intersection override to avoid recomputation.
    * When to use: Provide when caller already has intersection metadata on snapshot.
@@ -261,25 +246,7 @@ export interface OwnershipBorderStyleDecisionInput {
    */
   isOwnershipVisible: boolean;
   /**
-   * Lists human home-region hexes when scenario metadata exists.
-   *
-   * Contract: Optional home metadata used to classify home-region borders.
-   * When to use: Forward snapshot metadata for the active frame.
-   * Expected outcome: Human-home membership decisions remain deterministic.
-   * Exceptions: None.
-   */
-  humanHomeRegionHexes?: readonly string[];
-  /**
-   * Lists opponent home-region hexes when scenario metadata exists.
-   *
-   * Contract: Optional home metadata used to classify home-region borders.
-   * When to use: Forward snapshot metadata for the active frame.
-   * Expected outcome: Opponent-home membership decisions remain deterministic.
-   * Exceptions: None.
-   */
-  aiHomeRegionHexes?: readonly string[];
-  /**
-   * Lists intersecting home-region hexes; when omitted, helper derives them from both home sets.
+   * Lists intersecting home-region hexes; when omitted, helper derives them from the seat map.
    *
    * Contract: Optional precomputed intersection override to keep classification fast.
    * When to use: Pass provided snapshot intersection metadata when available.
@@ -287,6 +254,15 @@ export interface OwnershipBorderStyleDecisionInput {
    * Exceptions: None.
    */
   intersectingHomeRegionHexes?: readonly string[];
+  /**
+   * Home hexes keyed by seat.
+   *
+   * Contract: Each value is that seat's home hexes.
+   * When to use: Pass `homeRegionHexesBySeat` from the snapshot.
+   * Expected outcome: A hex in any of these lists is a home hex for the outer outline.
+   * Exceptions: None.
+   */
+  homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -304,17 +280,20 @@ function uniqueSortedHexes(hexes: readonly string[]): string[] {
 /**
  * Defines the `computeIntersectingHomeRegionHexes` function shape (export function computeIntersectingHomeRegionHexes().
 
- * Purpose: Supports maintainability by documenting why `computeIntersectingHomeRegionHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: A hex claimed by two or more homes is shared, including when more than two sides are playing.
+ * When to use: Snapshot metadata and any caller that used to pass the human list and the AI list.
+ * Expected outcome: Each shared hex once, sorted. A hex listed twice inside one home counts as one home.
  * Exceptions: None.
  */
-export function computeIntersectingHomeRegionHexes(
-  humanHomeRegionHexes: readonly string[],
-  aiHomeRegionHexes: readonly string[]
-): string[] {
-  const aiSet = new Set(aiHomeRegionHexes);
-  return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
+export function computeIntersectingHomeRegionHexes(homeHexLists: readonly (readonly string[])[]): string[] {
+  const counts = new Map<string, number>();
+  for (const list of homeHexLists) {
+    for (const h3Index of new Set(list)) {
+      counts.set(h3Index, (counts.get(h3Index) ?? 0) + 1);
+    }
+  }
+  const shared = [...counts.entries()].filter(([, count]) => count >= 2).map(([h3Index]) => h3Index);
+  return uniqueSortedHexes(shared);
 }
 
 /**
@@ -326,22 +305,22 @@ export function computeIntersectingHomeRegionHexes(
  * Exceptions: None; empty inputs yield empty arrays and `equalAsSets` true.
  */
 export function computeHomeRegionHexPartitionsForPrompting(
-  aiHomeRegionHexes: readonly string[] | undefined,
-  humanHomeRegionHexes: readonly string[] | undefined
+  leftHomeHexes: readonly string[] | undefined,
+  rightHomeHexes: readonly string[] | undefined
 ): {
   aiExclusive: string[];
   humanExclusive: string[];
   intersection: string[];
   equalAsSets: boolean;
 } {
-  const ai = uniqueSortedHexes(aiHomeRegionHexes ?? []);
-  const human = uniqueSortedHexes(humanHomeRegionHexes ?? []);
+  const ai = uniqueSortedHexes(leftHomeHexes ?? []);
+  const human = uniqueSortedHexes(rightHomeHexes ?? []);
   const aiSet = new Set(ai);
   const humanSet = new Set(human);
   const equalAsSets = ai.length === human.length && ai.every((h) => humanSet.has(h));
   const aiExclusive = ai.filter((h) => !humanSet.has(h));
   const humanExclusive = human.filter((h) => !aiSet.has(h));
-  const intersection = computeIntersectingHomeRegionHexes(humanHomeRegionHexes ?? [], aiHomeRegionHexes ?? []);
+  const intersection = computeIntersectingHomeRegionHexes([rightHomeHexes ?? [], leftHomeHexes ?? []]);
   return { aiExclusive, humanExclusive, intersection, equalAsSets };
 }
 
@@ -376,28 +355,7 @@ export function computeContestedHomeRegionHexes(
 }
 
 /**
- * Defines the `classifyHomeRegionOutlineState` function shape (export function classifyHomeRegionOutlineState( h3Index: string, intersectionHexes: ReadonlySet<string>, contestedHexes: ReadonlySet<string>, contro).
-
- * Purpose: Supports maintainability by documenting why `classifyHomeRegionOutlineState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function classifyHomeRegionOutlineState(
-  h3Index: string,
-  intersectionHexes: ReadonlySet<string>,
-  contestedHexes: ReadonlySet<string>,
-  controllerPlayerId: string | null | undefined
-): HomeRegionOutlineState {
-  if (intersectionHexes.has(h3Index)) return 'intersection';
-  if (contestedHexes.has(h3Index)) return 'contested';
-  if (controllerPlayerId === 'human') return 'controlledByHuman';
-  if (controllerPlayerId === 'opponent') return 'controlledByOpponent';
-  return 'unknown';
-}
-
-/**
- * Defines the `getForcedVisibleHomeRegionHexesForPlayer` function shape (export function getForcedVisibleHomeRegionHexesForPlayer( state: Pick<GameStateSnapshot, 'scenarioId' | 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'inter).
+ * Defines the `getForcedVisibleHomeRegionHexesForPlayer` function shape (export function getForcedVisibleHomeRegionHexesForPlayer( state: Pick<GameStateSnapshot, 'intersectingHomeRegionHexes' | 'homeRegionHexesBySeat'>,).
 
  * Purpose: Supports maintainability by documenting why `getForcedVisibleHomeRegionHexesForPlayer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -405,16 +363,14 @@ export function classifyHomeRegionOutlineState(
  * Exceptions: None.
  */
 export function getForcedVisibleHomeRegionHexesForPlayer(
-  state: Pick<GameStateSnapshot, 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'intersectingHomeRegionHexes'>,
-  playerId: 'human' | 'opponent',
+  state: Pick<GameStateSnapshot, 'intersectingHomeRegionHexes' | 'homeRegionHexesBySeat'>,
+  playerId: SeatId,
   mapHexSet: ReadonlySet<string>
 ): Set<string> {
-  if (!hasHomeRegionMetadata(state)) return new Set<string>();
-  const ownHomeHexes = playerId === 'human'
-    ? (state.humanHomeRegionHexes ?? [])
-    : (state.aiHomeRegionHexes ?? []);
+  const ownHomeHexes = state.homeRegionHexesBySeat?.[playerId] ?? [];
+  if (!hasHomeRegionMetadata(state) && ownHomeHexes.length === 0) return new Set<string>();
   const intersectionHexes = state.intersectingHomeRegionHexes ??
-    computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? []);
+    computeIntersectingHomeRegionHexes(Object.values(state.homeRegionHexesBySeat ?? {}));
   return new Set(
     [...ownHomeHexes, ...intersectionHexes].filter((h3Index) => mapHexSet.has(h3Index))
   );
@@ -425,13 +381,28 @@ export function getForcedVisibleHomeRegionHexesForPlayer(
  *
  * Purpose: Generalizes home-region behaviors across any scenario that provides home-region hex lists.
  * When to use: Use before applying forced-home visibility or ownership-display exceptions.
- * Expected outcome: `true` when either side has at least one home-region hex listed.
+ * Expected outcome: `true` when any seat has at least one home-region hex listed.
  * Exceptions: None.
  */
 export function hasHomeRegionMetadata(
-  state: { humanHomeRegionHexes?: readonly string[]; aiHomeRegionHexes?: readonly string[] }
+  state: { homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>> }
 ): boolean {
-  return (state.humanHomeRegionHexes?.length ?? 0) > 0 || (state.aiHomeRegionHexes?.length ?? 0) > 0;
+  const lists = Object.values(state.homeRegionHexesBySeat ?? {});
+  return lists.some((hexes) => hexes.length > 0);
+}
+
+/**
+ * Maps a snapshot perspective onto the three ownership views.
+ *
+ * Purpose: Drawing and tooltips must not treat All sides as the human seat.
+ * When to use: Before `isHexOwnershipVisibleToPerspective`.
+ * Expected outcome: `all` and a seat id pass through. Anything else is the human seat.
+ * Exceptions: None.
+ */
+export function ownershipPerspective(value: string | undefined): 'all' | SeatId {
+  if (value === 'all') return 'all';
+  if (value !== undefined && isSeatId(value)) return value;
+  return HUMAN_SEAT_ID;
 }
 
 /**
@@ -439,22 +410,19 @@ export function hasHomeRegionMetadata(
  *
  * Purpose: Centralizes ownership visibility contract across home exceptions and normal fog visibility.
  * When to use: Use before selecting owner-colored border styles in renderer draw passes.
- * Expected outcome: Own-home and intersecting home hexes remain ownership-visible even without proximity.
+ * Expected outcome: `'all'` shows every owner. Own-home and intersecting home hexes remain ownership-visible even without proximity.
  * Exceptions: None.
  */
 export function isHexOwnershipVisibleToPerspective(input: OwnershipVisibilityDecisionInput): boolean {
+  if (input.playerPerspective === 'all') return true;
   if (input.visibleHexes.has(input.h3Index)) return true;
   if (!hasHomeRegionMetadata(input)) return false;
   const intersectionSet = new Set(
     input.intersectingHomeRegionHexes ??
-      computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+      computeIntersectingHomeRegionHexes(Object.values(input.homeRegionHexesBySeat ?? {}))
   );
   if (intersectionSet.has(input.h3Index)) return true;
-  const ownHomeHexSet = new Set(
-    input.playerPerspective === 'human'
-      ? (input.humanHomeRegionHexes ?? [])
-      : (input.aiHomeRegionHexes ?? [])
-  );
+  const ownHomeHexSet = new Set(input.homeRegionHexesBySeat?.[input.playerPerspective] ?? []);
   return ownHomeHexSet.has(input.h3Index);
 }
 
@@ -470,19 +438,16 @@ export function isHexOwnershipVisibleToPerspective(input: OwnershipVisibilityDec
  * Exceptions: None.
  */
 export function resolveOwnershipBorderStyle(input: OwnershipBorderStyleDecisionInput): OwnershipBorderStyle {
-  const humanHomeHexes = new Set(input.humanHomeRegionHexes ?? []);
-  const aiHomeHexes = new Set(input.aiHomeRegionHexes ?? []);
-  const isHomeHex = humanHomeHexes.has(input.h3Index) || aiHomeHexes.has(input.h3Index);
+  const isHomeHex = declaredHomeSeatIds(input).length > 0;
+  const controller = input.controllerPlayerId ?? null;
   if (isHomeHex) {
-    // Home-region ownership outlines must always reflect current controller color, even when fog-hidden.
-    if (input.controllerPlayerId === 'human') return 'outlinedControlledByHuman';
-    if (input.controllerPlayerId === 'opponent') return 'outlinedControlledByOpponent';
-    return 'outlinedNeutral';
+    if (controller != null && isSeatId(controller)) return { kind: 'outlined', ownerId: controller };
+    return { kind: 'outlinedNeutral' };
   }
-  if (!input.isOwnershipVisible) return 'none';
-  if (input.controllerPlayerId === 'human') return 'normalControlledByHuman';
-  if (input.controllerPlayerId === 'opponent') return 'normalControlledByOpponent';
-  return 'none';
+  if (!input.isOwnershipVisible) return { kind: 'none' };
+  if (controller != null && isSeatId(controller)) return { kind: 'normal', ownerId: controller };
+  if (controller != null && isNeutralOwnerId(controller)) return { kind: 'outlinedNeutral' };
+  return { kind: 'none' };
 }
 
 /**
@@ -496,7 +461,7 @@ export function resolveOwnershipBorderStyle(input: OwnershipBorderStyleDecisionI
 export function countControlledHexesInRegion(
   controlRows: ReadonlyArray<{ h3Index: string; controllerPlayerId: string | null }>,
   regionHexes: readonly string[] | undefined,
-  playerId: 'human' | 'opponent'
+  playerId: string
 ): { controlled: number; total: number; pct: number } {
   const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
   const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));

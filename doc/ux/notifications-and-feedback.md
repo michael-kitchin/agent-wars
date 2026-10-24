@@ -12,7 +12,7 @@ Keep errors, turn summaries, and the opponent's consultation text on the surface
 | --- | --- | --- | --- |
 | Map toast | Errors, rejected orders, turn-loss summaries, unknown-battle announcements, and basemap load failure | Until dismiss, or until a fixed interval elapses. A new map toast replaces the old one and restarts the interval. The basemap failure uses the same interval. | This document |
 | Reports tab | A copy of every informational map toast and every shown AI strategy toast | Accumulates during a match. Starting a new match clears it. | [reports-tab.md](reports-tab.md) |
-| AI strategy toast | The opponent's message and strategy summary after a consultation | Until dismiss, or until the same fixed interval elapses. Empty content hides it. | This document |
+| AI strategy toast | One consult's message and strategy after Ready or a tactical commit, or one "Messages (n)" list when several commanders finish together | Until dismiss, or until the same fixed interval elapses. Empty content hides it. | This document |
 | Sidebar error line | Nothing. It is not a player-visible surface. Errors reported to the sidebar, such as a failed Ready or a failed tactical commit, show on the map toast instead. | Always hidden | This document |
 | AI activity log | AI interaction lines and error lines, including a one-line copy of a turn-update toast | Accumulates during a match. Starting a new match clears it. | [ai-activity-log.md](ai-activity-log.md) |
 | Hex tooltips | The hex readout, whose Effects line includes movement, range, and cover when those apply, a blocked-order notice, and the terrain, weather, and target cover that change an aimed order | The hex readout and the effects notice appear one second after the pointer rests. Moving farther than 6 pixels before either opens starts that wait again. Once open, the hex readout stays while the pointer remains on that cell. The effects notice stays too, until the player stops aiming. The blocked notice appears one second after the pointer rests and follows the pointer, then hides itself a short time after the pointer stops. Moving farther than 6 pixels before it opens starts that wait again. Stopping the aim, changing cell, leaving the map, or pressing hides it, including a notice that has not opened. A control tip hides the hex readout when that control tip appears. | [hex-tooltips.md](hex-tooltips.md) |
@@ -26,11 +26,13 @@ The map toast and the AI strategy toast can appear in Strategic planning, Resolu
 
 ## Information Displayed
 
-- Both toasts show in one band at the top of the map, 12 px below the map's top edge. The band is only as wide as its widest toast, and no wider than one third of the visible map. The visible map is the area beside the console, so that third is smaller while the console is open and larger while the console is collapsed to the rail. Its right edge stays 12 px in from the map's right edge, with the same gap while the console is open and while it is collapsed to the rail. It stays to the right of the minimap panel, or of the terrain legend when that legend is open beside the panel, or of the new-game setup panel when that panel reaches farther, each with 12 px of clearance. When the space between that left chrome and the right inset is narrower than 280 px, as at the 800 × 600 minimum window, the toast may overlap that chrome. It still stays against the right inset and within one third of the map (`toastBandSpan` in `src/shared/mapChromePlacement.ts`). The AI strategy toast sits above the map toast when both show. Both use the navy chrome in the [UI style guide](../ui-style-guide.md). An error has a light-red border. An informational message, including a turn update, an unknown-battle announcement, a basemap failure, and the AI strategy toast, has the steel border. The body is the message text, not a fixed sentence list.
+- Both toasts show in one band at the top of the map, 12 px below the map's top edge. The band is only as wide as its widest toast, and no wider than one third of the visible map. The visible map is the area beside the console, so that third is smaller while the console is open and larger while the console is collapsed to the rail. Its right edge stays 12 px in from the map's right edge, with the same gap while the console is open and while it is collapsed to the rail. It stays to the right of the minimap panel, or of the terrain legend when that legend is open beside the panel, or of the new-game setup panel when that panel reaches farther, each with 12 px of clearance. When the space between that left chrome and the right inset is narrower than 280 px, as at the 800 × 600 minimum window, the toast may overlap that chrome. It still stays against the right inset and within one third of the map (`toastBandSpan` in `src/shared/mapChromePlacement.ts`). The map toast sits above the AI strategy toast when both show, so a knockout notice stays above Messages. Both use the navy chrome in the [UI style guide](../ui-style-guide.md). An error has a light-red border. An informational message, including a turn update, an unknown-battle announcement, a basemap failure, and the AI strategy toast, has the steel border. The body is the message text, not a fixed sentence list.
+- A turn-update toast leads with sentences that name the sides (`buildTurnReportLines` in `src/shared/turnReportLines.ts`): hexes you took or lost, units you lost or destroyed, and a "Seen:" line for a fight that did not include you. Deployments and caps stay in the Updates section. While no human seat is still playing, the toast has only "Seen:" lines plus Updates.
 - In a turn-update toast, each victim named on a loss line is preceded by that unit's origin flag. The flag uses the same Bonuses tooltip as the [stack callout](stack-callout.md). A destroyed unit keeps those lines from the birth record remembered after it is gone, including a Tech line when the tech bonus is on and the unit's tech tier is known. Grouped totals such as "3 Infantry", the Updates section, and every other toast line have no flags. If two victims share a display name but would not show the same flag and the same formation date, that name gets no flag.
 - A count of one in that Updates section uses the singular: "1 infantry unit deployed", and "1 hex lost to opponent". Two or more keep the plural, so one armor and one infantry read "1 armor and 1 infantry units deployed" (`buildOtherTurnUpdatePrimaryLines` in `src/shared/consolidatedTurnUpdateToast.ts`).
 - A basemap failure uses the map toast once: some tiles failed to load, and the game remains playable. It hides after the same interval as other map toasts, on dismiss, or when a later map toast replaces it.
-- The AI strategy toast shows a Message section, a Strategy section, or both, in that order. A section whose text is empty or whitespace is omitted. If both are empty, the toast hides.
+- After Ready or a tactical commit, the AI strategy toast shows a Message section, a Strategy section, or both, in that order. A section whose text is empty or whitespace is omitted. If both are empty, the toast hides. When the commander pool drains, that toast is instead titled "Messages (n)" and lists each sender's full home name and message. Strategy is not on that toast. A side that sent only strategy adds no line.
+- A knockout uses the map toast. The text is one notice per seat (`announceKnockouts` in `src/renderer/gameplay/knockoutNotices.ts`). The Reports tab already has one Notice per seat, so that toast is not filed again.
 - The sidebar error line shows nothing and stays hidden.
 
 ## Inputs and Responses
@@ -47,7 +49,7 @@ The map toast and the AI strategy toast can appear in Strategic planning, Resolu
 ### Other
 
 - When a new map toast is shown, it replaces the previous map toast.
-- When an informational map toast or an AI strategy toast is shown, the [Reports tab](reports-tab.md) files a copy. An error toast is not filed.
+- When an informational map toast is shown, the [Reports tab](reports-tab.md) files a copy, unless the caller already filed that notice. An error toast is not filed. A Ready or tactical Message and Strategy toast is filed as one Message. The pool's "Messages (n)" toast is not filed; each kept message is already its own Message entry.
 - When an error is reported to the sidebar, the map toast shows that text as an error. The sidebar error line stays hidden.
 
 ## States
@@ -62,7 +64,7 @@ The map toast and the AI strategy toast can appear in Strategic planning, Resolu
 - Every map toast, including the basemap failure, hides after the fixed interval unless a newer message replaced it first.
 - An empty AI strategy toast never stays visible.
 - Showing one toast does not hide the other toast.
-- Every informational toast is filed on the Reports tab. An error toast never is.
+- Every informational map toast is filed on the Reports tab unless that notice was already filed. The pool's Messages toast is not filed a second time. An error toast never is.
 
 ## Strategic and Tactical Differences
 
@@ -89,11 +91,16 @@ None.
 - `static/index.html` (`#map-toast-band`, `#map-toast`, `#map-toast-text`, `#map-toast-dismiss`, `#ai-strategy-toast`, `#ai-strategy-toast-text`, `#ai-strategy-toast-dismiss`, `#sidebar-error`)
 - `static/feedbackChrome.css` (`.map-toast-band`)
 - `src/renderer/openRouter/openRouterUiHelpers.ts`
+- `src/renderer/openRouter/commanderMessagesToast.ts` (`showCommanderMessagesToast`)
+- `src/renderer/openRouter/commanderPoolClient.ts` (`readCommanderPoolAndApply`)
+- `src/renderer/gameplay/knockoutNotices.ts` (`announceKnockouts`)
+- `src/shared/knockoutNotice.ts` (`formatKnockoutNotice`)
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/gameplay/sidebarSupport.ts`
 - `src/renderer/gameplay/readyResolutionAnnouncements.ts`
 - `src/renderer/gameplay/turnUpdateSummary.ts`
-- `src/shared/consolidatedTurnUpdateToast.ts` (`buildOtherTurnUpdatePrimaryLines`)
+- `src/shared/consolidatedTurnUpdateToast.ts` (`buildOtherTurnUpdatePrimaryLines`, `buildConsolidatedTurnUpdateToastMessage`)
+- `src/shared/turnReportLines.ts` (`buildTurnReportLines`)
 - `src/renderer/core/unitOriginFlags.ts`
 - `src/shared/lossToastUnitSegments.ts`
 - `src/renderer/map/worldLeafletMap.ts`

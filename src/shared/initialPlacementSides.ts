@@ -1,12 +1,14 @@
+import type { OwnerId } from './seatIds';
+
 /**
- * The two owners that opening placement is allowed to record on a hex.
+ * The owner that opening placement records on a hex.
  *
  * Purpose: Shared by the claim map and the mixed-hex scan so strategic seeding and tactical opening placement use the same side names.
  * When to use: As the value stored for a hex and as the side passed into a claim.
- * Expected outcome: Only `'human'` or `'opponent'`.
+ * Expected outcome: An owner id. Two different owners still cannot share a hex.
  * Exceptions: None.
  */
-export type InitialPlacementSide = 'human' | 'opponent';
+export type InitialPlacementSide = OwnerId;
 
 /**
  * Records that `placingSide` holds `h3Index` when that hex is empty or already held by the same side.
@@ -32,7 +34,7 @@ export function claimInitialPlacementHex(
  *
  * Purpose: Seeders use this as a backstop after placement so a missed filter cannot start a game with mixed hexes.
  * When to use: After both sides' opening units are known, and in tests of that scan.
- * Expected outcome: Sorted unique hex ids that contain both `'human'` and `'opponent'`. Empty when every hex is one side or empty.
+ * Expected outcome: Sorted unique hex ids that contain more than one side. Empty when every hex is one side or empty.
  * Exceptions: None.
  */
 export function findMixedInitialPlacementHexes(

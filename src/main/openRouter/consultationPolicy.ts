@@ -7,10 +7,10 @@
  * Exceptions: None; predicates are total on their inputs.
  */
 
+import { isSeatId, type AiSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { logTrace } from '../logger';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 import type { GameStateSnapshot } from '../gameDb';
-import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { ReadyResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -24,10 +24,10 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
  */
 export type StrategicResolutionOpponentActivitySlice = Pick<
   ReadyResult,
-  | 'opponentCombatParticipantUnitIds'
+  | 'combatParticipantUnitIdsBySeat'
   | 'resolvedFerryMoves'
   | 'airStrikeMoves'
-  | 'opponentHadStrategicMarchResolution'
+  | 'hadStrategicMarchResolutionBySeat'
 >;
 
 /**
@@ -56,12 +56,12 @@ export type ReadyResultWithParticipants = Pick<
   | 'success'
   | 'reason'
   | 'removedUnitIds'
-  | 'removedOpponentUnitIds'
-  | 'opponentCombatParticipantUnitIds'
+  | 'removedUnitIdsBySeat'
+  | 'combatParticipantUnitIdsBySeat'
   | 'infrastructureDestroyedEvents'
   | 'resolvedFerryMoves'
   | 'airStrikeMoves'
-  | 'opponentHadStrategicMarchResolution'
+  | 'hadStrategicMarchResolutionBySeat'
   | 'humanMoves'
   | 'kills'
   | 'killsByDirectFire'
@@ -93,7 +93,7 @@ export function hasNonNoopMarchMoves(
  */
 export function animationRowsIncludePlayer<T extends { player: string }>(
   rows: readonly T[] | undefined,
-  playerId: 'human' | 'opponent'
+  playerId: string
 ): boolean {
   logTrace('animationRowsIncludePlayer', { playerId });
   return (rows ?? []).some((m) => m.player === playerId);
@@ -117,41 +117,8 @@ export function killBucketsMentionHumanStrategicKillers(
     for (const edge of bucket ?? []) {
       for (const killerId of edge.killerIds) {
         if (humanIds.has(killerId)) return true;
-        if (allowHumanPrefixFallback && unitIdOwnerFromId(killerId) === 'human') return true;
+        if (allowHumanPrefixFallback && unitIdOwnerFromId(killerId) === HUMAN_SEAT_ID) return true;
       }
-    }
-  }
-  return false;
-}
-
-/**
- * Returns true when a tactical sub-unit side had march (opponent only), non–no-op human marches, or any kill edge with that side as killer.
- *
- * Purpose: One implementation for `opponentHadTacticalBeatResolutionActions` / `humanHadTacticalBeatResolutionActions`.
- * When to use: Exported wrappers only; keeps tactical kill-bucket order identical for both players.
- * Expected outcome: Opponent branch treats non-empty `opponentMoves` as activity without per-leg no-op filtering (matches prior behavior).
- * When ranged or air orders were submitted this beat, treats that side as active even if march playback rows are empty or kills omit that side (see `humanBeatHadSubmittedRangedOrAirOrders` / `opponentBeatHadSubmittedRangedOrAirOrders` on playback).
- * Exceptions: None.
- */
-function subUnitPlayerHadTacticalBeatResolutionActions(
-  playback: TacticalCommitResolutionPlayback,
-  tacticalBattle: TacticalBattleSnapshot,
-  player: 'human' | 'opponent'
-): boolean {
-  if (player === 'opponent' && (playback.opponentMoves?.length ?? 0) > 0) return true;
-  if (player === 'human' && hasNonNoopMarchMoves(playback.humanMoves)) return true;
-  if (player === 'human' && playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
-  if (player === 'opponent' && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
-  const ids = new Set(tacticalBattle.subUnits.filter((s) => s.player === player).map((s) => s.id));
-  const buckets: ReadonlyArray<ReadonlyArray<KillEdge> | undefined> = [
-    playback.killsByDirectFire,
-    playback.killsByAirStrike,
-    playback.killsByReturnFire,
-    playback.killsByMelee,
-  ];
-  for (const bucket of buckets) {
-    for (const edge of bucket ?? []) {
-      if (edge.killerIds.some((id) => ids.has(id))) return true;
     }
   }
   return false;
@@ -168,8 +135,8 @@ function subUnitPlayerHadTacticalBeatResolutionActions(
 export function computePostResolutionConsultTriggers(args: {
   mandatoryCount: number;
   subscriptionCount: number;
-  opponentIdle: boolean;
-  humanObservable: boolean;
+  seatIdle: boolean;
+  enemyObservable: boolean;
 }): { shouldConsult: boolean; policyOnlyConsult: boolean } {
   logTrace('computePostResolutionConsultTriggers', {
     mandatoryCount: args.mandatoryCount,
@@ -178,8 +145,8 @@ export function computePostResolutionConsultTriggers(args: {
   const shouldConsult =
     args.mandatoryCount > 0 ||
     args.subscriptionCount > 0 ||
-    args.opponentIdle ||
-    args.humanObservable;
+    args.seatIdle ||
+    args.enemyObservable;
   const policyOnlyConsult =
     shouldConsult && args.mandatoryCount === 0 && args.subscriptionCount === 0;
   return { shouldConsult, policyOnlyConsult };
@@ -193,12 +160,15 @@ export function computePostResolutionConsultTriggers(args: {
  * Expected outcome: Unchanged contract vs pre-refactor implementation.
  * Exceptions: None.
  */
-export function opponentHadStrategicResolutionUnitActions(r: StrategicResolutionOpponentActivitySlice): boolean {
-  logTrace('opponentHadStrategicResolutionUnitActions', {});
-  if (r.opponentHadStrategicMarchResolution === true) return true;
-  if ((r.opponentCombatParticipantUnitIds?.length ?? 0) > 0) return true;
-  if (animationRowsIncludePlayer(r.resolvedFerryMoves, 'opponent')) return true;
-  if (animationRowsIncludePlayer(r.airStrikeMoves, 'opponent')) return true;
+export function seatHadStrategicResolutionUnitActions(
+  r: StrategicResolutionOpponentActivitySlice,
+  seatId: AiSeatId
+): boolean {
+  logTrace('seatHadStrategicResolutionUnitActions', { seatId });
+  if (r.hadStrategicMarchResolutionBySeat?.[seatId] === true) return true;
+  if ((r.combatParticipantUnitIdsBySeat?.[seatId]?.length ?? 0) > 0) return true;
+  if (animationRowsIncludePlayer(r.resolvedFerryMoves, seatId)) return true;
+  if (animationRowsIncludePlayer(r.airStrikeMoves, seatId)) return true;
   return false;
 }
 
@@ -210,21 +180,33 @@ export function opponentHadStrategicResolutionUnitActions(r: StrategicResolution
  * Expected outcome: Unchanged contract vs pre-refactor implementation.
  * Exceptions: None.
  */
-export function humanHadStrategicResolutionObservableActions(
-  r: StrategicResolutionHumanActivitySlice,
-  state: GameStateSnapshot
+export function enemyHadStrategicResolutionObservableActions(
+  r: StrategicResolutionHumanActivitySlice & Pick<ReadyResult, 'aiMoves'>,
+  state: GameStateSnapshot,
+  seatId: AiSeatId
 ): boolean {
-  logTrace('humanHadStrategicResolutionObservableActions', {});
+  logTrace('enemyHadStrategicResolutionObservableActions', { seatId, unitCount: state.units.length });
   if (hasNonNoopMarchMoves(r.humanMoves)) return true;
-  if (animationRowsIncludePlayer(r.resolvedFerryMoves, 'human')) return true;
-  if (animationRowsIncludePlayer(r.airStrikeMoves, 'human')) return true;
-  const humanIds = new Set(state.units.filter((u) => u.player === 'human').map((u) => u.id));
+  if ((r.aiMoves ?? []).some((move) => {
+    const owner = unitIdOwnerFromId(move.unitId);
+    return owner !== null && owner !== seatId && isSeatId(owner);
+  })) return true;
+  if ((r.resolvedFerryMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
+  if ((r.airStrikeMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
   const killBuckets: ReadonlyArray<ReadonlyArray<{ killerIds: string[] }> | undefined> = [
     r.killsByDirectFire,
     r.killsByReturnFire,
     r.kills,
   ];
-  return killBucketsMentionHumanStrategicKillers(killBuckets, humanIds);
+  for (const bucket of killBuckets) {
+    for (const edge of bucket ?? []) {
+      if (edge.killerIds.some((killerId) => {
+        const owner = unitIdOwnerFromId(killerId);
+        return owner !== null && owner !== seatId && isSeatId(owner);
+      })) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -232,15 +214,21 @@ export function humanHadStrategicResolutionObservableActions(
  *
  * Purpose: Tactical idle-opponent detection.
  * When to use: `afterTacticalBeatResolution`.
- * Expected outcome: Wrapper over `subUnitPlayerHadTacticalBeatResolutionActions` for `'opponent'`.
+ * Expected outcome: True when this seat marched, fired, or scored a kill on the beat.
  * Exceptions: None.
  */
-export function opponentHadTacticalBeatResolutionActions(
+export function seatHadTacticalBeatResolutionActions(
   playback: TacticalCommitResolutionPlayback,
-  tacticalBattle: TacticalBattleSnapshot
+  tacticalBattle: TacticalBattleSnapshot,
+  seatId: AiSeatId
 ): boolean {
-  logTrace('opponentHadTacticalBeatResolutionActions', {});
-  return subUnitPlayerHadTacticalBeatResolutionActions(playback, tacticalBattle, 'opponent');
+  logTrace('seatHadTacticalBeatResolutionActions', { seatId });
+  const partyIsSeat = tacticalBattle.opposingPartyId === undefined || tacticalBattle.opposingPartyId === seatId;
+  if (partyIsSeat && (playback.opponentMoves?.length ?? 0) > 0) return true;
+  if (partyIsSeat && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
+  const ids = new Set(tacticalBattle.subUnits.filter((unit) => unit.player === seatId).map((unit) => unit.id));
+  const buckets = [playback.killsByDirectFire, playback.killsByAirStrike, playback.killsByReturnFire, playback.killsByMelee];
+  return buckets.some((bucket) => (bucket ?? []).some((edge) => edge.killerIds.some((id) => ids.has(id))));
 }
 
 /**
@@ -248,13 +236,20 @@ export function opponentHadTacticalBeatResolutionActions(
  *
  * Purpose: Tactical human-observable detection.
  * When to use: `afterTacticalBeatResolution`.
- * Expected outcome: Wrapper over `subUnitPlayerHadTacticalBeatResolutionActions` for `'human'`.
+ * Expected outcome: True when another seat marched, fired, or scored a kill. Neutral fire does not count.
  * Exceptions: None.
  */
-export function humanHadTacticalBeatResolutionActions(
+export function enemyHadTacticalBeatResolutionActions(
   playback: TacticalCommitResolutionPlayback,
-  tacticalBattle: TacticalBattleSnapshot
+  tacticalBattle: TacticalBattleSnapshot,
+  seatId: AiSeatId
 ): boolean {
-  logTrace('humanHadTacticalBeatResolutionActions', {});
-  return subUnitPlayerHadTacticalBeatResolutionActions(playback, tacticalBattle, 'human');
+  logTrace('enemyHadTacticalBeatResolutionActions', { seatId });
+  if (hasNonNoopMarchMoves(playback.humanMoves)) return true;
+  if (playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
+  const enemyIds = new Set(
+    tacticalBattle.subUnits.filter((unit) => unit.player !== seatId && isSeatId(unit.player)).map((unit) => unit.id)
+  );
+  const buckets = [playback.killsByDirectFire, playback.killsByAirStrike, playback.killsByReturnFire, playback.killsByMelee];
+  return buckets.some((bucket) => (bucket ?? []).some((edge) => edge.killerIds.some((id) => enemyIds.has(id))));
 }

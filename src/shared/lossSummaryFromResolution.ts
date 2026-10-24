@@ -2,8 +2,10 @@
  * Normalizes combat resolution payloads into per-player, per-cause loss summaries.
  */
 
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
 import type { RemovedUnitSnapshot } from './ipc/readyTypes';
 import {
+  emptyPlayerLossSummary,
   emptyTurnLossSummary,
   type LostUnit,
   type LostUnitType,
@@ -128,19 +130,28 @@ export interface BuildTurnLossSummaryArgs {
    *
    * Contract: Returns undefined when the id is unknown; unknown ids are skipped.
    * When to use: Required for player bucketing and grouped totals.
-   * Expected outcome: `player === 'human'` maps to human summary; all others map to AI.
+   * Expected outcome: `player === HUMAN_SEAT_ID` maps to human summary; all others map to AI.
    * Exceptions: None.
    */
   resolveUnitMeta: (unitId: string) => { player: string; unitType: string } | undefined;
   /**
    * Optional fog filter for opponent victims in renderer popups.
    *
-   * Contract: When provided, human victims always pass; opponent victims pass only when this returns true.
+   * Contract: When provided, the perspective player always passes; other victims pass only when this returns true.
    * When to use: Renderer with `knownVictimIds`; omit on main for full prompt history.
    * Expected outcome: Defaults to including all victims when omitted.
    * Exceptions: None.
    */
   isVictimVisible?: (unitId: string, player: string) => boolean;
+  /**
+   * Owner whose losses stay in the summary even when the visibility predicate would hide them.
+   *
+   * Contract: When omitted, the human seat is always included. Other owners follow `isVictimVisible`.
+   * When to use: A commander's note, passing that seat. The toast omits it and passes the viewer through the predicate.
+   * Expected outcome: That owner's units are kept. Buckets are still keyed by the victim's owner.
+   * Exceptions: None.
+   */
+  perspectivePlayerId?: string;
 }
 
 /**
@@ -204,8 +215,9 @@ function resolveLostUnit(
   const unitType = normalizeUnitType(meta.unitType);
   if (!unitType) return null;
   const player = meta.player;
+  const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
   const visible =
-    player === 'human' ||
+    player === alwaysVisiblePlayer ||
     !args.isVictimVisible ||
     args.isVictimVisible(victimId, player);
   if (!visible) return null;
@@ -217,15 +229,19 @@ function resolveLostUnit(
 }
 
 /**
- * Selects the human or AI player bucket for a victim row.
+ * The cause buckets for the victim's owner, creating them on first use.
  *
- * Purpose: Maps raw player strings to the two-sided `TurnLossSummary` shape.
+ * Purpose: A loss is filed under whoever owned the unit.
  * When to use: When pushing a classified victim into the summary.
- * Expected outcome: Human player uses `summary.human`; all others use `summary.ai`.
+ * Expected outcome: The same `PlayerLossSummary` for later victims of that owner.
  * Exceptions: None.
  */
 function bucketForPlayer(summary: TurnLossSummary, player: string): PlayerLossSummary {
-  return player === 'human' ? summary.human : summary.ai;
+  const existing = summary.byOwner[player];
+  if (existing) return existing;
+  const created = emptyPlayerLossSummary();
+  summary.byOwner[player] = created;
+  return created;
 }
 
 /**
@@ -344,7 +360,7 @@ export function buildTurnLossSummary(args: BuildTurnLossSummaryArgs): TurnLossSu
     const unit = resolveLostUnit(victimId, snapshots, args);
     if (!unit) return;
     const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
-    const player = meta?.player ?? 'opponent';
+    const player = meta?.player ?? AI_SEAT_IDS[0];
     pushToBucket(summary, player, cause, unit);
     claimed.add(victimId);
   };

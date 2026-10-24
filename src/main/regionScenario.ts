@@ -71,39 +71,6 @@ export function installSideGroupHomes(
 }
 
 /**
- * Resolves two different side groups to the names stored on the match.
- *
- * Purpose: The dialog sends group ids. Prompts and victory use the display names.
- * When to use: `resetGameForNewMatch` when the chosen map is regional.
- * Expected outcome: The two display names. The hex lists are already installed under those names.
- * Exceptions: Throws when a group is unknown or both sides picked the same group.
- */
-export function resolveSideGroupHomeNames(
-  humanSideGroupId: string,
-  aiSideGroupId: string
-): { humanHomeRegion: string; aiHomeRegion: string } {
-  logDebug('regionScenario resolveSideGroupHomeNames', { humanSideGroupId, aiSideGroupId });
-  if (!sideGroupHomes) {
-    const err = new Error('No side groups are loaded');
-    logError('regionScenario resolveSideGroupHomeNames: none loaded', err);
-    throw err;
-  }
-  if (humanSideGroupId === aiSideGroupId) {
-    const err = new Error('The two sides must be different groups');
-    logError('regionScenario resolveSideGroupHomeNames: same group', err);
-    throw err;
-  }
-  const human = sideGroupHomes.find((group) => group.id === humanSideGroupId);
-  const ai = sideGroupHomes.find((group) => group.id === aiSideGroupId);
-  if (!human || !ai) {
-    const err = new Error('Unknown side group');
-    logError('regionScenario resolveSideGroupHomeNames: unknown', { humanSideGroupId, aiSideGroupId, err });
-    throw err;
-  }
-  return { humanHomeRegion: human.displayName, aiHomeRegion: ai.displayName };
-}
-
-/**
  * Drops the cached UN-subregion hex lists.
  *
  * Purpose: A map change must not keep names built from the previous naming file.
@@ -198,33 +165,6 @@ export function listScenarioHomeRegions(): string[] {
   const names = [...getRegionHexCache().keys()];
   names.sort((a, b) => a.localeCompare(b));
   return names;
-}
-
-/**
- * Defines the `resolveScenarioHomeRegions` function shape (export function resolveScenarioHomeRegions(options?: { humanHomeRegion?: string; aiHomeRegion?: string; }): { humanHomeRegion: string; aiHomeRegion: stri).
-
- * Purpose: Supports maintainability by documenting why `resolveScenarioHomeRegions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function resolveScenarioHomeRegions(options?: {
-  humanHomeRegion?: string;
-  aiHomeRegion?: string;
-}): { humanHomeRegion: string; aiHomeRegion: string } {
-  logTrace('regionScenario resolveScenarioHomeRegions');
-  const regionOptions = listScenarioHomeRegions();
-  const preferred = regionOptions.filter((name) => name.trim().toLowerCase() !== 'antarctica');
-  const fallbackHuman = preferred[0] ?? regionOptions[0] ?? '';
-  const fallbackAi =
-    preferred.find((name) => name !== fallbackHuman) ??
-    regionOptions.find((name) => name !== fallbackHuman) ??
-    fallbackHuman;
-  const requestedHuman = (options?.humanHomeRegion ?? '').trim();
-  const requestedAi = (options?.aiHomeRegion ?? '').trim();
-  const humanHomeRegion = regionOptions.includes(requestedHuman) ? requestedHuman : fallbackHuman;
-  const aiHomeRegion = regionOptions.includes(requestedAi) ? requestedAi : fallbackAi;
-  return { humanHomeRegion, aiHomeRegion };
 }
 
 /**

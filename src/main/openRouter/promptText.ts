@@ -3,7 +3,7 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
 import { buildOpeningUserMessage } from './promptSpec/consultationText';
@@ -174,14 +174,6 @@ export function formatLatLng(ll: [number, number], decimalPlaces: number): strin
   return `[${ll[0].toFixed(decimalPlaces)}, ${ll[1].toFixed(decimalPlaces)}]`;
 }
 
-/**
- * Builds the Available Tools intro paragraph (before numbered tool lines).
- *
- * Purpose: One source for the briefing vs no-briefing tool intro, including Best Options dest copy and strategic standing-order primacy.
- * When to use: `buildSystemPromptForTools` after computing tool flags, briefing presence, and roster gates.
- * Expected outcome: A single paragraph. Briefing+planning tells the model to copy approach/move/melee Target Hexes into explicit_move, ferry Target Hexes into ferryOrders when air is present, and to call plan_route only for dests not listed for that unit. Strategic adds optional query_orders / memory / production hints and does not tell the model to explicit_move every unit.
- * Exceptions: None.
- */
 /**
  * Roster and options-table gates for the Available Tools intro paragraph.
  *
@@ -484,16 +476,49 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
 }
 
 /**
- * Defines the `buildHumanUnitsPromptLine` function shape (export function buildHumanUnitsPromptLine(humanRoster: string): string).
-
- * Purpose: Supports maintainability by documenting why `buildHumanUnitsPromptLine` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * One side's observed units, already formatted as id, type, and cell.
+ *
+ * Purpose: The roster line groups those summaries under the side's home name, then Neutral.
+ * When to use: `buildEnemyUnitsPromptLine`.
+ * Expected outcome: `roster` is empty when that side has nothing observed. The line omits empty groups.
  * Exceptions: None.
  */
-export function buildHumanUnitsPromptLine(humanRoster: string): string {
-  if (humanRoster.length > 0) return `Human units (currently observed): ${humanRoster}`;
-  return 'Human units (currently observed): none. Enemy units may be out of view; actively scout to reacquire contact.';
+export type EnemyRosterGroup = {
+  /**
+   * Home display name, or `Neutral`.
+   *
+   * Contract: The side's `homeRegion`. Neutral uses the word Neutral.
+   * When to use: The group label before the colon.
+   * Expected outcome: A non-empty name.
+   * Exceptions: None.
+   */
+  readonly name: string;
+  /**
+   * Semicolon-joined unit summaries for this group.
+   *
+   * Contract: Each summary is `id (type) at cell`. Empty when nothing of this side is observed.
+   * When to use: After the colon. Empty groups are omitted.
+   * Expected outcome: An empty string or a semicolon-joined list.
+   * Exceptions: None.
+   */
+  readonly roster: string;
+};
+
+/**
+ * Observed-enemy line, grouped by side and then Neutral.
+ *
+ * Purpose: The commander sees which enemy each observed unit belongs to.
+ * When to use: The system prompt after the tools section. Pass groups in seat order, with Neutral last.
+ * Expected outcome: `Enemy units (currently observed): {name}: {roster}; ...`, or the none sentence when every roster is empty.
+ * Exceptions: None.
+ */
+export function buildEnemyUnitsPromptLine(groups: readonly EnemyRosterGroup[]): string {
+  const present = groups.filter((group) => group.roster.length > 0);
+  logTrace('promptText buildEnemyUnitsPromptLine', { groupCount: present.length });
+  if (present.length === 0) {
+    return 'Enemy units (currently observed): none. Enemy units may be out of view; actively scout to reacquire contact.';
+  }
+  return `Enemy units (currently observed): ${present.map((group) => `${group.name}: ${group.roster}`).join('; ')}`;
 }
 
 /**

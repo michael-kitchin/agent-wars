@@ -34,7 +34,7 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
   /**
    * Owning player id for the unit row.
    *
-   * Contract: `'human'` or `'opponent'` in normal games; stored as plain text in SQLite.
+   * Contract: `HUMAN_SEAT_ID` or the first AI seat in normal games; stored as plain text in SQLite.
    * When to use: Maps to `GameStateSnapshot.units[].player`.
    * Expected outcome: Preserved verbatim.
    * Exceptions: None.

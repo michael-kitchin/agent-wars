@@ -227,37 +227,3 @@ export function requireGameMapId(value: string | undefined): GameMapId {
   logError('requireGameMapId: unknown', err);
   throw err;
 }
-
-/**
- * Rejects a regional start that does not name two different groups on that map.
- *
- * Purpose: The database must not be wiped for a start the manifest cannot seed.
- * When to use: `resetGameForNewMatch` before `ensureGameMapLoaded`.
- * Expected outcome: Returns when both ids are different groups on the manifest.
- * Exceptions: Throws when the pack is missing, the ids match, or either id is unknown.
- */
-export function assertRegionalSideGroupsDistinct(
-  id: RegionalGameMapId,
-  humanSideGroupId: string | undefined,
-  aiSideGroupId: string | undefined
-): void {
-  logDebug('assertRegionalSideGroupsDistinct', { id, humanSideGroupId: humanSideGroupId ?? null, aiSideGroupId: aiSideGroupId ?? null });
-  const directory = regionPackDirectory(id);
-  if (!directory) {
-    const err = new Error(`Regional map ${id} is not extracted`);
-    logError('assertRegionalSideGroupsDistinct: missing pack', err);
-    throw err;
-  }
-  const manifest = readRegionManifest(path.join(directory, 'region_manifest.json'));
-  if (!humanSideGroupId || !aiSideGroupId || humanSideGroupId === aiSideGroupId) {
-    const err = new Error('The two sides must be different groups');
-    logError('assertRegionalSideGroupsDistinct: same group', err);
-    throw err;
-  }
-  const ids = new Set(manifest.sideGroups.map((group) => group.id));
-  if (!ids.has(humanSideGroupId) || !ids.has(aiSideGroupId)) {
-    const err = new Error('Unknown side group');
-    logError('assertRegionalSideGroupsDistinct: unknown', err);
-    throw err;
-  }
-}

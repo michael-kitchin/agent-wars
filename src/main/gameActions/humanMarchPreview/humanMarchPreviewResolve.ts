@@ -1,3 +1,4 @@
+import { type SeatId, HUMAN_SEAT_ID } from '../../../shared/seatIds';
 import { cellToLatLng } from 'h3-js';
 import {
   getGameStateForPlayer,
@@ -125,14 +126,14 @@ type PreviewComputationContext = HumanMarchPreviewComputationContext;
  */
 interface ActiveHoverPathfindingSession {
     /**
-   * Specifies the contract for the `playerId` member (playerId: 'human' | 'opponent';).
+   * Specifies the contract for the `playerId` member (playerId: SeatId;).
 
    * Contract: Describes stable behavior for callers of `playerId` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-playerId: 'human' | 'opponent';
+playerId: SeatId;
     /**
    * Specifies the contract for the `selectionSignature` member (selectionSignature: string;).
 
@@ -253,7 +254,7 @@ const previewResultCache = new Map<string, HumanOrderPreviewResult>();
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const activeHoverPathfindingSessionByPlayer = new Map<'human' | 'opponent', ActiveHoverPathfindingSession>();
+const activeHoverPathfindingSessionByPlayer = new Map<SeatId, ActiveHoverPathfindingSession>();
 
 /**
  * Documents the `HumanOrderPreviewSegment` interface as a named contract surface (export interface HumanOrderPreviewSegment).
@@ -498,14 +499,14 @@ function logPreviewOutcome(
 }
 
 /**
- * Defines the `snapshotStateForPlayer` function shape (function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapshot).
+ * Defines the `snapshotStateForPlayer` function shape (function snapshotStateForPlayer(playerId: SeatId): GameStateSnapshot).
 
  * Purpose: Supports maintainability by documenting why `snapshotStateForPlayer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapshot {
+function snapshotStateForPlayer(playerId: SeatId): GameStateSnapshot {
   return getGameStateForPlayer(playerId, { maskUnexploredTerrain: false });
 }
 
@@ -518,7 +519,7 @@ function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapsh
  * Exceptions: None.
  */
 function getOrCreateHoverSessionContext(
-  playerId: 'human' | 'opponent',
+  playerId: SeatId,
   selectedUnitIds: readonly string[]
 ): PreviewComputationContext {
   const selectionSignature = buildSelectionSignature(selectedUnitIds);
@@ -625,14 +626,14 @@ function computeHumanMarchPreviewForUnit(
     logPreviewOutcome(unitId, hoveredH3Index, cached, 'result_cache');
     return cached;
   }
-  const unit = context.state.units.find((u) => u.id === unitId && u.player === 'human');
+  const unit = context.state.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID);
   if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
   const hoveredHex = context.state.hexes.find((h) => h.h3Index === hoveredH3Index);
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
   let result: HumanOrderPreviewResult;
   if (unit.unitType === 'air') {
     const controller = getHexController(hoveredH3Index);
-    if (controller !== 'human') {
+    if (controller !== HUMAN_SEAT_ID) {
       return {
         valid: false,
         showInvalidMarker: true,
@@ -773,7 +774,7 @@ export function resolveHumanMarchOrderPreview(unitId: string, hoveredH3Index: st
     if (isTacticalBattleActive()) {
       return { valid: false, showInvalidMarker: false, invalidReason: 'March preview is unavailable during a tactical battle.', segments: [] };
     }
-    const context = getOrCreateHoverSessionContext('human', [unitId]);
+    const context = getOrCreateHoverSessionContext(HUMAN_SEAT_ID, [unitId]);
     return buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index);
   } catch (err) {
     logError('previewHumanMarchOrder: exception', err);
@@ -813,9 +814,9 @@ export function resolveHumanMarchOrderPreviews(unitIds: string[], hoveredH3Index
     }
     const uniqueUnitIds = uniqueStrategicMarchPreviewUnitIds(unitIds);
     if (uniqueUnitIds.length === 0) {
-      if (activeHoverPathfindingSessionByPlayer.has('human')) {
+      if (activeHoverPathfindingSessionByPlayer.has(HUMAN_SEAT_ID)) {
         previewDiagnostics.sessionInvalidateCount += 1;
-        activeHoverPathfindingSessionByPlayer.delete('human');
+        activeHoverPathfindingSessionByPlayer.delete(HUMAN_SEAT_ID);
       }
       return {
         validForAll: false,
@@ -825,10 +826,10 @@ export function resolveHumanMarchOrderPreviews(unitIds: string[], hoveredH3Index
         previews: [],
       };
     }
-    const context = getOrCreateHoverSessionContext('human', uniqueUnitIds);
+    const context = getOrCreateHoverSessionContext(HUMAN_SEAT_ID, uniqueUnitIds);
     const state = context.state;
     const selectedUnits = uniqueUnitIds
-      .map((unitId) => state.units.find((u) => u.id === unitId && u.player === 'human'))
+      .map((unitId) => state.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID))
       .filter((unit): unit is HumanOwnedUnit => !!unit);
     logDebug('gameActions parity previewBuild: strategic request', {
       requestedUnitCount: unitIds.length,

@@ -4,6 +4,8 @@ import {
   formatPendingMovementSidebarTargetLabel,
   formatTacticalDraftMarchPendingOrderTargetLabel,
 } from '../../shared/pendingMovementSidebarLabels';
+import { formatUnitNameForViewer, viewerSeatIdForRoster } from '../../shared/sideLabels';
+import { unitIdOwnerFromId } from '../../shared/unitIds';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { rendererSharedState as S } from '../core/state';
@@ -371,8 +373,17 @@ export function buildKillToastFormatterBundle(
   for (const row of tacticalSubUnitsForKillLabels ?? []) {
     displayNameById.set(row.id, row.displayName);
   }
-  const formatDisplayUnitName = (unitId: string) =>
-    displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+  const formatDisplayUnitName = (unitId: string): string => {
+    const baseName = displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+    if (!ownerId) return baseName;
+    return formatUnitNameForViewer({
+      baseName,
+      ownerId,
+      viewerSeatId: viewerSeatIdForRoster(S.gameState?.seats ?? []),
+      seats: S.gameState?.seats ?? [],
+    });
+  };
   const formatKillLine = (kill: KillEdge): string =>
     formatKillToastLine(kill, formatDisplayUnitName);
   return { formatUnitName: formatDisplayUnitName, formatKillLine };

@@ -16,16 +16,19 @@ import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tactic
 import { rendererSharedState as S } from '../core/state';
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { rendererMatchEpochCurrent } from '../core/matchEpoch';
+import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 import {
   applyTacticalPostBeatConsultSideEffects,
   isTacticalPostBeatConsultOnCommit,
+  tacticalBattleHasAiSide,
 } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { buildTacticalPendingMarchRowsFromContinuations } from '../tactical/tacticalPendingMarchPath';
 import {
   announceResolutionTurnUpdate,
   buildTacticalCommitReadyResultForToast,
   deriveCombatVisibilityClassification,
+  reportViewerSeatId,
   scheduleResolutionPlaybackCompleteNotify,
 } from './readyResolutionAnnouncements';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
@@ -130,9 +133,6 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     airStrikes: [...S.pendingAirStrikes],
     ferryOrders: [...S.pendingFerryOrders],
     embarkOrders: [...S.pendingEmbarkOrders],
-    ...(S.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(S.tacticalOpponentDraft)
-      ? { opponentTacticalDraft: S.tacticalOpponentDraft }
-      : {}),
     useEventDrivenConsultation: S.useEventDrivenConsultation,
     aiPlanningRunEnabled: S.runButtonOn,
   })) as CommitHumanTacticalDraftOrdersIpcResult;
@@ -218,10 +218,6 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   }
   // Drop selection / drafts that referenced sub-units removed during this beat before the next planning click.
   reconcileSelectionToCurrentState();
-  // Consume any opponent draft that was just applied (or emptied by sanitize). Post-beat consult may refill below.
-  if ('committedOpponentTacticalDraft' in commitResult) {
-    S.tacticalOpponentDraft = null;
-  }
   if (commitResult.tacticalPostBeatConsultDeferred) {
     S.pendingDeferredTacticalPostBeatConsult = true;
     S.deferredResolutionConsultNotifySent = false;
@@ -229,8 +225,9 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
     applyTacticalPostBeatConsultSideEffects(commitResult, deps);
   } else if (!commitResult.tacticalPostBeatConsultDeferred) {
-    if ('tacticalOpponentPlan' in commitResult) {
-      S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+    const plan = 'tacticalOpponentPlan' in commitResult ? commitResult.tacticalOpponentPlan : null;
+    if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && S.runButtonOn && tacticalBattleHasAiSide()) {
+      deps.startBackgroundRequestIfAllowed();
     }
     deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
   }
@@ -240,8 +237,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
     allowPrecomputedFallback: S.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null,
   });
-  // Replaces pending rows from the successful commit (continuations plus cleared ranged/air/ferry/embark). A late
-  // requestAiOrders result is dropped in openRouterRuntime when tacticalBattleSnapshot is gone.
+  // Replaces pending rows from the successful commit (continuations plus cleared ranged/air/ferry/embark).
   const previousPendingMarches = new Map(S.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
   S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
     ? buildTacticalPendingMarchRowsFromContinuations({
@@ -256,29 +252,27 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   S.pendingEmbarkOrders = [];
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
-  if (window.gameApi?.getGameState) {
-    try {
-      const refreshedStrategic = (await window.gameApi.getGameState()) as GameStateSnapshot;
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-      await deps.applyGameStateSnapshot(refreshedStrategic, {
-        refreshStandingOrders: false,
-        updateGameStateSidebarUi: false,
-        updateSelectionUi: false,
-        updateGameOverUi: false,
-        updateReadyButton: false,
-        refreshBuildPopup: true,
-        redraw: false,
-      });
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    } catch (err) {
-      console.error('tactical commit: failed to refresh strategic game state snapshot', err);
-      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
-    }
+  try {
+    const refreshedStrategic = await fetchMatchSnapshot();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    await deps.applyGameStateSnapshot(refreshedStrategic, {
+      refreshStandingOrders: false,
+      updateGameStateSidebarUi: false,
+      updateSelectionUi: false,
+      updateGameOverUi: false,
+      updateReadyButton: false,
+      refreshBuildPopup: true,
+      redraw: false,
+    });
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+  } catch (err) {
+    console.error('tactical commit: failed to refresh strategic game state snapshot', err);
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
   }
   if (playback && S.gameState && needsResolutionPlayback) {
     const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
     const visibleHexes = deps.getVisibleHexSet(S.gameState);
-    const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
+    const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
     const killToastFormatter = deps.buildKillToastFormatterBundle(
       S.gameState,
       tacticalReadySlice.removedUnits,
@@ -328,10 +322,6 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
       };
       scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
     }
-  }
-  if (S.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
-    const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-    if (oppAlive) deps.startBackgroundRequestIfAllowed();
   }
   deps.updateReadyButtonState();
   return true;

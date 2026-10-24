@@ -2,6 +2,7 @@
  * Lightweight tactical unit assessments for Commander briefing sections (no Tool 2).
  */
 
+import { briefingSeatForBattle } from '../briefing/briefingPerspective';
 import { cellToLatLng } from 'h3-js';
 import type { UnitAssessmentResult } from '../precomputation';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -163,18 +164,18 @@ function tacticalCanAttackRows(
 function assessTacticalOpponentUnit(
   unit: TacticalSubUnitSnapshot,
   byId: Map<string, TacticalSubUnitSnapshot>,
-  humans: TacticalSubUnitSnapshot[],
+  enemies: TacticalSubUnitSnapshot[],
   battle: TacticalBattleSnapshot
 ): UnitAssessmentResult {
   logTrace('tacticalBriefingAssessments assessTacticalOpponentUnit', {
     unitId: unit.id,
-    humanCount: humans.length,
+    enemyCount: enemies.length,
   });
   const selfH3 = effectiveH3(unit, byId);
   const [lat, lng] = cellToLatLng(selfH3);
   const footprint = new Set(battle.tacticalChildH3Indexes);
 
-  const nearby = humans
+  const nearby = enemies
     .flatMap((enemy) => {
       const enemyH3 = effectiveH3(enemy, byId);
       const hexDistance = gridHopDistanceBetween(selfH3, enemyH3);
@@ -266,8 +267,9 @@ export function buildLightweightTacticalUnitAssessments(
   const originBonusFor = (unit: TacticalSubUnitSnapshot): OriginBonusUnitFields =>
     tacticalOriginBonusUnitFields(originBonusSettings, tacticalBattle, unit);
   const byId = new Map(tacticalBattle.subUnits.map((u) => [u.id, u]));
-  const humans = tacticalBattle.subUnits.filter((u) => u.player === 'human');
-  const opponents = tacticalBattle.subUnits.filter((u) => u.player === 'opponent');
+  const ownSeat = briefingSeatForBattle(tacticalBattle);
+  const enemies = tacticalBattle.subUnits.filter((u) => u.player !== ownSeat);
+  const opponents = tacticalBattle.subUnits.filter((u) => u.player === ownSeat);
   const assessmentByStackKey = new Map<string, UnitAssessmentResult>();
   const results: UnitAssessmentResult[] = [];
   let uniqueAssessments = 0;
@@ -280,7 +282,7 @@ export function buildLightweightTacticalUnitAssessments(
       results.push(cloneTacticalAssessmentForStackedUnit(cached, unit, byId, originBonusFor, tacticalBattle));
       continue;
     }
-    const scanned = assessTacticalOpponentUnit(unit, byId, humans, tacticalBattle);
+    const scanned = assessTacticalOpponentUnit(unit, byId, enemies, tacticalBattle);
     const entry: UnitAssessmentResult = {
       ...scanned,
       result: {
@@ -313,8 +315,9 @@ export function buildTacticalBriefingNarrative(
   tacticalBattle: TacticalBattleSnapshot,
   unitAssessments: UnitAssessmentResult[]
 ): string {
-  const aiUnits = tacticalBattle.subUnits.filter((u) => u.player === 'opponent');
-  const humanUnits = tacticalBattle.subUnits.filter((u) => u.player === 'human');
+  const ownSeat = briefingSeatForBattle(tacticalBattle);
+  const aiUnits = tacticalBattle.subUnits.filter((u) => u.player === ownSeat);
+  const humanUnits = tacticalBattle.subUnits.filter((u) => u.player !== ownSeat);
   const inContact = unitAssessments.filter(
     (a) =>
       (a.result.threats?.length ?? 0) > 0 &&
@@ -325,7 +328,7 @@ export function buildTacticalBriefingNarrative(
   ).length;
   const sentences: string[] = [];
   sentences.push(
-    `Tactical beat ${tacticalBattle.tacticalTurnNumber}: you command ${aiUnits.length} sub-unit(s); human sub-units in this battle: ${humanUnits.length} (full visibility).`
+    `Tactical beat ${tacticalBattle.tacticalTurnNumber}: you command ${aiUnits.length} sub-unit(s); enemy sub-units in this battle: ${humanUnits.length} (full visibility).`
   );
   if (inContact > 0) {
     sentences.push(`${inContact} of your sub-units are in or near direct combat range.`);

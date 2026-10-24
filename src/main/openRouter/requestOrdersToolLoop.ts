@@ -11,7 +11,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
-import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { coordinateContextSeatId, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { createPathfindingSession, executePathfinding } from '../tools/pathfinding';
 import { executeAssessment } from '../tools/assessment';
 import { executeCombatEstimation } from '../tools/combatEstimation';
@@ -546,13 +546,14 @@ export async function runRequestOrdersToolLoop(
         if (toolName === 'check_distance') aiPathfindingSessionMetrics.checkDistanceToolCalls += 1;
         aiPathfindingSessionMetrics.totalToolCalls += 1;
         const toolState = tacticalBattle ? planState : state;
+        const actingSeatId = coordinateContextSeatId(coordinateContext);
         const result =
           toolName.includes('order') || toolName.includes('standing')
-            ? executeStandingOrders(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+            ? executeStandingOrders(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
             : toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production')
-              ? executeProductionTools(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+              ? executeProductionTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
               : toolName.includes('memory')
-                ? executeMemory(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                ? executeMemory(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
                   ? executeCombatEstimation(toolName, execArgs, toolState, latLngByH3, resolveToH3, tacticalBattle)
                   : toolName.includes('assess')

@@ -14,13 +14,13 @@ import {
   resetGameForNewMatch,
 } from '../gameDb';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
-import { applyParsedOpponentCallbackSubscriptions } from './applyParsedOpponentCallbacks';
+import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 
 /**
  * Opens a temp SQLite DB so subscription writes hit a real schema.
  *
  * Purpose: Isolates replace-all / clear checks from the developer's game database.
- * When to use: Wrap every case that calls `replaceSubscriptions` or `applyParsedOpponentCallbackSubscriptions`.
+ * When to use: Wrap every case that calls `replaceSubscriptions` or `applyParsedCallbackSubscriptions`.
  * Expected outcome: Fresh match schema; closed and deleted in `finally`.
  * Exceptions: None.
  */
@@ -41,7 +41,7 @@ function withTempDb(fn: () => void): void {
  * Seeds one opponent subscription so a later clear is observable.
  *
  * Purpose: Empty-array and omitted-field cases must actually delete stored rows, not no-op.
- * When to use: Inside `withTempDb` before `applyParsedOpponentCallbackSubscriptions`.
+ * When to use: Inside `withTempDb` before `applyParsedCallbackSubscriptions`.
  * Expected outcome: `getSubscriptions('opponent')` has one `turns` row.
  * Exceptions: None.
  */
@@ -53,7 +53,8 @@ function seedOpponentTurnsSubscription(): void {
 test('empty callbacks array clears all opponent subscriptions', () => {
   withTempDb(() => {
     seedOpponentTurnsSubscription();
-    const stored = applyParsedOpponentCallbackSubscriptions({
+    const stored = applyParsedCallbackSubscriptions({
+      seatId: 'opponent',
       callbacks: [],
       turnNumber: 11,
       battleSubUnitIds: null,
@@ -66,7 +67,8 @@ test('empty callbacks array clears all opponent subscriptions', () => {
 test('omitted callbacks field clears all opponent subscriptions', () => {
   withTempDb(() => {
     seedOpponentTurnsSubscription();
-    const stored = applyParsedOpponentCallbackSubscriptions({
+    const stored = applyParsedCallbackSubscriptions({
+      seatId: 'opponent',
       callbacks: undefined,
       turnNumber: 11,
       battleSubUnitIds: null,
@@ -79,7 +81,8 @@ test('omitted callbacks field clears all opponent subscriptions', () => {
 test('empty callbacks array clears subscriptions during a tactical consult', () => {
   withTempDb(() => {
     seedOpponentTurnsSubscription();
-    const stored = applyParsedOpponentCallbackSubscriptions({
+    const stored = applyParsedCallbackSubscriptions({
+      seatId: 'opponent',
       callbacks: [],
       turnNumber: 11,
       battleSubUnitIds: new Set(['opp-parent:01']),

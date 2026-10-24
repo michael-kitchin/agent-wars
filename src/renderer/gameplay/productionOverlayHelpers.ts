@@ -2,6 +2,7 @@
  * Shared production overlay math for strategic canvas labels and build-entry gating (capacity, queues, deployment caps).
  */
 
+import { isSeatId, type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { BuildUnitType, GameStateSnapshot } from '../../shared/ipcTypes';
 import { estimateTurnsToNextSpawn } from '../../shared/productionConfig';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
@@ -18,9 +19,14 @@ import { isNewGameOverlayOpen } from './newGameBanner';
 export type UnitCountsByType = Record<BuildUnitType, number>;
 
 /**
- * Human and opponent unit-count snapshots for production label hints under inspection mode.
+ * Unit counts for the seats a production draw has already totaled.
+ *
+ * Purpose: Inspection mode checks the deployment cap without scanning units once per hex.
+ * When to use: `formatProductionQueueAwareLabel` when fog is off.
+ * Expected outcome: Seats this pass computed are present. A missing seat is counted on demand.
+ * Exceptions: None.
  */
-export type UnitCountsByPlayer = Record<'human' | 'opponent', UnitCountsByType>;
+export type UnitCountsByPlayer = Partial<Record<SeatId, UnitCountsByType>>;
 
 /**
  * Context computed once per frame for strategic production overlay drawing and build-entry sync.
@@ -154,7 +160,7 @@ export function isStrategicHexHumanUrbanProduction(
   state: GameStateSnapshot,
   hx: GameStateSnapshot['hexes'][number]
 ): boolean {
-  if (getControllerForHex(state, hx.h3Index) !== 'human') return false;
+  if (getControllerForHex(state, hx.h3Index) !== HUMAN_SEAT_ID) return false;
   return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
 }
 
@@ -173,7 +179,7 @@ export function getBuildQueueSummaryForHex(
  */
 export function getUnitCountsByTypeForPlayer(
   state: GameStateSnapshot,
-  playerId: 'human' | 'opponent'
+  playerId: SeatId
 ): UnitCountsByType {
   return getPlayerUnitCountsByType(state.units, playerId);
 }
@@ -204,11 +210,8 @@ export function formatProductionQueueAwareLabel(
   if (!nextUnitType || capacityPerTurn <= 0) {
     return `${capacityText} / ?t`;
   }
-  if (controller === 'human' || controller === 'opponent') {
-    const countsByType =
-      controller === 'human'
-        ? (unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, 'human'))
-        : (unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, 'opponent'));
+  if (controller && isSeatId(controller)) {
+    const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
     if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
       return `${capacityText} / ∞t`;
     }
@@ -227,12 +230,12 @@ export function formatProductionLabelForHumanControllerOnly(
   capacityPerTurn: number,
   controller: string | null
 ): string {
-  if (controller !== 'human') return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
+  if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
 }
 
 /**
- * Full queue-aware labels for both sides when inspection mode reveals all controller queues.
+ * Full queue-aware labels for every seat when inspection mode reveals all controller queues.
  */
 export function formatProductionLabelForAnyController(
   state: GameStateSnapshot,
@@ -242,6 +245,22 @@ export function formatProductionLabelForAnyController(
   unitCountsByPlayer?: UnitCountsByPlayer
 ): string {
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
+}
+
+/**
+ * Counts each roster seat once for the deployment-cap label.
+ *
+ * Purpose: A later seat's queue can show the cap without scanning units on every hex.
+ * When to use: Fog is off and production labels are showing.
+ * Expected outcome: One entry per seat on the snapshot. A snapshot with no roster counts the human seat.
+ * Exceptions: None.
+ */
+function unitCountsForReveal(state: GameStateSnapshot): UnitCountsByPlayer {
+  const seatIds = (state.seats ?? []).map((seat) => seat.seatId);
+  const ids = seatIds.length > 0 ? seatIds : [HUMAN_SEAT_ID];
+  const counts: UnitCountsByPlayer = {};
+  for (const seatId of ids) counts[seatId] = getUnitCountsByTypeForPlayer(state, seatId);
+  return counts;
 }
 
 /**
@@ -256,11 +275,6 @@ export function buildProductionOverlayContext(state: GameStateSnapshot): Product
     productionDetailShown,
     revealAllControllerQueues,
     unitHexes: new Set(state.units.map((u) => u.h3Index)),
-    unitCountsByPlayer: revealAllControllerQueues
-      ? {
-          human: getUnitCountsByTypeForPlayer(state, 'human'),
-          opponent: getUnitCountsByTypeForPlayer(state, 'opponent'),
-        }
-      : undefined,
+    unitCountsByPlayer: revealAllControllerQueues ? unitCountsForReveal(state) : undefined,
   };
 }

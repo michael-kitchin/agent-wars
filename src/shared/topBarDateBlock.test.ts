@@ -20,3 +20,7 @@ test('formatTopBarDateBlock shows the date and the strategic turn', () => {
 test('formatTopBarDateBlock shows an em dash for a missing date', () => {
   assert.equal(formatTopBarDateBlock({ ...strategicArgs, dateLabel: '' }).date, '—');
 });
+
+test('formatTopBarDateBlock names the turn limit', () => {
+  assert.equal(formatTopBarDateBlock({ ...strategicArgs, turnLimit: 30 }).turnPhase, 'Turn 7 of 30 · Planning');
+});

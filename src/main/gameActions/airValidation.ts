@@ -14,6 +14,7 @@ import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Documents the `ValidationResult` type alias (export type ValidationResult).
@@ -64,7 +65,7 @@ export function validateAirStrikeOrder(
   options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): ValidationResult {
   logTrace('airValidation validateAirStrikeOrder', { unitId, targetH3Index, targetType, allowedPlayer: options?.allowedPlayer });
-  const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const allowedPlayer = options?.allowedPlayer ?? HUMAN_SEAT_ID;
   const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   const owned = loadOwnedStrategicUnit(unitId, { allowedPlayer, displayLabelForUnit: labelFor });
   if (!owned.ok) return owned.failure;
@@ -112,7 +113,7 @@ export function validateFerryOrder(
   options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): ValidationResult {
   logTrace('airValidation validateFerryOrder', { unitId, destinationH3Index, allowedPlayer: options?.allowedPlayer });
-  const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const allowedPlayer = options?.allowedPlayer ?? HUMAN_SEAT_ID;
   const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   const owned = loadOwnedStrategicUnit(unitId, { allowedPlayer, displayLabelForUnit: labelFor });
   if (!owned.ok) return owned.failure;

@@ -29,6 +29,7 @@ import {
 } from '../navalMovementMessages';
 import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import {
   checkDistanceTagSourceUnit,
   nearestWaterHexTo,
@@ -718,7 +719,7 @@ export function executeCheckDistance(
   }
 
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
-  const occupant = checkDistanceTagSourceUnit(state.units, fromH3, unitType);
+  const occupant = checkDistanceTagSourceUnit(state.units, fromH3, unitType, briefingOwnSeatId(state));
   const movementBudget = strategicRangeOnState(
     { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags },
     state

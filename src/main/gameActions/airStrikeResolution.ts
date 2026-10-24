@@ -37,6 +37,7 @@ import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBon
 import type { TerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Removes illegal build-queue rows after infrastructure changes and syncs Keep building.
@@ -540,7 +541,7 @@ export function resolveAirStrikePhase(
   for (const order of sorted) {
     if (acc.removedSet.has(order.unitId)) continue;
     const valid = validateAirStrikeOrder(order.unitId, order.targetH3Index, order.targetType, {
-      allowedPlayer: dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [order.unitId])?.player ?? 'human',
+      allowedPlayer: dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [order.unitId])?.player ?? HUMAN_SEAT_ID,
     });
     if (!valid.valid) continue;
     strikeHexes.add(order.targetH3Index);

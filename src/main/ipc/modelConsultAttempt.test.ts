@@ -13,12 +13,13 @@ describe('executeAbortableConsult', { concurrency: 1 }, () => {
       theater: 'strategic',
       timeoutMs: 5_000,
       fallbackModelId: 'captured-model',
+      seatId: 'opponent',
       errorLogMessage: 'model change retry failed',
       run: async ({ signal, modelId }) => {
         calls += 1;
         assert.equal(modelId, 'live-model');
         if (calls === 1) {
-          cancelModelCalls('model_changed', 'all');
+          cancelModelCalls('model_changed', 'all', 'all');
           assert.equal(signal.aborted, true);
           return 'first';
         }
@@ -36,10 +37,11 @@ describe('executeAbortableConsult', { concurrency: 1 }, () => {
       theater: 'strategic',
       timeoutMs: 5_000,
       fallbackModelId: 'captured-model',
+      seatId: 'opponent',
       errorLogMessage: 'run off failed',
       run: async () => {
         calls += 1;
-        cancelModelCalls('run_off', 'all');
+        cancelModelCalls('run_off', 'all', 'all');
         return 'done';
       },
     });
@@ -48,21 +50,22 @@ describe('executeAbortableConsult', { concurrency: 1 }, () => {
   });
 
   it('does not retry a timeout that aborts the scope itself', async () => {
-    cancelModelCalls('model_changed', 'all');
-    const epochAtStart = getModelCallCancelEpoch();
+    cancelModelCalls('model_changed', 'all', 'all');
+    const epochAtStart = getModelCallCancelEpoch('opponent');
     let calls = 0;
     const result = await executeAbortableConsult({
       label: 'timeout',
       theater: 'tactical',
       timeoutMs: 30,
       fallbackModelId: 'captured-model',
+      seatId: 'opponent',
       errorLogMessage: 'timeout failed',
       run: () => {
         calls += 1;
         return new Promise<string>(() => undefined);
       },
     });
-    assert.equal(getModelCallCancelEpoch(), epochAtStart);
+    assert.equal(getModelCallCancelEpoch('opponent'), epochAtStart);
     assert.equal(calls, 1);
     assert.equal(result.ok, false);
   });

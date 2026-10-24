@@ -13,6 +13,7 @@ import { tacticalCellCoverPlace, type TerrainCoverPlace } from '../../shared/ter
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Arguments for `buildOrderPreviewEffectsTooltipInput`.
@@ -67,12 +68,12 @@ export function buildOrderPreviewEffectsTooltipInput(
 function targetCoverPlace(hoveredH3Index: string): TerrainCoverPlace | null {
   const battle = S.tacticalBattleSnapshot;
   if (battle) {
-    const enemyHere = battle.subUnits.some((unit) => unit.player !== 'human' && unit.h3Index === hoveredH3Index);
+    const enemyHere = battle.subUnits.some((unit) => unit.player !== HUMAN_SEAT_ID && unit.h3Index === hoveredH3Index);
     return enemyHere ? tacticalCellCoverPlace(battle, hoveredH3Index) : null;
   }
   const state = S.gameState;
   if (!state) return null;
-  const enemyHere = state.units.some((unit) => unit.player !== 'human' && unit.h3Index === hoveredH3Index);
+  const enemyHere = state.units.some((unit) => unit.player !== HUMAN_SEAT_ID && unit.h3Index === hoveredH3Index);
   if (!enemyHere) return null;
   const hex = state.hexes.find((row) => row.h3Index === hoveredH3Index);
   return {
@@ -96,7 +97,7 @@ function effectsKind(preview: HoverRoutePreviewState): OrderPreviewEffectsKind {
   const battle = S.tacticalBattleSnapshot;
   if (battle) {
     const selected = battle.subUnits.filter(
-      (unit) => unit.player === 'human' && S.selectedUnitIds.includes(unit.id)
+      (unit) => unit.player === HUMAN_SEAT_ID && S.selectedUnitIds.includes(unit.id)
     );
     if (selected.length > 0 && selected.every((unit) => unit.unitType === 'air')) return 'tacticalFerry';
     return 'tacticalMarch';
@@ -118,7 +119,7 @@ function effectsUnits(kind: OrderPreviewEffectsKind): OrderPreviewEffectsUnit[] 
   const battle = S.tacticalBattleSnapshot;
   if (battle && kind !== 'strategicMarch' && kind !== 'strategicFerry') {
     return battle.subUnits
-      .filter((unit) => unit.player === 'human' && S.selectedUnitIds.includes(unit.id))
+      .filter((unit) => unit.player === HUMAN_SEAT_ID && S.selectedUnitIds.includes(unit.id))
       .map((unit) => ({
         unitType: unit.unitType,
         originWeather: battle.weather ?? null,
@@ -142,7 +143,7 @@ function effectsUnits(kind: OrderPreviewEffectsKind): OrderPreviewEffectsUnit[] 
  */
 function strategicSelection(): { unitType: string; h3Index: string; weatherTags?: readonly WeatherState[] }[] {
   const ids = new Set(S.selectedUnitIds);
-  return (S.gameState?.units ?? []).filter((unit) => unit.player === 'human' && ids.has(unit.id));
+  return (S.gameState?.units ?? []).filter((unit) => unit.player === HUMAN_SEAT_ID && ids.has(unit.id));
 }
 
 /**

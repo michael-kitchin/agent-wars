@@ -187,15 +187,33 @@ export function getFullDdl(): string {
       is_rubble INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS seats (
+      seat_id TEXT PRIMARY KEY,
+      seat_order INTEGER NOT NULL UNIQUE CHECK (seat_order BETWEEN 1 AND 4),
+      kind TEXT NOT NULL CHECK (kind IN ('human', 'ai')),
+      home_region TEXT NOT NULL,
+      model_id TEXT,
+      reasoning_effort TEXT,
+      doctrine_choice TEXT CHECK (doctrine_choice IN ('aggressive', 'balanced', 'cautious', 'random')),
+      doctrine TEXT CHECK (doctrine IN ('aggressive', 'balanced', 'cautious')),
+      out_turn INTEGER,
+      out_by TEXT,
+      out_reasons TEXT NOT NULL DEFAULT '[]',
+      place INTEGER,
+      consultation_count INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS turn_notes_history (
+      seat_id TEXT NOT NULL,
       scope TEXT NOT NULL CHECK(scope IN ('strategic', 'tactical')),
       battle_id TEXT NOT NULL DEFAULT '',
       turn_number INTEGER NOT NULL,
       strategy_text TEXT,
       message_text TEXT,
-      human_loss_json TEXT,
-      ai_loss_json TEXT,
-      PRIMARY KEY (scope, battle_id, turn_number)
+      own_loss_json TEXT,
+      enemy_loss_json TEXT,
+      PRIMARY KEY (seat_id, scope, battle_id, turn_number)
     );
   `;
 }

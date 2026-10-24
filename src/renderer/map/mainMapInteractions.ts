@@ -6,6 +6,7 @@ import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from '
 import { rendererSharedState as S } from '../core/state';
 import { isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { observeModeControls } from '../../shared/observeModeControls';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
@@ -40,6 +41,7 @@ import {
   restartOrderEffectsDwellIfPointerMoved,
 } from './orderSlowerHexTooltip';
 import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
@@ -438,17 +440,17 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     if (tb) {
       return S.selectedUnitIdsAtMouseDown
         .map((id) => tb.subUnits.find((u) => u.id === id))
-        .filter((u): u is NonNullable<typeof u> => !!u && u.player === 'human')
+        .filter((u): u is NonNullable<typeof u> => !!u && u.player === HUMAN_SEAT_ID)
         .map((u) => ({
           id: u.id,
           h3Index: u.h3Index,
-          player: 'human' as const,
+          player: HUMAN_SEAT_ID,
           unitType: u.unitType,
         }));
     }
     return S.selectedUnitIdsAtMouseDown
       .map((id) => state.units.find((u) => u.id === id))
-      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === HUMAN_SEAT_ID);
   }
 
   /**
@@ -790,6 +792,13 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     }
 
     S.selectedHexIndex = hit;
+    if (observeModeControls(S.gameState?.seats ?? []).observing) {
+      deps.replaceSelection([]);
+      deps.updateSidebar();
+      deps.updateRangedSidebar();
+      deps.redraw();
+      return;
+    }
 
     const { unitsToDraw, movingIds } = S.gameState
       ? deps.getUnitsForDrawWithMovingIds(S.gameState)
@@ -811,7 +820,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
 
     const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
     const unitIconHit = hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
-    const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === 'human' ? unitsAtHit[0] : undefined;
+    const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === HUMAN_SEAT_ID ? unitsAtHit[0] : undefined;
     const humanUnitIconSelectionDeps = {
       replaceSelection: deps.replaceSelection,
       toggleUnitSelection: deps.toggleUnitSelection,
@@ -894,14 +903,14 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.hideStackCallout();
     if (hit) {
       const unit = deps.getUnitAtHex(hit);
-      if (unit?.player === 'human' && unitIconHit) {
+      if (unit?.player === HUMAN_SEAT_ID && unitIconHit) {
         applyHumanUnitIconClickSelectionPolicy({
           shiftKey: e.shiftKey,
           unitId: unit.id,
           suppressSelectionRetarget: suppressIconRetargetOnNextClick,
           deps: humanUnitIconSelectionDeps,
         });
-      } else if (unit?.player === 'human' && !unitIconHit) {
+      } else if (unit?.player === HUMAN_SEAT_ID && !unitIconHit) {
         clearDeferredHumanUnitSingleSelectTimer();
       } else if (deps.getPrimarySelectedUnitId() && S.gameState && hit !== primarySelectedUnitHex(S.gameState)) {
         clearDeferredHumanUnitSingleSelectTimer();

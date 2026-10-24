@@ -26,28 +26,25 @@ test('a stored home that is not an installed group fails, and a display name tha
     withGameMap(profile, () => {
       assert.throws(
         () =>
-          assertStoredSideGroupsExist(() => ({
-            scenarioId: 'region_vs_region',
-            humanHomeRegion: 'Not A Group',
-            aiHomeRegion: 'Highveld',
-          })),
+          assertStoredSideGroupsExist(
+            () => ({ scenarioId: 'region_vs_region' }),
+            () => ['Not A Group', 'Highveld']
+          ),
         /This saved Southern Africa game uses side groups that no longer exist\. Start a new game\./
       );
       assert.doesNotThrow(() =>
-        assertStoredSideGroupsExist(() => ({
-          scenarioId: 'region_vs_region',
-          humanHomeRegion: 'Cape & neighbours',
-          aiHomeRegion: 'highveld',
-        }))
+        assertStoredSideGroupsExist(
+          () => ({ scenarioId: 'region_vs_region' }),
+          () => ['Cape & neighbours', 'highveld']
+        )
       );
     });
     installSideGroupHomes(null);
     assert.doesNotThrow(() =>
-      assertStoredSideGroupsExist(() => ({
-        scenarioId: 'region_vs_region',
-        humanHomeRegion: 'Not A Group',
-        aiHomeRegion: 'Highveld',
-      }))
+      assertStoredSideGroupsExist(
+        () => ({ scenarioId: 'region_vs_region' }),
+        () => ['Not A Group', 'Highveld']
+      )
     );
   } finally {
     installSideGroupHomes(null);

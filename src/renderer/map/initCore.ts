@@ -5,6 +5,7 @@ import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPa
 import { observeMapContainerResize } from './mapContainerResize';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
+import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { shouldRefreshStackCalloutOnShiftKeydown } from '../../shared/stackCalloutShiftKeydown';
@@ -23,6 +24,7 @@ import { showConsoleTab } from '../chrome/consoleFrame';
 import { consoleTabIdForLiveMatchLaunch } from '../../shared/consoleTabState';
 import { layoutMapChrome } from './mapChromeLayout';
 import { wireMapModeTabs } from './mapModeTabs';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -403,10 +405,10 @@ export function wireInitCore(deps: InitCoreDeps): void {
       const selectedUnits = tb
         ? S.selectedUnitIds
             .map((id) => tb.subUnits.find((u) => u.id === id))
-            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human')
+            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === HUMAN_SEAT_ID)
         : S.selectedUnitIds
             .map((id) => state.units.find((u) => u.id === id))
-            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === HUMAN_SEAT_ID);
       const mode = selectionSupportButtonMode(
         selectedUnits.map((unit) => unit.unitType),
         !!tb
@@ -430,8 +432,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
   });
 
   if (window.gameApi) {
-    window.gameApi
-      .getGameState()
+    fetchMatchSnapshot()
       .then(async (raw) => {
         const state = raw as GameStateSnapshot | null;
         if (!state) throw new Error('getGameState returned no snapshot');

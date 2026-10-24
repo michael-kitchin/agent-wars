@@ -5,6 +5,7 @@
  * Uses gameDb (dbRun, dbGetOne, dbGetAll, saveDatabase) for persistence.
  */
 
+import type { AiSeatId } from '../../shared/seatIds';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -55,15 +56,6 @@ export const KEY_PATTERN = /^[a-zA-Z0-9_-]+$/;
  * Exceptions: None.
  */
 export const KEY_MAX_LENGTH = 64;
-/**
- * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
-
- * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const AI_PLAYER_ID = 'opponent';
 
 /**
  * Documents the `MemoryRow` interface as a named contract surface (interface MemoryRow).
@@ -589,6 +581,7 @@ export const MEMORY_TOOL_NAMES = ['memory_read'] as const;
  * Exceptions: None.
  */
 export function executeMemory(
+  seatId: AiSeatId,
   toolName: string,
   args: unknown,
   state: { turnNumber: number },
@@ -597,8 +590,8 @@ export function executeMemory(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('memory executeMemory', { toolName, stateTurn: state.turnNumber });
-  const playerId = AI_PLAYER_ID;
+  logDebug('memory executeMemory', { seatId, toolName, stateTurn: state.turnNumber });
+  const playerId = seatId;
   const currentTurn = state.turnNumber;
 
   try {

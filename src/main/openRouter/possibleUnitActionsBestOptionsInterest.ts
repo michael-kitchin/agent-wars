@@ -13,6 +13,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { gridHopDistanceBetween, pickApproachHexesTowardNearestEnemy } from '../tools/assessUnitProximity';
 import { logDebug } from '../logger';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
 /**
@@ -51,6 +52,15 @@ export type BestOptionsInterestIndex = {
    * Exceptions: None.
    */
   controlByHex: ReadonlyMap<string, string | null>;
+  /**
+   * Seat treated as friendly. Missing values keep the first AI seat.
+   *
+   * Contract: Same id `buildPossibleActionsIndexedState` stored.
+   * When to use: Air-strike rows that keep only enemy-controlled infrastructure.
+   * Expected outcome: Enemy land is every non-null controller other than this seat.
+   * Exceptions: None.
+   */
+  ownSeatId?: string;
   /**
    * Urban / seaport / airport counts by hex.
    *
@@ -421,7 +431,9 @@ export function filterStrategicAirStrikeHexesForThisTurnOptionsTable(
 ): string[] {
   const kept = hexes.filter((h3) => {
     if ((indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0) return true;
-    if ((indexed.controlByHex.get(h3) ?? null) !== 'human') return false;
+    const controller = indexed.controlByHex.get(h3) ?? null;
+    const ownSeatId = indexed.ownSeatId ?? AI_SEAT_IDS[0];
+    if (controller === null || controller === ownSeatId) return false;
     const inf = infraCounts(indexed, h3);
     return inf.urban > 0 || inf.airport > 0 || inf.seaport > 0;
   });

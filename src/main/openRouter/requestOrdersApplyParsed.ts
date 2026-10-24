@@ -11,10 +11,11 @@ import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTy
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import { applyParsedOpponentCallbackSubscriptions } from './applyParsedOpponentCallbacks';
+import type { AiSeatId } from '../../shared/seatIds';
+import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { createPathfindingSession } from '../tools/pathfinding';
 import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools/standingOrders';
-import { mergeOpponentAttackOrders } from '../tools/tempoRuleAttacks';
+import { mergeCommanderAttackOrders } from '../tools/tempoRuleAttacks';
 import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
 import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
 import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
@@ -76,6 +77,15 @@ export interface ApplyParsedRequestOrdersArgs {
    * Exceptions: None.
    */
   readonly tacticalBattle: TacticalBattleSnapshot | undefined;
+  /**
+   * Commander whose orders are being applied.
+   *
+   * Contract: An AI seat. Standing orders, ferries, callbacks, and validators use this seat.
+   * When to use: Every successful parse.
+   * Expected outcome: Another seat's unit is dropped.
+   * Exceptions: None.
+   */
+  readonly seatId: AiSeatId;
   /**
    * World snapshot.
    *
@@ -213,6 +223,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     parsed,
     ordersEnabled,
     tacticalBattle,
+    seatId,
     state,
     planState,
     latLngByH3,
@@ -228,7 +239,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     markSuccessfulConsultation,
   } = args;
   const flags = { ordersEnabled };
-  toolInvocationCounts['events'] = applyParsedOpponentCallbackSubscriptions({
+  toolInvocationCounts['events'] = applyParsedCallbackSubscriptions({
+    seatId,
     callbacks: parsed.callbacks,
     turnNumber: state.turnNumber,
     battleSubUnitIds: tacticalBattle ? new Set(tacticalBattle.subUnits.map((u) => u.id)) : null,
@@ -239,7 +251,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   // so auto-generated pursue/march from parents must not substitute for explicit_move this beat.
   const standingGenerated =
     flags.ordersEnabled && !tacticalBattle
-      ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3, {
+      ? generateOrdersForStandingOrders(seatId, state, latLngByH3, resolveToH3, {
           mutateProgress: true,
           pathfindingSession: getOrCreateAiPlanningPathfindingSession(),
         })
@@ -257,7 +269,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
   const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
   const mergedMovement = [...standingGenerated.movementOrders.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
-  const { rangedAttacks: mergedRanged, airStrikes: mergedAirStrikes } = mergeOpponentAttackOrders({
+  const { rangedAttacks: mergedRanged, airStrikes: mergedAirStrikes } = mergeCommanderAttackOrders({
+    seatId,
     state,
     tacticalBattle,
     standingOrderRanged: standingGenerated.rangedAttacks,
@@ -319,7 +332,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       seenUnits.add(order.unitId);
       continue;
     }
-    const result = validateAiOrder(order, planState, { labelForUnitId: aiOrderUnitLabel });
+    const result = validateAiOrder(order, planState, { labelForUnitId: aiOrderUnitLabel, seatId });
     if (result.valid) {
       validated.push(order);
       seenUnits.add(order.unitId);
@@ -335,7 +348,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   }
   if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0 && !tacticalBattle) {
     for (const unitId of invalidStandingMovementUnits) {
-      executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      executeStandingOrders(seatId, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
     }
   }
 
@@ -355,6 +368,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     const result = validateAiRangedOrder(r, rangedState, {
       labelForUnitId: aiOrderUnitLabel,
       tacticalBattle: tacticalBattle ?? undefined,
+      seatId,
     });
     if (result.valid) {
       validatedRanged.push(r);
@@ -435,7 +449,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     outEmbark = validatedEmb;
   } else {
     const strategicFerry = buildStrategicOpponentFerryOrders({
-      playerId: 'opponent',
+      playerId: seatId,
       state,
       modelFerryOrders: llmFerryOrders,
       airStrikeUnitIds: new Set(mergedAirStrikes.map((s) => s.unitId)),

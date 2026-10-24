@@ -21,24 +21,24 @@ async function testUpsertMergeAndRecentWindow(): Promise<void> {
   const dbPath = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(dbPath);
-    gameDb.upsertTurnStrategyNote('strategic', '', 1, {
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 1, {
       strategyText: 'Hold the line',
       messageText: 'You will not find safety in delay.',
     });
-    gameDb.upsertTurnLossNote('strategic', '', 1, '{"ranged":[],"melee":[],"returnFire":[],"airStrike":[],"other":[]}', '{"ranged":[{"unitType":"armor","displayName":"A"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}');
-    gameDb.upsertTurnStrategyNote('strategic', '', 2, { strategyText: 'Advance east', messageText: null });
-    const recent = gameDb.getRecentTurnNotes('strategic', '', 3, 3);
+    gameDb.upsertTurnLossNote('opponent', 'strategic', '', 1, '{"ranged":[{"unitType":"armor","displayName":"A"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}', '{"ranged":[],"melee":[],"returnFire":[],"airStrike":[],"other":[]}');
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 2, { strategyText: 'Advance east', messageText: null });
+    const recent = gameDb.getRecentTurnNotes('opponent', 'strategic', '', 3, 3);
     assert.strictEqual(recent.length, 2);
     assert.strictEqual(recent[0]?.turnNumber, 1);
     assert.strictEqual(recent[1]?.turnNumber, 2);
     assert.strictEqual(recent[0]?.strategyText, 'Hold the line');
     assert.strictEqual(recent[0]?.messageText, 'You will not find safety in delay.');
     assert.ok(recent[0]?.aiLossJson?.includes('A'));
-    gameDb.upsertTurnStrategyNote('strategic', '', 1, {
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 1, {
       strategyText: 'Hold the line',
       messageText: 'Updated taunt.',
     });
-    const afterMessageUpdate = gameDb.getRecentTurnNotes('strategic', '', 3, 3);
+    const afterMessageUpdate = gameDb.getRecentTurnNotes('opponent', 'strategic', '', 3, 3);
     assert.strictEqual(afterMessageUpdate[0]?.messageText, 'Updated taunt.');
     assert.ok(afterMessageUpdate[0]?.aiLossJson?.includes('A'), 'strategy+message upsert preserves loss JSON');
   } finally {
@@ -61,11 +61,11 @@ async function testTacticalClearIsolation(): Promise<void> {
   const dbPath = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(dbPath);
-    gameDb.upsertTurnStrategyNote('strategic', '', 1, { strategyText: 'Strategic plan', messageText: null });
-    gameDb.upsertTurnStrategyNote('tactical', 'tb-1', 1, { strategyText: 'Beat plan', messageText: 'This close, hesitation is already a casualty.' });
+    gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', 1, { strategyText: 'Strategic plan', messageText: null });
+    gameDb.upsertTurnStrategyNote('opponent', 'tactical', 'tb-1', 1, { strategyText: 'Beat plan', messageText: 'This close, hesitation is already a casualty.' });
     gameDb.clearTacticalTurnNotes();
-    assert.strictEqual(gameDb.getRecentTurnNotes('tactical', 'tb-1', 2, 3).length, 0);
-    assert.strictEqual(gameDb.getRecentTurnNotes('strategic', '', 2, 3).length, 1);
+    assert.strictEqual(gameDb.getRecentTurnNotes('opponent', 'tactical', 'tb-1', 2, 3).length, 0);
+    assert.strictEqual(gameDb.getRecentTurnNotes('opponent', 'strategic', '', 2, 3).length, 1);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });

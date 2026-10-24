@@ -52,14 +52,12 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
 }
 
 /**
- * Derives renderer `tacticalOpponentDraft` and whether to start a background tactical `requestAiOrders` after post-beat consultation.
+ * Says whether the next battle beat needs another consult.
  *
- * Purpose: When `attachTacticalOpponentPlanToIpc` is true, main signals that consultation finished; a null or all-empty
- * plan must not replace a valid prior draft with empty rows (that would commit zero opponent movement on the next
- * Ready). Clearing to null and prefetching repopulates orders for the next beat.
- * When to use: Renderer after `commitHumanTacticalDraftOrders` returns tactical post-beat fields (`TacticalPostBeatConsultFields`).
- * Expected outcome: Non-empty `plan` becomes the new draft with no prefetch; missing/null/empty plan yields `draft: null`
- * and `startBackgroundPrefetch: true` so `isWaitingForPrecomputedAiOrders` gates Ready until a refill succeeds or fails.
+ * Purpose: A non-empty plan is already stored for the next beat. An empty plan means that beat has no orders yet.
+ * When to use: After a tactical commit returns post-beat consultation fields.
+ * Expected outcome: A non-empty plan returns `startBackgroundPrefetch` false. A missing or empty plan returns a null
+ * draft and `startBackgroundPrefetch` true so the screen can start another battle consult.
  * Exceptions: None.
  */
 export function nextTacticalOpponentDraftAfterPostBeatPlan(

@@ -57,6 +57,19 @@ describe('buildCombatDiceChips', () => {
     assert.equal(chip?.rows[0]?.hitCount, 3);
   });
 
+  it('orders one kind by seat: human, then each AI seat, then Neutral', () => {
+    const chips = buildCombatDiceChips([
+      roll({ player: 'neutral' }),
+      roll({ player: 'opponent2' }),
+      roll({ player: 'opponent' }),
+      roll({ player: 'human' }),
+    ]);
+    assert.deepEqual(
+      chips[0]?.rows.map((row) => row.player),
+      ['human', 'opponent', 'opponent2', 'neutral']
+    );
+  });
+
   it('splits rows by side and hit number and puts attack rows before defense rows', () => {
     const chips = buildCombatDiceChips([
       roll({ kind: 'meleeDefense', player: 'opponent', threshold: 7 }),

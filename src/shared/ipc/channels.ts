@@ -20,6 +20,11 @@ export const IPC_GAME = {
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
+  endMatch: 'game:endMatch',
+  setSeatCommander: 'game:setSeatCommander',
+  startCommanderPlanning: 'game:startCommanderPlanning',
+  stopCommanderPlanning: 'game:stopCommanderPlanning',
+  readCommanderPool: 'game:readCommanderPool',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',
   previewHumanMarchOrder: 'game:previewHumanMarchOrder',
@@ -57,7 +62,6 @@ export const IPC_GAME = {
    * Main pushes tactical post-beat consult after deferred `runEventDrivenAfterTacticalBeatConsultation`.
    */
   postTacticalBeatConsultation: 'game:postTacticalBeatConsultation',
-  requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
 } as const;
 

@@ -15,7 +15,10 @@ import {
   isDbReady,
   openGameDatabaseAtPathForTests,
 } from './gameDb';
-import { persistRegionVsRegionScenarioState } from './gameDb/scenarioState';
+import { persistRegionVsRegionScenarioId } from './gameDb/scenarioState';
+import { replaceSeatRoster } from './gameDb/seatRosterStore';
+import { HUMAN_SEAT_ID, aiSeatIdForIndex } from '../shared/seatIds';
+import { DEFAULT_DOCTRINE, type SeatRecord } from '../shared/seatRoster';
 import { seedUnits } from './gameDb/seeding/seedUnits';
 import { installSideGroupHomes } from './regionScenario';
 import type { UnitOrigin } from '../shared/unitOriginTypes';
@@ -62,6 +65,36 @@ function originForHex(h3Index: string): UnitOrigin {
   };
 }
 
+/**
+ * Two seats whose homes are the fake pack's display names.
+ *
+ * Purpose: Seeding reads homes from the roster, not from config keys.
+ * When to use: Before `seedUnits` in this test.
+ * Expected outcome: Human order 1 and the first AI seat order 2.
+ * Exceptions: None.
+ */
+function sideGroupRoster(firstHome: string, secondHome: string): SeatRecord[] {
+  const empty = {
+    outTurn: null,
+    outBy: null,
+    outReasons: [] as const,
+    place: null,
+    consultationCount: 0,
+    costUsd: 0,
+  };
+  return [
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, kind: 'human', homeRegion: firstHome, commander: null, ...empty },
+    {
+      seatId: aiSeatIdForIndex(1),
+      seatOrder: 2,
+      kind: 'ai',
+      homeRegion: secondHome,
+      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: DEFAULT_DOCTRINE },
+      ...empty,
+    },
+  ];
+}
+
 test('units seeded for two side groups stay inside those groups', () => {
   const cells = packCells();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-side-seed-'));
@@ -88,7 +121,8 @@ test('units seeded for two side groups stay inside those groups', () => {
     insert(cells.aiLand, 'land', 'plains');
     insert(cells.aiSea, 'water', 'water');
     insert(cells.outsider, 'land', 'plains');
-    persistRegionVsRegionScenarioState({ run: dbRun }, { humanHomeRegion: 'West', aiHomeRegion: 'East' });
+    persistRegionVsRegionScenarioId({ run: dbRun });
+    replaceSeatRoster({ run: dbRun }, sideGroupRoster('West', 'East'));
     seedUnits({
       run: dbRun,
       getOne: dbGetOne,

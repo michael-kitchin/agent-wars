@@ -7,16 +7,10 @@
  * Exceptions: Database/phase failures return structured `{ success: false, reason }` results.
  */
 
-import type {
-  AirStrikeOrder,
-  EmbarkOrder,
-  FerryOrder,
-  MovementOrder,
-  RangedAttackOrder,
-  ReadyResult,
-  ResolveMeleeInterceptIpcPayload,
-} from '../../shared/ipcTypes';
+import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { dbGetOne } from '../gameDb';
+import type { TurnOrdersByOwner } from './ownerTurnOrders';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { executeResolveMeleeIntercept } from './meleeInterceptStrategicResolve';
@@ -27,7 +21,6 @@ import {
 } from './readyStrategicGuards';
 import { executeReadyStrategicTurn } from './readyStrategicResolutionPipeline';
 
-const HUMAN_PLAYER_ID = 'human';
 const VALID_PHASE = 'planning';
 
 /**
@@ -38,20 +31,12 @@ const VALID_PHASE = 'planning';
  * Expected outcome: Completed turn snapshot or a structured pause (`awaitingMeleeDecision`).
  * Exceptions: Logs at error level and returns `{ success: false }` on unexpected exceptions.
  */
-export function ready(
-  aiOrders: MovementOrder[] = [],
-  aiRangedOrders: RangedAttackOrder[] = [],
-  aiAirStrikeOrders: AirStrikeOrder[] = [],
-  aiFerryOrders: FerryOrder[] = [],
-  aiEmbarkOrders: EmbarkOrder[] = []
-): ReadyResult {
-  logDebug('ready', {
-    aiOrderCount: aiOrders.length,
-    aiRangedCount: aiRangedOrders.length,
-    aiAirStrikeCount: aiAirStrikeOrders.length,
-    aiFerryCount: aiFerryOrders.length,
-    aiEmbarkCount: aiEmbarkOrders.length,
-  });
+export function ready(ordersByOwner: TurnOrdersByOwner = new Map()): ReadyResult {
+  const orders = new Map(ordersByOwner);
+  if (orders.delete(HUMAN_SEAT_ID)) {
+    logError('ready ignored a human key on the owner order map', {});
+  }
+  logDebug('ready', { ownerCount: orders.size });
   try {
     const failDb = failIfDatabaseNotReady('ready');
     if (failDb) return failDb;
@@ -66,18 +51,11 @@ export function ready(
       return { success: false, reason: 'Not in planning phase' };
     }
 
-    return executeReadyStrategicTurn(
-      aiOrders,
-      aiRangedOrders,
-      aiAirStrikeOrders,
-      aiFerryOrders,
-      aiEmbarkOrders,
-      {
-        humanPlayerId: HUMAN_PLAYER_ID,
-        validPhase: VALID_PHASE,
-        turnNumber: turnRow?.turn_number ?? 1,
-      }
-    );
+    return executeReadyStrategicTurn(orders, {
+      humanPlayerId: HUMAN_SEAT_ID,
+      validPhase: VALID_PHASE,
+      turnNumber: turnRow?.turn_number ?? 1,
+    });
   } catch (err) {
     logError('ready: exception', err);
     return { success: false, reason: String(err) };

@@ -11,7 +11,7 @@ Shipping version as of this writing: **2.6.0** (`package.json`). Phase 0 (hybrid
 | [how-to-play.md](how-to-play.md) | Player guide: setup, global and regional maps, turn order, targeting, air power, sealift, building, battles, roads and rail, unit bonuses, common surprises, messages, and controls | **Current UI.** Downloads and the OpenRouter key are under Play it in the root [README.md](../README.md). Per-surface detail is in [ux/](ux/). |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
-| [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `evaluateRegionControlWinnerAtEndOfTurn`. |
+| [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `decideEndOfTurnOutcome`. |
 | [hybrid-ai.md](hybrid-ai.md) | Hybrid opponent loop, callbacks, consult bounds | **Current engine behavior.** Prompt copy lives in the prompt package. |
 | [ai-tools.md](ai-tools.md) | The six tool groups the model (and host) can invoke | **Current.** Names from `PATHFINDING_TOOL_NAMES` and sibling `*_TOOL_NAMES` consts. |
 | [terrain-pipeline.md](terrain-pipeline.md) | What the app loads from `data/generated/` | **Current runtime.** Regeneration runbooks stay in [scripts/terrain_pipeline/README.md](../scripts/terrain_pipeline/README.md), [scripts/weather_pipeline/README.md](../scripts/weather_pipeline/README.md), and [scripts/naming_pipeline/README.md](../scripts/naming_pipeline/README.md). Data, flag, and library credits are in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) at the repository root. |
@@ -53,6 +53,8 @@ When you change one of these, update [combat-rules-v3.md](combat-rules-v3.md) (a
 | Sub-unit multiplication | `tacticalSubUnitCountForStrategicUnitType` in `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` |
 | Resolution phase order | `executeReadyStrategicTurn`, `buildResolutionOrderRule` |
 | Dice chip line and face limits (quoted in [ux/resolution-playback.md](ux/resolution-playback.md), not in the combat rules) | `COMBAT_DICE_CHIP_MAX_LINES` and `COMBAT_DICE_ROW_MAX_FACES` in `src/shared/combatDiceChips.ts` |
+| Seat limits and seat ids | `MIN_SEATS`, `MAX_SEATS`, `AI_SEAT_IDS`, `HUMAN_SEAT_ID`, `NEUTRAL_OWNER_ID` in `src/shared/seatIds.ts` |
+| Win rules, knockout, and places | `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`, `TURN_LIMIT_OPTIONS` and `DEFAULT_TURN_LIMIT` in `src/shared/victoryRules.ts` |
 
 Prompt-generating code is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md). That package describes today's emitted prompts and answers to the same engine symbols; it does not invent stats. How the consult is scheduled and which tools exist: [hybrid-ai.md](hybrid-ai.md) and [ai-tools.md](ai-tools.md).
 

@@ -3,6 +3,7 @@
  */
 
 import { strategicParentOf } from '../../shared/h3Resolutions';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
 import { logDebug } from '../logger';
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
@@ -72,7 +73,9 @@ export function validateTacticalOpponentAirStrikeOrder(
   if (!isDbReady()) return tacticalInvalidResult('Database not initialized');
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return tacticalInvalidResult(`Unit not found: ${displayLabelForUnit(order.unitId)}`);
-  if (unit.player !== 'opponent') return tacticalInvalidResult('Only opponent units can execute tactical AI strikes');
+  if (unit.player === HUMAN_SEAT_ID || isNeutralOwnerId(unit.player)) {
+    return tacticalInvalidResult('Only opponent units can execute tactical AI strikes');
+  }
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can execute strikes');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.targetH3Index)) return tacticalInvalidResult('Target not on tactical map');
@@ -122,7 +125,9 @@ export function validateTacticalOpponentFerryOrder(
   tacticalLogQuery('validateTacticalOpponentFerryOrder', { unitId: order.unitId });
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return tacticalInvalidResult(`Unit not found: ${displayLabelForUnit(order.unitId)}`);
-  if (unit.player !== 'opponent') return tacticalInvalidResult('Only opponent units can ferry in tactical AI flow');
+  if (unit.player === HUMAN_SEAT_ID || isNeutralOwnerId(unit.player)) {
+    return tacticalInvalidResult('Only opponent units can ferry in tactical AI flow');
+  }
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can ferry');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.destinationH3Index)) return tacticalInvalidResult('Destination not on tactical map');
@@ -201,11 +206,14 @@ export function validateTacticalOpponentEmbarkOrder(
   subUnits: readonly TacticalSubUnitSnapshot[],
   enclosingStrategicH3Index: string
 ): TacticalValidationResult {
+  const land = subUnits.find((unit) => unit.id === order.unitId);
+  const party =
+    land && land.player !== HUMAN_SEAT_ID && !isNeutralOwnerId(land.player) ? land.player : AI_SEAT_IDS[0];
   return validateTacticalEmbarkOrderForPlayer({
     order,
     subUnits,
     enclosingStrategicH3Index,
-    player: 'opponent',
+    player: party,
     wrongPlayerReason: 'Embark orders must target opponent units',
     logLabel: 'validateTacticalOpponentEmbarkOrder',
   });
@@ -228,7 +236,7 @@ export function validateTacticalHumanEmbarkOrder(
     order,
     subUnits,
     enclosingStrategicH3Index,
-    player: 'human',
+    player: HUMAN_SEAT_ID,
     wrongPlayerReason: 'Embark orders must target your own units',
     logLabel: 'validateTacticalHumanEmbarkOrder',
   });

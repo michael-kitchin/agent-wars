@@ -9,6 +9,7 @@
  */
 
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -24,6 +25,7 @@ export type ModelCallTheater = 'strategic' | 'tactical';
 type ModelCallScope = {
   controller: AbortController;
   theater: ModelCallTheater;
+  seatId: AiSeatId;
   ended: boolean;
 };
 
@@ -43,7 +45,8 @@ export type BegunModelCall = {
 };
 
 const scopes = new Set<ModelCallScope>();
-let cancelEpoch = 0;
+const seatCancelEpoch = new Map<AiSeatId, number>();
+let cancelEpochAll = 0;
 let lastCancelReason: ModelCallCancelReason | null = null;
 let begunCount = 0;
 
@@ -55,11 +58,11 @@ let begunCount = 0;
  * Expected outcome: A live scope. `end` removes it. `abort` aborts the controller and does not change the cancel epoch.
  * Exceptions: None.
  */
-export function beginModelCall(label: string, theater: ModelCallTheater): BegunModelCall {
-  logDebug('modelCallControl beginModelCall', { label, theater });
+export function beginModelCall(label: string, theater: ModelCallTheater, seatId: AiSeatId): BegunModelCall {
+  logDebug('modelCallControl beginModelCall', { label, theater, seatId });
   begunCount += 1;
   const controller = new AbortController();
-  const scope: ModelCallScope = { controller, theater, ended: false };
+  const scope: ModelCallScope = { controller, theater, seatId, ended: false };
   scopes.add(scope);
   return {
     signal: controller.signal,
@@ -85,17 +88,29 @@ export function beginModelCall(label: string, theater: ModelCallTheater): BegunM
  * `all` aborts both theaters. Returns how many signals this call aborted.
  * Exceptions: None.
  */
-export function cancelModelCalls(reason: ModelCallCancelReason, theater: ModelCallTheater | 'all'): number {
-  cancelEpoch += 1;
+export function cancelModelCalls(
+  reason: ModelCallCancelReason,
+  theater: ModelCallTheater | 'all',
+  seatId: AiSeatId | 'all'
+): number {
   lastCancelReason = reason;
+  if (seatId === 'all') cancelEpochAll += 1;
+  else seatCancelEpoch.set(seatId, (seatCancelEpoch.get(seatId) ?? 0) + 1);
   let aborted = 0;
   for (const scope of scopes) {
     if (theater !== 'all' && scope.theater !== theater) continue;
+    if (seatId !== 'all' && scope.seatId !== seatId) continue;
     if (scope.ended || scope.controller.signal.aborted) continue;
     scope.controller.abort();
     aborted += 1;
   }
-  logDebug('modelCallControl cancelModelCalls', { reason, theater, abortedCount: aborted, epoch: cancelEpoch });
+  logDebug('modelCallControl cancelModelCalls', {
+    reason,
+    theater,
+    seatId,
+    abortedCount: aborted,
+    epoch: seatId === 'all' ? cancelEpochAll : seatCancelEpoch.get(seatId),
+  });
   return aborted;
 }
 
@@ -120,9 +135,10 @@ export function getLastModelCallCancelReason(): ModelCallCancelReason | null {
  * Expected outcome: A count that starts at 0 and increases by one per `cancelModelCalls` call.
  * Exceptions: None.
  */
-export function getModelCallCancelEpoch(): number {
-  logTrace('modelCallControl getModelCallCancelEpoch', { epoch: cancelEpoch });
-  return cancelEpoch;
+export function getModelCallCancelEpoch(seatId: AiSeatId): number {
+  const epoch = cancelEpochAll + (seatCancelEpoch.get(seatId) ?? 0);
+  logTrace('modelCallControl getModelCallCancelEpoch', { seatId, epoch });
+  return epoch;
 }
 
 /**
@@ -133,9 +149,9 @@ export function getModelCallCancelEpoch(): number {
  * Expected outcome: True when the current epoch differs from `epochAtStart`.
  * Exceptions: None.
  */
-export function hasModelCallCancelSince(epochAtStart: number): boolean {
-  const changed = getModelCallCancelEpoch() !== epochAtStart;
-  logTrace('modelCallControl hasModelCallCancelSince', { epochAtStart, changed });
+export function hasModelCallCancelSince(epochAtStart: number, seatId: AiSeatId): boolean {
+  const changed = getModelCallCancelEpoch(seatId) !== epochAtStart;
+  logTrace('modelCallControl hasModelCallCancelSince', { epochAtStart, seatId, changed });
   return changed;
 }
 

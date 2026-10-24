@@ -1,7 +1,9 @@
 import type { TacticalPostBeatConsultFields } from '../../shared/ipc/consultationPushTypes';
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { nextTacticalOpponentDraftAfterPostBeatPlan } from '../../shared/ipc/tacticalOpponentPlanMerge';
+import { isAiSeatId } from '../../shared/seatIds';
 import { rendererSharedState as S } from '../core/state';
+import { refreshCommanderSeatCosts } from '../openRouter/commanderPoolClient';
 import { updateOpenRouterCostLabel } from '../openRouter/openRouterUiHelpers';
 
 /**
@@ -9,7 +11,7 @@ import { updateOpenRouterCostLabel } from '../openRouter/openRouterUiHelpers';
  *
  * Purpose: Keeps `readyHandler` wiring explicit while sharing the same contract the removed preload listener used.
  * When to use: Passed from tactical Ready success handling when `isTacticalPostBeatConsultOnCommit` is true.
- * Expected outcome: Opponent draft, prefetch, strategy toast, tool counts, redraw, and Ready gating stay aligned with main.
+ * Expected outcome: The next battle consult, the strategy toast, tool counts, redraw, and Ready stay aligned with main.
  * Exceptions: None.
  */
 export type TacticalPostBeatConsultSideEffectDeps = {
@@ -17,7 +19,7 @@ export type TacticalPostBeatConsultSideEffectDeps = {
   showAiStrategyToast: (content: AiStrategyToastFields) => void;
   hideAiStrategyToast: () => void;
   updateOpenRouterToolCountLabels: () => void;
-  appendOpenRouterLog: (line: string, isError?: boolean) => void;
+  appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;
   redraw: () => void;
   updateReadyButtonState: () => void;
 };
@@ -43,11 +45,9 @@ export function isTacticalPostBeatConsultOnCommit(obj: unknown): obj is Tactical
 /**
  * Applies `TacticalPostBeatConsultFields` from the commit IPC result (same behavior as the former push listener).
  *
- * Purpose: Hydrates `S.tacticalOpponentDraft`, optional prefetch, strategy toast, and tool telemetry once main finishes
- * post-beat consultation inside the same invoke round-trip. When attach is false, clears any just-consumed draft so
- * applied marches are not resent next Ready.
+ * Purpose: Starts the next battle consult when this one stored no orders, shows the strategy toast, and records cost.
  * When to use: After a successful tactical commit when `isTacticalPostBeatConsultOnCommit` is true and `battleId` matches.
- * Expected outcome: Renderer state matches main’s consultation outcome for the active tactical session.
+ * Expected outcome: An empty plan starts another battle consult only while an AI side still has a unit. The toast and the seat cost still update.
  * Exceptions: None.
  */
 export function applyTacticalPostBeatConsultSideEffects(
@@ -57,16 +57,10 @@ export function applyTacticalPostBeatConsultSideEffects(
   if (payload.kind !== 'tactical') return;
   if (payload.battleId !== S.tacticalBattleSnapshot?.battleId) return;
   if (payload.attachTacticalOpponentPlanToIpc) {
-    const { draft, startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload.tacticalOpponentPlan);
-    S.tacticalOpponentDraft = draft;
-    if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
-  } else {
-    // Opponent already acted from the draft just consumed on Ready — do not keep those rows for the next beat.
-    S.tacticalOpponentDraft = null;
-    const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-    if (S.runButtonOn && oppAlive) {
-      deps.startBackgroundRequestIfAllowed();
-    }
+    const { startBackgroundPrefetch } = nextTacticalOpponentDraftAfterPostBeatPlan(payload.tacticalOpponentPlan);
+    if (startBackgroundPrefetch && tacticalBattleHasAiSide()) deps.startBackgroundRequestIfAllowed();
+  } else if (S.runButtonOn && tacticalBattleHasAiSide()) {
+    deps.startBackgroundRequestIfAllowed();
   }
   deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
   if (payload.toolInvocationCounts) {
@@ -74,10 +68,23 @@ export function applyTacticalPostBeatConsultSideEffects(
     deps.updateOpenRouterToolCountLabels();
   }
   if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
-    S.openRouterGameCost += payload.cost;
-    updateOpenRouterCostLabel();
+    void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
   }
   deps.appendOpenRouterLog('Tactical post-beat consultation applied.', false);
   deps.redraw();
   deps.updateReadyButtonState();
+}
+
+/**
+ * Whether the open battle still has a unit owned by an AI seat.
+ *
+ * Purpose: A beat with no AI side has nothing for a commander to plan.
+ * When to use: Before starting another battle consult after a commit.
+ * Expected outcome: True when any sub-unit's owner is an AI seat id.
+ * Exceptions: None. A missing snapshot is false.
+ */
+export function tacticalBattleHasAiSide(): boolean {
+  const units = S.tacticalBattleSnapshot?.subUnits;
+  if (!units) return false;
+  return units.some((unit) => isAiSeatId(unit.player));
 }

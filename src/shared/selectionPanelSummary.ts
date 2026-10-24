@@ -12,6 +12,7 @@ import type { TechLevel } from './techBonusTypes';
 import { formatTerrainKindHtml } from './terrainSwatchHtml';
 import type { WeatherState } from './weatherBonusTypes';
 import { formatWeatherIconHtml } from './weatherIcons';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /**
  * One unit the panel may describe: a strategic unit, or a battle sub-unit during a battle.
@@ -165,7 +166,7 @@ export function summarizeSelectionPanel(
   if (selected.length === 0) return null;
   const panelHex = selected[0].h3Index;
   const selectedHere = selected.filter((unit) => unit.h3Index === panelHex).length;
-  const selectableHere = units.filter((unit) => unit.h3Index === panelHex && unit.player === 'human' && isSelectable(unit.id)).length;
+  const selectableHere = units.filter((unit) => unit.h3Index === panelHex && unit.player === HUMAN_SEAT_ID && isSelectable(unit.id)).length;
   return {
     panelHex,
     countText: `${selectedHere} selected of ${Math.max(selectableHere, selectedHere)}`,
@@ -224,14 +225,14 @@ export interface SelectionPanelChipInput {
    */
   readonly productionPerTurn: number | null;
   /**
-   * Whose home region the hex is in.
+   * The home or Neutral chip, already worded.
    *
-   * Contract: Null outside both home regions and in a battle.
-   * When to use: Always.
-   * Expected outcome: A `Home` or `Enemy home` chip.
+   * Contract: Null outside a home and off Neutral land, and in a battle.
+   * When to use: Always. Build it with `formatHomeChip`.
+   * Expected outcome: A `Home`, `{short name} home`, or `Neutral` chip.
    * Exceptions: None.
    */
-  readonly homeSide: 'human' | 'opponent' | null;
+  readonly homeChip: { readonly kind: 'home' | 'enemy-home'; readonly text: string } | null;
 }
 
 /**
@@ -279,7 +280,8 @@ export function buildSelectionPanelChips(input: SelectionPanelChipInput): Select
   if (input.productionPerTurn != null && input.productionPerTurn > 0) {
     chips.push({ kind: 'production', html: escapeHtmlText(`$${input.productionPerTurn.toLocaleString('en-US')}/turn`) });
   }
-  if (input.homeSide === 'human') chips.push({ kind: 'home', html: 'Home' });
-  if (input.homeSide === 'opponent') chips.push({ kind: 'enemy-home', html: 'Enemy home' });
+  if (input.homeChip) {
+    chips.push({ kind: input.homeChip.kind, html: escapeHtmlText(input.homeChip.text) });
+  }
   return chips;
 }

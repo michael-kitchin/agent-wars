@@ -67,7 +67,7 @@ function joined(gates: CoachingGates): string {
 
 test('strategic coaching includes every required item when its gate is on', () => {
   const text = joined(strategicGates());
-  assert.match(text, /all enemy home region hexes/i);
+  assert.match(text, /last side standing/i);
   assert.match(text, /embark, then air strikes/i);
   assert.match(text, /cargo sync/i);
   assert.match(text, /does not consume the move/i);
@@ -102,7 +102,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /embark at a legal cell/i);
   assert.match(text, /queue is empty, queue something/i);
   assert.match(text, /replace blocked queues/i);
-  assert.match(text, /shared cells count toward both/i);
+  assert.match(text, /more than one home region/i);
   assert.match(text, /Do not persist enemy positions/i);
   assert.match(text, /persistent slots are unused/i);
   assert.match(text, /replaces the entire subscription list/i);
@@ -120,14 +120,14 @@ test('strategic conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /toward the fighting/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /cannot enter land cells/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /embark at a legal cell/i);
-  assert.doesNotMatch(joined(strategicGates({ homeRegionsOverlap: false })), /shared cells count toward both/i);
+  assert.doesNotMatch(joined(strategicGates({ homeRegionsOverlap: false })), /more than one home region/i);
   assert.doesNotMatch(joined(strategicGates({ hasBestOptionsTable: false })), /Copy a Target Hex from a row listing that unit/i);
   assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /no options are listed this period/i);
   assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /routing tool/i);
   assert.doesNotMatch(joined(strategicGates({ hasObservedEnemy: true })), /move to regain contact/i);
   assert.match(joined(strategicGates({ hasObservedEnemy: false })), /move to regain contact/i);
-  assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false })), /all enemy home region hexes/i);
-  assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false, homeRegionsOverlap: true })), /shared cells count toward both/i);
+  assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false })), /last side standing/i);
+  assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false, homeRegionsOverlap: true })), /more than one home region/i);
   assert.doesNotMatch(
     joined(strategicGates({ hasAirUnits: false, hasBestOptionsTable: true })),
     /ferryOrders/
@@ -141,7 +141,7 @@ test('strategic conditional items disappear when their gate is off', () => {
 test('absent scenario id drops home-region goals from the context block', () => {
   const withScenario = buildContextCoaching(strategicGates());
   assert.match(withScenario, /Protect your home region's production capacity/);
-  assert.match(withScenario, /enemy home region's urban production/);
+  assert.match(withScenario, /enemy home regions' urban production/);
   const withoutScenario = buildContextCoaching(strategicGates({ includeScenarioWinPaths: false }));
   assert.doesNotMatch(withoutScenario, /home region/);
   assert.match(withoutScenario, /Engage enemy forces/);

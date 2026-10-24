@@ -1,6 +1,8 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { prepareNewGameMapPanel, selectedNewGameTab } from '../gameplay/newGameMapUi';
+import { refreshNewGameSides } from '../gameplay/newGameSidesUi';
+import { hideGameOverStandings, renderGameOverStandings } from '../gameplay/gameOverStandings';
 import { showGameOverBanner, showNewGameBanner } from '../gameplay/newGameBanner';
 import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gameplay/newGameMapPreviewUi';
 import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
@@ -73,9 +75,9 @@ export function blurMapChromeIfFocused(): void {
 /**
  * Turns pointer input on or off for the map, the top bar, and the console.
  *
- * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
+ * Purpose: The new-game overlay, the annihilation dialog, and the knocked-out dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than the annihilation dialog, and the console, ignore the pointer
+ * Expected outcome: Children of the map pane other than the annihilation dialog and the knocked-out dialog, and the console, ignore the pointer
  *   while `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar
  *   then, and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its
  *   New game item follows the overlay. The new-game overlay floats over the map pane but is not inside it, so this
@@ -87,7 +89,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'tactical-annihilation-overlay') continue;
+      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
@@ -114,7 +116,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * When to use: After every state refresh.
  * Expected outcome: Returns true only when `#game-over-overlay` gains or loses `hidden`. Returns false when it
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
- *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war, Auto-start AI, and the bonus dropdowns return
+ *   enabled. Otherwise the overlay shows standings or a start message. Fog of war, Auto-start AI, and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
  *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
  *   top-left corner, only on that open. A later refresh leaves a collapsed or moved panel as it is. While a match
@@ -160,14 +162,16 @@ export function updateGameOverUI(
     repaintNewGameMapPreview();
     void (async () => {
       await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+      refreshNewGameSides({ reset: true });
       await refreshNewGameMapPreview();
     })();
   }
   syncGameSizeCapPreview();
   setMainUIControlsEnabled(false);
   if (gameOver) {
-    showGameOverBanner(state!.winner === 'human' ? 'You win!' : 'You lose.');
+    showGameOverBanner(renderGameOverStandings(state!));
   } else {
+    hideGameOverStandings();
     showNewGameBanner('startup', selectedNewGameTab());
   }
   if (newGameBtn) {

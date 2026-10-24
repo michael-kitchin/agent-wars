@@ -3,8 +3,10 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { applyInitialCameraForState } from '../map/mapHelpers';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { rendererSharedState as S } from './state';
+import { fetchMatchSnapshot } from './matchSnapshotClient';
 import { installRendererGameMap } from './installRendererGameMap';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
+import { staleIntelViewer } from '../../shared/observeModeControls';
 
 /**
  * Documents the `ApplySnapshotDeps` interface as a named contract surface (interface ApplySnapshotDeps).
@@ -206,7 +208,7 @@ export async function refreshGameStateFromMain(
 ): Promise<void> {
   if (!window.gameApi?.getGameState) return;
   try {
-    const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+    const nextState = await fetchMatchSnapshot();
     await deps.applyGameStateSnapshot(nextState, applyOptions);
   } catch (err) {
     console.error(failureMessage, err);
@@ -342,40 +344,55 @@ export async function applyGameStateSnapshot(
 }
 
 /**
- * Defines the `updateClientStaleEnemyIntel` function shape (export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void).
-
- * Purpose: Supports maintainability by documenting why `updateClientStaleEnemyIntel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Records enemy units the current viewer has seen, and drops them when the view changes.
+ *
+ * Purpose: Stale tokens belong to the seat whose fog this snapshot uses. All sides shows no ghosts.
+ * When to use: Each applied snapshot, before the map redraws.
+ * Expected outcome: Units of the viewer are not enemies. A different viewer, or All sides, clears the previous ghosts.
  * Exceptions: None.
  */
 export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void {
+  const viewer = staleIntelViewer(state.playerPerspective);
+  if (viewer === null) {
+    S.lastObservedEnemyByUnitId.clear();
+    S.clientStaleEnemyIntelByUnitId.clear();
+    S.lastRenderedVisibleEnemyByUnitId.clear();
+    return;
+  }
+  const comparablePrevious = previousState && staleIntelViewer(previousState.playerPerspective) === viewer
+    ? previousState
+    : null;
+  if (previousState && comparablePrevious === null) {
+    S.lastObservedEnemyByUnitId.clear();
+    S.clientStaleEnemyIntelByUnitId.clear();
+    S.lastRenderedVisibleEnemyByUnitId.clear();
+  }
   const currentTurn = state.turnNumber;
   const hasFogData = Array.isArray(state.visibleHexes);
   const visibleHexes = hasFogData ? new Set(state.visibleHexes!) : new Set<string>();
-  const visibleEnemiesNow = state.units.filter((u) => u.player !== 'human');
-  const visibleEnemyIdsNow = new Set(visibleEnemiesNow.map((u) => u.id));
-  const visibleEnemyHexesNow = new Set(visibleEnemiesNow.map((u) => u.h3Index));
+  const visibleEnemiesNow = state.units.filter((unit) => unit.player !== viewer);
+  const visibleEnemyIdsNow = new Set(visibleEnemiesNow.map((unit) => unit.id));
+  const visibleEnemyHexesNow = new Set(visibleEnemiesNow.map((unit) => unit.h3Index));
 
   for (const enemy of visibleEnemiesNow) {
     S.lastObservedEnemyByUnitId.set(enemy.id, { h3Index: enemy.h3Index, lastSeenTurn: currentTurn });
     S.clientStaleEnemyIntelByUnitId.delete(enemy.id);
   }
 
-  if (previousState) {
-    const previousVisibleEnemies = previousState.units.filter((u) => u.player !== 'human');
+  if (comparablePrevious) {
+    const previousVisibleEnemies = comparablePrevious.units.filter((unit) => unit.player !== viewer);
     for (const enemy of previousVisibleEnemies) {
       if (visibleEnemyIdsNow.has(enemy.id)) continue;
       S.lastObservedEnemyByUnitId.set(enemy.id, {
         h3Index: enemy.h3Index,
-        lastSeenTurn: previousState.turnNumber,
+        lastSeenTurn: comparablePrevious.turnNumber,
       });
       if (!hasFogData || !visibleHexes.has(enemy.h3Index)) {
         S.clientStaleEnemyIntelByUnitId.set(enemy.id, {
           unitId: enemy.id,
           lastKnownH3Index: enemy.h3Index,
-          lastSeenTurn: previousState.turnNumber,
-          staleUntilTurn: previousState.turnNumber + 2,
+          lastSeenTurn: comparablePrevious.turnNumber,
+          staleUntilTurn: comparablePrevious.turnNumber + 2,
         });
       }
     }

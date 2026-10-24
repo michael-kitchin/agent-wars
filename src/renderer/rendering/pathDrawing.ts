@@ -1,16 +1,15 @@
 import { cellToLatLng } from 'h3-js';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import {
-  AI_ORDER_LINE_COLOR,
   COUNT_BADGE_OFFSET,
-  ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
-  PLAYER_COLORS,
   STACK_OFFSET_X,
   STACK_OFFSET_Y,
   UNIT_RADIUS,
   UNIT_TYPE_LABELS,
 } from '../core/constants';
+import { paletteForCurrentOwner } from './ownerColors';
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
@@ -28,6 +27,18 @@ import {
   straightOrderLineShape,
   type OrderLineRun,
 } from './orderLineStroke';
+
+/**
+ * Map color for one owner's order line or moving token.
+ *
+ * Purpose: Movement lines follow seat order instead of two fixed player colors.
+ * When to use: Every order line and playback token in this module.
+ * Expected outcome: That owner's map color, or `#333` when the roster has no such owner.
+ * Exceptions: None.
+ */
+function orderColorForOwner(ownerId: string): string {
+  return paletteForCurrentOwner(ownerId)?.map ?? '#333';
+}
 
 /**
  * Draws a straight movement line from one unit marker toward another, with the movement arrowhead.
@@ -52,7 +63,7 @@ export function drawLineArrow(
  *
  * Purpose: Single visual contract for standing orders, tactical draft marches, pending ferry lines, and matching hover previews.
  * When to use: Any committed or planned human movement polyline that should match ground march line styling.
- * Expected outcome: One cased line at `ORDER_LINE_COLOR` / `ORDER_LINE_WIDTH`, solid for turn 1 and dashed after, with an
+ * Expected outcome: One cased line in the human seat's map color at `ORDER_LINE_WIDTH`, solid for turn 1 and dashed after, with an
  *   arrowhead whose tip is the route's last hex center.
  * Exceptions: Skips segments with fewer than two lat/lng points; no-op when Leaflet map is unavailable.
  */
@@ -80,7 +91,7 @@ export function drawHumanMarchStyleRouteSegments(
   if (options?.globalAlpha !== undefined) {
     ctx.globalAlpha = options.globalAlpha;
   }
-  drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
+  drawOrderLine(ctx, { runs, arrow }, { color: orderColorForOwner(HUMAN_SEAT_ID), width: ORDER_LINE_WIDTH });
   ctx.restore();
 }
 
@@ -105,7 +116,7 @@ export function drawStandingOrderLines(
   const originH3ByUnitId = options?.originH3ByUnitId;
   for (const order of orders) {
     if (excludeUnitIds?.has(order.unitId)) continue;
-    const unit = units.find((u) => u.id === order.unitId && u.player === 'human');
+    const unit = units.find((u) => u.id === order.unitId && u.player === HUMAN_SEAT_ID);
     if (!unit) continue;
     const originH3 = originH3ByUnitId?.[order.unitId];
     if (!originH3 && order.destinationH3Index && unit.h3Index === order.destinationH3Index) continue;
@@ -117,7 +128,7 @@ export function drawStandingOrderLines(
           ctx,
           hexCenterPx(fromH3),
           hexCenterPxRelativeTo(fromH3, order.destinationH3Index),
-          ORDER_LINE_COLOR
+          orderColorForOwner(HUMAN_SEAT_ID)
         );
       }
       continue;
@@ -142,7 +153,7 @@ export function drawTacticalPendingMarchPlanLines(
   if (pendingMarches.length === 0) return;
   ctx.save();
   for (const row of pendingMarches) {
-    const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === 'human');
+    const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === HUMAN_SEAT_ID);
     if (!sub) continue;
     const fromH3 = sub.h3Index;
     const toH3 = row.destinationH3Index;
@@ -190,9 +201,9 @@ export function drawResolutionMoveLines(
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   const L = getLeafletGlobal();
   for (const move of moves) {
-    const isHumanMove = move.player === 'human';
+    const isHumanMove = move.player === HUMAN_SEAT_ID;
     const withArrow = !isHumanMove || includeArrowForHuman;
-    const style = { color: isHumanMove ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH };
+    const style = { color: orderColorForOwner(move.player), width: ORDER_LINE_WIDTH };
     const path = move.pathH3Indexes;
     if (path && path.length >= 2 && map) {
       const points = path.map((h) => {
@@ -279,7 +290,7 @@ export function drawMovingUnits(
       lng = lng0 + progress * (lng1Aligned - lng0);
     }
     const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-    const color = PLAYER_COLORS[move.player] ?? '#333';
+    const color = orderColorForOwner(move.player);
     const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');
     drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff', move.player);
     if (group.count > 1) {

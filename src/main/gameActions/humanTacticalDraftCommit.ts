@@ -1,3 +1,5 @@
+import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
+import { takeTacticalDraft } from '../openRouter/commanderPool';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
 import { committedOpponentTacticalDraftFieldAfterConsume } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -24,6 +26,7 @@ import {
 import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import { validateTacticalOpponentEmbarkOrder } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { tacticalMarchFirstStopAlongPath } from '../tacticalBattle/tacticalRulesAdapter';
+import { opposingPartyIdOf } from '../tacticalBattle/opposingParty';
 import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
 import {
   resolveTacticalRangedTargetForSubUnit,
@@ -63,6 +66,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
     embarkCount: draft?.embarkOrders.length ?? 0,
   });
   if (!draft) return undefined;
+  const party = opposingPartyIdOf(preBattle);
   const tacticalSet = new Set(preBattle.tacticalChildH3Indexes);
   const sub = [...preBattle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
@@ -102,12 +106,12 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
   const rangedAttacks: TacticalOpponentPlanPayload['rangedAttacks'] = [];
   for (const r of draft.rangedAttacks) {
     let targetH3Index = r.targetH3Index;
-    let checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+    let checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: party });
     if (!checked.success) {
       const retarget = resolveTacticalRangedTargetForSubUnit(preBattle, r.unitId, r.targetH3Index);
       if (retarget) {
         targetH3Index = retarget;
-        checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+        checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: party });
         if (checked.success) {
           logDebug('gameActions sanitizeOpponentTacticalDraftForReadyCommit: retargeted ranged', {
             unitId: r.unitId,
@@ -132,7 +136,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
   const airStrikes: TacticalOpponentPlanPayload['airStrikes'] = [];
   for (const a of draft.airStrikes) {
     const checked = validateGroupAirStrikeTarget([a.unitId], a.targetH3Index, a.targetType, {
-      tacticalAttackerPlayer: 'opponent',
+      tacticalAttackerPlayer: party,
     });
     if (!checked.success) {
       dropped += 1;
@@ -158,7 +162,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
       });
       continue;
     }
-    const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index, { tacticalAttackerPlayer: 'opponent' });
+    const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index, { tacticalAttackerPlayer: party });
     if (!checked.success) {
       dropped += 1;
       logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', {
@@ -259,9 +263,12 @@ export function commitHumanTacticalDraftOrders(args: {
     if (!preBattle) {
       return { success: false, reason: 'No tactical battle is active.' };
     }
+    const party = opposingPartyIdOf(preBattle);
+    const pooledDraft = isAiSeatId(party) ? takeTacticalDraft(party, preBattle.battleId) : null;
+    const suppliedDraft = isNeutralOwnerId(party) ? undefined : (args.opponentTacticalDraft ?? pooledDraft ?? undefined);
     const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(
       preBattle,
-      withTacticalTempoAttacks(preBattle, args.opponentTacticalDraft, holdFireUnitIdsForPlayer('opponent'))
+      withTacticalTempoAttacks(preBattle, suppliedDraft, holdFireUnitIdsForPlayer(party), party)
     );
     // The human's own slice stays explicit: strategic standing orders neither move nor fire their pawns in tactical.
     const effectiveHumanMarches = [...args.movementOrders];
@@ -303,7 +310,7 @@ export function commitHumanTacticalDraftOrders(args: {
     >();
     for (const o of effectiveHumanMarches) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
-      if (!sub || sub.player !== 'human') continue;
+      if (!sub || sub.player !== HUMAN_SEAT_ID) continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
       const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
@@ -356,7 +363,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
     for (const o of effectiveHumanMarches) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
-      if (!sub || sub.player !== 'human') continue;
+      if (!sub || sub.player !== HUMAN_SEAT_ID) continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
       const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
@@ -379,7 +386,7 @@ export function commitHumanTacticalDraftOrders(args: {
     }
     for (const f of args.ferryOrders ?? []) {
       const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
-      if (!u || u.unitType !== 'air' || u.player !== 'human') continue;
+      if (!u || u.unitType !== 'air' || u.player !== HUMAN_SEAT_ID) continue;
       if (u.h3Index === f.destinationH3Index) continue;
       humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
     }
@@ -388,7 +395,7 @@ export function commitHumanTacticalDraftOrders(args: {
     if (od) {
       for (const o of od.movementOrders) {
         const su = preBattle.subUnits.find((u) => u.id === o.unitId);
-        if (!su || su.player !== 'opponent') continue;
+        if (!su || su.player === HUMAN_SEAT_ID) continue;
         const from = su.h3Index;
         if (from === o.toH3Index) continue;
         const after = postMovementBattle.subUnits.find((u) => u.id === o.unitId);
@@ -423,7 +430,7 @@ export function commitHumanTacticalDraftOrders(args: {
       }
       for (const f of od.ferryOrders) {
         const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
-        if (!u || u.unitType !== 'air' || u.player !== 'opponent') continue;
+        if (!u || u.unitType !== 'air' || u.player === HUMAN_SEAT_ID) continue;
         if (u.h3Index === f.destinationH3Index) continue;
         opponentMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
       }
@@ -530,7 +537,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const rangedVictimIds = new Set(support.killsByDirectFire.map((k) => k.victimId));
     const airStrikeRemovedUnits = tacticalRemovedAll.filter((u) => {
       if (airStrikeVictimIds.has(u.id)) return true;
-      if (u.player === 'human' && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
+      if (u.player === HUMAN_SEAT_ID && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
       return false;
     });
     const beatNumberResolved = Math.max(1, finalBattle.tacticalTurnNumber - 1);

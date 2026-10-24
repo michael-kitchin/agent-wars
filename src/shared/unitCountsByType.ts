@@ -5,7 +5,7 @@ import { isBuildUnitType } from './ipc/productionTypes';
  * Totals deployable units per `BuildUnitType` for a single player from a unit list.
  *
  * Purpose: Shared between main (`productionCaps`) and renderer production UI so cap math and filtering stay aligned.
- * When to use: Pass `GameStateSnapshot['units']` (or equivalent `{ player, unitType }[]`) plus `'human'` or `'opponent'`.
+ * When to use: Pass `GameStateSnapshot['units']` (or equivalent `{ player, unitType }[]`) plus `HUMAN_SEAT_ID` or the first AI seat.
  * Expected outcome: Four counts summing only recognized build types; unknown `unitType` strings contribute nothing.
  * Exceptions: None; empty input yields all zeros.
  */

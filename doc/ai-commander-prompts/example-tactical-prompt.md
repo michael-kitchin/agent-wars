@@ -2,11 +2,11 @@
 
 One tactical prompt from a single consultation, laid out for reading on GitHub. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the capture prints that object on one line.
 
-The catalog is [tactical-prompt.md](tactical-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation.
+The catalog is [tactical-prompt.md](tactical-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation. Changed sentences (identity, legend, loss labels, roster line, narrative, and message) follow the builders. This capture does not record a home name, so the role line uses the builder's fallback. A named three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`.
 
 ---
 
-You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Strategic turn: 6, date: June, Year 1, tactical beat: 4, phase: planning.
+You command your side in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons. Strategic turn: 6, date: June, Year 1, tactical beat: 4, phase: planning.
 
 Your goal is to engage and defeat enemy forces in this battle. Review the rules, below, for how to order this.
 
@@ -62,7 +62,7 @@ Friendly units may stack on the same cell. Copy a move/melee Target Hex even whe
 
 # Commander's Briefing
 
-Tactical beat 4: you command 13 sub-unit(s); human sub-units in this battle: 4 (full visibility). 6 of your sub-units are in or near direct combat range. 6 sub-unit(s) face a critical threat and require immediate attention. Review the unit status table, attention flags, and operational map below, then issue explicit_move and ranged_attack as needed this beat.
+Tactical beat 4: you command 13 sub-unit(s); enemy sub-units in this battle: 4 (full visibility). 6 of your sub-units are in or near direct combat range. 6 sub-unit(s) face a critical threat and require immediate attention. Review the unit status table, attention flags, and operational map below, then issue explicit_move and ranged_attack as needed this beat.
 
 ## Unit Status and Threats
 
@@ -96,7 +96,7 @@ Each cell: top = tactical hex code, bottom = terrain + overlay.
 
 Terrain: x = land, . = water.
 
-Overlay: * = your units, ! = enemy units, # = contested.
+Overlay: * = your units, ! = enemy units, including neutral garrisons, # = contested.
 
 Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.
 
@@ -186,14 +186,14 @@ Turn 1:
 Turn 2:
 - Message: Enjoy your last quiet moments, commander. My armor is already on its way.
 - Strategy: Advance all armor and the flank infantry toward the enemy armor cluster, and move the main infantry body up behind them to set up contact.
-- Human Losses: Melee attack: h1-t1-s4, h1-t2-s4
-- AI Losses: Melee attack: a1-i1-s8
+- Enemy Losses: Melee attack: h1-t1-s4, h1-t2-s4
+- Your Losses: Melee attack: a1-i1-s8
 
 Turn 3:
 - Message: Your armor is already finished. You just haven't realized it yet.
 - Strategy: Focus all armor fire on the enemy armor in KL, then close to melee there to destroy it.
-- Human Losses: Ranged attack: h1-t1-s2, h1-t2-s2
-- AI Losses: Return fire: a1-t1-s1, a1-t1-s2
+- Enemy Losses: Ranged attack: h1-t1-s2, h1-t2-s2
+- Your Losses: Return fire: a1-t1-s1, a1-t1-s2
 
 ## Active Callbacks
 
@@ -208,7 +208,7 @@ Strategic context:
     (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
     (3) Create maximum disruption with minimum force
 - Your message is:
-    Address the human player in character as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
+    Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
 
 # Available Tools
 
@@ -250,7 +250,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
 
-Human units (currently observed): h1-t1-s1 (armor) at PI; h1-t1-s3 (armor) at KI; h1-t2-s1 (armor) at PI; h1-t2-s3 (armor) at KI
+Enemy units (currently observed): Enemy: h1-t1-s1 (armor) at PI; h1-t1-s3 (armor) at KI; h1-t2-s1 (armor) at PI; h1-t2-s3 (armor) at KI
 
 Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments).
 
@@ -265,7 +265,7 @@ Submit your final JSON only (one compact JSON object, no markdown fence, no extr
 
 Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.
 
-The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).
+The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).
 
 The "strategy" field is a one-line summary of your plan for this beat.
 

@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -25,7 +26,8 @@ import { SECTION_TITLE_NAVAL_TRANSPORT_STATUS, topLevelHeading } from './promptS
 function findNearestOpponentEmbarkHex(
   navalH3: string,
   state: GameStateSnapshot,
-  format: (h3: string) => string
+  format: (h3: string) => string,
+  ownSeatId: string
 ): string {
   const infraByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
@@ -37,7 +39,7 @@ function findNearestOpponentEmbarkHex(
         nativeTerrain: hex.terrain,
         terrainKind: hex.terrainKind,
         hasSeaport: seaport > 0,
-        hexControlledByPlayer: controlByHex.get(hex.h3Index) === 'opponent',
+        hexControlledByPlayer: controlByHex.get(hex.h3Index) === ownSeatId,
       })
     ) {
       legalH3.push(hex.h3Index);
@@ -69,9 +71,10 @@ export function buildSealiftBriefingBlock(
   mode: 'strategic' | 'tactical' = 'strategic'
 ): string {
   const lines: string[] = [];
-  const opponentNaval = state.units.filter((unit) => unit.player === 'opponent' && unit.unitType === 'naval');
+  const ownSeat = briefingOwnSeatId(state);
+  const opponentNaval = state.units.filter((unit) => unit.player === ownSeat && unit.unitType === 'naval');
   const opponentLand = state.units.filter(
-    (unit) => unit.player === 'opponent' && (unit.unitType === 'infantry' || unit.unitType === 'armor')
+    (unit) => unit.player === ownSeat && (unit.unitType === 'infantry' || unit.unitType === 'armor')
   );
   logDebug('briefingSections buildSealiftBriefingBlock', {
     turnNumber: state.turnNumber,
@@ -114,11 +117,11 @@ export function buildSealiftBriefingBlock(
   for (const naval of opponentNaval) {
     const infra = infraByHex.get(naval.h3Index);
     const hasPort = (infra?.seaportCount ?? 0) > 0;
-    const controlled = controlByHex.get(naval.h3Index) === 'opponent';
+    const controlled = controlByHex.get(naval.h3Index) === ownSeat;
     const embarked = opponentLand.filter((land) => land.embarkedOnNavalUnitId === naval.id);
     const armor = embarked.filter((unit) => unit.unitType === 'armor').length;
     const infantry = embarked.filter((unit) => unit.unitType === 'infantry').length;
-    const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format);
+    const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format, ownSeat);
     const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
     const aboard = `infantry ${infantry}, armor ${armor}`;
     navalRows.push([

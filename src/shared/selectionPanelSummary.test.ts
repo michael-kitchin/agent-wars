@@ -44,7 +44,7 @@ test('buildSelectionPanelChips lists the known facts in order', () => {
     weather: 'mild',
     techLevel: 'advanced',
     productionPerTurn: 1094,
-    homeSide: 'human',
+    homeChip: { kind: 'home', text: 'Home' },
   });
   assert.deepEqual(chips.map((chip) => chip.kind), ['terrain', 'weather', 'tech', 'production', 'home']);
   assert.match(chips[0].html, /Wetlands$/);
@@ -59,7 +59,7 @@ test('buildSelectionPanelChips leaves out unknown facts and zero production', ()
     weather: null,
     techLevel: null,
     productionPerTurn: 0,
-    homeSide: 'opponent',
+    homeChip: { kind: 'enemy-home', text: 'W. Turkey home' },
   });
-  assert.deepEqual(chips, [{ kind: 'enemy-home', html: 'Enemy home' }]);
+  assert.deepEqual(chips, [{ kind: 'enemy-home', html: 'W. Turkey home' }]);
 });

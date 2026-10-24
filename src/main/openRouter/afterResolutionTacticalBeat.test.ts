@@ -12,8 +12,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { clearSubscriptions } from '../callbackSubscriptions';
-import { closeGameDatabaseForTests, openGameDatabaseAtPathForTests, resetGameForNewMatch } from '../gameDb';
+import { closeGameDatabaseForTests, dbGetAll, dbRun, openGameDatabaseAtPathForTests, resetGameForNewMatch } from '../gameDb';
+import { updateSeatCommander } from '../gameDb/seatRosterStore';
+import { resetCommanderPool } from './commanderPool';
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
@@ -436,6 +439,11 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
         },
       ],
     };
+    updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
+      modelId: 'test-model',
+      reasoningEffort: null,
+      doctrineChoice: 'balanced',
+    });
     const merge = await runEventDrivenAfterTacticalBeatConsultation({
       useEventDrivenConsultation: true,
       aiPlanningRunEnabled: true,
@@ -457,5 +465,6 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
     const fields = toTacticalPostBeatConsultFields(tacticalBattle.battleId, merge);
     assert.equal(fields.aiStrategy, 'push armor');
     assert.equal(fields.aiMessage, 'This close, hesitation is already a casualty.');
+    resetCommanderPool([]);
   });
 });

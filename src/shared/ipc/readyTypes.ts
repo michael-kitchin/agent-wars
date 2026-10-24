@@ -1,12 +1,4 @@
-import type {
-  AirStrikeAnimationMove,
-  AirStrikeOrder,
-  EmbarkOrder,
-  FerryAnimationMove,
-  FerryOrder,
-  MovementOrder,
-  RangedAttackOrder,
-} from './ordersTypes';
+import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
@@ -33,69 +25,6 @@ enabledToolGroups?: string[];
    * Exceptions: None.
    */
 useEventDrivenConsultation?: boolean;
-    /**
-   * Specifies the contract for the `precomputedAiOrders` member (precomputedAiOrders?: MovementOrder[];).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiOrders?: MovementOrder[];
-    /**
-   * Specifies the contract for the `precomputedAiRangedOrders` member (precomputedAiRangedOrders?: RangedAttackOrder[];).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiRangedOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiRangedOrders?: RangedAttackOrder[];
-    /**
-   * Specifies the contract for the `precomputedAiAirStrikeOrders` member (precomputedAiAirStrikeOrders?: AirStrikeOrder[];).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiAirStrikeOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiAirStrikeOrders?: AirStrikeOrder[];
-    /**
-   * Specifies the contract for the `precomputedAiFerryOrders` member (precomputedAiFerryOrders?: FerryOrder[];).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiFerryOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiFerryOrders?: FerryOrder[];
-    /**
-   * Specifies the contract for the `precomputedAiEmbarkOrders` member (precomputedAiEmbarkOrders?: EmbarkOrder[];).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiEmbarkOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiEmbarkOrders?: EmbarkOrder[];
-    /**
-   * Specifies the contract for the `precomputedAiStrategy` member (precomputedAiStrategy?: string;).
-
-   * Contract: Describes stable behavior for callers of `precomputedAiStrategy` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-precomputedAiStrategy?: string;
-    /**
-   * Cached opponent message (taunt/threat) from a background `requestAiOrders` to show after Ready.
-
-   * Contract: Optional trimmed string; omit when empty.
-   * When to use: Renderer `buildReadyPayload` and main `applyPrecomputedOrdersFromPayload`.
-   * Expected outcome: Copied onto `ReadyResult.aiMessage` when precomputed orders are used.
-   * Exceptions: None.
-   */
-precomputedAiMessage?: string;
     /**
    * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
 
@@ -610,14 +539,14 @@ deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?:
    */
 humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
     /**
-   * Specifies the contract for the `opponentDeploymentCapReachedUnitTypes` member (opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];).
+   * Specifies the contract for the `deploymentCapReachedUnitTypesBySeat` member (deploymentCapReachedUnitTypesBySeat?: BuildUnitType[];).
 
-   * Contract: Describes stable behavior for callers of `opponentDeploymentCapReachedUnitTypes` in this codebase.
+   * Contract: Describes stable behavior for callers of `deploymentCapReachedUnitTypesBySeat` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
+deploymentCapReachedUnitTypesBySeat?: Readonly<Record<string, readonly BuildUnitType[]>>;
     /**
    * Specifies the contract for the `humanHexesLostCount` member (humanHexesLostCount?: number;).
 
@@ -627,6 +556,15 @@ opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
    * Exceptions: None.
    */
 humanHexesLostCount?: number;
+  /**
+   * Hexes whose controller changed this turn.
+   *
+   * Contract: `from` and `to` are owner ids, or null when the hex was or became unowned. Absent when nothing changed.
+   * When to use: The turn report's "took" sentences.
+   * Expected outcome: The same flips control resolution returned.
+   * Exceptions: None.
+   */
+  controlTransitions?: readonly { readonly h3Index: string; readonly from: string | null; readonly to: string | null }[];
     /**
    * Specifies the contract for the `controlLossLightningHexes` member (controlLossLightningHexes?: string[];).
 
@@ -700,14 +638,14 @@ inputTokens?: number;
    */
 outputTokens?: number;
     /**
-   * Specifies the contract for the `opponentCombatParticipantUnitIds` member (opponentCombatParticipantUnitIds?: string[];).
+   * Specifies the contract for the `combatParticipantUnitIdsBySeat` member (combatParticipantUnitIdsBySeat?: string[];).
 
-   * Contract: Describes stable behavior for callers of `opponentCombatParticipantUnitIds` in this codebase.
+   * Contract: Describes stable behavior for callers of `combatParticipantUnitIdsBySeat` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-opponentCombatParticipantUnitIds?: string[];
+combatParticipantUnitIdsBySeat?: Readonly<Record<string, readonly string[]>>;
     /**
    * True when at least one opponent unit executed a non–no-op strategic WEGO march this turn (any unit type, including air, which is omitted from control-traversal sets).
    *
@@ -716,16 +654,25 @@ opponentCombatParticipantUnitIds?: string[];
    * Expected outcome: Boolean aligned with `readyStrategicResolutionPipeline` movement application for opponent `pending_orders` legs.
    * Exceptions: Omitted on `awaitingMeleeDecision` early returns where finalize has not run yet.
    */
-opponentHadStrategicMarchResolution?: boolean;
+hadStrategicMarchResolutionBySeat?: Readonly<Record<string, boolean>>;
     /**
-   * Specifies the contract for the `removedOpponentUnitIds` member (removedOpponentUnitIds?: string[];).
+   * Seats knocked out on the turn that just resolved.
+   *
+   * Contract: Each entry names the seat, the seat credited, every reason that held, and the shared place. Absent when nobody was knocked out.
+   * When to use: The ready payload after resolution. A mutual wipe omits this because those knockouts are cancelled.
+   * Expected outcome: The same seats `recordEndOfTurnOutcome` wrote.
+   * Exceptions: Absent on an early return before the turn is finalized.
+   */
+knockouts?: readonly { readonly seatId: string; readonly outBy: string | null; readonly reasons: readonly string[]; readonly place: number }[];
+    /**
+   * Specifies the contract for the `removedUnitIdsBySeat` member (removedUnitIdsBySeat?: string[];).
 
-   * Contract: Describes stable behavior for callers of `removedOpponentUnitIds` in this codebase.
+   * Contract: Describes stable behavior for callers of `removedUnitIdsBySeat` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-removedOpponentUnitIds?: string[];
+removedUnitIdsBySeat?: Readonly<Record<string, readonly string[]>>;
     /**
    * Specifies the contract for the `aiConsulted` member (aiConsulted?: boolean;).
 

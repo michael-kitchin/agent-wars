@@ -15,6 +15,7 @@ import { resetHumanMarchPreviewDiagnosticsForTests } from '../gameActions/humanM
 import { withTempGameDb } from './withTempGameDb';
 import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import { hexSupportsMixedLandAndNaval } from '../gameActions/humanMarchPreviewMixedSelection';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -175,7 +176,7 @@ export function setHumanControlledPort(h3Index: string): void {
     dbRun('UPDATE res_t_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childTactical.h3Index]);
   }
   dbRun('UPDATE res_s_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [h3Index]);
-  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, HUMAN_SEAT_ID]);
 }
 
 /**

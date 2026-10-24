@@ -10,21 +10,21 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 ### 1.1 Role and clock line
 
-- **Shape:** one line naming the model as the enemy commander in a simultaneous-movement hex wargame, then the current turn number and phase.
+- **Shape:** one line naming the side the model commands, the number of sides, and that every other side and neutral garrisons are enemies, then the current turn number and phase. The sentence is `You command {home region} in a WEGO (simultaneous movement) hex wargame with {N} sides. Every other side is your enemy, and so are neutral garrisons.`
 - **Items:** `TURN_CLOCK`.
 - **Include:** always. **Empty-state:** not possible.
 - **Model use:** anchors every "this turn" reference that follows.
 
 ### 1.2 Goal statement
 
-- **Shape:** the victory conditions in plain language, followed by how they are achieved: units die to ranged and melee combat, production capacity dies to air strikes.
+- **Shape:** for last side standing, `Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral.` A turn-limit match appends `The match ends after turn {L}. If more than one side is left then, the side holding the most city hexes wins.` Both append `If every side would be knocked out on the same turn, none is knocked out and the match ends. The side holding the most city hexes wins. If several sides hold that many, no single side wins.` Then how they are achieved: units die to ranged and melee combat, production capacity dies to air strikes.
 - **Items:** `WIN_CONDITIONS`.
 - **Include:** always. **Empty-state:** when no scenario is set, state the generic objective of destroying enemy forces and taking territory, and do not name home regions. See [`variants.md`](variants.md).
 - **Model use:** decides whether this turn's effort goes to territory, production, or attrition.
 
 ### 1.3 Situational directives
 
-- **Scouting directive.** Include when no enemy unit is observed. The preamble sentence is `No human units are currently observed. Enemy forces may be out of view.` Coaching adds the move-to-regain-contact bullet. **Omit** the preamble sentence otherwise.
+- **Scouting directive.** Include when no enemy unit is observed. The preamble sentence is `No enemy units are currently observed. Enemy forces may be out of view.` Coaching adds the move-to-regain-contact bullet. **Omit** the preamble sentence otherwise.
 - **Tool-budget warning.** Include when the previous consultation exhausted its tool-call budget and submitted nothing, and planning or standing-order tools are enabled. State the round limit, that no orders were submitted last turn, and that the model must submit promptly after gathering what it needs. **Omit** otherwise.
 - **Items:** `ENEMY_ROSTER_OBSERVED`, `TOOL_BUDGET_WARNING`.
 - **Model use:** overrides the default of standing still, and caps tool spending.
@@ -99,7 +99,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Example:** one rendered grid from a single consultation is in [`example-strategic-prompt.md`](example-strategic-prompt.md).
 - **Shape:** a legend, then a fenced ASCII grid, then a displaced-features footnote when needed, then the options subsection.
 - **Extent:** every strategic cell of the match that is loaded. Global is the world grid. Regional is that region's footprint. A new match replaces the codes, including when the new map uses the same resolution. A code from the previous match is not a cell on this map.
-- **Legend contract:** each cell shows its code on the top line and terrain plus overlay on the bottom line; `x` is land and `.` is water; `*` marks own units, `!` enemy units, `#` contested, `?` undiscovered intel; feature letters mark airport, seaport, both, and urban, with uppercase meaning own control; odd rows are indented one space; only codes from this map or the tables may be used.
+- **Legend contract:** each cell shows its code on the top line and terrain plus overlay on the bottom line; `x` is land and `.` is water; `*` marks own units, `!` enemy units, including neutral garrisons, `#` contested, `?` undiscovered intel; feature letters mark airport, seaport, both, and urban, with uppercase meaning own control; odd rows are indented one space; only codes from this map or the tables may be used.
 - **Displaced-features footnote:** include when a unit overlay hides a feature marker, listing each affected cell and its feature. Omit when empty.
 - **Items:** `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES`.
 - **Include:** always inside the briefing. **Empty-state:** the heading plus `(No units — map not rendered.)` when neither side has units.
@@ -165,10 +165,17 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Detail-cell contract:** the detail cell must describe the subscription in terms the model can act on — the event and its parameters, such as the unit id or the cell code it watches. Repeating the event name in both cells carries no information and does not satisfy this contract. An unfiltered `infrastructure_destroyed` watch (no `targetType`, no hex) must say that it is unfiltered and that re-subscribing uses the event with no params — not `infrastructure_destroyed(any)`.
 - **Model use:** decides which subscriptions to keep, since the response replaces the whole list. Omitting `callbacks` or sending `[]` clears every subscription.
 
+### 1.6a `## Sides`
+
+- **Include:** strategic prompts. **Omit** in a battle, because that prompt does not list homes.
+- **Shape:** a Markdown table placed immediately before the Scenario Objective block. Columns are `Side`, `Unit id prefix`, `Home region`, `Status`. The commander's row is first and the Side cell ends with ` (you)`. Other seats follow in seat order. A knocked-out seat's status is `Out since turn {N}; its units are now neutral`. A Neutral row is present only when a neutral unit exists. Its prefix cell is `(keeps the prefix of the side it came from)`, its home cell is `none`, and its status states that garrisons hold their hexes and fire on any unit in range, and that a loaded ship sails to a landing, unloads, and then holds.
+- **Items:** `HOME_REGION_NAMES`.
+- **Model use:** tells the commander which sides are still playing.
+
 ### 1.7 `# Scenario Objective (Required)`
 
 - **Include:** when the scenario is the region-versus-region scenario. **Omit** for a missing or unrecognised scenario, and do not substitute region wording.
-- **Content:** the scenario id; own home region name when present; enemy home region name when present; the two win paths; and the statement that both home outlines are always visible. On a regional map the control path is enemy-home hexes that together hold at least 75% of that home's original urban cells, and two progress lines follow the win block: enemy-home urban cells in hexes you control, and your-home urban cells in hexes the enemy controls. On the global map the control path is every enemy home hex. The other path is elimination of all enemy home urban production.
+- **Content:** the scenario id; own home region name when present; `Enemy home regions:` listing every active enemy's full home name in seat order; the two win paths; and the statement that every home-region outline is always visible. On a regional map the control path is enemy-home hexes that together hold at least 75% of that home's original urban cells. One progress line per enemy follows: `{name} home urban cells in hexes you control`. A second line, `Your home urban cells in hexes {name} controls`, is included only when that enemy holds any of those cells. The other path is elimination of all enemy home urban production. This block is empty unless `scenarioId` is `region_vs_region`. The early reminder, `buildWinConditionReminderClause`, states the last-side, mutual-wipe, and turn-limit sentences.
 - **Items:** `SCENARIO_ID`, `HOME_REGION_NAMES`, `WIN_CONDITIONS`, `HOME_REGION_VISIBILITY`.
 - **Model use:** identifies which cells are worth taking and which must be held.
 
@@ -176,12 +183,12 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 Bullets in this order.
 
-1. **Goals**, five numbered lines: engage enemy forces to reduce their effectiveness; disperse to maximise visibility; maximise own production; protect own home production capacity; degrade or eliminate enemy home urban production.
-2. **Strategy**, three numbered lines of doctrine (speed and initiative; gaps not surfaces; maximum disruption with minimum force).
-3. **Message guidance**: one in-character line at the human player, psychological warfare only, revealing no orders, cells, ids, or intent.
+1. **Goals**, five numbered lines: engage enemy forces to reduce their effectiveness; disperse to maximise visibility; maximise own production; protect own home production capacity; degrade or eliminate enemy home regions' urban production capacity.
+2. **Strategy**, three numbered lines (speed and initiative; gaps not surfaces; maximum disruption with minimum force). This list is the Balanced doctrine. Aggressive and Cautious add one block immediately after it, `- Your doctrine is aggressive:` or `- Your doctrine is cautious:`. Balanced adds no block and no blank line. A random choice is drawn once from the match seed at the start and the prompt teaches that draw; the interface hides it until the match is over.
+3. **Message guidance**: one in-character line addressed to your enemies, psychological warfare only, revealing no orders, cells, ids, or intent.
 4. **Explored** progress: own explored land cells against total land cells.
 5. **Controlled** progress: own controlled land cells against total land cells.
-6. **Home-region bullets**, when the scenario supplies home regions: own home control, own home cells when the two regions are not the same set, control of the enemy home region, enemy home cells when the sets differ, and the shared-cell line when the regions intersect. Those hex counts are territory. On a regional map the control-win test is the urban-cell share in the scenario objective.
+6. **Home-region bullets**, when the scenario supplies home regions: own home control, own home cells when they are not shared, one control line and one hex line per enemy home, and `These hexes are in more than one home region` when any cell is shared. Those hex counts are territory. On a regional map the control-win test is the urban-cell share in the scenario objective.
 
 - **Items:** `EXPLORED_CONTROLLED_PROGRESS`, `HOME_CONTROL_PROGRESS`, `HOME_REGION_HEXES`, `HOME_REGION_OVERLAP`, `MESSAGE_DISCIPLINE`.
 - **Include:** always; bullets 4 through 6 are gated as stated.
@@ -212,7 +219,7 @@ Bullets in this order.
 
 ### 1.12 Observed enemy roster line
 
-- **Shape:** one line listing each observed enemy unit with its type and cell, or the empty-roster phrasing.
+- **Shape:** one line, `Enemy units (currently observed):`, with each side's summaries introduced by that side's home name and a colon, in seat order, then Neutral. The empty phrasing is `Enemy units (currently observed): none. Enemy units may be out of view; actively scout to reacquire contact.`
 - **Items:** `ENEMY_ROSTER_OBSERVED`.
 - **Include:** always.
 - **Model use:** a compact target list that does not require re-reading the unit table.
@@ -250,7 +257,7 @@ Cell contracts that carry meaning beyond the column name:
 8. **Best Options `Target Infrastructure`** is the feature text for that hex. `|` in the source text is written as a space. On an `air strike` row, text from `; strike:` onward is then omitted, so a cell that listed both infrastructure and strike kinds keeps the infrastructure text. A cell with no `; strike:` suffix is otherwise unchanged. When nothing remains, the cell is an em dash.
 9. **Controlled hex queues `Available Unit Types`** lists only types that can still be built, except when every available type is at cap, in which case the full list is shown with the at-cap marker. The marker string in this column and the marker quoted in the cap rule must be the same string; they come from one constant.
 10. **Controlled hex queues `Current Queue`** marks a queued type that cannot currently spawn as blocked at cap. The queue table shows the ten cells with the most urban capacity, plus every further cell that has something queued, so no active queue is hidden.
-11. **Units without standing orders `Suggested Destination`** has exactly three shapes. A bare two-character hex is an `assign_order` march. When any enemy is visible, that hex is still a one-step dest from `getValidDestinations` that strictly closes on the nearest enemy, never the unit's current hex. An enemy-occupied dest is preferred when one strictly closes, including a contested hex, and that hex is the Best Options move/melee contact. Otherwise the cell is one of that unit's approach hexes. A missing close is an em dash; an enemy-home hex is not substituted while an enemy is visible. When no enemy is visible, a ground unit outside `humanHomeRegionHexes` is offered the nearest passable hex in that list, and a unit already inside it is offered the nearest passable hex there that is not in `exploredHexes` and is not its current hex. That march may lie beyond this turn's movement budget. A land or armor hex must be on the snapshot, pass `landUnitCanOccupyHex`, share a continent id or an island id with the unit's current hex, and stay below `STRATEGIC_LAND_MAX_WATER_PCT`. A wetter cell fails the last step of a land route, and `assignOrder` drops that march. A naval hex must be `water` or `coastal` on the snapshot, so fog-masked `unknown` is not a destination. Distance is `gridHopDistanceBetween`, and ties break by ascending H3. `defend` plus one space plus a hex is defend on that hex, and it is only for an air unit whose id is on an `air strike` row; the hex is the unit's current hex. An em dash means no mission was chosen: empty or exhausted home list, a home hex missing from the snapshot, no shared landmass, a land hex at or above the water cap, inland or fog-masked naval, or air with no strike. Copy the cell into `explicit_move` only when that same hex is also a Best Options Target Hex for that unit. A farther explicit move is dropped, not shortened.
+11. **Units without standing orders `Suggested Destination`** has exactly three shapes. A bare two-character hex is an `assign_order` march. When any enemy is visible, that hex is still a one-step dest from `getValidDestinations` that strictly closes on the nearest enemy, never the unit's current hex. An enemy-occupied dest is preferred when one strictly closes, including a contested hex, and that hex is the Best Options move/melee contact. Otherwise the cell is one of that unit's approach hexes. A missing close is an em dash; an enemy-home hex is not substituted while an enemy is visible. When no enemy is visible, a ground unit outside `enemyHomeHexes` (the other active seats' lists in `homeRegionHexesBySeat`) is offered the nearest passable hex in that list, and a unit already inside it is offered the nearest passable hex there that is not in `exploredHexes` and is not its current hex. That march may lie beyond this turn's movement budget. A land or armor hex must be on the snapshot, pass `landUnitCanOccupyHex`, share a continent id or an island id with the unit's current hex, and stay below `STRATEGIC_LAND_MAX_WATER_PCT`. A wetter cell fails the last step of a land route, and `assignOrder` drops that march. A naval hex must be `water` or `coastal` on the snapshot, so fog-masked `unknown` is not a destination. Distance is `gridHopDistanceBetween`, and ties break by ascending H3. `defend` plus one space plus a hex is defend on that hex, and it is only for an air unit whose id is on an `air strike` row; the hex is the unit's current hex. An em dash means no mission was chosen: empty or exhausted home list, a home hex missing from the snapshot, no shared landmass, a land hex at or above the water cap, inland or fog-masked naval, or air with no strike. Copy the cell into `explicit_move` only when that same hex is also a Best Options Target Hex for that unit. A farther explicit move is dropped, not shortened.
 12. **Air operations `Base Intact` and `Base Controlled`** are yes or no. A unit whose base is not intact or not controlled cannot ferry from it, and the prompt's air coaching must not tell it to.
 13. **Naval transport `Nearest Embark Hex`** is the nearest cell where that unit may legally load, evaluated with the embark rule including the control condition.
 14. **Active callbacks `Details`** describes the subscription's parameters, per section 1.6. Unfiltered infrastructure watches use the unfiltered wording in that section, never `infrastructure_destroyed(any)`.
@@ -306,7 +313,7 @@ Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md
 
 System-prompt content only. Each item is a rule the model must be told, with the reason it is needed. Wording is left to the implementer; the content is not.
 
-1. **Win paths.** Name the two ways the game ends and which cells matter for each, so territorial effort has a target. Carries `WIN_CONDITIONS`, `HOME_REGION_HEXES`.
+1. **Win paths.** Last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. On a turn-limit match, add that if the turn limit arrives first the most city hexes wins. When the match has three or more seats, also state that every other side is an enemy of the others, that a side fighting a third side is exposed, and that neutral garrisons hold and fire, with the loaded-ship exception. Carries `WIN_CONDITIONS`, `HOME_REGION_HEXES`.
 2. **Resolution order.** State the full turn order, including cargo sync between movement and ferry, so the model can reason about firing then closing, cargo riding the transport, and ferry arriving after ground movement.
 3. **Fire before moving costs nothing.** Every unit with a legal shot should be given a ranged action, and an air strike when air is present, and the model chooses each target, because the shot resolves from the turn-start position and does not consume the move. The air half of this sentence is omitted when the opponent has no air units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 4. **Withholding fire is an explicit order.** A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire. Include only when standing-order tools are enabled, since that is the only way to issue it. Carries `HOLD_FIRE_SEMANTICS`.
@@ -320,7 +327,7 @@ System-prompt content only. Each item is a rule the model must be told, with the
 12. **Use sealift deliberately.** When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Carries `EMBARK_LEGALITY`, `EMBARK_HEX`.
 13. **Scout when blind.** With no enemy observed, move to regain contact rather than hold. The orderless table's bare hex is that march: the nearest passable enemy-home hex, or the nearest unexplored hex there when the unit is already inside the region. Carries `ENEMY_ROSTER_OBSERVED`.
 14. **Keep production queued.** When a controlled cell can build and its queue is empty, queue something. Replace a queue blocked by a cap with an available type this turn; when every available type for that cell is capped, leave the queue alone so it resumes when the cap frees. The response must include at least one `set_build_queue` when any controlled hex has an empty queue or a blocked-at-cap queue that still has an alternative type. Carries `PRODUCTION_QUEUES`, `PRODUCTION_CAP_QUEUE_RULE`.
-15. **Shared home cells count for both sides.** When the home regions intersect, the listed shared cells count toward both win conditions, so holding them serves defence and attack at once. Include only when an intersection exists. Carries `HOME_REGION_OVERLAP`.
+15. **Shared home cells count for every side that lists them.** When more than one home region lists the same cells, those cells count toward each of those sides, so holding them serves defence and attack at once. Include only when an intersection exists. Carries `HOME_REGION_OVERLAP`.
 16. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Always include a `memoryUpdates` write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
 17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Omitting `callbacks` or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
 18. **Keep the player-facing line clean.** The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent. Carries `MESSAGE_DISCIPLINE`.
@@ -330,7 +337,7 @@ Claims the builders **omit** from strategic coaching (tests forbid the substring
 
 - That every unfired legal shot is damage given up for free. Item 3 states that a shot is free of movement cost and that the model chooses each target. The engine sweep is not described; that omission is deliberate (`TEMPO_SWEEP_SILENCE`).
 - That the engine will fire, move, or otherwise act for any unit the model leaves unordered.
-- Any unconditional claim about what the human player is currently doing or intending.
+- Any unconditional claim about what an enemy is currently doing or intending.
 - Any instruction to call a tool that is not in this consultation's tool list.
 
 ## 5. Weak-model join rules

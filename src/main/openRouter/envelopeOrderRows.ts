@@ -9,8 +9,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
-import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
+import { coordinateContextSeatId, HEX_CODE_PATTERN, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { codeToH3 } from '../briefing/map/hexCodeTranslator';
 import { translateAssignOrderHexCodeParams } from './assignOrderHexParams';
 import type { LatLng } from '../tools/pathfinding';
@@ -187,7 +186,7 @@ export function processV3OrdersArray(
       }
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
       const orderPayload = translateAssignOrderHexCodeParams(o.order, context, unitId);
-      const assignResult = executeStandingOrders('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
+      const assignResult = executeStandingOrders(coordinateContextSeatId(context), 'assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
       if (assignResult.status === 'error') {
         if (typeof assignResult.error === 'string') {
           const orderType =
@@ -215,7 +214,7 @@ export function processV3OrdersArray(
         continue;
       }
       logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
-      executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      executeStandingOrders(coordinateContextSeatId(context), 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
       result.appliedStandingOrderCount += 1;
       continue;
     }

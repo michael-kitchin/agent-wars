@@ -32,7 +32,7 @@ export const AI_CONSULTATION_WALL_CLOCK_MS = 300_000;
  * How long callers may wait for one full `requestOrders` before treating it as hung.
  *
  * Purpose: Shorter outer races (the old 75s background timer and 120s post-resolution race) cancelled consultations the loop was still allowed to finish.
- * When to use: Post-resolution `Promise.race` and the renderer's background `requestAiOrders` timer.
+ * When to use: The outer wait around one `requestOrders` call, including post-resolution.
  * Expected outcome: Covers the 5-minute loop plus the in-flight round and the parse-repair call, each including its one retry (660s).
  * Exceptions: The waiter aborts the in-flight model call when it fires. The transport's own 90s abort still applies to each attempt.
  */

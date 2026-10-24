@@ -385,6 +385,41 @@ test('callback stash restores pre-battle subscriptions and drops tactical sub-un
   });
 });
 
+test('callback stash restores the battle AI seat and leaves other seats alone', () => {
+  withTempDb(() => {
+    replaceSubscriptions('opponent', [{ event: 'turns', params: { n: 1 }, subscribedTurn: 3 }], 3);
+    replaceSubscriptions('opponent2', [{ event: 'turns', params: { n: 9 }, subscribedTurn: 4 }], 4);
+    stashOpponentCallbackSubscriptionsForTacticalBattle('opponent2');
+    replaceSubscriptions(
+      'opponent2',
+      [{ event: 'unit_destroyed', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],
+      1
+    );
+    replaceSubscriptions('opponent', [{ event: 'threat_escalation', params: {}, subscribedTurn: 1 }], 1);
+    restoreOpponentCallbackSubscriptionsAfterTacticalBattle();
+    const restored = getSubscriptions('opponent2');
+    assert.equal(restored.length, 1);
+    assert.equal(restored[0]?.event, 'turns');
+    assert.equal((restored[0]?.params as { n?: number }).n, 9);
+    assert.equal(getSubscriptions('opponent')[0]?.event, 'threat_escalation');
+  });
+});
+
+test('callback stash for a non-AI party leaves every seat subscription list alone', () => {
+  withTempDb(() => {
+    replaceSubscriptions(
+      'opponent',
+      [{ event: 'unit_engaged', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],
+      1
+    );
+    stashOpponentCallbackSubscriptionsForTacticalBattle(null);
+    restoreOpponentCallbackSubscriptionsAfterTacticalBattle();
+    const remaining = getSubscriptions('opponent');
+    assert.equal(remaining.length, 1);
+    assert.equal(remaining[0]?.params?.unitId, 'opp-parent-armor-1:01');
+  });
+});
+
 test('callback stash persists to game_config and hydrates after memory clear', () => {
   withTempDb(() => {
     replaceSubscriptions(

@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from './state';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Returns whether a unit id refers to embarked cargo that must not be newly selected.
@@ -47,7 +48,7 @@ export function reconcileSelectionToCurrentState(): void {
   if (S.tacticalBattleSnapshot) {
     const validHumanUnitIds = new Set(
       S.tacticalBattleSnapshot.subUnits
-        .filter((u) => u.player === 'human')
+        .filter((u) => u.player === HUMAN_SEAT_ID)
         .map((u) => u.id)
     );
     S.selectedUnitIds = S.selectedUnitIds.filter(
@@ -59,7 +60,7 @@ export function reconcileSelectionToCurrentState(): void {
     S.selectedUnitIds = [];
     return;
   }
-  const validHumanUnitIds = new Set(S.gameState.units.filter((u) => u.player === 'human').map((u) => u.id));
+  const validHumanUnitIds = new Set(S.gameState.units.filter((u) => u.player === HUMAN_SEAT_ID).map((u) => u.id));
   S.selectedUnitIds = S.selectedUnitIds.filter((id) => {
     if (!validHumanUnitIds.has(id)) return false;
     return !isEmbarkedLandUnitBlockedForSelection(id);

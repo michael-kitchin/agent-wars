@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { previewHexIsDrawn, previewHomeBorder, previewTechIcon, previewWeatherIcon } from './newGameMapPreviewCore';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
+import { previewHexIsDrawn, previewHomeBorder, previewHomeSeatOrders, previewTechIcon, previewWeatherIcon } from './newGameMapPreviewCore';
 import type { WeatherState } from './weatherBonusTypes';
 
 /**
@@ -30,31 +31,34 @@ test('preview home borders mark exclusive, shared, and identical homes', () => {
   const human = new Set(['human-only', 'shared']);
   const ai = new Set(['ai-only', 'shared']);
   assert.deepEqual(previewHomeBorder('human-only', human, ai), {
-    controllerPlayerId: 'human',
-    homeOwnerIdentity: 'human',
+    controllerPlayerId: HUMAN_SEAT_ID,
+    homeOwnerIdentity: { kind: 'single', seatId: HUMAN_SEAT_ID },
   });
   assert.deepEqual(previewHomeBorder('ai-only', human, ai), {
-    controllerPlayerId: 'opponent',
-    homeOwnerIdentity: 'opponent',
+    controllerPlayerId: AI_SEAT_IDS[0],
+    homeOwnerIdentity: { kind: 'single', seatId: AI_SEAT_IDS[0] },
   });
   assert.deepEqual(previewHomeBorder('shared', human, ai), {
     controllerPlayerId: null,
-    homeOwnerIdentity: 'both',
+    homeOwnerIdentity: { kind: 'shared' },
   });
   const same = new Set(['home']);
   assert.deepEqual(previewHomeBorder('home', same, same), {
     controllerPlayerId: null,
-    homeOwnerIdentity: 'both',
+    homeOwnerIdentity: { kind: 'shared' },
   });
+  assert.deepEqual(previewHomeSeatOrders('shared', [['human-only', 'shared'], ['ai-only', 'shared'], ['third']]), [1, 2]);
+  assert.deepEqual(previewHomeSeatOrders('third', [['human-only', 'shared'], ['ai-only', 'shared'], ['third']]), [3]);
+  assert.deepEqual(previewHomeSeatOrders('none', [['human-only']]), []);
 });
 
 test('global preview paints homes always and the rest of the grid only while T is held, and a regional preview paints every hex', () => {
   assert.equal(previewHexIsDrawn('global', null, false), false);
-  assert.equal(previewHexIsDrawn('global', 'human', false), true);
-  assert.equal(previewHexIsDrawn('global', 'opponent', false), true);
-  assert.equal(previewHexIsDrawn('global', 'both', false), true);
+  assert.equal(previewHexIsDrawn('global', { kind: 'single', seatId: HUMAN_SEAT_ID }, false), true);
+  assert.equal(previewHexIsDrawn('global', { kind: 'single', seatId: AI_SEAT_IDS[0] }, false), true);
+  assert.equal(previewHexIsDrawn('global', { kind: 'shared' }, false), true);
   assert.equal(previewHexIsDrawn('global', null, true), true);
-  assert.equal(previewHexIsDrawn('global', 'human', true), true);
+  assert.equal(previewHexIsDrawn('global', { kind: 'single', seatId: HUMAN_SEAT_ID }, true), true);
   assert.equal(previewHexIsDrawn('northern_america', null, false), true);
   assert.equal(previewHexIsDrawn('northern_america', null, true), true);
 });

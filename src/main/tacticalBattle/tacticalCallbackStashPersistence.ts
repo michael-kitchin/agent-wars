@@ -7,16 +7,30 @@
  * Exceptions: Logs at error on JSON/SQLite failures without throwing across IPC.
  */
 
+import { AI_SEAT_IDS, isAiSeatId, type AiSeatId } from '../../shared/seatIds';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
 import { logDebug, logError } from '../logger';
+
+/**
+ * Pre-battle callback rows plus the AI seat they belong to.
+ *
+ * Purpose: A battle against a later AI seat must restore that seat, not the first one.
+ * When to use: The in-memory stash and the `game_config` payload.
+ * Expected outcome: `seatId` null means the other party is not an AI seat, so restore leaves every seat's callbacks alone.
+ * Exceptions: None.
+ */
+export interface TacticalCallbackStash {
+  readonly seatId: AiSeatId | null;
+  readonly subscriptions: readonly CallbackSubscription[];
+}
 
 /**
  * `game_config` key for the JSON-serialized pre-battle opponent callback stash.
  *
  * Purpose: Keeps stash next to the tactical snapshot row without new tables.
  * When to use: All read/write/delete operations in this module.
- * Expected outcome: Value is `{ subscriptions: CallbackSubscription[] }` or the key is absent.
+ * Expected outcome: Value is `{ seatId, subscriptions }` or `{ noAiParty: true, subscriptions: [] }`, or the key is absent. Older rows without `seatId` belong to the first AI seat.
  * Exceptions: None.
  */
 const TACTICAL_CALLBACK_STASH_CONFIG_KEY = 'tactical_callback_stash_json_v1';
@@ -29,20 +43,26 @@ const TACTICAL_CALLBACK_STASH_CONFIG_KEY = 'tactical_callback_stash_json_v1';
  * Expected outcome: One `game_config` row; overwrites any prior stash.
  * Exceptions: None when the DB handle is missing (early return).
  */
-export function writeTacticalCallbackStashToGameConfig(subscriptions: readonly CallbackSubscription[]): void {
-  logDebug('writeTacticalCallbackStashToGameConfig', { count: subscriptions.length });
+export function writeTacticalCallbackStashToGameConfig(stash: TacticalCallbackStash): void {
+  logDebug('writeTacticalCallbackStashToGameConfig', {
+    seatId: stash.seatId,
+    count: stash.subscriptions.length,
+  });
   if (!isDbReady()) {
     logDebug('writeTacticalCallbackStashToGameConfig: database not ready', {});
     return;
   }
   try {
-    const payload = {
-      subscriptions: subscriptions.map((s) => ({
-        event: s.event,
-        params: { ...(s.params ?? {}) },
-        subscribedTurn: s.subscribedTurn,
-      })),
-    };
+    const payload = stash.seatId === null
+      ? { noAiParty: true, subscriptions: [] }
+      : {
+        seatId: stash.seatId,
+        subscriptions: stash.subscriptions.map((s) => ({
+          event: s.event,
+          params: { ...(s.params ?? {}) },
+          subscribedTurn: s.subscribedTurn,
+        })),
+      };
     dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
       TACTICAL_CALLBACK_STASH_CONFIG_KEY,
       JSON.stringify(payload),
@@ -96,17 +116,18 @@ export function tacticalCallbackStashConfigExists(): boolean {
  *
  * Purpose: Hydrate in-memory stash after process restart and support end-path restore when memory was cleared.
  * When to use: `hydrateOpponentCallbackStashFromGameConfig` and restore when memory stash is null.
- * Expected outcome: Cloned subscription array (possibly empty) or null when key missing/invalid (invalid clears the key).
+ * Expected outcome: Stash for one AI seat, a no-AI-party marker, or null when the key is missing or invalid (invalid clears the key).
  * Exceptions: None; parse failures log and clear the key.
  */
-export function readTacticalCallbackStashFromGameConfig(): CallbackSubscription[] | null {
+export function readTacticalCallbackStashFromGameConfig(): TacticalCallbackStash | null {
   if (!isDbReady()) return null;
   const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [
     TACTICAL_CALLBACK_STASH_CONFIG_KEY,
   ]);
   if (!row?.value?.trim()) return null;
   try {
-    const parsed = JSON.parse(row.value) as { subscriptions?: unknown };
+    const parsed = JSON.parse(row.value) as { subscriptions?: unknown; seatId?: unknown; noAiParty?: unknown };
+    if (parsed.noAiParty === true) return { seatId: null, subscriptions: [] };
     if (!Array.isArray(parsed.subscriptions)) throw new Error('subscriptions is not an array');
     const subs: CallbackSubscription[] = [];
     for (const item of parsed.subscriptions) {
@@ -120,7 +141,9 @@ export function readTacticalCallbackStashFromGameConfig(): CallbackSubscription[
       const subscribedTurn = typeof o.subscribedTurn === 'number' ? o.subscribedTurn : undefined;
       subs.push({ event: o.event, params, subscribedTurn });
     }
-    return subs;
+    const seatId = typeof parsed.seatId === 'string' ? parsed.seatId : AI_SEAT_IDS[0];
+    if (!isAiSeatId(seatId)) throw new Error('seatId is not an AI seat');
+    return { seatId, subscriptions: subs };
   } catch (err) {
     logError('readTacticalCallbackStashFromGameConfig: invalid JSON', err);
     clearTacticalCallbackStashFromGameConfig();

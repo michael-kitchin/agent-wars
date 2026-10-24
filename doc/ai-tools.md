@@ -16,7 +16,7 @@ The engine under `src/` wins if this file drifts.
 | `production` | `query_production`, `set_build_queue` | `PRODUCTION_TOOL_NAMES`. Strategic only. `set_build_queue` is a **write** tool; queues can also arrive as `productionOrders` in the envelope. |
 | `precomputation` | *(none)* | UI group; the pipeline is `precomputation.ts`, not a model-callable tool. |
 
-Disabled groups drop those tools from the numbered list and omit the matching briefing/envelope tails (see [variants.md](ai-commander-prompts/variants.md) in the prompt package). A model whose OpenRouter listing does not include `tools` is consulted with every model-callable group off, whatever the Opponent tab's tool groups say; the strategic briefing is still attached, and the Events group still applies ([variants.md](ai-commander-prompts/variants.md) section 2.6).
+Disabled groups drop those tools from the numbered list and omit the matching briefing/envelope tails (see [variants.md](ai-commander-prompts/variants.md) in the prompt package). A model whose OpenRouter listing does not include `tools` is consulted with every model-callable group off, whatever the Commanders tab's tool groups say; the strategic briefing is still attached, and the Events group still applies ([variants.md](ai-commander-prompts/variants.md) section 2.6).
 
 ## Pathfinding
 

@@ -36,7 +36,7 @@ export function stopModelWork(reason: ModelCallCancelReason, sendActivityLog: (l
     advanceMatchGeneration('new_game');
     clearDeferredPlaybackConsultPending();
   }
-  const aborted = cancelModelCalls(reason, reason === 'battle_exit' ? 'tactical' : 'all');
+  const aborted = cancelModelCalls(reason, reason === 'battle_exit' ? 'tactical' : 'all', 'all');
   if (aborted > 0 || (reason === 'new_game' && pending)) {
     sendActivityLog(modelCallCancelLogLine(reason));
   }

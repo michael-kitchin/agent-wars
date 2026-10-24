@@ -74,7 +74,7 @@ export interface StrategicProductionLabelInput {
    * Whether the human controls this hex.
    *
    * Contract: A human non-urban hex still shows a canvas label without production detail.
-   * When to use: Pass true when the control row is `'human'`.
+   * When to use: Pass true when the control row is `HUMAN_SEAT_ID`.
    * Expected outcome: Combined with the other flags, selects `'canvas'` or `'none'`.
    * Exceptions: None.
    */

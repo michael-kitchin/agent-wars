@@ -161,7 +161,7 @@ function testBuildPossibleUnitActionsUsesTables(): void {
       { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: pair.originH3 },
       { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: pair.destH3 },
     ],
-    humanHomeRegionHexes: [pair.destH3],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [pair.destH3] },
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
@@ -208,7 +208,7 @@ function testUnitHexAppearsInSingleBucketWithPriority(): void {
       { h3Index: homelandHex, terrain: 'land', terrainKind: 'plains' },
     ],
     units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: base }],
-    humanHomeRegionHexes: [homelandHex],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [homelandHex] },
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
@@ -312,7 +312,7 @@ function testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality(): void {
     hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    humanHomeRegionHexes: [tacticalFarHuman],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [tacticalFarHuman] },
     strategicControl: [{ h3Index: parentCell, controllerPlayerId: 'opponent' }],
   };
   const plan = buildTacticalAiPlanState(strategic, tactical);
@@ -395,7 +395,7 @@ function testTacticalInfantryPossibleActionsIncludeRangedRows(): void {
     hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    humanHomeRegionHexes: [tacticalFarHuman],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [tacticalFarHuman] },
     strategicControl: [{ h3Index: parentCell, controllerPlayerId: 'opponent' }],
   };
   const plan = buildTacticalAiPlanState(strategic, tactical);
@@ -470,7 +470,7 @@ function testTacticalBestOptionsGroundMovesIncludeAdjacentEnemyHex(): void {
     hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    humanHomeRegionHexes: [tacticalHuman],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [tacticalHuman] },
     strategicControl: [{ h3Index: parentCell, controllerPlayerId: 'opponent' }],
   };
   const plan = buildTacticalAiPlanState(strategic, tactical);
@@ -572,7 +572,7 @@ function testTacticalBestOptionsStackedArmorShareMoveDests(): void {
     hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    humanHomeRegionHexes: [tacticalHuman],
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [tacticalHuman] },
     strategicControl: [{ h3Index: parentCell, controllerPlayerId: 'opponent' }],
   };
   const plan = buildTacticalAiPlanState(strategic, tactical);

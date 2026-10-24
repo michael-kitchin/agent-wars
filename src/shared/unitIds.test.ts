@@ -12,10 +12,10 @@ import {
   unitIdOwnerFromId,
   unitTypeFromUnitId,
   type StrategicUnitIdParts,
-  type UnitIdOwner,
 } from './unitIds';
+import { type SeatId } from './seatIds';
 
-const OWNERS: readonly UnitIdOwner[] = ['human', 'opponent'];
+const OWNERS: readonly SeatId[] = ['human', 'opponent'];
 
 describe('formatStrategicUnitId and parseStrategicUnitId', () => {
   it('round-trips one unit of each type for both players', () => {
@@ -35,9 +35,11 @@ describe('formatStrategicUnitId and parseStrategicUnitId', () => {
     assert.equal(parseStrategicUnitId(''), null);
   });
 
-  it('rejects player indexes other than 1', () => {
-    assert.equal(parseStrategicUnitId('a2-t1'), null);
-    assert.equal(parseStrategicUnitId('h2-i1'), null);
+  it('accepts AI indexes 1 to 4 and rejects every other player index', () => {
+    assert.deepEqual(parseStrategicUnitId('a4-t2'), { player: 'opponent4', unitType: 'armor', ordinal: 2 });
+    assert.equal(formatStrategicUnitId({ player: 'opponent3', unitType: 'armor', ordinal: 2 }), 'a3-t2');
+    assert.equal(parseStrategicUnitId('a5-t2'), null);
+    assert.equal(parseStrategicUnitId('h2-t2'), null);
   });
 });
 
@@ -119,6 +121,7 @@ describe('unitIdOwnerFromId', () => {
   it('resolves compact, compact sub-unit, and legacy prefixes', () => {
     assert.equal(unitIdOwnerFromId('h1-t3'), 'human');
     assert.equal(unitIdOwnerFromId('a1-a44'), 'opponent');
+    assert.equal(unitIdOwnerFromId('a2-i7'), 'opponent2');
     assert.equal(unitIdOwnerFromId('h1-t3-s2'), 'human');
     assert.equal(unitIdOwnerFromId('human-armor-1'), 'human');
     assert.equal(unitIdOwnerFromId('opponent-air-prod-3-276'), 'opponent');

@@ -20,6 +20,7 @@ import {
   scoreNeighborForPanAxes,
   type PanAxisKey,
 } from '../../shared/mapKeyboardPanLogic';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
  * Defines the `shouldIgnoreGlobalKeydown` function shape (export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean).
@@ -167,9 +168,9 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
   if (!map || !leafletRef) return;
 
   const humanGround = state.units.filter(
-    (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    (u) => u.player === HUMAN_SEAT_ID && (u.unitType === 'infantry' || u.unitType === 'armor')
   );
-  const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === 'human');
+  const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === HUMAN_SEAT_ID);
   if (anchors.length === 0) return;
 
   const [, anchorLng] = cellToLatLng(anchors[0]!.h3Index);

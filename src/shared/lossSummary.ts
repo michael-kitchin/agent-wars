@@ -118,32 +118,23 @@ export interface PlayerLossSummary {
 }
 
 /**
- * Human and AI loss summaries for one resolved strategic turn or tactical beat.
+ * Losses for one resolved strategic turn or tactical beat, filed by the victim's owner.
  *
- * Purpose: Top-level payload for popup sections and persisted turn notes.
- * When to use: After combat resolution on main or renderer before formatting.
- * Expected outcome: `human` holds human-player buckets; `ai` holds opponent buckets.
+ * Purpose: A turn can knock out more than one side, so losses are not a human bucket and an AI bucket.
+ * When to use: After combat resolution, before the turn report or a commander's note.
+ * Expected outcome: `byOwner` has one summary per owner that lost a visible unit.
  * Exceptions: None.
  */
 export interface TurnLossSummary {
   /**
-   * Losses suffered by the human player this turn or beat.
+   * Cause buckets keyed by the victim's owner id.
    *
-   * Contract: All five cause buckets; may be empty arrays when no human casualties.
-   * When to use: Popup `Human Losses` section and prompt `Human Losses` bullet.
-   * Expected outcome: Formatted only when `playerHasAnyLoss` is true.
+   * Contract: Missing keys mean that owner lost nothing visible. Each value has all five cause arrays.
+   * When to use: The turn report and a note that still stores one seat's losses apart from everyone else's.
+   * Expected outcome: The victim's owner id, including a seat other than the human.
    * Exceptions: None.
    */
-  human: PlayerLossSummary;
-  /**
-   * Losses suffered by the AI/opponent this turn or beat.
-   *
-   * Contract: All five cause buckets; may be empty arrays when no opponent casualties.
-   * When to use: Popup `AI Losses` section and prompt `AI Losses` bullet.
-   * Expected outcome: Formatted only when `playerHasAnyLoss` is true; popup may fog-filter victims before building.
-   * Exceptions: None.
-   */
-  ai: PlayerLossSummary;
+  byOwner: Record<string, PlayerLossSummary>;
 }
 
 /**
@@ -159,15 +150,31 @@ export function emptyPlayerLossSummary(): PlayerLossSummary {
 }
 
 /**
- * Creates an empty turn loss summary for both players.
+ * Creates an empty turn loss summary.
  *
  * Purpose: Shared initializer for normalizer output and tests.
  * When to use: Before populating buckets in `buildTurnLossSummary`.
- * Expected outcome: Both `human` and `ai` have empty cause arrays.
+ * Expected outcome: `byOwner` is empty until a victim is filed.
  * Exceptions: None.
  */
 export function emptyTurnLossSummary(): TurnLossSummary {
-  return { human: emptyPlayerLossSummary(), ai: emptyPlayerLossSummary() };
+  return { byOwner: {} };
+}
+
+/**
+ * Copies several owners' buckets into one summary.
+ *
+ * Purpose: A commander's note still stores that seat's losses apart from every other owner.
+ * When to use: When writing the note's other-owners column.
+ * Expected outcome: One summary whose cause arrays hold every input unit.
+ * Exceptions: None.
+ */
+export function mergePlayerLossSummaries(parts: readonly PlayerLossSummary[]): PlayerLossSummary {
+  const merged = emptyPlayerLossSummary();
+  for (const part of parts) {
+    for (const key of LOSS_CAUSE_KEYS) merged[key].push(...part[key]);
+  }
+  return merged;
 }
 
 /**

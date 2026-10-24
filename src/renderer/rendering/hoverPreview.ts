@@ -1,6 +1,8 @@
 import { strategicMovementHexesFor, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { tacticalHoverSolidEdgeCapByOriginH3 } from '../../shared/tacticalMarchHoverPreview';
-import { ORDER_LINE_COLOR, ORDER_LINE_WIDTH } from '../core/constants';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { ORDER_LINE_WIDTH } from '../core/constants';
+import { paletteForCurrentOwner } from './ownerColors';
 import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { strokeSupportOrderLines } from './orderDrawing';
 import {
@@ -65,7 +67,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (!tb && state) {
     const selectedHumanUnits = S.selectedUnitIds
       .map((id) => state.units.find((u) => u.id === id))
-      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === HUMAN_SEAT_ID);
     for (const unit of selectedHumanUnits) {
       const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
       const movementRange = strategicMovementHexesFor({
@@ -139,7 +141,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     }
     ctx.save();
     ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
-    drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
+    drawOrderLine(ctx, { runs, arrow }, { color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? '#115E59', width: ORDER_LINE_WIDTH });
     ctx.restore();
   }
   }
@@ -151,7 +153,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     ctx.lineTo(at.x + 8, at.y + 8);
     ctx.moveTo(at.x + 8, at.y - 8);
     ctx.lineTo(at.x - 8, at.y + 8);
-    ctx.strokeStyle = ORDER_LINE_COLOR;
+    ctx.strokeStyle = paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? '#115E59';
     ctx.lineWidth = ORDER_LINE_WIDTH;
     ctx.lineCap = 'round';
     ctx.stroke();

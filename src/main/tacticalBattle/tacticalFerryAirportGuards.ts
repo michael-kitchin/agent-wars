@@ -9,7 +9,7 @@
  * Exceptions: Does not apply dest-hex ownership (tactical battles are often contested at the enclosing strategic).
  */
 
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattlePlayerId, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { tacticalLogQuery } from './tacticalLogging';
 
@@ -115,7 +115,7 @@ export function validateTacticalGroupFerryTarget(
   battle: TacticalBattleSnapshot,
   unitIds: readonly string[],
   destinationH3Index: string,
-  attackerPlayer: 'human' | 'opponent'
+  attackerPlayer: TacticalBattlePlayerId
 ): { success: true } | { success: false; reason: string } {
   tacticalLogQuery('validateTacticalGroupFerryTarget', {
     unitCount: unitIds.length,

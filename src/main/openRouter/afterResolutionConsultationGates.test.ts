@@ -5,10 +5,10 @@
 
 import * as assert from 'assert';
 import {
-  humanHadStrategicResolutionObservableActions,
-  humanHadTacticalBeatResolutionActions,
-  opponentHadStrategicResolutionUnitActions,
-  opponentHadTacticalBeatResolutionActions,
+  enemyHadStrategicResolutionObservableActions,
+  enemyHadTacticalBeatResolutionActions,
+  seatHadStrategicResolutionUnitActions,
+  seatHadTacticalBeatResolutionActions,
 } from './afterResolution';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import { emptyOpponentState, minimalTacticalBattle } from './testSupport/postResolutionConsultationFixtures';
@@ -23,9 +23,12 @@ import { emptyOpponentState, minimalTacticalBattle } from './testSupport/postRes
  */
 function testOpponentHadStrategicResolutionUnitActionsQuietTurn(): void {
   assert.strictEqual(
-    opponentHadStrategicResolutionUnitActions({
-      opponentHadStrategicMarchResolution: false,
-    }),
+    seatHadStrategicResolutionUnitActions(
+      {
+        hadStrategicMarchResolutionBySeat: { opponent: false },
+      },
+      'opponent'
+    ),
     false
   );
 }
@@ -40,9 +43,12 @@ function testOpponentHadStrategicResolutionUnitActionsQuietTurn(): void {
  */
 function testOpponentHadStrategicResolutionUnitActionsDetectsMarch(): void {
   assert.strictEqual(
-    opponentHadStrategicResolutionUnitActions({
-      opponentHadStrategicMarchResolution: true,
-    }),
+    seatHadStrategicResolutionUnitActions(
+      {
+        hadStrategicMarchResolutionBySeat: { opponent: true },
+      },
+      'opponent'
+    ),
     true
   );
 }
@@ -57,9 +63,12 @@ function testOpponentHadStrategicResolutionUnitActionsDetectsMarch(): void {
  */
 function testOpponentHadStrategicResolutionUnitActionsDetectsCombatIds(): void {
   assert.strictEqual(
-    opponentHadStrategicResolutionUnitActions({
-      opponentCombatParticipantUnitIds: ['opponent-armor-1'],
-    }),
+    seatHadStrategicResolutionUnitActions(
+      {
+        combatParticipantUnitIdsBySeat: { opponent: ['opponent-armor-1'] },
+      },
+      'opponent'
+    ),
     true
   );
 }
@@ -84,7 +93,7 @@ function testOpponentHadTacticalBeatResolutionActionsIdle(): void {
     },
   ]);
   const playback: TacticalCommitResolutionPlayback = { humanMoves: [] };
-  assert.strictEqual(opponentHadTacticalBeatResolutionActions(playback, battle), false);
+  assert.strictEqual(seatHadTacticalBeatResolutionActions(playback, battle, 'opponent'), false);
 }
 
 /**
@@ -110,7 +119,7 @@ function testOpponentHadTacticalBeatResolutionActionsDetectsMarch(): void {
     humanMoves: [],
     opponentMoves: [{ unitId: 'opp-1', fromH3Index: '81283fffffffffff', toH3Index: '81284fffffffffff' }],
   };
-  assert.strictEqual(opponentHadTacticalBeatResolutionActions(playback, battle), true);
+  assert.strictEqual(seatHadTacticalBeatResolutionActions(playback, battle, 'opponent'), true);
 }
 
 /**
@@ -123,11 +132,12 @@ function testOpponentHadTacticalBeatResolutionActionsDetectsMarch(): void {
  */
 function testHumanHadStrategicResolutionObservableActionsHumanMove(): void {
   assert.strictEqual(
-    humanHadStrategicResolutionObservableActions(
+    enemyHadStrategicResolutionObservableActions(
       {
         humanMoves: [{ unitId: 'human-infantry-1', fromH3Index: '81193ffffffffff', toH3Index: '81195ffffffffff' }],
       },
-      emptyOpponentState()
+      emptyOpponentState(),
+      'opponent'
     ),
     true
   );
@@ -143,20 +153,22 @@ function testHumanHadStrategicResolutionObservableActionsHumanMove(): void {
  */
 function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
   assert.strictEqual(
-    humanHadStrategicResolutionObservableActions(
+    enemyHadStrategicResolutionObservableActions(
       {
         killsByDirectFire: [{ victimId: 'opponent-infantry-1', killerIds: ['human-armor-1'] }],
       },
-      emptyOpponentState()
+      emptyOpponentState(),
+      'opponent'
     ),
     true
   );
   assert.strictEqual(
-    humanHadStrategicResolutionObservableActions(
+    enemyHadStrategicResolutionObservableActions(
       {
         killsByDirectFire: [{ victimId: 'a1-i1', killerIds: ['h1-t1'] }],
       },
-      emptyOpponentState()
+      emptyOpponentState(),
+      'opponent'
     ),
     true,
     'compact human killer ids must still count when the roster is masked'
@@ -172,7 +184,7 @@ function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
  * Exceptions: None.
  */
 function testHumanHadStrategicResolutionObservableActionsQuiet(): void {
-  assert.strictEqual(humanHadStrategicResolutionObservableActions({}, emptyOpponentState()), false);
+  assert.strictEqual(enemyHadStrategicResolutionObservableActions({}, emptyOpponentState(), 'opponent'), false);
 }
 
 /**
@@ -197,7 +209,7 @@ function testHumanHadTacticalBeatResolutionActionsHumanMarch(): void {
   const playback: TacticalCommitResolutionPlayback = {
     humanMoves: [{ unitId: 'hum-1', fromH3Index: '81283fffffffffff', toH3Index: '81284fffffffffff' }],
   };
-  assert.strictEqual(humanHadTacticalBeatResolutionActions(playback, battle), true);
+  assert.strictEqual(enemyHadTacticalBeatResolutionActions(playback, battle, 'opponent'), true);
 }
 
 /**

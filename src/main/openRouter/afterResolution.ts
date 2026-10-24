@@ -6,15 +6,16 @@
  */
 
 import { isLikelyAbortError } from '../../shared/abortError';
+import { AI_SEAT_IDS, isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
 import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   getAiLastConsultationTurn,
   setAiLastConsultationTurn,
-  getOpponentUnitsInCombatSinceConsultation,
+  getCombatSinceConsultation,
   consumeFogNewContactsForPlayer,
-  addOpponentCombatParticipants,
-  clearOpponentCombatSinceConsultation,
+  addCombatSinceConsultation,
+  clearCombatSinceConsultation,
   setAiPendingOrders,
   clearAiPendingOrders,
 } from '../gameDb';
@@ -32,10 +33,10 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import {
   computePostResolutionConsultTriggers,
-  humanHadStrategicResolutionObservableActions,
-  humanHadTacticalBeatResolutionActions,
-  opponentHadStrategicResolutionUnitActions,
-  opponentHadTacticalBeatResolutionActions,
+  enemyHadStrategicResolutionObservableActions,
+  enemyHadTacticalBeatResolutionActions,
+  seatHadStrategicResolutionUnitActions,
+  seatHadTacticalBeatResolutionActions,
   type ReadyResultWithParticipants,
 } from './consultationPolicy';
 
@@ -86,7 +87,7 @@ hasKey: () => boolean;
 requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation: boolean; signal?: AbortSignal }
+    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
   /**
    * Aborts this consult when the player stops opponent planning or the waiter gives up.
@@ -166,30 +167,32 @@ cost?: number;
 export async function afterResolution(
   state: GameStateSnapshot,
   resolutionResult: ReadyResultWithParticipants,
-  deps: AfterResolutionDeps
+  deps: AfterResolutionDeps,
+  seatId: AiSeatId = AI_SEAT_IDS[0]
 ): Promise<AfterResolutionResult> {
   if (!resolutionResult.success || !deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterResolution: skip (no success, no model, or no key)');
     return { consulted: false };
   }
 
-  const opponentCombatants = resolutionResult.opponentCombatParticipantUnitIds ?? [];
+  const opponentCombatants = [...(resolutionResult.combatParticipantUnitIdsBySeat?.[seatId] ?? [])];
   const removedUnitIds = resolutionResult.removedUnitIds ?? [];
-  const removedOpponentUnitIds = resolutionResult.removedOpponentUnitIds ?? [];
+  const removedOpponentUnitIds = [...(resolutionResult.removedUnitIdsBySeat?.[seatId] ?? [])];
 
-  const combatSince = getOpponentUnitsInCombatSinceConsultation();
-  const lastConsultationTurn = getAiLastConsultationTurn();
+  const combatSince = getCombatSinceConsultation(seatId);
+  const lastConsultationTurn = getAiLastConsultationTurn(seatId);
 
   const mandatoryFired = evaluateMandatoryOverrides(
+    seatId,
     state,
     lastConsultationTurn,
     combatSince,
     opponentCombatants,
     removedOpponentUnitIds,
-    consumeFogNewContactsForPlayer('opponent')
+    consumeFogNewContactsForPlayer(seatId)
   );
 
-  addOpponentCombatParticipants(opponentCombatants);
+  addCombatSinceConsultation(seatId, opponentCombatants);
 
   const ctx: ResolutionContext = {
     opponentCombatParticipantUnitIds: opponentCombatants,
@@ -197,17 +200,17 @@ export async function afterResolution(
     removedOpponentUnitIds,
     infrastructureDestroyedEvents: resolutionResult.infrastructureDestroyedEvents,
   };
-  const subscriptions = getSubscriptions('opponent');
-  const subscriptionFired = evaluateSubscriptionEvents(state, subscriptions, ctx);
+  const subscriptions = getSubscriptions(seatId);
+  const subscriptionFired = evaluateSubscriptionEvents(seatId, state, subscriptions, ctx);
 
-  const opponentHadUnitActions = opponentHadStrategicResolutionUnitActions(resolutionResult);
+  const opponentHadUnitActions = seatHadStrategicResolutionUnitActions(resolutionResult, seatId);
   const consultBecauseOpponentIdle = !opponentHadUnitActions;
-  const humanHadObservableActions = humanHadStrategicResolutionObservableActions(resolutionResult, state);
+  const humanHadObservableActions = enemyHadStrategicResolutionObservableActions(resolutionResult, state, seatId);
   const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
     mandatoryCount: mandatoryFired.length,
     subscriptionCount: subscriptionFired.length,
-    opponentIdle: consultBecauseOpponentIdle,
-    humanObservable: humanHadObservableActions,
+    seatIdle: consultBecauseOpponentIdle,
+    enemyObservable: humanHadObservableActions,
   });
 
   if (shouldConsult && policyOnlyConsult) {
@@ -221,6 +224,7 @@ export async function afterResolution(
   if (shouldConsult) {
     try {
       const result = await deps.requestOrders(state, deps.modelId, {
+        seatId,
         enabledToolNames: deps.enabledToolNames,
         usePrecomputation: true,
         signal: deps.signal,
@@ -231,15 +235,15 @@ export async function afterResolution(
       }
       if (result.success === true) {
         setAiPendingOrders(
-          'opponent',
+          seatId,
           result.orders,
           result.rangedAttacks ?? [],
           result.airStrikes ?? [],
           result.ferryOrders ?? [],
           result.embarkOrders ?? []
         );
-        setAiLastConsultationTurn(state.turnNumber);
-        clearOpponentCombatSinceConsultation();
+        setAiLastConsultationTurn(seatId, state.turnNumber);
+        clearCombatSinceConsultation(seatId);
         logDebug('afterResolution: consultation completed, pending orders stored', {
           turnNumber: state.turnNumber,
           movementCount: result.orders.length,
@@ -258,7 +262,7 @@ export async function afterResolution(
       logDebug('afterResolution: requestOrders failed', {
         error: (result as { error?: string }).error,
       });
-      clearAiPendingOrders('opponent');
+      clearAiPendingOrders(seatId);
       return { consulted: false };
     } catch (err) {
       if (deps.signal?.aborted || isLikelyAbortError(err)) {
@@ -266,11 +270,11 @@ export async function afterResolution(
         return { consulted: false };
       }
       logError('afterResolution: requestOrders exception', err);
-      clearAiPendingOrders('opponent');
+      clearAiPendingOrders(seatId);
       return { consulted: false };
     }
   } else {
-    clearAiPendingOrders('opponent');
+    clearAiPendingOrders(seatId);
     logDebug('afterResolution: skipping LLM (no callback events; opponent had resolution actions; human had no observable resolution actions)', {
       turnNumber: state.turnNumber,
       opponentHadUnitActions,
@@ -294,21 +298,22 @@ export function buildTacticalBeatResolutionReadyParticipants(
 ): ReadyResultWithParticipants {
   const removedCombined = [...(playback.rangedRemovedUnits ?? []), ...(playback.meleeRemovedUnits ?? [])];
   const removedUnitIds = removedCombined.map((u) => u.id);
-  const removedOpponentUnitIds = removedCombined.filter((u) => u.player === 'opponent').map((u) => u.id);
+  const party = tacticalBattle.opposingPartyId;
+  const removedForParty = party
+    ? removedCombined.filter((unit) => unit.player === party).map((unit) => unit.id)
+    : [];
   const oppCombat = new Set<string>();
-  for (const m of playback.opponentMoves ?? []) {
-    if (tacticalBattle.subUnits.some((u) => u.id === m.unitId && u.player === 'opponent')) {
-      oppCombat.add(m.unitId);
+  for (const move of playback.opponentMoves ?? []) {
+    if (party && tacticalBattle.subUnits.some((unit) => unit.id === move.unitId && unit.player === party)) {
+      oppCombat.add(move.unitId);
     }
   }
-  for (const id of removedOpponentUnitIds) {
-    oppCombat.add(id);
-  }
+  for (const id of removedForParty) oppCombat.add(id);
   return {
     success: true,
     removedUnitIds: removedUnitIds.length > 0 ? removedUnitIds : undefined,
-    removedOpponentUnitIds: removedOpponentUnitIds.length > 0 ? removedOpponentUnitIds : undefined,
-    opponentCombatParticipantUnitIds: [...oppCombat],
+    removedUnitIdsBySeat: party ? { [party]: removedForParty } : undefined,
+    combatParticipantUnitIdsBySeat: party ? { [party]: [...oppCombat] } : undefined,
     infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents,
   };
 }
@@ -361,6 +366,7 @@ export interface AfterTacticalBeatResolutionDeps {
     state: GameStateSnapshot,
     modelId: string,
     options: {
+      seatId: AiSeatId;
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
@@ -399,7 +405,7 @@ export interface AfterTacticalBeatResolutionResult {
   /**
    * Opponent tactical plan rows for renderer buffering when consultation succeeded.
    *
-   * Contract: When present, payload is validated tactical-only opponent rows compatible with `tacticalOpponentDraft` hydration.
+   * Contract: When present, payload is validated tactical-only opponent rows for the commander pool.
    * When to use: After `afterTacticalBeatResolution` returns with a model-produced plan.
    * Expected outcome: Undefined when not consulted or model returned no tactical plan.
    * Exceptions: None.
@@ -442,11 +448,11 @@ export interface AfterTacticalBeatResolutionResult {
    */
   cost?: number;
   /**
-   * When true, the tactical commit IPC layer must set `tacticalOpponentPlan` (payload or explicit null) so the renderer can replace or clear its buffer.
+   * When true, the tactical commit result includes `tacticalOpponentPlan` so the screen can start another battle consult when that plan is empty.
    *
    * Contract: True only after mandatory/subscription evaluation decided to invoke `requestOrders` (including failed or empty model responses); false when the beat was skipped before any LLM call (same idea as strategic omitting draft updates when no consultation ran).
    * When to use: `runEventDrivenAfterTacticalBeatConsultation` and `main` merge logic branch on this instead of always sending a plan field.
-   * Expected outcome: False preserves the prior `tacticalOpponentDraft` client-side when no events fired; true with no payload clears the draft.
+   * Expected outcome: False leaves the pool's stored plan alone when no consultation ran. True with no plan means this beat stored nothing new.
    * Exceptions: None.
    */
   attachTacticalOpponentPlanToIpc?: boolean;
@@ -458,14 +464,15 @@ export interface AfterTacticalBeatResolutionResult {
  * Purpose: Mirrors strategic `afterResolution` for tactical battles without writing strategic `setAiPendingOrders`.
  * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags.
  * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC.
- * Exceptions: Swallows LLM failures after logging; clears strategic pending orders when skipping or failing.
+ * Exceptions: Swallows LLM failures after logging. Skip and failure paths leave strategic pending orders in place.
  * Annihilation: When `getTacticalAnnihilationOutcome(tacticalBattle.subUnits)` is non-null, skips immediately so no LLM runs while the renderer shows the tactical game-over modal.
  */
 export async function afterTacticalBeatResolution(
   state: GameStateSnapshot,
   tacticalBattle: TacticalBattleSnapshot,
   playback: TacticalCommitResolutionPlayback,
-  deps: AfterTacticalBeatResolutionDeps
+  deps: AfterTacticalBeatResolutionDeps,
+  requestedSeatId: AiSeatId = AI_SEAT_IDS[0]
 ): Promise<AfterTacticalBeatResolutionResult> {
   if (!deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
@@ -478,7 +485,6 @@ export async function afterTacticalBeatResolution(
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
   if (getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null) {
-    clearAiPendingOrders('opponent');
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
       reason: 'skip_annihilation_roster',
       turnNumber: state.turnNumber,
@@ -486,10 +492,22 @@ export async function afterTacticalBeatResolution(
     });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
+  if (tacticalBattle.opposingPartyId !== undefined && isNeutralOwnerId(tacticalBattle.opposingPartyId)) {
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_neutral_party',
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+    });
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+  }
+  const seatId =
+    tacticalBattle.opposingPartyId !== undefined && isAiSeatId(tacticalBattle.opposingPartyId)
+      ? tacticalBattle.opposingPartyId
+      : requestedSeatId;
   const resolutionSlice = buildTacticalBeatResolutionReadyParticipants(playback, tacticalBattle);
   const removedUnitIds = resolutionSlice.removedUnitIds ?? [];
-  const removedOpponentUnitIds = resolutionSlice.removedOpponentUnitIds ?? [];
-  const opponentCombatants = resolutionSlice.opponentCombatParticipantUnitIds ?? [];
+  const removedOpponentUnitIds = [...(resolutionSlice.removedUnitIdsBySeat?.[seatId] ?? [])];
+  const opponentCombatants = [...(resolutionSlice.combatParticipantUnitIdsBySeat?.[seatId] ?? [])];
   const ctx: ResolutionContext = {
     opponentCombatParticipantUnitIds: opponentCombatants,
     removedUnitIds,
@@ -497,19 +515,18 @@ export async function afterTacticalBeatResolution(
     infrastructureDestroyedEvents: resolutionSlice.infrastructureDestroyedEvents,
   };
   const mandatoryFired = evaluateTacticalMandatoryOverrides(ctx);
-  const subscriptions = getSubscriptions('opponent');
-  const subscriptionFired = evaluateSubscriptionEvents(state, subscriptions, ctx);
-  const hadOpponentBeatActions = opponentHadTacticalBeatResolutionActions(playback, tacticalBattle);
+  const subscriptions = getSubscriptions(seatId);
+  const subscriptionFired = evaluateSubscriptionEvents(seatId, state, subscriptions, ctx);
+  const hadOpponentBeatActions = seatHadTacticalBeatResolutionActions(playback, tacticalBattle, seatId);
   const consultBecauseOpponentIdle = !hadOpponentBeatActions;
-  const humanHadObservableBeatActions = humanHadTacticalBeatResolutionActions(playback, tacticalBattle);
+  const humanHadObservableBeatActions = enemyHadTacticalBeatResolutionActions(playback, tacticalBattle, seatId);
   const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
     mandatoryCount: mandatoryFired.length,
     subscriptionCount: subscriptionFired.length,
-    opponentIdle: consultBecauseOpponentIdle,
-    humanObservable: humanHadObservableBeatActions,
+    seatIdle: consultBecauseOpponentIdle,
+    enemyObservable: humanHadObservableBeatActions,
   });
   if (!shouldConsult) {
-    clearAiPendingOrders('opponent');
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
       reason: 'skip_should_consult_false',
       turnNumber: state.turnNumber,
@@ -531,6 +548,7 @@ export async function afterTacticalBeatResolution(
   }
   try {
     const result = await deps.requestOrders(state, deps.modelId, {
+      seatId,
       enabledToolNames: deps.enabledToolNames,
       usePrecomputation: false,
       tacticalAiBattle: tacticalBattle,
@@ -543,8 +561,8 @@ export async function afterTacticalBeatResolution(
     if (result.success === true) {
       const tacticalOpponentPlan =
         result.tacticalOpponentPlan ?? tacticalOpponentPlanFromRequestOrdersSuccess(result);
-      setAiLastConsultationTurn(state.turnNumber);
-      clearOpponentCombatSinceConsultation();
+      setAiLastConsultationTurn(seatId, state.turnNumber);
+      clearCombatSinceConsultation(seatId);
       logDebug('afterTacticalBeatResolution: tactical consultation completed', {
         movementCount: tacticalOpponentPlan.movementOrders.length,
         rangedCount: tacticalOpponentPlan.rangedAttacks.length,
@@ -563,7 +581,6 @@ export async function afterTacticalBeatResolution(
       };
     }
     logDebug('afterTacticalBeatResolution: requestOrders failed', { success: result.success });
-    clearAiPendingOrders('opponent');
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };
   } catch (err) {
     if (deps.signal?.aborted || isLikelyAbortError(err)) {
@@ -571,16 +588,15 @@ export async function afterTacticalBeatResolution(
       return { consulted: false, attachTacticalOpponentPlanToIpc: false };
     }
     logError('afterTacticalBeatResolution: requestOrders exception', err);
-    clearAiPendingOrders('opponent');
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };
   }
 }
 
 export {
-  opponentHadStrategicResolutionUnitActions,
-  humanHadStrategicResolutionObservableActions,
-  opponentHadTacticalBeatResolutionActions,
-  humanHadTacticalBeatResolutionActions,
+  seatHadStrategicResolutionUnitActions,
+  enemyHadStrategicResolutionObservableActions,
+  seatHadTacticalBeatResolutionActions,
+  enemyHadTacticalBeatResolutionActions,
 } from './consultationPolicy';
 export type {
   ReadyResultWithParticipants,

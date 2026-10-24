@@ -16,6 +16,7 @@
 import { cellToLatLng } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
+import { enemyHomeHexes } from '../briefing/briefingPerspective';
 import { collectAggregatedPossibleActionRows } from '../openRouter/possibleUnitActions';
 import { formatLatLng } from '../openRouter/promptText';
 import {
@@ -458,7 +459,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
     thisPeriodMoveByUnitId ?? readStandingThisPeriodMoves(playerId)
   );
   const unitsById = new Map(state.units.map((u) => [u.id, u]));
-  const homeHexes = state.humanHomeRegionHexes ?? [];
+  const homeHexes = enemyHomeHexes(state);
   const explored = new Set(state.exploredHexes ?? []);
   const terrainByH3 = new Map(state.hexes.map((hex) => [hex.h3Index, hex.terrain]));
   // Contact marches do not read land mass. Load it only for a blind land or armor march, so a contact turn does not

@@ -8,6 +8,7 @@
  */
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -195,6 +196,15 @@ export interface RequestOrdersError {
  */
 export interface RequestOrdersOptions {
   /**
+   * Commander this consultation plans for.
+   *
+   * Contract: An AI seat id. Own-unit filters, validators, standing orders, and stored notes use this seat.
+   * When to use: Every consultation, including the single AI seat of a two-sided match.
+   * Expected outcome: Orders for any other side are dropped.
+   * Exceptions: None.
+   */
+  readonly seatId: AiSeatId;
+  /**
    * Subset of tool names enabled for this request.
    *
    * Contract: Names must match catalog entries; unknown names are ignored by downstream builders.
@@ -234,7 +244,7 @@ export interface RequestOrdersOptions {
    * Active tactical snapshot for tactical-only AI order requests.
    *
    * Contract: When set, validation targets tactical sub-units and tactical geometry only.
-   * When to use: `game:requestAiOrders` while a tactical session is active.
+   * When to use: A tactical consult while a battle is active.
    * Expected outcome: Strategic production/memory tooling is omitted from prompts.
    * Exceptions: None.
    */

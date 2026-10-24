@@ -36,6 +36,7 @@ import type { TacticalMovementCategory } from './tacticalTerrainMovement';
 import { classifyTacticalMarchStep, type TacticalMarchStepContext } from './tacticalMarchStepCost';
 import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
 import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
+import { HUMAN_SEAT_ID } from './seatIds';
 
 /** Stable ordering for multi-terrain comma lists in order-preview HTML (lower sorts earlier). */
 const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
@@ -504,7 +505,7 @@ export function collectTacticalRangedSlowTerrainLabels(
   const seen = new Set<string>();
   for (const id of previewUnitIds) {
     const sub = battle.subUnits.find((s) => s.id === id);
-    if (!sub || sub.player !== 'human') continue;
+    if (!sub || sub.player !== HUMAN_SEAT_ID) continue;
     const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
     if (t && !seen.has(t)) {
       seen.add(t);

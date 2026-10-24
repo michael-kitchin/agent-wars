@@ -7,33 +7,33 @@
  * Exceptions: None.
  */
 export interface MeleeCandidateRow {
-    /**
-   * Specifies the contract for the `h3Index` member (h3Index: string;).
-
-   * Contract: Strategic cell id where melee would resolve.
-   * When to use: Row key and tactical auto-start target after Fight.
-   * Expected outcome: Valid strategic index present in the strategic map.
+  /**
+   * Strategic cell where the units meet.
+   *
+   * Contract: An H3 index on the map.
+   * When to use: The row key, and the Fight target when `tacticalEligible` is true.
+   * Expected outcome: The hex the units occupy.
    * Exceptions: None.
    */
-h3Index: string;
-    /**
-   * Specifies the contract for the `humanUnitSummary` member (humanUnitSummary: string;).
-
-   * Contract: Non-empty categories only, stable order air → armor → infantry → naval (e.g. "2 infantry, 1 armor").
-   * When to use: Human column in the intercept modal.
-   * Expected outcome: Plain text suitable for table cell display.
+  readonly h3Index: string;
+  /**
+   * Each owner on the hex, with a unit summary.
+   *
+   * Contract: Human first, then seat order, Neutral last. The summary omits empty types, in air, armor, infantry, naval order.
+   * When to use: The Yours and Enemy cells, and the world-map section.
+   * Expected outcome: One entry per owner that has a unit on the hex.
    * Exceptions: None.
    */
-humanUnitSummary: string;
-    /**
-   * Specifies the contract for the `aiUnitSummary` member (aiUnitSummary: string;).
-
-   * Contract: Same formatting rules as `humanUnitSummary` for opponent units in the hex.
-   * When to use: AI column in the intercept modal.
-   * Expected outcome: Plain text suitable for table cell display.
+  readonly parties: readonly { readonly ownerId: string; readonly unitSummary: string }[];
+  /**
+   * Whether the player can fight this hex as a battle.
+   *
+   * Contract: True only for the human seat and exactly one other owner, and only when a battle can be placed there.
+   * When to use: The choice rows. A false row is listed under the world-map section and cannot be selected.
+   * Expected outcome: A three-party hex and a fight between two other sides are false.
    * Exceptions: None.
    */
-aiUnitSummary: string;
+  readonly tacticalEligible: boolean;
 }
 
 /**

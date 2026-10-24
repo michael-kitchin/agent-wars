@@ -114,7 +114,6 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   tacticalBattleExitTeardownTransientRendererState();
   session.setBattleSnapshot(null);
   closeTacticalAnnihilationOutcomeDialog();
-  S.tacticalOpponentDraft = null;
   session.setPhasePlanning(true);
   exitTacticalMapView();
   tacticalApplyStrategicSidebarForTacticalMode(false);

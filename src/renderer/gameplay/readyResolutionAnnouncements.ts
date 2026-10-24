@@ -5,12 +5,17 @@ import {
 } from '../../shared/lossSummaryFromResolution';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleContinentNames';
+import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
+import { isHumanSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import type { TurnReportLoss } from '../../shared/turnReportLines';
+import { readoutViewerSeatId } from '../../shared/observeModeControls';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 import { buildUnitOriginByLossDisplayName } from '../core/unitOriginFlags';
 import { rendererSharedState as S } from '../core/state';
 import {
   dropQueuedResolutionPlaybackCompleteNotifies,
   enqueueResolutionPlaybackCompleteNotify,
+  notifyResolutionPlaybackFinished,
 } from '../openRouter/resolutionPlaybackDeferral';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
@@ -72,41 +77,19 @@ unknownVictimIds: string[];
  */
 export function deriveCombatVisibilityClassification(
   readyResult: ReadyResult,
-  visibleHexes: ReadonlySet<string>
+  visibleHexes: ReadonlySet<string>,
+  viewerSeatId: string | null
 ): CombatVisibilityClassification {
   const allKills = readyResult.kills ?? [];
-  const anyCombatResolved =
-    (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
-    (readyResult.airStrikeCasualtyHexes?.length ?? 0) > 0 ||
-    (readyResult.rangedCombatHexes?.length ?? 0) > 0 ||
-    (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 ||
-    (readyResult.meleeCombatHexes?.length ?? 0) > 0 ||
-    (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 ||
-    (readyResult.combatHexes?.length ?? 0) > 0 ||
-    (readyResult.casualtyHexes?.length ?? 0) > 0 ||
-    allKills.length > 0 ||
-    (readyResult.removedUnits?.length ?? 0) > 0;
-  if (anyCombatResolved) {
-    // In the two-side game flow, any resolved battle necessarily involves the human side.
-    // Treat all battle outcomes as known for turn updates and suppress unknown-battle toasts.
-    const knownVictimIds = new Set<string>([
-      ...allKills.map((k) => k.victimId),
-      ...(readyResult.removedUnits ?? []).map((u) => u.id),
-    ]);
-    return {
-      unknownCombatHexes: [],
-      unknownCasualtyHexes: [],
-      knownVictimIds,
-      unknownVictimIds: [],
-    };
-  }
+  const viewerInvolved = (ownerId: string | null | undefined): boolean => viewerSeatId !== null && ownerId === viewerSeatId;
+  const viewerIsHuman = viewerSeatId !== null && isHumanSeatId(viewerSeatId);
   const removedById = new Map<string, RemovedUnitSnapshot>((readyResult.removedUnits ?? []).map((u) => [u.id, u] as const));
   const friendlyInvolvedKillVictimIds = new Set<string>(
     allKills
       .filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => unitIdOwnerFromId(id) === 'human');
-        const victimIsFriendly = victim?.player === 'human';
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(unitIdOwnerFromId(id)));
+        const victimIsFriendly = viewerInvolved(victim?.player);
         return killerIsFriendly || victimIsFriendly;
       })
       .map((k) => k.victimId)
@@ -116,18 +99,22 @@ export function deriveCombatVisibilityClassification(
       .map((victimId) => removedById.get(victimId)?.h3Index ?? null)
       .filter((h3): h3 is string => typeof h3 === 'string')
   );
-  const friendlyPlannedCombatHexes = new Set<string>([
-    ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
-    ...S.pendingRangedAttacks.map((order) => order.targetH3Index),
-    ...S.pendingAirStrikes.map((order) => order.targetH3Index),
-    ...(readyResult.airStrikeMoves ?? [])
-      .filter((move) => move.player === 'human')
-      .flatMap((move) => [move.fromH3Index, move.targetH3Index]),
-    ...(readyResult.removedUnits ?? []).filter((unit) => unit.player === 'human').map((unit) => unit.h3Index),
-  ]);
+  const friendlyPlannedCombatHexes = new Set<string>(
+    viewerIsHuman
+      ? [
+          ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+          ...S.pendingRangedAttacks.map((order) => order.targetH3Index),
+          ...S.pendingAirStrikes.map((order) => order.targetH3Index),
+          ...(readyResult.airStrikeMoves ?? [])
+            .filter((move) => viewerInvolved(move.player))
+            .flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+          ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index),
+        ]
+      : []
+  );
   for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
   const knownHumanAirStrikeTargetHexes = new Set(
-    (readyResult.airStrikeMoves ?? []).filter((move) => move.player === 'human').map((move) => move.targetH3Index)
+    (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
   );
   const unknownCombatHexes = [
     ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
@@ -143,7 +130,7 @@ export function deriveCombatVisibilityClassification(
   ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
   const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
   for (const removed of readyResult.removedUnits ?? []) {
-    if (removed.player === 'human') knownVictimIds.add(removed.id);
+    if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
   }
   for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
   const unknownVictimIds = allKills
@@ -151,7 +138,7 @@ export function deriveCombatVisibilityClassification(
     .filter((id, idx, arr) => arr.indexOf(id) === idx)
     .filter((id) => {
       const removed = removedById.get(id);
-      if (removed?.player === 'human') return false;
+      if (viewerInvolved(removed?.player)) return false;
       return !friendlyInvolvedKillVictimIds.has(id);
     })
     .filter((id) => {
@@ -180,7 +167,7 @@ export function buildTacticalCommitReadyResultForToast(playback: TacticalCommitR
   const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
   const airStrikeRemovedUnits = removedAll.filter((u) => {
     if (airStrikeVictimIds.has(u.id)) return true;
-    if (u.player === 'human' && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
+    if (u.player === HUMAN_SEAT_ID && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
     return false;
   });
   return {
@@ -243,7 +230,7 @@ function buildPopupTurnLossSummary(args: {
       return formatUnitName(id);
     },
     resolveUnitMeta: (id) => metaMap.get(id),
-    isVictimVisible: (_id, player) => player === 'human' || knownVictimIds.has(_id),
+    isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id),
   });
 }
 
@@ -296,6 +283,73 @@ function buildCombatActivityFallbackBullets(readyResult: CombatActivityFallbackS
  *   hex or victim remains. The Reports tab files them as a Turn report and a Notice under `reportTag`.
  * Exceptions: None. Continent-name lookup failures follow `collectUnknownBattleContinentNames`.
  */
+/**
+ * The seat the turn report calls "you".
+ *
+ * Purpose: A watch uses View as. All sides has no "you", so the report is Seen lines only.
+ * When to use: Visibility and the turn-report sentences.
+ * Expected outcome: The active human seat while one is playing. While watching, the chosen seat, or null for All sides.
+ * Exceptions: None.
+ */
+export function reportViewerSeatId(): string | null {
+  const seats = S.gameState?.seats ?? [];
+  const viewer = readoutViewerSeatId(seats, S.viewAs);
+  return viewer ?? null;
+}
+
+/**
+ * Losses the turn report may name, limited to victims the viewer can see.
+ *
+ * Purpose: Each sentence needs the victim, the killer's side, and a hex label.
+ * When to use: `announceResolutionTurnUpdate`.
+ * Expected outcome: One row per known removed unit of a build type. The hex label is the strategic code when one exists.
+ * Exceptions: None.
+ */
+function turnReportLosses(
+  readySlice: ReadyResult,
+  knownVictimIds: ReadonlySet<string>,
+  extraKills: readonly { victimId: string; killerIds?: readonly string[] }[]
+): TurnReportLoss[] {
+  const removed = [...(readySlice.removedUnits ?? []), ...(readySlice.airStrikeRemovedUnits ?? [])];
+  const killerByVictim = new Map<string, string | null>();
+  const edges = [
+    ...(readySlice.kills ?? []),
+    ...(readySlice.killsByDirectFire ?? []),
+    ...(readySlice.killsByReturnFire ?? []),
+    ...extraKills,
+  ];
+  for (const edge of edges) {
+    const killerId = edge.killerIds?.[0];
+    killerByVictim.set(edge.victimId, killerId ? unitIdOwnerFromId(killerId) : null);
+  }
+  const losses: TurnReportLoss[] = [];
+  for (const unit of removed) {
+    if (!knownVictimIds.has(unit.id)) continue;
+    const unitType = reportUnitType(unit.unitType);
+    if (!unitType) continue;
+    losses.push({
+      victimOwnerId: unit.player,
+      killerOwnerId: killerByVictim.get(unit.id) ?? null,
+      hexLabel: getStrategicHexCode(unit.h3Index) ?? unit.h3Index,
+      unitType,
+    });
+  }
+  return losses;
+}
+
+/**
+ * Keeps a removed unit's type when the report can name it.
+ *
+ * Purpose: The count list only covers the four build types.
+ * When to use: `turnReportLosses`.
+ * Expected outcome: The type, or null.
+ * Exceptions: None.
+ */
+function reportUnitType(unitType: string): TurnReportLoss['unitType'] | null {
+  if (unitType === 'infantry' || unitType === 'armor' || unitType === 'naval' || unitType === 'air') return unitType;
+  return null;
+}
+
 export async function announceResolutionTurnUpdate(
   args: {
     readySlice: ReadyResult;
@@ -303,8 +357,8 @@ export async function announceResolutionTurnUpdate(
     killToastFormatter: ReturnType<ReadyHandlerDeps['buildKillToastFormatterBundle']>;
     reportTag: string;
     extraKills?: {
-      killsByMelee?: readonly { victimId: string }[];
-      killsByAirStrike?: readonly { victimId: string }[];
+      killsByMelee?: readonly { victimId: string; killerIds?: readonly string[] }[];
+      killsByAirStrike?: readonly { victimId: string; killerIds?: readonly string[] }[];
     };
   },
   deps: Pick<ReadyHandlerDeps, 'showMapToast' | 'appendOpenRouterLog' | 'formatUnknownBattleAnnouncement'>
@@ -318,10 +372,24 @@ export async function announceResolutionTurnUpdate(
     ...(extraKills !== undefined ? extraKills : {}),
   });
   const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
+  const seats = (S.gameState?.seats ?? []).map((seat) => ({
+    seatId: seat.seatId,
+    seatOrder: seat.seatOrder,
+    homeRegion: seat.homeRegion,
+  }));
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
     turnLossSummary,
     combatFallbackBullets,
+    turnReport: {
+      viewerSeatId: reportViewerSeatId(),
+      seats,
+      transitions: readySlice.controlTransitions ?? [],
+      losses: turnReportLosses(readySlice, knownVictimIds, [
+        ...(extraKills?.killsByMelee ?? []),
+        ...(extraKills?.killsByAirStrike ?? []),
+      ]),
+    },
   });
   if (updateText) {
     const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
@@ -358,5 +426,6 @@ export function scheduleResolutionPlaybackCompleteNotify(send: () => void, needs
   } else {
     dropQueuedResolutionPlaybackCompleteNotifies();
     send();
+    notifyResolutionPlaybackFinished();
   }
 }
