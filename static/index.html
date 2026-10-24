@@ -197,7 +197,7 @@
         </div>
         <div class="new-game-checks">
           <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
-          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Command tab with planning off." /> Auto-start AI</label>
+          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, to open the Command tab with planning off." /> Auto-start AI</label>
         </div>
       </section>
     </div>
@@ -329,17 +329,10 @@
       </section>
       <section id="console-panel-commanders" class="console-panel" role="tabpanel" aria-labelledby="console-tab-commanders" hidden>
         <div class="opponent-section opponent-status">
-          <span class="control-tooltip-host" data-control-tooltip="Turn planning on or off for every commander. Enter an API key first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
+          <span class="control-tooltip-host" data-control-tooltip="Turn planning on or off for every commander. Give at least one commander an API key and a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
           <p id="commander-status-text" class="commander-status-text">Planning is off.</p>
         </div>
         <section id="openrouter-model-panel" class="opponent-section" aria-labelledby="commander-cards-heading">
-          <div class="opponent-field">
-            <label for="openrouter-key">API key</label>
-            <div class="openrouter-key-row">
-              <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" data-control-tooltip="Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key." />
-              <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" aria-label="Refresh model list" data-control-tooltip="Load the model list again. If that fails, the message appears in the AI activity log."></button>
-            </div>
-          </div>
           <div id="openrouter-model-store" hidden>
             <select id="openrouter-model" aria-hidden="true">
               <option value="">— Select model —</option>

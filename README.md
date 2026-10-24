@@ -63,23 +63,22 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 ![Command tab.](doc/media/first-start-game-2.png)
 
-3. Under **Commanders**, paste your OpenRouter API key into the **API key** field (placeholder `Set key and blur to save`).
-4. Click outside the field, or press Enter, to save. A saved key loads the model list.
-5. Open a commander's card and choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button beside the key reloads the list. Each commander can use a different model, reasoning effort, and doctrine.
+3. Open a commander's card. The popover's first field is that opponent's **API key**. Paste the OpenRouter key, then click outside the field or press Enter. The key stays masked. Each opponent has its own key. A new game fills only the first opponent from the key you used last.
+4. In that same popover, choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button to the right of the model list reloads the list with the key in the popover. Each commander can use a different model, reasoning effort, and doctrine.
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-6. Click **Run**, at the top of the Command tab, to start planning for every commander that has a model.
+5. Click **Run**, at the top of the Command tab, to start planning. Run stays off until at least one commander has both a key and a model. A commander with a model and an empty key does not call the model.
     - You can change a commander's model at any time, or stop planning by clicking **Run** again.
 
-![Model setup.](doc/media/first-start-game-3.png)
+![Command tab after a model is chosen. The API key is entered in the commander popover.](doc/media/first-start-game-3.png)
 
-7. Then click **Command** to close the tab. You can explore the map, plan movement, etc. while the commanders are planning.
-8. When the AI is done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn.
+6. Then click **Command** to close the tab. You can explore the map, plan movement, etc. while the commanders are planning.
+7. When the AI is done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn.
     - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
 
 ![Ready button when the commanders are done (Command tab open).](doc/media/ready-done-open.png)
 
-The OpenRouter key is handled only in the Electron main process and stored locally in the Electron user-data directory. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+Each opponent's OpenRouter key is stored locally in the Electron user-data directory. The screen receives a key only to fill that opponent's password field, and the key is not written to the activity log. Without a key and a model on at least one commander the app still runs, **Run** stays disabled, and that opponent makes no model calls.
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 

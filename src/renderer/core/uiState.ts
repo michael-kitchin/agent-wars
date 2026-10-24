@@ -1,7 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { prepareNewGameMapPanel, selectedNewGameTab } from '../gameplay/newGameMapUi';
-import { refreshNewGameSides } from '../gameplay/newGameSidesUi';
+import { loadCommanderKeyMemory, refreshNewGameSides } from '../gameplay/newGameSidesUi';
 import { hideGameOverStandings, renderGameOverStandings } from '../gameplay/gameOverStandings';
 import { showGameOverBanner, showNewGameBanner } from '../gameplay/newGameBanner';
 import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gameplay/newGameMapPreviewUi';
@@ -161,7 +161,7 @@ export function updateGameOverUI(
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();
     void (async () => {
-      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
       refreshNewGameSides({ reset: true });
       await refreshNewGameMapPreview();
     })();

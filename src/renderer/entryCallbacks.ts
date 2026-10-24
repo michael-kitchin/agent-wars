@@ -29,6 +29,7 @@ import { tacticalReconcileBattleAfterStrategicSnapshot, tacticalSyncTacticalEntr
 import { createBuildQueuePopupHandler } from './gameplay/buildQueuePopup';
 
 import { renderOpenRouterToolsList as renderOpenRouterToolsListFromModule, startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule, stopOpponentPlanning } from './openRouter/openRouterRuntime';
+import { setOpenRouterRunToggleSync } from './openRouter/openRouterRunToggle';
 
 import { clearPendingTacticalOrders, refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule, type RefreshHoverRoutePreviewOptions } from './gameplay/tacticalOrders';
 import { prepareStrategicPlanningUiBeforeTacticalAutoStart, type ReadyHandlerDeps } from './gameplay/readyHandler';
@@ -343,7 +344,7 @@ export async function applyGameStateSnapshot(
     lastShownMapLoadError = nextState.gameMapLoadError;
     showMapToast(nextState.gameMapLoadError);
   }
-  return applyGameStateSnapshotFromModule(
+  await applyGameStateSnapshotFromModule(
     {
       rebuildUnitDisplayNameLookup,
       reconcileSelectionToCurrentState,
@@ -366,6 +367,7 @@ export async function applyGameStateSnapshot(
     nextState,
     options
   );
+  await syncOpenRouterRunToggleInteractable();
 }
 
 /**
@@ -904,11 +906,11 @@ export function showSidebarError(message: string): void {
  */
 export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
   const runBtn = document.getElementById('openrouter-run-btn') as HTMLButtonElement | null;
-  const api = window.gameApi?.openRouter;
-  if (!runBtn || !api?.getKey || !api.getSelectedModel) return;
+  if (!runBtn) return;
   try {
-    const [keyResult, modelId] = await Promise.all([api.getKey(), api.getSelectedModel()]);
-    const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
+    const canEnable = (S.gameState?.seats ?? []).some(
+      (seat) => seat.outTurn == null && seat.commander?.hasApiKey === true && Boolean(seat.commander.modelId?.trim())
+    );
     if (canEnable) {
       runBtn.disabled = false;
     } else {
@@ -936,4 +938,6 @@ export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
     runBtn.removeAttribute('title');
   }
 }
+
+setOpenRouterRunToggleSync(syncOpenRouterRunToggleInteractable);
 

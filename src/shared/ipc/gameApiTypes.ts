@@ -38,6 +38,7 @@ import type {
 } from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
 import type { OpenRouterModel } from './openRouterTypes';
+import type { CommanderKeyMemoryView } from '../commanderSetupCopy';
 import type { GameReadyIpcPayload, ReadyResult } from './readyTypes';
 import type { TacticalCommitResolutionPlayback } from './tacticalPlaybackTypes';
 import type {
@@ -228,14 +229,14 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
   /**
    * Saves one AI seat's model, effort, and doctrine choice.
    *
-   * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset.
+   * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset. `apiKey`, when present, replaces that seat's key.
    * When to use: The commander popover.
-   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's in-flight consult.
+   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's in-flight consult. An omitted `apiKey` leaves the stored key.
    * Exceptions: Rejects when the seat is human, missing, or knocked out.
    */
   setSeatCommander: (
     seatId: AiSeatId,
-    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice }
+    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string }
   ) => Promise<SeatSnapshot>;
   /**
    * Ends the match by ranking the seats that are still active.
@@ -598,7 +599,15 @@ openRouter?: {
     getKey: () => Promise<{ hasKey: boolean }>;
     getSelectedModel: () => Promise<string>;
     setKey: (key: string) => Promise<void>;
-    listModels: () => Promise<{ models?: OpenRouterModel[]; error?: string }>;
+    /**
+     * Loads the OpenRouter model list with the key from the open commander.
+     *
+     * Contract: A blank key resolves to `{ error: 'No API key set' }` and does not fetch. The key is not logged.
+     * When to use: Startup, when a remembered key exists, and the popover's refresh button.
+     * Expected outcome: The model list, or an error string.
+     * Exceptions: Rejects only on IPC failure.
+     */
+    listModels: (key: string) => Promise<{ models?: OpenRouterModel[]; error?: string }>;
     setSelectedModel: (modelId: string) => Promise<void>;
     /**
      * Reads the persisted reasoning-effort override for the selected model.
@@ -618,6 +627,24 @@ openRouter?: {
      * Exceptions: Rejects only on IPC or database failure.
      */
     setSelectedReasoningEffort: (effort: string) => Promise<void>;
+    /**
+     * Reads the remembered commanders and the key that fills the first AI row.
+     *
+     * Contract: Resolves to the snapshot view. The key is for a password field and is not logged.
+     * When to use: Opening the new-game screen.
+     * Expected outcome: `hasPreviousMatch` is false until a match has been snapshotted.
+     * Exceptions: Rejects only on IPC or database failure.
+     */
+    getCommanderKeyMemory: () => Promise<CommanderKeyMemoryView>;
+    /**
+     * Reads one AI seat's OpenRouter key.
+     *
+     * Contract: Resolves to the stored key, or `''` when that seat has none. A non-string seat id resolves to `''`.
+     * When to use: Opening a commander's popover during a match.
+     * Expected outcome: The secret for that password field. It is not logged.
+     * Exceptions: Rejects only on IPC or database failure.
+     */
+    getSeatApiKey: (seatId: string) => Promise<string>;
     getToolGroupList: () => Promise<{ id: string; label: string }[]>;
   };
 }

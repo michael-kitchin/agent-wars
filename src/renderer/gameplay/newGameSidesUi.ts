@@ -1,4 +1,11 @@
 import type { NewGameCommanderInput, NewGameSeatInput } from '../../shared/ipc/ordersTypes';
+import type { CommanderKeyMemoryView } from '../../shared/commanderSetupCopy';
+import {
+  commanderApiKey,
+  copyButtonState,
+  prefillFirstAiApiKey,
+  previousAiRowIndex,
+} from '../../shared/commanderSetupCopy';
 import { formatCommanderSummary } from '../../shared/commanderSummary';
 import { modelNameFromOptionLabel } from '../../shared/commanderPlanningStatus';
 import {
@@ -10,7 +17,6 @@ import {
   randomizeRowHome,
   removeSideRow,
   rowLabel,
-  setEveryAiCommander,
   setObserveOnly,
   setRowCommander,
   setRowHome,
@@ -22,7 +28,7 @@ import {
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { DEFAULT_TURN_LIMIT, TURN_LIMIT_OPTIONS } from '../../shared/victoryRules';
-import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
+import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
 import { regionalHomeOptions, selectedNewGameTab, setNewGameHomesChangedListener } from './newGameMapUi';
 import { refreshNewGameMapPreview, setPreviewHomeKeyReader } from './newGameMapPreviewUi';
@@ -31,7 +37,49 @@ import {
   commanderPopoverIsOpen,
   openCommanderPopover,
   reanchorCommanderPopover,
+  replaceOpenCommanderDraft,
 } from '../openRouter/commanderPopover';
+
+/**
+ * The remembered match used to fill the first AI key and the copy button.
+ *
+ * Purpose: The overlay reads this once per open, then row edits leave it alone.
+ * When to use: `loadCommanderKeyMemory`, refresh, and the copy button.
+ * Expected outcome: Empty until a read succeeds. A failed read keeps the previous value.
+ * Exceptions: None.
+ */
+let rememberedCommanders: CommanderKeyMemoryView = { hasPreviousMatch: false, prefillApiKey: '', previousMatch: [] };
+
+/**
+ * Reads the remembered commanders before the new-game rows are rebuilt.
+ *
+ * Purpose: Opponent 1's key comes from the last match, or from the legacy key when no match has been snapshotted.
+ * When to use: Both openers, before `refreshNewGameSides({ reset: true })`.
+ * Expected outcome: The cache holds the IPC result. A rejected read leaves the cache as it was.
+ * Exceptions: None. A rejected IPC is logged.
+ */
+export async function loadCommanderKeyMemory(): Promise<void> {
+  try {
+    const memory = await window.gameApi?.openRouter?.getCommanderKeyMemory();
+    if (memory) rememberedCommanders = memory;
+  } catch (err) {
+    console.error('getCommanderKeyMemory failed', err);
+  }
+}
+
+/**
+ * Whether some AI row has both a key and a model.
+ *
+ * Purpose: Auto-start looks at the rows on this screen, not at the Run button.
+ * When to use: `readStartMatchAiInput`.
+ * Expected outcome: True when at least one AI row has a non-empty key and a model id.
+ * Exceptions: None.
+ */
+export function newGameHasRunnableCommander(): boolean {
+  return (sidesState?.rows ?? []).some(
+    (row) => row.kind === AI_SEAT_KIND && commanderApiKey(row.commander) !== '' && Boolean(row.commander?.modelId?.trim())
+  );
+}
 
 /**
  * The rows the screen is editing.
@@ -90,7 +138,7 @@ function defaultCommander(): NewGameCommanderInput {
   const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
   const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
   const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-  return { modelId, reasoningEffort, doctrineChoice: 'balanced' };
+  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey: '' };
 }
 
 /**
@@ -133,7 +181,7 @@ export function refreshNewGameSides(options?: { readonly reset?: boolean }): voi
   for (let index = 0; index < next.rows.length; index += 1) {
     next = randomizeRowHome(next, index, homes, Math.random);
   }
-  sidesState = next;
+  sidesState = prefillFirstAiApiKey(next, rememberedCommanders.prefillApiKey);
   renderNewGameSides();
 }
 
@@ -152,7 +200,10 @@ export function bindNewGameSides(): void {
     if (!sidesState) return;
     const box = document.getElementById('new-game-observe-only') as HTMLInputElement | null;
     closeCommanderPopover();
-    sidesState = setObserveOnly(sidesState, box?.checked === true, defaultCommander());
+    sidesState = prefillFirstAiApiKey(
+      setObserveOnly(sidesState, box?.checked === true, defaultCommander()),
+      rememberedCommanders.prefillApiKey
+    );
     renderNewGameSides();
     void refreshNewGameMapPreview();
   });
@@ -305,11 +356,63 @@ function renderNewGameSides(): void {
 }
 
 /**
- * One side row.
+ * Copies a commander onto one AI row.
  *
- * Purpose: The human row has no remove button and no commander. Observe rows have both.
- * When to use: `renderNewGameSides`.
- * Expected outcome: A label, a home select, a randomize button, and the extra controls that row is allowed.
+ * Purpose: The copy button pulls the last game or the previous opponent, including the key.
+ * When to use: The popover's copy click.
+ * Expected outcome: The row and the open fields show that commander. A missing source does nothing.
+ * Exceptions: None.
+ */
+function copyCommanderFrom(index: number, source: 'previous-match' | 'previous-opponent'): void {
+  if (!sidesState) return;
+  const copied = source === 'previous-match' ? commanderFromLastGame() : commanderFromPreviousRow(index);
+  if (!copied) return;
+  sidesState = setRowCommander(sidesState, index, copied);
+  replaceOpenCommanderDraft(copied);
+  renderNewGameSides();
+}
+
+/**
+ * The first remembered commander, as a new-game row would store it.
+ *
+ * Purpose: Copy from last game uses the snapshot, not the drawn doctrine.
+ * When to use: `copyCommanderFrom` for the first AI row.
+ * Expected outcome: Null when the snapshot has no first entry.
+ * Exceptions: None.
+ */
+function commanderFromLastGame(): NewGameCommanderInput | null {
+  const previous = rememberedCommanders.previousMatch[0];
+  if (!previous) return null;
+  return {
+    modelId: previous.modelId,
+    reasoningEffort: previous.reasoningEffort,
+    doctrineChoice: previous.doctrineChoice,
+    apiKey: previous.apiKey,
+  };
+}
+
+/**
+ * A shallow copy of the AI row just above this one.
+ *
+ * Purpose: Opponent 3 copies opponent 2, including that row's current key.
+ * When to use: `copyCommanderFrom` for a later AI row.
+ * Expected outcome: Null when there is no earlier AI row or it has no commander.
+ * Exceptions: None.
+ */
+function commanderFromPreviousRow(index: number): NewGameCommanderInput | null {
+  if (!sidesState) return null;
+  const previousIndex = previousAiRowIndex(sidesState, index);
+  if (previousIndex === null) return null;
+  const previous = sidesState.rows[previousIndex]?.commander;
+  return previous ? { ...previous } : null;
+}
+
+/**
+ * Opens the commander popover for one new-game row.
+ *
+ * Purpose: That row's key, model, reasoning, and doctrine are edited here, and the copy button pulls another commander.
+ * When to use: The commander button's click.
+ * Expected outcome: A second click on the same open row closes the popover. A human row does not open.
  * Exceptions: None.
  */
 function openRowCommander(index: number, button: HTMLButtonElement): void {
@@ -321,20 +424,21 @@ function openRowCommander(index: number, button: HTMLButtonElement): void {
   const row = sidesState.rows[index];
   if (!row || row.kind !== AI_SEAT_KIND) return;
   const label = rowLabel(sidesState, index);
-  const observeOnly = sidesState.observeOnly;
+  const buttonState = copyButtonState(sidesState, index, rememberedCommanders.hasPreviousMatch);
   openCommanderPopover({
     anchor: button,
     title: `${label} commander`,
     commander: row.commander ?? defaultCommander(),
-    applyAllLabel: observeOnly ? 'Use for every side' : 'Use for every opponent',
+    copyButton: buttonState
+      ? {
+          label: buttonState.label,
+          disabled: buttonState.disabled,
+          onCopy: () => copyCommanderFrom(index, buttonState.source),
+        }
+      : null,
     onChange: (commander) => {
       if (!sidesState) return;
       sidesState = setRowCommander(sidesState, index, commander);
-      renderNewGameSides();
-    },
-    onApplyAll: (commander) => {
-      if (!sidesState) return;
-      sidesState = setEveryAiCommander(sidesState, commander);
       renderNewGameSides();
     },
     onClose: () => {
@@ -344,6 +448,14 @@ function openRowCommander(index: number, button: HTMLButtonElement): void {
   openCommanderRow = index;
 }
 
+/**
+ * One side row.
+ *
+ * Purpose: The human row has no remove button and no commander. Observe rows have both.
+ * When to use: `renderNewGameSides`.
+ * Expected outcome: A label, a home select, a randomize button, and the extra controls that row is allowed.
+ * Exceptions: None.
+ */
 function renderRow(state: NewGameSidesState, homes: readonly HomeOption[], index: number): HTMLElement {
   const row = state.rows[index]!;
   const label = rowLabel(state, index);
@@ -405,7 +517,7 @@ function renderRow(state: NewGameSidesState, homes: readonly HomeOption[], index
     commander.textContent = commanderButtonLabel(row.commander);
     commander.dataset.commanderRow = String(index);
     commander.setAttribute('aria-label', `${label} commander`);
-    commander.setAttribute('data-control-tooltip', 'Change this side\'s model, reasoning, and doctrine.');
+    commander.setAttribute('data-control-tooltip', newGameCommanderTooltipText);
     commander.addEventListener('click', () => openRowCommander(index, commander));
     wrap.appendChild(commander);
   }

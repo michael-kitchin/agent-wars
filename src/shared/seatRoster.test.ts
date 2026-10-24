@@ -21,7 +21,7 @@ function seat(partial: Pick<SeatRecord, 'seatId' | 'seatOrder' | 'kind'> & Parti
   return {
     homeRegion: partial.seatId,
     commander: partial.kind === 'ai'
-      ? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: 'balanced' }
+      ? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' }
       : null,
     outTurn: null,
     outBy: null,
@@ -77,17 +77,18 @@ describe('toSeatSnapshot', () => {
       seatId: 'opponent',
       seatOrder: 2,
       kind: 'ai',
-      commander: { modelId: 'model', reasoningEffort: null, doctrineChoice: 'random', doctrine: 'cautious' },
+      commander: { modelId: 'model', reasoningEffort: null, doctrineChoice: 'random', hasApiKey: false, doctrine: 'cautious' },
     });
-    assert.equal(toSeatSnapshot(randomSeat, false).commander?.doctrine, null);
-    assert.equal(toSeatSnapshot(randomSeat, true).commander?.doctrine, 'cautious');
+    assert.equal(toSeatSnapshot(randomSeat, false, false).commander?.doctrine, null);
+    assert.equal(toSeatSnapshot(randomSeat, true, false).commander?.doctrine, 'cautious');
 
     const chosenSeat = seat({
       seatId: 'opponent2',
       seatOrder: 3,
       kind: 'ai',
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'aggressive', doctrine: 'aggressive' },
+      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'aggressive', hasApiKey: true, doctrine: 'aggressive' },
     });
-    assert.equal(toSeatSnapshot(chosenSeat, false).commander?.doctrine, 'aggressive');
+    assert.equal(toSeatSnapshot(chosenSeat, false, true).commander?.doctrine, 'aggressive');
+    assert.equal(toSeatSnapshot(chosenSeat, false, true).commander?.hasApiKey, true);
   });
 });

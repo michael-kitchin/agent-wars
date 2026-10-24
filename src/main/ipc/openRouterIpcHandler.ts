@@ -1,12 +1,15 @@
 import type { IpcMain } from 'electron';
 import { IPC_OPENROUTER } from '../../shared/ipc/channels';
-import { logDebug } from '../logger';
+import { isAiSeatId } from '../../shared/seatIds';
+import { logDebug, logError, logTrace } from '../logger';
+import { readCommanderKeyMemory, readSeatApiKey } from '../openRouter/commanderKeyMemory';
 import {
   getSelectedModel,
   getSelectedReasoningEffort,
   getToolGroupList,
   hasKey,
   listModels,
+  loadKey,
   saveKey,
   setSelectedModel,
   setSelectedReasoningEffort,
@@ -29,12 +32,27 @@ export function registerOpenRouterIpcHandler(ipcMain: Pick<IpcMain, 'handle'>): 
   ipcMain.handle(IPC_OPENROUTER.setKey, (_event, key: unknown) => {
     saveKey(typeof key === 'string' ? key : '');
   });
-  ipcMain.handle(IPC_OPENROUTER.listModels, () => listModels());
+  ipcMain.handle(IPC_OPENROUTER.listModels, (_event, key: unknown) => listModels(typeof key === 'string' ? key : ''));
   ipcMain.handle(IPC_OPENROUTER.setSelectedModel, (_event, modelId: unknown) => {
     setSelectedModel(typeof modelId === 'string' ? modelId : '');
   });
   ipcMain.handle(IPC_OPENROUTER.getSelectedReasoningEffort, () => getSelectedReasoningEffort());
   ipcMain.handle(IPC_OPENROUTER.setSelectedReasoningEffort, (_event, effort: unknown) => {
     setSelectedReasoningEffort(typeof effort === 'string' ? effort : '');
+  });
+  ipcMain.handle(IPC_OPENROUTER.getCommanderKeyMemory, () => {
+    logTrace('openRouterIpc getCommanderKeyMemory');
+    return readCommanderKeyMemory(loadKey());
+  });
+  ipcMain.handle(IPC_OPENROUTER.getSeatApiKey, (_event, seatId: unknown) => {
+    if (typeof seatId !== 'string' || !isAiSeatId(seatId)) {
+      logError('openRouterIpc getSeatApiKey: seat id is not an AI seat', {
+        seatIdType: typeof seatId,
+        seatIdLength: typeof seatId === 'string' ? seatId.length : 0,
+      });
+      return '';
+    }
+    logTrace('openRouterIpc getSeatApiKey', { seatId });
+    return readSeatApiKey(seatId, loadKey());
   });
 }

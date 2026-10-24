@@ -18,6 +18,7 @@ import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
+import { notifyOpenRouterModelListUpdated, setOpenRouterModelRefresh, setOpenRouterPopoverLog } from './openRouterModelRefresh';
 
 /**
  * Documents the `OpenRouterUiDeps` interface as a named contract surface (interface OpenRouterUiDeps).
@@ -268,6 +269,7 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
  * Exceptions: None; a missing OpenRouter API leaves the listeners that were registered and returns.
  */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
+  setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
   bindCommanderPoolScreen({
     showCommanderMessages: showCommanderMessagesToast,
     fileCommanderMessage: (dispatch) => {
@@ -308,21 +310,14 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     }
   })();
 
-  const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
-  const refreshBtn = document.getElementById('openrouter-refresh-models');
   const newBtn = document.getElementById('openrouter-new-btn');
   let persistedSelectedModelId = '';
-  let lastPersistedApiKeyValue = '';
-  /**
-   * True when the key field is empty because a saved key is hidden, not because the player cleared typed text.
-   *
-   * When to use: Set only after `getKey()` reports `hasKey` and the input is still empty. An empty blur then calls `setKey('')`.
-   * Expected outcome: A later empty blur clears the saved key and restores the unsaved placeholder. Typed text never sets this flag.
-   * Exceptions: None.
-   */
-  let savedKeyHiddenInEmptyField = false;
+  let startupModelKey = '';
   let modelRefreshInFlight = false;
+  let modelRefreshPromise: Promise<void> = Promise.resolve();
+  let queuedModelKey: string | null = null;
+  let queuedModelRefresh: Promise<void> | null = null;
   let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let startupModelRetryConsumed = false;
   const modelDescriptionTooltip = modelSelect
@@ -391,7 +386,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     startupModelRetryConsumed = true;
     startupModelRetryTimer = setTimeout(() => {
       startupModelRetryTimer = null;
-      refreshModels(true);
+      void refreshModels(startupModelKey, true);
     }, 2000);
   }
 
@@ -402,11 +397,25 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     return true;
   }
 
-  function refreshModels(retryOnFailure = false): void {
-    if (modelRefreshInFlight) return;
+  function refreshModels(key: string, retryOnFailure = false): Promise<void> {
+    startupModelKey = key;
+    if (modelRefreshInFlight) {
+      queuedModelKey = key;
+      if (queuedModelRefresh) return queuedModelRefresh;
+      const followed = modelRefreshPromise.then(() => {
+        queuedModelRefresh = null;
+        const next = queuedModelKey;
+        queuedModelKey = null;
+        if (next === null) return;
+        return refreshModels(next, false);
+      });
+      queuedModelRefresh = followed;
+      return followed;
+    }
+    queuedModelKey = null;
     modelRefreshInFlight = true;
     modelDescriptionTooltip?.clear();
-    api.listModels().then((result) => {
+    const pending = api.listModels(key).then((result) => {
       if (!modelSelect) return;
       const kept = modelSelect.value;
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
@@ -416,6 +425,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         deps.appendOpenRouterLog(`Models: ${result.error}`, true);
         if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
         showReasoningEffortForSelectedModel();
+        notifyOpenRouterModelListUpdated();
         void deps.syncOpenRouterRunToggleInteractable();
         return;
       }
@@ -432,6 +442,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         modelSelect.value = targetModelId;
       }
       showReasoningEffortForSelectedModel();
+      notifyOpenRouterModelListUpdated();
       clearStartupModelRetryTimer();
       void deps.syncOpenRouterRunToggleInteractable();
     }).catch((err) => {
@@ -441,14 +452,18 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       deps.appendOpenRouterLog(`Models: ${message}`, true);
       if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
       showReasoningEffortForSelectedModel();
+      notifyOpenRouterModelListUpdated();
       void deps.syncOpenRouterRunToggleInteractable();
     }).finally(() => {
       modelRefreshInFlight = false;
       renderOpponentStatus();
     });
+    modelRefreshPromise = pending;
+    return pending;
   }
+  setOpenRouterModelRefresh((key) => refreshModels(key, false));
 
-  api.getSelectedModel().then((modelId) => {
+  api.getSelectedModel().then(async (modelId) => {
     persistedSelectedModelId = modelId;
     if (modelSelect && modelId && !Array.from(modelSelect.options).some((o) => o.value === modelId)) {
       const opt = document.createElement('option');
@@ -458,8 +473,10 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       modelSelect.value = modelId;
       renderOpponentStatus();
     }
-    refreshModels(true);
-  }).catch(() => refreshModels(true));
+    const memory = await api.getCommanderKeyMemory();
+    const key = memory.prefillApiKey.trim();
+    if (key) await refreshModels(key, true);
+  }).catch(() => undefined);
   api.getSelectedReasoningEffort().then((effort) => {
     if (playerChangedModel) return;
     persistedReasoningEffort = effort;
@@ -467,55 +484,6 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   }).catch((err) => {
     deps.appendOpenRouterLog(`Reasoning effort: ${String(err)}`, true);
   });
-
-  if (keyInput) {
-    api.getKey().then((keyResult) => {
-      if (keyResult?.hasKey && !keyInput.value.trim()) {
-        keyInput.placeholder = 'Saved API key';
-        lastPersistedApiKeyValue = '';
-        savedKeyHiddenInEmptyField = true;
-        refreshModels(true);
-      }
-    });
-    /**
-     * Saves the key field when its text changed, and clears a hidden saved key when the empty field blurs.
-     *
-     * When to use: Blur, change, or Enter on `#openrouter-key`.
-     * Expected outcome: `setKey` runs only after the value actually changed, or when an empty field still hides a saved key. The placeholder updates after `setKey` resolves.
-     * Exceptions: None. A rejected `setKey` leaves the placeholder unchanged.
-     */
-    const persistApiKey = (): void => {
-      const value = keyInput.value.trim();
-      if (value === '' && savedKeyHiddenInEmptyField) {
-        savedKeyHiddenInEmptyField = false;
-        lastPersistedApiKeyValue = '';
-        api.setKey('').then(() => {
-          keyInput.placeholder = 'Set key and blur to save';
-          deps.hideMapToast();
-          void deps.syncOpenRouterRunToggleInteractable();
-        });
-        return;
-      }
-      if (value === lastPersistedApiKeyValue) return;
-      lastPersistedApiKeyValue = value;
-      api.setKey(value).then(() => {
-        if (!value) {
-          keyInput.placeholder = 'Set key and blur to save';
-          deps.hideMapToast();
-          void deps.syncOpenRouterRunToggleInteractable();
-          return;
-        }
-        keyInput.placeholder = 'Saved API key';
-        refreshModels(true);
-        void deps.syncOpenRouterRunToggleInteractable();
-      });
-    };
-    keyInput.addEventListener('blur', persistApiKey);
-    keyInput.addEventListener('change', persistApiKey);
-    keyInput.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') persistApiKey();
-    });
-  }
 
   if (modelSelect) {
     modelSelect.addEventListener('change', () => {
@@ -548,7 +516,6 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     });
   }
 
-  if (refreshBtn) refreshBtn.addEventListener('click', () => refreshModels(false));
   if (newBtn) newBtn.addEventListener('click', deps.openNewGameOverlayFromModelTab);
 
   const runBtn = document.getElementById('openrouter-run-btn');

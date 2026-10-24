@@ -29,7 +29,7 @@ function seat(seatId: SeatId, seatOrder: number, outTurn: number | null = null):
     homeRegion: seatId,
     commander: seatId === HUMAN_SEAT_ID
       ? null
-      : { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: 'balanced' },
+      : { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
     outTurn,
     outBy: null,
     outReasons: [],

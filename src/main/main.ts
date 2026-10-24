@@ -6,10 +6,11 @@
 import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
-import { AI_SEAT_IDS, isAiSeatId, isSeatId, type SeatId } from '../shared/seatIds';
+import { AI_SEAT_IDS, aiIndexForSeatId, isAiSeatId, isSeatId, type SeatId } from '../shared/seatIds';
 import { DOCTRINE_CHOICES, toSeatSnapshot, type DoctrineChoice } from '../shared/seatRoster';
 import { fallbackConsultModelId, type TacticalBeatConsultArgs } from './ipc/readyIpcResolutionMapping';
 import { updateSeatCommander } from './gameDb/seatRosterStore';
+import { readSeatHasApiKey } from './gameDb/seatApiKeyFlags';
 import { cancelModelCalls } from './openRouter/modelCallControl';
 import { readMatchSnapshot } from './ipc/matchViewSnapshot';
 import {
@@ -62,8 +63,10 @@ import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { resetCommanderPool } from './openRouter/commanderPool';
+import { readSeatApiKey, storeNewMatchCommanderKeys, updateRememberedCommander, writeSeatApiKey } from './openRouter/commanderKeyMemory';
 import {
   hasKey,
+  loadKey,
   requestOrders,
   applyAppWideCommanderToLegacySeat,
   getSelectedModel,
@@ -349,6 +352,7 @@ function registerIpcHandlers(): void {
       seats: payload?.seats,
       turnLimit: payload?.turnLimit,
     });
+    storeNewMatchCommanderKeys(payload?.seats, loadKey());
     if (!payload?.seats) applyAppWideCommanderToLegacySeat();
     resetCommanderPool(getSeatRoster());
     clearDeferredPlaybackConsultPending();
@@ -361,9 +365,10 @@ function registerIpcHandlers(): void {
       throw new Error(`Cannot update a commander for ${String(seatId)}`);
     }
     if (!commander || typeof commander !== 'object') throw new Error('Invalid commander update');
-    const patch = commander as { modelId?: unknown; reasoningEffort?: unknown; doctrineChoice?: unknown };
+    const patch = commander as { modelId?: unknown; reasoningEffort?: unknown; doctrineChoice?: unknown; apiKey?: unknown };
     if (patch.modelId !== null && typeof patch.modelId !== 'string') throw new Error('Invalid commander model');
     if (patch.reasoningEffort !== null && typeof patch.reasoningEffort !== 'string') throw new Error('Invalid commander effort');
+    if (patch.apiKey !== undefined && typeof patch.apiKey !== 'string') throw new Error('Invalid commander key');
     if (!(DOCTRINE_CHOICES as readonly string[]).includes(String(patch.doctrineChoice))) {
       throw new Error('Invalid commander doctrine');
     }
@@ -373,11 +378,23 @@ function registerIpcHandlers(): void {
       reasoningEffort: patch.reasoningEffort,
       doctrineChoice: patch.doctrineChoice as DoctrineChoice,
     });
+    const suppliedKey = typeof patch.apiKey === 'string' ? patch.apiKey : null;
+    if (suppliedKey !== null) writeSeatApiKey(seatId, suppliedKey, loadKey());
+    const aiNumber = aiIndexForSeatId(seatId);
+    if (aiNumber !== null) {
+      updateRememberedCommander(aiNumber, {
+        modelId: typeof patch.modelId === 'string' ? patch.modelId : null,
+        reasoningEffort: typeof patch.reasoningEffort === 'string' ? patch.reasoningEffort : null,
+        doctrineChoice: patch.doctrineChoice as DoctrineChoice,
+        apiKey: suppliedKey ?? readSeatApiKey(seatId, loadKey()),
+      });
+    }
     const modelChanged = (before?.commander?.modelId ?? null) !== patch.modelId;
     const effortChanged = (before?.commander?.reasoningEffort ?? null) !== patch.reasoningEffort;
     if (modelChanged || effortChanged) cancelModelCalls('model_changed', 'all', seatId);
-    logDebug('main game:setSeatCommander', { seatId, modelChanged, effortChanged });
-    return toSeatSnapshot(updated, getGameState().gameOver === true);
+    const hasApiKey = readSeatHasApiKey(seatId);
+    logDebug('main game:setSeatCommander', { seatId, modelChanged, effortChanged, hasApiKey });
+    return toSeatSnapshot(updated, getGameState().gameOver === true, hasApiKey);
   });
   ipcMain.handle(IPC_GAME.submitOrders, (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = normalizeSubmitOrdersPayload(payload);

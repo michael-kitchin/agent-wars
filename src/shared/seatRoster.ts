@@ -138,6 +138,15 @@ export interface SeatCommander {
    */
   readonly doctrineChoice: DoctrineChoice;
   /**
+   * Whether an OpenRouter key is stored for this commander.
+   *
+   * Contract: True when a key is stored. The secret itself is not on this object.
+   * When to use: Deciding whether Run can call the model for this seat.
+   * Expected outcome: False on a roster row read from SQL. A snapshot copies the flag passed to `toSeatSnapshot`.
+   * Exceptions: None.
+   */
+  readonly hasApiKey: boolean;
+  /**
    * The doctrine the commander actually plays.
    *
    * Contract: When the choice is Random, this is the draw. Otherwise it matches the choice.
@@ -334,7 +343,7 @@ export function activeAiSeats<T extends Pick<SeatRecord, 'outTurn' | 'seatOrder'
 /**
  * Active AI seat ids in seat order.
  *
- * Purpose: Consults, loss notes, and apply-all need ids, not full rows.
+ * Purpose: Consults and loss notes need ids, not full rows.
  * When to use: After a roster is in hand. `activeAiSeats` already sorts, so the ids come back in seat order.
  * Expected outcome: Ids of active seats whose kind is `AI_SEAT_KIND`. A seat id that is not an AI seat id is dropped.
  * Exceptions: None.
@@ -396,10 +405,10 @@ export function enemySeatIdsOf(
  * When to use: While building `GameStateSnapshot.seats`. `revealDoctrine` is true when
  * the match is over.
  * Expected outcome: A chosen doctrine is always copied. A random doctrine is null until
- * `revealDoctrine` is true. A human seat keeps `commander: null`.
+ * `revealDoctrine` is true. `hasApiKey` is the boolean passed in. A human seat keeps `commander: null`.
  * Exceptions: None.
  */
-export function toSeatSnapshot(seat: SeatRecord, revealDoctrine: boolean): SeatSnapshot {
+export function toSeatSnapshot(seat: SeatRecord, revealDoctrine: boolean, hasApiKey: boolean): SeatSnapshot {
   if (seat.commander === null) {
     return { ...seat, commander: null };
   }
@@ -410,6 +419,7 @@ export function toSeatSnapshot(seat: SeatRecord, revealDoctrine: boolean): SeatS
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
       doctrineChoice: seat.commander.doctrineChoice,
+      hasApiKey,
       doctrine: hideRandomDoctrine ? null : seat.commander.doctrine,
     },
   };

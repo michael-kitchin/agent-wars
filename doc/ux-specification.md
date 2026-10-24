@@ -40,7 +40,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [orders-tab.md](ux/orders-tab.md) |
 | The selection panel | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md) | [selection-panel.md](ux/selection-panel.md) |
 | The Commanders tab's tool groups | [modes-and-transitions.md](ux/modes-and-transitions.md) | [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md) |
-| Run, its status sentence, API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
+| Run, its status sentence, or a commander's API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
@@ -91,7 +91,7 @@ Element documents share a fixed heading set:
 - [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.
 - [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, and holds the reticle that aims a ranged attack or an air strike.
 - [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Commanders tab's Tool groups section.
-- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Run and its sentence, the API key, one card per commander, and the activity log. Each commander's popover sets that seat's model, reasoning effort, and doctrine. The new-game popover uses the same model list.
+- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Run and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's API key, model, reasoning effort, and doctrine. The new-game popover uses the same model list.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
 - [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it.

@@ -1,6 +1,7 @@
 import type { StartMatchAiChoice, StartMatchAiInput } from '../../shared/startMatchAiChoice';
 import { showConsoleTab } from '../chrome/consoleFrame';
 import { rendererSharedState as S } from '../core/state';
+import { newGameHasRunnableCommander } from './newGameSidesUi';
 import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 
 /**
@@ -17,7 +18,7 @@ const AUTO_START_CHECKBOX_ID = 'new-game-auto-start-checkbox';
  * Id of the Run button.
  *
  * Purpose: A successful start treats Run as enabled only when this button is present and not disabled.
- * When to use: `readStartMatchAiInput` and `applyStartMatchAiChoice`.
+ * When to use: `applyStartMatchAiChoice`.
  * Expected outcome: Matches the button in `static/index.html`.
  * Exceptions: None.
  */
@@ -59,16 +60,15 @@ export interface StartMatchAiDeps {
  * Purpose: The start handler must keep the player's choice from the click, before the request, because the dialog can
  *   still change while the request runs.
  * When to use: At the beginning of the Start click, before any early return that skips applying the choice.
- * Expected outcome: The checkbox counts as checked only when it is present and checked. Run counts as enabled only
- *   when its button is present and not disabled. Both booleans are logged.
+ * Expected outcome: The checkbox counts as checked only when it is present and checked. Run counts as enabled when
+ *   some AI row has a key and a model. Both booleans are logged.
  * Exceptions: None.
  */
 export function readStartMatchAiInput(): StartMatchAiInput {
   const checkbox = document.getElementById(AUTO_START_CHECKBOX_ID) as HTMLInputElement | null;
-  const runButton = document.getElementById(RUN_BUTTON_ID) as HTMLButtonElement | null;
   const input = {
     autoStartChecked: checkbox?.checked === true,
-    runEnabled: runButton != null && runButton.disabled === false,
+    runEnabled: newGameHasRunnableCommander(),
   };
   console.debug('[agent-wars] readStartMatchAiInput', input);
   return input;

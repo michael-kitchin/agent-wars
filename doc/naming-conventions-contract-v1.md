@@ -45,7 +45,7 @@ Example: the const identifier `TOOL2_NAMES` may become `ASSESSMENT_TOOL_NAMES`, 
 | DB row type properties that mirror SQL | `TurnStateRow = { turn_number }` | Boundary mirror |
 | OpenRouter HTTP fields | `max_tokens`, `tool_calls`, `response_format`, `reasoning.effort`, `plugins`; models-list fields such as `supported_parameters`, `supported_efforts`, `top_provider.max_completion_tokens` | Vendor API |
 | Structured-output identifiers | `'orders_envelope'` schema name, `'response-healing'` plugin id | Vendor API |
-| `game_config` keys | `'openrouter_selected_model'`, `'openrouter_selected_reasoning_effort'`, `'game_map_id'` | Persisted settings |
+| `game_config` keys | `'openrouter_selected_model'`, `'openrouter_selected_reasoning_effort'`, `'game_map_id'`, `'openrouter_commander_memory'`, `'openrouter_seat_api_keys'`, `'openrouter_seat_api_key_flags'` | Persisted settings |
 | Persisted JSON keys | Saved games; `data/generated/` terrain JSON. Global pack filenames such as `terrain_res1_naming.json` and `terrain_res4_naming.json` stay as stored. | On-disk compatibility |
 | Electron entry filenames | `src/main/main.ts`, `src/main/preload.ts` | `"main": "dist/main/main.js"` in `package.json` |
 | Renderer bundle entry | `src/renderer/renderer.ts` | `build:renderer` esbuild entry |

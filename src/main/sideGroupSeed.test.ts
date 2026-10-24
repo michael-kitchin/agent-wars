@@ -89,7 +89,7 @@ function sideGroupRoster(firstHome: string, secondHome: string): SeatRecord[] {
       seatOrder: 2,
       kind: 'ai',
       homeRegion: secondHome,
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: DEFAULT_DOCTRINE },
+      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: DEFAULT_DOCTRINE },
       ...empty,
     },
   ];

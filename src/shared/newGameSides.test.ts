@@ -10,7 +10,6 @@ import {
   randomizeRowHome,
   removeSideRow,
   rowLabel,
-  setEveryAiCommander,
   setObserveOnly,
   setRowCommander,
   setRowHome,
@@ -106,16 +105,12 @@ test('Start refuses a shared home, and the payload keeps row order and kinds', (
   assert.deepEqual(regional.map((seat) => seat.sideGroupId), ['a', 'b', 'c']);
 });
 
-test('a commander change stays on that AI row, and apply-all skips You', () => {
+test('a commander change stays on that AI row', () => {
   const started = initialSidesState({ mapKind: 'global', homes: THREE, defaultCommander: COMMANDER, rowCount: 3 });
   const next = setRowCommander(started, 1, { ...COMMANDER, doctrineChoice: 'aggressive' });
   assert.equal(next.rows[1]?.commander?.doctrineChoice, 'aggressive');
   assert.equal(next.rows[2]?.commander?.doctrineChoice, 'balanced');
   assert.equal(setRowCommander(started, 0, COMMANDER), started);
-  const all = setEveryAiCommander(next, { ...COMMANDER, doctrineChoice: 'cautious' });
-  assert.equal(all.rows[0]?.commander, null);
-  assert.equal(all.rows[1]?.commander?.doctrineChoice, 'cautious');
-  assert.equal(all.rows[2]?.commander?.doctrineChoice, 'cautious');
 });
 
 test('randomize stays on a free home', () => {

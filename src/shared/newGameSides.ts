@@ -293,19 +293,6 @@ export function setRowCommander(
 }
 
 /**
- * Copies one commander onto every AI row.
- *
- * Purpose: "Use for every opponent" should not invent a commander for You.
- * When to use: The apply-all button in the commander popover.
- * Expected outcome: Every AI row uses `commander`. A human row stays human with a null commander.
- * Exceptions: None.
- */
-export function setEveryAiCommander(state: NewGameSidesState, commander: NewGameCommanderInput): NewGameSidesState {
-  const rows = state.rows.map((row) => (row.kind === AI_SEAT_KIND ? { ...row, commander } : row));
-  return { ...state, rows };
-}
-
-/**
  * The label of one row.
  *
  * Purpose: Selects, remove buttons, and taken-home suffixes share one name.

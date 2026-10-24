@@ -128,6 +128,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
           modelId: row.model_id,
           reasoningEffort: row.reasoning_effort,
           doctrineChoice: isDoctrineChoice(row.doctrine_choice) ? row.doctrine_choice : doctrine,
+          hasApiKey: false,
           doctrine,
         },
     outTurn: row.out_turn,
@@ -300,6 +301,7 @@ export function updateSeatCommander(
     modelId: commander.modelId,
     reasoningEffort: commander.reasoningEffort,
     doctrineChoice: commander.doctrineChoice,
+    hasApiKey: false,
     doctrine: doctrineAfterChoice(commander.doctrineChoice, seat.commander.doctrine),
   };
   ops.run(

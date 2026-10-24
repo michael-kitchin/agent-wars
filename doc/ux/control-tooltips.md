@@ -27,7 +27,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Randomize region: Pick one of the listed regions at random, including the region already shown.
 - Observe only: Leave this checked to watch. An AI commander plays every side, including the first.
 - Add another opponent, or Add another side: Add a side on the next free home. While the button is disabled the tip is "Up to 4 sides" or "No free side on this map".
-- Commander button: Change this side's model, reasoning, and doctrine.
+- Commander button: Change this side's API key, model, reasoning, and doctrine.
 - Victory rule: Regional matches end when one side remains. Global matches end at the turn limit, and the side holding the most city hexes wins.
 - Turn limit: The global match ends after this many turns. 30 is the usual length.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
@@ -37,7 +37,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
-- Auto-start AI: Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Command tab with planning off.
+- Auto-start AI: Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, to open the Command tab with planning off.
 - Starting month: Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.
 - Randomize starting month: Pick a month at random, including the month already shown.
 - Hide the new game choices: Hide the new game choices to see more of the map.
@@ -76,9 +76,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
 - Quit: Close Agent Wars.
 - Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
-- API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
-- Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
-- Run, while it cannot be clicked: Turn planning on or off for every commander. Enter an API key and choose a commander's model first.
+- API key: Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.
+- Refresh models: Load the model list again. If that fails, the message appears in the AI activity log. The button sits to the right of the model selector in the commander popover.
+- Run, while it cannot be clicked: Turn planning on or off for every commander. Give at least one commander an API key and a model first.
 - Run, while it can be clicked: Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.
 - New game in the game menu: Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.
 - New game in the game menu while a Ready is resolving, on its tip host: New game is available again once this turn or beat finishes resolving.

@@ -18597,9 +18597,6 @@ ${bonuses}`;
   function activeAiSeats(seats) {
     return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
   }
-  function activeAiSeatIds(seats) {
-    return activeAiSeats(seats).map((seat) => seat.seatId).filter((seatId) => isAiSeatId(seatId));
-  }
   function findHumanSeat(seats) {
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
   }
@@ -21717,6 +21714,228 @@ ${bonuses}`;
     return palette ?? null;
   }
 
+  // src/shared/newGameSides.ts
+  function initialSidesState(args) {
+    const requested = args.rowCount ?? MIN_SEATS;
+    const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
+    const rows = args.homes.slice(0, count).map((home, index) => ({
+      kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
+      homeKey: home.key,
+      commander: index === 0 ? null : args.defaultCommander
+    }));
+    return { mapKind: args.mapKind, observeOnly: false, rows };
+  }
+  function setObserveOnly(state, on, defaultCommander2) {
+    if (state.rows.length === 0) return { ...state, observeOnly: on };
+    const first = state.rows[0];
+    const nextFirst = on ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
+    return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
+  }
+  function addSideRow(state, homes, defaultCommander2) {
+    if (addRowBlockedReason(state, homes)) return state;
+    const taken = new Set(state.rows.map((row2) => row2.homeKey));
+    const free = homes.find((home) => !taken.has(home.key));
+    if (!free) return state;
+    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander2 };
+    return { ...state, rows: [...state.rows, row] };
+  }
+  function removeSideRow(state, index) {
+    if (state.rows.length <= MIN_SEATS) return state;
+    if (index < 0 || index >= state.rows.length) return state;
+    return { ...state, rows: state.rows.filter((_, rowIndex) => rowIndex !== index) };
+  }
+  function setRowHome(state, index, homeKey) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
+    if (taken) return state;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey } : row);
+    return { ...state, rows };
+  }
+  function randomizeRowHome(state, index, homes, random) {
+    if (index < 0 || index >= state.rows.length) return state;
+    const current = state.rows[index].homeKey;
+    const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
+    if (free.length === 0) return state;
+    const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
+    return setRowHome(state, index, picked.key);
+  }
+  function setRowCommander(state, index, commander) {
+    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
+    return { ...state, rows };
+  }
+  function rowLabel(state, index) {
+    if (index < 0 || index >= state.rows.length) return "";
+    if (state.observeOnly) return `Side ${index + 1}`;
+    if (state.rows[index].kind === HUMAN_SEAT_KIND) return "You";
+    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
+    return `Opponent ${opponentNumber}`;
+  }
+  function homeOptionsForRow(state, index, homes) {
+    return homes.map((home) => {
+      const taker = state.rows.findIndex((row, rowIndex) => rowIndex !== index && row.homeKey === home.key);
+      return {
+        key: home.key,
+        label: home.label,
+        disabled: taker >= 0,
+        takenBy: taker >= 0 ? rowLabel(state, taker) : null
+      };
+    });
+  }
+  function sidesCaption(state, homes) {
+    const max = Math.min(MAX_SEATS, homes.length);
+    const noun = state.observeOnly ? `${state.rows.length} of ${max} sides, all AI` : `${state.rows.length} of ${max} sides in play`;
+    return noun;
+  }
+  function addRowBlockedReason(state, homes) {
+    if (state.rows.length >= MAX_SEATS) return "Up to 4 sides";
+    const taken = new Set(state.rows.map((row) => row.homeKey));
+    const free = homes.some((home) => !taken.has(home.key));
+    if (!free) return "No free side on this map";
+    return null;
+  }
+  function startBlockedReason(state) {
+    if (!state || state.rows.length < MIN_SEATS) return "At least 2 sides";
+    if (state.rows.some((row) => !row.homeKey)) return "Each side needs a home";
+    const keys = state.rows.map((row) => row.homeKey);
+    if (new Set(keys).size !== keys.length) return "Two sides share a home";
+    return null;
+  }
+  function buildSeatsPayload(state) {
+    return state.rows.map((row) => {
+      const home = row.homeKey ?? void 0;
+      const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
+      if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
+      return seat;
+    });
+  }
+
+  // src/shared/commanderSetupCopy.ts
+  function commanderApiKey(commander) {
+    return commander?.apiKey?.trim() ?? "";
+  }
+  function prefillFirstAiApiKey(state, apiKey) {
+    const index = state.rows.findIndex((row2) => row2.kind === AI_SEAT_KIND);
+    if (index < 0) return state;
+    const row = state.rows[index];
+    const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: "balanced" };
+    const rows = state.rows.map(
+      (entry, rowIndex) => rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
+    );
+    return { ...state, rows };
+  }
+  function previousAiRowIndex(state, index) {
+    if (index < 0 || index >= state.rows.length) return null;
+    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (state.rows[cursor]?.kind === AI_SEAT_KIND) return cursor;
+    }
+    return null;
+  }
+  function copyButtonState(state, index, hasPreviousMatch) {
+    if (index < 0 || index >= state.rows.length) return null;
+    if (state.rows[index]?.kind !== AI_SEAT_KIND) return null;
+    const previous = previousAiRowIndex(state, index);
+    if (previous === null) {
+      if (!hasPreviousMatch) return { label: "No previous game", disabled: true, source: "previous-match" };
+      return { label: `Copy from Last Game (${rowLabel(state, index)})`, disabled: false, source: "previous-match" };
+    }
+    return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
+  }
+
+  // src/renderer/chrome/controlTooltipText.ts
+  var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
+  var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
+  function newGameButtonTooltipText(startGame) {
+    return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
+  }
+  var rangedAimTooltipText = "Aim a ranged attack. Turn this on, then double-click the target on the map.";
+  var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
+  var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
+  var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
+  function supportButtonTooltipText(kind, aiming) {
+    if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
+    return aiming ? rangedStopTooltipText : rangedAimTooltipText;
+  }
+  var apiKeyTooltipText = "Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.";
+  var refreshModelsTooltipText = "Load the model list again. If that fails, the message appears in the AI activity log.";
+  var runDisabledTooltipText = "Turn planning on or off for every commander. Give at least one commander an API key and a model first.";
+  var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
+  function runButtonTooltipText(enabled) {
+    return enabled ? runEnabledTooltipText : runDisabledTooltipText;
+  }
+  var newGameCommanderTooltipText = "Change this side's API key, model, reasoning, and doctrine.";
+  var newGameItemOpenTooltipText = "The new-game screen is already open.";
+  var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
+  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
+  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.";
+  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  function toolGroupTooltipText(groupId) {
+    switch (groupId) {
+      case "precomputation":
+        return precomputationTooltipText;
+      case "events":
+        return eventsTooltipText;
+      case "planning":
+        return planningTooltipText;
+      case "assessment":
+        return assessmentTooltipText;
+      case "estimation":
+        return estimationTooltipText;
+      case "memory":
+        return memoryTooltipText;
+      case "orders":
+        return ordersTooltipText;
+      case "production":
+        return productionTooltipText;
+      default:
+        return null;
+    }
+  }
+  var terrainStyleTooltipText = "Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.";
+  var buildEntryTooltipText = "Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.";
+  var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
+  var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
+  var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
+  var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var keepBuildingTooltipText = "After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.";
+  var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
+  var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
+  var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var multiKeepBuildingTooltipText = "After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.";
+  var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
+  var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
+  var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
+  var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
+
+  // src/renderer/openRouter/openRouterModelRefresh.ts
+  var refreshModels = null;
+  var onModelListUpdated = null;
+  var reportLine = null;
+  function setOpenRouterModelRefresh(refresh) {
+    refreshModels = refresh;
+  }
+  function refreshOpenRouterModels(key) {
+    return refreshModels?.(key) ?? Promise.resolve();
+  }
+  function setOpenRouterModelListListener(listener) {
+    onModelListUpdated = listener;
+  }
+  function notifyOpenRouterModelListUpdated() {
+    onModelListUpdated?.();
+  }
+  function setOpenRouterPopoverLog(report) {
+    reportLine = report;
+  }
+  function reportOpenRouterPopoverLine(line, isError) {
+    reportLine?.(line, isError);
+  }
+
   // src/renderer/openRouter/openRouterModelCatalog.ts
   var modelsById = /* @__PURE__ */ new Map();
   function replaceOpenRouterModelCatalog(models) {
@@ -21764,6 +21983,7 @@ ${bonuses}`;
   var anchor = null;
   var detachListeners = null;
   var notifyClosed = null;
+  var applyOpenDraft = null;
   function openCommanderPopover(request) {
     closeCommanderPopover();
     anchor = request.anchor;
@@ -21771,7 +21991,8 @@ ${bonuses}`;
     const draft = {
       modelId: request.commander.modelId,
       reasoningEffort: request.commander.reasoningEffort,
-      doctrineChoice: request.commander.doctrineChoice
+      doctrineChoice: request.commander.doctrineChoice,
+      apiKey: commanderApiKey(request.commander)
     };
     const root = document.createElement("div");
     root.className = "commander-popover";
@@ -21808,6 +22029,8 @@ ${bonuses}`;
     popover?.remove();
     popover = null;
     anchor = null;
+    applyOpenDraft = null;
+    setOpenRouterModelListListener(null);
     const closed = notifyClosed;
     notifyClosed = null;
     closed?.();
@@ -21819,6 +22042,9 @@ ${bonuses}`;
   }
   function commanderPopoverIsOpen() {
     return popover != null;
+  }
+  function replaceOpenCommanderDraft(commander) {
+    applyOpenDraft?.(commander);
   }
   function popoverHeader(title) {
     const header = document.createElement("div");
@@ -21837,47 +22063,112 @@ ${bonuses}`;
   function popoverFields(draft, request) {
     const fields = document.createElement("div");
     fields.className = "commander-popover-fields";
+    const keyInput = document.createElement("input");
+    keyInput.type = "password";
+    keyInput.autocomplete = "off";
+    keyInput.setAttribute("aria-label", "API key");
+    keyInput.value = commanderApiKey(draft);
+    keyInput.setAttribute("data-control-tooltip", apiKeyTooltipText);
     const model = document.createElement("select");
     model.setAttribute("aria-label", "Model");
     copyModelOptions(model, draft.modelId);
+    const modelControls = document.createElement("span");
+    modelControls.className = "commander-popover-model-controls";
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "openrouter-refresh-btn";
+    refresh.setAttribute("aria-label", "Refresh model list");
+    refresh.setAttribute("data-control-tooltip", refreshModelsTooltipText);
+    modelControls.append(model, refresh);
     const reasoningRow = document.createElement("label");
     reasoningRow.className = "commander-popover-field";
     reasoningRow.textContent = "Reasoning";
     const reasoning = document.createElement("select");
     reasoning.setAttribute("aria-label", "Reasoning");
     reasoningRow.appendChild(reasoning);
+    const current = () => {
+      draft.apiKey = keyInput.value.trim();
+      return { ...draft };
+    };
     const reasoningSelect = attachReasoningEffortSelect({
       select: reasoning,
       onEffortChange: (effort) => {
         draft.reasoningEffort = effort ? effort : null;
-        request.onChange({ ...draft });
+        request.onChange(current());
       }
     });
     const showReasoning = () => {
-      const record = openRouterModelById(draft.modelId ?? "");
+      const modelId = draft.modelId ?? "";
+      const record = modelId ? openRouterModelById(modelId) : void 0;
       reasoningSelect.showForModel(record, draft.reasoningEffort ?? "");
-      const hidden = listSelectableReasoningEfforts(record).length === 0;
-      reasoningRow.hidden = hidden;
-      if (hidden) draft.reasoningEffort = null;
+      const efforts = listSelectableReasoningEfforts(record);
+      reasoningRow.hidden = efforts.length === 0;
+      const modelKnown = modelId.length > 0 && record != null;
+      if (!modelId || modelKnown && efforts.length === 0) draft.reasoningEffort = null;
     };
     model.addEventListener("change", () => {
       draft.modelId = model.value ? model.value : null;
       draft.reasoningEffort = null;
       saveAppWideModel(draft.modelId);
       showReasoning();
-      request.onChange({ ...draft });
+      request.onChange(current());
     });
     showReasoning();
-    const doctrine = doctrineField(draft, request);
+    const emitKeyIfChanged = () => {
+      const next = keyInput.value.trim();
+      if (next === (draft.apiKey ?? "")) return;
+      draft.apiKey = next;
+      request.onChange({ ...draft });
+    };
+    keyInput.addEventListener("blur", emitKeyIfChanged);
+    keyInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") emitKeyIfChanged();
+    });
+    refresh.addEventListener("click", () => {
+      const key = keyInput.value.trim();
+      if (!key) {
+        reportOpenRouterPopoverLine("No API key set.", true);
+        return;
+      }
+      draft.apiKey = key;
+      request.onChange({ ...draft });
+      void refreshOpenRouterModels(key);
+    });
+    setOpenRouterModelListListener(() => {
+      copyModelOptions(model, draft.modelId);
+      showReasoning();
+    });
+    const doctrine = doctrineField(draft, request, current);
+    applyOpenDraft = (commander) => {
+      draft.modelId = commander.modelId;
+      draft.reasoningEffort = commander.reasoningEffort;
+      draft.doctrineChoice = commander.doctrineChoice;
+      draft.apiKey = commanderApiKey(commander);
+      keyInput.value = draft.apiKey ?? "";
+      copyModelOptions(model, draft.modelId);
+      showReasoning();
+      doctrine.show();
+    };
+    const copy = copyButton(request.copyButton);
+    fields.append(labeledField("API key", keyInput), labeledField("Model", modelControls), reasoningRow, doctrine.root);
+    if (copy) fields.append(copy);
+    return fields;
+  }
+  function copyButton(button) {
+    if (!button) return null;
     const apply = document.createElement("button");
     apply.type = "button";
     apply.className = "commander-popover-apply";
-    apply.textContent = request.applyAllLabel;
-    apply.addEventListener("click", () => request.onApplyAll({ ...draft }));
-    fields.append(labeledField("Model", model), reasoningRow, doctrine, apply);
-    return fields;
+    apply.textContent = button.label;
+    apply.disabled = button.disabled;
+    apply.addEventListener("click", () => {
+      if (apply.disabled) return;
+      button.onCopy();
+    });
+    return apply;
   }
   function copyModelOptions(select, modelId) {
+    select.replaceChildren();
     const source = document.getElementById("openrouter-model");
     if (!source) {
       select.appendChild(new Option("\u2014 Select model \u2014", ""));
@@ -21889,7 +22180,7 @@ ${bonuses}`;
     }
     select.value = modelId ?? "";
   }
-  function doctrineField(draft, request) {
+  function doctrineField(draft, request, current) {
     const wrap = document.createElement("div");
     const select = document.createElement("select");
     select.setAttribute("aria-label", "Doctrine");
@@ -21900,16 +22191,17 @@ ${bonuses}`;
     const description = document.createElement("p");
     description.className = "commander-popover-doctrine";
     const show = () => {
+      select.value = draft.doctrineChoice;
       description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[draft.doctrineChoice];
     };
     select.addEventListener("change", () => {
       draft.doctrineChoice = select.value;
       show();
-      request.onChange({ ...draft });
+      request.onChange(current());
     });
     show();
     wrap.append(labeledField("Doctrine", select), description);
-    return wrap;
+    return { root: wrap, show };
   }
   function labeledField(text, control) {
     const label = document.createElement("label");
@@ -21936,6 +22228,15 @@ ${bonuses}`;
     const box = popover.getBoundingClientRect();
     if (box.right > window.innerWidth - 8) popover.style.left = `${Math.max(8, window.innerWidth - box.width - 8)}px`;
     if (box.bottom > window.innerHeight - 8) popover.style.top = `${Math.max(8, rect.top - box.height - 6)}px`;
+  }
+
+  // src/renderer/openRouter/openRouterRunToggle.ts
+  var syncRunToggle = null;
+  function setOpenRouterRunToggleSync(sync) {
+    syncRunToggle = sync;
+  }
+  function syncOpenRouterRunToggle() {
+    return syncRunToggle?.() ?? Promise.resolve();
   }
 
   // src/renderer/openRouter/commanderCardsUi.ts
@@ -22012,7 +22313,7 @@ ${bonuses}`;
     summary.dataset.seatId = seat.seatId;
     summary.textContent = summaryText(seat);
     summary.disabled = presentation.summaryDisabled;
-    summary.addEventListener("click", () => openSeatCommander(seat, summary));
+    summary.addEventListener("click", () => void openSeatCommander(seat, summary));
     card.append(dot, name, chip, cost, summary);
     if (presentation.detail) {
       const detail = document.createElement("p");
@@ -22042,22 +22343,44 @@ ${bonuses}`;
     const optionRow = [...select.options].find((row) => row.value === modelId);
     return optionRow?.textContent?.trim() || modelId;
   }
-  function openSeatCommander(seat, anchor2) {
+  async function openSeatCommander(seat, anchor2) {
     if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
     const seatId = seat.seatId;
+    let includeKey = false;
+    let apiKey = "";
+    try {
+      const loaded = await window.gameApi?.openRouter?.getSeatApiKey(seatId);
+      if (typeof loaded === "string") {
+        apiKey = loaded;
+        includeKey = true;
+      }
+    } catch (err) {
+      console.error("getSeatApiKey failed", seatId, err);
+    }
+    if (!anchor2.isConnected) return;
     const commander = {
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
-      doctrineChoice: seat.commander.doctrineChoice
+      doctrineChoice: seat.commander.doctrineChoice,
+      ...includeKey ? { apiKey } : {}
     };
-    const observing = isObservingRoster(rendererSharedState.gameState?.seats ?? []);
     openCommanderPopover({
       anchor: anchor2,
       title: `${seat.homeRegion} commander`,
       commander,
-      applyAllLabel: observing ? "Use for every side" : "Use for every opponent",
-      onChange: (next) => void saveCommander(seatId, next),
-      onApplyAll: (next) => void saveEveryCommander(next)
+      copyButton: null,
+      onChange: (next) => {
+        if (!includeKey && (next.apiKey ?? "") === "") {
+          void saveCommander(seatId, {
+            modelId: next.modelId,
+            reasoningEffort: next.reasoningEffort,
+            doctrineChoice: next.doctrineChoice
+          });
+          return;
+        }
+        includeKey = true;
+        void saveCommander(seatId, next);
+      }
     });
     anchor2.setAttribute("aria-expanded", "true");
   }
@@ -22067,12 +22390,10 @@ ${bonuses}`;
       if (!updated || !rendererSharedState.gameState?.seats) return;
       rendererSharedState.gameState = { ...rendererSharedState.gameState, seats: rendererSharedState.gameState.seats.map((seat) => seat.seatId === updated.seatId ? updated : seat) };
       renderCommanderCards();
+      void syncOpenRouterRunToggle();
     } catch (err) {
       console.error("setSeatCommander failed", seatId, err);
     }
-  }
-  async function saveEveryCommander(commander) {
-    for (const seatId of activeAiSeatIds(rendererSharedState.gameState?.seats ?? [])) await saveCommander(seatId, commander);
   }
   function formatCost(dollars) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
@@ -22903,73 +23224,6 @@ ${bonuses}`;
     row.appendChild(label);
     container.appendChild(row);
   }
-
-  // src/renderer/chrome/controlTooltipText.ts
-  var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
-  var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
-  function newGameButtonTooltipText(startGame) {
-    return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
-  }
-  var rangedAimTooltipText = "Aim a ranged attack. Turn this on, then double-click the target on the map.";
-  var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
-  var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
-  var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
-  function supportButtonTooltipText(kind, aiming) {
-    if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
-    return aiming ? rangedStopTooltipText : rangedAimTooltipText;
-  }
-  var runDisabledTooltipText = "Turn planning on or off for every commander. Enter an API key and choose a commander's model first.";
-  var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
-  function runButtonTooltipText(enabled) {
-    return enabled ? runEnabledTooltipText : runDisabledTooltipText;
-  }
-  var newGameItemOpenTooltipText = "The new-game screen is already open.";
-  var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
-  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
-  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.";
-  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  function toolGroupTooltipText(groupId) {
-    switch (groupId) {
-      case "precomputation":
-        return precomputationTooltipText;
-      case "events":
-        return eventsTooltipText;
-      case "planning":
-        return planningTooltipText;
-      case "assessment":
-        return assessmentTooltipText;
-      case "estimation":
-        return estimationTooltipText;
-      case "memory":
-        return memoryTooltipText;
-      case "orders":
-        return ordersTooltipText;
-      case "production":
-        return productionTooltipText;
-      default:
-        return null;
-    }
-  }
-  var terrainStyleTooltipText = "Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.";
-  var buildEntryTooltipText = "Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.";
-  var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
-  var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
-  var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
-  var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var keepBuildingTooltipText = "After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.";
-  var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
-  var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
-  var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var multiKeepBuildingTooltipText = "After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.";
-  var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
-  var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
-  var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
-  var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
 
   // src/renderer/rendering/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
@@ -26705,106 +26959,6 @@ ${bonuses}`;
     return document.getElementById(id)?.value ?? "";
   }
 
-  // src/shared/newGameSides.ts
-  function initialSidesState(args) {
-    const requested = args.rowCount ?? MIN_SEATS;
-    const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
-    const rows = args.homes.slice(0, count).map((home, index) => ({
-      kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
-      homeKey: home.key,
-      commander: index === 0 ? null : args.defaultCommander
-    }));
-    return { mapKind: args.mapKind, observeOnly: false, rows };
-  }
-  function setObserveOnly(state, on, defaultCommander2) {
-    if (state.rows.length === 0) return { ...state, observeOnly: on };
-    const first = state.rows[0];
-    const nextFirst = on ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
-    return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
-  }
-  function addSideRow(state, homes, defaultCommander2) {
-    if (addRowBlockedReason(state, homes)) return state;
-    const taken = new Set(state.rows.map((row2) => row2.homeKey));
-    const free = homes.find((home) => !taken.has(home.key));
-    if (!free) return state;
-    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander2 };
-    return { ...state, rows: [...state.rows, row] };
-  }
-  function removeSideRow(state, index) {
-    if (state.rows.length <= MIN_SEATS) return state;
-    if (index < 0 || index >= state.rows.length) return state;
-    return { ...state, rows: state.rows.filter((_, rowIndex) => rowIndex !== index) };
-  }
-  function setRowHome(state, index, homeKey) {
-    if (index < 0 || index >= state.rows.length) return state;
-    const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
-    if (taken) return state;
-    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey } : row);
-    return { ...state, rows };
-  }
-  function randomizeRowHome(state, index, homes, random) {
-    if (index < 0 || index >= state.rows.length) return state;
-    const current = state.rows[index].homeKey;
-    const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
-    if (free.length === 0) return state;
-    const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
-    return setRowHome(state, index, picked.key);
-  }
-  function setRowCommander(state, index, commander) {
-    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
-    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
-    return { ...state, rows };
-  }
-  function setEveryAiCommander(state, commander) {
-    const rows = state.rows.map((row) => row.kind === AI_SEAT_KIND ? { ...row, commander } : row);
-    return { ...state, rows };
-  }
-  function rowLabel(state, index) {
-    if (index < 0 || index >= state.rows.length) return "";
-    if (state.observeOnly) return `Side ${index + 1}`;
-    if (state.rows[index].kind === HUMAN_SEAT_KIND) return "You";
-    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
-    return `Opponent ${opponentNumber}`;
-  }
-  function homeOptionsForRow(state, index, homes) {
-    return homes.map((home) => {
-      const taker = state.rows.findIndex((row, rowIndex) => rowIndex !== index && row.homeKey === home.key);
-      return {
-        key: home.key,
-        label: home.label,
-        disabled: taker >= 0,
-        takenBy: taker >= 0 ? rowLabel(state, taker) : null
-      };
-    });
-  }
-  function sidesCaption(state, homes) {
-    const max = Math.min(MAX_SEATS, homes.length);
-    const noun = state.observeOnly ? `${state.rows.length} of ${max} sides, all AI` : `${state.rows.length} of ${max} sides in play`;
-    return noun;
-  }
-  function addRowBlockedReason(state, homes) {
-    if (state.rows.length >= MAX_SEATS) return "Up to 4 sides";
-    const taken = new Set(state.rows.map((row) => row.homeKey));
-    const free = homes.some((home) => !taken.has(home.key));
-    if (!free) return "No free side on this map";
-    return null;
-  }
-  function startBlockedReason(state) {
-    if (!state || state.rows.length < MIN_SEATS) return "At least 2 sides";
-    if (state.rows.some((row) => !row.homeKey)) return "Each side needs a home";
-    const keys = state.rows.map((row) => row.homeKey);
-    if (new Set(keys).size !== keys.length) return "Two sides share a home";
-    return null;
-  }
-  function buildSeatsPayload(state) {
-    return state.rows.map((row) => {
-      const home = row.homeKey ?? void 0;
-      const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
-      if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
-      return seat;
-    });
-  }
-
   // src/shared/victoryRules.ts
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
@@ -26829,6 +26983,20 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/newGameSidesUi.ts
+  var rememberedCommanders = { hasPreviousMatch: false, prefillApiKey: "", previousMatch: [] };
+  async function loadCommanderKeyMemory() {
+    try {
+      const memory = await window.gameApi?.openRouter?.getCommanderKeyMemory();
+      if (memory) rememberedCommanders = memory;
+    } catch (err) {
+      console.error("getCommanderKeyMemory failed", err);
+    }
+  }
+  function newGameHasRunnableCommander() {
+    return (sidesState?.rows ?? []).some(
+      (row) => row.kind === AI_SEAT_KIND && commanderApiKey(row.commander) !== "" && Boolean(row.commander?.modelId?.trim())
+    );
+  }
   var sidesState = null;
   var requestedRows = MIN_SEATS;
   var openCommanderRow = null;
@@ -26842,7 +27010,7 @@ ${bonuses}`;
     const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
     const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
     const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-    return { modelId, reasoningEffort, doctrineChoice: "balanced" };
+    return { modelId, reasoningEffort, doctrineChoice: "balanced", apiKey: "" };
   }
   function commanderButtonLabel(commander) {
     const modelSelect = document.getElementById("openrouter-model");
@@ -26865,7 +27033,7 @@ ${bonuses}`;
     for (let index = 0; index < next.rows.length; index += 1) {
       next = randomizeRowHome(next, index, homes, Math.random);
     }
-    sidesState = next;
+    sidesState = prefillFirstAiApiKey(next, rememberedCommanders.prefillApiKey);
     renderNewGameSides();
   }
   function bindNewGameSides() {
@@ -26875,7 +27043,10 @@ ${bonuses}`;
       if (!sidesState) return;
       const box = document.getElementById("new-game-observe-only");
       closeCommanderPopover();
-      sidesState = setObserveOnly(sidesState, box?.checked === true, defaultCommander());
+      sidesState = prefillFirstAiApiKey(
+        setObserveOnly(sidesState, box?.checked === true, defaultCommander()),
+        rememberedCommanders.prefillApiKey
+      );
       renderNewGameSides();
       void refreshNewGameMapPreview();
     });
@@ -26977,6 +27148,31 @@ ${bonuses}`;
     const limitRow = document.getElementById("new-game-turn-limit-row");
     if (limitRow) limitRow.hidden = !global;
   }
+  function copyCommanderFrom(index, source) {
+    if (!sidesState) return;
+    const copied = source === "previous-match" ? commanderFromLastGame() : commanderFromPreviousRow(index);
+    if (!copied) return;
+    sidesState = setRowCommander(sidesState, index, copied);
+    replaceOpenCommanderDraft(copied);
+    renderNewGameSides();
+  }
+  function commanderFromLastGame() {
+    const previous = rememberedCommanders.previousMatch[0];
+    if (!previous) return null;
+    return {
+      modelId: previous.modelId,
+      reasoningEffort: previous.reasoningEffort,
+      doctrineChoice: previous.doctrineChoice,
+      apiKey: previous.apiKey
+    };
+  }
+  function commanderFromPreviousRow(index) {
+    if (!sidesState) return null;
+    const previousIndex = previousAiRowIndex(sidesState, index);
+    if (previousIndex === null) return null;
+    const previous = sidesState.rows[previousIndex]?.commander;
+    return previous ? { ...previous } : null;
+  }
   function openRowCommander(index, button) {
     if (!sidesState) return;
     if (openCommanderRow === index && commanderPopoverIsOpen()) {
@@ -26986,20 +27182,19 @@ ${bonuses}`;
     const row = sidesState.rows[index];
     if (!row || row.kind !== AI_SEAT_KIND) return;
     const label = rowLabel(sidesState, index);
-    const observeOnly = sidesState.observeOnly;
+    const buttonState = copyButtonState(sidesState, index, rememberedCommanders.hasPreviousMatch);
     openCommanderPopover({
       anchor: button,
       title: `${label} commander`,
       commander: row.commander ?? defaultCommander(),
-      applyAllLabel: observeOnly ? "Use for every side" : "Use for every opponent",
+      copyButton: buttonState ? {
+        label: buttonState.label,
+        disabled: buttonState.disabled,
+        onCopy: () => copyCommanderFrom(index, buttonState.source)
+      } : null,
       onChange: (commander) => {
         if (!sidesState) return;
         sidesState = setRowCommander(sidesState, index, commander);
-        renderNewGameSides();
-      },
-      onApplyAll: (commander) => {
-        if (!sidesState) return;
-        sidesState = setEveryAiCommander(sidesState, commander);
         renderNewGameSides();
       },
       onClose: () => {
@@ -27069,7 +27264,7 @@ ${bonuses}`;
       commander.textContent = commanderButtonLabel(row.commander);
       commander.dataset.commanderRow = String(index);
       commander.setAttribute("aria-label", `${label} commander`);
-      commander.setAttribute("data-control-tooltip", "Change this side's model, reasoning, and doctrine.");
+      commander.setAttribute("data-control-tooltip", newGameCommanderTooltipText);
       commander.addEventListener("click", () => openRowCommander(index, commander));
       wrap.appendChild(commander);
     }
@@ -28909,7 +29104,7 @@ ${bonuses}`;
       resetNewGameMapPreviewFrame();
       repaintNewGameMapPreview();
       void (async () => {
-        await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+        await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
         refreshNewGameSides({ reset: true });
         await refreshNewGameMapPreview();
       })();
@@ -32841,10 +33036,9 @@ ${bonuses}`;
   var RUN_BUTTON_ID = "openrouter-run-btn";
   function readStartMatchAiInput() {
     const checkbox = document.getElementById(AUTO_START_CHECKBOX_ID);
-    const runButton = document.getElementById(RUN_BUTTON_ID);
     const input = {
       autoStartChecked: checkbox?.checked === true,
-      runEnabled: runButton != null && runButton.disabled === false
+      runEnabled: newGameHasRunnableCommander()
     };
     console.debug("[agent-wars] readStartMatchAiInput", input);
     return input;
@@ -32964,6 +33158,7 @@ ${bonuses}`;
           startPlanning: () => deps.startBackgroundRequestIfAllowed(),
           updateReadyButtonState: () => deps.updateReadyButtonState()
         });
+        await syncOpenRouterRunToggle();
         deps.resizeAndRedraw();
       } catch (err) {
         console.error("newGame failed:", err);
@@ -32989,7 +33184,7 @@ ${bonuses}`;
     }
     resetNewGameOptionControls();
     void (async () => {
-      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
       refreshNewGameSides({ reset: true });
       await refreshNewGameMapPreview();
     })();
@@ -35749,7 +35944,7 @@ ${bonuses}`;
       lastShownMapLoadError = nextState.gameMapLoadError;
       showMapToast(nextState.gameMapLoadError);
     }
-    return applyGameStateSnapshot(
+    await applyGameStateSnapshot(
       {
         rebuildUnitDisplayNameLookup,
         reconcileSelectionToCurrentState,
@@ -35772,6 +35967,7 @@ ${bonuses}`;
       nextState,
       options
     );
+    await syncOpenRouterRunToggleInteractable();
   }
   async function showTerrainTooltip(clientX, clientY, state, namingTarget) {
     if (shouldSuppressTerrainTooltip()) return;
@@ -36026,11 +36222,11 @@ ${bonuses}`;
   }
   async function syncOpenRouterRunToggleInteractable() {
     const runBtn = document.getElementById("openrouter-run-btn");
-    const api = window.gameApi?.openRouter;
-    if (!runBtn || !api?.getKey || !api.getSelectedModel) return;
+    if (!runBtn) return;
     try {
-      const [keyResult, modelId] = await Promise.all([api.getKey(), api.getSelectedModel()]);
-      const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
+      const canEnable = (rendererSharedState.gameState?.seats ?? []).some(
+        (seat) => seat.outTurn == null && seat.commander?.hasApiKey === true && Boolean(seat.commander.modelId?.trim())
+      );
       if (canEnable) {
         runBtn.disabled = false;
       } else {
@@ -36058,6 +36254,7 @@ ${bonuses}`;
       runBtn.removeAttribute("title");
     }
   }
+  setOpenRouterRunToggleSync(syncOpenRouterRunToggleInteractable);
 
   // src/shared/openRouterModelDisplay.ts
   function parseFinitePrice(value) {
@@ -36318,6 +36515,7 @@ ${bonuses}`;
     deps.updateReadyButtonState();
   }
   function initOpenRouterUI(deps) {
+    setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
     bindCommanderPoolScreen({
       showCommanderMessages: showCommanderMessagesToast,
       fileCommanderMessage: (dispatch) => {
@@ -36355,14 +36553,14 @@ ${bonuses}`;
         deps.renderOpenRouterToolsList();
       }
     })();
-    const keyInput = document.getElementById("openrouter-key");
     const modelSelect = document.getElementById("openrouter-model");
-    const refreshBtn = document.getElementById("openrouter-refresh-models");
     const newBtn = document.getElementById("openrouter-new-btn");
     let persistedSelectedModelId = "";
-    let lastPersistedApiKeyValue = "";
-    let savedKeyHiddenInEmptyField = false;
+    let startupModelKey = "";
     let modelRefreshInFlight = false;
+    let modelRefreshPromise = Promise.resolve();
+    let queuedModelKey = null;
+    let queuedModelRefresh = null;
     let startupModelRetryTimer = null;
     let startupModelRetryConsumed = false;
     const modelDescriptionTooltip = modelSelect ? attachModelDescriptionTooltip({
@@ -36400,7 +36598,7 @@ ${bonuses}`;
       startupModelRetryConsumed = true;
       startupModelRetryTimer = setTimeout(() => {
         startupModelRetryTimer = null;
-        refreshModels(true);
+        void refreshModels2(startupModelKey, true);
       }, 2e3);
     }
     function shouldRetryStartupModelFetch(errorMessage) {
@@ -36409,11 +36607,25 @@ ${bonuses}`;
       if (errorMessage.startsWith("API error: 4")) return false;
       return true;
     }
-    function refreshModels(retryOnFailure = false) {
-      if (modelRefreshInFlight) return;
+    function refreshModels2(key, retryOnFailure = false) {
+      startupModelKey = key;
+      if (modelRefreshInFlight) {
+        queuedModelKey = key;
+        if (queuedModelRefresh) return queuedModelRefresh;
+        const followed = modelRefreshPromise.then(() => {
+          queuedModelRefresh = null;
+          const next = queuedModelKey;
+          queuedModelKey = null;
+          if (next === null) return;
+          return refreshModels2(next, false);
+        });
+        queuedModelRefresh = followed;
+        return followed;
+      }
+      queuedModelKey = null;
       modelRefreshInFlight = true;
       modelDescriptionTooltip?.clear();
-      api.listModels().then((result) => {
+      const pending2 = api.listModels(key).then((result) => {
         if (!modelSelect) return;
         const kept = modelSelect.value;
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
@@ -36423,6 +36635,7 @@ ${bonuses}`;
           deps.appendOpenRouterLog(`Models: ${result.error}`, true);
           if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
           showReasoningEffortForSelectedModel();
+          notifyOpenRouterModelListUpdated();
           void deps.syncOpenRouterRunToggleInteractable();
           return;
         }
@@ -36439,6 +36652,7 @@ ${bonuses}`;
           modelSelect.value = targetModelId;
         }
         showReasoningEffortForSelectedModel();
+        notifyOpenRouterModelListUpdated();
         clearStartupModelRetryTimer();
         void deps.syncOpenRouterRunToggleInteractable();
       }).catch((err) => {
@@ -36448,13 +36662,17 @@ ${bonuses}`;
         deps.appendOpenRouterLog(`Models: ${message}`, true);
         if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
         showReasoningEffortForSelectedModel();
+        notifyOpenRouterModelListUpdated();
         void deps.syncOpenRouterRunToggleInteractable();
       }).finally(() => {
         modelRefreshInFlight = false;
         renderOpponentStatus();
       });
+      modelRefreshPromise = pending2;
+      return pending2;
     }
-    api.getSelectedModel().then((modelId) => {
+    setOpenRouterModelRefresh((key) => refreshModels2(key, false));
+    api.getSelectedModel().then(async (modelId) => {
       persistedSelectedModelId = modelId;
       if (modelSelect && modelId && !Array.from(modelSelect.options).some((o) => o.value === modelId)) {
         const opt = document.createElement("option");
@@ -36464,8 +36682,10 @@ ${bonuses}`;
         modelSelect.value = modelId;
         renderOpponentStatus();
       }
-      refreshModels(true);
-    }).catch(() => refreshModels(true));
+      const memory = await api.getCommanderKeyMemory();
+      const key = memory.prefillApiKey.trim();
+      if (key) await refreshModels2(key, true);
+    }).catch(() => void 0);
     api.getSelectedReasoningEffort().then((effort) => {
       if (playerChangedModel) return;
       persistedReasoningEffort = effort;
@@ -36473,47 +36693,6 @@ ${bonuses}`;
     }).catch((err) => {
       deps.appendOpenRouterLog(`Reasoning effort: ${String(err)}`, true);
     });
-    if (keyInput) {
-      api.getKey().then((keyResult) => {
-        if (keyResult?.hasKey && !keyInput.value.trim()) {
-          keyInput.placeholder = "Saved API key";
-          lastPersistedApiKeyValue = "";
-          savedKeyHiddenInEmptyField = true;
-          refreshModels(true);
-        }
-      });
-      const persistApiKey = () => {
-        const value = keyInput.value.trim();
-        if (value === "" && savedKeyHiddenInEmptyField) {
-          savedKeyHiddenInEmptyField = false;
-          lastPersistedApiKeyValue = "";
-          api.setKey("").then(() => {
-            keyInput.placeholder = "Set key and blur to save";
-            deps.hideMapToast();
-            void deps.syncOpenRouterRunToggleInteractable();
-          });
-          return;
-        }
-        if (value === lastPersistedApiKeyValue) return;
-        lastPersistedApiKeyValue = value;
-        api.setKey(value).then(() => {
-          if (!value) {
-            keyInput.placeholder = "Set key and blur to save";
-            deps.hideMapToast();
-            void deps.syncOpenRouterRunToggleInteractable();
-            return;
-          }
-          keyInput.placeholder = "Saved API key";
-          refreshModels(true);
-          void deps.syncOpenRouterRunToggleInteractable();
-        });
-      };
-      keyInput.addEventListener("blur", persistApiKey);
-      keyInput.addEventListener("change", persistApiKey);
-      keyInput.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter") persistApiKey();
-      });
-    }
     if (modelSelect) {
       modelSelect.addEventListener("change", () => {
         renderOpponentStatus();
@@ -36543,7 +36722,6 @@ ${bonuses}`;
         writeTacticalBattlesInterceptPromptEnabled(tacticalBattlesCb.checked);
       });
     }
-    if (refreshBtn) refreshBtn.addEventListener("click", () => refreshModels(false));
     if (newBtn) newBtn.addEventListener("click", deps.openNewGameOverlayFromModelTab);
     const runBtn = document.getElementById("openrouter-run-btn");
     if (runBtn) {

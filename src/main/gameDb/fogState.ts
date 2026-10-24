@@ -18,6 +18,7 @@ import { gameMapLoadError } from '../gameMap/loadGameMap';
 import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 import { readSeatRoster } from './seatRosterStore';
+import { readSeatHasApiKey } from './seatApiKeyFlags';
 import { activeSeats, toSeatSnapshot } from '../../shared/seatRoster';
 import type { SeatId } from '../../shared/seatIds';
 import { readPersistedGameSize } from './gameSizeConfig';
@@ -118,7 +119,7 @@ function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean):
 function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameStateSnapshot {
   const scenario = loadScenarioState(ops);
   const roster = readSeatRoster(ops);
-  const seats = roster.map((seat) => toSeatSnapshot(seat, snapshot.gameOver === true));
+  const seats = roster.map((seat) => toSeatSnapshot(seat, snapshot.gameOver === true, readSeatHasApiKey(seat.seatId)));
   const homeRegionHexesBySeat: Record<string, readonly string[]> = {};
   for (const seat of roster) {
     homeRegionHexesBySeat[seat.seatId] = getScenarioHomeRegionHexes(seat.homeRegion);

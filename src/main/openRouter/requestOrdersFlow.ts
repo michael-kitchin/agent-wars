@@ -1,6 +1,7 @@
 import { cellToLatLng } from 'h3-js';
 import { isLikelyAbortError } from '../../shared/abortError';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
 import { parseOrdersResponse } from './orderResponseParsing';
@@ -128,7 +129,7 @@ export async function requestOrdersFlow(
     filteredForPrecomputation: usePrecomputation,
     tacticalAiBattle: tacticalBattle ? tacticalBattle.battleId : null,
   });
-  const key = loadKey();
+  const key = readSeatApiKey(seatId, loadKey());
   const failRequest = (error: string): RequestOrdersError => {
     return { success: false, error };
   };

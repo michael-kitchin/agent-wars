@@ -353,6 +353,15 @@ export interface NewGameCommanderInput {
    * Exceptions: None.
    */
   readonly doctrineChoice: DoctrineChoice;
+  /**
+   * OpenRouter key for this opponent.
+   *
+   * Contract: Optional. Missing and blank mean this opponent has no key. A string is trimmed before it is stored.
+   * When to use: The commander popover and the new-game start payload.
+   * Expected outcome: Stored with that AI seat. It is not written into logs.
+   * Exceptions: None.
+   */
+  readonly apiKey?: string;
 }
 
 /**

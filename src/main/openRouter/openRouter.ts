@@ -1,6 +1,6 @@
 /**
  * OpenRouter integration: API key storage, list models, and request AI movement orders.
- * All key handling is in the main process; the key is never logged or sent to the renderer in plain form.
+ * All key handling is in the main process. The local renderer receives a key only to fill a password field, and the key is never logged.
  */
 
 import * as fs from 'fs';
@@ -23,6 +23,7 @@ import {
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
+import { readSeatHasApiKey } from '../gameDb/seatApiKeyFlags';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
 import { isEmbarkedLandUnit } from '../gameActions/sealift';
@@ -53,6 +54,7 @@ import { buildOpenRouterModelList } from './buildOpenRouterModelList';
 import { getOpenRouterModelCapabilities, rememberOpenRouterModels } from './openRouterModelCapabilities';
 import { resolveOrdersRequestProfile, resolveSeatOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
+import { readSecretString, writeSecretString } from './secretConfig';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
 
@@ -151,19 +153,8 @@ function deleteGameConfigValue(key: string): void {
  * Exceptions: None.
  */
 export function loadKey(): string {
-  const fromDb = loadGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY);
-  if (typeof fromDb === 'string' && fromDb.length > 0) {
-    try {
-      const parsed = JSON.parse(fromDb) as { key?: string; encrypted?: string };
-      if (typeof parsed.encrypted === 'string' && safeStorage.isEncryptionAvailable()) {
-        return safeStorage.decryptString(Buffer.from(parsed.encrypted, 'base64'));
-      }
-      if (typeof parsed.key === 'string') return parsed.key;
-    } catch (err) {
-      logError('openRouter loadKey: failed to parse DB-stored key JSON', err);
-      return fromDb;
-    }
-  }
+  const fromDb = readSecretString(OPENROUTER_KEY_DB_CONFIG_KEY);
+  if (fromDb.length > 0) return fromDb;
   const configPath = getConfigPath();
   if (!fs.existsSync(configPath)) return '';
   try {
@@ -197,8 +188,8 @@ export function loadKey(): string {
 export function saveKey(key: string): void {
   const configPath = getConfigPath();
   try {
+    writeSecretString(OPENROUTER_KEY_DB_CONFIG_KEY, key);
     if (!key.trim()) {
-      deleteGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY);
       if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
       return;
     }
@@ -208,7 +199,6 @@ export function saveKey(key: string): void {
     } else {
       data.key = key;
     }
-    saveGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY, JSON.stringify(data));
     fs.writeFileSync(configPath, JSON.stringify(data), { mode: 0o600 });
   } catch (err) {
     logError('openRouter saveKey: failed to write config', err);
@@ -224,8 +214,10 @@ export function saveKey(key: string): void {
  * Exceptions: None.
  */
 export function hasKey(): boolean {
-  logTrace('openRouter hasKey');
-  return loadKey().length > 0;
+  const legacy = loadKey().length > 0;
+  const seat = AI_SEAT_IDS.some((seatId) => readSeatHasApiKey(seatId));
+  logTrace('openRouter hasKey', { legacy, seat });
+  return legacy || seat;
 }
 
 /**
@@ -367,23 +359,23 @@ export { setChatTransportOverrideForTests } from './openRouterChatTransport';
 export type ModelItem = OpenRouterModel;
 
 /**
- * Defines the `listModels` function shape (export async function listModels(): Promise<).
-
- * Purpose: Supports maintainability by documenting why `listModels` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads the OpenRouter model catalog with the caller's key.
+ *
+ * Purpose: Each popover refresh uses the key in that popover.
+ * When to use: The model-list IPC. Pass `''` when the argument is not a string.
+ * Expected outcome: The model list, or `{ error: 'No API key set' }` without a fetch when the key is blank. The key is not logged.
+ * Exceptions: None. A failed fetch returns `{ error }` and is logged.
  */
-export async function listModels(): Promise<{ models: ModelItem[] } | { error: string }> {
-  logDebug('openRouter listModels');
-  const key = loadKey();
-  if (!key) {
+export async function listModels(key: string): Promise<{ models: ModelItem[] } | { error: string }> {
+  const supplied = typeof key === 'string' ? key.trim() : '';
+  logDebug('openRouter listModels', { hasKey: supplied.length > 0 });
+  if (!supplied) {
     logError('openRouter listModels: no API key set');
     return { error: 'No API key set' };
   }
   try {
     const res = await fetch(OPENROUTER_MODELS_URL, {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { Authorization: `Bearer ${supplied}` },
     });
     if (!res.ok) {
       const text = await res.text();

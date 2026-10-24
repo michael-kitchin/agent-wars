@@ -2,7 +2,7 @@
 
 > **Note:** Some of the screenshots are out of date, since the v2.6.0 facelift. I'll replace them as soon as I can.
 
-This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
+This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up each opponent's OpenRouter key are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, both sides create combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once players are ready, the game executes their orders and determines the outcomes (think: "Axis & Allies" meets "Diplomacy", with a software referee).
 
@@ -302,7 +302,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 ## Things that may surprise you
 
-- **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
+- **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens. Each commander has its own key, entered in that commander's popover. A commander with a model and an empty key does not call the model.
 - **Reasoning costs more:** a higher reasoning level on a commander's card makes that consult slower and dearer.
 - **Waiting on the AI:** while a commander plans, Ready shows **AI:**, a timer, and how many are still planning, and the line above it reads **Commanders planning**. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
 - **Not every turn:** with **Events** on (the default) in the Commanders tab's Tool groups, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.

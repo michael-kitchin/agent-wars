@@ -346,9 +346,22 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   gap: 8px;
   font-size: 12.5px;
 }
-.commander-popover-field select {
+.commander-popover-field select,
+.commander-popover-field input {
   width: 160px;
   min-width: 0;
+}
+.commander-popover-model-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 160px;
+  min-width: 0;
+}
+.commander-popover-field .commander-popover-model-controls select {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 .commander-popover-doctrine {
   margin: 0;

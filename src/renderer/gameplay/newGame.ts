@@ -26,11 +26,12 @@ import {
 } from './newGameReturn';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
-import { bindNewGameSides, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
+import { bindNewGameSides, loadCommanderKeyMemory, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
 import { showNewGameBanner } from './newGameBanner';
 import { clearObserveAfterKnockout } from './observeIntent';
 import { chooseStartMatchAi } from '../../shared/startMatchAiChoice';
 import { applyStartMatchAiChoice, readStartMatchAiInput } from './newGameAiStart';
+import { syncOpenRouterRunToggle } from '../openRouter/openRouterRunToggle';
 import { advanceRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
@@ -365,6 +366,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         startPlanning: () => deps.startBackgroundRequestIfAllowed(),
         updateReadyButtonState: () => deps.updateReadyButtonState(),
       });
+      await syncOpenRouterRunToggle();
       deps.resizeAndRedraw();
     } catch (err) {
       console.error('newGame failed:', err);
@@ -407,7 +409,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   }
   resetNewGameOptionControls();
   void (async () => {
-    await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+    await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel(), loadCommanderKeyMemory()]);
     refreshNewGameSides({ reset: true });
     await refreshNewGameMapPreview();
   })();

@@ -177,17 +177,17 @@ export function supportButtonTooltipText(kind: 'ranged' | 'strike', aiming: bool
 }
 
 /**
- * Purpose: Says how to save the key and how to forget it.
- * When to use: `#openrouter-key`.
+ * Purpose: Says how to keep one opponent's key and how to forget it.
+ * When to use: The API key field in the commander popover.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const apiKeyTooltipText =
-  'Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.';
+  'Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent\'s key.';
 
 /**
  * Purpose: Says where a failed refresh is reported.
- * When to use: `#openrouter-refresh-models`.
+ * When to use: The refresh button beside the model selector in the commander popover.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
@@ -201,7 +201,7 @@ export const refreshModelsTooltipText =
  * Exceptions: None.
  */
 export const runDisabledTooltipText =
-  'Turn planning on or off for every commander. Enter an API key and choose a commander\'s model first.';
+  'Turn planning on or off for every commander. Give at least one commander an API key and a model first.';
 
 /**
  * Run's tip while it can be clicked.
@@ -223,6 +223,17 @@ export const runEnabledTooltipText =
 export function runButtonTooltipText(enabled: boolean): string {
   return enabled ? runEnabledTooltipText : runDisabledTooltipText;
 }
+
+/**
+ * The new-game commander button's tip.
+ *
+ * Purpose: The button opens the key, model, reasoning, and doctrine for that side.
+ * When to use: Each AI row's commander button.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameCommanderTooltipText =
+  'Change this side\'s API key, model, reasoning, and doctrine.';
 
 /**
  * Purpose: Says New opens the new-game screen over the match, which keeps going until a new one starts.

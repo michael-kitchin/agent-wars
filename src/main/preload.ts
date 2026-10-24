@@ -7,6 +7,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { AiSeatId } from '../shared/seatIds';
+import type { CommanderKeyMemoryView } from '../shared/commanderSetupCopy';
 import type { DoctrineChoice, SeatSnapshot } from '../shared/seatRoster';
 import type {
   SubmitOrdersIpcPayload,
@@ -126,6 +127,8 @@ const IPC_OPENROUTER = {
   setSelectedModel: 'openRouter:setSelectedModel',
   getSelectedReasoningEffort: 'openRouter:getSelectedReasoningEffort',
   setSelectedReasoningEffort: 'openRouter:setSelectedReasoningEffort',
+  getCommanderKeyMemory: 'openRouter:getCommanderKeyMemory',
+  getSeatApiKey: 'openRouter:getSeatApiKey',
 } as const;
 
 /**
@@ -297,13 +300,13 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    * Saves one AI seat's model, effort, and doctrine choice.
    *
    * Purpose: The commander popover writes that seat without changing the other seats.
-   * When to use: When the player changes a commander's model, effort, or doctrine.
-   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult.
+   * When to use: When the player changes a commander's model, effort, doctrine, or key.
+   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult. An omitted `apiKey` leaves the stored key.
    * Exceptions: Rejects when the seat is human, missing, or knocked out.
    */
   setSeatCommander: (
     seatId: AiSeatId,
-    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice }
+    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string }
   ): Promise<SeatSnapshot> => ipcRenderer.invoke('game:setSeatCommander', seatId, commander),
   /**
    * Ends the match by ranking the seats that are still active.
@@ -685,14 +688,42 @@ openRouter: {
       ipcRenderer.invoke(IPC_OPENROUTER.getSelectedModel),
     setKey: (key: string): Promise<void> =>
       ipcRenderer.invoke(IPC_OPENROUTER.setKey, key),
-    listModels: (): Promise<{ models?: OpenRouterModel[]; error?: string }> =>
-      ipcRenderer.invoke(IPC_OPENROUTER.listModels),
+    /**
+     * Loads the OpenRouter model list with the key from the open commander.
+     *
+     * Purpose: The model catalog is shared, and the refresh uses the popover's key.
+     * When to use: Startup, when a remembered key exists, and the popover's refresh button.
+     * Expected outcome: The model list, or an error string. The key is not logged.
+     * Exceptions: Rejects on IPC failure.
+     */
+    listModels: (key: string): Promise<{ models?: OpenRouterModel[]; error?: string }> =>
+      ipcRenderer.invoke(IPC_OPENROUTER.listModels, key),
     setSelectedModel: (modelId: string): Promise<void> =>
       ipcRenderer.invoke(IPC_OPENROUTER.setSelectedModel, modelId),
     getSelectedReasoningEffort: (): Promise<string> =>
       ipcRenderer.invoke(IPC_OPENROUTER.getSelectedReasoningEffort),
     setSelectedReasoningEffort: (effort: string): Promise<void> =>
       ipcRenderer.invoke(IPC_OPENROUTER.setSelectedReasoningEffort, effort),
+    /**
+     * Reads the remembered commanders and the key that fills the first AI row.
+     *
+     * Purpose: The new-game screen asks the main process for that snapshot.
+     * When to use: Before the new-game rows are rebuilt.
+     * Expected outcome: The snapshot view. The key is not logged.
+     * Exceptions: Rejects on IPC failure.
+     */
+    getCommanderKeyMemory: (): Promise<CommanderKeyMemoryView> =>
+      ipcRenderer.invoke(IPC_OPENROUTER.getCommanderKeyMemory),
+    /**
+     * Reads one AI seat's OpenRouter key.
+     *
+     * Purpose: The in-match commander popover fills its password field from this seat.
+     * When to use: When that popover opens.
+     * Expected outcome: The stored key, or `''` when the seat has none. The key is not logged.
+     * Exceptions: Rejects on IPC failure.
+     */
+    getSeatApiKey: (seatId: string): Promise<string> =>
+      ipcRenderer.invoke(IPC_OPENROUTER.getSeatApiKey, seatId),
     getToolGroupList: (): Promise<{ id: string; label: string }[]> =>
       ipcRenderer.invoke(IPC_OPENROUTER.getToolGroupList),
   },

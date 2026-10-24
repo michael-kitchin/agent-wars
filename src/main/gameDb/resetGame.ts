@@ -333,12 +333,13 @@ function drawRandomDoctrines(deps: ResetGameDeps): void {
  */
 function commanderForNewAiSeat(input: NewGameSeatInput['commander'] | null): SeatCommander {
   if (!input) {
-    return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', doctrine: DEFAULT_DOCTRINE };
+    return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: DEFAULT_DOCTRINE };
   }
   return {
     modelId: input.modelId,
     reasoningEffort: input.reasoningEffort,
     doctrineChoice: input.doctrineChoice,
+    hasApiKey: false,
     doctrine: input.doctrineChoice === 'random' ? DEFAULT_DOCTRINE : input.doctrineChoice,
   };
 }

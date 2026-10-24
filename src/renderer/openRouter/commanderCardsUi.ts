@@ -12,12 +12,12 @@ import { formatCommanderSummary } from '../../shared/commanderSummary';
 import type { CommanderStatus } from '../../shared/commanderStatus';
 import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
-import { isObservingRoster } from '../../shared/observeModeControls';
 import { paletteForOwner } from '../../shared/seatPalette';
-import { activeAiSeatIds, AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
+import { AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from './commanderPoolClient';
 import { commanderPopoverIsOpen, openCommanderPopover, reanchorCommanderPopover } from './commanderPopover';
+import { syncOpenRouterRunToggle } from './openRouterRunToggle';
 
 /**
  * The activity-log seat filter. Empty means every commander.
@@ -154,7 +154,7 @@ function cardElement(seat: SeatSnapshot): HTMLElement {
   summary.dataset.seatId = seat.seatId;
   summary.textContent = summaryText(seat);
   summary.disabled = presentation.summaryDisabled;
-  summary.addEventListener('click', () => openSeatCommander(seat, summary));
+  summary.addEventListener('click', () => void openSeatCommander(seat, summary));
   card.append(dot, name, chip, cost, summary);
   if (presentation.detail) {
     const detail = document.createElement('p');
@@ -215,27 +215,49 @@ function modelLabel(modelId: string | null): string | null {
 /**
  * Opens the commander popover for one seat.
  *
- * Purpose: Changes are saved on that seat. Apply-all copies them to every active AI seat.
+ * Purpose: Changes are saved on that seat. The key is loaded before the popover can save.
  * When to use: The summary button.
- * Expected outcome: The popover opens under the button. A knocked-out seat is not opened.
- * Exceptions: None. A rejected save is logged by `saveCommander`.
+ * Expected outcome: The popover opens under the button after the key fetch settles. A knocked-out seat is not opened. A failed fetch leaves the key field empty and does not send an empty key.
+ * Exceptions: None. A rejected save is logged by `saveCommander`. A rejected key fetch is logged here.
  */
-function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): void {
+async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promise<void> {
   if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
   const seatId = seat.seatId;
+  let includeKey = false;
+  let apiKey = '';
+  try {
+    const loaded = await window.gameApi?.openRouter?.getSeatApiKey(seatId);
+    if (typeof loaded === 'string') {
+      apiKey = loaded;
+      includeKey = true;
+    }
+  } catch (err) {
+    console.error('getSeatApiKey failed', seatId, err);
+  }
+  if (!anchor.isConnected) return;
   const commander: NewGameCommanderInput = {
     modelId: seat.commander.modelId,
     reasoningEffort: seat.commander.reasoningEffort,
     doctrineChoice: seat.commander.doctrineChoice,
+    ...(includeKey ? { apiKey } : {}),
   };
-  const observing = isObservingRoster(S.gameState?.seats ?? []);
   openCommanderPopover({
     anchor,
     title: `${seat.homeRegion} commander`,
     commander,
-    applyAllLabel: observing ? 'Use for every side' : 'Use for every opponent',
-    onChange: (next) => void saveCommander(seatId, next),
-    onApplyAll: (next) => void saveEveryCommander(next),
+    copyButton: null,
+    onChange: (next) => {
+      if (!includeKey && (next.apiKey ?? '') === '') {
+        void saveCommander(seatId, {
+          modelId: next.modelId,
+          reasoningEffort: next.reasoningEffort,
+          doctrineChoice: next.doctrineChoice,
+        });
+        return;
+      }
+      includeKey = true;
+      void saveCommander(seatId, next);
+    },
   });
   anchor.setAttribute('aria-expanded', 'true');
 }
@@ -244,7 +266,7 @@ function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): void {
  * Saves one seat and shows the returned commander.
  *
  * Purpose: The card follows the seat the main process stored.
- * When to use: The popover's change and apply-all.
+ * When to use: The popover's change.
  * Expected outcome: That seat in the snapshot is replaced and the cards render again.
  * Exceptions: A rejected IPC is logged and does not throw.
  */
@@ -254,21 +276,10 @@ async function saveCommander(seatId: AiSeatId, commander: NewGameCommanderInput)
     if (!updated || !S.gameState?.seats) return;
     S.gameState = { ...S.gameState, seats: S.gameState.seats.map((seat) => (seat.seatId === updated.seatId ? updated : seat)) };
     renderCommanderCards();
+    void syncOpenRouterRunToggle();
   } catch (err) {
     console.error('setSeatCommander failed', seatId, err);
   }
-}
-
-/**
- * Copies one commander onto every active AI seat.
- *
- * Purpose: Apply-all on this tab matches the new-game popover.
- * When to use: The popover's apply-all button.
- * Expected outcome: Each active AI seat is saved. A knocked-out seat is left alone.
- * Exceptions: A rejected save is logged and the rest still run.
- */
-async function saveEveryCommander(commander: NewGameCommanderInput): Promise<void> {
-  for (const seatId of activeAiSeatIds(S.gameState?.seats ?? [])) await saveCommander(seatId, commander);
 }
 
 /**

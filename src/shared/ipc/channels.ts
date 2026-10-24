@@ -76,4 +76,6 @@ export const IPC_OPENROUTER = {
   setSelectedModel: 'openRouter:setSelectedModel',
   getSelectedReasoningEffort: 'openRouter:getSelectedReasoningEffort',
   setSelectedReasoningEffort: 'openRouter:setSelectedReasoningEffort',
+  getCommanderKeyMemory: 'openRouter:getCommanderKeyMemory',
+  getSeatApiKey: 'openRouter:getSeatApiKey',
 } as const;
