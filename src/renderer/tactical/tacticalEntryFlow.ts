@@ -1,7 +1,7 @@
 /**
  * Tactical battle entry from strategic magnifier clicks, restored main snapshots, exit/advance IPC wiring.
  *
- * Purpose: Keeps `renderer.ts` as composition while preserving milestone-2.1 tactical activation sequencing.
+ * Purpose: Keeps `renderer.ts` as composition while preserving the tactical activation sequence.
  * When to use: Renderer bootstraps these helpers with renderer-local overlays (build popup, Ready pipeline).
  * Expected outcome: Same toasts, map mode transitions, and Exit Battle updates as the pre-extraction inline paths.
  * Exceptions: IPC failures surface through injected `showMapToast` contracts from tactical exit helpers.
@@ -121,7 +121,7 @@ export type StartTacticalBattleFromEntryHexDeps = {
  *
  * Contract: Invokes `tacticalRendererApplyStartBattleIpcResult` with fresh activation side effects.
  * When to use: Map hit-testing and direct `.tactical-entry-btn` clicks after `hideBuildPopup` is appropriate.
- * Expected outcome: Tactical tactical mode on success; error toasts preserve milestone-2.1 messaging.
+ * Expected outcome: Tactical mode on success; error toasts on failure.
  * Exceptions: None; missing IPC short-circuits through `onMissingStartTacticalBattleIpc`.
  */
 export async function startTacticalBattleFromEntryHex(

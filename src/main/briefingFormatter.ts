@@ -1,5 +1,5 @@
 /**
- * Formats the Commander's Briefing block for Milestone 0.6/0.7. Consumes pre-computed assessments and
+ * Formats the Commander's Briefing block. Consumes pre-computed assessments and
  * builds the three-section structure (strategic narrative, unit status, possible actions, attention flags)
  * plus memory, standing-order, and active callbacks sections.
  */

@@ -8,6 +8,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { AI_SEAT_IDS, isAiSeatId, isSeatId, type SeatId } from '../shared/seatIds';
 import { DOCTRINE_CHOICES, toSeatSnapshot, type DoctrineChoice } from '../shared/seatRoster';
+import { fallbackConsultModelId, type TacticalBeatConsultArgs } from './ipc/readyIpcResolutionMapping';
 import { updateSeatCommander } from './gameDb/seatRosterStore';
 import { cancelModelCalls } from './openRouter/modelCallControl';
 import { readMatchSnapshot } from './ipc/matchViewSnapshot';
@@ -18,7 +19,6 @@ import {
   resetGameForNewMatch,
   getTacticalTerrainOverridesForRendererFromGame,
   listScenarioHomeRegions,
-  commanderModelId,
   dbGetAll,
   dbRun,
   getSeatRoster,
@@ -106,49 +106,49 @@ import type {
 } from '../shared/ipcTypes';
 
 /**
- * Documents the module-scope binding `mainWindow` (mainWindow: BrowserWindow | null).
-
- * Purpose: Supports maintainability by documenting why `mainWindow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The game window, or null before it opens and after it closes.
+ *
+ * Purpose: Log lines and the closed handler need the window that is actually open.
+ * When to use: `createWindow`, and when sending a commander log line to the renderer.
+ * Expected outcome: Null until `createWindow` assigns it. Null again after the window closes.
  * Exceptions: None.
  */
 let mainWindow: BrowserWindow | null = null;
 
 /**
- * Documents the module-scope binding `MIN_WINDOW_WIDTH` (MIN_WINDOW_WIDTH).
-
- * Purpose: Supports maintainability by documenting why `MIN_WINDOW_WIDTH` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The narrowest window the game will open, in pixels.
+ *
+ * Purpose: A small work area must not clip the map and the console.
+ * When to use: `createWindow`, for both the opening width and `minWidth`.
+ * Expected outcome: 800.
  * Exceptions: None.
  */
 const MIN_WINDOW_WIDTH = 800;
 /**
- * Documents the module-scope binding `MIN_WINDOW_HEIGHT` (MIN_WINDOW_HEIGHT).
-
- * Purpose: Supports maintainability by documenting why `MIN_WINDOW_HEIGHT` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The shortest window the game will open, in pixels.
+ *
+ * Purpose: A short work area must not clip the top bar and the map.
+ * When to use: `createWindow`, for both the opening height and `minHeight`.
+ * Expected outcome: 600.
  * Exceptions: None.
  */
 const MIN_WINDOW_HEIGHT = 600;
 /**
- * Documents the module-scope binding `VERSIONED_APP_NAME_PREFIX` (VERSIONED_APP_NAME_PREFIX).
-
- * Purpose: Supports maintainability by documenting why `VERSIONED_APP_NAME_PREFIX` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The text before the version in the app name.
+ *
+ * Purpose: The window and the OS show which build is running.
+ * When to use: `applyVersionedAppName`.
+ * Expected outcome: The prefix `Agent Wars v`, with the version appended.
  * Exceptions: None.
  */
 const VERSIONED_APP_NAME_PREFIX = 'Agent Wars v';
 
 /**
- * Defines the `applyVersionedAppName` function shape (function applyVersionedAppName(): void).
-
- * Purpose: Supports maintainability by documenting why `applyVersionedAppName` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Sets the process name to the prefix plus the app version.
+ *
+ * Purpose: The title and the task switcher name the build.
+ * When to use: Once, when the app is ready.
+ * Expected outcome: `app.setName` receives `Agent Wars v` plus `app.getVersion()`.
  * Exceptions: None.
  */
 function applyVersionedAppName(): void {
@@ -158,12 +158,12 @@ function applyVersionedAppName(): void {
 }
 
 /**
- * Defines the `createWindow` function shape (function createWindow(): void).
-
- * Purpose: Supports maintainability by documenting why `createWindow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Opens the game window on the primary display and loads the renderer.
+ *
+ * Purpose: The player gets one window, sized to the work area and not smaller than the minimums.
+ * When to use: When the app is ready, and again if every window has closed on macOS activate.
+ * Expected outcome: A window about three quarters of the work area, centered, at least 800 by 600, loading `static/index.html`. Closing it clears `mainWindow`. A load failure and a renderer crash are logged.
+ * Exceptions: Logs and does not throw when the renderer file fails to load.
  */
 function createWindow(): void {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -210,12 +210,12 @@ function createWindow(): void {
 }
 
 /**
- * Defines the `requestOrdersWithLog` function shape (function requestOrdersWithLog( state: Parameters<typeof requestOrders>[0], modelId: string, options?: Parameters<typeof requestOrders>[2] ): ReturnTyp).
-
- * Purpose: Supports maintainability by documenting why `requestOrdersWithLog` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Requests orders and sends each log line to the open window.
+ *
+ * Purpose: The Commanders tab shows the consult log while the model runs.
+ * When to use: Ready and tactical commit, as their `requestOrders`.
+ * Expected outcome: The same result as `requestOrders`. A missing seat id is logged as the first AI seat. Lines go to `IPC_OPENROUTER.log` when a window is open.
+ * Exceptions: Rejects when `requestOrders` rejects.
  */
 function requestOrdersWithLog(
   state: Parameters<typeof requestOrders>[0],
@@ -256,12 +256,12 @@ function buildSharedHumanReadyConsultationDeps(
 }
 
 /**
- * Defines the `registerIpcHandlers` function shape (function registerIpcHandlers(): void).
-
- * Purpose: Supports maintainability by documenting why `registerIpcHandlers` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Binds the game and commander IPC channels to the main-process handlers.
+ *
+ * Purpose: The renderer reaches the database, Ready, and the commander pool through one registration.
+ * When to use: Once, before the window is created.
+ * Expected outcome: Each `IPC_GAME` and commander channel used by the preload bridge has a handler. Ready and melee resolve share `buildSharedHumanReadyConsultationDeps`.
+ * Exceptions: A handler may throw when its action throws. Registration itself does not throw.
  */
 function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.getState, (_event, viewAs: unknown) => readMatchSnapshot(viewAs));
@@ -452,17 +452,15 @@ function registerIpcHandlers(): void {
     ) {
       return result;
     }
-    const fromSeat = commanderModelId(AI_SEAT_IDS[0]);
-    const modelId = fromSeat === null ? getSelectedModel() : fromSeat;
+    const modelId = fallbackConsultModelId(getSelectedModel);
     const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
     const battleId = result.tacticalBattle.battleId;
-    const consultArgs = {
+    const consultArgs: TacticalBeatConsultArgs = {
       useEventDrivenConsultation: v.useEventDrivenConsultation,
       aiPlanningRunEnabled: v.aiPlanningRunEnabled,
-      opponentState: getGameStateForPlayer(AI_SEAT_IDS[0], { maskUnexploredTerrain: false }),
       tacticalBattle: result.tacticalBattle,
       tacticalResolutionPlayback: result.tacticalResolutionPlayback,
-      modelId: modelId ?? '',
+      modelId,
       enabledToolNames,
       hasKey,
       requestOrders: requestOrdersWithLog,

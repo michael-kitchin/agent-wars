@@ -78,7 +78,7 @@ function toastBandSpace(map, panel, legend) {
 const FRESH_STATUS_LINE = Object.freeze(['Commanders off', 'No model', '$0.00']);
 
 /**
- * The Opponent tab's parts, top to bottom.
+ * The Commanders tab's parts, top to bottom.
  *
  * Purpose: The four sections show together, in this order, with no sub-tabs.
  * When to use: The Opponent sections check.

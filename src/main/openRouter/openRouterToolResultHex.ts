@@ -74,7 +74,7 @@ function isLatLngTuple(value: unknown): value is [number, number] {
 /**
  * Deep-clones a tool JSON value and replaces geographic tuples with briefing hex codes.
  *
- * Purpose: Implements Phase 5B-style outbound translation for tools 2–5 without changing tool implementations.
+ * Purpose: Implements outbound hex translation for tools 2–5 without changing tool implementations.
  * When to use: After `executeAssessment`–`executeStandingOrders` (and memory tools) for successful responses before the model sees them.
  * Expected outcome: Known geo fields hold strings like `"AB"`; `waypoints` / `totalPath` become string arrays.
  * Exceptions: Leaves a tuple in place when encoding fails (rare); logs trace for debugging.

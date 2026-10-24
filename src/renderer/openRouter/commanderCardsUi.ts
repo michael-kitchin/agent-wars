@@ -11,9 +11,10 @@ import { commanderCardPresentation } from '../../shared/commanderCardState';
 import { formatCommanderSummary } from '../../shared/commanderSummary';
 import type { CommanderStatus } from '../../shared/commanderStatus';
 import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
-import { isAiSeatId, type AiSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
+import { isObservingRoster } from '../../shared/observeModeControls';
 import { paletteForOwner } from '../../shared/seatPalette';
-import { sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
+import { activeAiSeatIds, AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from './commanderPoolClient';
 import { commanderPopoverIsOpen, openCommanderPopover, reanchorCommanderPopover } from './commanderPopover';
@@ -69,7 +70,7 @@ export function setCommanderLogSeatFilter(seatId: string): void {
 export function renderCommanderCards(): void {
   const host = document.getElementById('commander-cards');
   if (!host) return;
-  const seats = sortSeatsByOrder((S.gameState?.seats ?? []).filter((seat) => seat.kind === 'ai'));
+  const seats = sortSeatsByOrder((S.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND));
   syncLogFilter(seats);
   const openSeat = host.querySelector<HTMLElement>('.commander-card-summary[aria-expanded="true"]')?.dataset.seatId ?? null;
   host.replaceChildren();
@@ -227,7 +228,7 @@ function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): void {
     reasoningEffort: seat.commander.reasoningEffort,
     doctrineChoice: seat.commander.doctrineChoice,
   };
-  const observing = !(S.gameState?.seats ?? []).some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+  const observing = isObservingRoster(S.gameState?.seats ?? []);
   openCommanderPopover({
     anchor,
     title: `${seat.homeRegion} commander`,
@@ -267,10 +268,7 @@ async function saveCommander(seatId: AiSeatId, commander: NewGameCommanderInput)
  * Exceptions: A rejected save is logged and the rest still run.
  */
 async function saveEveryCommander(commander: NewGameCommanderInput): Promise<void> {
-  const seats = (S.gameState?.seats ?? []).filter((seat) => seat.kind === 'ai' && seat.outTurn === null && isAiSeatId(seat.seatId));
-  for (const seat of seats) {
-    if (isAiSeatId(seat.seatId)) await saveCommander(seat.seatId, commander);
-  }
+  for (const seatId of activeAiSeatIds(S.gameState?.seats ?? [])) await saveCommander(seatId, commander);
 }
 
 /**

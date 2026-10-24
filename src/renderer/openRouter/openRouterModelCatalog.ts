@@ -3,7 +3,7 @@ import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 /**
  * Models from the last successful list, keyed by id.
  *
- * Purpose: The Opponent tab and the commander popover share one list.
+ * Purpose: The app-wide model select and the commander popover share one list.
  * When to use: After `listModels` succeeds, and when a control needs one model.
  * Expected outcome: Empty until a list arrives. Cleared when a refresh fails.
  * Exceptions: None.

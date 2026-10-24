@@ -44,8 +44,8 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
     turnNumber: request.turnNumber,
     battleId: request.battle?.battleId ?? null,
   });
-  const fromSeat = commanderModelId(request.seatId);
-  const modelId = (fromSeat === null ? getSelectedModel() : fromSeat).trim();
+  const stored = commanderModelId(request.seatId);
+  const modelId = (stored === null ? getSelectedModel() : stored).trim();
   if (!modelId || !hasKey()) {
     const errorMessage = !hasKey() ? 'No API key set' : 'No model selected';
     logError('commanderPoolConsult skipped', new Error(errorMessage));

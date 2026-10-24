@@ -241,8 +241,8 @@ let selectedModelId: string = '';
 /**
  * Persists the player's model choice.
  *
- * Purpose: Keeps the Opponent tab's model selection across restarts; a different model starts on its own default effort.
- * When to use: When the player picks a model on the Opponent tab (via IPC).
+ * Purpose: Keeps the app-wide model selection across restarts; a different model starts on its own default effort.
+ * When to use: When the app-wide model changes, from a commander popover (via IPC).
  * Expected outcome: Saves or deletes the model row. When the id differs from the current selection, the
  * reasoning-effort override is cleared too.
  * Exceptions: Propagates database errors.

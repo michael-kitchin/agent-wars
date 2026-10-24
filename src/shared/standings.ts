@@ -10,9 +10,8 @@
 import { formatCommanderSummary } from './commanderSummary';
 import { paletteForOwner } from './seatPalette';
 import type { SeatId } from './seatIds';
-import type { Doctrine, DoctrineChoice, SeatKind } from './seatRoster';
+import { HUMAN_SEAT_KIND, type Doctrine, type DoctrineChoice, type SeatKind } from './seatRoster';
 import type { GameEndReason } from './victoryRules';
-import { HUMAN_SEAT_ID } from './seatIds';
 
 /**
  * One seat as standings reads it.
@@ -44,7 +43,7 @@ export interface StandingsSeatInput {
   /**
    * Whether a person or a commander plays the seat.
    *
-   * Contract: `HUMAN_SEAT_ID` or `'ai'`.
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
    * When to use: The heading, and whether a row shows a commander.
    * Expected outcome: At most one human seat.
    * Exceptions: None.
@@ -387,7 +386,7 @@ export function buildStandings(input: StandingsInput): Standings {
  */
 function headingFor(seats: readonly StandingsSeatInput[], first: readonly StandingsSeatInput[]): string {
   if (first.length !== 1) return 'No side won.';
-  const human = seats.find((seat) => seat.kind === HUMAN_SEAT_ID);
+  const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
   if (!human) return `${first[0]!.homeRegion} wins.`;
   return `You placed ${ordinal(human.place ?? seats.length)} of ${seats.length}.`;
 }

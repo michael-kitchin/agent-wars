@@ -3,7 +3,7 @@ import { isTacticalCell } from '../../shared/h3Resolutions';
 import { tacticalLogError, tacticalLogQuery } from './tacticalLogging';
 
 /**
- * Returns the H3 grid distance between two tactical cells for tactical range math (milestone-2.1 adapter seed).
+ * Returns the H3 grid distance between two tactical cells for tactical range math.
  *
  * Purpose: Centralizes tactical-only distance so future tactical movement/combat can share one definition with strategic rules wrappers.
  * When to use: Any tactical path or range check that must count hex steps at resolution 4.

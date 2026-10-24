@@ -8,7 +8,6 @@ import {
   collectTacticalLegalRangedTargetHexes,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { logDebug, logTrace } from '../logger';
 
@@ -161,7 +160,7 @@ export function collectTacticalTempoAttacks(args: TacticalTempoAttackArgs): {
  * inactivity the strategic sweep was written for. Running at commit rather than only at consultation makes the
  * guarantee hold for unconsulted beats, matching how the strategic fallback covers unconsulted turns.
  * When to use: `commitHumanTacticalDraftOrders`, against the pre-battle snapshot and before draft sanitization, so
- * added rows go through exactly the same validation as everything the model asked for.
+ * added rows go through exactly the same validation as everything the model asked for. `playerId` is required and selects that player's sub-units.
  * Expected outcome: The draft's own rows are untouched and keep the targets the model chose; sub-units it never
  * mentioned gain at most one attack each. Returns the draft unchanged when there is nothing legal to add, which
  * includes returning `undefined` when there was no draft either.
@@ -171,7 +170,7 @@ export function withTacticalTempoAttacks(
   preBattle: TacticalBattleSnapshot,
   draft: TacticalOpponentPlanPayload | undefined,
   holdFireParentUnitIds: ReadonlySet<string>,
-  playerId: string = AI_SEAT_IDS[0]
+  playerId: string
 ): TacticalOpponentPlanPayload | undefined {
   const sweep = collectTacticalTempoAttacks({
     battle: preBattle,

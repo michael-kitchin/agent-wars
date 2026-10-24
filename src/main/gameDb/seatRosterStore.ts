@@ -8,11 +8,13 @@
  */
 
 import { logDebug, logError, logTrace } from '../logger';
-import { isSeatId, type AiSeatId, type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isSeatId, type AiSeatId, type SeatId } from '../../shared/seatIds';
 import {
+  AI_SEAT_KIND,
   DEFAULT_DOCTRINE,
   DOCTRINES,
   DOCTRINE_CHOICES,
+  HUMAN_SEAT_KIND,
   type Doctrine,
   type DoctrineChoice,
   type SeatCommander,
@@ -105,7 +107,7 @@ function readOutReasons(seatId: string, raw: string): readonly SeatOutReason[] {
  * Exceptions: None. A bad id or kind is logged and skipped.
  */
 function seatFromRow(row: SeatRow): SeatRecord | null {
-  if (!isSeatId(row.seat_id) || (row.kind !== HUMAN_SEAT_ID && row.kind !== 'ai')) {
+  if (!isSeatId(row.seat_id) || (row.kind !== HUMAN_SEAT_KIND && row.kind !== AI_SEAT_KIND)) {
     logError('seatRosterStore seatFromRow: unknown seat', { seatId: row.seat_id, kind: row.kind });
     return null;
   }
@@ -120,7 +122,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
     seatOrder: row.seat_order,
     kind,
     homeRegion: row.home_region,
-    commander: kind === HUMAN_SEAT_ID
+    commander: kind === HUMAN_SEAT_KIND
       ? null
       : {
           modelId: row.model_id,
@@ -272,7 +274,7 @@ function doctrineAfterChoice(choice: DoctrineChoice, stored: Doctrine): Doctrine
 /**
  * Updates one AI seat's model, effort, and doctrine choice.
  *
- * Purpose: Commander settings belong on the seat. The app-wide Opponent tab copies into the first AI seat until that tab is gone.
+ * Purpose: Commander settings belong on the seat. The app-wide model and effort are copied into the first AI seat.
  * When to use: The commander IPC, and when the app-wide model or effort changes during a match.
  * Expected outcome: The updated row. A named choice sets `doctrine` to that choice. Random keeps the stored doctrine.
  * Exceptions: Throws when the seat is missing, human, or already knocked out. Propagates SQLite errors.
@@ -288,7 +290,7 @@ export function updateSeatCommander(
     doctrineChoice: commander.doctrineChoice,
   });
   const seat = readSeatRoster(ops).find((row) => row.seatId === seatId);
-  if (!seat || seat.kind !== 'ai' || seat.commander === null) {
+  if (!seat || seat.kind !== AI_SEAT_KIND || seat.commander === null) {
     throw new Error(`Cannot update a commander for ${seatId}`);
   }
   if (seat.outTurn !== null) {

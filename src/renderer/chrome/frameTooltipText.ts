@@ -28,7 +28,7 @@ export const ordersTabTooltipText = `Show the orders queued for this turn or bea
  * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
-export const opponentTabTooltipText =
+export const commandersTabTooltipText =
   `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
 
 /**

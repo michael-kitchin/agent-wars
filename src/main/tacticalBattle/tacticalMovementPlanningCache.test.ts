@@ -116,7 +116,7 @@ test('tactical turn advance resets session so planner sees updated terrain', () 
 /**
  * Verifies plan output and memo reuse when only sub-unit positions change under stable terrain layer refs.
  *
- * Purpose: Regression guard for Phase 3 cache identity (terrain-only, not placement-driven).
+ * Purpose: Regression guard for cache identity (terrain-only, not placement-driven).
  * When to use: After changes to `planTacticalMarchWithSessionCache` env key logic.
  * Expected outcome: Identical plans before/after unrelated unit move; third call matches cached second.
  * Exceptions: None.

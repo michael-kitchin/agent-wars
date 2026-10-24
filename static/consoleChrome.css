@@ -247,23 +247,6 @@
   display: flex;
   min-width: 0;
 }
-.opponent-model-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  min-width: 0;
-}
-.opponent-model-row > select {
-  flex: 1 1 auto;
-}
-/* Refresh stretches to the dropdown's height and centres its icon. */
-.opponent-model-row > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-block: 0;
-  line-height: 1;
-}
 .opponent-section-head {
   display: flex;
   align-items: baseline;

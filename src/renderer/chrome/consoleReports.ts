@@ -14,7 +14,7 @@ import {
 import { paletteForOwner } from '../../shared/seatPalette';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isObservingRoster } from '../../shared/observeModeControls';
 
 /**
  * Extra facts a message entry can name.
@@ -124,7 +124,7 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
   name.textContent = `${seat?.homeRegion ?? 'Commander'} "${meta.messageText ?? ''}"`;
   line.append(dot, name);
   wrap.append(line);
-  const observing = seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+  const observing = isObservingRoster(seats);
   if (observing && meta.strategyText) {
     const strategy = document.createElement('p');
     strategy.className = 'console-report-strategy';

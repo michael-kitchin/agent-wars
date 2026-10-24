@@ -14,7 +14,7 @@ import {
   fallbackDisplayNameFromUnitId,
   type UnitDisplayIdentity,
 } from '../../shared/unitDisplayNames';
-import { isAiSeatId } from '../../shared/seatIds';
+import { activeAiSeatIds } from '../../shared/seatRoster';
 import { getSeatRoster, upsertTurnLossNote, type TurnNotesScope } from '../gameDb';
 import { logDebug } from '../logger';
 
@@ -190,18 +190,16 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     },
     resolveUnitMeta: (id: string) => metaMap.get(id),
   };
-  const aiSeats = getSeatRoster().filter((seat) => seat.kind === 'ai' && seat.outTurn === null && isAiSeatId(seat.seatId));
-  for (const seat of aiSeats) {
-    if (!isAiSeatId(seat.seatId)) continue;
-    const summary = buildTurnLossSummary({ ...lossArgs, perspectivePlayerId: seat.seatId });
-    const own = summary.byOwner[seat.seatId] ?? emptyPlayerLossSummary();
+  for (const seatId of activeAiSeatIds(getSeatRoster())) {
+    const summary = buildTurnLossSummary({ ...lossArgs, perspectivePlayerId: seatId });
+    const own = summary.byOwner[seatId] ?? emptyPlayerLossSummary();
     const others = mergePlayerLossSummaries(
       Object.entries(summary.byOwner)
-        .filter(([ownerId]) => ownerId !== seat.seatId)
+        .filter(([ownerId]) => ownerId !== seatId)
         .map(([, bucket]) => bucket)
     );
     upsertTurnLossNote(
-      seat.seatId,
+      seatId,
       scope,
       battleId,
       turnNumber,

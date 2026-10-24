@@ -59,7 +59,6 @@ async function testSkippedTacticalConsultReturnsEmptyMerge(): Promise<void> {
   const skipped = await runEventDrivenAfterTacticalBeatConsultation({
     useEventDrivenConsultation: false,
     aiPlanningRunEnabled: true,
-    opponentState: {} as never,
     tacticalBattle,
     tacticalResolutionPlayback: { humanMoves: [] },
     modelId: '',

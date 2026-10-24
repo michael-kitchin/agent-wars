@@ -1,7 +1,7 @@
 /**
  * ASCII renderer for the operational hex map (2×2 cells, odd-row offset).
  *
- * Purpose: Phase 3 visualization for Commander briefings and tactical appendices.
+ * Purpose: Visualization for Commander briefings and tactical appendices.
  * When to use: After grid projection and per-hex game state assembly.
  * Expected outcome: Dense ASCII with legend-compatible symbology (`x`/`.`, overlays, `?` for undiscovered intel).
  * Exceptions: None for sparse cells; throws only on internal consistency bugs.
@@ -111,7 +111,7 @@ export interface HexAsciiMapResult {
 /**
  * Renders `HexGrid` into the operational ASCII map string.
  *
- * Purpose: Main Phase 3 entry point.
+ * Purpose: Main entry point.
  * When to use: Strategic and tactical briefing generation.
  * Expected outcome: Two text lines per grid row with per-cell 2×2 blocks and odd-row indentation.
  * Exceptions: Throws if a grid cell lacks `HexMapCellState` (caller must supply defaults).

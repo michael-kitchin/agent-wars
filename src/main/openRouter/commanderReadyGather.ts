@@ -11,7 +11,8 @@ import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimi
 import type { GameStateSnapshot } from '../gameDb';
 import { commanderModelId, getAiPendingOrders, clearAiPendingOrders, getSeatRoster } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
-import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
+import { type AiSeatId } from '../../shared/seatIds';
+import { activeAiSeatIds } from '../../shared/seatRoster';
 import type { OwnerTurnOrders, TurnOrdersByOwner } from '../gameActions/ownerTurnOrders';
 import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { collectTempoRuleAttacks } from '../tools/tempoRuleAttacks';
@@ -113,7 +114,7 @@ export function buildUnconsultedCommanderOrders(seatId: AiSeatId, aiState: GameS
  * Exceptions: A seat whose state throws is logged and omitted.
  */
 export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherArgs): Promise<TurnOrdersByOwner> {
-  const active = getSeatRoster().filter((seat) => seat.kind === 'ai' && seat.outTurn === null && isAiSeatId(seat.seatId));
+  const active = activeAiSeatIds(getSeatRoster());
   logDebug('commanderReadyGather gatherCommanderOrdersForReady', {
     turnNumber: args.turnNumber,
     useEventDriven: args.useEventDriven,
@@ -121,8 +122,7 @@ export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherAr
     seatCount: active.length,
   });
   const orders = new Map<AiSeatId, OwnerTurnOrders>();
-  for (const seat of active) {
-    const seatId = seat.seatId as AiSeatId;
+  for (const seatId of active) {
     if (isPlanning(seatId)) {
       await waitForSeatsSettled([seatId], AI_CONSULTATION_WAIT_TIMEOUT_MS);
     }

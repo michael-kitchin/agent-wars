@@ -9,8 +9,6 @@
  */
 
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
-import { commanderModelId } from '../gameDb';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
 import type { ReadyDeps, ReadyResultMinimal } from '../gameIpcHandlers';
 import { logHybridPipelineBoundary } from '../hybridTurnPipeline';
@@ -20,8 +18,10 @@ import {
   setPendingMeleeResolveConsult,
 } from './deferredResolutionPlaybackConsult';
 import {
+  fallbackConsultModelId,
   pickReadyResolutionIpcMirrorFields,
   runEventDrivenAfterResolutionConsultation,
+  type StrategicConsultArgs,
 } from './readyIpcResolutionMapping';
 
 /**
@@ -65,8 +65,7 @@ export async function handleResolveMeleeIntercept(
   }
   const state = deps.getGameState();
   logHybridPipelineBoundary('handleResolveMeleeIntercept', { turnNumber: state.turnNumber, phase: state.phase });
-  const fromSeat = commanderModelId(AI_SEAT_IDS[0]);
-  const modelId = fromSeat === null ? deps.getSelectedModel() : fromSeat;
+  const modelId = fallbackConsultModelId(deps.getSelectedModel);
   const enabledGroupIds =
     payload?.enabledToolGroups && payload.enabledToolGroups.length > 0
       ? payload.enabledToolGroups
@@ -95,34 +94,22 @@ export async function handleResolveMeleeIntercept(
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
 
+  const consultArgs: StrategicConsultArgs = {
+    useEventDrivenConsultation,
+    resolutionSuccess: resolveResult.success,
+    aiPlanningRunEnabled,
+    resolution: resolveResult,
+    modelId,
+    enabledToolNames,
+    hasKey: deps.hasKey,
+    requestOrders: deps.requestOrders,
+    timeoutMs: AI_CONSULTATION_WAIT_TIMEOUT_MS,
+    errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
+  };
   if (shouldDeferPostResolutionConsult) {
-    setPendingMeleeResolveConsult(planningTurnNumberAfterResolution, {
-      useEventDrivenConsultation,
-      resolutionSuccess: resolveResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
-      resolution: resolveResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: AI_CONSULTATION_WAIT_TIMEOUT_MS,
-      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
-    });
+    setPendingMeleeResolveConsult(planningTurnNumberAfterResolution, consultArgs);
   } else {
-    const resolvePostConsult = await runEventDrivenAfterResolutionConsultation({
-      useEventDrivenConsultation,
-      resolutionSuccess: resolveResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
-      resolution: resolveResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: AI_CONSULTATION_WAIT_TIMEOUT_MS,
-      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
-    });
+    const resolvePostConsult = await runEventDrivenAfterResolutionConsultation(consultArgs);
     if (resolvePostConsult.aiStrategy) {
       aiStrategy = resolvePostConsult.aiStrategy;
     }

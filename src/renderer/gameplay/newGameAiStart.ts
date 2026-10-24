@@ -77,11 +77,11 @@ export function readStartMatchAiInput(): StartMatchAiInput {
 /**
  * Applies the click-time Auto-start AI choice after a new match is installed.
  *
- * Purpose: Turns Run on and starts turn-1 planning, or turns Run off and opens the Opponent tab. It awaits the stop
+ * Purpose: Turns Run on and starts turn-1 planning, or turns Run off and opens the Commanders tab. It awaits the stop
  *   of any previous consult before starting a new one, so that cancel cannot abort the new request.
  * When to use: Only after a successful start, once the overlay has closed and the precomputed plan has been cleared.
  * Expected outcome: Run's pressed state matches `choice.runOn`. Planning starts once when that is true. The Opponent
- *   tab opens expanded when `choice.openOpponentTab` is true. A rejected cancel is logged by `stopOpponentPlanning`
+ *   tab opens expanded when `choice.openCommandersTab` is true. A rejected cancel is logged by `stopOpponentPlanning`
  *   and does not throw.
  * Exceptions: None. `stopOpponentPlanning` catches a rejected cancel.
  */
@@ -93,5 +93,5 @@ export async function applyStartMatchAiChoice(choice: StartMatchAiChoice, deps: 
   if (runButton) runButton.setAttribute('aria-pressed', choice.runOn ? 'true' : 'false');
   deps.updateReadyButtonState();
   if (choice.runOn) deps.startPlanning();
-  if (choice.openOpponentTab) showConsoleTab('console-tab-commanders');
+  if (choice.openCommandersTab) showConsoleTab('console-tab-commanders');
 }

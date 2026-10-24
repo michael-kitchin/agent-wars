@@ -1,5 +1,5 @@
 /**
- * Tests for the briefing formatter (Milestone 0.6 Phase 3). Asserts the three-section structure,
+ * Tests for the briefing formatter. Asserts the three-section structure,
  * two tables, attention flags, and memory/standing-order blocks.
  */
 

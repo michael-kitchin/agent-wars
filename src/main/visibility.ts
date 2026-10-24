@@ -1,5 +1,5 @@
 /**
- * Fog-of-war visibility helpers for Milestone 1.3.
+ * Fog-of-war visibility helpers.
  * Centralizes per-unit vision ranges and pure set computations so DB and renderer logic stay aligned.
  */
 

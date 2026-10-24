@@ -4,7 +4,7 @@ import { HEX_DETAILS_TOOLTIP_DELAY_MS, TOOLTIP_OFFSET_PX } from '../core/constan
  * Options for attaching the selected-model description tooltip to a `<select>`.
 
  * Purpose: Keeps wiring small and testable without reaching into OpenRouter control state.
- * When to use: Construct once when the Opponent tab's model dropdown is available.
+ * When to use: Construct once when the app-wide model select is available.
  * Expected outcome: Tooltip shows trimmed descriptions after the hex-details dwell delay.
  * Exceptions: None.
  */

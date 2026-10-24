@@ -9,7 +9,7 @@ import { buildOpenRouterModelList } from './buildOpenRouterModelList';
 /**
  * Verifies batch and junk rows are omitted and remaining rows keep name sort.
 
- * Purpose: Happy path for the list shown in the Opponent tab's model dropdown.
+ * Purpose: Happy path for the list shown in the model selects.
  * When to use: After changing `buildOpenRouterModelList` filtering or sort.
  * Expected outcome: Interactive and `:free` ids only, in `(name ?? id)` case-insensitive order.
  * Exceptions: None.

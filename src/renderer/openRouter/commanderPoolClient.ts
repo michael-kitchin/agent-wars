@@ -15,7 +15,7 @@ import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { rendererSharedState as S } from '../core/state';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isObservingRoster } from '../../shared/observeModeControls';
 
 const POLL_MS = 1000;
 
@@ -87,7 +87,7 @@ function notifyPoolChanged(): void {
  * Remembers how the screen shows a toast and refreshes Ready.
  *
  * Purpose: The poll has no other way to reach those controls.
- * When to use: Once, when the Opponent tab is wired.
+ * When to use: Once, when the Commanders tab is wired.
  * Expected outcome: Later reads can toast and refresh.
  * Exceptions: None.
  */
@@ -155,7 +155,7 @@ export function longestPlanningElapsedMs(): number {
 /**
  * The match cost stored on the seats.
  *
- * Purpose: The footer and the Opponent tab show one total.
+ * Purpose: The footer and the Commanders tab show one total.
  * When to use: When drawing the cost.
  * Expected outcome: The sum of `costUsd` on the current snapshot's seats. Zero when the snapshot has none.
  * Exceptions: None.
@@ -239,16 +239,15 @@ function messageLines(dispatches: readonly CommanderDispatch[]): string[] {
 }
 
 /**
- * True when no human seat is still in the match.
+ * True when the loaded roster has no human seat that can still give orders.
  *
- * Purpose: Strategy prose is shown only while observing.
+ * Purpose: Strategy prose is shown only while observing. An empty roster is the start screen, not a watch.
  * When to use: `messageLines`.
- * Expected outcome: True when the roster has seats and none is an active human.
+ * Expected outcome: True when the roster has seats and none is an active human. False when the roster is empty.
  * Exceptions: None.
  */
 function matchIsObserving(): boolean {
-  const seats = S.gameState?.seats ?? [];
-  return seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+  return isObservingRoster(S.gameState?.seats ?? []);
 }
 
 /**

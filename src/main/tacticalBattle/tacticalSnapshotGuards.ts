@@ -19,7 +19,8 @@ import {
 } from '../../shared/tacticalTerrainMovement';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
-import { AI_SEAT_IDS, HUMAN_SEAT_ID, isNeutralOwnerId, type OwnerId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID, isNeutralOwnerId, type OwnerId } from '../../shared/seatIds';
+import { opposingPartyIdOf } from './opposingParty';
 import { tacticalLogError, tacticalLogMutate } from './tacticalLogging';
 import { logDebug } from '../logger';
 
@@ -486,7 +487,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
  * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
  *
  * Contract: Does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint. Emits debug logs for planner outcomes.
- * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
+ * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates. The opposing party comes from `opposingPartyIdOf`.
  * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone and `appliedToH3Index` (first leg toward
  * the ordered cell, matching `tacticalMarchFirstStopAlongPath` / human Ready), or `ok: false` with a reason and diagnostic context.
  * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, or when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`). Friendly stacking on the applied cell is legal.
@@ -494,7 +495,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
 export function tacticalComputeMovementOrderOutcome(
   args: TacticalMovementOrderOutcomeArgs
 ): TacticalMovementOrderOutcome {
-  const party = args.battle.opposingPartyId ?? AI_SEAT_IDS[0];
+  const party = opposingPartyIdOf(args.battle);
   if (isNeutralOwnerId(party)) {
     return { ok: false, reason: 'non_opponent', context: { unitId: args.order.unitId } };
   }
@@ -565,13 +566,13 @@ export function tacticalInfrastructureStrikeStaysOnEnclosingHex(
  *
  * Contract: Does not validate airport infrastructure or destination legality.
  * When to use: Composite ferry loop after `findIndex` succeeds.
- * Expected outcome: True only when the row is air and owned by `expectedPlayer`.
+ * Expected outcome: `expectedPlayer` is required. True only when the row is air and owned by that player.
  * Exceptions: None.
  */
 export function tacticalGuardOpponentAirSubUnitForFerry(
   sub: readonly TacticalSubUnitSnapshot[],
   index: number,
-  expectedPlayer: OwnerId = AI_SEAT_IDS[0]
+  expectedPlayer: OwnerId
 ): boolean {
   const u = sub[index];
   return !!u && u.unitType === 'air' && u.player === expectedPlayer;

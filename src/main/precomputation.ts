@@ -1,5 +1,5 @@
 /**
- * Pre-computation pipeline for Milestone 0.6: runs assess_unit and assess_hex before the LLM is invoked,
+ * Pre-computation pipeline: runs assess_unit and assess_hex before the LLM is invoked,
  * so the briefing can inject results into the prompt. Used when usePrecomputation is true to validate the
  * hybrid AI architecture (fewer ad-hoc tool calls, lower latency/cost). Pre-computation calls the same tool
  * executors as the LLM loop; it does not duplicate tool logic. Combat estimates were removed in favor of

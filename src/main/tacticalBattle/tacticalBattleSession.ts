@@ -398,7 +398,7 @@ export function validateHumanTacticalMarchOrders(
 }
 
 /**
- * Applies validated human tactical march orders to the active snapshot (milestone 2.1+ human parity).
+ * Applies validated human tactical march orders to the active snapshot.
  *
  * Purpose: Mutates the in-memory tactical footprint for human player marches with the same guards as AI projection.
  * When to use: `commitHumanTacticalDraftOrders` IPC after tactical Ready aggregates draft rows from the renderer only.

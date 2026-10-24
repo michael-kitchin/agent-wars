@@ -6,6 +6,7 @@ import type { MeleeCandidateRow } from '../../shared/ipcTypes';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
+import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { shortSideName } from '../../shared/seatRoster';
 import { formatHexControlLabel, homeSeatIdsAtHex } from '../../shared/sideLabels';
 import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
@@ -271,7 +272,7 @@ function hexCell(h3Index: string): HTMLElement {
 function hexDetailLine(h3Index: string): string {
   const state = S.gameState;
   const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
-  const viewer = seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null)?.seatId ?? null;
+  const viewer = activeHumanSeatId(seats);
   const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
   const control = formatHexControlLabel({
     controllerId: controller,

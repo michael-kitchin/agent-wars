@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { type SeatId } from './seatIds';
 import {
   type SeatRecord,
+  activeAiSeatIds,
   enemySeatIdsOf,
   shortSideName,
   toSeatSnapshot,
@@ -31,6 +32,18 @@ function seat(partial: Pick<SeatRecord, 'seatId' | 'seatOrder' | 'kind'> & Parti
     ...partial,
   };
 }
+
+describe('activeAiSeatIds', () => {
+  it('returns active AI seats in seat order', () => {
+    const seats = [
+      seat({ seatId: 'human', seatOrder: 1, kind: 'human' }),
+      seat({ seatId: 'opponent2', seatOrder: 3, kind: 'ai' }),
+      seat({ seatId: 'opponent', seatOrder: 2, kind: 'ai' }),
+      seat({ seatId: 'opponent3', seatOrder: 4, kind: 'ai', outTurn: 5 }),
+    ];
+    assert.deepEqual(activeAiSeatIds(seats), ['opponent', 'opponent2']);
+  });
+});
 
 describe('shortSideName', () => {
   it('cuts at the first separator and shortens a leading compass word', () => {

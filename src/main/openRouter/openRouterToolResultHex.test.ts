@@ -42,7 +42,7 @@ function makeResolveToH3(hexList: string[]): (lat: number, lng: number) => strin
 /**
  * Defines the `testEncodeAssessUnitReplacesPositionTuples` function shape (function testEncodeAssessUnitReplacesPositionTuples(): void).
 
- * Purpose: Guards the optional Phase 5B path for tool 2 success payloads.
+ * Purpose: Guards the optional hex translation path for tool 2 success payloads.
  * When to use: `npm run build:main` then `node dist/main/openRouter/openRouterToolResultHex.test.js`.
  * Expected outcome: `position` fields become two-character strings; status stays `ok`.
  * Exceptions: None.

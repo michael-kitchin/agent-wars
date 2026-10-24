@@ -414,6 +414,9 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   color: var(--chrome-text);
 }
 .openrouter-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   justify-self: center;
   width: auto;
@@ -421,9 +424,11 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   padding-inline: 0.4rem;
   font-size: 12px;
   font-weight: 500;
+  line-height: 1;
 }
 .openrouter-refresh-btn::before {
   content: '';
+  display: block;
   width: 1em;
   height: 1em;
   background-color: currentColor;

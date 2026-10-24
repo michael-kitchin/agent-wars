@@ -1,6 +1,6 @@
 /**
  * In-memory record of each unit's last strategic h3 index before its current position.
- * Used for tactical entry-edge placement; cleared on new game. Not persisted in SQLite (milestone 2.1 scope).
+ * Used for tactical entry-edge placement; cleared on new game. Not persisted in SQLite.
  */
 
 import { logDebug, logTrace } from './logger';

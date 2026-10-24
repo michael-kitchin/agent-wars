@@ -9,7 +9,7 @@
 
 import { logDebug, logError } from '../logger';
 import { HUMAN_SEAT_ID, MAX_SEATS, MIN_SEATS, aiSeatIdForIndex } from '../../shared/seatIds';
-import type { SeatRecord } from '../../shared/seatRoster';
+import { AI_SEAT_KIND, HUMAN_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { installedSideGroups, listScenarioHomeRegions } from '../regionScenario';
 
@@ -70,7 +70,7 @@ function assertSeatCount(seats: readonly NewGameSeatInput[]): void {
     logError('seatResolution assertSeatCount', { seatCount: seats.length, err });
     throw err;
   }
-  const humanCount = seats.filter((seat) => seat.kind === HUMAN_SEAT_ID).length;
+  const humanCount = seats.filter((seat) => seat.kind === HUMAN_SEAT_KIND).length;
   if (humanCount > 1) {
     const err = new Error('A match can have only one human side');
     logError('seatResolution assertSeatCount: two humans', err);
@@ -160,17 +160,17 @@ function assignSeatIdentity(
   seats: readonly NewGameSeatInput[],
   homeRegions: readonly string[]
 ): ResolvedNewMatchSeat[] {
-  const humanIndexes = seats.flatMap((seat, index) => (seat.kind === HUMAN_SEAT_ID ? [index] : []));
-  const aiIndexes = seats.flatMap((seat, index) => (seat.kind === 'ai' ? [index] : []));
+  const humanIndexes = seats.flatMap((seat, index) => (seat.kind === HUMAN_SEAT_KIND ? [index] : []));
+  const aiIndexes = seats.flatMap((seat, index) => (seat.kind === AI_SEAT_KIND ? [index] : []));
   return [...humanIndexes, ...aiIndexes].map((sourceIndex, position) => {
     const seat = seats[sourceIndex]!;
     const aiNumber = position - humanIndexes.length + 1;
     return {
-      seatId: seat.kind === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : aiSeatIdForIndex(aiNumber),
+      seatId: seat.kind === HUMAN_SEAT_KIND ? HUMAN_SEAT_ID : aiSeatIdForIndex(aiNumber),
       seatOrder: position + 1,
       kind: seat.kind,
       homeRegion: homeRegions[sourceIndex]!,
-      commanderInput: seat.kind === HUMAN_SEAT_ID ? null : (seat.commander ?? null),
+      commanderInput: seat.kind === HUMAN_SEAT_KIND ? null : (seat.commander ?? null),
       outTurn: null,
       outBy: null,
       outReasons: [],

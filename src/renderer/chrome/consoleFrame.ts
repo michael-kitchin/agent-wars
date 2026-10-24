@@ -5,14 +5,14 @@
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
 import { expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
-import { observeModeControls } from '../../shared/observeModeControls';
+import { isObservingRoster, observeModeControls } from '../../shared/observeModeControls';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
 import { onQueuedOrdersChanged, queuedOrderCount } from '../gameplay/queuedOrderRows';
 import { scrollOpenRouterLogToEnd } from '../openRouter/openRouterUiHelpers';
 import { onConsoleReportsChanged, refreshReportSenderFilter, setConsoleReportsVisible, unreadConsoleReportCount } from './consoleReports';
 import { selectTabPanel, type TabPanelBinding } from './selectTabPanel';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { AI_SEAT_KIND } from '../../shared/seatRoster';
 
 /**
  * One enabled console tab: its button, its panel, the title shown while it is active, and what to refresh on show.
@@ -108,9 +108,8 @@ function ordersSubtitle(): string {
  */
 function commandersSubtitle(): string {
   const seats = S.gameState?.seats ?? [];
-  const humanPlaying = seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
-  if (!humanPlaying && seats.length > 0) return `${seats.length} sides, observing`;
-  const opponents = seats.filter((seat) => seat.kind === 'ai').length || 1;
+  if (isObservingRoster(seats)) return `${seats.length} sides, observing`;
+  const opponents = seats.filter((seat) => seat.kind === AI_SEAT_KIND).length || 1;
   const word = opponents === 1 ? 'opponents'.slice(0, -1) : 'opponents';
   return `${opponents} ${word}`;
 }
@@ -181,7 +180,7 @@ function applyConsoleState(): void {
 /**
  * Expands the console on one of its tabs.
  *
- * Purpose: A successful start can show the Opponent tab without a click. A click on the selected tab would collapse it.
+ * Purpose: A successful start can show the Commanders tab without a click. A click on the selected tab would collapse it.
  * When to use: After a new match is installed, and once when the app opens onto a live match. The console is on screen either way.
  * Expected outcome: The named tab's panel shows and the console is expanded. An unknown id is logged and the console stays as it was.
  * Exceptions: None. A missing page element is skipped by `applyConsoleState`.

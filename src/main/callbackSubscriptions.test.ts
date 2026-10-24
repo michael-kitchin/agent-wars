@@ -1,5 +1,5 @@
 /**
- * Callback subscriptions (Phase 1) — storage and replace-all semantics.
+ * Callback subscriptions — storage and replace-all semantics.
  * Without a live DB, getSubscriptions returns []; replaceSubscriptions/clearSubscriptions no-op.
  * Run with: node dist/callbackSubscriptions.test.js
  */

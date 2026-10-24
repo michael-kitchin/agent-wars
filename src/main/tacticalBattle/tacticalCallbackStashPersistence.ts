@@ -8,7 +8,7 @@
  */
 
 import { AI_SEAT_IDS, isAiSeatId, type AiSeatId } from '../../shared/seatIds';
-import type { CallbackSubscription } from '../callbackSubscriptions';
+import { copyCallbackSubscriptions, type CallbackSubscription } from '../callbackSubscriptions';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
 import { logDebug, logError } from '../logger';
 
@@ -21,7 +21,23 @@ import { logDebug, logError } from '../logger';
  * Exceptions: None.
  */
 export interface TacticalCallbackStash {
+  /**
+   * The AI seat whose callbacks were stashed, or null when the other party is not an AI seat.
+   *
+   * Contract: Null means restore must leave every seat's callbacks alone.
+   * When to use: Writing the stash and choosing which seat to restore.
+   * Expected outcome: An `AiSeatId`, or null.
+   * Exceptions: None.
+   */
   readonly seatId: AiSeatId | null;
+  /**
+   * The callback rows captured before the battle.
+   *
+   * Contract: A copy of that seat's subscriptions, or empty when `seatId` is null.
+   * When to use: The `game_config` payload and the in-memory stash.
+   * Expected outcome: Each row keeps its event, params, and subscribed turn.
+   * Exceptions: None.
+   */
   readonly subscriptions: readonly CallbackSubscription[];
 }
 
@@ -57,11 +73,7 @@ export function writeTacticalCallbackStashToGameConfig(stash: TacticalCallbackSt
       ? { noAiParty: true, subscriptions: [] }
       : {
         seatId: stash.seatId,
-        subscriptions: stash.subscriptions.map((s) => ({
-          event: s.event,
-          params: { ...(s.params ?? {}) },
-          subscribedTurn: s.subscribedTurn,
-        })),
+        subscriptions: copyCallbackSubscriptions(stash.subscriptions),
       };
     dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
       TACTICAL_CALLBACK_STASH_CONFIG_KEY,

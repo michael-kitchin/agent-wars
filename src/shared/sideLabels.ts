@@ -1,5 +1,5 @@
-import { isNeutralOwnerId, isSeatId, HUMAN_SEAT_ID } from './seatIds';
-import { shortSideName, type SeatSnapshot } from './seatRoster';
+import { isNeutralOwnerId, isSeatId } from './seatIds';
+import { HUMAN_SEAT_KIND, shortSideName, type SeatSnapshot } from './seatRoster';
 
 /**
  * The roster fields a side label needs.
@@ -56,7 +56,7 @@ export function homeSeatIdsAtHex(h3Index: string, lists: HomeHexLists): string[]
  * Exceptions: None.
  */
 export function viewerSeatIdForRoster(seats: readonly Pick<SeatSnapshot, 'seatId' | 'kind'>[]): string | null {
-  return seats.find((seat) => seat.kind === HUMAN_SEAT_ID)?.seatId ?? null;
+  return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
 }
 
 /**

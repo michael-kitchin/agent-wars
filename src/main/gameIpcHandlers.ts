@@ -4,7 +4,7 @@
  * No Electron imports so tests can run under Node.
  */
 
-import { commanderModelId, getAiPendingOrders, type GameStateSnapshot } from './gameDb';
+import { getAiPendingOrders, type GameStateSnapshot } from './gameDb';
 import { AI_SEAT_IDS, isAiSeatId, type AiSeatId, type SeatId, HUMAN_SEAT_ID } from '../shared/seatIds';
 import { type OwnerTurnOrders, type TurnOrdersByOwner } from './gameActions/ownerTurnOrders';
 import { gatherCommanderOrdersForReady } from './openRouter/commanderReadyGather';
@@ -15,8 +15,10 @@ import {
 import {
   buildDistinctAiMovesFromPlanningOrders,
   computeAiRangedByTypeCounts,
+  fallbackConsultModelId,
   pickReadyResolutionIpcMirrorFields,
   runEventDrivenAfterResolutionConsultation,
+  type StrategicConsultArgs,
 } from './ipc/readyIpcResolutionMapping';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
@@ -35,7 +37,7 @@ export {
 } from './ipc/meleeInterceptResolveIpc';
 
 /**
- * Documents the module-scope binding `POST_RESOLUTION_CONSULT_TIMEOUT_MS` (POST_RESOLUTION_CONSULT_TIMEOUT_MS).
+ * How long a post-resolution consult may run.
 
  * Purpose: Local name for `AI_CONSULTATION_WAIT_TIMEOUT_MS`. A shorter race would abandon the post-resolution consult while the tool loop was still allowed to run.
  * When to use: `runEventDrivenAfterResolutionConsultation` and `runEventDrivenAfterTacticalBeatConsultation`.
@@ -64,85 +66,85 @@ function aiPlanningOrders(ordersByOwner: TurnOrdersByOwner): {
 }
 
 /**
- * Documents the `ReadyResultMinimal` type alias (export type ReadyResultMinimal).
-
- * Purpose: Supports maintainability by documenting why `ReadyResultMinimal` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The Ready result this handler returns to the renderer.
+ *
+ * Purpose: Callers and tests name the IPC result without repeating the full resolution type.
+ * When to use: The return of `handleGameReady` and `handleResolveMeleeIntercept`.
+ * Expected outcome: The same fields as `ReadyResult`.
  * Exceptions: None.
  */
 export type ReadyResultMinimal = ReadyResult;
 
 /**
- * Documents the `ReadyDeps` interface as a named contract surface (export interface ReadyDeps).
-
- * Purpose: Supports maintainability by documenting why `ReadyDeps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * The game and model operations Ready needs from the process that owns the database.
+ *
+ * Purpose: Tests pass fakes. The Electron process passes the real database and model calls.
+ * When to use: The second argument of `handleGameReady`. Melee resolve reuses every field except `ready`.
+ * Expected outcome: One object can resolve a turn and, when Events and Run are on, consult the commanders.
+ * Exceptions: None. Members may throw the errors of the database or the model call they wrap.
  */
 export interface ReadyDeps {
     /**
-   * Specifies the contract for the `getGameState` member (getGameState: () => GameStateSnapshot;).
-
-   * Contract: Describes stable behavior for callers of `getGameState` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * The current match, without a seat's fog mask.
+   *
+   * Contract: The snapshot Ready reads before it gathers orders.
+   * When to use: Turn number, phase, and unit labels.
+   * Expected outcome: The match as stored, including every seat's units.
+   * Exceptions: Throws when the database is not open.
    */
 getGameState: () => GameStateSnapshot;
     /**
-   * Specifies the contract for the `getGameStateForPlayer` member (getGameStateForPlayer: (playerId: SeatId) => GameStateSnapshot;).
-
-   * Contract: Describes stable behavior for callers of `getGameStateForPlayer` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * One seat's view of the match.
+   *
+   * Contract: The human view may hide unexplored terrain. An AI view does not.
+   * When to use: A consult that plans for `playerId`.
+   * Expected outcome: That seat's snapshot.
+   * Exceptions: Throws when the database is not open or the id is not a seat.
    */
 getGameStateForPlayer: (playerId: SeatId) => GameStateSnapshot;
     /**
-   * Specifies the contract for the `getSelectedModel` member (getSelectedModel: () => string;).
-
-   * Contract: Describes stable behavior for callers of `getSelectedModel` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The app-wide model, used when a seat has no commander row.
+   *
+   * Contract: A function, so a consult sees the selection at call time.
+   * When to use: `fallbackConsultModelId`.
+   * Expected outcome: The selected model id, or `''` when none is selected.
    * Exceptions: None.
    */
 getSelectedModel: () => string;
     /**
-   * Specifies the contract for the `hasKey` member (hasKey: () => boolean;).
-
-   * Contract: Describes stable behavior for callers of `hasKey` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Whether an API key is configured.
+   *
+   * Contract: A function, so a consult sees the key at call time.
+   * When to use: Before a model call.
+   * Expected outcome: True when a key is present.
    * Exceptions: None.
    */
 hasKey: () => boolean;
     /**
-   * Specifies the contract for the `getToolNamesForEnabledGroups` member (getToolNamesForEnabledGroups: (groupIds: string[]) => string[];).
-
-   * Contract: Describes stable behavior for callers of `getToolNamesForEnabledGroups` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Tool names for the groups the player left on.
+   *
+   * Contract: Unknown group ids contribute no names.
+   * When to use: The consult's `enabledToolNames`.
+   * Expected outcome: The names those groups expose.
    * Exceptions: None.
    */
 getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
     /**
-   * Specifies the contract for the `defaultGroupIds` member (defaultGroupIds: string[];).
-
-   * Contract: Describes stable behavior for callers of `defaultGroupIds` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Tool groups used when the payload names none.
+   *
+   * Contract: The ids of the groups the app enables by default.
+   * When to use: A Ready payload with an empty or missing group list.
+   * Expected outcome: Those ids, in registry order.
    * Exceptions: None.
    */
 defaultGroupIds: string[];
     /**
-   * Specifies the contract for the `requestOrders` member (requestOrders: ( state: GameStateSnapshot, modelId: string, options: { enabledToolNames: string[]; usePrecomputation?: boolean } ) => Promise<).
-
-   * Contract: Describes stable behavior for callers of `requestOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Asks one seat's model for orders.
+   *
+   * Contract: `options.seatId` is the seat being consulted. The function does not pick a seat on its own.
+   * When to use: The post-resolution runner.
+   * Expected outcome: That seat's order result, or a rejection the runner logs.
+   * Exceptions: May reject. The runner catches that rejection.
    */
 requestOrders: (
     state: GameStateSnapshot,
@@ -150,23 +152,23 @@ requestOrders: (
     options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
     /**
-   * Specifies the contract for the `ready` member (ready: ( aiOrders: { unitId: string; toH3Index: string }[], aiRangedOrders: RangedAttackOrder[], aiAirStrikeOrders?: AirStrikeOrder[], aiFer).
-
-   * Contract: Describes stable behavior for callers of `ready` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Resolves the turn from the orders gathered for every owner.
+   *
+   * Contract: Does not consult. Consultation happens after this returns success.
+   * When to use: Once the handler has an order map and the match generation is unchanged.
+   * Expected outcome: A success result, a failure reason, or a pause for a melee decision.
+   * Exceptions: Throws when resolution itself throws.
    */
 ready: (ordersByOwner: TurnOrdersByOwner) => ReadyResult;
 }
 
 /**
- * Defines the `handleGameReady` function shape (export async function handleGameReady().
-
- * Purpose: Supports maintainability by documenting why `handleGameReady` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Resolves one strategic turn and, when Events and Run are on, consults the commanders afterward.
+ *
+ * Purpose: `game:ready` stays testable without Electron. The process registers this function with the real dependencies.
+ * When to use: The Ready IPC handler, and tests that pass fakes.
+ * Expected outcome: A failure reason when a consult is still pending, the match changed, or resolution failed. A melee pause returns the decision token and candidates. Otherwise the turn result, with a consult either stored for playback or already merged into the strategy, message, tool counts, and cost.
+ * Exceptions: Does not throw for a pending consult, a changed match, or a failed resolution. Database and model errors propagate from `deps`.
  */
 export async function handleGameReady(
   payload: GameReadyIpcPayload | undefined,
@@ -183,8 +185,7 @@ export async function handleGameReady(
   const formatAiMoveLogLine = (o: { unitId: string; toH3Index: string }) =>
     `${opponentUnitDisplayLabel(o.unitId)} → ${o.toH3Index}`;
   logHybridPipelineBoundary('handleGameReady', { turnNumber: state.turnNumber, phase: state.phase });
-  const fromSeat = commanderModelId(AI_SEAT_IDS[0]);
-  const modelId = fromSeat === null ? deps.getSelectedModel() : fromSeat;
+  const modelId = fallbackConsultModelId(deps.getSelectedModel);
   const enabledGroupIds =
     payload?.enabledToolGroups && payload.enabledToolGroups.length > 0
       ? payload.enabledToolGroups
@@ -277,34 +278,22 @@ export async function handleGameReady(
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
 
+  const consultArgs: StrategicConsultArgs = {
+    useEventDrivenConsultation,
+    resolutionSuccess: readyResult.success,
+    aiPlanningRunEnabled,
+    resolution: readyResult,
+    modelId,
+    enabledToolNames,
+    hasKey: deps.hasKey,
+    requestOrders: deps.requestOrders,
+    timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
+    errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
+  };
   if (shouldDeferPostResolutionConsult) {
-    setPendingStrategicReadyConsult(planningTurnNumberAfterResolution, {
-      useEventDrivenConsultation,
-      resolutionSuccess: readyResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
-      resolution: readyResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-      errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
-    });
+    setPendingStrategicReadyConsult(planningTurnNumberAfterResolution, consultArgs);
   } else {
-    const postConsult = await runEventDrivenAfterResolutionConsultation({
-      useEventDrivenConsultation,
-      resolutionSuccess: readyResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer(AI_SEAT_IDS[0]),
-      resolution: readyResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-      errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
-    });
+    const postConsult = await runEventDrivenAfterResolutionConsultation(consultArgs);
     if (postConsult.aiStrategy) {
       aiStrategy = postConsult.aiStrategy;
     }

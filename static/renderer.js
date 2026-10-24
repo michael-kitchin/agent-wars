@@ -18583,9 +18583,62 @@ ${bonuses}`;
     return captured === rendererMatchEpoch;
   }
 
+  // src/shared/seatRoster.ts
+  var HUMAN_SEAT_KIND = "human";
+  var AI_SEAT_KIND = "ai";
+  var DOCTRINES = ["aggressive", "balanced", "cautious"];
+  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
+  function sortSeatsByOrder(seats) {
+    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function isSeatActive(seat) {
+    return seat.outTurn === null;
+  }
+  function activeAiSeats(seats) {
+    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
+  }
+  function activeAiSeatIds(seats) {
+    return activeAiSeats(seats).map((seat) => seat.seatId).filter((seatId) => isAiSeatId(seatId));
+  }
+  function findHumanSeat(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
+  }
+  var COMPASS_PREFIXES = [
+    ["Northern", "N."],
+    ["Southern", "S."],
+    ["Eastern", "E."],
+    ["Western", "W."],
+    ["Central", "C."],
+    ["North", "N."],
+    ["South", "S."],
+    ["East", "E."],
+    ["West", "W."]
+  ];
+  function cutAtFirstSeparator(displayName) {
+    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
+    if (separatorAt.length === 0) return displayName;
+    return displayName.slice(0, Math.min(...separatorAt));
+  }
+  function shortenLeadingCompass(name) {
+    for (const [word, short] of COMPASS_PREFIXES) {
+      if (name === word) return short;
+      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+    }
+    return name;
+  }
+  function shortSideName(displayName) {
+    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
+  }
+
   // src/shared/observeModeControls.ts
+  function activeHumanSeatId(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
+  }
+  function isObservingRoster(seats) {
+    return seats.length > 0 && activeHumanSeatId(seats) === null;
+  }
   function observeModeControls(seats) {
-    const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null);
+    const observing = isObservingRoster(seats);
     return {
       observing,
       ordersEnabled: !observing,
@@ -18599,7 +18652,7 @@ ${bonuses}`;
   function readoutViewerSeatId(seats, viewAs) {
     if (seats.length === 0) return void 0;
     if (!observeModeControls(seats).observing) {
-      return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+      return activeHumanSeatId(seats);
     }
     if (viewAs === "all") return null;
     const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
@@ -19707,48 +19760,6 @@ ${bonuses}`;
     return { controlled, total, pct };
   }
 
-  // src/shared/seatRoster.ts
-  var DOCTRINES = ["aggressive", "balanced", "cautious"];
-  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
-  function sortSeatsByOrder(seats) {
-    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
-  }
-  function isSeatActive(seat) {
-    return seat.outTurn === null;
-  }
-  function activeAiSeats(seats) {
-    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === "ai"));
-  }
-  function findHumanSeat(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID) ?? null;
-  }
-  var COMPASS_PREFIXES = [
-    ["Northern", "N."],
-    ["Southern", "S."],
-    ["Eastern", "E."],
-    ["Western", "W."],
-    ["Central", "C."],
-    ["North", "N."],
-    ["South", "S."],
-    ["East", "E."],
-    ["West", "W."]
-  ];
-  function cutAtFirstSeparator(displayName) {
-    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
-    if (separatorAt.length === 0) return displayName;
-    return displayName.slice(0, Math.min(...separatorAt));
-  }
-  function shortenLeadingCompass(name) {
-    for (const [word, short] of COMPASS_PREFIXES) {
-      if (name === word) return short;
-      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
-    }
-    return name;
-  }
-  function shortSideName(displayName) {
-    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
-  }
-
   // src/shared/sideLabels.ts
   function homeSeatIdsAtHex(h3Index, lists) {
     const bySeat = lists.homeRegionHexesBySeat;
@@ -19756,7 +19767,7 @@ ${bonuses}`;
     return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
   }
   function viewerSeatIdForRoster(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID)?.seatId ?? null;
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
   }
   function sideDisplayName(seatId, seats, viewerSeatId2) {
     const seat = seats.find((row) => row.seatId === seatId);
@@ -21462,8 +21473,7 @@ ${bonuses}`;
     return lines;
   }
   function matchIsObserving() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    return seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+    return isObservingRoster(rendererSharedState.gameState?.seats ?? []);
   }
   function dispatchSeatName(seatId) {
     return rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId)?.homeRegion ?? seatId;
@@ -21945,7 +21955,7 @@ ${bonuses}`;
   function renderCommanderCards() {
     const host = document.getElementById("commander-cards");
     if (!host) return;
-    const seats = sortSeatsByOrder((rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === "ai"));
+    const seats = sortSeatsByOrder((rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND));
     syncLogFilter(seats);
     const openSeat = host.querySelector('.commander-card-summary[aria-expanded="true"]')?.dataset.seatId ?? null;
     host.replaceChildren();
@@ -22040,7 +22050,7 @@ ${bonuses}`;
       reasoningEffort: seat.commander.reasoningEffort,
       doctrineChoice: seat.commander.doctrineChoice
     };
-    const observing = !(rendererSharedState.gameState?.seats ?? []).some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+    const observing = isObservingRoster(rendererSharedState.gameState?.seats ?? []);
     openCommanderPopover({
       anchor: anchor2,
       title: `${seat.homeRegion} commander`,
@@ -22062,10 +22072,7 @@ ${bonuses}`;
     }
   }
   async function saveEveryCommander(commander) {
-    const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === "ai" && seat.outTurn === null && isAiSeatId(seat.seatId));
-    for (const seat of seats) {
-      if (isAiSeatId(seat.seatId)) await saveCommander(seat.seatId, commander);
-    }
+    for (const seatId of activeAiSeatIds(rendererSharedState.gameState?.seats ?? [])) await saveCommander(seatId, commander);
   }
   function formatCost(dollars) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dollars);
@@ -22139,7 +22146,7 @@ ${bonuses}`;
   // src/renderer/chrome/frameTooltipText.ts
   var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
   var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
-  var opponentTabTooltipText = `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
+  var commandersTabTooltipText = `Show each commander's status, cost, and settings, the tool groups, and the AI activity log. ${consoleTabCollapseSentence}`;
   function unavailableTooltipText(name) {
     return `${name} is not available in this version.`;
   }
@@ -22170,7 +22177,7 @@ ${bonuses}`;
     name.textContent = `${seat?.homeRegion ?? "Commander"} "${meta.messageText ?? ""}"`;
     line.append(dot, name);
     wrap.append(line);
-    const observing = seats.length > 0 && !seats.some((row) => row.kind === HUMAN_SEAT_ID && row.outTurn === null);
+    const observing = isObservingRoster(seats);
     if (observing && meta.strategyText) {
       const strategy = document.createElement("p");
       strategy.className = "console-report-strategy";
@@ -22333,7 +22340,7 @@ ${bonuses}`;
     const statuses = commanderPoolStatuses();
     const ready = active2.filter((seat) => statuses.find((row) => row.seatId === seat.seatId)?.status === "ready").length;
     const status = commanderPlanningStatus(rendererSharedState.runButtonOn, isWaitingForPrecomputedAiOrders());
-    const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
+    const observing = isObservingRoster(seats);
     const sentence = document.getElementById("commander-status-text");
     if (sentence) sentence.textContent = commanderPlanningSentence(rendererSharedState.runButtonOn, active2.length || 1);
     document.getElementById("commander-status-line")?.setAttribute("data-status", status);
@@ -22636,35 +22643,6 @@ ${bonuses}`;
     if (!rendererSharedState.gameState) return false;
     const explored = getExploredHexSet(rendererSharedState.gameState);
     return explored.has(h3Index);
-  }
-
-  // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
-  function mergePendingTacticalEmbarkOrdersIntoSealiftState(base, pendingEmbark) {
-    if (pendingEmbark.length === 0) {
-      return { ...base, navalRows: base.navalRows.map((r) => ({ ...r })) };
-    }
-    const landType = new Map(base.landOptions.map((o) => [o.unitId, o.unitType]));
-    const rows = base.navalRows.map((r) => ({ ...r }));
-    const pendingLand = new Set(pendingEmbark.map((e) => e.unitId));
-    for (const row of rows) {
-      if (row.slot1UnitId && pendingLand.has(row.slot1UnitId)) row.slot1UnitId = null;
-      if (row.slot2UnitId && pendingLand.has(row.slot2UnitId)) row.slot2UnitId = null;
-    }
-    const sorted = [...pendingEmbark].sort((a, b) => a.navalUnitId.localeCompare(b.navalUnitId) || a.unitId.localeCompare(b.unitId));
-    for (const e of sorted) {
-      const row = rows.find((r) => r.navalUnitId === e.navalUnitId);
-      if (!row) continue;
-      const t = landType.get(e.unitId);
-      if (t === "armor") {
-        row.slot1UnitId = e.unitId;
-        row.slot2UnitId = null;
-        continue;
-      }
-      if (!row.slot1UnitId) row.slot1UnitId = e.unitId;
-      else if (!row.slot2UnitId && !row.slot2Disabled) row.slot2UnitId = e.unitId;
-      else row.slot1UnitId = e.unitId;
-    }
-    return { ...base, navalRows: rows };
   }
 
   // src/renderer/core/parityDiagnostics.ts
@@ -24386,51 +24364,311 @@ ${bonuses}`;
     orderSlowerTooltip.repositionIfVisible();
   }
 
-  // src/renderer/map/stackCallout.ts
-  var hideBuildPopup = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var scheduleTerrainTooltipRestoreAfterPopoverClose = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var syncUiAfterSelectionChange = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var refreshGameStateAfterSealiftChange = async () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var formatUnitDisplayName = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var formatTargetingValidationReason = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var refreshHumanStandingOrders = async () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var updatePendingOrdersSidebar = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var requestRedraw = () => {
-    throw new Error("stack callout host is not bound");
-  };
-  var refreshHoverRoutePreview = async () => {
-    throw new Error("stack callout host is not bound");
-  };
+  // src/renderer/map/stackCalloutHost.ts
+  var boundStackCalloutHost = null;
   function bindStackCalloutHost(host) {
-    hideBuildPopup = host.hideBuildPopup;
-    scheduleTerrainTooltipRestoreAfterPopoverClose = host.scheduleTerrainTooltipRestoreAfterPopoverClose;
-    syncUiAfterSelectionChange = host.syncUiAfterSelectionChange;
-    refreshGameStateAfterSealiftChange = host.refreshGameStateAfterSealiftChange;
-    formatUnitDisplayName = host.formatUnitDisplayName;
-    formatTargetingValidationReason = host.formatTargetingValidationReason;
-    refreshHumanStandingOrders = host.refreshHumanStandingOrders;
-    updatePendingOrdersSidebar = host.updatePendingOrdersSidebar;
-    requestRedraw = host.requestRedraw;
-    refreshHoverRoutePreview = host.refreshHoverRoutePreview;
+    boundStackCalloutHost = host;
   }
+  function requireStackCalloutHost() {
+    if (boundStackCalloutHost === null) {
+      throw new Error("stack callout host is not bound");
+    }
+    return boundStackCalloutHost;
+  }
+  function hideBuildPopup() {
+    requireStackCalloutHost().hideBuildPopup();
+  }
+  function scheduleTerrainTooltipRestoreAfterPopoverClose() {
+    requireStackCalloutHost().scheduleTerrainTooltipRestoreAfterPopoverClose();
+  }
+  function syncUiAfterSelectionChange(options) {
+    requireStackCalloutHost().syncUiAfterSelectionChange(options);
+  }
+  async function refreshGameStateAfterSealiftChange(options) {
+    await requireStackCalloutHost().refreshGameStateAfterSealiftChange(options);
+  }
+  function formatUnitDisplayName(unitId) {
+    return requireStackCalloutHost().formatUnitDisplayName(unitId);
+  }
+  function formatTargetingValidationReason(reason, fallbackMessage) {
+    return requireStackCalloutHost().formatTargetingValidationReason(reason, fallbackMessage);
+  }
+  async function refreshHumanStandingOrders() {
+    await requireStackCalloutHost().refreshHumanStandingOrders();
+  }
+  function updatePendingOrdersSidebar() {
+    requireStackCalloutHost().updatePendingOrdersSidebar();
+  }
+  function requestRedraw() {
+    requireStackCalloutHost().requestRedraw();
+  }
+  async function refreshHoverRoutePreview() {
+    await requireStackCalloutHost().refreshHoverRoutePreview();
+  }
+
+  // src/renderer/map/stackCalloutSelectionToggles.ts
   var stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
+  function resetStackCalloutNonSelectableUnitIds() {
+    stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
+  }
+  function currentStackCalloutNonSelectableUnitIds() {
+    return stackCalloutNonSelectableUnitIds;
+  }
+  function applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectableUnitIds) {
+    const listEl = document.getElementById("stack-callout-list");
+    if (!listEl) return;
+    const rows = Array.from(listEl.querySelectorAll("li"));
+    for (const row of rows) {
+      const unitId = row.getAttribute("data-unit-id");
+      if (!unitId) continue;
+      const btn = row.querySelector("button.stack-unit-toggle");
+      if (!btn) continue;
+      btn.textContent = rendererSharedState.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+      btn.style.visibility = nonSelectableUnitIds.has(unitId) ? "hidden" : "visible";
+    }
+  }
+  function setStackPopupNonSelectableUnitIds(calloutEl, unitIds) {
+    const normalized = [...new Set(unitIds)].sort((a, b) => a.localeCompare(b));
+    const nonSelectable = new Set(normalized);
+    stackCalloutNonSelectableUnitIds = nonSelectable;
+    const selectedBlockedIds = normalized.filter((unitId) => rendererSharedState.selectedUnitIds.includes(unitId));
+    if (selectedBlockedIds.length > 0) {
+      removeUnitsFromSelection(selectedBlockedIds);
+      syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
+    }
+    applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
+  }
+  function getSelectableHumanIdsForStackCallout(units) {
+    return units.filter((u) => u.player === HUMAN_SEAT_ID && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
+  }
+
+  // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
+  function mergePendingTacticalEmbarkOrdersIntoSealiftState(base, pendingEmbark) {
+    if (pendingEmbark.length === 0) {
+      return { ...base, navalRows: base.navalRows.map((r) => ({ ...r })) };
+    }
+    const landType = new Map(base.landOptions.map((o) => [o.unitId, o.unitType]));
+    const rows = base.navalRows.map((r) => ({ ...r }));
+    const pendingLand = new Set(pendingEmbark.map((e) => e.unitId));
+    for (const row of rows) {
+      if (row.slot1UnitId && pendingLand.has(row.slot1UnitId)) row.slot1UnitId = null;
+      if (row.slot2UnitId && pendingLand.has(row.slot2UnitId)) row.slot2UnitId = null;
+    }
+    const sorted = [...pendingEmbark].sort((a, b) => a.navalUnitId.localeCompare(b.navalUnitId) || a.unitId.localeCompare(b.unitId));
+    for (const e of sorted) {
+      const row = rows.find((r) => r.navalUnitId === e.navalUnitId);
+      if (!row) continue;
+      const t = landType.get(e.unitId);
+      if (t === "armor") {
+        row.slot1UnitId = e.unitId;
+        row.slot2UnitId = null;
+        continue;
+      }
+      if (!row.slot1UnitId) row.slot1UnitId = e.unitId;
+      else if (!row.slot2UnitId && !row.slot2Disabled) row.slot2UnitId = e.unitId;
+      else row.slot1UnitId = e.unitId;
+    }
+    return { ...base, navalRows: rows };
+  }
+
+  // src/renderer/map/stackCalloutSealift.ts
   var sealiftSectionRenderGeneration = 0;
+  function invalidateSealiftSectionRenders() {
+    sealiftSectionRenderGeneration += 1;
+  }
+  function removeSealiftSection(calloutEl) {
+    calloutEl.querySelectorAll(".stack-sealift-section").forEach((el) => el.remove());
+  }
+  function buildSealiftUnitLabel(unitId, unitType) {
+    void unitType;
+    return formatUnitDisplayName(unitId);
+  }
+  async function renderSealiftSection(units, calloutEl) {
+    const generation = ++sealiftSectionRenderGeneration;
+    const h3Index = units[0]?.h3Index;
+    if (!h3Index) {
+      removeSealiftSection(calloutEl);
+      return;
+    }
+    const api = window.gameApi;
+    if (!api) {
+      removeSealiftSection(calloutEl);
+      return;
+    }
+    const tacticalSealiftMode = !!rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index);
+    const refreshSameHexSealiftSection = () => {
+      if (calloutEl.classList.contains("hidden") || calloutEl.getAttribute("data-h3-index") !== h3Index) return;
+      void renderSealiftSection(units, calloutEl);
+    };
+    try {
+      let state;
+      if (tacticalSealiftMode) {
+        state = await api.getTacticalSealiftStackState({ h3Index });
+        state = mergePendingTacticalEmbarkOrdersIntoSealiftState(state, rendererSharedState.pendingEmbarkOrders);
+      } else {
+        state = await api.getSealiftStackState({ h3Index });
+      }
+      if (generation !== sealiftSectionRenderGeneration) return;
+      if (calloutEl.classList.contains("hidden")) return;
+      if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
+      if (!state.showSealiftSection) {
+        removeSealiftSection(calloutEl);
+        return;
+      }
+      const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
+      setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
+      if (generation !== sealiftSectionRenderGeneration) return;
+      const section = document.createElement("div");
+      section.className = "stack-sealift-section";
+      for (const row of state.navalRows) {
+        const rowEl = document.createElement("div");
+        rowEl.className = "stack-sealift-row";
+        const left = document.createElement("span");
+        left.className = "stack-sealift-naval";
+        setUnitNameContent(left, row.navalUnitId, formatUnitDisplayName(row.navalUnitId));
+        rowEl.appendChild(left);
+        const right = document.createElement("div");
+        right.className = "stack-sealift-slots";
+        const addSlotControl = (slotIndex, selectedUnitId, slotDisabled, debarkEnabled) => {
+          const slotRow = document.createElement("div");
+          slotRow.className = "stack-sealift-slot-row";
+          const select = document.createElement("select");
+          select.className = "stack-sealift-select";
+          select.disabled = slotDisabled;
+          const noneOption = document.createElement("option");
+          noneOption.value = "";
+          noneOption.textContent = "(none)";
+          select.appendChild(noneOption);
+          for (const option2 of state.landOptions) {
+            const opt = document.createElement("option");
+            opt.value = option2.unitId;
+            opt.textContent = buildSealiftUnitLabel(option2.unitId, option2.unitType);
+            select.appendChild(opt);
+          }
+          select.value = selectedUnitId ?? "";
+          select.dataset.prevLand = selectedUnitId ?? "";
+          const selectHost = document.createElement("span");
+          selectHost.className = "control-tooltip-host";
+          selectHost.setAttribute("data-control-tooltip", sealiftSelectTooltipText);
+          selectHost.appendChild(select);
+          select.addEventListener("change", async () => {
+            const selected = select.value.trim();
+            if (tacticalSealiftMode) {
+              const prev = select.dataset.prevLand ?? "";
+              const result2 = await api.updateTacticalSealiftSlot({
+                h3Index,
+                navalUnitId: row.navalUnitId,
+                slotIndex,
+                landUnitId: selected.length > 0 ? selected : null
+              });
+              if (!result2.success) {
+                select.value = select.dataset.prevLand ?? "";
+                showMapToast(formatTargetingValidationReason(result2.reason, "Failed to update sealift assignment."));
+              } else {
+                if (prev) {
+                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                }
+                if (selected.length > 0) {
+                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+                }
+                if (result2.tacticalBattle) {
+                  rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
+                }
+                const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                select.dataset.prevLand = selected;
+                if (selected.length > 0) {
+                  await refreshHumanStandingOrders();
+                }
+                updatePendingOrdersSidebar();
+              }
+              refreshSameHexSealiftSection();
+              requestRedraw();
+              return;
+            }
+            const result = await api.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: selected.length > 0 ? selected : null
+            });
+            if (!result.success) {
+              select.value = select.dataset.prevLand ?? "";
+              showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
+            } else {
+              await refreshGameStateAfterSealiftChange({ refreshStandingOrders: selected.length > 0 });
+              if (selected.length > 0) {
+                await refreshHoverRoutePreview();
+              }
+            }
+            refreshSameHexSealiftSection();
+            requestRedraw();
+          });
+          slotRow.appendChild(selectHost);
+          const debarkBtn = document.createElement("button");
+          debarkBtn.type = "button";
+          debarkBtn.className = "unit-select stack-unit-toggle";
+          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+          debarkBtn.setAttribute("data-control-tooltip", sealiftDebarkTooltipText);
+          debarkBtn.disabled = !debarkEnabled;
+          debarkBtn.style.visibility = debarkEnabled ? "visible" : "hidden";
+          debarkBtn.addEventListener("click", async () => {
+            if (tacticalSealiftMode) {
+              const prev = selectedUnitId ?? "";
+              if (prev) {
+                const result2 = await api.updateTacticalSealiftSlot({
+                  h3Index,
+                  navalUnitId: row.navalUnitId,
+                  slotIndex,
+                  landUnitId: null
+                });
+                if (!result2.success) {
+                  showMapToast(formatTargetingValidationReason(result2.reason, "Failed to debark unit."));
+                } else {
+                  if (result2.tacticalBattle) {
+                    rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
+                  }
+                  const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                  rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                  updatePendingOrdersSidebar();
+                }
+              }
+              refreshSameHexSealiftSection();
+              requestRedraw();
+              return;
+            }
+            const result = await api.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: null
+            });
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
+            } else {
+              await refreshGameStateAfterSealiftChange();
+            }
+            refreshSameHexSealiftSection();
+            requestRedraw();
+          });
+          slotRow.appendChild(debarkBtn);
+          right.appendChild(slotRow);
+        };
+        addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
+        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+        rowEl.appendChild(right);
+        section.appendChild(rowEl);
+      }
+      if (generation !== sealiftSectionRenderGeneration) return;
+      removeSealiftSection(calloutEl);
+      calloutEl.appendChild(section);
+    } catch (err) {
+      console.error("sealift stack section failed:", err);
+    }
+  }
+
+  // src/renderer/map/stackCallout.ts
   function formatStackTooltip(units) {
     const byKey = /* @__PURE__ */ new Map();
     for (const u of units) {
@@ -24454,8 +24692,8 @@ ${bonuses}`;
       el.removeAttribute("data-unit-ids");
     }
     rendererSharedState.stackCalloutModalActive = false;
-    stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
-    sealiftSectionRenderGeneration += 1;
+    resetStackCalloutNonSelectableUnitIds();
+    invalidateSealiftSectionRenders();
     scheduleTerrainTooltipRestoreAfterPopoverClose();
   }
   function isStackOrBuildMapPopoverOpen() {
@@ -24532,227 +24770,6 @@ ${bonuses}`;
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
   }
-  function applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectableUnitIds) {
-    const listEl = document.getElementById("stack-callout-list");
-    if (!listEl) return;
-    const rows = Array.from(listEl.querySelectorAll("li"));
-    for (const row of rows) {
-      const unitId = row.getAttribute("data-unit-id");
-      if (!unitId) continue;
-      const btn = row.querySelector("button.stack-unit-toggle");
-      if (!btn) continue;
-      btn.textContent = rendererSharedState.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
-      btn.style.visibility = nonSelectableUnitIds.has(unitId) ? "hidden" : "visible";
-    }
-  }
-  function setStackPopupNonSelectableUnitIds(calloutEl, unitIds) {
-    const normalized = [...new Set(unitIds)].sort((a, b) => a.localeCompare(b));
-    const nonSelectable = new Set(normalized);
-    stackCalloutNonSelectableUnitIds = nonSelectable;
-    const selectedBlockedIds = normalized.filter((unitId) => rendererSharedState.selectedUnitIds.includes(unitId));
-    if (selectedBlockedIds.length > 0) {
-      removeUnitsFromSelection(selectedBlockedIds);
-      syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
-    }
-    applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
-  }
-  function getSelectableHumanIdsForStackCallout(units) {
-    return units.filter((u) => u.player === HUMAN_SEAT_ID && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
-  }
-  function removeSealiftSection(calloutEl) {
-    calloutEl.querySelectorAll(".stack-sealift-section").forEach((el) => el.remove());
-  }
-  function buildSealiftUnitLabel(unitId, unitType) {
-    void unitType;
-    return formatUnitDisplayName(unitId);
-  }
-  async function renderSealiftSection(units, calloutEl) {
-    const generation = ++sealiftSectionRenderGeneration;
-    const h3Index = units[0]?.h3Index;
-    if (!h3Index) {
-      removeSealiftSection(calloutEl);
-      return;
-    }
-    const tacticalSealiftMode = !!(rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index) && window.gameApi?.getTacticalSealiftStackState && window.gameApi?.updateTacticalSealiftSlot);
-    if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) {
-      removeSealiftSection(calloutEl);
-      return;
-    }
-    if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot)) {
-      removeSealiftSection(calloutEl);
-      return;
-    }
-    const refreshSameHexSealiftSection = () => {
-      if (calloutEl.classList.contains("hidden") || calloutEl.getAttribute("data-h3-index") !== h3Index) return;
-      void renderSealiftSection(units, calloutEl);
-    };
-    try {
-      let state;
-      if (tacticalSealiftMode) {
-        state = await window.gameApi.getTacticalSealiftStackState({ h3Index });
-        state = mergePendingTacticalEmbarkOrdersIntoSealiftState(state, rendererSharedState.pendingEmbarkOrders);
-      } else {
-        state = await window.gameApi.getSealiftStackState({ h3Index });
-      }
-      if (generation !== sealiftSectionRenderGeneration) return;
-      if (calloutEl.classList.contains("hidden")) return;
-      if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
-      if (!state.showSealiftSection) {
-        removeSealiftSection(calloutEl);
-        return;
-      }
-      const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
-      setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
-      if (generation !== sealiftSectionRenderGeneration) return;
-      const section = document.createElement("div");
-      section.className = "stack-sealift-section";
-      for (const row of state.navalRows) {
-        const rowEl = document.createElement("div");
-        rowEl.className = "stack-sealift-row";
-        const left = document.createElement("span");
-        left.className = "stack-sealift-naval";
-        setUnitNameContent(left, row.navalUnitId, formatUnitDisplayName(row.navalUnitId));
-        rowEl.appendChild(left);
-        const right = document.createElement("div");
-        right.className = "stack-sealift-slots";
-        const addSlotControl = (slotIndex, selectedUnitId, slotDisabled, debarkEnabled) => {
-          const slotRow = document.createElement("div");
-          slotRow.className = "stack-sealift-slot-row";
-          const select = document.createElement("select");
-          select.className = "stack-sealift-select";
-          select.disabled = slotDisabled;
-          const noneOption = document.createElement("option");
-          noneOption.value = "";
-          noneOption.textContent = "(none)";
-          select.appendChild(noneOption);
-          for (const option2 of state.landOptions) {
-            const opt = document.createElement("option");
-            opt.value = option2.unitId;
-            opt.textContent = buildSealiftUnitLabel(option2.unitId, option2.unitType);
-            select.appendChild(opt);
-          }
-          select.value = selectedUnitId ?? "";
-          select.dataset.prevLand = selectedUnitId ?? "";
-          const selectHost = document.createElement("span");
-          selectHost.className = "control-tooltip-host";
-          selectHost.setAttribute("data-control-tooltip", sealiftSelectTooltipText);
-          selectHost.appendChild(select);
-          select.addEventListener("change", async () => {
-            const selected = select.value.trim();
-            if (tacticalSealiftMode) {
-              const prev = select.dataset.prevLand ?? "";
-              const result2 = await window.gameApi.updateTacticalSealiftSlot({
-                h3Index,
-                navalUnitId: row.navalUnitId,
-                slotIndex,
-                landUnitId: selected.length > 0 ? selected : null
-              });
-              if (!result2.success) {
-                select.value = select.dataset.prevLand ?? "";
-                showMapToast(formatTargetingValidationReason(result2.reason, "Failed to update sealift assignment."));
-              } else {
-                if (prev) {
-                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-                }
-                if (selected.length > 0) {
-                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
-                }
-                if (result2.tacticalBattle) {
-                  rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
-                }
-                const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
-                rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
-                select.dataset.prevLand = selected;
-                if (selected.length > 0) {
-                  await refreshHumanStandingOrders();
-                }
-                updatePendingOrdersSidebar();
-              }
-              refreshSameHexSealiftSection();
-              requestRedraw();
-              return;
-            }
-            const result = await window.gameApi.updateSealiftSlot({
-              h3Index,
-              navalUnitId: row.navalUnitId,
-              slotIndex,
-              landUnitId: selected.length > 0 ? selected : null
-            });
-            if (!result.success) {
-              select.value = select.dataset.prevLand ?? "";
-              showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
-            } else {
-              await refreshGameStateAfterSealiftChange({ refreshStandingOrders: selected.length > 0 });
-              if (selected.length > 0) {
-                await refreshHoverRoutePreview();
-              }
-            }
-            refreshSameHexSealiftSection();
-            requestRedraw();
-          });
-          slotRow.appendChild(selectHost);
-          const debarkBtn = document.createElement("button");
-          debarkBtn.type = "button";
-          debarkBtn.className = "unit-select stack-unit-toggle";
-          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
-          debarkBtn.setAttribute("data-control-tooltip", sealiftDebarkTooltipText);
-          debarkBtn.disabled = !debarkEnabled;
-          debarkBtn.style.visibility = debarkEnabled ? "visible" : "hidden";
-          debarkBtn.addEventListener("click", async () => {
-            if (tacticalSealiftMode) {
-              const prev = selectedUnitId ?? "";
-              if (prev) {
-                const result2 = await window.gameApi.updateTacticalSealiftSlot({
-                  h3Index,
-                  navalUnitId: row.navalUnitId,
-                  slotIndex,
-                  landUnitId: null
-                });
-                if (!result2.success) {
-                  showMapToast(formatTargetingValidationReason(result2.reason, "Failed to debark unit."));
-                } else {
-                  if (result2.tacticalBattle) {
-                    rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
-                  }
-                  const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
-                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-                  rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
-                  updatePendingOrdersSidebar();
-                }
-              }
-              refreshSameHexSealiftSection();
-              requestRedraw();
-              return;
-            }
-            const result = await window.gameApi.updateSealiftSlot({
-              h3Index,
-              navalUnitId: row.navalUnitId,
-              slotIndex,
-              landUnitId: null
-            });
-            if (!result.success) {
-              showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
-            } else {
-              await refreshGameStateAfterSealiftChange();
-            }
-            refreshSameHexSealiftSection();
-            requestRedraw();
-          });
-          slotRow.appendChild(debarkBtn);
-          right.appendChild(slotRow);
-        };
-        addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
-        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
-        rowEl.appendChild(right);
-        section.appendChild(rowEl);
-      }
-      if (generation !== sealiftSectionRenderGeneration) return;
-      removeSealiftSection(calloutEl);
-      calloutEl.appendChild(section);
-    } catch (err) {
-      console.error("sealift stack section failed:", err);
-    }
-  }
   function showStackCallout(units, clientX, clientY) {
     if (shouldDismissStackCalloutForHoverPlanning()) return;
     if (shouldHideStrategicMapUnitsForZoom()) {
@@ -24777,7 +24794,7 @@ ${bonuses}`;
     calloutEl.setAttribute("data-y", String(clientY));
     calloutEl.setAttribute("data-h3-index", sorted[0]?.h3Index ?? "");
     calloutEl.setAttribute("data-unit-ids", JSON.stringify(sorted.map((u) => u.id)));
-    stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
+    resetStackCalloutNonSelectableUnitIds();
     listEl.innerHTML = "";
     const existingHeader = calloutEl.querySelector(".stack-callout-actions");
     if (existingHeader) existingHeader.remove();
@@ -24844,7 +24861,7 @@ ${bonuses}`;
       }
       listEl.appendChild(li);
     }
-    applyStackCalloutSelectionButtonVisibility(calloutEl, stackCalloutNonSelectableUnitIds);
+    applyStackCalloutSelectionButtonVisibility(calloutEl, currentStackCalloutNonSelectableUnitIds());
     calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     calloutEl.setAttribute("aria-label", formatStackTooltip(units));
@@ -26693,7 +26710,7 @@ ${bonuses}`;
     const requested = args.rowCount ?? MIN_SEATS;
     const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
     const rows = args.homes.slice(0, count).map((home, index) => ({
-      kind: index === 0 ? HUMAN_SEAT_ID : "ai",
+      kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
       homeKey: home.key,
       commander: index === 0 ? null : args.defaultCommander
     }));
@@ -26702,7 +26719,7 @@ ${bonuses}`;
   function setObserveOnly(state, on, defaultCommander2) {
     if (state.rows.length === 0) return { ...state, observeOnly: on };
     const first = state.rows[0];
-    const nextFirst = on ? { ...first, kind: "ai", commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_ID, commander: null };
+    const nextFirst = on ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
     return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
   }
   function addSideRow(state, homes, defaultCommander2) {
@@ -26710,7 +26727,7 @@ ${bonuses}`;
     const taken = new Set(state.rows.map((row2) => row2.homeKey));
     const free = homes.find((home) => !taken.has(home.key));
     if (!free) return state;
-    const row = { kind: "ai", homeKey: free.key, commander: defaultCommander2 };
+    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander2 };
     return { ...state, rows: [...state.rows, row] };
   }
   function removeSideRow(state, index) {
@@ -26734,19 +26751,19 @@ ${bonuses}`;
     return setRowHome(state, index, picked.key);
   }
   function setRowCommander(state, index, commander) {
-    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== "ai") return state;
+    if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
     const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, commander } : row);
     return { ...state, rows };
   }
   function setEveryAiCommander(state, commander) {
-    const rows = state.rows.map((row) => row.kind === "ai" ? { ...row, commander } : row);
+    const rows = state.rows.map((row) => row.kind === AI_SEAT_KIND ? { ...row, commander } : row);
     return { ...state, rows };
   }
   function rowLabel(state, index) {
     if (index < 0 || index >= state.rows.length) return "";
     if (state.observeOnly) return `Side ${index + 1}`;
-    if (state.rows[index].kind === HUMAN_SEAT_ID) return "You";
-    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === "ai").length;
+    if (state.rows[index].kind === HUMAN_SEAT_KIND) return "You";
+    const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
     return `Opponent ${opponentNumber}`;
   }
   function homeOptionsForRow(state, index, homes) {
@@ -26783,7 +26800,7 @@ ${bonuses}`;
     return state.rows.map((row) => {
       const home = row.homeKey ?? void 0;
       const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
-      if (row.kind === "ai" && row.commander) return { ...seat, commander: row.commander };
+      if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
       return seat;
     });
   }
@@ -26967,7 +26984,7 @@ ${bonuses}`;
       return;
     }
     const row = sidesState.rows[index];
-    if (!row || row.kind !== "ai") return;
+    if (!row || row.kind !== AI_SEAT_KIND) return;
     const label = rowLabel(sidesState, index);
     const observeOnly = sidesState.observeOnly;
     openCommanderPopover({
@@ -27027,7 +27044,7 @@ ${bonuses}`;
       void refreshNewGameMapPreview();
     });
     wrap.append(name, select, randomize);
-    const showRemove = state.observeOnly || row.kind === "ai";
+    const showRemove = state.observeOnly || row.kind === AI_SEAT_KIND;
     if (showRemove) {
       const remove = document.createElement("button");
       remove.type = "button";
@@ -27045,7 +27062,7 @@ ${bonuses}`;
       });
       wrap.appendChild(remove);
     }
-    if (row.kind === "ai") {
+    if (row.kind === AI_SEAT_KIND) {
       const commander = document.createElement("button");
       commander.type = "button";
       commander.className = "new-game-side-commander";
@@ -27076,7 +27093,7 @@ ${bonuses}`;
   }
   function headingFor(seats, first) {
     if (first.length !== 1) return "No side won.";
-    const human = seats.find((seat) => seat.kind === HUMAN_SEAT_ID);
+    const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
     if (!human) return `${first[0].homeRegion} wins.`;
     return `You placed ${ordinal(human.place ?? seats.length)} of ${seats.length}.`;
   }
@@ -27714,7 +27731,7 @@ ${bonuses}`;
   function viewerSeatId(state) {
     const seats = state.seats ?? [];
     if (seats.length === 0) return void 0;
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+    return activeHumanSeatId(seats);
   }
   function renderTopBarSides(state) {
     const host = document.getElementById("topbar-sides");
@@ -28025,9 +28042,8 @@ ${bonuses}`;
   }
   function commandersSubtitle() {
     const seats = rendererSharedState.gameState?.seats ?? [];
-    const humanPlaying = seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
-    if (!humanPlaying && seats.length > 0) return `${seats.length} sides, observing`;
-    const opponents = seats.filter((seat) => seat.kind === "ai").length || 1;
+    if (isObservingRoster(seats)) return `${seats.length} sides, observing`;
+    const opponents = seats.filter((seat) => seat.kind === AI_SEAT_KIND).length || 1;
     const word = opponents === 1 ? "opponents".slice(0, -1) : "opponents";
     return `${opponents} ${word}`;
   }
@@ -32815,9 +32831,9 @@ ${bonuses}`;
   // src/shared/startMatchAiChoice.ts
   function chooseStartMatchAi(input) {
     if (input.autoStartChecked && input.runEnabled) {
-      return { runOn: true, openOpponentTab: false };
+      return { runOn: true, openCommandersTab: false };
     }
-    return { runOn: false, openOpponentTab: true };
+    return { runOn: false, openCommandersTab: true };
   }
 
   // src/renderer/gameplay/newGameAiStart.ts
@@ -32841,7 +32857,7 @@ ${bonuses}`;
     if (runButton) runButton.setAttribute("aria-pressed", choice.runOn ? "true" : "false");
     deps.updateReadyButtonState();
     if (choice.runOn) deps.startPlanning();
-    if (choice.openOpponentTab) showConsoleTab("console-tab-commanders");
+    if (choice.openCommandersTab) showConsoleTab("console-tab-commanders");
   }
 
   // src/renderer/gameplay/newGame.ts
@@ -35109,7 +35125,7 @@ ${bonuses}`;
     const share = activeGameMap().controlWinMinUrbanShare;
     return formatKnockoutNotice({
       victimName: victim?.homeRegion ?? row.seatId,
-      victimIsHuman: victim?.kind === HUMAN_SEAT_ID,
+      victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
       outByName: outBy?.homeRegion ?? null,
       reasons: row.reasons,
       globalHome: share === null,
@@ -36892,7 +36908,7 @@ ${bonuses}`;
   function hexDetailLine(h3Index) {
     const state = rendererSharedState.gameState;
     const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
-    const viewer = seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null)?.seatId ?? null;
+    const viewer = activeHumanSeatId(seats);
     const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
     const control = formatHexControlLabel({
       controllerId: controller,

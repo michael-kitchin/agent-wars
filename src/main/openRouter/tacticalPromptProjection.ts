@@ -1,5 +1,5 @@
 /**
- * Builds a compact tactical-only context block for future tactical AI prompts (milestone 2.1).
+ * Builds a compact tactical-only context block for future tactical AI prompts.
  * Strategic production, standing orders, and AI-memory sections must be omitted from tactical prompts; this module supplies the allowed tactical slice.
  */
 

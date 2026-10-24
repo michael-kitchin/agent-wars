@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-function-type -- dynamic require + Module._load typing for Electron mock */
 /**
- * Phase 5E-style audit: generated system prompt must not embed legacy WGS84 coordinate tuples for the LLM.
+ * Audit: generated system prompt must not embed legacy WGS84 coordinate tuples for the LLM.
  *
  * Purpose: Guards against regression where bracketed lat/lng examples re-enter `buildSystemPromptForTools` output.
  * When to use: Run via `npm test` / `verify:modularization` after `build:main`.
@@ -25,7 +25,7 @@ import { getToolNamesForEnabledGroups } from './openRouterToolGroups';
 
  * Purpose: Matches common `[\d…, \d…]` coordinate examples the plan forbids on LLM-visible surfaces.
  * When to use: Single pass over the assembled system prompt string.
- * Expected outcome: No match when Phase 5E migration remains intact.
+ * Expected outcome: No match while the hex-only prompt stays intact.
  * Exceptions: None.
  */
 const LATLNG_TUPLE_IN_PROMPT = /\[\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+\s*\]/;

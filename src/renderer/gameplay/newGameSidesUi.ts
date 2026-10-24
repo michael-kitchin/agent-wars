@@ -20,6 +20,7 @@ import {
   type NewGameSidesState,
 } from '../../shared/newGameSides';
 import { MIN_SEATS } from '../../shared/seatIds';
+import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { DEFAULT_TURN_LIMIT, TURN_LIMIT_OPTIONS } from '../../shared/victoryRules';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
@@ -78,7 +79,7 @@ function homesForTab(): readonly HomeOption[] {
 /**
  * The commander new AI rows start with.
  *
- * Purpose: A new side follows the model and effort already saved on the Opponent tab, with Balanced doctrine.
+ * Purpose: A new side follows the app-wide model and effort, with Balanced doctrine.
  * When to use: Creating or resetting rows.
  * Expected outcome: A null model when none is selected.
  * Exceptions: None.
@@ -318,7 +319,7 @@ function openRowCommander(index: number, button: HTMLButtonElement): void {
     return;
   }
   const row = sidesState.rows[index];
-  if (!row || row.kind !== 'ai') return;
+  if (!row || row.kind !== AI_SEAT_KIND) return;
   const label = rowLabel(sidesState, index);
   const observeOnly = sidesState.observeOnly;
   openCommanderPopover({
@@ -379,7 +380,7 @@ function renderRow(state: NewGameSidesState, homes: readonly HomeOption[], index
     void refreshNewGameMapPreview();
   });
   wrap.append(name, select, randomize);
-  const showRemove = state.observeOnly || row.kind === 'ai';
+  const showRemove = state.observeOnly || row.kind === AI_SEAT_KIND;
   if (showRemove) {
     const remove = document.createElement('button');
     remove.type = 'button';
@@ -397,7 +398,7 @@ function renderRow(state: NewGameSidesState, homes: readonly HomeOption[], index
     });
     wrap.appendChild(remove);
   }
-  if (row.kind === 'ai') {
+  if (row.kind === AI_SEAT_KIND) {
     const commander = document.createElement('button');
     commander.type = 'button';
     commander.className = 'new-game-side-commander';

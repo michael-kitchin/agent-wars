@@ -1,5 +1,5 @@
 /**
- * Centralized constants and pure queue-production helpers for milestone 1.4.
+ * Centralized constants and pure queue-production helpers.
  */
 
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';

@@ -1,5 +1,5 @@
 /**
- * Phase 1 / 2.5 / 3 ordering contracts: tactical air sort matches strategic-style keys; infra reconcile + urban strike rollup;
+ * Ordering contracts: tactical air sort matches strategic-style keys; infra reconcile + urban strike rollup;
  * opponent embark helper. Run: `node dist/main/tacticalBattle/tacticalStrategicOrderingAlignment.test.js`
  */
 
@@ -104,7 +104,7 @@ test('applyTacticalEmbarkPhaseOnBattle applies opponent embark before callers ru
   assert.strictEqual(land?.embarkedOnSubUnitId, 'opp-nav');
 });
 
-test('reconcileRes1InfrastructureCountsFromRes4Overrides is callable after tactical DB session (Phase 2.5 smoke)', () => {
+test('reconcileRes1InfrastructureCountsFromRes4Overrides is callable after tactical DB session', () => {
   withTempGameDb('aw-tactical-infra-reconcile-', () => {
     const { changedHexCount } = reconcileStrategicInfrastructureCountsFromTacticalOverrides();
     assert.ok(typeof changedHexCount === 'number');
@@ -112,7 +112,7 @@ test('reconcileRes1InfrastructureCountsFromRes4Overrides is callable after tacti
   });
 });
 
-test('tactical urban air strike updates res1 urban_hex_count after reconcile (Phase 2.5)', () => {
+test('tactical urban air strike updates res1 urban_hex_count after reconcile', () => {
   withTempGameDb('aw-tactical-infra-urban-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index

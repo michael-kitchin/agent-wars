@@ -12,7 +12,7 @@ import { persistRegionVsRegionScenarioId } from './scenarioState';
 import { replaceSeatRoster } from './seatRosterStore';
 import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolution';
 import { createSeededRng } from '../seededRng';
-import { DEFAULT_DOCTRINE, DOCTRINES, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
+import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
 import { victorySettingsForMapKind } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
@@ -20,89 +20,87 @@ import {
   loadedGameMapId,
   requireGameMapId,
 } from '../gameMap/loadGameMap';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
-
 /**
- * Documents the `ResetGameDeps` interface as a named contract surface (interface ResetGameDeps extends GuardedDbRunAndGetAllOps).
-
- * Purpose: Supports maintainability by documenting why `ResetGameDeps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Database steps a new-match reset calls while it wipes and reseeds the match.
+ *
+ * Purpose: The reset sequence stays in this file, and the database operations stay injectable.
+ * When to use: The argument of the seed helpers and `resetGameForNewMatch`.
+ * Expected outcome: Each member runs one step of the wipe and seed.
+ * Exceptions: Members propagate SQLite errors from the operations they call.
  */
 interface ResetGameDeps extends GuardedDbRunAndGetAllOps {
     /**
-   * Specifies the contract for the `clearGameOver` member (clearGameOver: () => void;).
-
-   * Contract: Describes stable behavior for callers of `clearGameOver` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Clears the stored game-over flag before the new match is written.
+   *
+   * Contract: Called once at the start of a reset, before seats and units are seeded.
+   * When to use: `resetGameForNewMatch` only.
+   * Expected outcome: A later read does not treat the new match as already over.
+   * Exceptions: Propagates a database error.
    */
 clearGameOver: () => void;
     /**
-   * Specifies the contract for the `seedGameSeedIfMissing` member (seedGameSeedIfMissing: () => void;).
-
-   * Contract: Describes stable behavior for callers of `seedGameSeedIfMissing` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Stores a match seed when the caller did not supply one.
+   *
+   * Contract: Leaves a seed that was already stored in place.
+   * When to use: After optional `gameSeed` persistence, before units are seeded.
+   * Expected outcome: `game_seed` is present for doctrine draws and combat.
+   * Exceptions: Propagates a database error.
    */
 seedGameSeedIfMissing: () => void;
     /**
-   * Specifies the contract for the `seedHexesFromTerrainMetadata` member (seedHexesFromTerrainMetadata: () => void;).
-
-   * Contract: Describes stable behavior for callers of `seedHexesFromTerrainMetadata` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Writes hex rows from the loaded map's terrain metadata.
+   *
+   * Contract: Replaces hex rows for the map that reset just loaded.
+   * When to use: After the previous match's rows are deleted.
+   * Expected outcome: The `hexes` table matches the loaded map.
+   * Exceptions: Propagates a database error.
    */
 seedHexesFromTerrainMetadata: () => void;
     /**
-   * Specifies the contract for the `seedInfrastructureStateFromMetadata` member (seedInfrastructureStateFromMetadata: () => void;).
-
-   * Contract: Describes stable behavior for callers of `seedInfrastructureStateFromMetadata` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Writes infrastructure rows from the loaded map's metadata.
+   *
+   * Contract: Replaces infrastructure state for the map that reset just loaded.
+   * When to use: After hexes are seeded and before units are seeded.
+   * Expected outcome: Roads, rail, and other infrastructure match the loaded map.
+   * Exceptions: Propagates a database error.
    */
 seedInfrastructureStateFromMetadata: () => void;
     /**
-   * Specifies the contract for the `seedUnits` member (seedUnits: () => void;).
-
-   * Contract: Describes stable behavior for callers of `seedUnits` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Places the starting units for the new match.
+   *
+   * Contract: Uses the seed, game size, and roster already stored by this reset.
+   * When to use: After hexes, infrastructure, and the roster are in place.
+   * Expected outcome: The `units` table holds the opening forces.
+   * Exceptions: Propagates a database error.
    */
 seedUnits: () => void;
     /**
-   * Specifies the contract for the `refreshFogOfWarIntelFromCurrentState` member (refreshFogOfWarIntelFromCurrentState: () => void;).
-
-   * Contract: Describes stable behavior for callers of `refreshFogOfWarIntelFromCurrentState` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Rebuilds fog-of-war intel from the units just seeded.
+   *
+   * Contract: Reads current unit positions and writes the intel tables.
+   * When to use: After `seedUnits`, before the database is saved.
+   * Expected outcome: The opening snapshot's fog matches the new unit positions.
+   * Exceptions: Propagates a database error.
    */
 refreshFogOfWarIntelFromCurrentState: () => void;
     /**
-   * Specifies the contract for the `saveDatabase` member (saveDatabase: () => void;).
-
-   * Contract: Describes stable behavior for callers of `saveDatabase` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Persists the SQLite file after the new match is seeded.
+   *
+   * Contract: Writes the database that the preceding members just filled.
+   * When to use: The last step of `resetGameForNewMatch`.
+   * Expected outcome: A process restart reopens this match.
+   * Exceptions: Propagates a database error.
    */
 saveDatabase: () => void;
 }
 
 /**
- * Defines the `seedInitialHexControlFromUnitOccupancy` function shape (function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void).
-
- * Purpose: Supports maintainability by documenting why `seedInitialHexControlFromUnitOccupancy` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Gives each hex a controller when only one seat's infantry, armor, or naval occupies it.
+ *
+ * Purpose: Opening control follows the forces on the map before home-region ownership is applied.
+ * When to use: `resetGameForNewMatch`, after units are seeded.
+ * Expected outcome: `res_s_control` is replaced. A hex with zero or several occupiers gets no row.
+ * Exceptions: Propagates a database error from `deps.run` or `deps.getAll`.
  */
 function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
   const { run, getAll } = deps;
@@ -124,12 +122,12 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
 }
 
 /**
- * Defines the `seedInitialHexControlFromHomeRegions` function shape (function seedInitialHexControlFromHomeRegions().
-
- * Purpose: Supports maintainability by documenting why `seedInitialHexControlFromHomeRegions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Sets control of a home hex to the one seat whose home contains it.
+ *
+ * Purpose: A home hex belongs to its seat even when opening forces do not occupy it. A hex in two homes stays as the occupancy pass left it.
+ * When to use: `resetGameForNewMatch`, after `seedInitialHexControlFromUnitOccupancy`.
+ * Expected outcome: One-owner home hexes are inserted or replaced. Shared home hexes are left unchanged and counted in the debug log.
+ * Exceptions: Propagates a database error from `deps.run`.
  */
 function seedInitialHexControlFromHomeRegions(deps: ResetGameDeps, seats: readonly SeatRecord[]): void {
   const { run } = deps;
@@ -282,8 +280,8 @@ function defaultTwoSeatInputs(): NewGameSeatInput[] {
     ?? humanHome;
   logDebug('gameDb defaultTwoSeatInputs', { humanHome, aiHome });
   return [
-    { kind: HUMAN_SEAT_ID, homeRegion: humanHome },
-    { kind: 'ai', homeRegion: aiHome },
+    { kind: HUMAN_SEAT_KIND, homeRegion: humanHome },
+    { kind: AI_SEAT_KIND, homeRegion: aiHome },
   ];
 }
 
@@ -357,7 +355,7 @@ function seatRecordFromResolved(seat: ResolvedNewMatchSeat): SeatRecord {
   const { commanderInput, ...stored } = seat;
   return {
     ...stored,
-    commander: seat.kind === HUMAN_SEAT_ID ? null : commanderForNewAiSeat(commanderInput),
+    commander: seat.kind === HUMAN_SEAT_KIND ? null : commanderForNewAiSeat(commanderInput),
   };
 }
 

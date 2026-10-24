@@ -110,7 +110,7 @@ test('afterTacticalBeatResolution invokes LLM when opponent had no beat-time uni
           tacticalOpponentPlan: emptyTacticalPlan,
         };
       },
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(calls, 1);
     assert.equal(res.consulted, true);
     assert.equal(res.attachTacticalOpponentPlanToIpc, true);
@@ -167,7 +167,7 @@ test('afterTacticalBeatResolution skips LLM when opponent marched and no mandato
         calls += 1;
         return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
       },
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(calls, 0);
     assert.equal(res.consulted, false);
     assert.equal(res.attachTacticalOpponentPlanToIpc, false);
@@ -227,7 +227,7 @@ test('afterTacticalBeatResolution invokes LLM when human marched even if opponen
         calls += 1;
         return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
       },
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(calls, 1);
     assert.equal(res.consulted, true);
     assert.equal(res.attachTacticalOpponentPlanToIpc, true);
@@ -283,7 +283,7 @@ test('afterTacticalBeatResolution invokes requestOrders when opponent loss fires
         calls += 1;
         return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
       },
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(calls, 1);
     assert.equal(res.consulted, true);
     assert.equal(res.attachTacticalOpponentPlanToIpc, true);
@@ -331,7 +331,7 @@ test('afterTacticalBeatResolution skips LLM when roster is terminal (annihilatio
         calls += 1;
         return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
       },
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(calls, 0);
     assert.equal(res.consulted, false);
     assert.equal(res.attachTacticalOpponentPlanToIpc, false);
@@ -389,7 +389,7 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
         message: 'This close, hesitation is already a casualty.',
         toolInvocationCounts: { planning: 7, assessment: 0 },
       }),
-    });
+    }, AI_SEAT_IDS[0]);
     assert.equal(res.consulted, true);
     assert.equal(res.attachTacticalOpponentPlanToIpc, true);
     assert.equal(res.tacticalOpponentPlan?.movementOrders.length, 1);
@@ -404,16 +404,6 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
   await withFreshDb(async () => {
     const strategic = tacticalParentCell(12, 34);
     const tacticalIndex = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
-    const state: GameStateSnapshot = {
-      turnNumber: 2,
-      phase: 'planning',
-      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
-      units: [
-        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: tacticalIndex },
-        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: tacticalIndex },
-      ],
-      pendingOrders: [],
-    };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-message-ipc',
       enclosingStrategicH3Index: strategic,
@@ -447,7 +437,6 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
     const merge = await runEventDrivenAfterTacticalBeatConsultation({
       useEventDrivenConsultation: true,
       aiPlanningRunEnabled: true,
-      opponentState: state,
       tacticalBattle,
       tacticalResolutionPlayback: { humanMoves: [] },
       modelId: 'test-model',

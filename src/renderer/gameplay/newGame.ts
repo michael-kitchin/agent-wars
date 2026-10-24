@@ -281,7 +281,7 @@ function stopMatchWaitingUnderNewGame(): void {
  * Expected outcome: The randomize buttons, the game-size caps, the panel's grip, and its close control are live. Close
  *   goes back to a match waiting under the screen. Clicking Start stops that match, if any, then sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`. Auto-start AI is not sent.
- *   A successful start then applies that click-time choice: planning turns on, or Run turns off and the Opponent tab opens.
+ *   A successful start then applies that click-time choice: planning turns on, or Run turns off and the Commanders tab opens.
  *   A failure leaves Run and the console unchanged. Start reloads the map,
  *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the console,
  *   before the loaded extent is fit. Start then zooms one level toward human infantry and armor, or any human units

@@ -6,7 +6,7 @@
  */
 
 import { isLikelyAbortError } from '../../shared/abortError';
-import { AI_SEAT_IDS, isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
+import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
 import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
@@ -41,48 +41,48 @@ import {
 } from './consultationPolicy';
 
 /**
- * Documents the `AfterResolutionDeps` interface as a named contract surface (export interface AfterResolutionDeps).
-
- * Purpose: Supports maintainability by documenting why `AfterResolutionDeps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * What a post-resolution consult needs from the process that calls the model.
+ *
+ * Purpose: `afterResolution` stays free of the OpenRouter client. The runner injects the call.
+ * When to use: `runEventDrivenAfterResolutionConsultation`.
+ * Expected outcome: A model id, a tool list, a key check, and one order request for the seat being consulted.
+ * Exceptions: `requestOrders` may reject. This module logs that and returns `consulted: false`.
  */
 export interface AfterResolutionDeps {
     /**
-   * Specifies the contract for the `modelId` member (modelId: string;).
-
-   * Contract: Describes stable behavior for callers of `modelId` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The model this seat's consult should call.
+   *
+   * Contract: A blank or missing id skips the consult.
+   * When to use: Passed through to `requestOrders`.
+   * Expected outcome: The stored model for the seat, or the fallback when that seat has no commander row.
    * Exceptions: None.
    */
 modelId: string;
     /**
-   * Specifies the contract for the `enabledToolNames` member (enabledToolNames: string[];).
-
-   * Contract: Describes stable behavior for callers of `enabledToolNames` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Tool names the consult may call.
+   *
+   * Contract: The names enabled for this Ready.
+   * When to use: The `requestOrders` options.
+   * Expected outcome: The consult uses this list.
    * Exceptions: None.
    */
 enabledToolNames: string[];
     /**
-   * Specifies the contract for the `hasKey` member (hasKey: () => boolean;).
-
-   * Contract: Describes stable behavior for callers of `hasKey` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Whether an API key is configured.
+   *
+   * Contract: False skips the consult without a network call.
+   * When to use: Before `requestOrders`.
+   * Expected outcome: `consulted: false` when this returns false.
    * Exceptions: None.
    */
 hasKey: () => boolean;
     /**
-   * Specifies the contract for the `requestOrders` member (requestOrders: ( state: GameStateSnapshot, modelId: string, options: { enabledToolNames: string[]; usePrecomputation: boolean } ) => Promise<R).
-
-   * Contract: Describes stable behavior for callers of `requestOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Asks the model for this seat's orders.
+   *
+   * Contract: `options.seatId` is the seat `afterResolution` was given. `usePrecomputation` is required here.
+   * When to use: After the loss and subscription checks decide a consult should run.
+   * Expected outcome: That seat's order result. A rejection is logged and the consult reports `consulted: false`.
+   * Exceptions: May reject.
    */
 requestOrders: (
     state: GameStateSnapshot,
@@ -101,29 +101,29 @@ requestOrders: (
 }
 
 /**
- * Documents the `AfterResolutionResult` interface as a named contract surface (export interface AfterResolutionResult).
-
- * Purpose: Supports maintainability by documenting why `AfterResolutionResult` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * What a strategic post-resolution consult returns to Ready.
+ *
+ * Purpose: The runner copies strategy, message, tool counts, and cost onto the IPC result.
+ * When to use: The return of `afterResolution`.
+ * Expected outcome: `consulted` is false when the consult did not run. The other fields are set only when the model returned them.
  * Exceptions: None.
  */
 export interface AfterResolutionResult {
     /**
-   * Specifies the contract for the `consulted` member (consulted: boolean;).
-
-   * Contract: Describes stable behavior for callers of `consulted` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Whether the model call finished and stored orders.
+   *
+   * Contract: False when the consult was skipped, cancelled, or failed.
+   * When to use: Ready's consulted flag for this seat.
+   * Expected outcome: True only after a successful `requestOrders`.
    * Exceptions: None.
    */
 consulted: boolean;
     /**
-   * Specifies the contract for the `strategy` member (strategy?: string;).
-
-   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The strategy prose the model returned.
+   *
+   * Contract: Omitted when the model returned none.
+   * When to use: The Ready result and the strategy toast.
+   * Expected outcome: The model's strategy text, or absent.
    * Exceptions: None.
    */
 strategy?: string;
@@ -137,11 +137,11 @@ strategy?: string;
    */
 message?: string;
     /**
-   * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
-
-   * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * How many times each tool group ran during the consult.
+   *
+   * Contract: Omitted when the model result has no counts.
+   * When to use: The Ready tool-count labels.
+   * Expected outcome: The counts `requestOrders` returned.
    * Exceptions: None.
    */
 toolInvocationCounts?: Record<string, number>;
@@ -157,18 +157,18 @@ cost?: number;
 }
 
 /**
- * Defines the `afterResolution` function shape (export async function afterResolution( state: GameStateSnapshot, resolutionResult: ReadyResultWithParticipants, deps: AfterResolutionDeps ): Promise<A).
-
- * Purpose: Supports maintainability by documenting why `afterResolution` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: When consultation runs, pending opponent orders are stored (including empty movement lists) and `strategy` / `toolInvocationCounts` are returned for Ready IPC telemetry—same success gate as `afterTacticalBeatResolution`.
- * Exceptions: None.
+ * Consults one AI seat after a strategic turn and stores the orders it returns.
+ *
+ * Purpose: Event-driven mode plans the next turn from the resolution that just finished.
+ * When to use: The post-resolution runner, once per active AI seat. `seatId` is required and selects that seat's losses, subscriptions, and stored orders.
+ * Expected outcome: When consultation runs, pending orders for `seatId` are stored (including empty movement lists) and `strategy` / `toolInvocationCounts` are returned for Ready IPC telemetry—same success gate as `afterTacticalBeatResolution`.
+ * Exceptions: Does not throw. A model failure is logged and returns `consulted: false`.
  */
 export async function afterResolution(
   state: GameStateSnapshot,
   resolutionResult: ReadyResultWithParticipants,
   deps: AfterResolutionDeps,
-  seatId: AiSeatId = AI_SEAT_IDS[0]
+  seatId: AiSeatId
 ): Promise<AfterResolutionResult> {
   if (!resolutionResult.success || !deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterResolution: skip (no success, no model, or no key)');
@@ -319,7 +319,7 @@ export function buildTacticalBeatResolutionReadyParticipants(
 }
 
 /**
- * Documents the `AfterTacticalBeatResolutionDeps` interface as a named contract surface (export interface AfterTacticalBeatResolutionDeps).
+ * What a post-beat consult needs from the process that calls the model.
 
  * Purpose: Same injection surface as strategic `afterResolution`, but `requestOrders` may pass `tacticalAiBattle`.
  * When to use: `runEventDrivenAfterTacticalBeatConsultation` from the tactical commit IPC path.
@@ -385,7 +385,7 @@ export interface AfterTacticalBeatResolutionDeps {
 }
 
 /**
- * Documents the `AfterTacticalBeatResolutionResult` interface as a named contract surface (export interface AfterTacticalBeatResolutionResult).
+ * What a post-beat consult returns to the tactical commit.
 
  * Purpose: Returns buffered opponent tactical rows when event-driven consultation fires after a tactical beat.
  * When to use: Consumed by `game:commitHumanTacticalDraftOrders` IPC (main awaits consultation, then merges fields onto the invoke result for the renderer).
@@ -462,7 +462,7 @@ export interface AfterTacticalBeatResolutionResult {
  * Event-driven tactical post-beat consultation: subscriptions + tactical-only mandatory rules, then optional LLM call.
  *
  * Purpose: Mirrors strategic `afterResolution` for tactical battles without writing strategic `setAiPendingOrders`.
- * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags.
+ * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags. `requestedSeatId` is required and selects that seat's sub-units.
  * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC.
  * Exceptions: Swallows LLM failures after logging. Skip and failure paths leave strategic pending orders in place.
  * Annihilation: When `getTacticalAnnihilationOutcome(tacticalBattle.subUnits)` is non-null, skips immediately so no LLM runs while the renderer shows the tactical game-over modal.
@@ -472,7 +472,7 @@ export async function afterTacticalBeatResolution(
   tacticalBattle: TacticalBattleSnapshot,
   playback: TacticalCommitResolutionPlayback,
   deps: AfterTacticalBeatResolutionDeps,
-  requestedSeatId: AiSeatId = AI_SEAT_IDS[0]
+  requestedSeatId: AiSeatId
 ): Promise<AfterTacticalBeatResolutionResult> {
   if (!deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {

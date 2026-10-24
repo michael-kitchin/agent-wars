@@ -133,7 +133,7 @@ export function refreshTacticalBattleTerrainFromGameDb(battle: TacticalBattleSna
 /**
  * Returns true when both human and opponent have at least one placed tactical sub-unit.
  *
- * Purpose: Enforces milestone-2.1 start rules so a tactical session never begins with one side already annihilated by placement alone.
+ * Purpose: Enforces tactical start rules so a tactical session never begins with one side already annihilated by placement alone.
  * When to use: After greedy placement in `computeTacticalBattleSnapshot` before returning a snapshot.
  * Expected outcome: False when either player has zero tactical sub-units in the synthesized array.
  * Exceptions: None.

@@ -1,5 +1,5 @@
 /**
- * Pure projection of opponent tactical march orders onto a tactical battle snapshot (milestone 2.1).
+ * Pure projection of opponent tactical march orders onto a tactical battle snapshot.
  */
 
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';

@@ -12,7 +12,7 @@ import { formatKnockoutNotice } from '../../shared/knockoutNotice';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { HUMAN_SEAT_KIND } from '../../shared/seatRoster';
 
 /**
  * One knockout row from a Ready result.
@@ -99,7 +99,7 @@ function noticeText(
   const share = activeGameMap().controlWinMinUrbanShare;
   return formatKnockoutNotice({
     victimName: victim?.homeRegion ?? row.seatId,
-    victimIsHuman: victim?.kind === HUMAN_SEAT_ID,
+    victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
     outByName: outBy?.homeRegion ?? null,
     reasons: row.reasons,
     globalHome: share === null,

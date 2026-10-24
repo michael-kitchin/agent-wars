@@ -79,6 +79,9 @@ None.
 
 - `static/index.html` (`#stack-callout`, `#stack-callout-list`, `#unit-origin-tooltip`)
 - `src/renderer/map/stackCallout.ts`
+- `src/renderer/map/stackCalloutHost.ts`
+- `src/renderer/map/stackCalloutSelectionToggles.ts`
+- `src/renderer/map/stackCalloutSealift.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
 - `src/shared/soleSelectableHumanUnit.ts`

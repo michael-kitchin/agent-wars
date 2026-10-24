@@ -553,7 +553,7 @@ updateSealiftSlot: (payload: {
     /**
    * Specifies the contract for the `startTacticalBattle` member (startTacticalBattle: (payload: { enclosingStrategicH3Index: string }) => Promise<StartTacticalBattleIpcResult>;).
 
-   * Contract: Starts a milestone-2.1 tactical battle for a contested strategic hex during strategic planning; fails if prerequisites are not met.
+   * Contract: Starts a tactical battle for a contested strategic hex during strategic planning; fails if prerequisites are not met.
    * When to use: Renderer invokes this after the player confirms tactical entry from the map overlay.
    * Expected outcome: On success, returns a tactical snapshot the renderer stores for tactical-focused drawing and interaction.
    * Exceptions: None.

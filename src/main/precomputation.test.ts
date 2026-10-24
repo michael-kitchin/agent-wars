@@ -1,5 +1,5 @@
 /**
- * Tests for the pre-computation pipeline (Milestone 0.6). Covers unit assessments, hex assessments,
+ * Tests for the pre-computation pipeline. Covers unit assessments, hex assessments,
  * and the orchestrator. Uses real tool executors; DB may be null (standing orders then absent).
  */
 

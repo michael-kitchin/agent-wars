@@ -30,7 +30,7 @@ export interface ConsoleTabState {
 /**
  * Shows one tab with the console expanded.
  *
- * Purpose: A successful start opens the Opponent tab without using a tab click. A click on the selected tab collapses
+ * Purpose: A successful start opens the Commanders tab without using a tab click. A click on the selected tab collapses
  *   the console, so this result does not go through `nextConsoleTabState`.
  * When to use: From the console frame when a start should show a tab.
  * Expected outcome: The named tab is active and the console is expanded, whatever the previous tab and collapsed state were.
@@ -43,7 +43,7 @@ export function expandedConsoleTabState(tabId: string): ConsoleTabState {
 /**
  * Chooses the console tab to open when the app loads a match.
  *
- * Purpose: A live match should show the Opponent tab. A launch that shows the new-game dialog should leave the console on its start tab.
+ * Purpose: A live match should show the Commanders tab. A launch that shows the new-game dialog should leave the console on its start tab.
  * When to use: Once, after the launch snapshot is applied. Null is not a live match. A missing snapshot is the caller's failure, not a value to pass here.
  * Expected outcome: `'console-tab-commanders'` when the match has hexes and is not over. Null otherwise, so the caller leaves the start tab.
  * Exceptions: None.

@@ -9,6 +9,7 @@
  */
 
 import { AI_SEAT_IDS, isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
+import { activeAiSeatIds } from '../../shared/seatRoster';
 import { commanderModelId, getGameStateForPlayer, getSeatRoster, type GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { afterResolution, afterTacticalBeatResolution, type AfterResolutionResult, type AfterTacticalBeatResolutionResult } from '../openRouter/afterResolution';
@@ -38,6 +39,170 @@ function optionalConsultToastFields(message?: string, strategy?: string): { aiMe
     ...(strat ? { aiStrategy: strat } : {}),
     ...(msg ? { aiMessage: msg } : {}),
   };
+}
+
+/**
+ * Fields shared by a strategic Ready consult and a tactical beat consult.
+ *
+ * Purpose: The two runners wait, log, and call a model the same way. Each runner adds its own resolution payload.
+ * When to use: The base of `StrategicConsultArgs` and `TacticalBeatConsultArgs`.
+ * Expected outcome: Enough to decide whether to consult, which model to fall back to, and how long to wait.
+ * Exceptions: None.
+ */
+export interface PostResolutionConsultArgs {
+  /**
+   * Whether this match consults after resolution.
+   *
+   * Contract: False skips the runner and returns an empty result.
+   * When to use: The Events choice from the Ready or commit payload.
+   * Expected outcome: The runner returns immediately when this is false.
+   * Exceptions: None.
+   */
+  readonly useEventDrivenConsultation: boolean;
+  /**
+   * Whether Run is on for this consult.
+   *
+   * Contract: False skips the runner even when consultation is enabled.
+   * When to use: The Run choice from the same payload.
+   * Expected outcome: The runner returns immediately when this is false.
+   * Exceptions: None.
+   */
+  readonly aiPlanningRunEnabled: boolean;
+  /**
+   * The model used when a seat has no commander row.
+   *
+   * Contract: A stored commander model always wins, including a stored empty string. This value is only the fallback `modelIdForSeat` uses when `commanderModelId` returns null.
+   * When to use: Built by `fallbackConsultModelId`.
+   * Expected outcome: A string. `''` means a seat with no model of its own is not called.
+   * Exceptions: None.
+   */
+  readonly modelId: string;
+  /**
+   * Tool names the consult may call.
+   *
+   * Contract: The names enabled for this Ready or commit.
+   * When to use: Passed through to `requestOrders`.
+   * Expected outcome: The consult uses this list and no other tools.
+   * Exceptions: None.
+   */
+  readonly enabledToolNames: string[];
+  /**
+   * Whether an API key is configured.
+   *
+   * Contract: A function, not a boolean captured earlier.
+   * When to use: The consult reads it when it is about to call the model.
+   * Expected outcome: True when a key is present at call time.
+   * Exceptions: None.
+   */
+  readonly hasKey: () => boolean;
+  /**
+   * How long the pool waits for the seats it started.
+   *
+   * Contract: Milliseconds. Strategic Ready and melee use their own constants.
+   * When to use: The pool runner's wait.
+   * Expected outcome: A seat that is still planning when this elapses is settled as a timeout.
+   * Exceptions: None.
+   */
+  readonly timeoutMs: number;
+  /**
+   * The message logged when a seat's consult throws.
+   *
+   * Contract: Names the handler that started the consult.
+   * When to use: The `catch` in the runner.
+   * Expected outcome: `logError` records this text with the thrown value. The runner does not rethrow.
+   * Exceptions: None.
+   */
+  readonly errorLogMessage: string;
+}
+
+/**
+ * Arguments for the strategic post-resolution consult.
+ *
+ * Purpose: Ready and melee resolve share one runner, and the deferred-playback mutex stores this same object until notify replays it.
+ * When to use: `runEventDrivenAfterResolutionConsultation`, `setPendingStrategicReadyConsult`, and `setPendingMeleeResolveConsult`.
+ * Expected outcome: The runner can finish the consult without reading the turn again.
+ * Exceptions: None.
+ */
+export interface StrategicConsultArgs extends PostResolutionConsultArgs {
+  /**
+   * Whether the turn resolution succeeded.
+   *
+   * Contract: False skips the consult.
+   * When to use: `readyResult.success` or `resolveResult.success`.
+   * Expected outcome: A failed resolution does not call the model.
+   * Exceptions: None.
+   */
+  readonly resolutionSuccess: boolean;
+  /**
+   * The finished strategic resolution.
+   *
+   * Contract: The object `afterResolution` reads. Callers pass it only after success.
+   * When to use: The runner and the deferred replay.
+   * Expected outcome: Loss and order fields match the turn that just resolved.
+   * Exceptions: None.
+   */
+  readonly resolution: ReadyResult;
+  /**
+   * Starts one strategic order request for a seat.
+   *
+   * Contract: No tactical battle argument. The seat and the tool list travel in `options`.
+   * When to use: The runner, after it has built that seat's state.
+   * Expected outcome: The order result for that seat, or a rejection the runner logs.
+   * Exceptions: May reject. The runner catches that rejection.
+   */
+  readonly requestOrders: (
+    state: GameStateSnapshot,
+    modelId: string,
+    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
+  ) => Promise<RequestAiOrdersResult>;
+}
+
+/**
+ * Arguments for the consult after one tactical beat.
+ *
+ * Purpose: The tactical commit handler stores this object while playback runs, and notify passes it to the tactical runner.
+ * When to use: `runEventDrivenAfterTacticalBeatConsultation` and `setPendingTacticalBeatConsult`.
+ * Expected outcome: The runner can re-plan the opposing seat without rebuilding the battle snapshot.
+ * Exceptions: None.
+ */
+export interface TacticalBeatConsultArgs extends PostResolutionConsultArgs {
+  /**
+   * The battle the beat just resolved.
+   *
+   * Contract: Includes the opposing party and the battle id the runner logs.
+   * When to use: Choosing the seat and passing the battle into the pool.
+   * Expected outcome: A neutral opposing party skips the consult.
+   * Exceptions: None.
+   */
+  readonly tacticalBattle: TacticalBattleSnapshot;
+  /**
+   * The playback the renderer is showing for this beat.
+   *
+   * Contract: The commit result's playback payload, stored unchanged until notify.
+   * When to use: The tactical runner's call to `afterTacticalBeatResolution`.
+   * Expected outcome: The consult sees the same playback the player is watching.
+   * Exceptions: None.
+   */
+  readonly tacticalResolutionPlayback: TacticalCommitResolutionPlayback;
+  /**
+   * Starts one order request that may include the tactical battle.
+   *
+   * Contract: `tacticalAiBattle` is optional. Strategic Ready's order function does not have this field, so the two request types stay separate.
+   * When to use: The tactical runner, after it has built that seat's state.
+   * Expected outcome: The order result for that seat, or a rejection the runner logs.
+   * Exceptions: May reject. The runner catches that rejection.
+   */
+  readonly requestOrders: (
+    state: GameStateSnapshot,
+    modelId: string,
+    options: {
+      seatId: AiSeatId;
+      enabledToolNames: string[];
+      usePrecomputation?: boolean;
+      tacticalAiBattle?: TacticalBattleSnapshot;
+      signal?: AbortSignal;
+    }
+  ) => Promise<RequestAiOrdersResult>;
 }
 
 /**
@@ -233,27 +398,13 @@ export function buildDistinctAiMovesFromPlanningOrders(
  * the mutex (`game:notifyResolutionPlaybackComplete`). Tactical beat consult uses `setPendingTacticalBeatConsult` likewise.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
-export async function runEventDrivenAfterResolutionConsultation(args: {
-  useEventDrivenConsultation: boolean;
-  resolutionSuccess: boolean;
-  aiPlanningRunEnabled: boolean;
-  opponentState: GameStateSnapshot;
-  resolution: ReadyResult;
-  modelId: string;
-  enabledToolNames: string[];
-  hasKey: () => boolean;
-  requestOrders: (
-    state: GameStateSnapshot,
-    modelId: string,
-    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
-  ) => Promise<RequestAiOrdersResult>;
-  timeoutMs: number;
-  errorLogMessage: string;
-}): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number }> {
+export async function runEventDrivenAfterResolutionConsultation(
+  args: StrategicConsultArgs
+): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number }> {
   if (!args.useEventDrivenConsultation || !args.resolutionSuccess || !args.aiPlanningRunEnabled) {
     return {};
   }
-  const seatIds = activeAiSeatIds();
+  const seatIds = activeAiSeatIds(getSeatRoster());
   logDebug('runEventDrivenAfterResolutionConsultation', { timeoutMs: args.timeoutMs, seatCount: seatIds.length });
   const results = new Map<AiSeatId, AfterResolutionResult>();
   await consultSeatsThroughPool(seatIds, 'strategic', null, args.timeoutMs, async (request) => {
@@ -297,29 +448,9 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
  * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise an empty merge and the pool keeps the plan it already stored.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
-export async function runEventDrivenAfterTacticalBeatConsultation(args: {
-  useEventDrivenConsultation: boolean;
-  aiPlanningRunEnabled: boolean;
-  opponentState: GameStateSnapshot;
-  tacticalBattle: TacticalBattleSnapshot;
-  tacticalResolutionPlayback: TacticalCommitResolutionPlayback;
-  modelId: string;
-  enabledToolNames: string[];
-  hasKey: () => boolean;
-  requestOrders: (
-    state: GameStateSnapshot,
-    modelId: string,
-    options: {
-      seatId: AiSeatId;
-      enabledToolNames: string[];
-      usePrecomputation?: boolean;
-      tacticalAiBattle?: TacticalBattleSnapshot;
-      signal?: AbortSignal;
-    }
-  ) => Promise<RequestAiOrdersResult>;
-  timeoutMs: number;
-  errorLogMessage: string;
-}): Promise<TacticalPostBeatConsultMergeSource> {
+export async function runEventDrivenAfterTacticalBeatConsultation(
+  args: TacticalBeatConsultArgs
+): Promise<TacticalPostBeatConsultMergeSource> {
   if (!args.useEventDrivenConsultation || !args.aiPlanningRunEnabled) {
     return {};
   }
@@ -330,7 +461,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
     });
     return {};
   }
-  const seatId = opposingParty !== undefined && isAiSeatId(opposingParty) ? opposingParty : activeAiSeatIds()[0];
+  const seatId = opposingParty !== undefined && isAiSeatId(opposingParty) ? opposingParty : activeAiSeatIds(getSeatRoster())[0];
   if (seatId === undefined) return {};
   logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs, seatId });
   let post: AfterTacticalBeatResolutionResult | undefined;
@@ -379,19 +510,18 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
 }
 
 /**
- * Active AI seats, in seat order.
+ * The model a consult uses when a seat has no commander row.
  *
- * Purpose: Post-resolution consults every commander that is still in the match.
- * When to use: Before launching those consults.
- * Expected outcome: Seat ids whose kind is AI and whose knockout turn is null.
+ * Purpose: Ready, melee resolve, and tactical commit were each reading the first AI seat's stored model the same way.
+ * When to use: Before building `StrategicConsultArgs` or `TacticalBeatConsultArgs`. Pass `getSelectedModel` itself, not its result.
+ * Expected outcome: The first AI seat's stored model when `commanderModelId` returns a string, including `''`. The app-wide selection only when it returns null. `modelIdForSeat` still prefers each seat's own model.
  * Exceptions: None.
  */
-function activeAiSeatIds(): AiSeatId[] {
-  const seatIds = getSeatRoster()
-    .filter((seat) => seat.kind === 'ai' && seat.outTurn === null && isAiSeatId(seat.seatId))
-    .map((seat) => seat.seatId);
-  logTrace('readyIpcResolutionMapping activeAiSeatIds', { seatCount: seatIds.length });
-  return seatIds.filter((seatId): seatId is AiSeatId => isAiSeatId(seatId));
+export function fallbackConsultModelId(getSelectedModel: () => string): string {
+  const stored = commanderModelId(AI_SEAT_IDS[0]);
+  const modelId = stored === null ? getSelectedModel() : stored;
+  logTrace('readyIpcResolutionMapping fallbackConsultModelId', { hasStoredModel: stored !== null });
+  return modelId;
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Pure helpers for tactical battle end conditions (milestone 2.1 annihilation slice).
+ * Pure helpers for tactical battle end conditions.
  */
 
 import type { TacticalBattlePlayerId } from './tacticalBattleTypes';

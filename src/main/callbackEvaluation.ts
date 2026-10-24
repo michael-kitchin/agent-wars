@@ -1,5 +1,5 @@
 /**
- * Callback event evaluation for event-driven AI consultation (Milestone 0.7).
+ * Callback event evaluation for event-driven AI consultation.
  * Evaluates mandatory overrides and LLM-requested subscription events after each resolution
  * to decide whether to consult the LLM. Uses game state and persisted callback state.
  */

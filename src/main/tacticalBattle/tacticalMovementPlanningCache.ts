@@ -1,5 +1,5 @@
 /**
- * Bounded memoization for tactical march planning keyed by battle terrain (milestone 2.2).
+ * Bounded memoization for tactical march planning keyed by battle terrain.
  */
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -18,7 +18,7 @@ import {
 import { logDebug } from '../logger';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
-/** Milestone 2.2 §3.4: bounded memo entries per tactical planning session (LRU eviction). */
+/** Bounded memo entries per tactical planning session (LRU eviction). */
 const MAX_PLAN_MEMO_ENTRIES = 64;
 
 /**
@@ -169,7 +169,7 @@ export function resetTacticalMovementPlanningCacheForTests(): void {
 /**
  * Evicts the oldest memo entry when at capacity so new `(from,to,type,budget)` keys stay bounded (Map insertion order LRU).
  *
- * Purpose: Implements milestone 2.2 bounded caching without dropping the entire session on pressure spikes.
+ * Purpose: Implements bounded caching without dropping the entire session on pressure spikes.
  * When to use: Before inserting a fresh memo entry after a cache miss.
  * Expected outcome: `planMemo.size` remains at most `MAX_PLAN_MEMO_ENTRIES` after insertion.
  * Exceptions: None.

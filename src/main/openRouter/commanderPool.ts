@@ -10,7 +10,7 @@
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS, AI_CONSULTATION_WALL_CLOCK_MS } from '../../shared/aiConsultationLimits';
 import type { CommanderDispatch, CommanderPoolSnapshot, CommanderStatus } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
-import type { SeatRecord } from '../../shared/seatRoster';
+import { AI_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -231,7 +231,7 @@ export function resetCommanderPool(seats: readonly SeatRecord[]): void {
   dispatches.length = 0;
   tacticalDrafts.clear();
   for (const seat of seats) {
-    if (seat.kind !== 'ai' || !isAiSeatId(seat.seatId)) continue;
+    if (seat.kind !== AI_SEAT_KIND || !isAiSeatId(seat.seatId)) continue;
     entries.set(seat.seatId, idlePoolSeat(seat.seatId, rosterBlocksConsult(seat) ?? 'ready', generation));
   }
   notifyWaiters(waiters);

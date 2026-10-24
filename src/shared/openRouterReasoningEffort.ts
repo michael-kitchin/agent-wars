@@ -39,7 +39,7 @@ const REASONING_EFFORT_ABBREVIATIONS: ReadonlyMap<string, string> = new Map([
 /**
  * Capitalizes the first letter of a reasoning effort name.
  *
- * Purpose: Vendor effort ids arrive in lowercase; the Opponent tab shows them as names.
+ * Purpose: Vendor effort ids arrive in lowercase; the reasoning selects show them as names.
  * When to use: Reasoning dropdown options, and the fallback for efforts without an abbreviation.
  * Expected outcome: `high` becomes `High`. An empty string stays empty.
  * Exceptions: None.

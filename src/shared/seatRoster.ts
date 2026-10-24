@@ -8,17 +8,37 @@
  * Exceptions: None. This module does not import the main-process logger.
  */
 
-import { type SeatId, HUMAN_SEAT_ID } from './seatIds';
+import { isAiSeatId, type AiSeatId, type SeatId } from './seatIds';
+
+/**
+ * Kind stored for the seat a person plays.
+ *
+ * Purpose: `seat.kind` is compared with this constant. The human seat id is a different idea, even though both strings are `human`.
+ * When to use: Roster rows, new-game rows, and any check for the human kind.
+ * Expected outcome: The string `human`, which the seats table CHECK constraint stores.
+ * Exceptions: None.
+ */
+export const HUMAN_SEAT_KIND = 'human' as const;
+
+/**
+ * Kind stored for a seat a commander plays.
+ *
+ * Purpose: `seat.kind` is compared with this constant rather than a bare `'ai'` literal.
+ * When to use: Roster rows, new-game rows, and any check for an AI kind.
+ * Expected outcome: The string `ai`, which the seats table CHECK constraint stores.
+ * Exceptions: None.
+ */
+export const AI_SEAT_KIND = 'ai' as const;
 
 /**
  * Whether a seat is played by a person or by a commander.
  *
  * Purpose: Observe mode has no human seat. A human seat has no commander.
  * When to use: Roster rows and snapshot filtering.
- * Expected outcome: `HUMAN_SEAT_ID` or `'ai'`.
+ * Expected outcome: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
  * Exceptions: None.
  */
-export type SeatKind = 'human' | 'ai';
+export type SeatKind = typeof HUMAN_SEAT_KIND | typeof AI_SEAT_KIND;
 
 /**
  * The three doctrines a commander can play.
@@ -160,9 +180,9 @@ export interface SeatRecord {
   /**
    * Whether a person or a commander plays the seat.
    *
-   * Contract: `HUMAN_SEAT_ID` has a null commander. `'ai'` has a commander.
+   * Contract: `HUMAN_SEAT_KIND` has a null commander. `AI_SEAT_KIND` has a commander.
    * When to use: Consults and the "you" label.
-   * Expected outcome: `HUMAN_SEAT_ID` or `'ai'`.
+   * Expected outcome: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
    * Exceptions: None.
    */
   readonly kind: SeatKind;
@@ -178,7 +198,7 @@ export interface SeatRecord {
   /**
    * The AI seat's commander, or null for the human seat.
    *
-   * Contract: Null only when `kind` is `HUMAN_SEAT_ID`.
+   * Contract: Null only when `kind` is `HUMAN_SEAT_KIND`.
    * When to use: Consults and the commander summary.
    * Expected outcome: A `SeatCommander` or null.
    * Exceptions: None.
@@ -302,13 +322,29 @@ export function activeSeats<T extends Pick<SeatRecord, 'outTurn' | 'seatOrder'>>
  *
  * Purpose: Consults run for commanders, not for the human seat.
  * When to use: Planning and Ready gather.
- * Expected outcome: Active seats whose `kind` is `'ai'`, in seat order.
+ * Expected outcome: Active seats whose `kind` is `AI_SEAT_KIND`, in seat order.
  * Exceptions: None.
  */
 export function activeAiSeats<T extends Pick<SeatRecord, 'outTurn' | 'seatOrder' | 'kind'>>(
   seats: readonly T[]
 ): T[] {
-  return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === 'ai'));
+  return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
+}
+
+/**
+ * Active AI seat ids in seat order.
+ *
+ * Purpose: Consults, loss notes, and apply-all need ids, not full rows.
+ * When to use: After a roster is in hand. `activeAiSeats` already sorts, so the ids come back in seat order.
+ * Expected outcome: Ids of active seats whose kind is `AI_SEAT_KIND`. A seat id that is not an AI seat id is dropped.
+ * Exceptions: None.
+ */
+export function activeAiSeatIds(
+  seats: readonly Pick<SeatRecord, 'seatId' | 'outTurn' | 'seatOrder' | 'kind'>[]
+): AiSeatId[] {
+  return activeAiSeats(seats)
+    .map((seat) => seat.seatId)
+    .filter((seatId): seatId is AiSeatId => isAiSeatId(seatId));
 }
 
 /**
@@ -316,11 +352,11 @@ export function activeAiSeats<T extends Pick<SeatRecord, 'outTurn' | 'seatOrder'
  *
  * Purpose: Observe mode has none. The interface uses this to decide who "you" is.
  * When to use: Top bar, standings, and view-as defaults.
- * Expected outcome: The seat with `kind === HUMAN_SEAT_ID`, or null.
+ * Expected outcome: The seat with `kind === HUMAN_SEAT_KIND`, or null.
  * Exceptions: None.
  */
 export function findHumanSeat<T extends Pick<SeatRecord, 'kind'>>(seats: readonly T[]): T | null {
-  return seats.find((seat) => seat.kind === HUMAN_SEAT_ID) ?? null;
+  return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
 }
 
 /**

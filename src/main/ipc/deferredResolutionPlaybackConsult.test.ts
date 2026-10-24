@@ -12,9 +12,8 @@ import {
   setPendingMeleeResolveConsult,
   setPendingStrategicReadyConsult,
   setPendingTacticalBeatConsult,
-  type DeferredStrategicResolutionConsultArgs,
-  type DeferredTacticalBeatConsultArgs,
 } from './deferredResolutionPlaybackConsult';
+import { type StrategicConsultArgs, type TacticalBeatConsultArgs } from './readyIpcResolutionMapping';
 import { cancelModelCalls, modelCallsBegun } from '../openRouter/modelCallControl';
 import { resetCommanderPool } from '../openRouter/commanderPool';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
@@ -38,12 +37,11 @@ const minimalResolution: ReadyResult = {
  * Expected outcome: `runEventDrivenAfterResolutionConsultation` completes without calling a model.
  * Exceptions: None.
  */
-function minimalConsultArgs(): DeferredStrategicResolutionConsultArgs {
+function minimalConsultArgs(): StrategicConsultArgs {
   return {
     useEventDrivenConsultation: false,
     resolutionSuccess: true,
     aiPlanningRunEnabled: true,
-    opponentState: {} as never,
     resolution: minimalResolution,
     modelId: '',
     enabledToolNames: [],
@@ -172,7 +170,7 @@ async function testCancelBeforeNotifySkipsConsult(): Promise<void> {
  */
 async function testLateTacticalCompletionLeavesNewerStrategicPending(): Promise<void> {
   clearDeferredPlaybackConsultPending();
-  setPendingTacticalBeatConsult('battle-1', {} as DeferredTacticalBeatConsultArgs);
+  setPendingTacticalBeatConsult('battle-1', {} as TacticalBeatConsultArgs);
   const tactical = peekPendingPlaybackConsult();
   assert.ok(tactical);
   const generationAtStart = tactical.generationAtStart;

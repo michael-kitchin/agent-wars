@@ -3,7 +3,7 @@
  * battle header instead; see `battleHeader.ts`.
  */
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { readoutViewerSeatId } from '../../shared/observeModeControls';
+import { activeHumanSeatId, readoutViewerSeatId } from '../../shared/observeModeControls';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { syncObserveChrome } from '../gameplay/observeChrome';
 import { formatTopBarDateBlock } from '../../shared/topBarDateBlock';
@@ -66,7 +66,7 @@ function setHostHidden(id: string, hidden: boolean): void {
 function viewerSeatId(state: GameStateSnapshot): string | null | undefined {
   const seats = state.seats ?? [];
   if (seats.length === 0) return undefined;
-  return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+  return activeHumanSeatId(seats);
 }
 
 /**

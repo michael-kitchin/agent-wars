@@ -25,7 +25,7 @@ import { tacticalCell, firstRingCellDistinctFrom } from './testSupport/tacticalH
 /**
  * Verifies precomputed footprint adjacency matches live `tacticalNeighborsInFootprint` for every cell.
  *
- * Purpose: Regression guard for Phase 1 adjacency precompute used by the march session cache.
+ * Purpose: Regression guard for adjacency precompute used by the march session cache.
  * When to use: After changes to `buildTacticalFootprintAdjacencyMap` or `tacticalNeighborsInFootprint`.
  * Expected outcome: Identical neighbor lists for each cell in a multi-cell tactical footprint sample.
  * Exceptions: None; uses a smaller two-cell footprint when `gridDisk(k=2)` throws on pentagon edges.

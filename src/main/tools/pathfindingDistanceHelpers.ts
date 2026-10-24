@@ -7,33 +7,32 @@ import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { terrainIsPassableForDomain } from '../pathfinding';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
- * Documents the `GridDistanceFailureSample` interface as a named contract surface (interface GridDistanceFailureSample).
-
- * Purpose: Supports maintainability by documenting why `GridDistanceFailureSample` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * One cell whose grid distance could not be measured.
+ *
+ * Purpose: The nearest-hex scans log a few of these instead of one line per cell.
+ * When to use: The `samples` list of `logGridDistanceFailureSummary`.
+ * Expected outcome: The cell id and the reason `tryDistanceWithFallback` gave.
  * Exceptions: None.
  */
 interface GridDistanceFailureSample {
     /**
-   * Specifies the contract for the `candidateH3` member (candidateH3: string;).
-
-   * Contract: Describes stable behavior for callers of `candidateH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The cell that could not be measured.
+   *
+   * Contract: An H3 index from the scan.
+   * When to use: The log's sample list.
+   * Expected outcome: The candidate that failed.
    * Exceptions: None.
    */
 candidateH3: string;
     /**
-   * Specifies the contract for the `error` member (error: string;).
-
-   * Contract: Describes stable behavior for callers of `error` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Why the distance could not be derived.
+   *
+   * Contract: The `error` string from `tryDistanceWithFallback`.
+   * When to use: The log's sample list.
+   * Expected outcome: A short reason, not a thrown exception.
    * Exceptions: None.
    */
 error: string;
@@ -62,11 +61,11 @@ function tryDistanceWithFallback(
 }
 
 /**
- * Defines the `logGridDistanceFailureSummary` function shape (function logGridDistanceFailureSummary(payload: { context: string; referenceH3: string; failureCount: number; fallbackCount?: number; samples: Gr).
-
- * Purpose: Supports maintainability by documenting why `logGridDistanceFailureSummary` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Logs a scan's fallback count and a sample of cells whose distance could not be measured.
+ *
+ * Purpose: A nearest-hex scan can fail on many cells. One summary is enough to see that.
+ * When to use: After `nearestReachableWaterHexTo`, `nearestWaterHexTo`, or `nearestAdjacentWaterOrCoastalHex`.
+ * Expected outcome: A debug line when any candidate used the path fallback. An error line when any candidate had no distance, with at most the samples the caller kept.
  * Exceptions: None.
  */
 function logGridDistanceFailureSummary(payload: {
@@ -91,12 +90,12 @@ function logGridDistanceFailureSummary(payload: {
 }
 
 /**
- * Defines the `nearestReachableWaterHexTo` function shape (export function nearestReachableWaterHexTo( originH3: string, refLandH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, getReacha).
-
- * Purpose: Supports maintainability by documenting why `nearestReachableWaterHexTo` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * The reachable water cell closest to a land reference.
+ *
+ * Purpose: A naval route that starts inland needs a water cell the ship can actually reach.
+ * When to use: When the caller already has a reachability function for the water domain.
+ * Expected outcome: The reachable water cell with the smallest grid distance to `refLandH3`, or undefined when none is reachable. Failures are logged and skipped.
+ * Exceptions: None. `getReachableHexes` may throw; this function does not catch that.
  */
 export function nearestReachableWaterHexTo(
   originH3: string,
@@ -144,11 +143,11 @@ export function nearestReachableWaterHexTo(
 }
 
 /**
- * Defines the `nearestWaterHexTo` function shape (export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>): string | undefined).
-
- * Purpose: Supports maintainability by documenting why `nearestWaterHexTo` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The water cell in the set closest to a reference cell.
+ *
+ * Purpose: Callers that do not need reachability still need the nearest water cell by grid steps.
+ * When to use: A scan of `hexSet` for passable water.
+ * Expected outcome: The passable water cell with the smallest grid distance to `refH3`, or undefined when the set has none. Failures are logged and skipped.
  * Exceptions: None.
  */
 export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>): string | undefined {
@@ -184,12 +183,12 @@ export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH
 }
 
 /**
- * Defines the `nearestAdjacentWaterOrCoastalHex` function shape (export function nearestAdjacentWaterOrCoastalHex( originH3: string, refTargetH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, b).
-
- * Purpose: Supports maintainability by documenting why `nearestAdjacentWaterOrCoastalHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * The neighboring water cell closest to a target.
+ *
+ * Purpose: A one-step egress into water should be the neighbor nearest the route's target.
+ * When to use: When the mover is on land and the next cell must be water or coast.
+ * Expected outcome: The passable water neighbor of `originH3` closest to `refTargetH3`, skipping blocked cells, or undefined when none qualifies. A bad origin logs and returns undefined.
+ * Exceptions: None. `gridDisk` errors are logged.
  */
 export function nearestAdjacentWaterOrCoastalHex(
   originH3: string,
@@ -244,11 +243,11 @@ export function nearestAdjacentWaterOrCoastalHex(
 }
 
 /**
- * Defines the `prependSeaportEgressStep` function shape (export function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null).
-
- * Purpose: Supports maintainability by documenting why `prependSeaportEgressStep` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Puts the land origin in front of a path that starts at the seaport's water cell.
+ *
+ * Purpose: Pathfinding starts on water. The player still needs to see the step off the land hex.
+ * When to use: After `findPath` when a seaport egress cell was used as the route origin.
+ * Expected outcome: Null when `path` is null. The path unchanged when it does not start at `seaportEgressHex`. Otherwise `originH3` followed by the path.
  * Exceptions: None.
  */
 export function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null {
@@ -258,13 +257,12 @@ export function prependSeaportEgressStep(path: string[] | null, originH3: string
 }
 
 /**
- * Defines the `findPathWithOptionalAvoidanceRetry` function shape (export function findPathWithOptionalAvoidanceRetry(payload: { routeOriginH3: string; destinationH3: string; hexSet: Set<string>; terrainByH3: Map<st).
-
- * Purpose: Supports maintainability by documenting why `findPathWithOptionalAvoidanceRetry` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * A `land` search additionally requires `landMass`; omitting it makes every land route fail.
- * Exceptions: None.
+ * Finds a path, and tries once more without the blocked set when the first search fails.
+ *
+ * Purpose: A blocked cell should not hide the only route. The retry says so in `warnings`.
+ * When to use: Route preview and order paths that may avoid enemy or occupied cells.
+ * Expected outcome: The first path, including a seaport egress step when one applies. When that fails and `blocked` was set, the same search without `blocked`, and `blockedRetryWarning` pushed onto `warnings` when both are set. A `land` search additionally requires `landMass`; omitting it makes every land route fail.
+ * Exceptions: None. `findPath` failures come back as null.
  */
 export function findPathWithOptionalAvoidanceRetry(payload: {
   routeOriginH3: string;
@@ -318,7 +316,7 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
  * Purpose: `check_distance` names a unit type rather than a unit, but weather budgets and enter costs depend on the
  * mover's tags. The AI is asking about its own forces, so its unit wins when both sides share the cell.
  * When to use: Strategic and battle `check_distance`, before computing the movement budget.
- * Expected outcome: The first AI unit of that type on the cell, else the first unit of that type from any player, else
+ * Expected outcome: `ownPlayerId` is required. The first unit of that player and type on the cell, else the first unit of that type from any player, else
  * undefined, which callers treat as an untagged mover.
  * Exceptions: None.
  */
@@ -328,7 +326,7 @@ export function checkDistanceTagSourceUnit<
   units: readonly T[],
   fromH3: string,
   unitType: string,
-  ownPlayerId: string = AI_SEAT_IDS[0]
+  ownPlayerId: string
 ): T | undefined {
   const here = units.filter((u) => u.h3Index === fromH3 && u.unitType === unitType);
   const picked = here.find((u) => u.player === ownPlayerId) ?? here[0];

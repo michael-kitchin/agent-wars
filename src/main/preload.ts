@@ -410,7 +410,7 @@ registerPostTacticalBeatConsultationListener: (callback: (payload: TacticalPostB
     /**
    * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingStrategicH3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
 
-   * Purpose: Exposes milestone-2.1 tactical battle entry to the renderer with the same contract as the main-process handler.
+   * Purpose: Exposes tactical battle entry to the renderer with the same contract as the main-process handler.
    * When to use: After the player activates a contested-hex tactical entry control during strategic planning.
    * Expected outcome: Returns a tactical snapshot on success for tactical-scoped rendering and interaction.
    * Exceptions: None.

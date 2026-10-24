@@ -1,5 +1,5 @@
 /**
- * Shared contracts for milestone 2.1 tactical battle entry and in-session tactical units.
+ * Shared contracts for tactical battle entry and in-session tactical units.
  * Kept renderer/main aligned via IPC payloads.
  */
 
@@ -241,7 +241,7 @@ export interface TacticalBattleSnapshot {
   /**
    * Tactical turn counter for future resolution milestones.
    *
-   * Contract: Starts at 1 for milestone 2.1 entry slice; may increment later.
+   * Contract: Starts at 1 on entry; may increment later.
    * When to use: Future tactical AI prompts and phase gating.
    * Expected outcome: Positive integer.
    * Exceptions: None.
@@ -420,7 +420,7 @@ export interface EndTacticalBattleIpcResult {
    *
    * Contract: Renderer should still refresh `getGameState` after a successful end.
    * When to use: Branching UI cleanup after tactical exit.
-   * Expected outcome: Normally true for milestone 2.1 synchronous handler.
+   * Expected outcome: Normally true for the synchronous handler.
    * Exceptions: None.
    */
   success: boolean;
@@ -429,7 +429,7 @@ export interface EndTacticalBattleIpcResult {
    *
    * Contract: Present only on failure paths if extended later.
    * When to use: Diagnostics for future multi-step tactical teardown.
-   * Expected outcome: Usually omitted in milestone 2.1.
+   * Expected outcome: Usually omitted.
    * Exceptions: None.
    */
   reason?: string;

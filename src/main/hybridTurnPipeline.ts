@@ -1,5 +1,5 @@
 /**
- * Hybrid AI turn pipeline (milestone 1.1): documents the logical sequence the main process follows
+ * Hybrid AI turn pipeline: documents the logical sequence the main process follows
  * for WEGO + optional LLM consultation. This module does not replace existing handlers; it centralizes
  * the narrative for readers and agents. Order of operations in production:
  *

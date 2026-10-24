@@ -243,7 +243,7 @@ function popoverHeader(title: string): HTMLElement {
  *
  * Purpose: The controls write one commander object the caller stores.
  * When to use: `openCommanderPopover`.
- * Expected outcome: Each change calls `onChange`. Apply-all calls `onApplyAll`. A model change also updates the Opponent tab's model.
+ * Expected outcome: Each change calls `onChange`. Apply-all calls `onApplyAll`. A model change also updates the app-wide model.
  * Exceptions: None.
  */
 function popoverFields(
@@ -294,12 +294,12 @@ function popoverFields(
 }
 
 /**
- * Copies the Opponent tab's model options.
+ * Copies the options of the app-wide model select (`#openrouter-model`).
  *
  * Purpose: The popover offers the same list, including the empty choice.
  * When to use: When the popover opens.
  * Expected outcome: The row's model is selected when that option exists.
- * Exceptions: None. A missing Opponent select leaves one empty option.
+ * Exceptions: None. A missing app-wide select leaves one empty option.
  */
 function copyModelOptions(select: HTMLSelectElement, modelId: string | null): void {
   const source = document.getElementById('openrouter-model') as HTMLSelectElement | null;
@@ -368,7 +368,7 @@ function labeledField(text: string, control: HTMLElement): HTMLLabelElement {
  *
  * Purpose: The next match's new sides start from the model the player just picked.
  * When to use: A model change in the popover.
- * Expected outcome: The Opponent tab's model select changes when the id differs, which saves it. An empty choice clears it.
+ * Expected outcome: The app-wide model select changes when the id differs, which saves it. An empty choice clears it.
  * Exceptions: None. A missing select still calls `setSelectedModel`.
  */
 function saveAppWideModel(modelId: string | null): void {

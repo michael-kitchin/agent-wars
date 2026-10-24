@@ -25,29 +25,29 @@ import type { ReadyResult } from '../shared/ipcTypes';
 import type { TurnOrdersByOwner } from './gameActions/ownerTurnOrders';
 
 /**
- * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
-
- * Purpose: Supports maintainability by documenting why `minimalPlanningState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * A planning snapshot small enough for Ready tests that do not read the database.
+ *
+ * Purpose: The handler tests share one state so a fake `getGameState` does not invent a new shape each time.
+ * When to use: The `getGameState` and `getGameStateForPlayer` fakes in this file.
+ * Expected outcome: Turn 1, planning, one hex, one human infantry, and one AI armor. No pending orders.
+ * Exceptions: None. This value is for testing.
  */
 const minimalPlanningState = {
     /**
-   * Documents the object literal property `hexes` (hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }]).
-
-   * Purpose: Supports maintainability by documenting why `hexes` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The one hex both units occupy.
+   *
+   * Purpose: Ready's display-name helper reads `hexes` before it looks at orders.
+   * When to use: The shared snapshot.
+   * Expected outcome: One plains land hex.
    * Exceptions: None.
    */
 hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }],
     /**
-   * Documents the object literal property `units` (units: [ { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: '891f1d48b9fffff' }, { id: 'opponent-1', player: 'opponent', unitType: 'armo).
-
-   * Purpose: Supports maintainability by documenting why `units` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * One unit for each side, on that hex.
+   *
+   * Purpose: Order assertions name these unit ids.
+   * When to use: The shared snapshot.
+   * Expected outcome: Human infantry `human-1` and AI armor `opponent-1`.
    * Exceptions: None.
    */
 units: [
@@ -55,40 +55,40 @@ units: [
     { id: 'opponent-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' },
   ],
     /**
-   * Documents the object literal property `phase` (phase: 'planning' as const).
-
-   * Purpose: Supports maintainability by documenting why `phase` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The phase Ready expects before it resolves a turn.
+   *
+   * Purpose: The handler logs the phase from this snapshot.
+   * When to use: The shared snapshot.
+   * Expected outcome: `planning`.
    * Exceptions: None.
    */
 phase: 'planning' as const,
     /**
-   * Documents the object literal property `turnNumber` (turnNumber: 1).
-
-   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * The turn the handler logs before resolution.
+   *
+   * Purpose: The tests do not depend on a stored turn.
+   * When to use: The shared snapshot.
+   * Expected outcome: 1.
    * Exceptions: None.
    */
 turnNumber: 1,
     /**
-   * Documents the object literal property `pendingOrders` (pendingOrders: [] as { unitId: string; toH3Index: string }[]).
-
-   * Purpose: Supports maintainability by documenting why `pendingOrders` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Orders already on the snapshot. Ready's gathered orders are separate.
+   *
+   * Purpose: The fake state has nothing queued, so a test that sees orders got them from the gather.
+   * When to use: The shared snapshot.
+   * Expected outcome: An empty list.
    * Exceptions: None.
    */
 pendingOrders: [] as { unitId: string; toH3Index: string }[],
 };
 
 /**
- * Defines the `testGameReadyPrecomputedSkipsRequestOrders` function shape (async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testGameReadyPrecomputedSkipsRequestOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Ready with Events and Run on, and no stored plan, does not call the model before resolution.
+ *
+ * Purpose: A turn with nothing queued must still resolve. The consult, if any, is after `ready`.
+ * When to use: This file's runner.
+ * Expected outcome: `requestOrders` is not called. The result succeeds with no AI orders and `aiConsulted` false.
  * Exceptions: None.
  */
 async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
@@ -129,11 +129,11 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
 }
 
 /**
- * Defines the `testGameReadyRunOffSkipsRequestOrdersNonEventDriven` function shape (async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testGameReadyRunOffSkipsRequestOrdersNonEventDriven` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Ready with Run off does not call the model.
+ *
+ * Purpose: Turning Run off leaves the turn on standing orders and stored plans.
+ * When to use: This file's runner.
+ * Expected outcome: `requestOrders` is not called, and the result succeeds.
  * Exceptions: None.
  */
 async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<void> {
@@ -166,11 +166,11 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
 }
 
 /**
- * Defines the `testGameReadyPrecomputedWithOrders` function shape (async function testGameReadyPrecomputedWithOrders(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testGameReadyPrecomputedWithOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * A stored plan is the orders Ready resolves, without a second model call.
+ *
+ * Purpose: The gather uses pending orders and clears them. Ready must see those orders.
+ * When to use: This file's runner.
+ * Expected outcome: `ready` receives the stored move. `requestOrders` is not called. `aiConsulted` is true.
  * Exceptions: None.
  */
 async function testGameReadyPrecomputedWithOrders(): Promise<void> {
@@ -216,11 +216,11 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
 }
 
 /**
- * Defines the `testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders` function shape (async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Stored air strikes, ferry orders, and embark orders reach `ready`.
+ *
+ * Purpose: The gather is not only movement and ranged fire.
+ * When to use: This file's runner.
+ * Expected outcome: The first AI seat's order set has one of each, and no movement or ranged orders.
  * Exceptions: None.
  */
 async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void> {
@@ -259,11 +259,11 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
 }
 
 /**
- * Defines the `runAll` function shape (async function runAll(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `runAll` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * A melee pause returns the token and the candidate hexes and does not consult.
+ *
+ * Purpose: The player still has to choose Fight or Ignore. The turn is not finished.
+ * When to use: This file's runner.
+ * Expected outcome: `awaitingMeleeDecision` is true, the token matches, and one candidate is returned.
  * Exceptions: None.
  */
 async function testGameReadyAwaitingMeleeDecisionSurfacesFields(): Promise<void> {
@@ -292,11 +292,11 @@ async function testGameReadyAwaitingMeleeDecisionSurfacesFields(): Promise<void>
 }
 
 /**
- * Defines the `testHandleResolveMeleeInterceptRejectsInvalidPayload` function shape (async function testHandleResolveMeleeInterceptRejectsInvalidPayload(): Promise<void>).
-
- * Purpose: Contract that `handleResolveMeleeIntercept` rejects missing token or invalid decision before calling game actions.
- * When to use: Regression guard for melee modal IPC wiring.
- * Expected outcome: `{ success: false }` without invoking `resolveMeleeIntercept` for malformed payloads.
+ * A melee resolve without a token or a Fight or Ignore decision does not resolve the intercept.
+ *
+ * Purpose: The modal must send a token and one of those two decisions.
+ * When to use: This file's runner.
+ * Expected outcome: `{ success: false }` and `resolveMeleeIntercept` is not called.
  * Exceptions: None.
  */
 async function testHandleResolveMeleeInterceptRejectsInvalidPayload(): Promise<void> {
@@ -326,11 +326,11 @@ const minimalResolvedReady: ReadyResult = {
 };
 
 /**
- * Defines the `testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight` function shape (async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void>).
-
- * Purpose: Locks Phase E contract that IPC mirrors `tacticalAutoStartStrategicH3Index` only when the resolve layer returns it (Fight path).
- * When to use: Regression guard for melee intercept completion wiring.
- * Expected outcome: Handler output includes the same strategic index the mocked `resolveMeleeIntercept` returned.
+ * Fight copies the battle hex from the resolve result onto the IPC result.
+ *
+ * Purpose: The renderer starts the battle at the hex resolution chose.
+ * When to use: This file's runner.
+ * Expected outcome: `tacticalAutoStartH3Index` is the hex the fake resolve returned.
  * Exceptions: None.
  */
 async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void> {
@@ -364,20 +364,12 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
 }
 
 /**
- * Defines the `testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore` function shape (async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void>).
-
- * Purpose: Locks Phase E contract that Ignore does not surface tactical auto-start on the IPC completion payload.
- * When to use: Regression guard paired with the Fight forwarding test.
- * Expected outcome: `tacticalAutoStartStrategicH3Index` is absent when the mocked resolve result omits it.
+ * Ready does not resolve a turn while a playback consult is still pending.
+ *
+ * Purpose: The next turn waits until notify finishes or abandons the stored consult.
+ * When to use: This file's runner.
+ * Expected outcome: `{ success: false }` and `ready` is not called. The pending consult is cleared afterward.
  * Exceptions: None.
- */
-/**
- * Defines the `testHandleGameReadyFailsWhileDeferredPlaybackConsultPending` function shape.
-
- * Purpose: Locks mutex behavior so a second `game:ready` cannot run while deferred consultation is outstanding.
- * When to use: Regression guard for playback deferral ordering.
- * Expected outcome: `{ success: false }` without invoking `ready`.
- * Exceptions: Clears pending after the assertion so other tests stay isolated.
  */
 async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Promise<void> {
   clearDeferredPlaybackConsultPending();
@@ -385,7 +377,6 @@ async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Pr
     useEventDrivenConsultation: false,
     resolutionSuccess: true,
     aiPlanningRunEnabled: true,
-    opponentState: minimalPlanningState as never,
     resolution: { success: true } as ReadyResult,
     modelId: '',
     enabledToolNames: [],
@@ -414,6 +405,14 @@ async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Pr
   clearDeferredPlaybackConsultPending();
 }
 
+/**
+ * Ignore does not add a battle hex when resolution did not return one.
+ *
+ * Purpose: Skipping the fight must not open a battle.
+ * When to use: This file's runner.
+ * Expected outcome: The result succeeds and `tacticalAutoStartH3Index` is absent.
+ * Exceptions: None.
+ */
 async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,

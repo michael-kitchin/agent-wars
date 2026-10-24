@@ -13,106 +13,45 @@
  */
 
 import type { WebContents } from 'electron';
-import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
-import type { GameStateSnapshot } from '../gameDb';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { logDebug, logError, logTrace } from '../logger';
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
 import { DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG } from '../../shared/ipc/deferredPlaybackConsultAbandoned';
-import type { RequestAiOrdersResult } from '../../shared/ipc/openRouterTypes';
-import type { ReadyResult } from '../../shared/ipc/readyTypes';
-import type { TacticalCommitResolutionPlayback } from '../../shared/ipc/tacticalPlaybackTypes';
 import type {
   NotifyResolutionPlaybackCompletePayload,
   PostResolutionConsultationPushPayload,
   TacticalPostBeatConsultFields,
   TacticalPostBeatConsultMergeSource,
 } from '../../shared/ipc/consultationPushTypes';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getMatchGeneration } from '../matchGeneration';
 import { getModelCallCancelEpoch, hasModelCallCancelSince } from '../openRouter/modelCallControl';
 import {
   runEventDrivenAfterResolutionConsultation,
   runEventDrivenAfterTacticalBeatConsultation,
   toTacticalPostBeatConsultFields,
+  type StrategicConsultArgs,
+  type TacticalBeatConsultArgs,
 } from './readyIpcResolutionMapping';
-
-/**
- * Captured arguments for `runEventDrivenAfterResolutionConsultation`, aligned with its parameter object.
- *
- * Purpose: Stored while playback runs so notify can invoke the same runner without re-simulating the turn.
- * When to use: Only inside pending strategic/melee records.
- * Expected outcome: Satisfies `runEventDrivenAfterResolutionConsultation` at notify time.
- * Exceptions: None.
- */
-export type DeferredStrategicResolutionConsultArgs = {
-  useEventDrivenConsultation: boolean;
-  resolutionSuccess: boolean;
-  aiPlanningRunEnabled: boolean;
-  opponentState: GameStateSnapshot;
-  resolution: ReadyResult;
-  modelId: string;
-  enabledToolNames: string[];
-  hasKey: () => boolean;
-  requestOrders: (
-    state: GameStateSnapshot,
-    modelId: string,
-    options: { seatId: AiSeatId; enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
-  ) => Promise<RequestAiOrdersResult>;
-  timeoutMs: number;
-  errorLogMessage: string;
-};
-
-/**
- * Captured arguments for `runEventDrivenAfterTacticalBeatConsultation`.
- *
- * Purpose: Stored while tactical resolution playback runs so notify can finish post-beat opponent LLM work later.
- * When to use: Only inside pending tactical-beat records.
- * Expected outcome: Satisfies `runEventDrivenAfterTacticalBeatConsultation` at notify time.
- * Exceptions: None.
- */
-export type DeferredTacticalBeatConsultArgs = {
-  useEventDrivenConsultation: boolean;
-  aiPlanningRunEnabled: boolean;
-  opponentState: GameStateSnapshot;
-  tacticalBattle: TacticalBattleSnapshot;
-  tacticalResolutionPlayback: TacticalCommitResolutionPlayback;
-  modelId: string;
-  enabledToolNames: string[];
-  hasKey: () => boolean;
-  requestOrders: (
-    state: GameStateSnapshot,
-    modelId: string,
-    options: {
-      seatId: AiSeatId;
-      enabledToolNames: string[];
-      usePrecomputation?: boolean;
-      tacticalAiBattle?: TacticalBattleSnapshot;
-      signal?: AbortSignal;
-    }
-  ) => Promise<RequestAiOrdersResult>;
-  timeoutMs: number;
-  errorLogMessage: string;
-};
 
 export type PendingPlaybackConsult =
   | {
       tag: 'strategic-ready';
       planningTurnNumber: number;
-      consultArgs: DeferredStrategicResolutionConsultArgs;
+      consultArgs: StrategicConsultArgs;
       cancelEpoch: number;
       generationAtStart: number;
     }
   | {
       tag: 'melee-resolve';
       planningTurnNumber: number;
-      consultArgs: DeferredStrategicResolutionConsultArgs;
+      consultArgs: StrategicConsultArgs;
       cancelEpoch: number;
       generationAtStart: number;
     }
   | {
       tag: 'tactical-beat';
       battleId: string;
-      consultArgs: DeferredTacticalBeatConsultArgs;
+      consultArgs: TacticalBeatConsultArgs;
       cancelEpoch: number;
       generationAtStart: number;
     };
@@ -219,7 +158,7 @@ export function clearDeferredPlaybackConsultPending(): void {
  */
 export function setPendingStrategicReadyConsult(
   planningTurnNumber: number,
-  consultArgs: DeferredStrategicResolutionConsultArgs
+  consultArgs: StrategicConsultArgs
 ): void {
   logDebug('setPendingStrategicReadyConsult', { planningTurnNumber });
   pendingPlaybackConsult = { tag: 'strategic-ready', planningTurnNumber, consultArgs, ...deferredConsultStamp() };
@@ -235,7 +174,7 @@ export function setPendingStrategicReadyConsult(
  */
 export function setPendingMeleeResolveConsult(
   planningTurnNumber: number,
-  consultArgs: DeferredStrategicResolutionConsultArgs
+  consultArgs: StrategicConsultArgs
 ): void {
   logDebug('setPendingMeleeResolveConsult', { planningTurnNumber });
   pendingPlaybackConsult = { tag: 'melee-resolve', planningTurnNumber, consultArgs, ...deferredConsultStamp() };
@@ -249,7 +188,7 @@ export function setPendingMeleeResolveConsult(
  * Expected outcome: Mutex held until notify validates `battleId`.
  * Exceptions: None.
  */
-export function setPendingTacticalBeatConsult(battleId: string, consultArgs: DeferredTacticalBeatConsultArgs): void {
+export function setPendingTacticalBeatConsult(battleId: string, consultArgs: TacticalBeatConsultArgs): void {
   logDebug('setPendingTacticalBeatConsult', { battleId });
   pendingPlaybackConsult = { tag: 'tactical-beat', battleId, consultArgs, ...deferredConsultStamp() };
 }

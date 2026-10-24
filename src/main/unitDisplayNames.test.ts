@@ -274,7 +274,7 @@ function testKillLabelRosterResolvesHiddenProductionKillers(): void {
 /**
  * Defines the `testFormatTacticalSubUnitDisplayName` function shape (function testFormatTacticalSubUnitDisplayName(): void).
 
- * Purpose: Locks milestone-2.1 tactical sub-label formatting to the shared strategic parent display string plus two-digit ordinal.
+ * Purpose: Locks tactical sub-label formatting to the shared strategic parent display string plus two-digit ordinal.
  * When to use: Regression guard when editing `formatTacticalSubUnitDisplayName` or tactical snapshot synthesis.
  * Expected outcome: Human ordinals and AI roman parent labels compose with zero-padded tactical indices.
  * Exceptions: None.

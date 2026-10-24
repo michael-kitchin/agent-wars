@@ -1,5 +1,6 @@
 import type { NewGameCommanderInput, NewGameSeatInput } from './ipc/ordersTypes';
-import { MAX_SEATS, MIN_SEATS, HUMAN_SEAT_ID } from './seatIds';
+import { MAX_SEATS, MIN_SEATS } from './seatIds';
+import { AI_SEAT_KIND, HUMAN_SEAT_KIND, type SeatKind } from './seatRoster';
 
 /**
  * One home the new-game screen can assign.
@@ -42,12 +43,12 @@ export interface NewGameSideRow {
   /**
    * Whether a person or a commander plays the row.
    *
-   * Contract: `HUMAN_SEAT_ID` or `'ai'`. Observe has no human row.
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`. Observe has no human row.
    * When to use: Labels and the start payload.
    * Expected outcome: At most one human row.
    * Exceptions: None.
    */
-  readonly kind: 'human' | 'ai';
+  readonly kind: SeatKind;
   /**
    * Home assigned to the row.
    *
@@ -171,7 +172,7 @@ export function initialSidesState(args: {
   const requested = args.rowCount ?? MIN_SEATS;
   const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
   const rows = args.homes.slice(0, count).map((home, index): NewGameSideRow => ({
-    kind: index === 0 ? HUMAN_SEAT_ID : 'ai',
+    kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
     homeKey: home.key,
     commander: index === 0 ? null : args.defaultCommander,
   }));
@@ -195,8 +196,8 @@ export function setObserveOnly(
   if (state.rows.length === 0) return { ...state, observeOnly: on };
   const first = state.rows[0]!;
   const nextFirst: NewGameSideRow = on
-    ? { ...first, kind: 'ai', commander: first.commander ?? defaultCommander }
-    : { ...first, kind: HUMAN_SEAT_ID, commander: null };
+    ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander }
+    : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
   return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
 }
 
@@ -217,7 +218,7 @@ export function addSideRow(
   const taken = new Set(state.rows.map((row) => row.homeKey));
   const free = homes.find((home) => !taken.has(home.key));
   if (!free) return state;
-  const row: NewGameSideRow = { kind: 'ai', homeKey: free.key, commander: defaultCommander };
+  const row: NewGameSideRow = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander };
   return { ...state, rows: [...state.rows, row] };
 }
 
@@ -286,7 +287,7 @@ export function setRowCommander(
   index: number,
   commander: NewGameCommanderInput
 ): NewGameSidesState {
-  if (index < 0 || index >= state.rows.length || state.rows[index]!.kind !== 'ai') return state;
+  if (index < 0 || index >= state.rows.length || state.rows[index]!.kind !== AI_SEAT_KIND) return state;
   const rows = state.rows.map((row, rowIndex) => (rowIndex === index ? { ...row, commander } : row));
   return { ...state, rows };
 }
@@ -300,7 +301,7 @@ export function setRowCommander(
  * Exceptions: None.
  */
 export function setEveryAiCommander(state: NewGameSidesState, commander: NewGameCommanderInput): NewGameSidesState {
-  const rows = state.rows.map((row) => (row.kind === 'ai' ? { ...row, commander } : row));
+  const rows = state.rows.map((row) => (row.kind === AI_SEAT_KIND ? { ...row, commander } : row));
   return { ...state, rows };
 }
 
@@ -315,8 +316,8 @@ export function setEveryAiCommander(state: NewGameSidesState, commander: NewGame
 export function rowLabel(state: NewGameSidesState, index: number): string {
   if (index < 0 || index >= state.rows.length) return '';
   if (state.observeOnly) return `Side ${index + 1}`;
-  if (state.rows[index]!.kind === HUMAN_SEAT_ID) return 'You';
-  const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === 'ai').length;
+  if (state.rows[index]!.kind === HUMAN_SEAT_KIND) return 'You';
+  const opponentNumber = state.rows.slice(0, index + 1).filter((row) => row.kind === AI_SEAT_KIND).length;
   return `Opponent ${opponentNumber}`;
 }
 
@@ -405,7 +406,7 @@ export function buildSeatsPayload(state: NewGameSidesState): readonly NewGameSea
     const seat: NewGameSeatInput = state.mapKind === 'global'
       ? { kind: row.kind, homeRegion: home }
       : { kind: row.kind, sideGroupId: home };
-    if (row.kind === 'ai' && row.commander) return { ...seat, commander: row.commander };
+    if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
     return seat;
   });
 }

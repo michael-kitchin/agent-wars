@@ -8,6 +8,7 @@
  */
 
 import { isSeatId, type SeatId, HUMAN_SEAT_ID } from './seatIds';
+import { HUMAN_SEAT_KIND, type SeatKind } from './seatRoster';
 
 /**
  * The roster fields that decide whether a seat is still playing.
@@ -30,12 +31,12 @@ export interface ObserveSeat {
   /**
    * Whether the seat is the human player.
    *
-   * Contract: `HUMAN_SEAT_ID` or `'ai'`.
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
    * When to use: Finding the seat that can still give orders.
    * Expected outcome: At most one human seat.
    * Exceptions: None.
    */
-  readonly kind: 'human' | 'ai';
+  readonly kind: SeatKind;
   /**
    * The turn the seat was knocked out, or null while it is still playing.
    *
@@ -45,6 +46,30 @@ export interface ObserveSeat {
    * Exceptions: None.
    */
   readonly outTurn: number | null;
+}
+
+/**
+ * The seat that can still give orders.
+ *
+ * Purpose: Readouts and observe mode share one test for an active human seat.
+ * When to use: Before treating a roster as a played match or a watch.
+ * Expected outcome: The human seat id while that seat's `outTurn` is null, otherwise null. A missing `outTurn` counts as active.
+ * Exceptions: None.
+ */
+export function activeHumanSeatId(seats: readonly ObserveSeat[]): string | null {
+  return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
+}
+
+/**
+ * Whether a loaded roster has no human seat that can still give orders.
+ *
+ * Purpose: Observe labels and disabled play controls share one test. An empty roster is the start screen, not a watch.
+ * When to use: The Commanders tab, reports, and the console subtitle.
+ * Expected outcome: True when the roster has seats and `activeHumanSeatId` is null. False for an empty roster.
+ * Exceptions: None.
+ */
+export function isObservingRoster(seats: readonly ObserveSeat[]): boolean {
+  return seats.length > 0 && activeHumanSeatId(seats) === null;
 }
 
 /**
@@ -179,7 +204,7 @@ export interface MatchViewDecision {
  * Exceptions: None.
  */
 export function observeModeControls(seats: readonly ObserveSeat[]): ObserveControls {
-  const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null);
+  const observing = isObservingRoster(seats);
   return {
     observing,
     ordersEnabled: !observing,
@@ -203,7 +228,7 @@ export function observeModeControls(seats: readonly ObserveSeat[]): ObserveContr
 export function readoutViewerSeatId(seats: readonly ObserveSeat[], viewAs: 'all' | string): string | null | undefined {
   if (seats.length === 0) return undefined;
   if (!observeModeControls(seats).observing) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null)?.seatId ?? null;
+    return activeHumanSeatId(seats);
   }
   if (viewAs === 'all') return null;
   const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
@@ -225,7 +250,7 @@ export function resolveMatchView(args: {
   readonly requested: string | null | undefined;
 }): MatchViewDecision {
   const requested = args.requested?.trim() ? args.requested.trim() : null;
-  const humanActive = args.seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn == null);
+  const humanActive = activeHumanSeatId(args.seats) !== null;
   if (humanActive) {
     return { view: HUMAN_SEAT_ID, ignoredRequest: requested != null, rejected: false };
   }

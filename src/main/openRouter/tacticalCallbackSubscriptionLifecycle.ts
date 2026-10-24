@@ -11,6 +11,7 @@
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import {
   clearSubscriptions,
+  copyCallbackSubscriptions,
   getSubscriptions,
   replaceSubscriptions,
   type CallbackSubscription,
@@ -68,22 +69,6 @@ export function looksLikeTacticalSubUnitId(id: string): boolean {
 }
 
 /**
- * Deep-copies subscription rows for stash persistence.
- *
- * Purpose: Prevents later mutate-in-place of live params from corrupting the pre-battle snapshot.
- * When to use: Before writing memory or `game_config`.
- * Expected outcome: New array and new `params` objects; `subscribedTurn` preserved when present.
- * Exceptions: None.
- */
-function cloneSubscriptions(rows: readonly CallbackSubscription[]): CallbackSubscription[] {
-  return rows.map((s) => ({
-    event: s.event,
-    params: { ...(s.params ?? {}) },
-    subscribedTurn: s.subscribedTurn,
-  }));
-}
-
-/**
  * Snapshots opponent callback subscriptions at tactical battle start into memory and `game_config`.
  *
  * Purpose: Preserves that seat's strategic subscriptions so sub-unit tactical callbacks can be discarded on battle end.
@@ -94,7 +79,7 @@ function cloneSubscriptions(rows: readonly CallbackSubscription[]): CallbackSubs
 export function stashOpponentCallbackSubscriptionsForTacticalBattle(seatId: AiSeatId | null = AI_SEAT_IDS[0]): void {
   stashedOpponentSubscriptions = seatId === null
     ? { seatId: null, subscriptions: [] }
-    : { seatId, subscriptions: cloneSubscriptions(getSubscriptions(seatId)) };
+    : { seatId, subscriptions: copyCallbackSubscriptions(getSubscriptions(seatId)) };
   writeTacticalCallbackStashToGameConfig(stashedOpponentSubscriptions);
   logDebug('tacticalCallbackSubscriptionLifecycle stashOpponentCallbackSubscriptionsForTacticalBattle', {
     seatId,
@@ -114,7 +99,7 @@ export function hydrateOpponentCallbackStashFromGameConfig(): void {
   const fromDisk = readTacticalCallbackStashFromGameConfig();
   stashedOpponentSubscriptions = fromDisk === null
     ? null
-    : { seatId: fromDisk.seatId, subscriptions: cloneSubscriptions(fromDisk.subscriptions) };
+    : { seatId: fromDisk.seatId, subscriptions: copyCallbackSubscriptions(fromDisk.subscriptions) };
   logDebug('tacticalCallbackSubscriptionLifecycle hydrateOpponentCallbackStashFromGameConfig', {
     hydrated: fromDisk !== null,
     seatId: fromDisk?.seatId ?? null,
@@ -221,7 +206,7 @@ export function clearTacticalLookingOpponentCallbackSubscriptions(seatId: AiSeat
 }
 
 /**
- * Restores pre-battle opponent subscriptions after tactical exit, or applies missing-stash path C.
+ * Restores pre-battle opponent subscriptions after tactical exit, or, with no stash, removes only the first AI seat's sub-unit subscriptions.
  *
  * Purpose: Removes ephemeral sub-unit callbacks after tactical exit without losing pre-battle strategic subscriptions when a stash exists.
  * When to use: `endTacticalBattleSessionCore` on every teardown path.

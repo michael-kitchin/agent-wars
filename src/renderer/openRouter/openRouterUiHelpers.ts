@@ -18,21 +18,21 @@ import { markCommanderLogLine, renderCommanderCards } from './commanderCardsUi';
 import { setReadyButtonLabelAiWait, setReadyButtonLabelReady } from './readyButtonLabel';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
+import { isObservingRoster } from '../../shared/observeModeControls';
 import { activeAiSeats, shortSideName } from '../../shared/seatRoster';
 import { commanderFooterLabel, commanderPlanningSentence, modelNameFromOptionLabel, commanderPlanningStatus } from '../../shared/commanderPlanningStatus';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
- * Defines the `updateReadyButtonState` function shape (export function updateReadyButtonState(): void).
-
- * Purpose: Supports maintainability by documenting why `updateReadyButtonState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Enables Ready and sets its label from the match and the commander pool.
+ *
+ * Purpose: The button stays disabled until the player can advance, and the label shows whose consult is running.
+ * When to use: After Ready, Run, a consult, or a tactical annihilation dialog changes.
  * Expected outcome: Disables the control while the game is over, while any commander is still planning, while
  * deferred post-resolution / post-beat consultation is outstanding (`isDeferredResolutionPlaybackConsultPending`), or
  * while `readyRequestInFlight` is true. The "AI:" label uses the longest planning seat's elapsed time. Before that
  * seat is planning, a deferred consult that has been notified uses a local clock. During the playback that precedes
  * a deferred consultation, the label stays "Ready". Turning Run off returns the label to "Ready".
- * Exceptions: None.
+ * Exceptions: None. A missing button is skipped.
  */
 export function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
@@ -83,7 +83,7 @@ function clearReadyAiWaitClock(): void {
 }
 
 /**
- * Writes the opponent's planning status: the Opponent tab's sentence and the footer line above Ready.
+ * Writes the opponent's planning status: the Commanders tab's sentence and the footer line above Ready.
  *
  * Purpose: Shows whether opponent planning is on, which model plans, and what this match has cost, from any tab.
  * When to use: After Run, the opponent's wait, the selected model, or the match cost changes. `updateReadyButtonState`
@@ -99,7 +99,7 @@ export function renderOpponentStatus(): void {
   const statuses = commanderPoolStatuses();
   const ready = active.filter((seat) => statuses.find((row) => row.seatId === seat.seatId)?.status === 'ready').length;
   const status = commanderPlanningStatus(S.runButtonOn, isWaitingForPrecomputedAiOrders());
-  const observing = seats.length > 0 && !seats.some((seat) => seat.kind === HUMAN_SEAT_ID && seat.outTurn === null);
+  const observing = isObservingRoster(seats);
   const sentence = document.getElementById('commander-status-text');
   if (sentence) sentence.textContent = commanderPlanningSentence(S.runButtonOn, active.length || 1);
   document.getElementById('commander-status-line')?.setAttribute('data-status', status);
@@ -115,11 +115,11 @@ export function renderOpponentStatus(): void {
 }
 
 /**
- * Defines the `updateOpenRouterToolCountLabels` function shape (export function updateOpenRouterToolCountLabels(): void).
-
- * Purpose: Supports maintainability by documenting why `updateOpenRouterToolCountLabels` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Writes each tool group's invocation count onto its toggle.
+ *
+ * Purpose: The Commanders tab shows how often each tool group ran this consult.
+ * When to use: After counts are replaced, and when the toggles are first painted.
+ * Expected outcome: Each toggle shows that group's count, or 0 when the group has none. A missing toggle is skipped.
  * Exceptions: None.
  */
 export function updateOpenRouterToolCountLabels(): void {
@@ -154,11 +154,11 @@ export function applyToolInvocationCountsAfterReady(args: {
 }
 
 /**
- * Defines the `formatOpenRouterCost` function shape (export function formatOpenRouterCost(dollars: number): string).
-
- * Purpose: Supports maintainability by documenting why `formatOpenRouterCost` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Formats a dollar amount for the match cost labels.
+ *
+ * Purpose: The footer and the cost readout share one currency format.
+ * When to use: Any label that shows commander spend.
+ * Expected outcome: A USD string with two fraction digits, for example "$0.00".
  * Exceptions: None.
  */
 export function formatOpenRouterCost(dollars: number): string {
@@ -171,13 +171,12 @@ export function formatOpenRouterCost(dollars: number): string {
 }
 
 /**
- * Defines the `updateOpenRouterCostLabel` function shape (export function updateOpenRouterCostLabel(): void).
-
- * Purpose: Supports maintainability by documenting why `updateOpenRouterCostLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- *   The footer status line shows the same cost.
- * Exceptions: None.
+ * Writes the match cost onto the cost readout and the footer status line.
+ *
+ * Purpose: Both labels stay on the sum of commander spend.
+ * When to use: After a consult records a cost, and when the footer is refreshed.
+ * Expected outcome: `#openrouter-cost` shows the formatted sum. The footer status line shows the same cost.
+ * Exceptions: None. A missing cost element is skipped.
  */
 export function updateOpenRouterCostLabel(): void {
   const el = document.getElementById('openrouter-cost');
@@ -239,7 +238,7 @@ function planningCommanderCount(): number {
  * Scrolls the AI activity log to its newest line.
  *
  * Purpose: A line added while the log is hidden cannot scroll it, so the log is scrolled again when it is shown.
- * When to use: After a line is appended, and each time the console's Opponent tab is shown.
+ * When to use: After a line is appended, and each time the console's Commanders tab is shown.
  * Expected outcome: `#openrouter-log` shows its last line. A missing log is a no-op; a hidden log keeps its position.
  * Exceptions: None.
  */
@@ -395,11 +394,11 @@ export function appendMapToastMessageBody(
 }
 
 /**
- * Defines the `showToast` function shape (function showToast().
-
- * Purpose: Supports maintainability by documenting why `showToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Fills one toast element and shows it.
+ *
+ * Purpose: The map toast and the strategy toast share the fill and the info class.
+ * When to use: `showMapToast` and `showFilledAiStrategyToast`.
+ * Expected outcome: The text element is rebuilt by `textContentBuilder`. `toast-info` is on when `isInfo` is true. `hidden` is removed.
  * Exceptions: None.
  */
 function showToast(
@@ -451,12 +450,12 @@ export function showMapToast(message: string, options?: MapToastOptions): void {
 }
 
 /**
- * Defines the `hideMapToast` function shape (export function hideMapToast(): void).
-
- * Purpose: Supports maintainability by documenting why `hideMapToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Hides the map toast and cancels its auto-hide timer.
+ *
+ * Purpose: A new toast and the planning-chrome clear both start from a hidden map toast.
+ * When to use: When the timer fires, and from `hidePlanningChromeToasts`.
+ * Expected outcome: `#map-toast` has `hidden`. The timer id is null.
+ * Exceptions: None. A missing element is skipped.
  */
 export function hideMapToast(): void {
   if (S.toastHideTimer !== null) {
@@ -519,12 +518,12 @@ export function showAiStrategyToast(content: AiStrategyToastFields): void {
 }
 
 /**
- * Defines the `hideAiStrategyToast` function shape (export function hideAiStrategyToast(): void).
-
- * Purpose: Supports maintainability by documenting why `hideAiStrategyToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Hides the strategy toast and cancels its auto-hide timer.
+ *
+ * Purpose: An empty consult and the planning-chrome clear both start from a hidden strategy toast.
+ * When to use: When the timer fires, when a consult has nothing to show, and from `hidePlanningChromeToasts`.
+ * Expected outcome: `#ai-strategy-toast` has `hidden`. The timer id is null.
+ * Exceptions: None. A missing element is skipped.
  */
 export function hideAiStrategyToast(): void {
   if (S.aiStrategyToastHideTimer !== null) {
@@ -552,12 +551,12 @@ export function hidePlanningChromeToasts(): void {
 }
 
 /**
- * Defines the `callReadyWithTimeout` function shape (export async function callReadyWithTimeout().
-
- * Purpose: Supports maintainability by documenting why `callReadyWithTimeout` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Calls Ready and rejects when the IPC does not settle in time.
+ *
+ * Purpose: A hung Ready must not leave the button disabled forever.
+ * When to use: The Ready click handler.
+ * Expected outcome: The Ready result, or a rejection when `ready` is missing or the wait exceeds `READY_REQUEST_TIMEOUT_MS`.
+ * Exceptions: Throws `Ready action unavailable.` when the bridge has no `ready`. Rejects with a timeout error when the IPC does not settle.
  */
 export async function callReadyWithTimeout(
   payload: GameReadyIpcPayload

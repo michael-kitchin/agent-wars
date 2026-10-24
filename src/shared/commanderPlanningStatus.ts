@@ -1,6 +1,6 @@
 /**
  * Whether opponent planning is off, on and idle, or on and planning now. This module holds what the console says
- * about opponent planning, in the Opponent tab's status sentence and in the footer line; both read the same state.
+ * about opponent planning, in the Commanders tab's status sentence and in the footer line; both read the same state.
  *
  * Purpose: Names the three states the footer dot and label show.
  * When to use: Returned by `commanderPlanningStatus`.
@@ -69,7 +69,7 @@ export const NO_MODEL_LABEL = 'No model';
 /**
  * Works out the planning state from Run and the wait that Ready already tracks.
  *
- * Purpose: The footer and the Opponent tab agree with Ready's "AI:" timer.
+ * Purpose: The footer and the Commanders tab agree with Ready's "AI:" timer.
  * When to use: Pass whether Run is on, and whether the opponent's orders are still being planned.
  * Expected outcome: `off` while Run is off, `planning` while Run is on and the opponent is planning, `on` otherwise.
  * Exceptions: None.

@@ -9,7 +9,7 @@
 
 import type { CommanderStatus } from './commanderStatus';
 import { SEAT_PALETTES } from './seatPalette';
-import { shortSideName } from './seatRoster';
+import { shortSideName, type SeatKind } from './seatRoster';
 
 const READY_CHECK_COLOR = '#86EFAC';
 
@@ -43,12 +43,12 @@ export interface TopBarSideSeat {
   /**
    * Human or AI.
    *
-   * Contract: `HUMAN_SEAT_ID` or `'ai'`.
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
    * When to use: The lead chip is the human seat when one is playing.
    * Expected outcome: At most one human.
    * Exceptions: None.
    */
-  readonly kind: 'human' | 'ai';
+  readonly kind: SeatKind;
   /**
    * Home name.
    *

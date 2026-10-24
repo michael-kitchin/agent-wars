@@ -33,7 +33,7 @@ export function tacticalMarchWithinGridSteps(
 /**
  * Returns the tactical cell reached after spending at most `movementPointBudget` movement points toward `toTacticalH3Index` along the cheapest valid tactical path.
  *
- * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs (milestone 2.2).
+ * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs.
  * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalDraftBeatInStrategicOrder`, using the same footprint and terrain snapshot as march validation.
  * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
  * When the budget cannot pay for the first step but the path exists and the budget is positive, `planTacticalMarch` still advances one hex along that path.

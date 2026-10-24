@@ -694,7 +694,7 @@ export function getSeatRoster(): SeatRecord[] {
 /**
  * The model id stored for one AI seat.
  *
- * Purpose: Consults follow the seat, not the Opponent tab, once a roster exists.
+ * Purpose: Consults follow the seat, not the app-wide model, once a roster exists.
  * When to use: Before starting a consult for that seat.
  * Expected outcome: The stored id, or `''` when the seat has no model. `null` when the seat is missing or the roster cannot be read, so the caller can keep its previous fallback.
  * Exceptions: Logs and returns null when the database is closed.

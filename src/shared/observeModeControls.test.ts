@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HUMAN_SEAT_ID, aiSeatIdForIndex } from './seatIds';
-import { observeModeControls, readoutViewerSeatId, resolveMatchView, staleIntelViewer, type ObserveSeat } from './observeModeControls';
+import { activeHumanSeatId, isObservingRoster, observeModeControls, readoutViewerSeatId, resolveMatchView, staleIntelViewer, type ObserveSeat } from './observeModeControls';
 
 const FIRST_AI = 'opponent' as const;
 const SECOND_AI = aiSeatIdForIndex(2);
@@ -52,6 +52,14 @@ test('an active human seat plays', () => {
   assert.equal(controls.unitSelectionEnabled, true);
   assert.equal(controls.magnifierEnabled, true);
   assert.equal(controls.hexOnlySelection, false);
+});
+
+test('the active human seat counts only while it plays, and an empty roster is not observing', () => {
+  const playing = [{ seatId: HUMAN_SEAT_ID, kind: 'human' as const, outTurn: null }, ai()];
+  assert.equal(activeHumanSeatId(playing), HUMAN_SEAT_ID);
+  assert.equal(activeHumanSeatId([{ seatId: HUMAN_SEAT_ID, kind: 'human' as const, outTurn: 4 }, ai()]), null);
+  assert.equal(isObservingRoster([]), false);
+  assert.equal(isObservingRoster([ai()]), true);
 });
 
 test('an empty roster is not a watch', () => {

@@ -5,12 +5,12 @@
 
 import {
   applyModifierDrivenPopoverCloseRules,
-  bindStackCalloutHost,
   hideStackCallout,
   refreshStackCalloutIfOpen,
   shouldSuppressTerrainTooltip,
   showStackCallout,
 } from './map/stackCallout';
+import { bindStackCalloutHost } from './map/stackCalloutHost';
 import {
   bindEntryCallbacksHost,
   hideBuildPopup,

@@ -31,7 +31,7 @@ export interface StartMatchAiInput {
 /**
  * The opponent-planning outcome of a successful start.
  *
- * Contract: `runOn` and `openOpponentTab` are never both true.
+ * Contract: `runOn` and `openCommandersTab` are never both true.
  * When to use: The result of `chooseStartMatchAi`, applied after the new match is installed.
  * Expected outcome: See `chooseStartMatchAi`.
  * Exceptions: None.
@@ -41,35 +41,35 @@ export interface StartMatchAiChoice {
    * Whether Run should be pressed and turn-1 planning started once.
    *
    * Contract: True only when Auto-start AI was checked and Run was enabled.
-   * When to use: Setting the Run flag and starting one planning request. It does not open the Opponent tab.
+   * When to use: Setting the Run flag and starting one planning request. It does not open the Commanders tab.
    * Expected outcome: One planning start, and the console stays on its current tab.
    * Exceptions: None.
    */
   readonly runOn: boolean;
   /**
-   * Whether the console should expand on the Opponent tab with planning off.
+   * Whether the console should expand on the Commanders tab with planning off.
    *
    * Contract: True whenever `runOn` is false.
-   * When to use: Releasing Run and showing the Opponent tab. It does not start planning.
+   * When to use: Releasing Run and showing the Commanders tab. It does not start planning.
    * Expected outcome: The player can press Run from that tab.
    * Exceptions: None.
    */
-  readonly openOpponentTab: boolean;
+  readonly openCommandersTab: boolean;
 }
 
 /**
  * Chooses what a successful start does with opponent planning.
  *
  * Purpose: Checked plus an enabled Run turns planning on. Every other combination leaves planning off and opens the
- *   Opponent tab, including a checked box whose Run button is disabled and an unchecked box whose Run button is enabled.
+ *   Commanders tab, including a checked box whose Run button is disabled and an unchecked box whose Run button is enabled.
  * When to use: Once per Start click, with the values captured before the start request.
- * Expected outcome: `{ runOn: true, openOpponentTab: false }` only when both inputs are true. Otherwise
- *   `{ runOn: false, openOpponentTab: true }`.
+ * Expected outcome: `{ runOn: true, openCommandersTab: false }` only when both inputs are true. Otherwise
+ *   `{ runOn: false, openCommandersTab: true }`.
  * Exceptions: None.
  */
 export function chooseStartMatchAi(input: StartMatchAiInput): StartMatchAiChoice {
   if (input.autoStartChecked && input.runEnabled) {
-    return { runOn: true, openOpponentTab: false };
+    return { runOn: true, openCommandersTab: false };
   }
-  return { runOn: false, openOpponentTab: true };
+  return { runOn: false, openCommandersTab: true };
 }

@@ -46,7 +46,7 @@ function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned(): void {
  *
  * Contract: Implementations close over `rendererSharedState` and renderer-only helpers without importing `renderer.ts`; callers hide build UI before IPC when appropriate.
  * When to use: `tryHandleTacticalEntryAtClientXY` after the main process returns a tactical snapshot.
- * Expected outcome: Tactical tactical view becomes active; skipped-parent toasts preserve milestone-2.1 UX.
+ * Expected outcome: The tactical view becomes active; skipped-parent toasts are shown.
  * Exceptions: None; IPC failures are handled before this helper runs.
  */
 export type TacticalRendererStartBattleSideEffects = {

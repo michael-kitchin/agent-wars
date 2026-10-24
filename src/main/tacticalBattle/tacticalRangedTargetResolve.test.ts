@@ -4,6 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { cellToParent, gridDisk, gridDistance } from 'h3-js';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -192,7 +193,8 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
       ferryOrders: [],
       embarkOrders: [],
     },
-    new Set<string>()
+    new Set<string>(),
+    AI_SEAT_IDS[0]
   );
   const armorRows = (backfilled?.rangedAttacks ?? []).filter((r) => r.unitId === 'opp-armor:01');
   assert.strictEqual(armorRows.length, 1, 'the model-named sub-unit must keep exactly one attack');
@@ -204,7 +206,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
   );
 
   assert.strictEqual(
-    withTacticalTempoAttacks(battle, undefined, new Set<string>())?.rangedAttacks.length,
+    withTacticalTempoAttacks(battle, undefined, new Set<string>(), AI_SEAT_IDS[0])?.rangedAttacks.length,
     1,
     'an unconsulted beat with no draft at all must still produce the legal shots'
   );

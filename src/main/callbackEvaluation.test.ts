@@ -1,5 +1,5 @@
 /**
- * Callback mandatory override evaluation (Phase 2) — happy path and essential cases.
+ * Callback mandatory override evaluation — happy path and essential cases.
  * Run with: node dist/callbackEvaluation.test.js
  */
 

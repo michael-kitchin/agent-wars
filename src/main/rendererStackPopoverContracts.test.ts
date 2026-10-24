@@ -9,11 +9,11 @@ import * as path from 'path';
 import { getFunctionSource } from './testSupport/rendererSourceAssertions';
 
 /**
- * Defines the `testStackCalloutSingleUnitNonShiftClosesPopup` function shape (function testStackCalloutSingleUnitNonShiftClosesPopup(): void).
-
- * Purpose: Supports maintainability by documenting why `testStackCalloutSingleUnitNonShiftClosesPopup` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * A plain click on one stack row closes the popup.
+ *
+ * Purpose: Shift keeps the list open. A click without Shift must not.
+ * When to use: After a change to the stack row click handler.
+ * Expected outcome: The handler checks Shift and calls `hideStackCallout` on the plain-click path. The popup wires that handler.
  * Exceptions: None.
  */
 function testStackCalloutSingleUnitNonShiftClosesPopup(): void {
@@ -31,16 +31,17 @@ function testStackCalloutSingleUnitNonShiftClosesPopup(): void {
 }
 
 /**
- * Defines the `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` function shape (function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void).
-
- * Purpose: Supports maintainability by documenting why `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Embarked cargo stays in the list, without a usable select toggle, and debark keeps its gap.
+ *
+ * Purpose: Sealift and the stack list have to agree on which units can be selected.
+ * When to use: After a change to the sealift section or the selection toggles.
+ * Expected outcome: The joined stack sources still mark embarked ids, hide their toggles, and refresh the same hex after a slot edit.
  * Exceptions: None.
  */
 function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
-  const stackCalloutPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'stackCallout.ts');
-  const source = fs.readFileSync(stackCalloutPath, 'utf8');
+  const source = ['stackCallout.ts', 'stackCalloutSelectionToggles.ts', 'stackCalloutSealift.ts']
+    .map((fileName) => fs.readFileSync(path.resolve(process.cwd(), 'src', 'renderer', 'map', fileName), 'utf8'))
+    .join('\n');
   const renderSealiftSectionFn = getFunctionSource(source, 'renderSealiftSection');
   const removeSealiftSectionFn = getFunctionSource(source, 'removeSealiftSection');
   const setNonSelectableFn = getFunctionSource(source, 'setStackPopupNonSelectableUnitIds');
@@ -103,11 +104,11 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
 }
 
 /**
- * Defines the `testModifierDrivenPopoverCloseRulesCentralized` function shape (function testModifierDrivenPopoverCloseRulesCentralized(): void).
-
- * Purpose: Supports maintainability by documenting why `testModifierDrivenPopoverCloseRulesCentralized` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shift and blur go through one helper instead of closing popovers in the key handler.
+ *
+ * Purpose: Key repeat must not rebuild the popup, and Shift release must close only the stack list.
+ * When to use: After a change to the modifier rules or the init key handlers.
+ * Expected outcome: The helper closes the stack on Shift release and does not hide the build popup on Shift press. Init calls it only on the transition.
  * Exceptions: None.
  */
 function testModifierDrivenPopoverCloseRulesCentralized(): void {

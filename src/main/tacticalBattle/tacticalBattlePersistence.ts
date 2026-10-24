@@ -1,7 +1,7 @@
 /**
  * Persists the active tactical battle snapshot in `game_config` so a tactical session survives main-process restarts.
  *
- * Purpose: Milestone 2.1 tactical mode is otherwise in-memory only; this bridges app restarts until the player exits tactical.
+ * Purpose: Tactical mode is otherwise in-memory only; this bridges app restarts until the player exits tactical.
  * When to use: After every successful tactical session mutation and when clearing the session on exit or invalid restore.
  * Expected outcome: JSON round-trip restores the same `TacticalBattleSnapshot` when turn/phase and parent units still match.
  * Exceptions: Parse/validation failures are logged at error and clear stored state without throwing across IPC boundaries.

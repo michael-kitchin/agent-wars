@@ -262,9 +262,9 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
 /**
  * Wires the OpenRouter panel and the deferred-consultation push listeners.
  *
- * Purpose: One bootstrap for the Opponent tab's controls plus the pushes that release Ready after a deferred consult.
+ * Purpose: One bootstrap for the Commanders tab's controls plus the pushes that release Ready after a deferred consult.
  * When to use: Once during renderer startup.
- * Expected outcome: The Opponent tab's controls, the model list, and the consultation listeners are registered.
+ * Expected outcome: The Commanders tab's controls, the model list, and the consultation listeners are registered.
  * Exceptions: None; a missing OpenRouter API leaves the listeners that were registered and returns.
  */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
