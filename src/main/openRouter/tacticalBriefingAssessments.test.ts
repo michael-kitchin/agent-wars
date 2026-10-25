@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { cellToParent, gridDisk } from 'h3-js';
+import { computeGridPathCellsPure } from '../../shared/h3GridRangePure';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import {
   tacticalPentagonCrossingPair,
@@ -114,18 +115,27 @@ test('tactical Unit Status does not treat urban armor as in range of an enemy th
 
 test('tactical Unit Status does not treat mountain-blocked armor as in ranged range', () => {
   const origin = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
-  const neighbor = [...gridDisk(origin, 1)].find((h) => h !== origin);
-  assert.ok(neighbor, 'need a ring-1 neighbor');
+  const far = [...gridDisk(origin, 2)].find((candidate) => {
+    if (gridHopDistanceBetween(origin, candidate) !== 2) return false;
+    const path = computeGridPathCellsPure(origin, candidate);
+    return path !== null && path.length >= 3 && path[0] === origin && path[path.length - 1] === candidate;
+  });
+  assert.ok(far, 'need a res4 cell two hops away with a cell between');
+  const path = computeGridPathCellsPure(origin, far);
+  assert.ok(path, 'need a cell between the shooter and the target');
+  const footprint = [...gridDisk(origin, 2)];
+  const terrain = Object.fromEntries(footprint.map((h) => [h, 'plains']));
+  for (const between of path.slice(1, -1)) terrain[between] = 'mountain';
   const strategic = cellToParent(origin, 1);
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-mountain-los',
     enclosingStrategicH3Index: strategic,
-    tacticalChildH3Indexes: [...gridDisk(origin, 1)],
+    tacticalChildH3Indexes: footprint,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    tacticalTerrainKindByH3: { [origin]: 'plains', [neighbor]: 'mountain' },
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
       {
         id: 'opp-armor:01',
@@ -140,7 +150,7 @@ test('tactical Unit Status does not treat mountain-blocked armor as in ranged ra
         parentUnitId: 'hum-armor',
         player: 'human',
         unitType: 'armor',
-        h3Index: neighbor,
+        h3Index: far,
         displayName: 'Human Armor',
       },
     ],
@@ -149,7 +159,7 @@ test('tactical Unit Status does not treat mountain-blocked armor as in ranged ra
   const assessments = buildLightweightTacticalUnitAssessments(battle);
   const nearest = assessments[0]?.result.nearbyEnemies[0];
   assert.ok(nearest);
-  assert.strictEqual(nearest.hexDistance, 1);
+  assert.strictEqual(nearest.hexDistance, 2);
   assert.equal(nearest.inRangedRange, false);
 });
 
