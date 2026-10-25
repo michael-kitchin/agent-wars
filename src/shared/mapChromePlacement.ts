@@ -4,7 +4,7 @@
  * band against the map's right edge, and the new-game setup panel that floats over the map.
  *
  * Purpose: The minimap panel, the legend, and the toast band keep the same inset.
- * When to use: Through `legendPopoverPosition`, `toastBandSpan`, and `floatingPanelOffset`.
+ * When to use: Through `legendPopoverPosition`, `toastBandSpan`, `messageToastBandWidth`, and `floatingPanelOffset`.
  * Expected outcome: 12.
  * Exceptions: None.
  */
@@ -24,7 +24,7 @@ export const MAP_CHROME_GAP = 8;
  * The narrowest the toast band may be beside the panel, in CSS pixels.
  *
  * Purpose: Below this width the left offset moves to the map's inset, so the toast is not held in a thinner column.
- *   The toast's own width is still capped at one third of the map.
+ *   `messageToastBandWidth` may still widen the band past one third of the map when the opponent tab row needs it.
  * When to use: Through `toastBandSpan`.
  * Expected outcome: 280.
  * Exceptions: None.
@@ -60,8 +60,7 @@ export function legendPopoverPosition(input: {
  *
  * Purpose: Toasts sit between the chrome at the top-left (the minimap panel, or the legend when it is open beside the
  *   panel) and the map's right edge. When that gap is under `TOAST_BAND_MIN_WIDTH`, the left offset moves to the map's
- *   inset so the toast is not held in a thinner column. The toast's width is capped at one third of the map in the
- *   stylesheet.
+ *   inset so the toast is not held in a thinner column. The band's width is chosen by `messageToastBandWidth`.
  * When to use: Each time the map changes size and each time the legend opens or closes, with x positions measured from
  *   the map's left edge. Pass the map width as `rightObstacleLeft`.
  * Expected outcome: `left` and `right` are CSS offsets from the map's left and right edges, each keeping
@@ -80,6 +79,25 @@ export function toastBandSpan(input: {
     return { left: MAP_CHROME_INSET, right, overChrome: true };
   }
   return { left, right, overChrome: false };
+}
+
+/**
+ * Chooses the message band's width from the gap and the opponent tab row.
+ *
+ * Purpose: Short side names usually fit in one third of the map. Four of them on a narrower map do not, and the tabs stay on one line.
+ * When to use: `layoutMapChrome`, after `toastBandSpan`. Pass 0 for `tabRowOuterWidth` while the message toast is hidden.
+ * Expected outcome: The smaller of the gap and one third of the map, unless the tab row is wider. Then the row's width, and never more than the map minus `MAP_CHROME_INSET` on each side. A non-finite row width counts as 0.
+ * Exceptions: None.
+ */
+export function messageToastBandWidth(input: {
+  readonly mapWidth: number;
+  readonly available: number;
+  readonly tabRowOuterWidth: number;
+}): number {
+  const cap = Math.max(0, input.mapWidth - 2 * MAP_CHROME_INSET);
+  const fitted = Math.max(0, Math.min(Math.max(0, input.available), input.mapWidth / 3));
+  const row = Number.isFinite(input.tabRowOuterWidth) ? Math.max(0, input.tabRowOuterWidth) : 0;
+  return Math.min(cap, Math.max(fitted, row));
 }
 
 /**

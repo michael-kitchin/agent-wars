@@ -13,7 +13,7 @@ describe('modelCallCancelTypes', () => {
   });
 
   it('keeps the stop lines distinct', () => {
-    assert.equal(modelCallCancelLogLine('run_off'), 'Opponent planning stopped: Run was turned off.');
+    assert.equal(modelCallCancelLogLine('run_off'), 'Opponent planning stopped: Stop was turned off.');
     assert.equal(modelCallCancelLogLine('model_changed'), 'Opponent planning stopped: the model changed.');
     assert.equal(modelCallCancelLogLine('new_game'), 'Opponent planning stopped for a new game.');
     assert.equal(modelCallCancelLogLine('battle_exit'), 'Opponent planning stopped: you left the battle.');

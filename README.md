@@ -67,8 +67,8 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 4. In that same popover, choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button to the right of the model list reloads the list with the key in the popover. Each commander can use a different model, reasoning effort, and doctrine.
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-5. Click **Run**, at the top of the Command tab, to start planning. Run stays off until at least one commander has both a key and a model. A commander with a model and an empty key does not call the model.
-    - You can change a commander's model at any time, or stop planning by clicking **Run** again.
+5. Click **Start**, at the top of the Command tab, to start planning. The button then reads **Stop**. It stays on Start until at least one commander has both a key and a model. A commander with a model and an empty key does not call the model.
+    - You can change a commander's model at any time, or stop planning by clicking **Stop**.
 
 ![Command tab after a model is chosen. The API key is entered in the commander popover.](doc/media/first-start-game-3.png)
 
@@ -78,7 +78,7 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 ![Ready button when the commanders are done (Command tab open).](doc/media/ready-done-open.png)
 
-Each opponent's OpenRouter key is stored locally in the Electron user-data directory. The screen receives a key only to fill that opponent's password field, and the key is not written to the activity log. Without a key and a model on at least one commander the app still runs, **Run** stays disabled, and that opponent makes no model calls.
+Each opponent's OpenRouter key is stored locally in the Electron user-data directory. The screen receives a key only to fill that opponent's password field, and the key is not written to the activity log. Without a key and a model on at least one commander the app still runs, **Start** stays disabled, and that opponent makes no model calls.
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 

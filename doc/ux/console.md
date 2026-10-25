@@ -18,12 +18,12 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - A count on the Reports tab in the rail: the number of unread reports. It is hidden at zero. See [reports-tab.md](reports-tab.md).
 - The Orders tab: the order groups. See [orders-tab.md](orders-tab.md). The selected units, and the reticle that aims a ranged attack or an air strike, are in the [selection panel](selection-panel.md) on the map.
 - The Reports tab: what the map toasts showed during this match. See [reports-tab.md](reports-tab.md).
-- The Commanders tab, labeled Command on the rail: Run and a sentence, one card per AI commander, tool groups, and the AI activity log. The API key and the model-list refresh are in each commander's popover. The sentence reads "Planning is on for all {n} commanders." while Run is on, and "Planning is off." otherwise. See [opponent-tab-commander.md](opponent-tab-commander.md), [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md), and [ai-activity-log.md](ai-activity-log.md).
+- The Commanders tab, labeled Command on the rail: Start or Stop, and a sentence, one card per AI commander, tool groups, and the AI activity log. The API key and the model-list refresh are in each commander's popover. The sentence reads "Planning is on for all {n} commanders." while the button reads Stop, and "Planning is off." otherwise. See [opponent-tab-commander.md](opponent-tab-commander.md), [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md), and [ai-activity-log.md](ai-activity-log.md).
 - A footer under the tab content, with the commander status line above Ready. While observing, a checkbox between them reads "Start the next turn when every commander is ready". It starts unchecked. Watch the rest checks it. See [modes-and-transitions.md](modes-and-transitions.md). For Ready, see [console-command-bar.md](console-command-bar.md).
 - While observing, the Orders tab is disabled. If it was the selected tab, the console moves to Commanders. Build and Forces stay disabled.
 - The opponent status line, read-only and with no tip:
   - A dot: grey while planning is off, teal while it is on, and rose while the opponent plans.
-  - A label: "Commanders off" while Run is off, "Commanders planning · {ready} of {active} ready" while any commander is planning, and "Commanders ready" otherwise. While observing, the planning label is "Planning · {ready} of {active} ready". Ready's wait label is "AI: {m:ss} (x{n})", and `{n}` is how many commanders are still planning.
+  - A label: "Commanders off" while the button reads Start, "Commanders planning · {ready} of {active} ready" while any commander is planning, and "Commanders ready" otherwise. While observing, the planning label is "Planning · {ready} of {active} ready". Ready's wait label is "AI: {m:ss} (x{n})", and `{n}` is how many commanders are still planning.
   - The selected model's name: the model option's text before " [", or "No model". A long name is cut short with an ellipsis.
   - The match cost, the sum of the seats' stored cost.
   - The labels come from `src/shared/commanderPlanningStatus.ts`.
@@ -38,7 +38,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - When the player clicks the selected tab, the console collapses to its rail.
 - When the player clicks any tab while the console is collapsed, the console expands on that tab.
 - The map takes the width the console gives up, and gives it back when the console expands.
-- Turning Run on or off does not change the selected tab. See [opponent-tab-commander.md](opponent-tab-commander.md).
+- Clicking Start or Stop does not change the selected tab. See [opponent-tab-commander.md](opponent-tab-commander.md).
 - A successful start that does not turn planning on expands the console on the Commanders tab. That open does not collapse the console when Commanders was already selected. A start that turns planning on leaves the tab and the collapsed state as they were.
 
 ### Keyboard
@@ -48,7 +48,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 ### Other
 
 - The console starts expanded on the Orders tab. When the app opens onto a live match, that launch expands it on the Commanders tab. A launch that shows the new-game dialog leaves it on Orders. That launch open does not run again when a snapshot refreshes or when the player closes the dialog back onto the match.
-- The commander status line updates whenever Run, a commander's wait, the selected model, or the match cost changes.
+- The commander status line updates whenever the planning button, a commander's wait, the selected model, or the match cost changes.
 - The selected tab, and whether the console is collapsed, last until the app closes. Neither is saved.
 
 ## States
@@ -66,7 +66,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - The console is absent for the whole New game and Game over overlay, and present again as soon as that overlay closes.
 - Exactly one tab's content shows while the console is expanded.
 - Ready is on screen whenever the console is, expanded or collapsed.
-- The opponent status line's label always agrees with Run and with Ready's "AI:" label.
+- The opponent status line's label always agrees with the planning button and with Ready's "AI:" label.
 - Build and Forces never open a tab in this version.
 
 ## Strategic and Tactical Differences

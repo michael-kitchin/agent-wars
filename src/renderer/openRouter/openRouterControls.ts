@@ -15,6 +15,7 @@ import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 import { anyCommanderIsPlanning, bindCommanderPoolScreen, readCommanderPoolAndApply, refreshCommanderSeatCosts } from './commanderPoolClient';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
+import { setPlanningTogglePressed } from './openRouterRunToggle';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 import { notifyOpenRouterModelListUpdated, setOpenRouterModelRefresh, setOpenRouterPopoverLog } from './openRouterModelRefresh';
@@ -515,7 +516,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     runBtn.addEventListener('click', () => {
       if ((runBtn as HTMLButtonElement).disabled) return;
       S.runButtonOn = !S.runButtonOn;
-      runBtn.setAttribute('aria-pressed', S.runButtonOn ? 'true' : 'false');
+      setPlanningTogglePressed(runBtn, S.runButtonOn);
       if (S.runButtonOn) {
         deps.updateReadyButtonState();
         deps.startBackgroundRequestIfAllowed();

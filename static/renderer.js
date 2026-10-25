@@ -20088,14 +20088,19 @@ ${bonuses}`;
   }
 
   // src/shared/commanderMessageTabs.ts
+  function compareCommanderMessageTabs(left, right) {
+    const leftIndex = aiIndexForSeatId(left.seatId) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = aiIndexForSeatId(right.seatId) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex || left.seatId.localeCompare(right.seatId, "en");
+  }
   function initialCommanderMessageTabs(seats) {
     const tabs = seats.map((seat) => ({
       seatId: seat.seatId,
-      label: seat.label,
+      label: shortSideName(seat.label),
       enabled: false,
       message: null,
       strategy: null
-    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
+    })).sort(compareCommanderMessageTabs);
     return { tabs, selectedSeatId: null };
   }
   function applyCommanderMessage(state, arrival) {
@@ -21808,6 +21813,12 @@ ${bonuses}`;
     }
     return { left, right, overChrome: false };
   }
+  function messageToastBandWidth(input) {
+    const cap = Math.max(0, input.mapWidth - 2 * MAP_CHROME_INSET);
+    const fitted = Math.max(0, Math.min(Math.max(0, input.available), input.mapWidth / 3));
+    const row = Number.isFinite(input.tabRowOuterWidth) ? Math.max(0, input.tabRowOuterWidth) : 0;
+    return Math.min(cap, Math.max(fitted, row));
+  }
   function floatingPanelOffset(input) {
     const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
     const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
@@ -21850,10 +21861,35 @@ ${bonuses}`;
       rightObstacleLeft: mapBox.width
     });
     const available = mapBox.width - span.left - span.right;
-    const width = Math.max(0, Math.min(available, mapBox.width / 3));
+    let tabRowOuterWidth = messageTabRowOuterWidth();
+    let width = messageToastBandWidth({ mapWidth: mapBox.width, available, tabRowOuterWidth });
     band.style.left = "auto";
     band.style.right = `${span.right}px`;
     band.style.width = `${width}px`;
+    const bar = document.querySelector("#ai-strategy-toast:not(.hidden) .ai-strategy-tab-bar");
+    if (bar instanceof HTMLElement && bar.scrollWidth > bar.clientWidth) {
+      tabRowOuterWidth += bar.scrollWidth - bar.clientWidth;
+      width = messageToastBandWidth({ mapWidth: mapBox.width, available, tabRowOuterWidth });
+      band.style.width = `${width}px`;
+    }
+  }
+  function messageTabRowOuterWidth() {
+    const toast = document.getElementById("ai-strategy-toast");
+    if (!(toast instanceof HTMLElement) || toast.classList.contains("hidden")) return 0;
+    const bar = toast.querySelector(".ai-strategy-tab-bar");
+    if (!(bar instanceof HTMLElement)) return 0;
+    let buttonsWidth = 0;
+    for (const button of bar.querySelectorAll("button")) {
+      if (button instanceof HTMLElement) buttonsWidth += button.getBoundingClientRect().width;
+    }
+    if (buttonsWidth <= 0) return 0;
+    const dismiss = document.getElementById("ai-strategy-toast-dismiss");
+    const style = getComputedStyle(toast);
+    const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
+    const gap = Number.parseFloat(style.columnGap) || Number.parseFloat(style.gap) || 0;
+    const border = (Number.parseFloat(style.borderLeftWidth) || 0) + (Number.parseFloat(style.borderRightWidth) || 0);
+    const dismissWidth = dismiss instanceof HTMLElement ? dismiss.getBoundingClientRect().width : 0;
+    return Math.ceil(buttonsWidth + dismissWidth + padding + gap + border);
   }
 
   // src/renderer/gameplay/newGameDialogMove.ts
@@ -22246,6 +22282,9 @@ ${bonuses}`;
   function commanderPlanningStatus(runOn, planning) {
     if (!runOn) return "off";
     return planning ? "planning" : "on";
+  }
+  function planningToggleLabel(planningOn) {
+    return planningOn ? "Stop" : "Start";
   }
   function commanderPlanningSentence(runOn, commanderCount) {
     return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
@@ -22875,6 +22914,10 @@ ${bonuses}`;
   }
 
   // src/renderer/openRouter/openRouterRunToggle.ts
+  function setPlanningTogglePressed(button, planningOn) {
+    button.setAttribute("aria-pressed", planningOn ? "true" : "false");
+    button.textContent = planningToggleLabel(planningOn);
+  }
   var syncRunToggle = null;
   function setOpenRouterRunToggleSync(sync) {
     syncRunToggle = sync;
@@ -23435,6 +23478,7 @@ ${bonuses}`;
     const textEl = document.getElementById("ai-strategy-toast-text");
     if (el && textEl) {
       showToast2(el, textEl, build, true);
+      layoutMapChrome();
       if (fileReport) recordConsoleReport("message", currentConsoleReportTag(), textEl);
     }
     scheduleAiStrategyToastHide();
@@ -33481,7 +33525,7 @@ ${bonuses}`;
     await stopOpponentPlanning("run_off");
     rendererSharedState.runButtonOn = choice.runOn;
     const runButton = document.getElementById(RUN_BUTTON_ID);
-    if (runButton) runButton.setAttribute("aria-pressed", choice.runOn ? "true" : "false");
+    if (runButton) setPlanningTogglePressed(runButton, choice.runOn);
     deps.updateReadyButtonState();
     if (choice.runOn) deps.startPlanning();
     if (choice.openCommandersTab) showConsoleTab("console-tab-commanders");
@@ -36516,11 +36560,11 @@ ${bonuses}`;
         runBtn.disabled = true;
         if (rendererSharedState.runButtonOn) {
           rendererSharedState.runButtonOn = false;
-          runBtn.setAttribute("aria-pressed", "false");
           void stopOpponentPlanning("run_off");
           updateReadyButtonState();
         }
       }
+      setPlanningTogglePressed(runBtn, rendererSharedState.runButtonOn);
       const runTipHost = runBtn.closest(".control-tooltip-host");
       (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
         "data-control-tooltip",
@@ -36529,6 +36573,7 @@ ${bonuses}`;
       runBtn.removeAttribute("title");
     } catch {
       runBtn.disabled = true;
+      setPlanningTogglePressed(runBtn, rendererSharedState.runButtonOn);
       const runTipHost = runBtn.closest(".control-tooltip-host");
       (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
         "data-control-tooltip",
@@ -37085,7 +37130,7 @@ ${bonuses}`;
       runBtn.addEventListener("click", () => {
         if (runBtn.disabled) return;
         rendererSharedState.runButtonOn = !rendererSharedState.runButtonOn;
-        runBtn.setAttribute("aria-pressed", rendererSharedState.runButtonOn ? "true" : "false");
+        setPlanningTogglePressed(runBtn, rendererSharedState.runButtonOn);
         if (rendererSharedState.runButtonOn) {
           deps.updateReadyButtonState();
           deps.startBackgroundRequestIfAllowed();

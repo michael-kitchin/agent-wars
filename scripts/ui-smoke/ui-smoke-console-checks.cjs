@@ -68,7 +68,7 @@ function toastBandSpace(map, panel, legend) {
 }
 
 /**
- * What the footer status line reads in a fresh match: Run is off and there is no API key, so no model loads.
+ * What the footer status line reads in a fresh match: Start is off and there is no API key, so no model loads.
  *
  * Purpose: The smoke run uses an empty user-data folder, so these values never depend on the network.
  * When to use: The status line check.
@@ -82,7 +82,7 @@ const FRESH_STATUS_LINE = Object.freeze(['Commanders off', 'No model', '$0.00'])
  *
  * Purpose: The four sections show together, in this order, with no sub-tabs.
  * When to use: The Opponent sections check.
- * Expected outcome: Run (Status), Commander, Tool groups, the log's heading, and the log.
+ * Expected outcome: Start, Commander, Tool groups, the log's heading, and the log.
  * Exceptions: None.
  */
 const OPPONENT_SECTION_ORDER = Object.freeze([

@@ -83,7 +83,7 @@ export function newGameHasAnyModel(): boolean {
 /**
  * Whether some AI row has both a key and a model.
  *
- * Purpose: Auto-start looks at the rows on this screen, not at the Run button.
+ * Purpose: Auto-start looks at the rows on this screen, not at the Start button.
  * When to use: `readStartMatchAiInput`.
  * Expected outcome: True when at least one AI row has a non-empty key and a model id.
  * Exceptions: None.

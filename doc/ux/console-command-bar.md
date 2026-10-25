@@ -47,7 +47,7 @@ Ready shows whenever the console does. The reticle and the air-strike target lis
 
 ## Invariants
 
-- Ready never uses the AI wait label unless opponent planning is outstanding: Run is on and opponent orders are not ready, or a deferred consultation is running after playback. Turning Run off stops that consultation, so the label stops counting. When a battle is already in planning, the label keeps counting until the battle's opponent plan is buffered or the player stops planning.
+- Ready never uses the AI wait label unless opponent planning is outstanding: the button reads Stop and opponent orders are not ready, or a deferred consultation is running after playback. Clicking Stop stops that consultation, so the label stops counting. When a battle is already in planning, the label keeps counting until the battle's opponent plan is buffered or the player stops planning.
 - The target-type choice is never shown unless strike targeting is on.
 - A world-map selection with infantry never enables the reticle. Tactical infantry can fire.
 - A greyed-out reticle never starts targeting.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { floatingPanelOffset, legendPopoverPosition, toastBandSpan } from './mapChromePlacement';
+import { floatingPanelOffset, legendPopoverPosition, messageToastBandWidth, toastBandSpan } from './mapChromePlacement';
 
 test('legendPopoverPosition puts the legend right of the panel when it fits', () => {
   assert.deepEqual(legendPopoverPosition({ mapWidth: 904, panelRight: 310, panelBottom: 214, legendWidth: 110 }), {
@@ -32,6 +32,20 @@ test('toastBandSpan moves the left offset to the map inset when the gap is under
     right: 12,
     overChrome: true,
   });
+});
+
+test('messageToastBandWidth keeps the one-third cap when the tab row fits or is hidden', () => {
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 566, tabRowOuterWidth: 200 }), 300);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 800, tabRowOuterWidth: 0 }), 300);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 200, tabRowOuterWidth: 0 }), 200);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 800, tabRowOuterWidth: Number.NaN }), 300);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 800, tabRowOuterWidth: -10 }), 300);
+});
+
+test('messageToastBandWidth grows to the tab row and stops at the map insets', () => {
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 566, tabRowOuterWidth: 520 }), 520);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 200, tabRowOuterWidth: 520 }), 520);
+  assert.equal(messageToastBandWidth({ mapWidth: 900, available: 566, tabRowOuterWidth: 2000 }), 876);
 });
 
 test('toastBandSpan keeps the inset at the map right edge', () => {

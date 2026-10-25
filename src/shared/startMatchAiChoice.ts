@@ -1,8 +1,8 @@
 /**
- * The click-time reading of Auto-start AI and of whether Run can be pressed.
+ * The click-time reading of Auto-start AI and of whether Start can be pressed.
  *
  * Contract: `autoStartChecked` is true only when that checkbox is present and checked. `runEnabled` is true only when
- *   the Run button is present and not disabled, which means an API key and a model are set.
+ *   at least one AI row has a key and a model. That is also what enables Start once the match is installed.
  * When to use: The argument to `chooseStartMatchAi`.
  * Expected outcome: Both flags are booleans captured before the start request.
  * Exceptions: None.
@@ -18,11 +18,11 @@ export interface StartMatchAiInput {
    */
   readonly autoStartChecked: boolean;
   /**
-   * Whether Run can be pressed.
+   * Whether Start can turn planning on.
    *
-   * Contract: True only when the Run button exists and is not disabled.
-   * When to use: With `autoStartChecked`. A disabled Run never starts planning.
-   * Expected outcome: The button's enabled state at the click.
+   * Contract: True only when at least one AI row has a non-empty key and a model id.
+   * When to use: With `autoStartChecked`. False leaves planning off and opens the Commanders tab.
+   * Expected outcome: The click-time row check.
    * Exceptions: None.
    */
   readonly runEnabled: boolean;
@@ -38,10 +38,10 @@ export interface StartMatchAiInput {
  */
 export interface StartMatchAiChoice {
   /**
-   * Whether Run should be pressed and turn-1 planning started once.
+   * Whether Start should be pressed and turn-1 planning started once.
    *
-   * Contract: True only when Auto-start AI was checked and Run was enabled.
-   * When to use: Setting the Run flag and starting one planning request. It does not open the Commanders tab.
+   * Contract: True only when Auto-start AI was checked and Start was enabled.
+   * When to use: Setting the planning flag and starting one planning request. It does not open the Commanders tab.
    * Expected outcome: One planning start, and the console stays on its current tab.
    * Exceptions: None.
    */
@@ -50,8 +50,8 @@ export interface StartMatchAiChoice {
    * Whether the console should expand on the Commanders tab with planning off.
    *
    * Contract: True whenever `runOn` is false.
-   * When to use: Releasing Run and showing the Commanders tab. It does not start planning.
-   * Expected outcome: The player can press Run from that tab.
+   * When to use: Releasing Start and showing the Commanders tab. It does not start planning.
+   * Expected outcome: The player can press Start from that tab.
    * Exceptions: None.
    */
   readonly openCommandersTab: boolean;
@@ -60,8 +60,8 @@ export interface StartMatchAiChoice {
 /**
  * Chooses what a successful start does with opponent planning.
  *
- * Purpose: Checked plus an enabled Run turns planning on. Every other combination leaves planning off and opens the
- *   Commanders tab, including a checked box whose Run button is disabled and an unchecked box whose Run button is enabled.
+ * Purpose: Checked plus a runnable commander turns planning on. Every other combination leaves planning off and opens the
+ *   Commanders tab, including a checked box with no runnable commander and an unchecked box that has one.
  * When to use: Once per Start click, with the values captured before the start request.
  * Expected outcome: `{ runOn: true, openCommandersTab: false }` only when both inputs are true. Otherwise
  *   `{ runOn: false, openCommandersTab: true }`.

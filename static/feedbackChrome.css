@@ -1,12 +1,11 @@
 /* Toasts, and the dialog that reports a battle's result. */
-/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, so a longer tab does not widen it. The map toast is a sibling at the lower right, above the zoom buttons. */
+/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, unless the opponent tab row needs more. It stays inside the map insets. The map toast is a sibling at the lower right, above the zoom buttons. */
 .map-toast-band {
   position: absolute;
   top: 12px;
   left: 12px;
   right: 12px;
   z-index: 7000;
-  max-width: calc(100% / 3);
   margin-left: 0;
   margin-right: 0;
   display: flex;
@@ -111,13 +110,15 @@
 }
 #ai-strategy-toast .ai-strategy-tab-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0;
   border-bottom: 1px solid var(--chrome-border);
   margin: 0 0 0.5rem 0;
 }
 #ai-strategy-toast .ai-strategy-tab-bar button {
   padding: 0.35rem 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   font-size: 12px;
   background: var(--chrome-bg);
   color: var(--button-off-text);
@@ -143,4 +144,25 @@
 }
 #ai-strategy-toast .ai-strategy-tab-bar button[aria-selected="true"]:hover {
   background: var(--chrome-bg);
+}
+/* The border is inside the country-flag box, so the badge matches an origin flag. The drop shadow is off so that edge stays one pixel. */
+#ai-strategy-toast .side-number-flag {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 1.125em;
+  height: 0.75em;
+  padding: 0;
+  border: 1px solid #ffffff;
+  filter: none;
+}
+/* 0.6em is the largest digit that keeps about 1px of the map color inside the border at the tab's 12px font. 0.03em drops the ink onto the vertical center; the shared 0.12em shift would meet the stroke. */
+#ai-strategy-toast .side-number-flag span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6em;
+  line-height: 1;
+  transform: translateY(0.03em);
 }

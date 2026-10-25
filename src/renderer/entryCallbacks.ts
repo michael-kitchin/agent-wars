@@ -29,7 +29,7 @@ import { tacticalReconcileBattleAfterStrategicSnapshot, tacticalSyncTacticalEntr
 import { createBuildQueuePopupHandler } from './gameplay/buildQueuePopup';
 
 import { renderOpenRouterToolsList as renderOpenRouterToolsListFromModule, startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule, stopOpponentPlanning } from './openRouter/openRouterRuntime';
-import { setOpenRouterRunToggleSync } from './openRouter/openRouterRunToggle';
+import { setOpenRouterRunToggleSync, setPlanningTogglePressed } from './openRouter/openRouterRunToggle';
 
 import { clearPendingTacticalOrders, refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule, type RefreshHoverRoutePreviewOptions } from './gameplay/tacticalOrders';
 import { prepareStrategicPlanningUiBeforeTacticalAutoStart, type ReadyHandlerDeps } from './gameplay/readyHandler';
@@ -906,11 +906,11 @@ export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
       runBtn.disabled = true;
       if (S.runButtonOn) {
         S.runButtonOn = false;
-        runBtn.setAttribute('aria-pressed', 'false');
         void stopOpponentPlanning('run_off');
         updateReadyButtonState();
       }
     }
+    setPlanningTogglePressed(runBtn, S.runButtonOn);
     const runTipHost = runBtn.closest('.control-tooltip-host');
     (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
       'data-control-tooltip',
@@ -919,6 +919,7 @@ export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
     runBtn.removeAttribute('title');
   } catch {
     runBtn.disabled = true;
+    setPlanningTogglePressed(runBtn, S.runButtonOn);
     const runTipHost = runBtn.closest('.control-tooltip-host');
     (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
       'data-control-tooltip',

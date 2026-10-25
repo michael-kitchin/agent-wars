@@ -196,7 +196,7 @@ export const refreshModelsTooltipText =
 
 /**
  * Purpose: Says an API key and a model are required first.
- * When to use: The wrapper around `#openrouter-run-btn` when Run is disabled.
+ * When to use: The wrapper around `#openrouter-run-btn` while that button cannot be clicked. Its label is Start.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
@@ -204,10 +204,10 @@ export const runDisabledTooltipText =
   'Turn planning on or off for every commander. Give at least one commander an API key and a model first.';
 
 /**
- * Run's tip while it can be clicked.
+ * The planning button's tip while it can be clicked.
  *
- * Purpose: Says what turning Run on and off does to Ready.
- * When to use: The wrapper around `#openrouter-run-btn` when Run is enabled.
+ * Purpose: Says what Start and Stop do to Ready. The button reads Start while planning is off and Stop while it is on.
+ * When to use: The wrapper around `#openrouter-run-btn` while that button can be clicked.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
@@ -215,8 +215,8 @@ export const runEnabledTooltipText =
   'Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.';
 
 /**
- * Purpose: Run's tip changes when a key and model become available.
- * When to use: Whenever Run's disabled state is written.
+ * Purpose: The planning button's tip changes when a key and model become available.
+ * When to use: Whenever that button's disabled state is written.
  * Expected outcome: The enabled sentence when `enabled` is true, otherwise the disabled sentence.
  * Exceptions: None.
  */

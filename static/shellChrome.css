@@ -382,6 +382,21 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
 .openrouter-tool-toggle:disabled {
   opacity: 0.55;
 }
+/* The Commanders planning button. It reads Start or Stop. Its height and type match the console footer's Ready button. */
+#openrouter-run-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 46px;
+  padding: 0 0.75rem;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 4px;
+}
 .ready-btn,
 .ranged-btn {
   box-sizing: border-box;

@@ -80,11 +80,23 @@ export function commanderPlanningStatus(runOn: boolean, planning: boolean): Comm
 }
 
 /**
- * Builds the sentence next to Run.
+ * The Commanders planning button's label.
+ *
+ * Purpose: The same control starts planning and stops it, and the word tells the player which click they are about to make.
+ * When to use: Whenever the button's pressed state is written.
+ * Expected outcome: "Stop" while planning is on. "Start" while it is off.
+ * Exceptions: None.
+ */
+export function planningToggleLabel(planningOn: boolean): string {
+  return planningOn ? 'Stop' : 'Start';
+}
+
+/**
+ * Builds the sentence next to the planning button.
  *
  * Purpose: Says whether planning is on for every commander.
- * When to use: The Commanders tab, beside Run.
- * Expected outcome: "Planning is off." while Run is off. Otherwise "Planning is on for all {n} commanders."
+ * When to use: The Commanders tab, beside the planning button.
+ * Expected outcome: "Planning is off." while the button reads Start. Otherwise "Planning is on for all {n} commanders."
  * Exceptions: None.
  */
 export function commanderPlanningSentence(runOn: boolean, commanderCount: number): string {

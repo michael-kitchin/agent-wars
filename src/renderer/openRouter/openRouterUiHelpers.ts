@@ -17,6 +17,7 @@ import { markCommanderLogLine, renderCommanderCards } from './commanderCardsUi';
 import { setReadyButtonLabelAiWait, setReadyButtonLabelReady } from './readyButtonLabel';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
+import { layoutMapChrome } from '../map/mapChromeLayout';
 import { isObservingRoster } from '../../shared/observeModeControls';
 import { activeAiSeats, shortSideName } from '../../shared/seatRoster';
 import { commanderFooterLabel, commanderPlanningSentence, modelNameFromOptionLabel, commanderPlanningStatus } from '../../shared/commanderPlanningStatus';
@@ -378,7 +379,7 @@ export function hideMapToast(): void {
  *
  * Purpose: The opponent message dialog uses this timer.
  * When to use: After a dispatch enables a tab.
- * Expected outcome: The toast shows and the timer restarts. `fileReport` copies it onto the Reports tab. The dialog passes false.
+ * Expected outcome: The toast shows and the timer restarts. The band is measured after the toast is visible, so the tab row can widen it. `fileReport` copies it onto the Reports tab. The dialog passes false.
  * Exceptions: None.
  */
 export function showFilledAiStrategyToast(build: (target: HTMLElement) => void, fileReport: boolean): void {
@@ -390,6 +391,7 @@ export function showFilledAiStrategyToast(build: (target: HTMLElement) => void, 
   const textEl = document.getElementById('ai-strategy-toast-text');
   if (el && textEl) {
     showToast(el, textEl, build, true);
+    layoutMapChrome();
     if (fileReport) recordConsoleReport('message', currentConsoleReportTag(), textEl);
   }
   scheduleAiStrategyToastHide();

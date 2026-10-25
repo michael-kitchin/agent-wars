@@ -168,6 +168,11 @@
   align-items: baseline;
   gap: 6px;
 }
+/* This row aligns on the baseline, which ignores vertical-align. Center the badge
+   on the name. The color dot stays on the baseline. */
+.console-report-sender .side-number-flag {
+  align-self: center;
+}
 .console-report-dot {
   flex: none;
   width: 8px;
@@ -220,8 +225,13 @@
   align-items: center;
   gap: 10px;
 }
+/* The sentence can shrink. This host does not, so a long planning sentence cannot squeeze the button. */
+.opponent-status > .control-tooltip-host {
+  flex-shrink: 0;
+}
 .commander-status-text {
   margin: 0;
+  min-width: 0;
   font-size: 13px;
 }
 .opponent-field {

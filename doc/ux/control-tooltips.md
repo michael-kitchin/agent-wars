@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -78,8 +78,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
 - API key: Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log. The button sits to the right of the model selector in the commander popover.
-- Run, while it cannot be clicked: Turn planning on or off for every commander. Give at least one commander an API key and a model first.
-- Run, while it can be clicked: Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.
+- Start, while it cannot be clicked: Turn planning on or off for every commander. Give at least one commander an API key and a model first.
+- Start or Stop, while it can be clicked: Turn planning on or off for every commander. Start turns planning on. Stop turns it off. On can hold Ready while a commander is planning; off cancels a plan that is still running.
 - New game in the game menu: Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.
 - New game in the game menu while a Ready is resolving, on its tip host: New game is available again once this turn or beat finishes resolving.
 - New-game panel close, shown only while a match is waiting under the screen: Close this screen and go back to the match in progress.
@@ -87,7 +87,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
 - Offer tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
 - Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.
-- Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.
+- Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you click Start, or when you turn this on, and the number counts uses since the last Ready.
 - Planning: Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
 - Assessment: Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
 - Estimation: Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.

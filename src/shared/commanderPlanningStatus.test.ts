@@ -6,12 +6,18 @@ import {
   modelNameFromOptionLabel,
   NO_MODEL_LABEL,
   commanderPlanningStatus,
+  planningToggleLabel,
 } from './commanderPlanningStatus';
 
 test('commanderPlanningStatus is off while Run is off, and planning only while Run is on', () => {
   assert.equal(commanderPlanningStatus(false, true), 'off');
   assert.equal(commanderPlanningStatus(true, false), 'on');
   assert.equal(commanderPlanningStatus(true, true), 'planning');
+});
+
+test('the planning button reads Stop while planning is on and Start while it is off', () => {
+  assert.equal(planningToggleLabel(true), 'Stop');
+  assert.equal(planningToggleLabel(false), 'Start');
 });
 
 test('the footer and the Run sentence name the commanders', () => {

@@ -3,9 +3,12 @@
  *
  * Purpose: One dialog lists every AI opponent. A tab turns on when that opponent sends prose.
  * When to use: The message dialog, before it paints.
- * Expected outcome: Tabs stay in alphabetical order. A later consult from the same seat replaces that tab's message and strategy.
+ * Expected outcome: Tabs stay in opponent-number order, labeled with the short side name. A later consult from the same seat replaces that tab's message and strategy.
  * Exceptions: None. This module does not import the logger.
  */
+
+import { aiIndexForSeatId } from './seatIds';
+import { shortSideName } from './seatRoster';
 
 /**
  * One opponent's tab.
@@ -26,11 +29,11 @@ export interface CommanderMessageTab {
    */
   readonly seatId: string;
   /**
-   * Full home name shown on the tab.
+   * Short side name shown on the tab.
    *
-   * Contract: The seat's `homeRegion`, or the seat id when that name is empty.
+   * Contract: `shortSideName` of the string passed in. The caller passes the trimmed home name, or the seat id when that name is blank.
    * When to use: The tab button.
-   * Expected outcome: The name the player reads.
+   * Expected outcome: The name the player reads, such as `E. Europe`.
    * Exceptions: None.
    */
   readonly label: string;
@@ -73,9 +76,9 @@ export interface CommanderMessageTab {
  */
 export interface CommanderMessageTabState {
   /**
-   * Tabs in label order.
+   * Tabs in opponent-number order.
    *
-   * Contract: Sorted by `localeCompare('en')`, then seat id. Apply does not reorder them.
+   * Contract: Sorted by `aiIndexForSeatId`, then seat id. A seat id with no opponent number sorts last. Apply does not reorder them.
    * When to use: The tab bar.
    * Expected outcome: One tab per AI seat passed in.
    * Exceptions: None.
@@ -93,11 +96,28 @@ export interface CommanderMessageTabState {
 }
 
 /**
- * Builds a disabled tab for every AI seat, in alphabetical order.
+ * Orders two tabs by opponent number.
+ *
+ * Purpose: The flags show `aiIndexForSeatId`, and the row should read 1 through 4 from left to right.
+ * When to use: `initialCommanderMessageTabs` only.
+ * Expected outcome: The lower opponent number comes first. A missing number sorts after every numbered seat. Equal numbers break ties by seat id.
+ * Exceptions: None.
+ */
+function compareCommanderMessageTabs(
+  left: { readonly seatId: string },
+  right: { readonly seatId: string }
+): number {
+  const leftIndex = aiIndexForSeatId(left.seatId) ?? Number.MAX_SAFE_INTEGER;
+  const rightIndex = aiIndexForSeatId(right.seatId) ?? Number.MAX_SAFE_INTEGER;
+  return leftIndex - rightIndex || left.seatId.localeCompare(right.seatId, 'en');
+}
+
+/**
+ * Builds a disabled tab for every AI seat, in opponent-number order.
  *
  * Purpose: The dialog's first appearance shows every opponent, none of them open yet.
  * When to use: When the toast is hidden or no tab state exists.
- * Expected outcome: Every tab disabled, message and strategy null, and no selection.
+ * Expected outcome: Every tab disabled, message and strategy null, and no selection. Each label is `shortSideName` of the name that was passed in.
  * Exceptions: None.
  */
 export function initialCommanderMessageTabs(
@@ -106,12 +126,12 @@ export function initialCommanderMessageTabs(
   const tabs = seats
     .map((seat) => ({
       seatId: seat.seatId,
-      label: seat.label,
+      label: shortSideName(seat.label),
       enabled: false,
       message: null,
       strategy: null,
     }))
-    .sort((left, right) => left.label.localeCompare(right.label, 'en') || left.seatId.localeCompare(right.seatId, 'en'));
+    .sort(compareCommanderMessageTabs);
   return { tabs, selectedSeatId: null };
 }
 

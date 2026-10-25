@@ -17,7 +17,7 @@ Shown while the console's Commanders tab is selected and the console is expanded
 - The group list comes from the app. If that list has no Events group, Events is added.
 - What the groups do is described in [AI tools](../ai-tools.md).
 - Control tips for these cells are in [control-tooltips.md](control-tooltips.md).
-- The first consult after a new game, after Run is turned on, or after Events is turned on is started through the commander pool. Later event-driven turns do not start another strategic one at Ready. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
+- The first consult after a new game, after Start is turned on, or after Events is turned on is started through the commander pool. Later event-driven turns do not start another strategic one at Ready. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
 
 ## Inputs and Responses
 

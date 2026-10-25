@@ -43,7 +43,9 @@ export function parseModelCallCancelReason(raw: unknown): ModelCallCancelReason 
 /**
  * Returns the one activity-log sentence for a cancel reason.
  *
- * Purpose: Each stop tells the player what they did, and a second cancel that aborts nothing does not add another line.
+ * Purpose: Each stop names why planning stopped. A click on Stop, removing the last key or model, and the stop
+ *   before a new match applies its planning choice all use the Stop line. A second cancel that aborts nothing does not
+ *   add another line.
  * When to use: `stopModelWork` when this call aborted a scope, or when New found a deferred consult waiting.
  * Expected outcome: The sentence for `reason`. `teardown` is the generic line.
  * Exceptions: None.
@@ -51,7 +53,7 @@ export function parseModelCallCancelReason(raw: unknown): ModelCallCancelReason 
 export function modelCallCancelLogLine(reason: ModelCallCancelReason): string {
   switch (reason) {
     case 'run_off':
-      return 'Opponent planning stopped: Run was turned off.';
+      return 'Opponent planning stopped: Stop was turned off.';
     case 'model_changed':
       return 'Opponent planning stopped: the model changed.';
     case 'new_game':
