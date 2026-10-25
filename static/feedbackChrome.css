@@ -1,5 +1,5 @@
 /* Toasts, and the dialog that reports a battle's result. */
-/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, unless the opponent tab row needs more. It stays inside the map insets. The map toast is a sibling at the lower right, above the zoom buttons. */
+/* The message toast sits in one band at the top of the map. mapChromeLayout.ts sets its pixel width and right edge. The width is the gap beside the left chrome, and no wider than one third of the map, unless the opponent tab row needs more. It stays inside the map insets. The map toast is a sibling at the lower right, on the same corner as the + and − buttons, and it covers them. */
 .map-toast-band {
   position: absolute;
   top: 12px;
@@ -13,11 +13,12 @@
   gap: 8px;
   pointer-events: none;
 }
-/* 83px is the 12px map inset, plus the 63px zoom stack, plus an 8px gap. Border-box keeps the padding inside the one-third cap. */
+/* 12px matches the zoom control's corner. 62px is two 30px buttons plus the control's 1px top and bottom borders, so a short toast still covers both. */
 #map-toast {
   position: absolute;
   right: 12px;
-  bottom: 83px;
+  bottom: 12px;
+  min-height: 62px;
   left: auto;
   z-index: 7000;
   box-sizing: border-box;
@@ -144,25 +145,4 @@
 }
 #ai-strategy-toast .ai-strategy-tab-bar button[aria-selected="true"]:hover {
   background: var(--chrome-bg);
-}
-/* The border is inside the country-flag box, so the badge matches an origin flag. The drop shadow is off so that edge stays one pixel. */
-#ai-strategy-toast .side-number-flag {
-  display: inline-block;
-  box-sizing: border-box;
-  width: 1.125em;
-  height: 0.75em;
-  padding: 0;
-  border: 1px solid #ffffff;
-  filter: none;
-}
-/* 0.6em is the largest digit that keeps about 1px of the map color inside the border at the tab's 12px font. 0.03em drops the ink onto the vertical center; the shared 0.12em shift would meet the stroke. */
-#ai-strategy-toast .side-number-flag span {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6em;
-  line-height: 1;
-  transform: translateY(0.03em);
 }

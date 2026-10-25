@@ -11,7 +11,7 @@
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { gridHopDistanceBetween, pickApproachHexesTowardNearestEnemy } from '../tools/assessUnitProximity';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
@@ -240,7 +240,7 @@ export function filterGroundMoveHexesForThisTurnOptionsTable(
       (inf.urban > 0 || inf.airport > 0 || inf.seaport > 0);
     return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
   });
-  logDebug('possibleUnitActionsBestOptionsInterest filterGroundMoveHexesForThisTurnOptionsTable', {
+  logTrace('possibleUnitActionsBestOptionsInterest filterGroundMoveHexesForThisTurnOptionsTable', {
     inCount: hexes.length,
     outCount: kept.length,
   });
@@ -370,7 +370,7 @@ export function applyInterestOrApproach(args: {
       result = { hexes: [], actionType: ACTION_MOVES_MELEE };
     }
   }
-  logDebug('possibleUnitActionsBestOptionsInterest applyInterestOrApproach', {
+  logTrace('possibleUnitActionsBestOptionsInterest applyInterestOrApproach', {
     unitH3: args.unitH3,
     legalCount: args.legalHexes.length,
     interestCount: args.interest.length,

@@ -4,7 +4,7 @@
 
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
 import { buildMinimumUrbanCells } from '../shared/gameRules';
-import { logDebug } from './logger';
+import { logTrace } from './logger';
 import {
   applyProduction as applyProductionShared,
   computeKeepBuildingRefillCount as computeKeepBuildingRefillCountShared,
@@ -249,7 +249,7 @@ export function getAvailableBuildUnitTypes(
     if (unitType === 'air') return airportCount > 0;
     return true;
   });
-  logDebug('getAvailableBuildUnitTypes', { urbanHexCount, seaportCount, airportCount, available });
+  logTrace('getAvailableBuildUnitTypes', { urbanHexCount, seaportCount, airportCount, available });
   return available;
 }
 

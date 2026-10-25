@@ -15,6 +15,7 @@ import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 import { anyCommanderIsPlanning, bindCommanderPoolScreen, readCommanderPoolAndApply, refreshCommanderSeatCosts } from './commanderPoolClient';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
+import { bindMapToastWheel } from './mapToastWheel';
 import { setPlanningTogglePressed } from './openRouterRunToggle';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
@@ -263,6 +264,7 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
   bindCommanderMessageTabs();
+  bindMapToastWheel();
   bindCommanderPoolScreen({
     showCommanderMessages: showCommanderMessageTabs,
     fileCommanderMessage: (dispatch) => {

@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { logDebug, logTrace } from '../logger';
+import { logTrace } from '../logger';
 import { getStrategicProductionContext, isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { techLevelFromUrbanHexCount } from '../../shared/techBonusRules';
 import type { TechLevel } from '../../shared/techBonusTypes';
@@ -38,7 +38,7 @@ export function techLevelForBirthHex(
   birthH3Index: string | null | undefined,
   urbanHexCountAt: (h3Index: string) => number | null = urbanHexCountForTech
 ): TechLevel {
-  logDebug('techBonus techLevelForBirthHex', { birthH3Index: birthH3Index ?? null });
+  logTrace('techBonus techLevelForBirthHex', { birthH3Index: birthH3Index ?? null });
   if (!birthH3Index) return 'basic';
   return techLevelFromUrbanHexCount(urbanHexCountAt(birthH3Index));
 }
