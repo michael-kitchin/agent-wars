@@ -1,6 +1,5 @@
 import { COUNTRY_FLAG_CLASS_NAME } from '../../shared/countryFlags';
 import { originFlagAssetPath } from '../../shared/originArea';
-import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { indexLossFlagsByOwner } from '../../shared/lossFlagIndex';
 import { LOSS_CAUSE_KEYS, type TurnLossSummary } from '../../shared/lossSummary';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
@@ -58,11 +57,17 @@ const techLevelByBirthHex = new Map<string, TechLevel>();
  * Records the birth origin of every unit in a snapshot that carries one.
  *
  * Purpose: Fills the accumulating origin cache so unit labels can show flags, even after a unit is destroyed.
- * When to use: For every applied game-state snapshot, before unit labels are rendered.
- * Expected outcome: Each unit with `origin` has an entry. A numeric `formedTurn` is remembered by unit id. Weather tags and tech tier are remembered by birth hex when the snapshot carries them. Existing entries are overwritten, never deleted.
+ * When to use: For every applied game-state snapshot, before unit labels are rendered, and for the casualties of a turn update before its flags are drawn.
+ * Expected outcome: Each unit with `origin` has an entry. A numeric `formedTurn` is remembered by unit id. Weather tags and tech tier are remembered by birth hex when the snapshot carries them. Existing entries are overwritten, never deleted. Casualty rows from a ready result are remembered the same way, so a unit the player had not seen still gets a flag.
  * Exceptions: None.
  */
-export function rememberUnitOrigins(units: GameStateSnapshot['units']): void {
+export function rememberUnitOrigins(units: readonly {
+  readonly id: string;
+  readonly origin?: UnitOrigin;
+  readonly formedTurn?: number;
+  readonly weatherTags?: readonly WeatherState[];
+  readonly techLevel?: TechLevel;
+}[]): void {
   for (const unit of units) {
     if (unit.origin) unitOriginById.set(unit.id, unit.origin);
     if (typeof unit.formedTurn === 'number') formedTurnById.set(unit.id, unit.formedTurn);

@@ -8,7 +8,7 @@ import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleCo
 import { isHumanSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { readoutViewerSeatId } from '../../shared/observeModeControls';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
-import { buildUnitOriginByLossDisplayName } from '../core/unitOriginFlags';
+import { buildUnitOriginByLossDisplayName, rememberUnitOrigins } from '../core/unitOriginFlags';
 import { rendererSharedState as S } from '../core/state';
 import {
   dropQueuedResolutionPlaybackCompleteNotifies,
@@ -353,6 +353,13 @@ export async function announceResolutionTurnUpdate(
     unknownBattleLine,
   });
   if (updateText) {
+    // Casualties carry birth records for units that never appeared in a fog-filtered snapshot.
+    rememberUnitOrigins([
+      ...(readySlice.removedUnits ?? []),
+      ...(readySlice.airStrikeRemovedUnits ?? []),
+      ...(readySlice.rangedRemovedUnits ?? []),
+      ...(readySlice.meleeRemovedUnits ?? []),
+    ]);
     const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
     deps.showMapToast(updateText, {
       isError: false,

@@ -12,6 +12,7 @@ import type {
 } from '../../shared/ipcTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
+import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
@@ -350,13 +351,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       const row = sub.find((u) => u.id === id);
       if (row) {
         removedUnitIdsLogged.add(id);
-        removedUnits.push({
-          id: row.id,
-          player: row.player,
-          unitType: row.unitType,
-          h3Index: row.h3Index,
-          displayName: row.displayName,
-        });
+        removedUnits.push(removedUnitSnapshot(row));
         airStrikeCasualtyHexSet.add(row.h3Index);
       }
     }
@@ -577,13 +572,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     for (const id of rangedResult.removedUnitIds) {
       const row = byId.get(id);
       if (row) {
-        removedUnits.push({
-          id: row.id,
-          player: row.player,
-          unitType: row.unitType,
-          h3Index: row.h3Index,
-          displayName: row.displayName,
-        });
+        removedUnits.push(removedUnitSnapshot(row));
       }
     }
     for (const k of rangedResult.killsByDirectFire ?? []) {
@@ -768,13 +757,7 @@ export function applyTacticalFerryPhaseOnBattle(
     }
     if (outcome === 'destroy') {
       toDestroy.add(air.id);
-      removedUnits.push({
-        id: air.id,
-        player: air.player,
-        unitType: air.unitType,
-        h3Index: air.h3Index,
-        displayName: air.displayName,
-      });
+      removedUnits.push(removedUnitSnapshot(air));
       tacticalLogQuery('applyTacticalFerryPhaseOnBattle destroy lost origin', {
         unitId: f.unitId,
         dest: f.destinationH3Index,

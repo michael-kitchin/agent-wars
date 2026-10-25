@@ -3,12 +3,17 @@
  * - Electron runtime: used by the desktop app.
  * - Node runtime: used by npm test (dist/main/*.test.js under node).
  *
- * Prefers official prebuilds; falls back to runtime-specific rebuild when needed.
+ * Prefers official prebuilds. A locked binary is retried on that path.
+ * Falls back to a runtime-specific rebuild only when the prebuild itself is missing.
  */
 
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { nativeBuildStepAfterPrebuild } = require('./rebuild-native-plan.cjs');
+
+/** How many times to retry prebuild-install after a locked better_sqlite3.node before giving up. */
+const NATIVE_BINARY_LOCK_RETRIES = 4;
 
 const root = path.join(__dirname, '..');
 const betterSqlite = path.join(root, 'node_modules', 'better-sqlite3');
@@ -23,6 +28,27 @@ function run(cmd, args, opts = {}) {
     ...opts,
   });
   return r.status ?? 1;
+}
+
+/**
+ * Runs a command and keeps its combined output for the prebuild decision.
+ *
+ * Purpose: A file-lock failure and a missing prebuild both exit non-zero; the text says which one happened.
+ * When to use: For prebuild-install. Other rebuild commands can keep inheriting the console via `run`.
+ * Expected outcome: `{ code, output }`. A spawn failure uses code 1 and includes the error message in `output`.
+ * Exceptions: None. Does not throw.
+ */
+function runCapture(cmd, args, opts = {}) {
+  const r = spawnSync(cmd, args, {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+    ...opts,
+  });
+  const output = `${r.stdout || ''}${r.stderr || ''}${r.error ? `\n${r.error.message}` : ''}`;
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  if (r.error) console.error(r.error);
+  return { code: r.status ?? 1, output };
 }
 
 function sleepMs(ms) {
@@ -73,7 +99,39 @@ if (runtime === 'electron') {
   prebuildArgs = ['prebuild-install', '--runtime', 'node'];
 }
 
-let code = run('npx', prebuildArgs, { cwd: betterSqlite });
+/**
+ * Runs one prebuild-install attempt for the runtime selected above.
+ *
+ * Purpose: Downloads the official better-sqlite3 binary and records output for lock detection.
+ * When to use: The first attempt, and each retry while the native file is locked.
+ * Expected outcome: `{ code, output }` from prebuild-install.
+ * Exceptions: None.
+ */
+function installPrebuild() {
+  return runCapture('npx', prebuildArgs, { cwd: betterSqlite });
+}
+
+let prebuild = installPrebuild();
+let step = nativeBuildStepAfterPrebuild(prebuild.code, prebuild.output);
+let lockAttempt = 0;
+while (step === 'retry-prebuild' && lockAttempt < NATIVE_BINARY_LOCK_RETRIES) {
+  lockAttempt += 1;
+  console.warn(
+    `rebuild-native: better_sqlite3.node is in use; retrying prebuild-install (${lockAttempt}/${NATIVE_BINARY_LOCK_RETRIES}).`
+  );
+  sleepMs(1200);
+  prebuild = installPrebuild();
+  step = nativeBuildStepAfterPrebuild(prebuild.code, prebuild.output);
+}
+
+if (step === 'retry-prebuild') {
+  console.error(
+    'rebuild-native: better_sqlite3.node is still in use, so the prebuild could not be installed. Close Agent Wars and any Node process that has loaded better-sqlite3, then retry.'
+  );
+  process.exit(1);
+}
+
+let code = prebuild.code;
 if (code === 0) {
   if (runtime === 'node' && !isBetterSqliteLoadableForRuntime(runtime)) {
     console.warn(

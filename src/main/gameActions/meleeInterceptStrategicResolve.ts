@@ -82,6 +82,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     allRanged: pending.allRanged,
     aiRangedOrders: pending.aiRangedOrders,
     knockoutCoordinates: buildLatLngCoordinateMap(pending.hexList),
+    lossFlagFactsByUnitId: pending.lossFlagFactsByUnitId,
   });
   if (!baseResult.success) {
     return baseResult;

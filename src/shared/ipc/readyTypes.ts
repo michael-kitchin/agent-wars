@@ -4,6 +4,9 @@ import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
 import type { CombatDicePlaybackFields } from './combatDiceTypes';
 import type { MeleeCandidateRow } from './meleeInterceptTypes';
+import type { TechLevel } from '../techBonusTypes';
+import type { UnitOrigin } from '../unitOriginTypes';
+import type { WeatherState } from '../weatherBonusTypes';
 
 export type { RangedResolutionShotLine };
 export interface GameReadyIpcPayload {
@@ -99,6 +102,43 @@ displayOrder?: number;
    * Exceptions: Omitted for strategic-only removals where lookup uses `units` roster rules.
    */
 displayName?: string;
+  /**
+   * Birth record of the lost unit.
+   *
+   * Contract: Present when the unit had an origin at the start of the turn, or the tactical sub-unit carried its parent's.
+   *   Absent when the row was created without one.
+   * When to use: The origin flag on a named victim in the turn-update dialog, including a unit that was outside the player's view.
+   * Expected outcome: The same origin a live flag would show. Omitted means that name gets no flag.
+   * Exceptions: None.
+   */
+  origin?: UnitOrigin;
+  /**
+   * Strategic turn on which the lost unit was formed.
+   *
+   * Contract: Present with `origin` when the formation turn was known. A tactical sub-unit may omit it.
+   * When to use: The DOB line of the loss-flag tooltip.
+   * Expected outcome: A positive integer, or absent.
+   * Exceptions: None.
+   */
+  formedTurn?: number;
+  /**
+   * Acclimation tags of the lost unit's birth hex.
+   *
+   * Contract: Present with `origin` only when the weather bonus is on.
+   * When to use: The Weather line of the loss-flag tooltip.
+   * Expected outcome: The tags the live unit would show.
+   * Exceptions: None.
+   */
+  weatherTags?: readonly WeatherState[];
+  /**
+   * Tech tier of the lost unit's birth hex.
+   *
+   * Contract: Present with `origin` only when the tech bonus is on.
+   * When to use: The Tech line of the loss-flag tooltip.
+   * Expected outcome: `advanced` or `basic`.
+   * Exceptions: None.
+   */
+  techLevel?: TechLevel;
 }
 
 /**

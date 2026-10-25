@@ -111,6 +111,7 @@ function main() {
       'linux-sandbox-launcher.test.cjs',
       'generated-data-packaging.test.cjs',
       'generated-data-pack-assert.test.cjs',
+      'rebuild-native-plan.test.cjs',
       'renderer-typecheck-report.test.cjs',
       'ui-smoke/ui-smoke-checks.test.cjs',
     ]) {

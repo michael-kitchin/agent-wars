@@ -27,6 +27,7 @@ import type { BuildUnitType } from '../../shared/ipc/productionTypes';
 import { HUMAN_SEAT_ID, isAiSeatId, isSeatId, type OwnerId, type SeatId } from '../../shared/seatIds';
 import { activeAiSeats } from '../../shared/seatRoster';
 import { buildKillLabelUnitRoster } from '../../shared/unitDisplayNames';
+import { withLossFlagFacts, type LossFlagFacts } from '../../shared/lossFlagFacts';
 
 /**
  * AI seats that reached a deployment cap this turn.
@@ -200,6 +201,15 @@ aiRangedOrders: RangedAttackOrder[];
    * Exceptions: None.
    */
 knockoutCoordinates: KnockoutCoordinates;
+  /**
+   * Birth records captured before this turn deleted any units.
+   *
+   * Purpose: Removed rows name the unit and the hex where it was lost. The flag needs the birth record.
+   * When to use: Stamp every removed-unit list on the ready result.
+   * Expected outcome: One entry per unit that had an origin at turn start.
+   * Exceptions: None.
+   */
+  lossFlagFactsByUnitId: ReadonlyMap<string, LossFlagFacts>;
 }
 
 /**
@@ -220,6 +230,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
   logDebug('finalizeReadyTurnAfterMelee', {
     turnNumber: args.turnNumber,
     meleeRemoved: args.meleeResult.removedUnitIds.length,
+    unitsWithOrigin: args.lossFlagFactsByUnitId.size,
     airStrikeDiceRollCount: diceFields.airStrikeDiceRolls?.length ?? 0,
     rangedDiceRollCount: diceFields.rangedDiceRolls?.length ?? 0,
     meleeDiceRollCount: diceFields.meleeDiceRolls?.length ?? 0,
@@ -403,6 +414,17 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     airStrikeMoves: airStrikeResult.strikeMoves,
   });
 
+  /**
+   * Attaches each casualty's birth record so the turn-update dialog can draw its flag.
+   *
+   * Purpose: Combat rows keep the hex where the unit was lost. The flag comes from the record captured before the delete.
+   * When to use: The removed-unit lists on the ready result.
+   * Expected outcome: A unit that had an origin keeps it. A unit that had none is unchanged.
+   * Exceptions: None.
+   */
+  const stampLossFlags = <T extends { id: string }>(units: readonly T[]): Array<T & Partial<LossFlagFacts>> =>
+    units.map((unit) => withLossFlagFacts(unit, args.lossFlagFactsByUnitId.get(unit.id)));
+
   return {
     success: true,
     knockouts: endOfTurnOutcome.knockouts.length > 0
@@ -417,21 +439,21 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     combatHexes: allCombatHexes.length > 0 ? allCombatHexes : undefined,
     removedUnitIds: allRemovedIds.length > 0 ? allRemovedIds : undefined,
     casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
-    removedUnits: allRemovedUnits.length > 0 ? allRemovedUnits : undefined,
+    removedUnits: allRemovedUnits.length > 0 ? stampLossFlags(allRemovedUnits) : undefined,
     killLabelUnits: killLabelUnits.length > 0 ? killLabelUnits : undefined,
     kills: allKills.length > 0 ? allKills : undefined,
     killsByDirectFire: rangedResult.killsByDirectFire?.length ? rangedResult.killsByDirectFire : undefined,
     killsByReturnFire: rangedResult.killsByReturnFire?.length ? rangedResult.killsByReturnFire : undefined,
     rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
     rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
-    rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
+    rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? stampLossFlags(rangedResult.removedUnits) : undefined,
     rangedResolutionShotLines:
       rangedResult.rangedResolutionShotLines && rangedResult.rangedResolutionShotLines.length > 0
         ? rangedResult.rangedResolutionShotLines
         : undefined,
     airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
     airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
-    airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? airStrikeResult.removedUnits : undefined,
+    airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? stampLossFlags(airStrikeResult.removedUnits) : undefined,
     airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,
     airStrikeAttemptCount: airStrikeResult.attemptCount > 0 ? airStrikeResult.attemptCount : undefined,
     airStrikeSuccessfulCount: airStrikeResult.successfulCount > 0 ? airStrikeResult.successfulCount : undefined,
@@ -443,7 +465,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     resolvedFerryMoves: resolvedFerryMoves.length > 0 ? resolvedFerryMoves : undefined,
     meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
     meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
-    meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
+    meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? stampLossFlags(meleeResult.removedUnits) : undefined,
     humanMoves: humanMoves.length + embarkedFollowMoves.length > 0 ? [...humanMoves, ...embarkedFollowMoves] : undefined,
     aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
     deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,

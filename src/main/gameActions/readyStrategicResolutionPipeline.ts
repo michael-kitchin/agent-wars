@@ -20,6 +20,8 @@ import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
+import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
+import { buildLossFlagFacts } from '../../shared/lossFlagFacts';
 import { buildStrategicOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import { createStrategicTerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import {
@@ -223,6 +225,16 @@ export function executeReadyStrategicTurn(
 
   const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+  const lossFlagFactsByUnitId = buildLossFlagFacts(unitsBeforeMove, {
+    weatherEnabled: weatherSettings.weatherBonusEnabled === true,
+    techEnabled: weatherSettings.techBonusEnabled === true,
+    weatherTagsFor: weatherTagsForBirthHex,
+    techLevelFor: techLevelForBirthHex,
+  });
+  logDebug('executeReadyStrategicTurn loss flag facts', {
+    unitCount: unitsBeforeMove.length,
+    withOrigin: lossFlagFactsByUnitId.size,
+  });
   const listedForWeather = listUnitsForSnapshot();
   const techHitBonusAt = buildTechHitBonusLookupFromDb(listedForWeather);
   const targetCoverAt = createStrategicTerrainCoverLookup(preMoveState.hexes);
@@ -445,6 +457,7 @@ export function executeReadyStrategicTurn(
       aiRangedOrders: [...aiRangedOrders],
       candidateHexes: [...candidateHexes],
       meleeInterceptCandidates,
+      lossFlagFactsByUnitId,
     };
     setMeleeInterceptPendingSnapshot(snapshot);
     logDebug('ready: awaiting melee intercept decision', {
@@ -479,5 +492,6 @@ export function executeReadyStrategicTurn(
     allRanged,
     aiRangedOrders,
     knockoutCoordinates: { latLngByH3, resolveToH3 },
+    lossFlagFactsByUnitId,
   });
 }

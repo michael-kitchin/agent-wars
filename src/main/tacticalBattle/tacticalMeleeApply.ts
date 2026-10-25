@@ -12,6 +12,7 @@ import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHi
 import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
+import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { syncStrategicUnitsDbWhenTacticalParentsEliminated } from './tacticalStrategicOrderPhases';
@@ -121,13 +122,7 @@ export function applyTacticalMeleeAfterSupportOrders(
   for (const id of meleeResult.removedUnitIds) {
     const row = byId.get(id);
     if (row) {
-      meleeRemovedUnits.push({
-        id: row.id,
-        player: row.player,
-        unitType: row.unitType,
-        h3Index: row.h3Index,
-        displayName: row.displayName,
-      });
+      meleeRemovedUnits.push(removedUnitSnapshot(row));
     }
   }
   const subUnits = battle.subUnits.filter((u) => !removedSet.has(u.id));
