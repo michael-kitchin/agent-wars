@@ -135,19 +135,32 @@ function pickBirthCountryFromRows(record: TerrainNamingRecordTactical): BirthCou
 /**
  * Builds the canonical country name for each code from strategic country rows.
  *
- * Purpose: Cities and states sometimes spell a country differently from its own row.
- * When to use: Once, before picking birth countries.
- * Expected outcome: After sorting rows by name, the first name seen per code wins.
+ * Purpose: Cities and states sometimes spell a country differently from its own row, and one ISO code can name a territory as well as the country.
+ * When to use: Once, before picking birth countries or filling the display-name cache.
+ * Expected outcome: For each code, the name that appears on the most country rows. An equal count keeps the ordinal-first name. A code with one name is unchanged. Rows with a null code are ignored.
  * Exceptions: None.
  */
 export function buildCanonicalCountryNameByCode(strategicRecords: ReadonlyArray<TerrainNamingRecordStrategic>): Map<string, string> {
-  const rows = strategicRecords
-    .flatMap((record) => record.countries)
-    .filter((row): row is TerrainNamingCountryRow & { countryCode: string } => row.countryCode !== null)
-    .sort((a, b) => compareOrdinal(a.name, b.name));
+  const countsByCode = new Map<string, Map<string, number>>();
+  for (const record of strategicRecords) {
+    for (const row of record.countries) {
+      if (row.countryCode === null) continue;
+      const countsForCode = countsByCode.get(row.countryCode) ?? new Map<string, number>();
+      countsForCode.set(row.name, (countsForCode.get(row.name) ?? 0) + 1);
+      countsByCode.set(row.countryCode, countsForCode);
+    }
+  }
   const nameByCode = new Map<string, string>();
-  for (const row of rows) {
-    if (!nameByCode.has(row.countryCode)) nameByCode.set(row.countryCode, row.name);
+  for (const [countryCode, countsForCode] of countsByCode) {
+    let winningName: string | null = null;
+    let winningCount = -1;
+    for (const [name, count] of countsForCode) {
+      const nameWins = winningName === null || count > winningCount || (count === winningCount && compareOrdinal(name, winningName) < 0);
+      if (!nameWins) continue;
+      winningName = name;
+      winningCount = count;
+    }
+    if (winningName !== null) nameByCode.set(countryCode, winningName);
   }
   return nameByCode;
 }

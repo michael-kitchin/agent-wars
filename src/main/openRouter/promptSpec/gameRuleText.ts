@@ -432,7 +432,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
 /**
  * Infantry (and mode-specific) ranged reach, including tactical terrain caps and mountain LOS.
  *
- * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have tactical baselines; forest, urban, or rubble caps infantry and armor to 1; mountain blocks armor/naval/air LOS.
+ * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have tactical baselines; forest, urban, or rubble caps infantry and armor to 1; a mountain between the shooter and the target blocks armor and naval.
  * When to use: Combat paragraph after the one-attack-per-unit clause.
  * Expected outcome: Strategic melee-only sentence, or tactical baselines plus the engine cap and LOS rules.
  * Exceptions: None.
@@ -443,7 +443,7 @@ export function buildRangedReachRule(mode: PromptCoordinateMode): string {
     return (
       `Infantry and armor fire at their tactical baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
       'forest, urban, or rubble on the attacker\'s cell caps infantry and armor to range 1. ' +
-      'Mountain along the line of sight blocks armor and naval shots (infantry is exempt). Air strikes and ferry are not blocked by mountains. ' +
+      'A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. ' +
       'Close to melee when out of range.'
     );
   }
@@ -551,16 +551,17 @@ function buildNavalClause(mode: PromptCoordinateMode): string {
 /**
  * One-attack-per-unit and target-field constraints, plus the period-start tempo sentence.
  *
- * Purpose: strategic-prompt.md section 1.5 items 9 and 13. Air strikes join the tempo sentence only when air is present.
+ * Purpose: One attack per unit, the reach sentence, and the Best Options tempo sentence. Air-strike wording joins that sentence only when air is present.
  * When to use: Inside `buildCombatRulesParagraph`.
- * Expected outcome: Existing targetHexCode/targetUnitId wording and the "does not prevent movement" tempo clause.
+ * Expected outcome: Existing targetHexCode/targetUnitId wording, a tempo clause that copies listed Best Options rows, and the "does not prevent movement" fact.
  * Exceptions: None.
  */
 function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
   const period = periodNoun(gates.coordinateMode);
-  const tempo = gates.hasAirUnits
-    ? `If a legal ranged_attack or air strike is available this ${period}, take it — these attacks resolve from ${period}-start positions and do not prevent movement in the same ${period}.`
-    : `If a legal ranged_attack is available this ${period}, take it — ranged attacks resolve from ${period}-start positions and do not prevent movement in the same ${period}.`;
+  const listedRows = gates.hasAirUnits ? 'ranged or air-strike row' : 'ranged row';
+  const tempo =
+    `Copy each ${listedRows} that Best Options This Turn lists for that unit, and choose among those listed rows. ` +
+    `Do not invent a target the table does not list. Those attacks resolve from ${period}-start positions and do not prevent movement in the same ${period}.`;
   return (
     `At most one ranged_attack per unit from ${period}-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). ` +
     `${buildRangedReachRule(gates.coordinateMode)} ${tempo} Drop invalid attacks before submit.`

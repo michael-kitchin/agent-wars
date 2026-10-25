@@ -79,12 +79,12 @@ const TACTICAL_PRIORITY_BLOCK =
  *
  * Purpose: Same tempo rule as strategic, with beat nouns.
  * When to use: Always in tactical coaching.
- * Expected outcome: Names air strike only when an air sub-unit exists; mentions that firing does not consume the move.
+ * Expected outcome: Names an air-strike row only when an air sub-unit exists. Tells the model to copy listed Best Options rows and not invent a target. Mentions that firing does not consume the move.
  * Exceptions: None.
  */
 function tempoBullet(hasAirUnits: boolean): string {
-  const shot = hasAirUnits ? 'a ranged_attack or air strike' : 'a ranged_attack';
-  return `- Every sub-unit with a legal shot should be given ${shot}, and you choose each target, because attacks resolve from beat-start positions and firing does not consume the move.`;
+  const listedRows = hasAirUnits ? 'a ranged or air-strike row' : 'a ranged row';
+  return `- Every sub-unit with ${listedRows} in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the beat-start position and does not consume the move. Do not invent a target the table does not list.`;
 }
 
 /**
@@ -115,11 +115,11 @@ const REACH_BULLET =
  *
  * Purpose: A model carrying strategic melee-only infantry or baseline-5 armor into a beat will order illegal shots.
  * When to use: Always in tactical coaching.
- * Expected outcome: States tactical baselines, the range-1 cap, mountain line of sight for armor and naval, and that air strikes and ferry are not blocked by mountains.
+ * Expected outcome: States tactical baselines, the range-1 cap, that only a mountain between the shooter and the target blocks armor and naval, and that air strikes and ferry are not blocked by mountains.
  * Exceptions: None.
  */
 const INFANTRY_REACH_BULLET =
-  `- Infantry and armor fire at tactical baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, or rubble caps them to range 1. Mountain along the line of sight blocks armor and naval. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.`;
+  `- Infantry and armor fire at tactical baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, or rubble caps them to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.`;
 
 /**
  * Air strikes reach the whole battle, once.

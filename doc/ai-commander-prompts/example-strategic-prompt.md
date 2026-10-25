@@ -34,7 +34,7 @@ The Unit Status Weather column names the weather where that unit stands. Birth t
 
 Terrain cover: ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands. An air strike on units in a hex whose main terrain is forest needs a roll 1 lower. Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. A city hex uses the higher of its terrain cover and city cover in each column. A rugged hex uses the higher of its terrain cover and rugged ground cover.
 
-This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). Infantry has no strategic ranged_attack (melee only); use movement and melee. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
+This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
 
 Movement budgets in clear weather: 1 cell for infantry, 2 for armor and naval, and air never marches. When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. A longer route continues on the next turn, and the turn count includes that halt. An explicit_move farther than this turn's budget is dropped, not shortened to the first step.
 
@@ -98,7 +98,7 @@ Best Options This Turn Target Hexes are the one-step destinations already inside
 
 - a1-i12 faces a critical threat (nearest enemy: h1-i32, distance 0).
 - a1-i6 faces a moderate threat (nearest enemy: h1-i32, distance 1).
-- 12 unit(s) have a legal attack this turn — order a ranged_attack or air strike for each and choose the targets yourself: a1-a4, a1-a5, a1-a6, a1-a7, a1-a8, a1-n4, a1-n5, a1-n6, a1-n7, a1-n8, a1-n9, a1-n10.
+- 12 unit(s) have a legal attack this turn — copy a Best Options ranged or air-strike row for each and do not invent a target: a1-a4, a1-a5, a1-a6, a1-a7, a1-a8, a1-n4, a1-n5, a1-n6, a1-n7, a1-n8, a1-n9, a1-n10.
 
 # Operational Map
 
@@ -444,7 +444,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - Production: use query_production to inspect controlled-hex queues and constraints; use set_build_queue to set one unit type/count for a queue (this replaces existing queue entries). If skipping tools, you may include productionOrders in final JSON.
 - Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter. If the turn limit arrives first, the most city hexes wins.
 - This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.
-- Every unit with a legal shot should be given a ranged_attack or air strike, and you choose each target, because the shot resolves from the turn-start position and does not consume the move.
+- Every unit with a ranged or air-strike row in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. Do not invent a target the table does not list.
 - A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire.
 - Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
 - Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from a row listing that unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes.

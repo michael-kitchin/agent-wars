@@ -223,7 +223,7 @@ test('roster: no air omits the section, envelope tails, and air coaching', () =>
   const coaching = buildCoachingBullets(strategicCoaching({ hasAirUnits: false })).join('\n');
   assert.doesNotMatch(coaching, /toward the fighting/i);
   assert.doesNotMatch(coaching, /ferryOrders/);
-  assert.doesNotMatch(coaching, /or air strike/);
+  assert.doesNotMatch(coaching, /or air-strike row/);
   const opening = buildOpeningUserMessage(strategicOpening({ hasAirUnits: false }));
   assert.ok(!opening.includes('"airStrikes"'));
   assert.ok(!opening.includes('"ferryOrders"'));

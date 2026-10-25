@@ -268,7 +268,7 @@ function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
  * True when the armed-units bullet can tell the model to order a shot for this unit.
  *
  * Purpose: Same-hex contact is stored as `melee`. Strategic infantry have no ranged attack, so naming them in
- * "order a ranged_attack or air strike" contradicts the combat rules. Armor and naval still qualify at distance 0,
+ * "copy a Best Options ranged or air-strike row" contradicts the combat rules. Armor and naval still qualify at distance 0,
  * because that hex is inside their strategic range, and air qualifies because the order is a strike.
  * When to use: The armed-units Attention Flags bullet, and the closer bullets that skip units already on that list.
  * Expected outcome: Strategic infantry are omitted. Other strategic units with any in-range row are included.
@@ -379,7 +379,7 @@ function isSameHexContactOnly(
  *
  * Purpose: Same-hex armor and naval stay on the list, and the sentence must not tell them to order a ranged_attack.
  * When to use: After the armed-unit ids are sliced to `ATTENTION_ARMED_UNITS_LISTED`.
- * Expected outcome: One sentence. The shot clause names ranged, air-strike, and air ids. The contact clause names
+ * Expected outcome: One sentence. The shot clause tells the model to copy a listed Best Options row and not invent a target. The contact clause names
  * strategic armor and naval whose only in-range row is melee and tells the model to stay for that melee. The overflow
  * suffix counts the combined remainder.
  * Exceptions: None.
@@ -403,10 +403,10 @@ function armedUnitsBulletText(args: {
   }
   const count = args.listedIds.length + args.overflow;
   const overflowText = args.overflow > 0 ? `, and ${args.overflow} more marked Action needed = yes` : '';
-  const attackKinds = args.hasAirShooter ? 'a ranged_attack or air strike' : 'a ranged_attack';
+  const attackKinds = args.hasAirShooter ? 'a Best Options ranged or air-strike row' : 'a Best Options ranged row';
   const clauses: string[] = [];
   if (shotIds.length > 0) {
-    clauses.push(`order ${attackKinds} for each and choose the targets yourself: ${shotIds.join(', ')}`);
+    clauses.push(`copy ${attackKinds} for each and do not invent a target: ${shotIds.join(', ')}`);
   }
   if (contactIds.length > 0) {
     clauses.push(

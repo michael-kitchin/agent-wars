@@ -256,12 +256,13 @@ export function effectiveTacticalRangedMaxRangeForAttacker(
 /**
  * Describes whether mountain LOS rules apply and whether the shot is blocked (including LOS trace failures).
  *
- * Contract: `applies` false for infantry. For air/armor/naval: `blocked` true when any LOS cell is mountain, or when no
- * path can be derived at all (`traceFailed`). Pairs where `gridPathCells` throws at an icosahedron face crossing are
- * traced by the `computeGridPathCellsPure` BFS fallback instead of counting as a failure, so a clear shot across a face
- * boundary is no longer rejected as blocked terrain.
+ * Contract: `applies` false for infantry. For air/armor/naval: `blocked` true when a mountain cell lies strictly between
+ * the shooter and the target, or when no path can be derived at all (`traceFailed`). The shooter's cell and the target
+ * cell do not block. Pairs where `gridPathCells` throws at an icosahedron face crossing are traced by the
+ * `computeGridPathCellsPure` BFS fallback instead of counting as a failure, so a clear shot across a face boundary is
+ * no longer rejected as blocked terrain.
  * When to use: `validateGroupRangedTarget` logs at **error** when `traceFailed`; `blocked` gates the order.
- * Expected outcome: `blocked` false when LOS is clear and a path was derived.
+ * Expected outcome: `blocked` false when no intervening cell is mountain and a path was derived. A path of length 2 is not blocked.
  * Exceptions: None.
  */
 export function tacticalMountainLosBlockedState(
@@ -277,8 +278,8 @@ export function tacticalMountainLosBlockedState(
   if (path === null) {
     return { applies: true, blocked: true, traceFailed: true };
   }
-  for (const h of path) {
-    if (tacticalCellIsMountain(battle, h)) {
+  for (let index = 1; index < path.length - 1; index += 1) {
+    if (tacticalCellIsMountain(battle, path[index]!)) {
       return { applies: true, blocked: true, traceFailed: false };
     }
   }

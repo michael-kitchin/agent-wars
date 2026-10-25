@@ -322,14 +322,14 @@ function testTacticalArmorDistance2ReturnFireOnPlains(): void {
 }
 
 /**
- * Verifies tactical mountain LOS blocks armor return fire.
+ * Verifies an adjacent mountain cell does not block armor return fire.
  *
- * Purpose: Terrain planning parity for return fire.
+ * Purpose: Terrain planning parity for return fire. The mountain is the cell the attacker stands on, which is the return-fire target.
  * When to use: After changing tactical return-fire eligibility wiring.
- * Expected outcome: No attacker removals from return fire when rolls would otherwise hit.
+ * Expected outcome: The defender's return fire removes the attacker when the roll would hit.
  * Exceptions: None.
  */
-function testTacticalMountainBlocksArmorReturnFire(): void {
+function testTacticalMountainTargetDoesNotBlockArmorReturnFire(): void {
   const defenderHex = latLngToCell(48.2, 58.2, 4);
   const neighbor = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
   assert.ok(neighbor);
@@ -348,7 +348,7 @@ function testTacticalMountainBlocksArmorReturnFire(): void {
       tacticalFootprint: footprint,
     },
   });
-  assert.deepStrictEqual(out.attackerRemovedIds, [], 'mountain LOS must block armor return fire');
+  assert.ok(out.attackerRemovedIds.includes('atk'), 'the attacker mountain cell must not block armor return fire');
 }
 
 /**
@@ -563,7 +563,7 @@ function run(): void {
   testStrategicNavalOutOfRangeDoesNotReturnFire();
   testStrategicAirWithoutAirportDoesNotReturnFire();
   testTacticalArmorDistance2ReturnFireOnPlains();
-  testTacticalMountainBlocksArmorReturnFire();
+  testTacticalMountainTargetDoesNotBlockArmorReturnFire();
   testRangedOriginBonusTurnsMissIntoHit();
   testMeleeDefenderOriginBonusRaisesDefense();
   testRangedTargetCoverAppliesToAttackersOnly();

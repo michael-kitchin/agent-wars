@@ -61,7 +61,7 @@ test('the strategic shot list omits infantry and keeps units that can fire', () 
   assert.ok(contactClause.includes('a1-t4'), shot);
   assert.ok(contactClause.includes('do not order a ranged_attack'), shot);
   assert.equal(contactClause.includes('a1-t2'), false, shot);
-  assert.ok(shot.includes('air strike'), shot);
+  assert.ok(shot.includes('air-strike'), shot);
   assert.equal(shot.includes('a1-i1'), false, shot);
   assert.equal(shot.includes('a1-i2'), false, shot);
   assert.ok(flags.includes('a1-i1'), 'infantry in contact stays on a threat bullet');
@@ -92,7 +92,7 @@ test('a unit with both contact and a ranged row stays in the shot clause', () =>
   const flags = buildAttentionFlags([mixed], 'strategic', true);
   const shot = flags.split('\n').find((line) => line.includes('legal attack')) ?? '';
   assert.ok(shot.includes('a1-t9'), shot);
-  assert.ok(shot.includes('order a ranged_attack for each'), shot);
+  assert.ok(shot.includes('copy a Best Options ranged row for each and do not invent a target'), shot);
   assert.equal(shot.includes('copy a move/melee'), false, shot);
 });
 

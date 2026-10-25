@@ -67,3 +67,23 @@ test('a snapshot origin copies the canonical country name for its country code',
     clearTacticalBirthCountryCache();
   }
 });
+
+test('a shared country code displays the name used by the most country rows', () => {
+  clearTacticalBirthCountryCache();
+  try {
+    storeTacticalBirthCountryCache(
+      [
+        {
+          h3_index: '81187ffffffffff',
+          states: [],
+          countries: [country('France', 'FR'), country('France', 'FR'), country('Clipperton I.', 'FR')],
+          water: [],
+        },
+      ],
+      []
+    );
+    assert.equal(countryDisplayNameForCode('FR'), 'France');
+  } finally {
+    clearTacticalBirthCountryCache();
+  }
+});

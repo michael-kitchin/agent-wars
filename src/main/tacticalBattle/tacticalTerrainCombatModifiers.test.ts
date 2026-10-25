@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, gridPathCells } from 'h3-js';
+import { computeGridPathCellsPure } from '../../shared/h3GridRangePure';
 import {
   effectiveTacticalMovementPointBudgetForMarchLeg,
   effectiveTacticalRangedMaxRangeForAttacker,
@@ -173,7 +174,7 @@ test('forest urban and rubble still cap infantry and armor ranged range', () => 
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'infantry', rubbleCell), 1);
 });
 
-test('naval ranged blocked when implicit LOS crosses mountain; infantry not subject to mountain LOS', () => {
+test('an adjacent mountain target does not block armor or naval; infantry stays exempt', () => {
   const a = tacticalCell(44, 54);
   const b = firstRingCellDistinctFrom(a);
   const battle = {
@@ -184,12 +185,65 @@ test('naval ranged blocked when implicit LOS crosses mountain; infantry not subj
     },
   };
   const path = gridPathCells(a, b);
-  assert.ok(path.length >= 1);
-  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'naval'), true);
+  assert.equal(path.length, 2);
+  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'naval'), false);
+  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'armor'), false);
   assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'infantry'), false);
   const los = tacticalMountainLosBlockedState(battle, a, b, 'armor');
   assert.equal(los.traceFailed, false);
-  assert.equal(los.blocked, true);
+  assert.equal(los.blocked, false);
+});
+
+test('armor standing on a mountain can fire at an adjacent plains target', () => {
+  const a = tacticalCell(46, 56);
+  const b = firstRingCellDistinctFrom(a);
+  const battle = {
+    ...baseBattle,
+    tacticalTerrainKindByH3: {
+      [a]: 'mountain',
+      [b]: 'plains',
+    },
+  };
+  const los = tacticalMountainLosBlockedState(battle, a, b, 'armor');
+  assert.equal(los.traceFailed, false);
+  assert.equal(los.blocked, false);
+});
+
+/**
+ * Finds a distance-2 cell whose shortest path has a cell strictly between the ends.
+ *
+ * Purpose: Intervening-mountain cases need a middle cell that is not the shooter or the target.
+ * When to use: The mountain line-of-sight tests below.
+ * Expected outcome: Origin, middle, and target indexes. Throws when no such path exists.
+ * Exceptions: Throws when the disk has no path of length 3 or more.
+ */
+function pathWithMiddleCell(origin: string): { middle: string; target: string } {
+  const target = [...gridDisk(origin, 2)].find((candidate) => {
+    try {
+      const path = gridPathCells(origin, candidate);
+      return path.length >= 3 && path[0] === origin && path[path.length - 1] === candidate;
+    } catch {
+      return false;
+    }
+  });
+  if (!target) throw new Error('expected a path with an intervening cell');
+  return { middle: gridPathCells(origin, target)[1]!, target };
+}
+
+test('a mountain between the shooter and the target blocks armor and naval; infantry is exempt', () => {
+  const origin = tacticalCell(47, 57);
+  const { middle, target } = pathWithMiddleCell(origin);
+  const battle = {
+    ...baseBattle,
+    tacticalTerrainKindByH3: {
+      [origin]: 'plains',
+      [middle]: 'mountain',
+      [target]: 'plains',
+    },
+  };
+  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, origin, target, 'armor'), true);
+  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, origin, target, 'naval'), true);
+  assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, origin, target, 'infantry'), false);
 });
 
 test('clear terrain stays shootable when the LOS trace crosses an icosahedron face boundary', () => {
@@ -206,13 +260,19 @@ test('clear terrain stays shootable when the LOS trace crosses an icosahedron fa
   }
 });
 
-test('mountain still blocks LOS across an icosahedron face boundary', () => {
+test('a mountain between the cells still blocks LOS across an icosahedron face boundary', () => {
   const pair = tacticalPentagonCrossingPair();
+  const path = computeGridPathCellsPure(pair.originH3Index, pair.crossingH3Index);
+  assert.ok(path);
+  assert.ok(path.length >= 3, 'this face-crossing pair must have an intervening cell');
+  const middle = path[1]!;
   const battle = {
     ...baseBattle,
     tacticalTerrainKindByH3: {
       ...Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
-      [pair.crossingH3Index]: 'mountain',
+      [pair.originH3Index]: 'plains',
+      [pair.crossingH3Index]: 'plains',
+      [middle]: 'mountain',
     },
   };
 
@@ -238,13 +298,13 @@ test('tacticalRes4BriefingLandWater classifies wetlands as land even when the pa
   assert.equal(tacticalBriefingLandWater(battle, openWater), 'water');
 });
 
-test('tacticalRangedDirectFirePassesTerrainAndRange rejects naval shot through mountain footprint', () => {
+test('tacticalRangedDirectFirePassesTerrainAndRange rejects naval shot through an intervening mountain', () => {
   const a = tacticalCell(45, 55);
-  const b = firstRingCellDistinctFrom(a);
-  const ring = new Set([a, b]);
+  const { middle, target } = pathWithMiddleCell(a);
+  const ring = new Set([a, middle, target]);
   const battle = {
     ...baseBattle,
-    tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+    tacticalTerrainKindByH3: { [a]: 'plains', [middle]: 'mountain', [target]: 'plains' },
   };
-  assert.equal(tacticalRangedDirectFirePassesTerrainAndRange(battle, ring, 'naval', a, b), false);
+  assert.equal(tacticalRangedDirectFirePassesTerrainAndRange(battle, ring, 'naval', a, target), false);
 });

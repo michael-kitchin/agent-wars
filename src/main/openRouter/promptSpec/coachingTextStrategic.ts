@@ -170,16 +170,16 @@ const RESOLUTION_ORDER_BULLET =
   '- This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
 
 /**
- * A legal shot costs no movement, so decline it only deliberately.
+ * A listed shot costs no movement, so copy it from Best Options.
  *
- * Purpose: The model chooses each target; the engine must not be described as filling in unfired shots.
+ * Purpose: The model copies listed rows and must not invent a target. The sentence does not describe the engine filling omitted shots.
  * When to use: Always in strategic coaching.
- * Expected outcome: Names air strike only when an air unit exists; mentions that firing does not consume the move.
+ * Expected outcome: Names an air-strike row only when an air unit exists. Tells the model not to invent a target. Mentions that firing does not consume the move.
  * Exceptions: None.
  */
 function tempoBullet(hasAirUnits: boolean): string {
-  const shot = hasAirUnits ? 'a ranged_attack or air strike' : 'a ranged_attack';
-  return `- Every unit with a legal shot should be given ${shot}, and you choose each target, because the shot resolves from the turn-start position and does not consume the move.`;
+  const listedRows = hasAirUnits ? 'a ranged or air-strike row' : 'a ranged row';
+  return `- Every unit with ${listedRows} in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. Do not invent a target the table does not list.`;
 }
 
 /**

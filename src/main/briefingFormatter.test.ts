@@ -442,11 +442,11 @@ function testAttentionFlagsPeriodNounFollowsCoordinateMode(): void {
   const tactical = buildAttentionFlags([shooter('opp-armor-1', 'armor')], 'tactical', false);
   assert.ok(tactical.includes('this beat'), `tactical armed bullet must say this beat: ${tactical}`);
   assert.ok(!tactical.includes('this turn'), `tactical armed bullet must not say this turn: ${tactical}`);
-  assert.ok(!tactical.includes('air strike'), `no-air armed bullet must not name air strike: ${tactical}`);
+  assert.ok(!tactical.includes('air-strike'), `no-air armed bullet must not name air strike: ${tactical}`);
   const strategic = buildAttentionFlags([shooter('opp-armor-1', 'armor')], 'strategic', false);
   assert.ok(strategic.includes('this turn'), `strategic armed bullet must say this turn: ${strategic}`);
   const withAir = buildAttentionFlags([shooter('opp-air-1', 'air')], 'tactical', false);
-  assert.ok(withAir.includes('air strike'), `air shooter names air strike: ${withAir}`);
+  assert.ok(withAir.includes('air-strike'), `air shooter names air strike: ${withAir}`);
 }
 
 /**

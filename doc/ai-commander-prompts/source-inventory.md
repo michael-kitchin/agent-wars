@@ -74,7 +74,7 @@ Table columns as coded:
 - Units Without Standing Orders: `Unit ID` | `Unit Type` | `Suggested Destination`.
 - Active Callbacks: `Event` | `Details` (parameters, not just the event name).
 
-Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. Same-hex armor and naval are told not to order a ranged_attack, that they are already in contact, and that melee resolves if they stay. In a battle it includes only a ranged attack or an air strike.
+Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. Same-hex armor and naval are told not to order a ranged_attack, that they are already in contact, and that melee resolves if they stay. The shot clause tells the model to copy a Best Options ranged row for each and not invent a target, and names a ranged or air-strike row when an air shooter is listed. In a battle it includes only a ranged attack or an air strike.
 
 Production status interpolates `buildProductionIncomeRule` and `buildProductionCostRulesLine` (costs and prerequisites from engine tables).
 
@@ -103,7 +103,7 @@ When a briefing override is present, `buildSystemPromptForTools` still computes 
 
 ### 2.4 Coaching bullets (`HOW TO USE THESE TOOLS EFFECTIVELY`)
 
-After the numbered tool lines, `buildToolUsageGuidance` emits mechanic bullets (briefing-already-contains, tool-call batching, memory tiers, production query/set), then `buildStrategicCoachingBullets`. Membership is gated by `CoachingGates`. Tempo wording is "you choose each target" and does **not** contain `damage given up for free`.
+After the numbered tool lines, `buildToolUsageGuidance` emits mechanic bullets (briefing-already-contains, tool-call batching, memory tiers, production query/set), then `buildStrategicCoachingBullets`. Membership is gated by `CoachingGates`. Tempo wording tells the model to copy listed Best Options rows and not invent a target, and does **not** contain `damage given up for free`.
 
 ## 3. Tactical section catalog
 
@@ -252,7 +252,7 @@ Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, 
 | Hits land on lowest defense then infantry, armor, naval, air | engine-true | casualty sort |
 | Friendly stacks illegal; enemy cells are move/melee | engine-true | `getValidDestinations` / unoccupied approach |
 | `hold_fire` suppresses automatic engagement | engine-true | `holdFireUnitIdsForPlayer` |
-| Tempo: every unit with a legal shot should be given one; you choose each target | engine-true as instruction; sweep still fills omitted shots (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |
+| Tempo: copy each listed Best Options ranged or air-strike row; do not invent a target | engine-true as instruction; sweep still fills omitted shots (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |
 | `damage given up for free` | **not emitted** | matrix tests forbid the substring |
 | Unconditional "enemy remains in play and is hunting you" | **not emitted** | matrix tests forbid the substring |
 | Embark: coastal or land seaport, or a controlled water seaport | engine-true | `canEmbarkAtHex` |

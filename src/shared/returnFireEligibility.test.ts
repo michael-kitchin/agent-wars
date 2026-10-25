@@ -203,7 +203,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
     );
   });
 
-  it('denies tactical armor/naval when mountain blocks LOS; allows infantry', () => {
+  it('allows tactical return fire at an adjacent mountain target', () => {
     const a = tacticalIndex(48, 58);
     const b = neighborOf(a);
     const footprint = new Set([a, b]);
@@ -212,14 +212,14 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
       strategicHexTerrainKind: 'plains',
       tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
     };
-    assert.ok(gridPathCells(a, b).length >= 1);
+    assert.equal(gridPathCells(a, b).length, 2);
     const ctx: ReturnFireEligibilityContext = {
       theater: 'tactical',
       tacticalBattle: battle,
       tacticalFootprint: footprint,
     };
-    assert.equal(canDefenderReturnFireAtAttackerHex({ unitType: 'armor', h3Index: a }, b, ctx), false);
-    assert.equal(canDefenderReturnFireAtAttackerHex({ unitType: 'naval', h3Index: a }, b, ctx), false);
+    assert.equal(canDefenderReturnFireAtAttackerHex({ unitType: 'armor', h3Index: a }, b, ctx), true);
+    assert.equal(canDefenderReturnFireAtAttackerHex({ unitType: 'naval', h3Index: a }, b, ctx), true);
     assert.equal(canDefenderReturnFireAtAttackerHex({ unitType: 'infantry', h3Index: a }, b, ctx), true);
   });
 

@@ -208,10 +208,10 @@ test('option copy maps ranged rows and picks one row per actor per action in bot
 });
 
 test('tempo coaching names air strike only when air is present', () => {
-  assert.match(joined(strategicGates({ hasAirUnits: true })), /or air strike/);
-  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /or air strike/);
-  assert.match(joined(tacticalGates({ hasAirUnits: true })), /or air strike/);
-  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /or air strike/);
+  assert.match(joined(strategicGates({ hasAirUnits: true })), /or air-strike row/);
+  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /or air-strike row/);
+  assert.match(joined(tacticalGates({ hasAirUnits: true })), /or air-strike row/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /or air-strike row/);
 });
 
 test('callback coaching states the empty-list event-driven consequence', () => {

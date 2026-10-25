@@ -99,7 +99,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
 - **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
-- **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
+- **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain cell between the shooter and the target can still block armor and naval. The cell either unit stands on does not.
 - **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond, ending in an arrowhead. A queued move keeps that route through the movement animation, then drops it once the animation has finished and the unit is on the destination. Move routes and the attack lines above are drawn over a pale edge so they stay readable.
 
 ## Air power

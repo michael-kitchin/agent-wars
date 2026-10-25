@@ -362,7 +362,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 - **Arbitrary number of players:** Participant IDs are assigned once per side. Melee with three or more sides follows §4.6. A match has two to four sides.
 - **Line of sight / blocking (strategic):** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range is a valid target.
 - **Cover never blocks:** terrain cover (§4.9) lowers hit numbers but never makes a shot illegal.
-- **Line of sight (tactical):** Mountain along the implicit grid path blocks armor and naval shots. Infantry is exempt. Air strikes and ferry are not blocked by mountains. See §12.5.
+- **Line of sight (tactical):** A mountain cell strictly between the shooter and the target blocks armor and naval shots. The shooter's cell and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. The target cell still applies its cover. See §12.5.
 - **Reproducibility:** A single RNG seed for the entire game so that replay is deterministic.
 - **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed during the post-melee check. The air unit does not fight in melee.
 - **Air unit destroyed during air strike phase:** If air unit A strikes air unit B's airport and destroys it, and air unit B has not yet resolved its own strike (higher H3 index), air unit B is destroyed before it can act.
@@ -570,7 +570,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 **Terrain caps and LOS** (`tacticalTerrainCombatModifiers.ts`):
 
 - Forest, urban, or rubble on the **attacker's** cell caps **infantry and armor** to effective range **1**.
-- Mountain along the implicit H3 grid path blocks **armor and naval** shots. **Infantry is exempt.** Air strikes and ferry are not blocked by mountains. If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
+- A mountain cell strictly between the shooter and the target blocks **armor and naval** shots (`tacticalMountainLosBlockedState`). The shooter's cell and the target cell do not. **Infantry is exempt.** Air strikes and ferry are not blocked by mountains. The target cell still applies its cover. If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
 - Return fire uses the same range + LOS rules (planning parity).
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 - Legal targets include enemy-occupied cells anywhere in the footprint, including a margin cell, **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail) on the enclosing hex's own tactical cells. A margin city or road still slows movement and still gives cover. It is not a legal infrastructure target, and a shot there does not change a strategic hex.

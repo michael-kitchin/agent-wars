@@ -72,17 +72,17 @@ test('forest with transport keeps range cap and adds movement bonus', () => {
   );
 });
 
-test('mountain blocks armor movement and armor and naval range', () => {
+test('mountain blocks armor movement and slows infantry movement', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain' })),
-    '(-) Infantry Movement, (x) Armored Movement, (x) Armored Range, (x) Naval Range'
+    '(-) Infantry Movement, (x) Armored Movement'
   );
 });
 
 test('mountain with transport clears land movement penalties and adds bonus for all', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain', hasRail: true })),
-    '(+) All Movement, (x) Armored Range, (x) Naval Range'
+    '(+) All Movement'
   );
 });
 
@@ -108,7 +108,7 @@ test('urban shows movement and range slowdown for all land units', () => {
 test('urban on mountain mixes range symbols for armored', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain', isUrban: true })),
-    '(-) All Movement, (-) Infantry Range, (x) Naval Range, (x/-) Armored Range'
+    '(-) All Movement, (-) All Range'
   );
 });
 
@@ -137,7 +137,7 @@ test('water with a road shows plus movement and water without a road stays blank
 test('rubble mountain with a road blocks armor and does not slow infantry', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain', isRubble: true, hasRoad: true })),
-    '(-) Infantry Range, (x) Armored Movement, (x) Naval Range, (x/-) Armored Range'
+    '(-) All Range, (x) Armored Movement'
   );
 });
 
@@ -193,15 +193,11 @@ test('formatTerrainEffectsLineHtml leaves an unmatched clause unchanged', () => 
 test('computeTerrainEffectsLineHtml keeps plain clause order and uses status icons', () => {
   const input = fx({ terrainKind: 'mountain', isUrban: true });
   const plain = computeTerrainEffectsLine(input);
-  assert.equal(plain, '(-) All Movement, (-) Infantry Range, (x) Naval Range, (x/-) Armored Range');
+  assert.equal(plain, '(-) All Movement, (-) All Range');
   const down = formatStatusIconHtml('down');
-  const blocked = formatStatusIconHtml('blocked');
   const html = computeTerrainEffectsLineHtml(input);
-  assert.equal(
-    html,
-    `${down}All Movement, ${down}Infantry Range, ${blocked}Naval Range, ${blocked}|${down}Armored Range`
-  );
-  assert.ok(html!.indexOf('Naval Range') < html!.indexOf('Armored Range'));
+  assert.equal(html, `${down}All Movement, ${down}All Range`);
+  assert.equal(html!.includes('Naval Range'), false);
   assert.equal(html!.includes('(+)'), false);
   assert.equal(html!.includes('(-)'), false);
   assert.equal(html!.includes('(x)'), false);

@@ -425,11 +425,11 @@ function shouldSuppressMovementBlock(
 }
 
 /**
- * Adds range effect symbols per forest/urban/rubble cap and mountain LOS rules.
+ * Adds the forest, urban, and rubble range slowdown. A mountain cell has no range symbol.
  *
- * Purpose: Populates the range symbol map alongside movement in `computeTerrainEffectsLine`.
+ * Purpose: Populates the range symbol map alongside movement in `computeTerrainEffectsLine`. Mountain line of sight is not a property of one cell, so this map does not mark it.
  * When to use: After movement symbols are computed.
- * Expected outcome: Infantry/Armored `-` on forest/urban/rubble; Armored/Naval `x` on mountains. Air strikes and ferry are not blocked by mountains.
+ * Expected outcome: Infantry/Armored `-` on forest/urban/rubble. A mountain cell does not mark range, because only an intervening mountain blocks a shot.
  * Exceptions: None.
  */
 function applyRangeSymbols(
@@ -442,10 +442,6 @@ function applyRangeSymbols(
   if (rangedCap) {
     addSymbol(rangeByUnit, 'Infantry', '-');
     addSymbol(rangeByUnit, 'Armored', '-');
-  }
-  if (cat === 'mountains') {
-    addSymbol(rangeByUnit, 'Armored', 'x');
-    addSymbol(rangeByUnit, 'Naval', 'x');
   }
 }
 

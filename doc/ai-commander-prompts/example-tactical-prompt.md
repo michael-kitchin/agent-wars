@@ -44,9 +44,9 @@ Terrain cover: ranged fire at a forest, mountain, urban, or rubble cell needs a 
 
 This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step. Ranged uses pre-move positions. At most one ranged_attack per unit from beat-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination).
 
-Infantry and armor fire at their tactical baselines (infantry 2, armor 5); forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. Mountain along the line of sight blocks armor and naval shots (infantry is exempt). Air strikes and ferry are not blocked by mountains. Close to melee when out of range.
+Infantry and armor fire at their tactical baselines (infantry 2, armor 5); forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of range.
 
-If a legal ranged_attack is available this beat, take it — ranged attacks resolve from beat-start positions and do not prevent movement in the same beat. Drop invalid attacks before submit.
+Copy each ranged row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from beat-start positions and do not prevent movement in the same beat. Drop invalid attacks before submit.
 
 Clear of weather, the point budget is 2 points for infantry, 4 for armor, 3 for naval, and air does not march.
 
@@ -88,7 +88,7 @@ Tactical beat 4: you command 13 sub-unit(s); enemy sub-units in this battle: 4 (
 - a1-t1-s4 faces a critical threat (nearest enemy: h1-t1-s3, distance 1).
 - a1-t2-s1 faces a critical threat (nearest enemy: h1-t1-s3, distance 1).
 - a1-t2-s2 faces a critical threat (nearest enemy: h1-t1-s3, distance 1).
-- 6 unit(s) have a legal attack this beat — order a ranged_attack for each and choose the targets yourself: a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4.
+- 6 unit(s) have a legal attack this beat — copy a Best Options ranged row for each and do not invent a target: a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4.
 
 # Operational Map
 
@@ -229,7 +229,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. Sub-units of one parent on the same cell match, so assess one of them; assess another sub-unit on that cell when its parent differs.
 - Use estimate_combat before any ranged or melee attack. Do not guess at combat odds.
 - Batch independent tool calls: when you need the same tool for several units or hexes, request all of those calls together in one reply as parallel tool calls instead of one call per reply. Wait for a result only when the next call's arguments depend on it.
-- Every sub-unit with a legal shot should be given a ranged_attack, and you choose each target, because attacks resolve from beat-start positions and firing does not consume the move.
+- Every sub-unit with a ranged row in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the beat-start position and does not consume the move. Do not invent a target the table does not list.
 - Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat.
 - Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry.
 
@@ -243,7 +243,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
   Entering an intact road cell costs 1/2 point and an intact rail cell costs 1/3 point, for every terrain, for infantry and armor. That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell.
 
   Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain.
-- Infantry and armor fire at tactical baselines of 2 and 5; forest, urban, or rubble caps them to range 1. Mountain along the line of sight blocks armor and naval. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.
+- Infantry and armor fire at tactical baselines of 2 and 5; forest, urban, or rubble caps them to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.
 - Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 - Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
