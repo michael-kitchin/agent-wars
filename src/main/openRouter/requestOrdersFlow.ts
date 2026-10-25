@@ -523,6 +523,7 @@ export async function requestOrdersFlow(
     return applyParsedRequestOrders({
       parsed,
       ordersEnabled: flags.ordersEnabled,
+      memoryEnabled: flags.memoryEnabled,
       tacticalBattle,
       state,
       planState,

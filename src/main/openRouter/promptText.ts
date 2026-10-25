@@ -83,15 +83,15 @@ fallbackMovementEnabled: boolean;
 }
 
 /**
- * Documents the module-scope binding `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` (MOVEMENT_INSTRUCTION_MEMORY_SUFFIX).
-
- * Purpose: Supports maintainability by documenting why `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Sentence appended when memory is on and the consult has no planning tools.
+ *
+ * Purpose: Those returns are the only place this sentence is taught, so the example must include content and tier.
+ * When to use: Concatenated onto the orders-only and fallback returns of `getMovementOrderInstruction`.
+ * Expected outcome: The model sees a write that names key, tier, and content. Planning returns do not append this.
  * Exceptions: None.
  */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
-  ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent") in your final JSON to record your plan.';
+  ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent" content "this turn\'s objectives") in your final JSON to record your plan.';
 
 /**
  * Condition under which the submit clause requires at least one `set_build_queue`.

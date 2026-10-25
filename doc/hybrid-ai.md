@@ -63,6 +63,8 @@ Exhausting the tool-round cap records a successful-but-empty consult and warns o
 
 Tactical envelopes omit `assign_order`, memory writes, and production. Sub-units are ordered with `explicit_move`, `ranged_attack`, embark/disembark, `transport_move`.
 
+A strategic consult applies `memoryUpdates` through `executeMemory` in `applyParsedMemoryUpdates` after order validation when memory tools are enabled. A rejected row is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the memory group is off is one drop reason and is not stored.
+
 ## Coordinates
 
 The model never sees raw H3 indexes. Briefing hex codes (and lat/lng internally) are the contract. Strategic codes name the loaded match's strategic cells and are replaced when another map loads. Tactical codes name one battle's footprint. Tool results are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.

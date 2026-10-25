@@ -126,7 +126,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `airStrikes` | array | present when the opponent has air units | Strike actions |
 | `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, dests are intact airport cells in the footprint; strike-or-ferry exclusivity still applies. |
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
-| `memoryUpdates` | array | present when memory tools are enabled | Memory writes and deletes |
+| `memoryUpdates` | array | present when memory tools are enabled | Write or delete. A write requires `content` and `tier`. A strategic consult applies the rows through `executeMemory` when memory tools are enabled; a rejected row is a drop reason. A battle consult does not apply them. A list sent while the group is off is not stored. |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
 
 Envelope-wide rules the prompt must state:
@@ -136,7 +136,7 @@ Envelope-wide rules the prompt must state:
 3. Optional arrays may be omitted or empty. An omitted or empty `callbacks` field clears all subscriptions.
 4. Legacy top-level `movementOrders` and `rangedAttacks` are invalid.
 5. Every `orders` entry carries an `action` and a `unitId` or a `unitIds` array. `unitIds` is the compact form for several actors sharing the same action and destination or target, copied from a Best Options `Unit IDs` cell. A non-empty `unitIds` list is the actor set; otherwise `unitId` is. The engine expands the list into per-unit orders. The prompt must tell the model to prefer `unitIds` whenever a row lists more than one id, because one JSON object per unit will not fit a large roster inside the completion budget.
-6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries. The engine logs a drop reason for incomplete `orders`, `airStrikes`, `ferryOrders`, and `productionOrders` entries, but nothing about a drop reaches the model.
+6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries. The engine logs a drop reason for incomplete `orders`, `airStrikes`, `ferryOrders`, `productionOrders`, and `memoryUpdates` entries, but nothing about a drop reaches the model. When one unit has more than one movement, ranged, air, ferry, or embark row, the last row is kept and each discarded earlier row logs a drop reason.
 7. Output is compact JSON only: no prose, no commentary, no markdown fence, and no extra whitespace around the submitted object.
 
 ### 5.2 Action legality by mode

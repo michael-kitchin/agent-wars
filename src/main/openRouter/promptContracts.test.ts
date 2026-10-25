@@ -488,6 +488,26 @@ function testStandingOrderActionsGatedByIncludeStandingOrderActions(): void {
 }
 
 /**
+ * Verifies the fallback memory example names content, and the planning return does not append that example.
+ *
+ * Purpose: The fallback and orders-only returns teach a memory write. Planning consults already carry the JSON
+ * contract, so they must not also receive this sentence.
+ * When to use: After editing `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` or the early returns in `getMovementOrderInstruction`.
+ * Expected outcome: Memory-only flags include `content`. Planning plus memory does not include `memoryUpdates entry`.
+ * Exceptions: AssertionError when the fallback example omits content or the planning return gains the suffix.
+ */
+function testFallbackMemoryExampleIncludesContent(): void {
+  const memoryOnly = getToolFlags(['memory_read']);
+  assert.strictEqual(memoryOnly.memoryEnabled, true);
+  assert.strictEqual(memoryOnly.planningEnabled, false);
+  assert.strictEqual(memoryOnly.fallbackMovementEnabled, true);
+  const fallback = getMovementOrderInstruction(memoryOnly, 'strategic');
+  assert.ok(fallback.includes('content'), 'fallback memory example must name content');
+  const planning = getMovementOrderInstruction(getToolFlags(['plan_route', 'memory_read']), 'strategic');
+  assert.ok(!planning.includes('memoryUpdates entry'), 'planning return must not append the memory suffix');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -549,6 +569,10 @@ const tests = [
   {
     name: 'example block uses placeholder ids not live roster ids',
     fn: testExampleBlockUsesPlaceholderIdsNotLiveRosterIds,
+  },
+  {
+    name: 'fallback memory example includes content and planning omits the suffix',
+    fn: testFallbackMemoryExampleIncludesContent,
   },
 ];
 

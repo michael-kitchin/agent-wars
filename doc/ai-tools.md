@@ -11,7 +11,7 @@ The engine under `src/` wins if this file drifts.
 | `planning` | `plan_route`, `check_distance` | `PATHFINDING_TOOL_NAMES` |
 | `assessment` | `assess_unit`, `assess_hex` | `ASSESSMENT_TOOL_NAMES`. Omitted from a strategic consult tool list when a precomputed briefing is present (`requestOrdersFlow` excludes them). In battle, `assess_unit` stays when the group is on and `assess_hex` is stripped (`filterToolNamesForTacticalBattle`). |
 | `estimation` | `estimate_combat` | `COMBAT_ESTIMATION_TOOL_NAMES`. Same strategic omission when a briefing is present. Offered in battle when the group is on. |
-| `memory` | `memory_read` | `MEMORY_TOOL_NAMES`. Writes are `memoryUpdates` in the envelope, not tools. |
+| `memory` | `memory_read` | `MEMORY_TOOL_NAMES`. Writes are `memoryUpdates` in the envelope, not tools. A strategic consult applies them through `executeMemory` when this group is on. |
 | `orders` | `query_orders` | `STANDING_ORDER_TOOL_NAMES`. Assign/cancel are envelope actions; `executeStandingOrderActionForPlayer` still implements `assign_order` / `cancel_order` for the host and for parsed JSON. |
 | `production` | `query_production`, `set_build_queue` | `PRODUCTION_TOOL_NAMES`. Strategic only. `set_build_queue` is a **write** tool; queues can also arrive as `productionOrders` in the envelope. |
 | `precomputation` | *(none)* | UI group; the pipeline is `precomputation.ts`, not a model-callable tool. |
@@ -56,6 +56,7 @@ Strategic movement budgets are `getMovementBudget` (infantry 1, armor 2, naval 2
 `src/main/tools/memory.ts`.
 
 - **`memory_read`:** Fetch stored-tier notes by key or tag.
+- **Envelope writes:** `applyParsedMemoryUpdates` applies `memoryUpdates` through `executeMemory` after order validation on a strategic consult when memory tools are enabled. A rejected row, including a write with no tier or with empty content, is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the group is off is one drop reason and is not stored.
 - Limits: **5** persistent slots (`PERSISTENT_LIMIT`), **15** stored (`STORED_LIMIT`). Persistent rows appear in every strategic briefing. There are no `memory_write` / `memory_delete` tools on the model.
 
 ## Standing orders

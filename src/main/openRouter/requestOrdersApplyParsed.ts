@@ -1,9 +1,11 @@
 /**
  * Validates and merges parsed opponent orders after a successful JSON parse.
  *
- * Purpose: Keeps `requestOrdersFlow` under the file-size limit without changing merge or drop behavior.
+ * Purpose: Keeps `requestOrdersFlow` under the file-size limit. The last row for a unit still wins. An earlier discarded
+ * row, and a rejected memory row, are drop reasons.
  * When to use: After `parseOrdersResponse` (and optional repair) returns a non-null parse.
- * Expected outcome: A success result with validated movement, fire, air, ferry, and embark rows.
+ * Expected outcome: A success result with validated movement, fire, air, ferry, and embark rows. Strategic memory
+ * rows are applied in the same pass. A rejected memory row is a drop reason and does not fail the consultation.
  * Exceptions: None; invalid rows are dropped with reasons rather than thrown.
  */
 
@@ -13,6 +15,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import type { AiSeatId } from '../../shared/seatIds';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
+import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import { createPathfindingSession } from '../tools/pathfinding';
 import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { mergeCommanderAttackOrders } from '../tools/tempoRuleAttacks';
@@ -28,7 +31,7 @@ import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalS
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
-import { dedupeByUnitKeepLast } from './requestOrdersFlowSupport';
+import { dedupeByUnitKeepLast, unitIdsWhoseEarlierRowsWereDiscarded } from './requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
 
 /**
@@ -68,6 +71,15 @@ export interface ApplyParsedRequestOrdersArgs {
    * Exceptions: None.
    */
   readonly ordersEnabled: boolean;
+  /**
+   * Whether memory tools are enabled for this consultation.
+   *
+   * Contract: `flags.memoryEnabled`. False means envelope memory rows are not stored.
+   * When to use: Before applying `memoryUpdates`.
+   * Expected outcome: A strategic consult with the group on applies the rows. A present list while the group is off is one drop reason.
+   * Exceptions: None.
+   */
+  readonly memoryEnabled: boolean;
   /**
    * Battle snapshot when this consultation is a tactical beat.
    *
@@ -210,8 +222,10 @@ export interface ApplyParsedRequestOrdersArgs {
  *
  * Purpose: The apply block is large enough that leaving it in the orchestrator would breach the size limit.
  * When to use: Once per consultation after a successful parse.
- * Expected outcome: `RequestOrdersResult` with the same drops as the previous inline implementation.
- * Exceptions: None.
+ * Expected outcome: Validated movement, fire, air, ferry, and embark rows. The last row for a unit wins, and each
+ * discarded earlier row is a drop reason. Strategic memory rows are applied when memory tools are on. A rejected
+ * memory row does not fail the consultation.
+ * Exceptions: None. Invalid rows are dropped with reasons rather than thrown.
  */
 export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): RequestOrdersResult {
   logDebug('openRouter applyParsedRequestOrders', {
@@ -222,6 +236,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   const {
     parsed,
     ordersEnabled,
+    memoryEnabled,
     tacticalBattle,
     seatId,
     state,
@@ -261,11 +276,32 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       battleId: tacticalBattle.battleId,
     });
   }
-  const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
-  const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
-  const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
-  const llmFerryOrders = dedupeByUnitKeepLast(parsed.ferryOrders ?? []);
-  const llmEmbarkOrders = dedupeByUnitKeepLast(parsed.embarkOrders ?? []);
+  const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
+  const movementSource = parsed.movementOrders ?? [];
+  const rangedSource = parsed.rangedAttacks ?? [];
+  const airSource = parsed.airStrikes ?? [];
+  const ferrySource = parsed.ferryOrders ?? [];
+  const embarkSource = parsed.embarkOrders ?? [];
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(movementSource)) {
+    dropReasons.push(`Duplicate order for ${aiOrderUnitLabel(unitId)}`);
+  }
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(rangedSource)) {
+    dropReasons.push(`Duplicate ranged for ${aiOrderUnitLabel(unitId)}`);
+  }
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(airSource)) {
+    dropReasons.push(`Duplicate air strike for ${aiOrderUnitLabel(unitId)}`);
+  }
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(ferrySource)) {
+    dropReasons.push(`Duplicate ferry for ${aiOrderUnitLabel(unitId)}`);
+  }
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(embarkSource)) {
+    dropReasons.push(`Duplicate embark for ${aiOrderUnitLabel(unitId)}`);
+  }
+  const llmMovementOrders = dedupeByUnitKeepLast(movementSource);
+  const llmRangedOrders = dedupeByUnitKeepLast(rangedSource);
+  const llmAirStrikes = dedupeByUnitKeepLast(airSource);
+  const llmFerryOrders = dedupeByUnitKeepLast(ferrySource);
+  const llmEmbarkOrders = dedupeByUnitKeepLast(embarkSource);
   const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
   const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
   const mergedMovement = [...standingGenerated.movementOrders.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
@@ -280,7 +316,6 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   });
 
   const validated: { unitId: string; toH3Index: string }[] = [];
-  const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
   const invalidStandingMovementUnits = new Set<string>();
   const seenUnits = new Set<string>();
   for (const order of mergedMovement) {
@@ -458,6 +493,15 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     outFerry = strategicFerry.ferryOrders;
     dropReasons.push(...strategicFerry.dropReasons);
   }
+
+  const memoryResult = applyParsedMemoryUpdates({
+    seatId,
+    turnNumber: state.turnNumber,
+    updates: parsed.memoryUpdates,
+    tactical: tacticalBattle != null,
+    memoryEnabled,
+  });
+  dropReasons.push(...memoryResult.dropReasons);
 
   markSuccessfulConsultation(parsed.strategy, parsed.message);
   logDebug('openRouter requestOrders: orders applied', {

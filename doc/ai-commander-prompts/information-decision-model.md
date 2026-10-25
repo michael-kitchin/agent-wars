@@ -159,7 +159,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `MEMORY_PERSISTENT` | Notes that reappear in every briefing | `memory.getInjectionText` | own-side | 12, 13 | strategic | conditional — `flags.memoryEnabled` |
 | `MEMORY_TRIGGERED` | Stored notes that fired this turn | same | own-side | 13 | strategic | conditional — `flags.memoryEnabled` |
 | `MEMORY_LIMITS` | Five persistent slots, fifteen stored slots, and the current usage | `PERSISTENT_LIMIT`, `STORED_LIMIT` | own-side | 13 | strategic | conditional — `flags.memoryEnabled` |
-| `MEMORY_WRITE_PATH` | Writes and deletes travel in the response envelope; there is no write tool | `MEMORY_TOOL_NAMES`, `executeMemory` | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
+| `MEMORY_WRITE_PATH` | Writes and deletes travel in the response envelope, and a strategic consult applies them when memory tools are enabled. A write needs content and tier. There is no write tool | `applyParsedMemoryUpdates`, `executeMemory` | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
 | `MEMORY_WRITE_LIMITS` | A key is at most 64 characters from a restricted alphabet and content at most 500 characters | `memory` validation | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
 | `CALLBACK_ACTIVE_LIST` | Which subscriptions are live right now | `getSubscriptions('opponent')` | own-side | 11, 22 | both | required |
 | `CALLBACK_EVENT_VOCABULARY` | The subscribable event names and their parameters | `evaluateSubscriptionEvents` | n/a | 11 | both | required |

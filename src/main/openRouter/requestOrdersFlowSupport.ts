@@ -462,6 +462,32 @@ export function dedupeByUnitKeepLast<T extends { unitId: string }>(rows: T[]): T
 }
 
 /**
+ * Names the unit ids whose earlier rows `dedupeByUnitKeepLast` discards.
+ *
+ * Purpose: Keep-last is silent unless the caller records a drop reason for each discarded row.
+ * When to use: On the same array passed into `dedupeByUnitKeepLast`, before standing orders are merged.
+ * Expected outcome: One id per discarded earlier row, in input order. The last row of each unit is omitted.
+ * An empty list, a single row, and a list with no repeated ids return an empty array. The input is not mutated.
+ * Exceptions: None.
+ */
+export function unitIdsWhoseEarlierRowsWereDiscarded<T extends { unitId: string }>(
+  rows: readonly T[]
+): string[] {
+  const seen = new Set<string>();
+  const discardedReversed: string[] = [];
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const unitId = rows[i]!.unitId;
+    if (seen.has(unitId)) {
+      discardedReversed.push(unitId);
+      continue;
+    }
+    seen.add(unitId);
+  }
+  discardedReversed.reverse();
+  return discardedReversed;
+}
+
+/**
  * Merges per-request pathfinding counters into the turn aggregate and emits end-of-request debug logs.
  *
  * Purpose: Keeps the `requestOrdersFlow` `finally` block thin while preserving telemetry shape.

@@ -4,7 +4,7 @@ One OpenRouter completion from a single strategic consultation, laid out for rea
 
 The capture stores the envelope as a string on `choices[0].message.content`. It is parsed and indented below. That body also carried an encrypted reasoning blob, which is left out.
 
-The `memoryUpdates` write has no `content`. `write` in `src/main/tools/memory.ts` rejects empty content, so that row does not store a note.
+The host applies `memoryUpdates` through `executeMemory`. This sample's write has no `content`. `write` in `src/main/tools/memory.ts` rejects empty content, so that row is a drop reason, and the rest of the envelope still applies.
 
 ## Completion
 

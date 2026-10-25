@@ -345,6 +345,43 @@ function testStandingOrderBranchesRequireTypeFields(): void {
 }
 
 /**
+ * Verifies a memory write must name content and tier, and a delete must not.
+ *
+ * Purpose: Gemini ignores `anyOf` when the items node also has `type` or `properties`, so this locks a bare union.
+ * When to use: After changing the `memoryUpdates` schema.
+ * Expected outcome: The items node is only `anyOf`. A complete write and a bare delete fit. A write missing content
+ * or tier, and a delete that includes content, do not.
+ * Exceptions: AssertionError when the schema accepts a partial write or a delete that carries content.
+ */
+function testMemoryUpdateRowsRequireContentAndTier(): void {
+  const properties = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  const items = asRecord(asRecord(properties.memoryUpdates, 'memoryUpdates').items, 'memoryUpdates.items');
+  assert.deepEqual(Object.keys(items), ['anyOf']);
+  const path = 'memoryUpdates';
+  assert.equal(
+    schemaMismatch(
+      { action: 'write', key: 'turn_objectives', tier: 'persistent', content: 'Hold the coast.' },
+      items,
+      path
+    ),
+    undefined
+  );
+  assert.ok(
+    schemaMismatch({ action: 'write', key: 'turn_objectives', tier: 'persistent' }, items, path),
+    'write without content must not fit'
+  );
+  assert.ok(
+    schemaMismatch({ action: 'write', key: 'turn_objectives', content: 'Hold the coast.' }, items, path),
+    'write without tier must not fit'
+  );
+  assert.equal(schemaMismatch({ action: 'delete', key: 'turn_objectives' }, items, path), undefined);
+  assert.ok(
+    schemaMismatch({ action: 'delete', key: 'turn_objectives', content: 'gone' }, items, path),
+    'delete with content must not fit'
+  );
+}
+
+/**
  * Verifies ranged rows and air strikes accept exactly one target key.
  *
  * Purpose: A row with both targets, or with neither, is dropped by the parser.
@@ -437,6 +474,7 @@ function run(): void {
   testOrderRowIsBareUnion();
   testStandingOrderBranchesRequireTypeFields();
   testRangedAndAirStrikeTargets();
+  testMemoryUpdateRowsRequireContentAndTier();
   testTaughtExamplesFitSchema();
   testTaughtCallbackParametersFitSchema();
   console.log('envelopeJsonSchema.test.ts passed');

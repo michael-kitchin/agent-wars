@@ -45,16 +45,6 @@ const AIR_STRIKE_TARGET_TYPES: readonly string[] = ['units', 'urban', 'airport',
 const INFRASTRUCTURE_TARGET_TYPES: readonly string[] = ['urban', 'airport', 'seaport'];
 
 /**
- * Memory update actions accepted by `normalizeMemoryUpdates`.
- *
- * Purpose: Enum for `memoryUpdates[].action`.
- * When to use: Building the memory row schema.
- * Expected outcome: Same values the parser accepts.
- * Exceptions: None.
- */
-const MEMORY_UPDATE_ACTIONS: readonly string[] = ['write', 'delete'];
-
-/**
  * Memory tiers accepted by `normalizeMemoryUpdates`.
  *
  * Purpose: Enum for `memoryUpdates[].tier`.
@@ -273,6 +263,39 @@ function orderActionRowSchema(action: string, allProperties: Readonly<Record<str
 }
 
 /**
+ * Builds the two `memoryUpdates` branches.
+ *
+ * The items node that holds this array must stay a bare `anyOf`. A sibling `type` or `properties` makes Gemini
+ * ignore the branches and accept a write that has no content.
+ *
+ * Purpose: A write must name content and tier. A delete names only the action and the key.
+ * When to use: The `memoryUpdates` property.
+ * Expected outcome: Two closed objects. The write branch requires `action`, `key`, `content`, and `tier`. The delete
+ * branch requires `action` and `key` and does not list `content` or `tier`.
+ * Exceptions: None.
+ */
+function memoryUpdateRowSchemas(): Record<string, unknown>[] {
+  return [
+    closedObjectSchema(
+      {
+        action: enumSchema(['write']),
+        key: STRING_SCHEMA,
+        content: STRING_SCHEMA,
+        tier: enumSchema(MEMORY_TIERS),
+      },
+      ['action', 'key', 'content', 'tier']
+    ),
+    closedObjectSchema(
+      {
+        action: enumSchema(['delete']),
+        key: STRING_SCHEMA,
+      },
+      ['action', 'key']
+    ),
+  ];
+}
+
+/**
  * Builds the two `ranged_attack` branches.
  *
  * Purpose: A shot must name a hex or a unit, and a row that names both matches neither branch.
@@ -390,17 +413,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'callbacks':
       return arraySchema(callbackRowSchema(gates));
     case 'memoryUpdates':
-      return arraySchema(
-        closedObjectSchema(
-          {
-            action: enumSchema(MEMORY_UPDATE_ACTIONS),
-            key: STRING_SCHEMA,
-            content: STRING_SCHEMA,
-            tier: enumSchema(MEMORY_TIERS),
-          },
-          ['action', 'key']
-        )
-      );
+      return arraySchema({ anyOf: memoryUpdateRowSchemas() });
     case 'productionOrders':
       return arraySchema(
         closedObjectSchema(
