@@ -204,9 +204,9 @@ knockoutCoordinates: KnockoutCoordinates;
   /**
    * Birth records captured before this turn deleted any units.
    *
-   * Purpose: Removed rows name the unit and the hex where it was lost. The flag needs the birth record.
+   * Contract: One entry per unit that had an origin at turn start. Empty when none did.
    * When to use: Stamp every removed-unit list on the ready result.
-   * Expected outcome: One entry per unit that had an origin at turn start.
+   * Expected outcome: A casualty can be named after its row is gone, including a unit the player never saw.
    * Exceptions: None.
    */
   lossFlagFactsByUnitId: ReadonlyMap<string, LossFlagFacts>;

@@ -212,9 +212,9 @@ meleeInterceptCandidates: MeleeCandidateRow[];
   /**
    * Birth records of units that existed before this turn's deletes.
    *
-   * Purpose: A casualty can be named after its row is gone, including a unit the player never saw.
+   * Contract: One entry per unit that had an origin at turn start. Empty when none did.
    * When to use: `finalizeReadyTurnAfterMelee` stamps these onto the removed-unit lists.
-   * Expected outcome: One entry per unit that had an origin at turn start. Empty when none did.
+   * Expected outcome: A casualty can be named after its row is gone, including a unit the player never saw.
    * Exceptions: None.
    */
   lossFlagFactsByUnitId: ReadonlyMap<string, LossFlagFacts>;

@@ -35303,6 +35303,12 @@ ${bonuses}`;
       unknownBattleLine
     });
     if (updateText) {
+      rememberUnitOrigins([
+        ...readySlice.removedUnits ?? [],
+        ...readySlice.airStrikeRemovedUnits ?? [],
+        ...readySlice.rangedRemovedUnits ?? [],
+        ...readySlice.meleeRemovedUnits ?? []
+      ]);
       const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
       deps.showMapToast(updateText, {
         isError: false,
@@ -37305,6 +37311,19 @@ ${bonuses}`;
     ctx.textBaseline = "middle";
     ctx.fillText("Loading...", width / 2, height / 2);
   }
+  function drawUnitFromRemoved(unit) {
+    return {
+      id: unit.id,
+      player: unit.player,
+      unitType: unit.unitType,
+      h3Index: unit.h3Index,
+      ...typeof unit.displayOrder === "number" ? { displayOrder: unit.displayOrder } : {},
+      ...typeof unit.formedTurn === "number" ? { formedTurn: unit.formedTurn } : {},
+      ...unit.origin ? { origin: unit.origin } : {},
+      ...unit.weatherTags ? { weatherTags: [...unit.weatherTags] } : {},
+      ...unit.techLevel ? { techLevel: unit.techLevel } : {}
+    };
+  }
   function getUnitsForDrawWithMovingIds2(state, deps) {
     let unitsToDraw = state.units;
     let movingIds;
@@ -37348,7 +37367,7 @@ ${bonuses}`;
           const move = anim.moves.find((m) => m.unitId === u.id);
           return move ? { ...u, h3Index: move.fromH3Index } : u;
         });
-        unitsToDraw = [...preMoveSurvivors, ...anim.rangedRemovedUnits ?? []];
+        unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? []).map(drawUnitFromRemoved)];
         movingIds = void 0;
       } else if (phase.inMovement) {
         unitsToDraw = state.units;
@@ -37361,7 +37380,7 @@ ${bonuses}`;
         });
         movingIds = void 0;
       } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
-        unitsToDraw = [...state.units, ...anim.meleeRemovedUnits ?? []];
+        unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? []).map(drawUnitFromRemoved)];
         movingIds = void 0;
       }
       unitsToDraw = unitsDrawnAtCasualtyTiming({

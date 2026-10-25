@@ -1,4 +1,4 @@
-import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { GameStateSnapshot, RemovedUnitSnapshot } from '../../shared/ipcTypes';
 import {
   marchPlayedForUnit,
   resolutionCasualtyTiming,
@@ -83,6 +83,28 @@ export function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, h
 }
 
 /**
+ * Copies a casualty row into the unit shape the map draws.
+ *
+ * Purpose: Playback keeps a removed icon on screen. The casualty's weather tags are read-only, and a game-state unit's tags are not.
+ * When to use: When a ranged or melee casualty is added to the icons for this frame.
+ * Expected outcome: The same id, owner, type, hex, and birth fields. Weather tags are a new array when the casualty has them.
+ * Exceptions: None.
+ */
+function drawUnitFromRemoved(unit: RemovedUnitSnapshot): GameStateSnapshot['units'][number] {
+  return {
+    id: unit.id,
+    player: unit.player,
+    unitType: unit.unitType,
+    h3Index: unit.h3Index,
+    ...(typeof unit.displayOrder === 'number' ? { displayOrder: unit.displayOrder } : {}),
+    ...(typeof unit.formedTurn === 'number' ? { formedTurn: unit.formedTurn } : {}),
+    ...(unit.origin ? { origin: unit.origin } : {}),
+    ...(unit.weatherTags ? { weatherTags: [...unit.weatherTags] } : {}),
+    ...(unit.techLevel ? { techLevel: unit.techLevel } : {}),
+  };
+}
+
+/**
  * Chooses the unit icons for this frame and which of them are mid-playback.
  *
  * Purpose: Resolution playback has to keep a removed icon through its destruction mark and glide a march only when that unit reached the destination.
@@ -138,7 +160,7 @@ export function getUnitsForDrawWithMovingIds(
           const move = anim.moves.find((m) => m.unitId === u.id);
           return move ? { ...u, h3Index: move.fromH3Index } : u;
         });
-      unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? [])];
+      unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? []).map(drawUnitFromRemoved)];
       movingIds = undefined;
     } else if (phase.inMovement) {
       unitsToDraw = state.units;
@@ -155,7 +177,7 @@ export function getUnitsForDrawWithMovingIds(
       });
       movingIds = undefined;
     } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
-      unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? [])];
+      unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? []).map(drawUnitFromRemoved)];
       movingIds = undefined;
     }
     unitsToDraw = unitsDrawnAtCasualtyTiming({
