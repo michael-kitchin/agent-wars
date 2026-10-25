@@ -4,7 +4,14 @@
  *
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
-import { collapseOpenConsoleTab, expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
+import {
+  collapseOpenConsoleTab,
+  collapsedConsoleState,
+  consoleTabWhenOrdersDisabled,
+  expandedConsoleTabState,
+  nextConsoleTabState,
+  type ConsoleTabState,
+} from '../../shared/consoleTabState';
 import { isObservingRoster, observeModeControls } from '../../shared/observeModeControls';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
@@ -136,15 +143,21 @@ function setRailBadge(badgeId: string, count: number): void {
  *   reports, and, on the Commanders tab, how many commanders are playing.
  * When to use: After the queued orders change, after a snapshot or turn or beat changes, and when the tab changes.
  * Expected outcome: `#console-subtitle` shows the active tab's subtitle. The Orders badge shows the number of
- *   queued orders, and the Reports badge the number of unread reports.
+ *   queued orders, and the Reports badge the number of unread reports. While observing, a selected Orders tab moves to
+ *   Commanders and keeps the console collapsed or expanded as it was.
  * Exceptions: None; missing elements are skipped.
  */
 export function refreshConsoleHeader(): void {
   const orders = document.getElementById('console-tab-orders');
   const observing = observeModeControls(S.gameState?.seats ?? []).observing;
   if (orders instanceof HTMLButtonElement) orders.disabled = observing;
-  if (observing && consoleState.activeTabId === 'console-tab-orders') {
-    consoleState = expandedConsoleTabState('console-tab-commanders');
+  const redirected = consoleTabWhenOrdersDisabled(consoleState, observing);
+  if (redirected !== consoleState) {
+    console.debug('[agent-wars] refreshConsoleHeader orders disabled', {
+      collapsed: redirected.collapsed,
+      activeTabId: redirected.activeTabId,
+    });
+    consoleState = redirected;
     applyConsoleState();
     return;
   }
@@ -178,9 +191,29 @@ function applyConsoleState(): void {
 }
 
 /**
+ * Collapses the console whichever tab is open.
+ *
+ * Purpose: A successful Start game or New game closes every panel. The selected tab stays selected.
+ * When to use: After a new match is installed, from `applyStartMatchAiChoice`.
+ * Expected outcome: The console collapses. An already collapsed console is left as it was.
+ * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
+ */
+export function collapseConsole(): void {
+  const next = collapsedConsoleState(consoleState);
+  console.debug('[agent-wars] collapseConsole', {
+    activeTabId: consoleState.activeTabId,
+    collapsed: next.collapsed,
+    changed: next !== consoleState,
+  });
+  if (next === consoleState) return;
+  consoleState = next;
+  applyConsoleState();
+}
+
+/**
  * Collapses the console when the named tab is the one on screen.
  *
- * Purpose: Clicking Start on the Commanders tab hides that panel. Stop does not call this.
+ * Purpose: Start is on the Commanders panel. Turning planning on should hide that panel and widen the map.
  * When to use: After Start turns planning on.
  * Expected outcome: The named tab stays selected and the console collapses. Another tab, or a console that is already collapsed, is left as it was. An unknown id is logged and the console stays as it was.
  * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
@@ -200,8 +233,8 @@ export function collapseConsoleTab(tabId: string): void {
 /**
  * Expands the console on one of its tabs.
  *
- * Purpose: A successful start can show the Commanders tab without a click. A click on the selected tab would collapse it.
- * When to use: After a new match is installed, and once when the app opens onto a live match. The console is on screen either way.
+ * Purpose: Opening the app onto a live match shows the Commanders tab without a click. A click on the selected tab would collapse it.
+ * When to use: Once when the app opens onto a live match. The console is on screen.
  * Expected outcome: The named tab's panel shows and the console is expanded. An unknown id is logged and the console stays as it was.
  * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
  */

@@ -10,6 +10,7 @@ import {
   reportOpenRouterPopoverLine,
   setOpenRouterModelListListener,
 } from './openRouterModelRefresh';
+import { choicePair, fieldLabel, POPOVER_CONTROL_IDS, popoverLabelWidthText } from './commanderPopoverLabels';
 import { openRouterModelById } from './openRouterModelCatalog';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 
@@ -313,19 +314,21 @@ function popoverHeader(title: string): HTMLElement {
  *
  * Purpose: The controls write one commander object the caller stores.
  * When to use: `openCommanderPopover`.
- * Expected outcome: A model, reasoning, or doctrine change calls `onChange` with the key field's current value. The key calls `onChange` on blur and Enter only when its trimmed value changed. A model change also updates the app-wide model.
+ * Expected outcome: A model, reasoning, or doctrine change calls `onChange` with the key field's current value. The key calls `onChange` on blur and Enter only when its trimmed value changed. A model change also updates the app-wide model. The reasoning list stays visible when the model offers no levels: it is disabled and reads "Model default". Every label is as wide as the word Reasoning, so the API key field and the model list start at the reasoning list's left edge.
  * Exceptions: None.
  */
 function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'commander-popover-fields';
   const keyInput = document.createElement('input');
+  keyInput.id = POPOVER_CONTROL_IDS.apiKey;
   keyInput.type = 'password';
   keyInput.autocomplete = 'off';
   keyInput.setAttribute('aria-label', 'API key');
   keyInput.value = commanderApiKey(draft);
   keyInput.setAttribute('data-control-tooltip', apiKeyTooltipText);
   const model = document.createElement('select');
+  model.id = POPOVER_CONTROL_IDS.model;
   model.setAttribute('aria-label', 'Model');
   copyModelOptions(model, draft.modelId);
   const modelControls = document.createElement('span');
@@ -336,12 +339,17 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
   refresh.setAttribute('aria-label', 'Refresh model list');
   refresh.setAttribute('data-control-tooltip', refreshModelsTooltipText);
   modelControls.append(model, refresh);
-  const reasoningRow = document.createElement('label');
-  reasoningRow.className = 'commander-popover-field';
-  reasoningRow.textContent = 'Reasoning';
+  const keyModel = document.createElement('div');
+  keyModel.className = 'commander-popover-key-model';
+  keyModel.append(
+    fieldLabel(POPOVER_CONTROL_IDS.apiKey, 'API key'),
+    keyInput,
+    fieldLabel(POPOVER_CONTROL_IDS.model, 'Model'),
+    modelControls
+  );
   const reasoning = document.createElement('select');
+  reasoning.id = POPOVER_CONTROL_IDS.reasoning;
   reasoning.setAttribute('aria-label', 'Reasoning');
-  reasoningRow.appendChild(reasoning);
   const current = (): NewGameCommanderInput => {
     draft.apiKey = keyInput.value.trim();
     return { ...draft };
@@ -358,7 +366,6 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     const record = modelId ? openRouterModelById(modelId) : undefined;
     reasoningSelect.showForModel(record, draft.reasoningEffort ?? '');
     const efforts = listSelectableReasoningEfforts(record);
-    reasoningRow.hidden = efforts.length === 0;
     const modelKnown = modelId.length > 0 && record != null;
     if (!modelId || (modelKnown && efforts.length === 0)) draft.reasoningEffort = null;
     placeCommanderPopover();
@@ -396,6 +403,9 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     showReasoning();
   });
   const doctrine = doctrineField(draft, request, current);
+  const choices = document.createElement('div');
+  choices.className = 'commander-popover-choices';
+  choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), doctrine.pair);
   applyOpenDraft = (commander) => {
     draft.modelId = commander.modelId;
     draft.reasoningEffort = commander.reasoningEffort;
@@ -407,7 +417,7 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     doctrine.show();
   };
   const copy = copyButton(request.copyButton);
-  fields.append(labeledField('API key', keyInput), labeledField('Model', modelControls), reasoningRow, doctrine.root);
+  fields.append(keyModel, choices, doctrine.description);
   if (copy) fields.append(copy);
   return fields;
 }
@@ -468,9 +478,9 @@ function doctrineField(
   draft: CommanderDraft,
   request: CommanderPopoverRequest,
   current: () => NewGameCommanderInput
-): { root: HTMLElement; show: () => void } {
-  const wrap = document.createElement('div');
+): { pair: HTMLElement; description: HTMLElement; show: () => void } {
   const select = document.createElement('select');
+  select.id = POPOVER_CONTROL_IDS.doctrine;
   select.setAttribute('aria-label', 'Doctrine');
   for (const choice of DOCTRINE_CHOICES) {
     select.appendChild(new Option(DOCTRINE_CHOICE_LABELS[choice], choice));
@@ -488,23 +498,7 @@ function doctrineField(
     request.onChange(current());
   });
   show();
-  wrap.append(labeledField('Doctrine', select), description);
-  return { root: wrap, show };
-}
-
-/**
- * A label with its control beside it.
- *
- * Purpose: Model, reasoning, and doctrine share one row shape.
- * When to use: `popoverFields` and `doctrineField`.
- * Expected outcome: A label element containing the text and the control.
- * Exceptions: None.
- */
-function labeledField(text: string, control: HTMLElement): HTMLLabelElement {
-  const label = document.createElement('label');
-  label.className = 'commander-popover-field';
-  label.append(document.createTextNode(text), control);
-  return label;
+  return { pair: choicePair(POPOVER_CONTROL_IDS.doctrine, 'Doctrine', select), description, show };
 }
 
 /**

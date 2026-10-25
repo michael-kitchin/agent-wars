@@ -1,5 +1,5 @@
 import type { StartMatchAiChoice, StartMatchAiInput } from '../../shared/startMatchAiChoice';
-import { showConsoleTab } from '../chrome/consoleFrame';
+import { collapseConsole } from '../chrome/consoleFrame';
 import { rendererSharedState as S } from '../core/state';
 import { newGameHasRunnableCommander } from './newGameSidesUi';
 import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
@@ -78,12 +78,11 @@ export function readStartMatchAiInput(): StartMatchAiInput {
 /**
  * Applies the click-time Auto-start AI choice after a new match is installed.
  *
- * Purpose: Turns Start on and starts turn-1 planning, or turns Start off and opens the Commanders tab. It awaits the stop
- *   of any previous consult before starting a new one, so that cancel cannot abort the new request.
+ * Purpose: Turns Start on and starts turn-1 planning, or turns Start off. Either way the console collapses. It awaits the
+ *   stop of any previous consult before starting a new one, so that cancel cannot abort the new request.
  * When to use: Only after a successful start, once the overlay has closed and the precomputed plan has been cleared.
- * Expected outcome: The button's pressed state and label match `choice.runOn`: Stop while planning is on, Start while it is off. Planning starts once when that is true. The Commanders
- *   tab opens expanded when `choice.openCommandersTab` is true. A rejected cancel is logged by `stopOpponentPlanning`
- *   and does not throw.
+ * Expected outcome: The button's pressed state and label match `choice.runOn`: Stop while planning is on, Start while it is off. Planning starts once when that is true. The console
+ *   collapses and the selected tab stays selected. A rejected cancel is logged by `stopOpponentPlanning` and does not throw.
  * Exceptions: None. `stopOpponentPlanning` catches a rejected cancel.
  */
 export async function applyStartMatchAiChoice(choice: StartMatchAiChoice, deps: StartMatchAiDeps): Promise<void> {
@@ -94,5 +93,5 @@ export async function applyStartMatchAiChoice(choice: StartMatchAiChoice, deps: 
   if (runButton) setPlanningTogglePressed(runButton, choice.runOn);
   deps.updateReadyButtonState();
   if (choice.runOn) deps.startPlanning();
-  if (choice.openCommandersTab) showConsoleTab('console-tab-commanders');
+  collapseConsole();
 }

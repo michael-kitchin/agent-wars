@@ -22687,6 +22687,34 @@ ${bonuses}`;
     reportLine?.(line, isError);
   }
 
+  // src/renderer/openRouter/commanderPopoverLabels.ts
+  var popoverLabelWidthText = "Reasoning";
+  var POPOVER_CONTROL_IDS = {
+    apiKey: "commander-popover-api-key",
+    model: "commander-popover-model",
+    reasoning: "commander-popover-reasoning",
+    doctrine: "commander-popover-doctrine"
+  };
+  function fieldLabel(id, text) {
+    const label = document.createElement("label");
+    label.className = "commander-popover-label";
+    label.htmlFor = id;
+    const sizer = document.createElement("span");
+    sizer.className = "commander-popover-label-sizer";
+    sizer.setAttribute("aria-hidden", "true");
+    sizer.textContent = popoverLabelWidthText;
+    const shown = document.createElement("span");
+    shown.textContent = text;
+    label.append(sizer, shown);
+    return label;
+  }
+  function choicePair(id, text, control) {
+    const pair = document.createElement("div");
+    pair.className = "commander-popover-choice";
+    pair.append(fieldLabel(id, text), control);
+    return pair;
+  }
+
   // src/renderer/openRouter/openRouterModelCatalog.ts
   var modelsById = /* @__PURE__ */ new Map();
   function replaceOpenRouterModelCatalog(models) {
@@ -22815,12 +22843,14 @@ ${bonuses}`;
     const fields = document.createElement("div");
     fields.className = "commander-popover-fields";
     const keyInput = document.createElement("input");
+    keyInput.id = POPOVER_CONTROL_IDS.apiKey;
     keyInput.type = "password";
     keyInput.autocomplete = "off";
     keyInput.setAttribute("aria-label", "API key");
     keyInput.value = commanderApiKey(draft);
     keyInput.setAttribute("data-control-tooltip", apiKeyTooltipText);
     const model = document.createElement("select");
+    model.id = POPOVER_CONTROL_IDS.model;
     model.setAttribute("aria-label", "Model");
     copyModelOptions(model, draft.modelId);
     const modelControls = document.createElement("span");
@@ -22831,12 +22861,17 @@ ${bonuses}`;
     refresh.setAttribute("aria-label", "Refresh model list");
     refresh.setAttribute("data-control-tooltip", refreshModelsTooltipText);
     modelControls.append(model, refresh);
-    const reasoningRow = document.createElement("label");
-    reasoningRow.className = "commander-popover-field";
-    reasoningRow.textContent = "Reasoning";
+    const keyModel = document.createElement("div");
+    keyModel.className = "commander-popover-key-model";
+    keyModel.append(
+      fieldLabel(POPOVER_CONTROL_IDS.apiKey, "API key"),
+      keyInput,
+      fieldLabel(POPOVER_CONTROL_IDS.model, "Model"),
+      modelControls
+    );
     const reasoning = document.createElement("select");
+    reasoning.id = POPOVER_CONTROL_IDS.reasoning;
     reasoning.setAttribute("aria-label", "Reasoning");
-    reasoningRow.appendChild(reasoning);
     const current = () => {
       draft.apiKey = keyInput.value.trim();
       return { ...draft };
@@ -22853,7 +22888,6 @@ ${bonuses}`;
       const record = modelId ? openRouterModelById(modelId) : void 0;
       reasoningSelect.showForModel(record, draft.reasoningEffort ?? "");
       const efforts = listSelectableReasoningEfforts(record);
-      reasoningRow.hidden = efforts.length === 0;
       const modelKnown = modelId.length > 0 && record != null;
       if (!modelId || modelKnown && efforts.length === 0) draft.reasoningEffort = null;
       placeCommanderPopover();
@@ -22891,6 +22925,9 @@ ${bonuses}`;
       showReasoning();
     });
     const doctrine = doctrineField(draft, request, current);
+    const choices = document.createElement("div");
+    choices.className = "commander-popover-choices";
+    choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), doctrine.pair);
     applyOpenDraft = (commander) => {
       draft.modelId = commander.modelId;
       draft.reasoningEffort = commander.reasoningEffort;
@@ -22902,7 +22939,7 @@ ${bonuses}`;
       doctrine.show();
     };
     const copy = copyButton(request.copyButton);
-    fields.append(labeledField("API key", keyInput), labeledField("Model", modelControls), reasoningRow, doctrine.root);
+    fields.append(keyModel, choices, doctrine.description);
     if (copy) fields.append(copy);
     return fields;
   }
@@ -22933,8 +22970,8 @@ ${bonuses}`;
     select.value = modelId ?? "";
   }
   function doctrineField(draft, request, current) {
-    const wrap = document.createElement("div");
     const select = document.createElement("select");
+    select.id = POPOVER_CONTROL_IDS.doctrine;
     select.setAttribute("aria-label", "Doctrine");
     for (const choice of DOCTRINE_CHOICES) {
       select.appendChild(new Option(DOCTRINE_CHOICE_LABELS[choice], choice));
@@ -22952,14 +22989,7 @@ ${bonuses}`;
       request.onChange(current());
     });
     show();
-    wrap.append(labeledField("Doctrine", select), description);
-    return { root: wrap, show };
-  }
-  function labeledField(text, control) {
-    const label = document.createElement("label");
-    label.className = "commander-popover-field";
-    label.append(document.createTextNode(text), control);
-    return label;
+    return { pair: choicePair(POPOVER_CONTROL_IDS.doctrine, "Doctrine", select), description, show };
   }
   function saveAppWideModel(modelId) {
     const select = document.getElementById("openrouter-model");
@@ -28933,9 +28963,19 @@ ${bonuses}`;
   function expandedConsoleTabState(tabId) {
     return { activeTabId: tabId, collapsed: false };
   }
+  var ORDERS_TAB_ID = "console-tab-orders";
+  var COMMANDERS_TAB_ID = "console-tab-commanders";
+  function collapsedConsoleState(current) {
+    if (current.collapsed) return current;
+    return { activeTabId: current.activeTabId, collapsed: true };
+  }
+  function consoleTabWhenOrdersDisabled(current, observing) {
+    if (!observing || current.activeTabId !== ORDERS_TAB_ID) return current;
+    return { activeTabId: COMMANDERS_TAB_ID, collapsed: current.collapsed };
+  }
   function consoleTabIdForLiveMatchLaunch(match) {
     if (match == null || match.hexCount === 0 || match.gameOver) return null;
-    return "console-tab-commanders";
+    return COMMANDERS_TAB_ID;
   }
   function collapseOpenConsoleTab(current, tabId) {
     if (current.collapsed || current.activeTabId !== tabId) return current;
@@ -29025,8 +29065,13 @@ ${bonuses}`;
     const orders = document.getElementById("console-tab-orders");
     const observing = observeModeControls(rendererSharedState.gameState?.seats ?? []).observing;
     if (orders instanceof HTMLButtonElement) orders.disabled = observing;
-    if (observing && consoleState.activeTabId === "console-tab-orders") {
-      consoleState = expandedConsoleTabState("console-tab-commanders");
+    const redirected = consoleTabWhenOrdersDisabled(consoleState, observing);
+    if (redirected !== consoleState) {
+      console.debug("[agent-wars] refreshConsoleHeader orders disabled", {
+        collapsed: redirected.collapsed,
+        activeTabId: redirected.activeTabId
+      });
+      consoleState = redirected;
       applyConsoleState();
       return;
     }
@@ -29046,6 +29091,17 @@ ${bonuses}`;
     setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === "console-tab-reports");
     refreshConsoleHeader();
     if (!consoleState.collapsed) active2?.onShow?.();
+  }
+  function collapseConsole() {
+    const next = collapsedConsoleState(consoleState);
+    console.debug("[agent-wars] collapseConsole", {
+      activeTabId: consoleState.activeTabId,
+      collapsed: next.collapsed,
+      changed: next !== consoleState
+    });
+    if (next === consoleState) return;
+    consoleState = next;
+    applyConsoleState();
   }
   function collapseConsoleTab(tabId) {
     if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
@@ -33589,10 +33645,7 @@ ${bonuses}`;
 
   // src/shared/startMatchAiChoice.ts
   function chooseStartMatchAi(input) {
-    if (input.autoStartChecked && input.runEnabled) {
-      return { runOn: true, openCommandersTab: false };
-    }
-    return { runOn: false, openCommandersTab: true };
+    return { runOn: input.autoStartChecked && input.runEnabled };
   }
 
   // src/renderer/gameplay/newGameAiStart.ts
@@ -33615,7 +33668,7 @@ ${bonuses}`;
     if (runButton) setPlanningTogglePressed(runButton, choice.runOn);
     deps.updateReadyButtonState();
     if (choice.runOn) deps.startPlanning();
-    if (choice.openCommandersTab) showConsoleTab("console-tab-commanders");
+    collapseConsole();
   }
 
   // src/renderer/gameplay/newGame.ts

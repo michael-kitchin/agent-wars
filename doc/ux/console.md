@@ -20,7 +20,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - The Reports tab: what the map toasts showed during this match. See [reports-tab.md](reports-tab.md).
 - The Commanders tab, labeled Command on the rail: Start or Stop, and a sentence, one card per AI commander, tool groups, and the AI activity log. The API key and the model-list refresh are in each commander's popover. The sentence reads "Planning is on for all {n} commanders." while the button reads Stop, and "Planning is off." otherwise. See [opponent-tab-commander.md](opponent-tab-commander.md), [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md), and [ai-activity-log.md](ai-activity-log.md).
 - A footer under the tab content, with the commander status line above Ready. While observing, a checkbox between them reads "Start the next turn when every commander is ready". It starts unchecked. Watch the rest checks it. See [modes-and-transitions.md](modes-and-transitions.md). For Ready, see [console-command-bar.md](console-command-bar.md).
-- While observing, the Orders tab is disabled. If it was the selected tab, the console moves to Commanders. Build and Forces stay disabled.
+- While observing, the Orders tab is disabled. If it was the selected tab, the console moves to Commanders. A collapsed console stays collapsed. Build and Forces stay disabled.
 - The opponent status line, read-only and with no tip:
   - A dot: grey while planning is off, teal while it is on, and rose while the opponent plans.
   - A label: "Commanders off" while the button reads Start, "Commanders planning · {ready} of {active} ready" while any commander is planning, and "Commanders ready" otherwise. While observing, the planning label is "Planning · {ready} of {active} ready". Ready's wait label is "AI: {m:ss} (x{n})", and `{n}` is how many commanders are still planning.
@@ -39,7 +39,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - When the player clicks any tab while the console is collapsed, the console expands on that tab.
 - The map takes the width the console gives up, and gives it back when the console expands.
 - Clicking Start while the Commanders tab is open collapses the console. The selected tab stays Commanders. Clicking Stop does not change the tab or the collapsed state. See [opponent-tab-commander.md](opponent-tab-commander.md).
-- Starting a match without turning planning on expands the console on the Commanders tab. That open does not collapse the console when Commanders was already selected. Starting a match with planning on leaves the tab and the collapsed state as they were. That path is not a click on Start.
+- Starting a match collapses the console (`collapseConsole` in `src/renderer/chrome/consoleFrame.ts`). The selected tab stays selected, so the next click on that rail button opens it again. Planning follows Auto-start AI and does not choose the tab. That path is not a click on Start.
 
 ### Keyboard
 
@@ -98,11 +98,11 @@ None.
 - `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-commanders`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-commanders`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#commander-status-line`, `#commander-status-label`, `#commander-status-model`, `#commander-status-cost`)
 - `static/frameChrome.css`
 - `static/consoleChrome.css`
-- `src/renderer/chrome/consoleFrame.ts` (`showConsoleTab`)
+- `src/renderer/chrome/consoleFrame.ts` (`showConsoleTab`, `collapseConsole`)
 - `src/renderer/map/initCore.ts` (`wireInitCore`, which calls `showConsoleTab` after the launch snapshot when `consoleTabIdForLiveMatchLaunch` returns the Commanders tab)
 - `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, which redraws the Commanders subtitle when the snapshot changes)
 - `src/renderer/gameplay/queuedOrderRows.ts`
-- `src/shared/consoleTabState.ts` (`nextConsoleTabState`, `expandedConsoleTabState`, `consoleTabIdForLiveMatchLaunch`)
+- `src/shared/consoleTabState.ts` (`nextConsoleTabState`, `expandedConsoleTabState`, `collapsedConsoleState`, `consoleTabWhenOrdersDisabled`, `consoleTabIdForLiveMatchLaunch`)
 - `src/shared/commanderPlanningStatus.ts`
 - `src/renderer/openRouter/openRouterUiHelpers.ts` (`renderOpponentStatus`)
 - `src/renderer/map/mapContainerResize.ts`

@@ -65,9 +65,9 @@ async function waitForNewGameOverlay(page) {
  *
  * Purpose: One click for both matches. The button is the same element in the footer and in the collapsed header.
  * When to use: After the scenario's choices are set, whether or not the choices are hidden.
- * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map. The console is then on
- *   Orders. A live match opens the Commanders tab; the scenes after this click measure Orders, so the click selects
- *   Orders. A later click on Commanders must open that tab rather than collapse it.
+ * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map. A successful start
+ *   collapses the console and leaves Orders selected, so this click expands Orders. The scenes after it measure Orders.
+ *   A later click on Commanders opens that tab rather than collapsing the console.
  * Exceptions: Throws a Playwright timeout when the overlay does not close within `timeoutMs`.
  */
 async function clickStartGame(page, timeoutMs) {

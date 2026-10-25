@@ -30,9 +30,9 @@ export interface ConsoleTabState {
 /**
  * Shows one tab with the console expanded.
  *
- * Purpose: A successful start opens the Commanders tab without using a tab click. A click on the selected tab collapses
- *   the console, so this result does not go through `nextConsoleTabState`.
- * When to use: From the console frame when a start should show a tab.
+ * Purpose: A launch onto a live match opens the Commanders tab without using a tab click. A click on the selected tab
+ *   collapses the console, so this result does not go through `nextConsoleTabState`.
+ * When to use: From the console frame when a tab should be shown expanded.
  * Expected outcome: The named tab is active and the console is expanded, whatever the previous tab and collapsed state were.
  * Exceptions: None.
  */
@@ -41,18 +41,67 @@ export function expandedConsoleTabState(tabId: string): ConsoleTabState {
 }
 
 /**
+ * Id of the Orders rail tab.
+ *
+ * Purpose: Observe mode disables this tab, and the redirect compares against this id.
+ * When to use: `consoleTabWhenOrdersDisabled`.
+ * Expected outcome: Matches `#console-tab-orders` in `static/index.html`.
+ * Exceptions: None.
+ */
+const ORDERS_TAB_ID = 'console-tab-orders';
+
+/**
+ * Id of the Commanders rail tab.
+ *
+ * Purpose: Observe mode selects this tab when Orders was selected.
+ * When to use: `consoleTabWhenOrdersDisabled`.
+ * Expected outcome: Matches `#console-tab-commanders` in `static/index.html`.
+ * Exceptions: None.
+ */
+const COMMANDERS_TAB_ID = 'console-tab-commanders';
+
+/**
+ * Collapses the console without changing which tab is selected.
+ *
+ * Purpose: A successful Start game or New game closes every open panel. The selected tab stays selected so the next
+ *   click on that rail button opens it again.
+ * When to use: After a new match is installed.
+ * Expected outcome: `collapsed` is true and `activeTabId` is unchanged. An already collapsed console is returned as the
+ *   same object.
+ * Exceptions: None.
+ */
+export function collapsedConsoleState(current: ConsoleTabState): ConsoleTabState {
+  if (current.collapsed) return current;
+  return { activeTabId: current.activeTabId, collapsed: true };
+}
+
+/**
+ * Moves off the Orders tab while the player is observing, without opening a collapsed console.
+ *
+ * Purpose: Orders is disabled while observing. Selecting Commanders must not expand a console that Start just collapsed.
+ * When to use: From the console header refresh, with whether the current seats are observing.
+ * Expected outcome: When `observing` is true and Orders is selected, Commanders is selected and `collapsed` is unchanged.
+ *   Every other state is returned as the same object.
+ * Exceptions: None.
+ */
+export function consoleTabWhenOrdersDisabled(current: ConsoleTabState, observing: boolean): ConsoleTabState {
+  if (!observing || current.activeTabId !== ORDERS_TAB_ID) return current;
+  return { activeTabId: COMMANDERS_TAB_ID, collapsed: current.collapsed };
+}
+
+/**
  * Chooses the console tab to open when the app loads a match.
  *
  * Purpose: A live match should show the Commanders tab. A launch that shows the new-game dialog should leave the console on its start tab.
  * When to use: Once, after the launch snapshot is applied. Null is not a live match. A missing snapshot is the caller's failure, not a value to pass here.
- * Expected outcome: `'console-tab-commanders'` when the match has hexes and is not over. Null otherwise, so the caller leaves the start tab.
+ * Expected outcome: `'console-tab-commanders'` (`COMMANDERS_TAB_ID`) when the match has hexes and is not over. Null otherwise, so the caller leaves the start tab.
  * Exceptions: None.
  */
 export function consoleTabIdForLiveMatchLaunch(
   match: { readonly hexCount: number; readonly gameOver: boolean } | null
 ): string | null {
   if (match == null || match.hexCount === 0 || match.gameOver) return null;
-  return 'console-tab-commanders';
+  return COMMANDERS_TAB_ID;
 }
 
 /**

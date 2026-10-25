@@ -338,19 +338,55 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-.commander-popover-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   font-size: 13px;
 }
-.commander-popover-field select,
-.commander-popover-field input {
-  flex: 1;
+/* API key and Model share one label column, as wide as "Reasoning", so those controls start where the reasoning list starts. */
+.commander-popover-key-model {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.commander-popover-key-model > .commander-popover-label,
+.commander-popover-choice > .commander-popover-label {
+  display: grid;
+  text-align: right;
+  white-space: nowrap;
+}
+.commander-popover-key-model > .commander-popover-label > span,
+.commander-popover-choice > .commander-popover-label > span {
+  grid-area: 1 / 1;
+}
+.commander-popover-key-model > input,
+.commander-popover-key-model > .commander-popover-model-controls {
   min-width: 0;
-  width: auto;
+  width: 100%;
+}
+.commander-popover-key-model > input {
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+/* Reasoning and Doctrine share the next line. Each pair is half the row. The invisible sizer makes both labels as wide as "Reasoning". */
+.commander-popover-choices {
+  display: flex;
+  gap: 8px;
+}
+.commander-popover-choice {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.commander-popover-label-sizer {
+  visibility: hidden;
+}
+.commander-popover-choice > select {
+  width: 100%;
+  min-width: 0;
   height: 30px;
   padding: 0 8px;
   box-sizing: border-box;
@@ -360,15 +396,16 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
-  width: auto;
   min-width: 0;
 }
-.commander-popover-field .commander-popover-model-controls select {
+.commander-popover-model-controls select {
   flex: 1;
   min-width: 0;
   width: auto;
   height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-size: 13px;
 }
 .commander-popover .openrouter-refresh-btn {
   height: 30px;
