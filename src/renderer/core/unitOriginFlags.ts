@@ -1,6 +1,7 @@
 import { COUNTRY_FLAG_CLASS_NAME } from '../../shared/countryFlags';
 import { originFlagAssetPath } from '../../shared/originArea';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
+import { indexLossFlagsByOwner } from '../../shared/lossFlagIndex';
 import { LOSS_CAUSE_KEYS, type TurnLossSummary } from '../../shared/lossSummary';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { formatGameDateForTurn, gameCalendarKindForMap } from '../../shared/gameCalendar';
@@ -337,27 +338,23 @@ export function setUnitNameContent(target: HTMLElement, unitId: string, text: st
 /**
  * Maps each named victim of a turn's losses to its birth origin, for flags in the loss toast.
  *
- * Purpose: The toast is plain text built from display names, so its flags are matched by name.
+ * Purpose: The toast is plain text built from display names, so its flags are matched by the side that lost the unit and that name.
  * When to use: Right before showing a map toast built from `summary`.
- * Expected outcome: One entry per victim display name whose unit id has a remembered origin. A name shared by
- *   victims whose origins would not show the same flag and tooltip is left out, so no flag is shown rather than a wrong one.
+ * Expected outcome: One inner map per owner. A name is kept when every remembered origin for that owner and name would show the same flag.
+ *   A disagreement omits that name for that owner only. A victim with no remembered origin is skipped.
  * Exceptions: None.
  */
-export function buildUnitOriginByLossDisplayName(summary: TurnLossSummary): ReadonlyMap<string, LossFlagIdentity> {
-  const flagByName = new Map<string, LossFlagIdentity>();
-  const ambiguousNames = new Set<string>();
-  const victims = Object.values(summary.byOwner).flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
-  for (const victim of victims) {
-    const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
-    if (!origin || !victim.unitId) continue;
-    const flag: LossFlagIdentity = { origin, formedLabel: formedLabelFor(victim.unitId) };
-    const existing = flagByName.get(victim.displayName);
-    const sameFlag = existing != null
-      && unitOriginsPresentTheSame(existing.origin, flag.origin)
-      && existing.formedLabel === flag.formedLabel;
-    if (existing && !sameFlag) ambiguousNames.add(victim.displayName);
-    else flagByName.set(victim.displayName, flag);
-  }
-  for (const name of ambiguousNames) flagByName.delete(name);
-  return flagByName;
+export function buildUnitOriginByLossDisplayName(
+  summary: TurnLossSummary
+): ReadonlyMap<string, ReadonlyMap<string, LossFlagIdentity>> {
+  const rows = Object.entries(summary.byOwner).flatMap(([ownerId, player]) =>
+    LOSS_CAUSE_KEYS.flatMap((key) => player[key]).map((victim) => {
+      const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
+      const value = origin && victim.unitId ? { origin, formedLabel: formedLabelFor(victim.unitId) } : null;
+      return { ownerId, name: victim.displayName, value };
+    })
+  );
+  return indexLossFlagsByOwner(rows, (left, right) =>
+    unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel
+  );
 }

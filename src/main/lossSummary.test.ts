@@ -26,9 +26,9 @@ function sampleUnits(n: number, type: LostUnit['unitType'] = 'infantry'): LostUn
 /**
  * Verifies short lists use comma-separated display names.
  *
- * Purpose: Guards the ≤5 entry list contract.
+ * Purpose: Guards the popup rule that three of one type stay named.
  * When to use: Run after changing `formatLossEntries`.
- * Expected outcome: Names joined with commas when count ≤ 5.
+ * Expected outcome: Names joined with commas when one type has three victims.
  * Exceptions: None.
  */
 function testListWhenFiveOrFewer(): void {
@@ -37,16 +37,16 @@ function testListWhenFiveOrFewer(): void {
 }
 
 /**
- * Verifies crowded lines switch to grouped type totals.
+ * Verifies a type past three collapses, and a type of three stays named.
  *
- * Purpose: Guards the >5 grouped totals contract.
- * When to use: Run after changing group labels or order.
- * Expected outcome: Shows `6 Infantry` for six infantry victims.
+ * Purpose: Guards the popup per-type collapse.
+ * When to use: Run after changing `formatLossEntries`.
+ * Expected outcome: Four infantry read `4x Infantry`. Six infantry read `6x Infantry`.
  * Exceptions: None.
  */
-function testGroupedWhenMoreThanFive(): void {
-  const text = formatLossEntries(sampleUnits(6));
-  assert.strictEqual(text, '6 Infantry');
+function testGroupedWhenMoreThanThreeOfOneType(): void {
+  assert.strictEqual(formatLossEntries(sampleUnits(4)), '4x Infantry');
+  assert.strictEqual(formatLossEntries(sampleUnits(6)), '6x Infantry');
 }
 
 /**
@@ -54,7 +54,7 @@ function testGroupedWhenMoreThanFive(): void {
  *
  * Purpose: Protects mixed-type grouping labels including Armored spelling.
  * When to use: Run after changing `GROUP_ORDER` or label map.
- * Expected outcome: `1 Naval, 2 Armored` with no zero groups.
+ * Expected outcome: Named naval units first, then `4x Armored`. Zero groups are omitted.
  * Exceptions: None.
  */
 function testGroupedOrderAndZeroOmission(): void {
@@ -67,7 +67,48 @@ function testGroupedOrderAndZeroOmission(): void {
     { unitType: 'naval', displayName: 'F' },
   ];
   const text = formatLossEntries(units);
-  assert.strictEqual(text, '2 Naval, 4 Armored');
+  assert.strictEqual(text, 'B, F, 4x Armored');
+}
+
+/**
+ * Verifies four of two types collapse in naval-then-armor order, and six named units stay named.
+ *
+ * Purpose: Mixed lines must not collapse a type that is still at the name cap.
+ * When to use: Run after changing `formatLossEntries`.
+ * Expected outcome: `4x Naval, 4x Armored`, and six interleaved names with no `x`.
+ * Exceptions: None.
+ */
+function testMixedCollapseAndNameCap(): void {
+  const collapsed: LostUnit[] = [
+    ...sampleUnits(4, 'naval'),
+    ...sampleUnits(4, 'armor'),
+  ];
+  assert.strictEqual(formatLossEntries(collapsed), '4x Naval, 4x Armored');
+  const named: LostUnit[] = [
+    { unitType: 'infantry', displayName: 'I1' },
+    { unitType: 'armor', displayName: 'A1' },
+    { unitType: 'infantry', displayName: 'I2' },
+    { unitType: 'armor', displayName: 'A2' },
+    { unitType: 'infantry', displayName: 'I3' },
+    { unitType: 'armor', displayName: 'A3' },
+  ];
+  assert.strictEqual(formatLossEntries(named), 'I1, A1, I2, A2, I3, A3');
+}
+
+/**
+ * Verifies a type outside the four stays a name.
+ *
+ * Purpose: An unexpected type must not disappear from the popup line.
+ * When to use: Run after changing `formatLossEntries`.
+ * Expected outcome: The four display names, in input order.
+ * Exceptions: None.
+ */
+function testUnknownTypeStaysNamed(): void {
+  const units: LostUnit[] = Array.from({ length: 4 }, (_, index) => ({
+    unitType: 'transport' as unknown as LostUnit['unitType'],
+    displayName: `T${index + 1}`,
+  }));
+  assert.strictEqual(formatLossEntries(units), 'T1, T2, T3, T4');
 }
 
 /**
@@ -138,6 +179,12 @@ function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
   assert.strictEqual(text, 'Ranged attack: 1 Infantry; Melee attack: 1 Armored, 1 Infantry');
   assert.ok(!text.includes('IX Fleet'), 'prompt losses must not use display names');
   assert.ok(!text.includes('human-armor-1'), 'partial ids fall back to grouped totals, not a mixed list');
+  const six = formatPlayerLossInline({
+    ...summary,
+    ranged: sampleUnits(6),
+    melee: [],
+  });
+  assert.strictEqual(six, 'Ranged attack: 6 Infantry');
 }
 
 /**
@@ -150,8 +197,10 @@ function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
  */
 function run(): void {
   testListWhenFiveOrFewer();
-  testGroupedWhenMoreThanFive();
+  testGroupedWhenMoreThanThreeOfOneType();
   testGroupedOrderAndZeroOmission();
+  testMixedCollapseAndNameCap();
+  testUnknownTypeStaysNamed();
   testMultilineCauseOrderAndSuppression();
   testInlineJoinsWithSemicolons();
   testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames();

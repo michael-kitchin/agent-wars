@@ -957,2138 +957,8 @@
     return after.some((id) => !beforeSet.has(id));
   }
 
-  // src/shared/htmlTextFormatting.ts
-  function escapeHtmlText(text) {
-    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-  }
-
-  // src/shared/countryFlags.ts
-  var AVAILABLE_COUNTRY_FLAG_CODES = /* @__PURE__ */ new Set([
-    "AD",
-    "AE",
-    "AF",
-    "AG",
-    "AI",
-    "AL",
-    "AM",
-    "AO",
-    "AQ",
-    "AR",
-    "AS",
-    "AT",
-    "AU",
-    "AW",
-    "AX",
-    "AZ",
-    "BA",
-    "BB",
-    "BD",
-    "BE",
-    "BF",
-    "BG",
-    "BH",
-    "BI",
-    "BJ",
-    "BL",
-    "BM",
-    "BN",
-    "BO",
-    "BQ",
-    "BR",
-    "BS",
-    "BT",
-    "BV",
-    "BW",
-    "BY",
-    "BZ",
-    "CA",
-    "CC",
-    "CD",
-    "CF",
-    "CG",
-    "CH",
-    "CI",
-    "CK",
-    "CL",
-    "CM",
-    "CN",
-    "CO",
-    "CR",
-    "CU",
-    "CV",
-    "CW",
-    "CX",
-    "CY",
-    "CZ",
-    "DE",
-    "DJ",
-    "DK",
-    "DM",
-    "DO",
-    "DZ",
-    "EC",
-    "EE",
-    "EG",
-    "EH",
-    "ER",
-    "ES",
-    "ET",
-    "EU",
-    "FI",
-    "FJ",
-    "FK",
-    "FM",
-    "FO",
-    "FR",
-    "GA",
-    "GB",
-    "GD",
-    "GE",
-    "GF",
-    "GG",
-    "GH",
-    "GI",
-    "GL",
-    "GM",
-    "GN",
-    "GP",
-    "GQ",
-    "GR",
-    "GS",
-    "GT",
-    "GU",
-    "GW",
-    "GY",
-    "HK",
-    "HM",
-    "HN",
-    "HR",
-    "HT",
-    "HU",
-    "ID",
-    "IE",
-    "IL",
-    "IM",
-    "IN",
-    "IO",
-    "IQ",
-    "IR",
-    "IS",
-    "IT",
-    "JE",
-    "JM",
-    "JO",
-    "JP",
-    "KE",
-    "KG",
-    "KH",
-    "KI",
-    "KM",
-    "KN",
-    "KP",
-    "KR",
-    "KW",
-    "KY",
-    "KZ",
-    "LA",
-    "LB",
-    "LC",
-    "LI",
-    "LK",
-    "LR",
-    "LS",
-    "LT",
-    "LU",
-    "LV",
-    "LY",
-    "MA",
-    "MC",
-    "MD",
-    "ME",
-    "MF",
-    "MG",
-    "MH",
-    "MK",
-    "ML",
-    "MM",
-    "MN",
-    "MO",
-    "MP",
-    "MQ",
-    "MR",
-    "MS",
-    "MT",
-    "MU",
-    "MV",
-    "MW",
-    "MX",
-    "MY",
-    "MZ",
-    "NA",
-    "NC",
-    "NE",
-    "NF",
-    "NG",
-    "NI",
-    "NL",
-    "NO",
-    "NP",
-    "NR",
-    "NU",
-    "NZ",
-    "OM",
-    "PA",
-    "PE",
-    "PF",
-    "PG",
-    "PH",
-    "PK",
-    "PL",
-    "PM",
-    "PN",
-    "PR",
-    "PS",
-    "PT",
-    "PW",
-    "PY",
-    "QA",
-    "RE",
-    "RO",
-    "RS",
-    "RU",
-    "RW",
-    "SA",
-    "SB",
-    "SC",
-    "SD",
-    "SE",
-    "SG",
-    "SH",
-    "SI",
-    "SJ",
-    "SK",
-    "SL",
-    "SM",
-    "SN",
-    "SO",
-    "SR",
-    "SS",
-    "ST",
-    "SV",
-    "SX",
-    "SY",
-    "SZ",
-    "TC",
-    "TD",
-    "TF",
-    "TG",
-    "TH",
-    "TJ",
-    "TK",
-    "TL",
-    "TM",
-    "TN",
-    "TO",
-    "TR",
-    "TT",
-    "TV",
-    "TW",
-    "TZ",
-    "UA",
-    "UG",
-    "UM",
-    "US",
-    "UY",
-    "UZ",
-    "VA",
-    "VC",
-    "VE",
-    "VG",
-    "VI",
-    "VN",
-    "VU",
-    "WF",
-    "WS",
-    "XK",
-    "YE",
-    "YT",
-    "ZA",
-    "ZM",
-    "ZW"
-  ]);
-  var UNKNOWN_COUNTRY_FLAG_PATH = "flag-unknown.svg";
-  var COUNTRY_FLAG_CLASS_NAME = "country-flag";
-  function countryFlagAssetPath(countryCode) {
-    const code = countryCode?.trim().toUpperCase() ?? "";
-    return AVAILABLE_COUNTRY_FLAG_CODES.has(code) ? `flags/${code.toLowerCase()}.svg` : UNKNOWN_COUNTRY_FLAG_PATH;
-  }
-  function countryFlagImgHtml(countryCode) {
-    const src = escapeHtmlText(countryFlagAssetPath(countryCode));
-    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
-  }
-
-  // src/shared/subdivisionFlagCodes.ts
-  var SUBDIVISION_FLAG_CODES = /* @__PURE__ */ new Set([
-    "ad-02",
-    "ad-03",
-    "ad-05",
-    "ad-06",
-    "ad-07",
-    "ad-08",
-    "ae-aj",
-    "ae-az",
-    "ae-du",
-    "ae-fu",
-    "ae-sh",
-    "ae-uq",
-    "af-kab",
-    "af-pan",
-    "ag-10",
-    "al-01",
-    "al-02",
-    "al-03",
-    "al-06",
-    "al-07",
-    "al-11",
-    "al-12",
-    "am-er",
-    "ar-a",
-    "ar-b",
-    "ar-c",
-    "ar-d",
-    "ar-e",
-    "ar-f",
-    "ar-g",
-    "ar-h",
-    "ar-j",
-    "ar-k",
-    "ar-n",
-    "ar-p",
-    "ar-q",
-    "ar-r",
-    "ar-s",
-    "ar-t",
-    "ar-u",
-    "ar-v",
-    "ar-w",
-    "ar-x",
-    "ar-y",
-    "ar-z",
-    "at-2",
-    "at-3",
-    "at-4",
-    "at-5",
-    "at-6",
-    "at-7",
-    "at-8",
-    "at-9",
-    "au-act",
-    "au-nsw",
-    "au-nt",
-    "au-qld",
-    "au-sa",
-    "au-tas",
-    "au-vic",
-    "au-wa",
-    "az-ba",
-    "az-nx",
-    "ba-brc",
-    "ba-srp",
-    "be-bru",
-    "be-van",
-    "be-vbr",
-    "be-vlg",
-    "be-vli",
-    "be-vov",
-    "be-vwv",
-    "be-wal",
-    "be-wbr",
-    "be-wht",
-    "be-wlg",
-    "be-wlx",
-    "be-wna",
-    "bh-13",
-    "bh-14",
-    "bh-15",
-    "bh-17",
-    "bo-b",
-    "bo-c",
-    "bo-h",
-    "bo-l",
-    "bo-n",
-    "bo-o",
-    "bo-p",
-    "bo-s",
-    "bo-t",
-    "bq-bo",
-    "bq-sa",
-    "bq-se",
-    "br-ac",
-    "br-al",
-    "br-am",
-    "br-ap",
-    "br-ba",
-    "br-ce",
-    "br-df",
-    "br-es",
-    "br-go",
-    "br-ma",
-    "br-mg",
-    "br-ms",
-    "br-mt",
-    "br-pa",
-    "br-pb",
-    "br-pe",
-    "br-pi",
-    "br-pr",
-    "br-rn",
-    "br-ro",
-    "br-rr",
-    "br-rs",
-    "br-sc",
-    "br-se",
-    "br-sp",
-    "br-to",
-    "bw-ga",
-    "by-br",
-    "by-hm",
-    "by-ho",
-    "by-hr",
-    "by-ma",
-    "by-mi",
-    "by-vi",
-    "ca-ab",
-    "ca-bc",
-    "ca-mb",
-    "ca-nb",
-    "ca-nl",
-    "ca-ns",
-    "ca-nt",
-    "ca-nu",
-    "ca-on",
-    "ca-qc",
-    "ca-sk",
-    "ca-yt",
-    "cd-kn",
-    "cd-sa",
-    "cg-16",
-    "ch-ag",
-    "ch-ai",
-    "ch-ar",
-    "ch-be",
-    "ch-bl",
-    "ch-bs",
-    "ch-fr",
-    "ch-ge",
-    "ch-gl",
-    "ch-gr",
-    "ch-ju",
-    "ch-lu",
-    "ch-ne",
-    "ch-nw",
-    "ch-ow",
-    "ch-sg",
-    "ch-sh",
-    "ch-so",
-    "ch-sz",
-    "ch-tg",
-    "ch-ti",
-    "ch-ur",
-    "ch-vd",
-    "ch-vs",
-    "ch-zg",
-    "ch-zh",
-    "cl-ai",
-    "cl-an",
-    "cl-ap",
-    "cl-at",
-    "cl-bi",
-    "cl-co",
-    "cl-li",
-    "cl-ll",
-    "cl-lr",
-    "cl-ma",
-    "cl-ml",
-    "cl-nb",
-    "cl-rm",
-    "cl-ta",
-    "cl-vs",
-    "cn-hk",
-    "cn-mo",
-    "co-ama",
-    "co-ant",
-    "co-ara",
-    "co-atl",
-    "co-bol",
-    "co-boy",
-    "co-cal",
-    "co-caq",
-    "co-cas",
-    "co-cau",
-    "co-ces",
-    "co-cho",
-    "co-cor",
-    "co-cun",
-    "co-dc",
-    "co-gua",
-    "co-guv",
-    "co-hui",
-    "co-lag",
-    "co-mag",
-    "co-met",
-    "co-nar",
-    "co-nsa",
-    "co-put",
-    "co-qui",
-    "co-ris",
-    "co-san",
-    "co-sap",
-    "co-suc",
-    "co-tol",
-    "co-vac",
-    "co-vau",
-    "co-vid",
-    "cr-a",
-    "cr-c",
-    "cr-g",
-    "cr-l",
-    "cr-p",
-    "cr-sj",
-    "cu-06",
-    "cu-11",
-    "cu-14",
-    "cv-mo",
-    "cv-pr",
-    "cv-sm",
-    "cz-10",
-    "cz-20",
-    "cz-31",
-    "cz-32",
-    "cz-41",
-    "cz-42",
-    "cz-51",
-    "cz-52",
-    "cz-53",
-    "cz-63",
-    "cz-64",
-    "cz-71",
-    "cz-72",
-    "cz-80",
-    "de-bb",
-    "de-be",
-    "de-bw",
-    "de-by",
-    "de-hb",
-    "de-he",
-    "de-hh",
-    "de-mv",
-    "de-ni",
-    "de-nw",
-    "de-rp",
-    "de-sh",
-    "de-sl",
-    "de-sn",
-    "de-st",
-    "de-th",
-    "dk-81",
-    "dk-82",
-    "dk-83",
-    "dk-84",
-    "dk-85",
-    "do-18",
-    "do-23",
-    "do-28",
-    "ec-a",
-    "ec-b",
-    "ec-c",
-    "ec-d",
-    "ec-e",
-    "ec-f",
-    "ec-g",
-    "ec-i",
-    "ec-l",
-    "ec-m",
-    "ec-n",
-    "ec-o",
-    "ec-r",
-    "ec-s",
-    "ec-sd",
-    "ec-se",
-    "ec-t",
-    "ec-u",
-    "ec-w",
-    "ec-x",
-    "ec-y",
-    "ec-z",
-    "ee-130",
-    "ee-141",
-    "ee-142",
-    "ee-171",
-    "ee-184",
-    "ee-191",
-    "ee-198",
-    "ee-214",
-    "ee-245",
-    "ee-247",
-    "ee-251",
-    "ee-255",
-    "ee-272",
-    "ee-283",
-    "ee-284",
-    "ee-291",
-    "ee-293",
-    "ee-296",
-    "ee-303",
-    "ee-305",
-    "ee-317",
-    "ee-321",
-    "ee-338",
-    "ee-353",
-    "ee-37",
-    "ee-39",
-    "ee-424",
-    "ee-430",
-    "ee-431",
-    "ee-432",
-    "ee-442",
-    "ee-446",
-    "ee-45",
-    "ee-478",
-    "ee-480",
-    "ee-50",
-    "ee-503",
-    "ee-511",
-    "ee-514",
-    "ee-52",
-    "ee-528",
-    "ee-557",
-    "ee-56",
-    "ee-567",
-    "ee-586",
-    "ee-60",
-    "ee-615",
-    "ee-618",
-    "ee-622",
-    "ee-624",
-    "ee-638",
-    "ee-64",
-    "ee-651",
-    "ee-653",
-    "ee-661",
-    "ee-663",
-    "ee-668",
-    "ee-68",
-    "ee-689",
-    "ee-698",
-    "ee-708",
-    "ee-71",
-    "ee-712",
-    "ee-714",
-    "ee-719",
-    "ee-726",
-    "ee-732",
-    "ee-735",
-    "ee-74",
-    "ee-784",
-    "ee-79",
-    "ee-793",
-    "ee-796",
-    "ee-803",
-    "ee-809",
-    "ee-81",
-    "ee-824",
-    "ee-834",
-    "ee-84",
-    "ee-855",
-    "ee-87",
-    "ee-890",
-    "ee-897",
-    "ee-901",
-    "ee-903",
-    "ee-907",
-    "ee-917",
-    "ee-919",
-    "ee-928",
-    "eg-alx",
-    "eg-asn",
-    "eg-bh",
-    "eg-bns",
-    "eg-dk",
-    "eg-dt",
-    "eg-js",
-    "eg-kfs",
-    "eg-pts",
-    "eg-shr",
-    "eg-sin",
-    "eg-suz",
-    "es-a",
-    "es-ab",
-    "es-an",
-    "es-ar",
-    "es-as",
-    "es-b",
-    "es-ba",
-    "es-bi",
-    "es-bu",
-    "es-cb",
-    "es-cc",
-    "es-ce",
-    "es-cl",
-    "es-cm",
-    "es-cn",
-    "es-co",
-    "es-cs",
-    "es-ct",
-    "es-cu",
-    "es-ex",
-    "es-ga",
-    "es-gc",
-    "es-gi",
-    "es-gr",
-    "es-ib",
-    "es-l",
-    "es-le",
-    "es-lo",
-    "es-lu",
-    "es-m",
-    "es-mc",
-    "es-md",
-    "es-ml",
-    "es-mu",
-    "es-na",
-    "es-nc",
-    "es-o",
-    "es-or",
-    "es-pm",
-    "es-po",
-    "es-pv",
-    "es-ri",
-    "es-s",
-    "es-sa",
-    "es-ss",
-    "es-t",
-    "es-te",
-    "es-v",
-    "es-vc",
-    "es-vi",
-    "es-z",
-    "es-za",
-    "et-aa",
-    "et-af",
-    "et-am",
-    "et-be",
-    "et-ga",
-    "et-ha",
-    "et-or",
-    "et-si",
-    "et-sn",
-    "et-so",
-    "et-sw",
-    "et-ti",
-    "fi-01",
-    "fi-03",
-    "fi-04",
-    "fi-05",
-    "fi-06",
-    "fi-07",
-    "fi-08",
-    "fi-11",
-    "fi-13",
-    "fi-15",
-    "fi-16",
-    "fi-17",
-    "fi-18",
-    "fm-ksa",
-    "fm-pni",
-    "fm-trk",
-    "fm-yap",
-    "fr-01",
-    "fr-02",
-    "fr-03",
-    "fr-04",
-    "fr-05",
-    "fr-06",
-    "fr-07",
-    "fr-09",
-    "fr-10",
-    "fr-11",
-    "fr-12",
-    "fr-13",
-    "fr-14",
-    "fr-15",
-    "fr-16",
-    "fr-17",
-    "fr-18",
-    "fr-19",
-    "fr-20r",
-    "fr-21",
-    "fr-22",
-    "fr-23",
-    "fr-24",
-    "fr-25",
-    "fr-26",
-    "fr-27",
-    "fr-28",
-    "fr-29",
-    "fr-2a",
-    "fr-2b",
-    "fr-30",
-    "fr-31",
-    "fr-32",
-    "fr-33",
-    "fr-34",
-    "fr-35",
-    "fr-36",
-    "fr-37",
-    "fr-38",
-    "fr-39",
-    "fr-40",
-    "fr-41",
-    "fr-42",
-    "fr-43",
-    "fr-44",
-    "fr-45",
-    "fr-46",
-    "fr-47",
-    "fr-48",
-    "fr-49",
-    "fr-50",
-    "fr-51",
-    "fr-52",
-    "fr-53",
-    "fr-54",
-    "fr-55",
-    "fr-56",
-    "fr-57",
-    "fr-58",
-    "fr-59",
-    "fr-60",
-    "fr-61",
-    "fr-63",
-    "fr-64",
-    "fr-65",
-    "fr-66",
-    "fr-68",
-    "fr-69",
-    "fr-69m",
-    "fr-6ae",
-    "fr-70",
-    "fr-71",
-    "fr-72",
-    "fr-73",
-    "fr-74",
-    "fr-75c",
-    "fr-76",
-    "fr-77",
-    "fr-78",
-    "fr-79",
-    "fr-80",
-    "fr-81",
-    "fr-82",
-    "fr-83",
-    "fr-84",
-    "fr-85",
-    "fr-86",
-    "fr-87",
-    "fr-88",
-    "fr-89",
-    "fr-90",
-    "fr-91",
-    "fr-92",
-    "fr-93",
-    "fr-94",
-    "fr-95",
-    "fr-971",
-    "fr-972",
-    "fr-973",
-    "fr-974",
-    "fr-976",
-    "fr-ara",
-    "fr-bfc",
-    "fr-bl",
-    "fr-bre",
-    "fr-cp",
-    "fr-cvl",
-    "fr-ges",
-    "fr-hdf",
-    "fr-idf",
-    "fr-mf",
-    "fr-naq",
-    "fr-nc",
-    "fr-nor",
-    "fr-occ",
-    "fr-pac",
-    "fr-pdl",
-    "fr-pf",
-    "fr-pm",
-    "fr-tf",
-    "fr-wf",
-    "ga-1",
-    "ga-2",
-    "ga-3",
-    "ga-4",
-    "ga-5",
-    "ga-6",
-    "ga-7",
-    "ga-8",
-    "ga-9",
-    "gb-abd",
-    "gb-abe",
-    "gb-agy",
-    "gb-ann",
-    "gb-bdf",
-    "gb-bir",
-    "gb-bkm",
-    "gb-bns",
-    "gb-cam",
-    "gb-cbf",
-    "gb-cgn",
-    "gb-chw",
-    "gb-cma",
-    "gb-con",
-    "gb-cov",
-    "gb-crf",
-    "gb-dby",
-    "gb-dev",
-    "gb-dor",
-    "gb-dur",
-    "gb-edh",
-    "gb-eln",
-    "gb-els",
-    "gb-eng",
-    "gb-erw",
-    "gb-ery",
-    "gb-ess",
-    "gb-esx",
-    "gb-fal",
-    "gb-fln",
-    "gb-fmo",
-    "gb-glg",
-    "gb-gls",
-    "gb-gwn",
-    "gb-ham",
-    "gb-hef",
-    "gb-hrt",
-    "gb-ios",
-    "gb-iow",
-    "gb-ken",
-    "gb-lan",
-    "gb-lec",
-    "gb-lin",
-    "gb-lnd",
-    "gb-man",
-    "gb-mon",
-    "gb-mry",
-    "gb-nbl",
-    "gb-nfk",
-    "gb-ngm",
-    "gb-nir",
-    "gb-nnh",
-    "gb-ntt",
-    "gb-ork",
-    "gb-pem",
-    "gb-ply",
-    "gb-por",
-    "gb-pow",
-    "gb-rct",
-    "gb-rut",
-    "gb-sct",
-    "gb-sfk",
-    "gb-shr",
-    "gb-som",
-    "gb-sry",
-    "gb-stg",
-    "gb-sts",
-    "gb-vgl",
-    "gb-war",
-    "gb-wbk",
-    "gb-wil",
-    "gb-wls",
-    "gb-wnh",
-    "gb-wor",
-    "gb-wsx",
-    "gb-yor",
-    "gb-zet",
-    "ge-ab",
-    "ge-aj",
-    "ge-gu",
-    "ge-im",
-    "ge-ka",
-    "ge-rl",
-    "ge-sj",
-    "ge-sk",
-    "ge-tb",
-    "gh-aa",
-    "gh-ah",
-    "gh-ep",
-    "gl-ku",
-    "gl-qe",
-    "gl-sm",
-    "gm-b",
-    "gr-69",
-    "gr-a",
-    "gr-b",
-    "gr-c",
-    "gt-01",
-    "gt-03",
-    "gt-05",
-    "gt-07",
-    "gt-08",
-    "gt-16",
-    "gt-21",
-    "gy-cu",
-    "gy-de",
-    "gy-eb",
-    "gy-es",
-    "gy-ma",
-    "gy-pm",
-    "gy-pt",
-    "gy-ud",
-    "gy-ut",
-    "hn-cp",
-    "hn-oc",
-    "hn-sb",
-    "hn-yo",
-    "hr-01",
-    "hr-02",
-    "hr-04",
-    "hr-09",
-    "hr-12",
-    "hr-14",
-    "hr-15",
-    "hr-16",
-    "hr-17",
-    "hr-18",
-    "hr-20",
-    "hr-21",
-    "hu-ba",
-    "hu-bk",
-    "hu-de",
-    "hu-du",
-    "hu-er",
-    "hu-gs",
-    "hu-gy",
-    "hu-he",
-    "hu-hv",
-    "hu-kv",
-    "hu-nk",
-    "hu-ny",
-    "hu-sd",
-    "hu-sf",
-    "hu-sh",
-    "hu-sk",
-    "hu-sn",
-    "hu-ss",
-    "hu-st",
-    "hu-tb",
-    "hu-ve",
-    "hu-vm",
-    "hu-ze",
-    "id-ac",
-    "id-ba",
-    "id-bb",
-    "id-be",
-    "id-bt",
-    "id-go",
-    "id-ja",
-    "id-jb",
-    "id-ji",
-    "id-jk",
-    "id-jt",
-    "id-kb",
-    "id-ki",
-    "id-kr",
-    "id-ks",
-    "id-kt",
-    "id-ku",
-    "id-ma",
-    "id-mu",
-    "id-nb",
-    "id-nt",
-    "id-pa",
-    "id-pb",
-    "id-ri",
-    "id-sb",
-    "id-sg",
-    "id-sn",
-    "id-sr",
-    "id-ss",
-    "id-st",
-    "id-yo",
-    "ie-c",
-    "ie-l",
-    "ie-m",
-    "ie-u",
-    "il-jm",
-    "il-ta",
-    "iq-ba",
-    "iq-kr",
-    "iq-sd",
-    "is-rkv",
-    "it-21",
-    "it-23",
-    "it-25",
-    "it-32",
-    "it-36",
-    "it-42",
-    "it-45",
-    "it-55",
-    "it-57",
-    "it-62",
-    "it-65",
-    "it-67",
-    "it-72",
-    "it-75",
-    "it-77",
-    "it-78",
-    "it-82",
-    "it-88",
-    "it-al",
-    "it-an",
-    "it-aq",
-    "it-at",
-    "it-av",
-    "it-ba",
-    "it-bg",
-    "it-bo",
-    "it-br",
-    "it-bz",
-    "it-cb",
-    "it-co",
-    "it-ct",
-    "it-cz",
-    "it-fe",
-    "it-fi",
-    "it-go",
-    "it-kr",
-    "it-lc",
-    "it-le",
-    "it-li",
-    "it-lo",
-    "it-mb",
-    "it-me",
-    "it-mi",
-    "it-ms",
-    "it-na",
-    "it-nu",
-    "it-or",
-    "it-pc",
-    "it-pe",
-    "it-pi",
-    "it-pr",
-    "it-pt",
-    "it-pz",
-    "it-ra",
-    "it-re",
-    "it-rn",
-    "it-sa",
-    "it-so",
-    "it-ss",
-    "it-su",
-    "it-sv",
-    "it-ta",
-    "it-tn",
-    "it-to",
-    "it-tr",
-    "it-ud",
-    "it-va",
-    "it-vb",
-    "it-ve",
-    "it-vr",
-    "jp-01",
-    "jp-02",
-    "jp-03",
-    "jp-04",
-    "jp-05",
-    "jp-06",
-    "jp-07",
-    "jp-08",
-    "jp-09",
-    "jp-10",
-    "jp-11",
-    "jp-12",
-    "jp-13",
-    "jp-14",
-    "jp-15",
-    "jp-16",
-    "jp-17",
-    "jp-18",
-    "jp-19",
-    "jp-20",
-    "jp-21",
-    "jp-22",
-    "jp-23",
-    "jp-24",
-    "jp-25",
-    "jp-26",
-    "jp-27",
-    "jp-28",
-    "jp-29",
-    "jp-30",
-    "jp-31",
-    "jp-32",
-    "jp-33",
-    "jp-34",
-    "jp-35",
-    "jp-36",
-    "jp-37",
-    "jp-38",
-    "jp-39",
-    "jp-40",
-    "jp-41",
-    "jp-42",
-    "jp-43",
-    "jp-44",
-    "jp-45",
-    "jp-46",
-    "jp-47",
-    "ke-04",
-    "ke-13",
-    "ke-19",
-    "ke-24",
-    "ke-28",
-    "ke-30",
-    "ke-45",
-    "ke-46",
-    "kg-b",
-    "kg-c",
-    "kg-gb",
-    "kg-go",
-    "kg-n",
-    "kg-o",
-    "kg-t",
-    "kg-y",
-    "km-a",
-    "km-g",
-    "km-m",
-    "kn-n",
-    "kr-11",
-    "kr-26",
-    "kr-27",
-    "kr-28",
-    "kr-29",
-    "kr-30",
-    "kr-31",
-    "kr-41",
-    "kr-42",
-    "kr-43",
-    "kr-44",
-    "kr-45",
-    "kr-46",
-    "kr-47",
-    "kr-48",
-    "kr-49",
-    "kr-50",
-    "kz-23",
-    "kz-35",
-    "kz-55",
-    "kz-71",
-    "kz-75",
-    "li-01",
-    "li-02",
-    "li-03",
-    "li-04",
-    "li-05",
-    "li-06",
-    "li-07",
-    "li-08",
-    "li-09",
-    "li-10",
-    "li-11",
-    "lk-4",
-    "lk-6",
-    "lk-8",
-    "lr-bg",
-    "lr-bm",
-    "lr-cm",
-    "lr-gb",
-    "lr-gg",
-    "lr-gk",
-    "lr-gp",
-    "lr-lo",
-    "lr-mg",
-    "lr-mo",
-    "lr-my",
-    "lr-ni",
-    "lr-rg",
-    "lr-ri",
-    "lr-si",
-    "lt-01",
-    "lt-04",
-    "lt-08",
-    "lt-09",
-    "lt-10",
-    "lt-15",
-    "lt-20",
-    "lt-25",
-    "lt-28",
-    "lt-32",
-    "lt-33",
-    "lt-35",
-    "lt-37",
-    "lt-40",
-    "lt-43",
-    "lt-45",
-    "lt-47",
-    "lt-49",
-    "lt-51",
-    "lt-52",
-    "lt-53",
-    "lt-54",
-    "lt-55",
-    "lt-56",
-    "lt-57",
-    "lt-58",
-    "lt-59",
-    "lt-al",
-    "lt-kl",
-    "lt-ku",
-    "lt-mr",
-    "lt-sa",
-    "lt-ut",
-    "lt-vl",
-    "lu-wi",
-    "lv-011",
-    "lv-022",
-    "lv-041",
-    "lv-042",
-    "lv-050",
-    "lv-052",
-    "lv-062",
-    "lv-077",
-    "lv-080",
-    "lv-106",
-    "lv-111",
-    "lv-113",
-    "lv-jel",
-    "lv-jur",
-    "lv-lpx",
-    "lv-rez",
-    "lv-rix",
-    "lv-ven",
-    "ma-07",
-    "md-br",
-    "md-ca",
-    "md-cu",
-    "md-du",
-    "md-ed",
-    "md-fl",
-    "md-ga",
-    "md-re",
-    "md-sn",
-    "md-so",
-    "md-un",
-    "me-06",
-    "me-15",
-    "me-16",
-    "me-17",
-    "me-18",
-    "me-19",
-    "me-20",
-    "me-24",
-    "mh-alk",
-    "mh-ebo",
-    "mh-kwa",
-    "mh-maj",
-    "mh-mil",
-    "mh-nmk",
-    "mh-uja",
-    "mh-wth",
-    "mk-101",
-    "mk-103",
-    "mk-104",
-    "mk-105",
-    "mk-106",
-    "mk-109",
-    "mk-201",
-    "mk-202",
-    "mk-203",
-    "mk-204",
-    "mk-205",
-    "mk-206",
-    "mk-207",
-    "mk-208",
-    "mk-210",
-    "mk-211",
-    "mk-301",
-    "mk-303",
-    "mk-304",
-    "mk-307",
-    "mk-308",
-    "mk-311",
-    "mk-312",
-    "mk-313",
-    "mk-401",
-    "mk-402",
-    "mk-403",
-    "mk-404",
-    "mk-407",
-    "mk-408",
-    "mk-409",
-    "mk-410",
-    "mk-501",
-    "mk-502",
-    "mk-503",
-    "mk-504",
-    "mk-506",
-    "mk-507",
-    "mk-508",
-    "mk-509",
-    "mk-601",
-    "mk-602",
-    "mk-603",
-    "mk-605",
-    "mk-606",
-    "mk-607",
-    "mk-608",
-    "mk-609",
-    "mk-701",
-    "mk-702",
-    "mk-703",
-    "mk-704",
-    "mk-705",
-    "mk-706",
-    "mk-802",
-    "mk-803",
-    "mk-805",
-    "mk-806",
-    "mk-807",
-    "mk-808",
-    "mk-809",
-    "mk-810",
-    "mk-811",
-    "mk-812",
-    "mk-815",
-    "mk-817",
-    "mm-01",
-    "mm-03",
-    "mm-04",
-    "mm-06",
-    "mm-07",
-    "mm-11",
-    "mm-12",
-    "mm-13",
-    "mm-14",
-    "mm-15",
-    "mm-16",
-    "mm-17",
-    "mm-18",
-    "mn-035",
-    "mn-037",
-    "mn-039",
-    "mn-041",
-    "mn-043",
-    "mn-046",
-    "mn-047",
-    "mn-049",
-    "mn-051",
-    "mn-053",
-    "mn-055",
-    "mn-057",
-    "mn-059",
-    "mn-061",
-    "mn-063",
-    "mn-064",
-    "mn-065",
-    "mn-067",
-    "mn-071",
-    "mn-1",
-    "mt-01",
-    "mt-02",
-    "mt-03",
-    "mt-04",
-    "mt-06",
-    "mt-07",
-    "mt-08",
-    "mt-09",
-    "mt-10",
-    "mt-11",
-    "mt-12",
-    "mt-13",
-    "mt-14",
-    "mt-15",
-    "mt-16",
-    "mt-17",
-    "mt-18",
-    "mt-19",
-    "mt-20",
-    "mt-22",
-    "mt-23",
-    "mt-24",
-    "mt-25",
-    "mt-26",
-    "mt-27",
-    "mt-28",
-    "mt-29",
-    "mt-30",
-    "mt-31",
-    "mt-32",
-    "mt-33",
-    "mt-34",
-    "mt-35",
-    "mt-36",
-    "mt-37",
-    "mt-38",
-    "mt-40",
-    "mt-41",
-    "mt-42",
-    "mt-43",
-    "mt-44",
-    "mt-45",
-    "mt-46",
-    "mt-47",
-    "mt-48",
-    "mt-49",
-    "mt-50",
-    "mt-51",
-    "mt-52",
-    "mt-53",
-    "mt-54",
-    "mt-55",
-    "mt-56",
-    "mt-57",
-    "mt-58",
-    "mt-59",
-    "mt-60",
-    "mt-61",
-    "mt-62",
-    "mt-63",
-    "mt-64",
-    "mt-65",
-    "mt-66",
-    "mt-67",
-    "mt-68",
-    "mu-pl",
-    "mu-ro",
-    "mx-bcn",
-    "mx-bcs",
-    "mx-chh",
-    "mx-gro",
-    "mx-gua",
-    "mx-jal",
-    "mx-mic",
-    "mx-mor",
-    "mx-nle",
-    "mx-pue",
-    "mx-roo",
-    "mx-son",
-    "mx-tab",
-    "mx-tam",
-    "mx-tla",
-    "mx-yuc",
-    "my-01",
-    "my-02",
-    "my-03",
-    "my-04",
-    "my-05",
-    "my-06",
-    "my-07",
-    "my-08",
-    "my-09",
-    "my-10",
-    "my-11",
-    "my-12",
-    "my-13",
-    "my-14",
-    "my-15",
-    "my-16",
-    "ng-ak",
-    "ng-by",
-    "ng-fc",
-    "ng-go",
-    "ng-kt",
-    "ng-os",
-    "ng-oy",
-    "ng-ta",
-    "ni-an",
-    "ni-as",
-    "ni-bo",
-    "ni-ca",
-    "ni-ci",
-    "ni-co",
-    "ni-es",
-    "ni-le",
-    "ni-md",
-    "ni-mn",
-    "ni-mt",
-    "ni-ri",
-    "ni-sj",
-    "nl-aw",
-    "nl-bq1",
-    "nl-bq2",
-    "nl-bq3",
-    "nl-cw",
-    "nl-dr",
-    "nl-fl",
-    "nl-fr",
-    "nl-ge",
-    "nl-gr",
-    "nl-li",
-    "nl-nb",
-    "nl-nh",
-    "nl-ov",
-    "nl-sx",
-    "nl-ut",
-    "nl-ze",
-    "nl-zh",
-    "no-03",
-    "no-11",
-    "no-15",
-    "no-18",
-    "no-34",
-    "no-38",
-    "no-46",
-    "no-50",
-    "no-54",
-    "nz-auk",
-    "nz-cit",
-    "nz-nsn",
-    "nz-ota",
-    "pa-1",
-    "pa-10",
-    "pa-2",
-    "pa-3",
-    "pa-4",
-    "pa-5",
-    "pa-6",
-    "pa-7",
-    "pa-9",
-    "pa-em",
-    "pa-ky",
-    "pa-nb",
-    "pe-ama",
-    "pe-anc",
-    "pe-apu",
-    "pe-aya",
-    "pe-caj",
-    "pe-cal",
-    "pe-cus",
-    "pe-huc",
-    "pe-huv",
-    "pe-ica",
-    "pe-jun",
-    "pe-lal",
-    "pe-lam",
-    "pe-lim",
-    "pe-lma",
-    "pe-lor",
-    "pe-mdd",
-    "pe-moq",
-    "pe-pas",
-    "pe-piu",
-    "pe-pun",
-    "pe-tac",
-    "pe-tum",
-    "pg-cpk",
-    "pg-cpm",
-    "pg-ebr",
-    "pg-ehg",
-    "pg-hla",
-    "pg-jwk",
-    "pg-mba",
-    "pg-mpm",
-    "pg-mrl",
-    "pg-ncd",
-    "pg-nik",
-    "pg-nsb",
-    "pg-san",
-    "pg-shm",
-    "pg-wbk",
-    "pg-whm",
-    "pg-wpd",
-    "ph-14",
-    "ph-bas",
-    "ph-boh",
-    "ph-buk",
-    "ph-cag",
-    "ph-que",
-    "ph-slu",
-    "ph-sun",
-    "pk-ba",
-    "pk-gb",
-    "pk-jk",
-    "pk-kp",
-    "pk-pb",
-    "pk-sd",
-    "pl-02",
-    "pl-04",
-    "pl-06",
-    "pl-08",
-    "pl-10",
-    "pl-12",
-    "pl-14",
-    "pl-16",
-    "pl-18",
-    "pl-20",
-    "pl-22",
-    "pl-24",
-    "pl-26",
-    "pl-28",
-    "pl-30",
-    "pl-32",
-    "pt-20",
-    "pt-30",
-    "pw-002",
-    "pw-010",
-    "pw-050",
-    "pw-100",
-    "pw-214",
-    "pw-218",
-    "pw-224",
-    "pw-226",
-    "pw-227",
-    "pw-350",
-    "pw-370",
-    "py-1",
-    "py-10",
-    "py-11",
-    "py-12",
-    "py-13",
-    "py-14",
-    "py-15",
-    "py-16",
-    "py-19",
-    "py-4",
-    "py-5",
-    "py-6",
-    "py-8",
-    "py-asu",
-    "ro-ab",
-    "ro-ar",
-    "ro-b",
-    "ro-bh",
-    "ro-cv",
-    "ro-gr",
-    "ro-il",
-    "rs-00",
-    "rs-14",
-    "rs-km",
-    "rs-vo",
-    "ru-ad",
-    "ru-al",
-    "ru-alt",
-    "ru-amu",
-    "ru-ast",
-    "ru-ba",
-    "ru-bel",
-    "ru-bry",
-    "ru-bu",
-    "ru-ce",
-    "ru-che",
-    "ru-chu",
-    "ru-cu",
-    "ru-da",
-    "ru-in",
-    "ru-irk",
-    "ru-kam",
-    "ru-kb",
-    "ru-kc",
-    "ru-kem",
-    "ru-kgd",
-    "ru-kgn",
-    "ru-kha",
-    "ru-khm",
-    "ru-kir",
-    "ru-kk",
-    "ru-kl",
-    "ru-klu",
-    "ru-ko",
-    "ru-kos",
-    "ru-kr",
-    "ru-krs",
-    "ru-kya",
-    "ru-len",
-    "ru-lip",
-    "ru-mag",
-    "ru-me",
-    "ru-mo",
-    "ru-mos",
-    "ru-mow",
-    "ru-mur",
-    "ru-nen",
-    "ru-ngr",
-    "ru-niz",
-    "ru-nvs",
-    "ru-oms",
-    "ru-per",
-    "ru-pri",
-    "ru-psk",
-    "ru-ros",
-    "ru-rya",
-    "ru-sa",
-    "ru-sak",
-    "ru-sam",
-    "ru-se",
-    "ru-smo",
-    "ru-spe",
-    "ru-sta",
-    "ru-sve",
-    "ru-ta",
-    "ru-tam",
-    "ru-tul",
-    "ru-tve",
-    "ru-ty",
-    "ru-tyu",
-    "ru-ud",
-    "ru-uly",
-    "ru-vgg",
-    "ru-vla",
-    "ru-vlg",
-    "ru-vor",
-    "ru-yan",
-    "ru-yar",
-    "ru-yev",
-    "ru-zab",
-    "sb-ct",
-    "sb-ml",
-    "sb-rb",
-    "sb-te",
-    "se-ab",
-    "se-ac",
-    "se-bd",
-    "se-c",
-    "se-d",
-    "se-e",
-    "se-f",
-    "se-g",
-    "se-h",
-    "se-i",
-    "se-k",
-    "se-m",
-    "se-n",
-    "se-o",
-    "se-s",
-    "se-t",
-    "se-u",
-    "se-w",
-    "se-x",
-    "se-y",
-    "se-z",
-    "sh-hl",
-    "sh-ta",
-    "si-002",
-    "si-003",
-    "si-004",
-    "si-011",
-    "si-012",
-    "si-013",
-    "si-017",
-    "si-022",
-    "si-023",
-    "si-026",
-    "si-027",
-    "si-029",
-    "si-030",
-    "si-032",
-    "si-033",
-    "si-034",
-    "si-036",
-    "si-040",
-    "si-041",
-    "si-043",
-    "si-047",
-    "si-048",
-    "si-050",
-    "si-052",
-    "si-057",
-    "si-061",
-    "si-069",
-    "si-070",
-    "si-071",
-    "si-080",
-    "si-082",
-    "si-085",
-    "si-090",
-    "si-094",
-    "si-096",
-    "si-099",
-    "si-104",
-    "si-106",
-    "si-108",
-    "si-109",
-    "si-122",
-    "si-125",
-    "si-128",
-    "si-132",
-    "si-133",
-    "si-147",
-    "si-150",
-    "si-151",
-    "si-158",
-    "si-160",
-    "si-163",
-    "si-167",
-    "si-168",
-    "si-172",
-    "si-192",
-    "si-200",
-    "si-204",
-    "si-206",
-    "si-208",
-    "si-211",
-    "si-213",
-    "sk-bc",
-    "sk-bl",
-    "sk-ki",
-    "sk-ni",
-    "sk-pv",
-    "sk-ta",
-    "sk-tc",
-    "sk-zi",
-    "sm-01",
-    "sm-02",
-    "sm-03",
-    "sm-04",
-    "sm-05",
-    "sm-06",
-    "sm-07",
-    "sm-08",
-    "sm-09",
-    "so-bk",
-    "so-bn",
-    "so-br",
-    "so-by",
-    "so-ga",
-    "so-hi",
-    "so-jd",
-    "so-jh",
-    "so-mu",
-    "so-nu",
-    "so-sd",
-    "so-sh",
-    "st-p",
-    "sv-ca",
-    "sv-ch",
-    "sv-li",
-    "sv-mo",
-    "sv-sa",
-    "sv-sv",
-    "sv-un",
-    "sv-us",
-    "th-10",
-    "th-12",
-    "th-13",
-    "th-14",
-    "th-15",
-    "th-21",
-    "th-22",
-    "th-26",
-    "th-33",
-    "th-34",
-    "th-35",
-    "th-41",
-    "th-42",
-    "th-45",
-    "th-46",
-    "th-48",
-    "th-50",
-    "th-51",
-    "th-53",
-    "th-54",
-    "th-55",
-    "th-57",
-    "th-62",
-    "th-64",
-    "th-65",
-    "th-67",
-    "th-70",
-    "th-71",
-    "th-73",
-    "th-74",
-    "th-76",
-    "th-77",
-    "th-80",
-    "th-81",
-    "th-82",
-    "th-83",
-    "th-85",
-    "th-90",
-    "th-92",
-    "th-93",
-    "th-94",
-    "th-96",
-    "tw-cha",
-    "tw-cyi",
-    "tw-cyq",
-    "tw-hsq",
-    "tw-hsz",
-    "tw-hua",
-    "tw-ila",
-    "tw-kee",
-    "tw-khh",
-    "tw-kin",
-    "tw-lie",
-    "tw-mia",
-    "tw-nan",
-    "tw-nwt",
-    "tw-pen",
-    "tw-pif",
-    "tw-tao",
-    "tw-tnn",
-    "tw-tpe",
-    "tw-ttt",
-    "tw-txg",
-    "tw-yun",
-    "ua-05",
-    "ua-07",
-    "ua-09",
-    "ua-12",
-    "ua-14",
-    "ua-18",
-    "ua-21",
-    "ua-23",
-    "ua-26",
-    "ua-30",
-    "ua-32",
-    "ua-35",
-    "ua-40",
-    "ua-43",
-    "ua-46",
-    "ua-51",
-    "ua-53",
-    "ua-56",
-    "ua-59",
-    "ua-61",
-    "ua-63",
-    "ua-65",
-    "ua-68",
-    "ua-71",
-    "ua-74",
-    "ua-77",
-    "us-ak",
-    "us-al",
-    "us-ar",
-    "us-as",
-    "us-az",
-    "us-ca",
-    "us-co",
-    "us-ct",
-    "us-dc",
-    "us-de",
-    "us-ga",
-    "us-gu",
-    "us-hi",
-    "us-ia",
-    "us-il",
-    "us-in",
-    "us-ks",
-    "us-ky",
-    "us-ma",
-    "us-md",
-    "us-me",
-    "us-mi",
-    "us-mn",
-    "us-mo",
-    "us-mp",
-    "us-ms",
-    "us-mt",
-    "us-nc",
-    "us-nd",
-    "us-nh",
-    "us-nj",
-    "us-nm",
-    "us-nv",
-    "us-ny",
-    "us-oh",
-    "us-ok",
-    "us-or",
-    "us-pr",
-    "us-ri",
-    "us-sc",
-    "us-sd",
-    "us-tn",
-    "us-tx",
-    "us-um",
-    "us-ut",
-    "us-vi",
-    "us-wa",
-    "us-wy",
-    "uy-ar",
-    "uy-ca",
-    "uy-cl",
-    "uy-co",
-    "uy-du",
-    "uy-la",
-    "uy-pa",
-    "uy-rn",
-    "uy-ro",
-    "uy-sa",
-    "uy-sj",
-    "uy-so",
-    "uy-tt",
-    "uz-qr",
-    "uz-tk",
-    "ve-a",
-    "ve-b",
-    "ve-c",
-    "ve-e",
-    "ve-f",
-    "ve-g",
-    "ve-h",
-    "ve-i",
-    "ve-j",
-    "ve-k",
-    "ve-l",
-    "ve-m",
-    "ve-n",
-    "ve-o",
-    "ve-p",
-    "ve-s",
-    "ve-t",
-    "ve-u",
-    "ve-v",
-    "ve-w",
-    "ve-x",
-    "ve-z",
-    "vu-map",
-    "vu-pam",
-    "vu-sam",
-    "vu-see",
-    "vu-tae",
-    "wf-al",
-    "wf-sg",
-    "wf-uv",
-    "za-mp",
-    "zm-01",
-    "zm-02",
-    "zm-03",
-    "zm-04",
-    "zm-05",
-    "zm-06",
-    "zm-07",
-    "zm-10"
-  ]);
-
-  // src/shared/originArea.ts
-  function originFlagAssetPath(input) {
-    const subdivision = input.subdivisionCode?.trim().toLowerCase() ?? "";
-    if (subdivision.length > 0 && SUBDIVISION_FLAG_CODES.has(subdivision)) {
-      return `flags/subdivisions/${subdivision}.svg`;
-    }
-    return countryFlagAssetPath(input.countryCode);
-  }
-  function originFlagImgHtml(input) {
-    const src = escapeHtmlText(originFlagAssetPath(input));
-    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
-  }
-  function formatOriginPlaceLabel(input) {
-    const areaName = input.areaName?.trim() ?? "";
-    const countryName = input.countryName?.trim() ?? "";
-    if (!input.hasSubdivision) return countryName.length > 0 ? countryName : areaName;
-    if (areaName.length > 0 && countryName.length > 0 && areaName !== countryName) return `${areaName}, ${countryName}`;
-    return areaName.length > 0 ? areaName : countryName;
-  }
-  function originPlaceLabelFor(origin) {
-    const subdivisionCode = origin.birthSubdivisionCode?.trim() ?? "";
-    return formatOriginPlaceLabel({
-      areaName: origin.birthAreaName ?? origin.birthCountryName,
-      countryName: origin.birthOriginCountryName,
-      hasSubdivision: subdivisionCode.length > 0
-    });
-  }
-
   // src/shared/lossSummary.ts
-  var LOSS_ENTRY_LIST_MAX = 5;
+  var LOSS_TYPE_NAME_LIST_MAX = 3;
   var GROUP_LABEL_BY_TYPE = {
     naval: "Naval",
     air: "Air",
@@ -3102,22 +972,24 @@
   function emptyTurnLossSummary() {
     return { byOwner: {} };
   }
+  function isKnownLossType(unitType) {
+    return unitType === "naval" || unitType === "air" || unitType === "armor" || unitType === "infantry";
+  }
   function formatLossEntries(units) {
     if (units.length === 0) return "";
-    if (units.length <= LOSS_ENTRY_LIST_MAX) {
-      return units.map((u) => u.displayName).join(", ");
-    }
-    return formatGroupedTypeTotals(units);
-  }
-  function formatGroupedTypeTotals(units) {
     const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
-    for (const u of units) {
-      if (u.unitType in counts) counts[u.unitType] += 1;
+    for (const unit of units) {
+      if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
     }
     const parts = [];
-    for (const t of GROUP_ORDER) {
-      const n = counts[t];
-      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
+    for (const unit of units) {
+      if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
+        parts.push(unit.displayName);
+      }
+    }
+    for (const unitType of GROUP_ORDER) {
+      const count = counts[unitType];
+      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
     }
     return parts.join(", ");
   }
@@ -3139,6 +1011,40 @@
       if (text.length > 0) lines.push({ causeLabel: spec.label, text });
     }
     return lines;
+  }
+
+  // src/shared/lossToastUnitSegments.ts
+  var GROUP_TYPE_BY_LABEL = {
+    Naval: "naval",
+    Air: "air",
+    Armored: "armor",
+    Infantry: "infantry"
+  };
+  var GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry)$/;
+  var VICTIM_SEPARATOR = ", ";
+  var BULLET_PREFIX = "\u2022 ";
+  function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
+    const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
+    const body = line.slice(bullet.length);
+    const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
+    if (!label) return [{ text: line, unitDisplayName: null }];
+    const prefix = `${bullet}${label}: `;
+    const tokens = body.slice(label.length + 2).split(VICTIM_SEPARATOR);
+    const segments = [{ text: prefix, unitDisplayName: null }];
+    tokens.forEach((token, index) => {
+      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
+      segments.push(victimSegment(token, knownDisplayNames));
+    });
+    return segments;
+  }
+  function victimSegment(token, knownDisplayNames) {
+    if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
+    const match = GROUP_TOKEN.exec(token);
+    const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ""] : void 0;
+    if (match && unitType) {
+      return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
+    }
+    return { text: token, unitDisplayName: null };
   }
 
   // src/shared/seatIds.ts
@@ -3165,6 +1071,253 @@
       throw new RangeError(`AI seat index must be from 1 to ${MAX_SEATS}, got ${aiIndex}`);
     }
     return seatId;
+  }
+  function aiIndexForSeatId(seatId) {
+    const index = AI_SEAT_IDS.indexOf(seatId);
+    return index < 0 ? null : index + 1;
+  }
+
+  // src/shared/turnLossSections.ts
+  var SECTION_HEADER_PREFIX = "## ";
+  function buildTurnLossSections(summary, viewerSeatId2, seats) {
+    const lines = [];
+    if (viewerSeatId2 !== null) lines.push(...sectionLines(summary, viewerSeatId2, "Your Losses"));
+    const others = Object.keys(summary.byOwner).filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID).sort((left, right) => compareOwners(left, right, seats));
+    for (const ownerId of others) {
+      const seat = seats.find((row) => row.seatId === ownerId);
+      lines.push(...sectionLines(summary, ownerId, lossSectionTitle(seat, ownerId)));
+    }
+    lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, "Neutral Losses"));
+    return lines;
+  }
+  function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
+    if (headerTitle === "Your Losses") return viewerSeatId2;
+    if (headerTitle === "Neutral Losses") return NEUTRAL_OWNER_ID;
+    if (!headerTitle.endsWith(" Losses")) return null;
+    const name = headerTitle.slice(0, -" Losses".length);
+    const matches = seats.filter((seat) => {
+      const home = seat.homeRegion.trim();
+      return (home.length > 0 ? home : seat.seatId) === name;
+    }).sort((left, right) => left.seatOrder - right.seatOrder);
+    return matches[0]?.seatId ?? null;
+  }
+  function lossSectionTitle(seat, ownerId) {
+    const name = seat?.homeRegion.trim() ?? "";
+    return `${name.length > 0 ? name : ownerId} Losses`;
+  }
+  function sectionLines(summary, ownerId, header) {
+    const buckets = summary.byOwner[ownerId];
+    if (!buckets) return [];
+    const causes = formatPlayerLossLinesMultiline(buckets);
+    if (causes.length === 0) return [];
+    return [
+      `${SECTION_HEADER_PREFIX}${header}`,
+      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`)
+    ];
+  }
+  function compareOwners(left, right, seats) {
+    const leftSeat = seats.find((row) => row.seatId === left);
+    const rightSeat = seats.find((row) => row.seatId === right);
+    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
+    if (leftSeat) return -1;
+    if (rightSeat) return 1;
+    return left.localeCompare(right, "en");
+  }
+
+  // src/shared/seatRoster.ts
+  var HUMAN_SEAT_KIND = "human";
+  var AI_SEAT_KIND = "ai";
+  var DOCTRINES = ["aggressive", "balanced", "cautious"];
+  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
+  function sortSeatsByOrder(seats) {
+    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function isSeatActive(seat) {
+    return seat.outTurn === null;
+  }
+  function activeAiSeats(seats) {
+    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
+  }
+  function findHumanSeat(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
+  }
+  var COMPASS_PREFIXES = [
+    ["Northern", "N."],
+    ["Southern", "S."],
+    ["Eastern", "E."],
+    ["Western", "W."],
+    ["Central", "C."],
+    ["North", "N."],
+    ["South", "S."],
+    ["East", "E."],
+    ["West", "W."]
+  ];
+  function cutAtFirstSeparator(displayName) {
+    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
+    if (separatorAt.length === 0) return displayName;
+    return displayName.slice(0, Math.min(...separatorAt));
+  }
+  function shortenLeadingCompass(name) {
+    for (const [word, short] of COMPASS_PREFIXES) {
+      if (name === word) return short;
+      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+    }
+    return name;
+  }
+  function shortSideName(displayName) {
+    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
+  }
+
+  // src/shared/turnReportLines.ts
+  function buildTurnReportLines(input) {
+    return [...hexLines(input), ...input.otherLines];
+  }
+  function ownerName(ownerId, seats) {
+    if (isNeutralOwnerId(ownerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === ownerId);
+    return seat ? hexLabelForSeat(seat) : ownerId;
+  }
+  function hexLabelForSeat(seat) {
+    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+  }
+  function compareOwners2(left, right, seats) {
+    const rank = (ownerId) => {
+      if (isNeutralOwnerId(ownerId)) return 1e4;
+      return seats.find((row) => row.seatId === ownerId)?.seatOrder ?? 9e3;
+    };
+    return rank(left) - rank(right) || left.localeCompare(right);
+  }
+  function hexLines(input) {
+    const viewer = input.viewerSeatId;
+    if (viewer === null) return [];
+    const taken = /* @__PURE__ */ new Map();
+    const lost = /* @__PURE__ */ new Map();
+    for (const row of input.transitions) {
+      if (row.to === viewer && row.from !== null && row.from !== viewer) taken.set(row.from, (taken.get(row.from) ?? 0) + 1);
+      if (row.from === viewer && row.to !== null && row.to !== viewer) lost.set(row.to, (lost.get(row.to) ?? 0) + 1);
+    }
+    const lines = [];
+    for (const ownerId of [...taken.keys()].sort((left, right) => compareOwners2(left, right, input.seats))) {
+      const count = taken.get(ownerId) ?? 0;
+      const hexWord = count === 1 ? "hex" : "hexes";
+      lines.push(`You took ${count} ${hexWord} from ${ownerName(ownerId, input.seats)}.`);
+    }
+    for (const ownerId of [...lost.keys()].sort((left, right) => compareOwners2(left, right, input.seats))) {
+      const count = lost.get(ownerId) ?? 0;
+      lines.push(`${ownerName(ownerId, input.seats)} took ${count} of your hexes.`);
+    }
+    return lines;
+  }
+  function hexNameForSeat(seat) {
+    if (aiIndexForSeatId(seat.seatId) == null) return null;
+    return hexLabelForSeat(seat);
+  }
+  function headerNameForSeat(seat) {
+    if (aiIndexForSeatId(seat.seatId) == null) return null;
+    const home = seat.homeRegion.trim();
+    return home.length > 0 ? home : seat.seatId;
+  }
+  function seatForDisplayedName(seats, name, nameOf) {
+    const matches = seats.filter((seat) => nameOf(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    return matches[0] ?? null;
+  }
+  function markInBody(body, seats) {
+    const from = /^You took \d+ hex(?:es)? from (.+)\.$/.exec(body);
+    if (from) {
+      const name2 = from[1] ?? "";
+      const seat2 = seatForDisplayedName(seats, name2, hexNameForSeat);
+      if (!seat2) return [];
+      const start = body.length - name2.length - 1;
+      return [{ seatId: seat2.seatId, start, end: start + name2.length }];
+    }
+    const took = /^(.+) took \d+ of your hexes\.$/.exec(body);
+    if (took) {
+      const name2 = took[1] ?? "";
+      const seat2 = seatForDisplayedName(seats, name2, hexNameForSeat);
+      if (!seat2 || !body.startsWith(`${name2} took `)) return [];
+      return [{ seatId: seat2.seatId, start: 0, end: name2.length }];
+    }
+    if (body === "Your Losses" || body === "Neutral Losses" || !body.endsWith(" Losses")) return [];
+    const name = body.slice(0, -" Losses".length);
+    const seat = seatForDisplayedName(seats, name, headerNameForSeat);
+    if (!seat) return [];
+    return [{ seatId: seat.seatId, start: 0, end: name.length }];
+  }
+  function sideNameMarksForLine(line, seats) {
+    let offset = 0;
+    let body = line;
+    if (body.startsWith("\u2022 ")) {
+      offset += 2;
+      body = body.slice(2);
+    }
+    if (body.startsWith("## ")) {
+      offset += 3;
+      body = body.slice(3);
+    }
+    return markInBody(body, seats).map((mark) => ({
+      seatId: mark.seatId,
+      start: mark.start + offset,
+      end: mark.end + offset
+    }));
+  }
+
+  // src/shared/seatPalette.ts
+  var SEAT_PALETTES = [
+    { map: "#115E59", forceBar: "#1B8A82", text: "#7DCEC8" },
+    { map: "#9D174D", forceBar: "#B02A62", text: "#F0B4C8" },
+    { map: "#C2410C", forceBar: "#EA580C", text: "#FDBA74" },
+    { map: "#2563EB", forceBar: "#3B82F6", text: "#A9C1F5" }
+  ];
+  var NEUTRAL_PALETTE = {
+    map: "#141414",
+    heldHexOutline: "#1F1F1F",
+    forceBar: "#9CA3AF",
+    text: "#D9D9D9"
+  };
+  function miniTokenColors(palette) {
+    return { fill: palette.map, glyph: "#ffffff", ring: palette.text };
+  }
+  function paletteForOwner(ownerId, seats) {
+    if (ownerId == null) return null;
+    if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;
+    const seat = seats.find((row) => row.seatId === ownerId);
+    if (!seat) return null;
+    const palette = SEAT_PALETTES[seat.seatOrder - 1];
+    return palette ?? null;
+  }
+
+  // src/shared/observeModeControls.ts
+  function activeHumanSeatId(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
+  }
+  function isObservingRoster(seats) {
+    return seats.length > 0 && activeHumanSeatId(seats) === null;
+  }
+  function observeModeControls(seats) {
+    const observing = isObservingRoster(seats);
+    return {
+      observing,
+      ordersEnabled: !observing,
+      buildEnabled: false,
+      forcesEnabled: false,
+      unitSelectionEnabled: !observing,
+      magnifierEnabled: !observing,
+      hexOnlySelection: observing
+    };
+  }
+  function readoutViewerSeatId(seats, viewAs) {
+    if (seats.length === 0) return void 0;
+    if (!observeModeControls(seats).observing) {
+      return activeHumanSeatId(seats);
+    }
+    if (viewAs === "all") return null;
+    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
+    return chosen?.seatId ?? null;
+  }
+  function staleIntelViewer(playerPerspective) {
+    if (playerPerspective === "all") return null;
+    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
+    return HUMAN_SEAT_ID;
   }
 
   // src/shared/unitIds.ts
@@ -3240,521 +1393,17 @@
     return null;
   }
 
-  // src/shared/unitDisplayNames.ts
-  var UNIT_TYPE_NOUN_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'Infantry').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "Infantry",
-    /**
-       * Documents the object literal property `armor` (armor: 'Armored').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "Armored",
-    /**
-       * Documents the object literal property `naval` (naval: 'Fleet').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "Fleet",
-    /**
-       * Documents the object literal property `air` (air: 'Squadron').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "Squadron"
-  };
-  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
-  function capitalizeWord(s) {
-    if (!s) return s;
-    return s.charAt(0).toUpperCase() + s.slice(1);
+  // src/renderer/rendering/ownerColors.ts
+  function paletteSeats() {
+    return rendererSharedState.gameState?.seats ?? [];
   }
-  function ordinalSuffix(value) {
-    const abs = Math.abs(Math.trunc(value));
-    const mod100 = abs % 100;
-    if (mod100 >= 11 && mod100 <= 13) return "th";
-    const mod10 = abs % 10;
-    if (mod10 === 1) return "st";
-    if (mod10 === 2) return "nd";
-    if (mod10 === 3) return "rd";
-    return "th";
-  }
-  function toRomanNumeral(value) {
-    let remaining = Math.max(1, Math.trunc(value));
-    const numerals = [
-      [1e3, "M"],
-      [900, "CM"],
-      [500, "D"],
-      [400, "CD"],
-      [100, "C"],
-      [90, "XC"],
-      [50, "L"],
-      [40, "XL"],
-      [10, "X"],
-      [9, "IX"],
-      [5, "V"],
-      [4, "IV"],
-      [1, "I"]
-    ];
-    let out = "";
-    for (const [unit, symbol] of numerals) {
-      while (remaining >= unit) {
-        out += symbol;
-        remaining -= unit;
-      }
-    }
-    return out;
-  }
-  function unitDisplayOwner(unit) {
-    if (unit.player !== void 0 && isSeatId(unit.player)) return unit.player;
-    return unitIdOwnerFromId(unit.id) ?? "other";
-  }
-  function formatUnitNumberLabel(unit, value, locale) {
-    const owner = unitDisplayOwner(unit);
-    return owner !== "other" && isAiSeatId(owner) ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
-  }
-  function parseSeedUnitIdParts(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
-    if (!match) return null;
-    const ordinal3 = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal3) || ordinal3 <= 0) return null;
-    return { unitType: match[2], ordinal: ordinal3 };
-  }
-  function productionSpawnSequenceFromUnitId(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
-    if (!match) return null;
-    const sequence = Number.parseInt(match[3], 10);
-    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
-  }
-  function resolvePersistedDisplayOrderForUnitLabel(unit) {
-    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
-    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
-    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
-    return unit.displayOrder;
-  }
-  function unitDisplaySequenceGroupKey(unit) {
-    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
-  }
-  function uniqueUnitsPreferringPersistedOrder(units) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const existing = byId.get(unit.id);
-      if (!existing) {
-        byId.set(unit.id, unit);
-        continue;
-      }
-      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
-      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
-      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
-    }
-    return [...byId.values()];
-  }
-  function formatOrdinalLabel(value, locale) {
-    const normalized = Math.max(1, Math.trunc(value));
-    const numberText = new Intl.NumberFormat(locale).format(normalized);
-    return `${numberText}${ordinalSuffix(normalized)}`;
-  }
-  function getUnitDisplayNoun(unitType) {
-    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
-  }
-  function buildUnitDisplayNameLookup(units, locale) {
-    const byGroup = /* @__PURE__ */ new Map();
-    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
-      const key = unitDisplaySequenceGroupKey(unit);
-      const existing = byGroup.get(key);
-      if (existing) existing.push(unit);
-      else byGroup.set(key, [unit]);
-    }
-    const result = /* @__PURE__ */ new Map();
-    for (const group of byGroup.values()) {
-      const unitType = group[0]?.unitType ?? "";
-      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
-        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
-      );
-      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
-      const noun = getUnitDisplayNoun(unitType);
-      for (const unit of withPersisted) {
-        const ordinal3 = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal3, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-      let fallbackOrdinal = withPersisted.reduce(
-        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
-        0
-      );
-      for (const unit of withoutPersisted) {
-        fallbackOrdinal += 1;
-        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-    }
-    return result;
-  }
-  function fallbackDisplayNameFromUnitId(unitId, locale) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
-    }
-    const seed = parseSeedUnitIdParts(unitId);
-    if (seed) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
-    }
-    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
-    return unitId;
-  }
-
-  // src/shared/gameCalendar.ts
-  var GAME_MONTH_NAMES = Object.freeze([
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-  ]);
-  var DAYS_IN_COMMON_YEAR = Object.freeze([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
-  function parseStartMonth(raw) {
-    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
-    const text = String(raw ?? "").trim();
-    if (/^\d+$/.test(text)) {
-      const numeric = Number(text);
-      return numeric >= 1 && numeric <= 12 ? numeric : 1;
-    }
-    const index = GAME_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
-    return index >= 0 ? index + 1 : 1;
-  }
-  function gameCalendarKindForMap(gameMapId) {
-    return gameMapId === "global" ? "monthly" : "weekly";
-  }
-  function isLeapGameYear(year) {
-    const normalized = Number.isFinite(year) ? Math.floor(year) : 1;
-    return (normalized - 1) % 4 === 0;
-  }
-  function daysInGameMonth(year, monthIndex) {
-    const index = monthIndex === 1 ? 1 : Math.min(11, Math.max(0, monthIndex));
-    if (index === 1 && isLeapGameYear(year)) return 29;
-    return DAYS_IN_COMMON_YEAR[index] ?? 31;
-  }
-  function normalizedTurn(turnNumber) {
-    return Number.isFinite(turnNumber) && turnNumber >= 1 ? Math.floor(turnNumber) : 1;
-  }
-  function weeklyDate(turn, startMonth) {
-    let year = 1;
-    let monthIndex = startMonth - 1;
-    let day = 1;
-    let monthsElapsed = 0;
-    for (let step = 1; step < turn; step += 1) {
-      day += 7;
-      while (day > daysInGameMonth(year, monthIndex)) {
-        day -= daysInGameMonth(year, monthIndex);
-        monthsElapsed += 1;
-        year = Math.floor(monthsElapsed / 12) + 1;
-        monthIndex = (startMonth - 1 + monthsElapsed) % 12;
-      }
-    }
-    return { year, monthIndex, day };
-  }
-  function gameDateForTurn(turnNumber, startMonth, kind) {
-    const turn = normalizedTurn(turnNumber);
-    const start = parseStartMonth(startMonth);
-    if (kind === "weekly") return weeklyDate(turn, start);
-    return {
-      year: Math.floor((turn - 1) / 12) + 1,
-      monthIndex: (turn - 1 + start - 1) % 12,
-      day: null
-    };
-  }
-  function formatGameDate(date) {
-    const monthName = GAME_MONTH_NAMES[date.monthIndex] ?? "January";
-    const yearLabel = `Year ${date.year}`;
-    if (date.day == null) return `${monthName}, ${yearLabel}`;
-    return `${monthName} ${formatOrdinalLabel(date.day, "en-US")}, ${yearLabel}`;
-  }
-  function formatGameDateForTurn(turnNumber, startMonth, kind) {
-    return formatGameDate(gameDateForTurn(turnNumber, startMonth, kind));
-  }
-
-  // src/shared/pipelineTerrain.ts
-  var PIPELINE_TERRAIN_KINDS = [
-    "water",
-    "coastal",
-    "wetlands",
-    "plains",
-    "forest",
-    "mountain",
-    "desert",
-    "arctic"
-  ];
-  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
-  function isPipelineTerrainKind(s) {
-    return KIND_SET.has(s);
-  }
-
-  // src/shared/terrainKindLabel.ts
-  function formatTerrainKindLabel(kind) {
-    if (!kind) return "Unknown";
-    return kind.charAt(0).toUpperCase() + kind.slice(1);
-  }
-
-  // src/shared/terrainSwatchHtml.ts
-  var TERRAIN_SWATCH_CLASS_NAME = "terrain-swatch";
-  var DISPLAY_LABEL_TO_KIND = Object.freeze({
-    Water: "water",
-    Coastal: "coastal",
-    Wetlands: "wetlands",
-    Plains: "plains",
-    Forest: "forest",
-    Mountain: "mountain",
-    Desert: "desert",
-    Arctic: "arctic"
-  });
-  function pipelineKindFromRaw(kind) {
-    if (kind == null) return null;
-    const normalized = kind.trim().toLowerCase();
-    return isPipelineTerrainKind(normalized) ? normalized : null;
-  }
-  function formatTerrainSwatchHtml(kind) {
-    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="${kind}" aria-hidden="true"></span>`;
-  }
-  function formatUrbanSwatchHtml() {
-    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="urban" aria-hidden="true"></span>`;
-  }
-  function formatRubbleSwatchHtml() {
-    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="rubble" aria-hidden="true"></span>`;
-  }
-  function rubbleSwatchBackgroundImage() {
-    const line = "rgba(110, 22, 18, 0.95)";
-    const slash = `repeating-linear-gradient(45deg, transparent 0 2px, ${line} 2px 3px)`;
-    const backslash = `repeating-linear-gradient(-45deg, transparent 0 2px, ${line} 2px 3px)`;
-    return `${slash}, ${backslash}`;
-  }
-  function formatTerrainKindHtml(kind) {
-    const label = formatTerrainKindLabel(kind ?? null);
-    const pipeline = pipelineKindFromRaw(kind);
-    if (!pipeline) return escapeHtmlText(label);
-    return `${formatTerrainSwatchHtml(pipeline)}${escapeHtmlText(label)}`;
-  }
-  function formatTerrainNameListHtml(text) {
-    return text.split(", ").map(formatTerrainNameTokenHtml).join(", ");
-  }
-  function formatTerrainNameTokenHtml(token) {
-    const match = /^([A-Za-z]+)([\s\S]*)$/.exec(token);
-    const word = match?.[1] ?? "";
-    if (match && word === "Urban") {
-      return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
-    }
-    if (match && word === "Rubble") {
-      return `${formatRubbleSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
-    }
-    const kind = DISPLAY_LABEL_TO_KIND[word];
-    if (!match || !kind) return escapeHtmlText(token);
-    return `${formatTerrainSwatchHtml(kind)}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
-  }
-
-  // src/shared/bonusLevel.ts
-  var BONUS_LEVELS = Object.freeze(["off", "low", "high"]);
-  var DEFAULT_BONUS_LEVEL = "low";
-  function parseBonusLevel(raw, fallback) {
-    if (typeof raw !== "string") return fallback;
-    const normalized = raw.trim().toLowerCase();
-    return BONUS_LEVELS.find((level) => level === normalized) ?? fallback;
-  }
-  function bonusLevelOf(enabled, level) {
-    return enabled === true ? level ?? "low" : "off";
-  }
-
-  // src/shared/weatherBonusRules.ts
-  var STRATEGIC_MOVEMENT_HEXES = Object.freeze({
-    infantry: 1,
-    armor: 2,
-    naval: 2,
-    air: 0
-  });
-  var OPEN_GROUND_CATEGORIES = /* @__PURE__ */ new Set(["plains", "desert", "wetlands", "arctic", "coastal"]);
-  var WEATHER_SLOWING_STATES = Object.freeze({
-    low: Object.freeze({ armor: Object.freeze(["snow", "rain"]), naval: Object.freeze(["snow"]) }),
-    high: Object.freeze({
-      armor: Object.freeze(["snow", "rain", "heat"]),
-      naval: Object.freeze(["snow", "rain"])
-    })
-  });
-  var SLOWED_STRATEGIC_MOVEMENT_HEXES = 1;
-  var TACTICAL_WEATHER_BUDGET_CAP = Object.freeze({
-    low: 2,
-    high: 1
-  });
-  var WEATHER_ATTACK_PENALTY_BY_LEVEL = Object.freeze({
-    low: 3,
-    high: 5
-  });
-  var TAG_TIE_ORDER = Object.freeze(["snow", "heat", "rain"]);
-  var TAG_DISPLAY_ORDER = Object.freeze(["snow", "rain", "heat"]);
-  function weatherTagsInDisplayOrder(tags) {
-    const present = new Set(tags ?? []);
-    return TAG_DISPLAY_ORDER.filter((state) => present.has(state)).slice();
-  }
-  function weatherBonusLevelOf(source) {
-    return bonusLevelOf(source.weatherBonusEnabled, source.weatherBonusLevel);
-  }
-  function strategicMovementHexes(unitType) {
-    return STRATEGIC_MOVEMENT_HEXES[unitType] ?? 1;
-  }
-  function weatherSlowsMovement(input) {
-    const { unitType, weather, tags, level } = input;
-    if (level === "off" || !weather || hasWeatherTag(tags, weather)) return false;
-    return WEATHER_SLOWING_STATES[level][unitType]?.includes(weather) === true;
-  }
-  function strategicMovementHexesFor(input) {
-    return weatherSlowsMovement(input) ? SLOWED_STRATEGIC_MOVEMENT_HEXES : strategicMovementHexes(input.unitType);
-  }
-  function tacticalWeatherMovementBudget(input) {
-    const { printedBudget, level } = input;
-    if (level === "off" || !weatherSlowsMovement(input)) return printedBudget;
-    return Math.max(1, Math.min(printedBudget, TACTICAL_WEATHER_BUDGET_CAP[level]));
-  }
-  function tacticalWeatherOpenGroundCost(input) {
-    if (!input.enabled || input.unitType !== "infantry" || !input.weather) return input.baseCost;
-    if (input.weather !== "snow" && input.weather !== "rain") return input.baseCost;
-    if (hasWeatherTag(input.tags, input.weather)) return input.baseCost;
-    if (!OPEN_GROUND_CATEGORIES.has(input.category)) return input.baseCost;
-    return Math.max(input.baseCost, 2);
-  }
-  function weatherAttackPenalty(input) {
-    const { level } = input;
-    if (level === "off") return 0;
-    const penalized = input.kind === "ranged" ? penalizesRangedAttack(input.unitType, input.weatherAtUnit, input.tags) : input.unitType === "air" && [input.weatherAtUnit, input.weatherAtTarget].some((weather) => penalizesAirStrike(weather, input.tags));
-    return penalized ? WEATHER_ATTACK_PENALTY_BY_LEVEL[level] : 0;
-  }
-  function strategicFerryRangeHexes(input) {
-    if (input.enabled && input.weatherAtDestination === "snow" && !hasWeatherTag(input.tags, "snow")) return 2;
-    return 4;
-  }
-  function formatWeatherLabel(weather) {
-    switch (weather) {
-      case "rain":
-        return "Rain";
-      case "snow":
-        return "Snow";
-      case "heat":
-        return "Heat";
-      default:
-        return "Mild";
-    }
-  }
-  function hasWeatherTag(tags, weather) {
-    return tags?.includes(weather) === true;
-  }
-  function penalizesRangedAttack(unitType, weather, tags) {
-    if (unitType !== "armor" || weather !== "snow" && weather !== "heat") return false;
-    return !hasWeatherTag(tags, weather);
-  }
-  function penalizesAirStrike(weather, tags) {
-    if (weather !== "snow" && weather !== "rain" && weather !== "heat") return false;
-    return !hasWeatherTag(tags, weather);
-  }
-
-  // src/shared/weatherIcons.ts
-  var WEATHER_ICON_CLASS_NAME = "weather-icon";
-  var WEATHER_ICON_FILE = Object.freeze({
-    mild: "mild.svg",
-    rain: "rain.svg",
-    snow: "snow.svg",
-    heat: "heat.svg"
-  });
-  function weatherIconAssetPath(weather) {
-    const file = weather ? WEATHER_ICON_FILE[weather] : WEATHER_ICON_FILE.mild;
-    return `weather/${file ?? WEATHER_ICON_FILE.mild}`;
-  }
-  function formatWeatherIconHtml(weather) {
-    const label = formatWeatherLabel(weather);
-    const src = escapeHtmlText(weatherIconAssetPath(weather));
-    return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
-  }
-
-  // src/shared/activeGameMap.ts
-  var GLOBAL_GAME_MAP = {
-    id: "global",
-    displayName: "Global",
-    strategicResolution: 1,
-    tacticalResolution: 4,
-    controlWinMinUrbanShare: null,
-    rules: {
-      infantryCost: 20,
-      armorCost: 40,
-      navalCost: 100,
-      airCost: 60,
-      armorMinUrbanCells: 2,
-      airMinUrbanCells: 5,
-      navalMinUrbanCells: 10,
-      advancedMinUrbanCells: 21,
-      strategicStrikeUrbanCells: 9
-    },
-    scaleranks: {
-      urbanOverlay: 5,
-      airport: 5,
-      seaport: 5,
-      cityLabel: 6
-    }
-  };
-  var activeProfile = GLOBAL_GAME_MAP;
-  var profileResetters = [];
-  function registerActiveGameMapReset(reset) {
-    profileResetters.push(reset);
-  }
-  function assignActiveProfile(profile) {
-    activeProfile = profile;
-    for (const reset of profileResetters) reset();
-  }
-  function activeGameMap() {
-    return activeProfile;
-  }
-  function setActiveGameMap(profile) {
-    assignActiveProfile(profile);
-  }
-
-  // src/shared/gameRules.ts
-  function unitCostFor(unitType) {
-    const rules = activeGameMap().rules;
-    switch (unitType) {
-      case "infantry":
-        return rules.infantryCost;
-      case "armor":
-        return rules.armorCost;
-      case "naval":
-        return rules.navalCost;
-      case "air":
-        return rules.airCost;
-      default: {
-        const unexpected = unitType;
-        throw new Error(`Unknown unit type ${String(unexpected)}`);
-      }
-    }
-  }
-  function advancedTechMinUrbanCells() {
-    return activeGameMap().rules.advancedMinUrbanCells;
+  function paletteForCurrentOwner(ownerId) {
+    if (ownerId == null || ownerId === "") return null;
+    const seats = paletteSeats();
+    const palette = paletteForOwner(ownerId, seats);
+    if (palette) return palette;
+    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
+    return null;
   }
 
   // node_modules/h3-js/dist/browser/h3-js.es.js
@@ -17953,802 +15602,45 @@
     return rad * 180 / Math.PI;
   }
 
-  // src/shared/tacticalRanges.ts
-  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 4,
-    naval: 3,
-    air: 0
-  });
-  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 5,
-    naval: 10,
-    air: 99
-  });
-  function unitHasTacticalRangedBaseline(unitType) {
-    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
-  }
-  var AIR_STRIKE_RANGE_HEXES = 3;
-
-  // src/shared/tacticalTransportLink.ts
-  var orderedRingMemo = /* @__PURE__ */ new Map();
-  var ORDERED_RING_MEMO_CAPACITY = 1e3;
-  function tacticalGridDiskNeighborsOrdered(fromH3) {
-    const cached = orderedRingMemo.get(fromH3);
-    if (cached !== void 0) return cached;
-    let ring;
-    try {
-      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
-    } catch {
-      ring = [];
+  // src/shared/activeGameMap.ts
+  var GLOBAL_GAME_MAP = {
+    id: "global",
+    displayName: "Global",
+    strategicResolution: 1,
+    tacticalResolution: 4,
+    controlWinMinUrbanShare: null,
+    rules: {
+      infantryCost: 20,
+      armorCost: 40,
+      navalCost: 100,
+      airCost: 60,
+      armorMinUrbanCells: 2,
+      airMinUrbanCells: 5,
+      navalMinUrbanCells: 10,
+      advancedMinUrbanCells: 21,
+      strategicStrikeUrbanCells: 9
+    },
+    scaleranks: {
+      urbanOverlay: 5,
+      airport: 5,
+      seaport: 5,
+      cityLabel: 6
     }
-    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
-      const oldest = orderedRingMemo.keys().next().value;
-      if (oldest !== void 0) orderedRingMemo.delete(oldest);
-    }
-    orderedRingMemo.set(fromH3, ring);
-    return ring;
-  }
-  function tacticalNeighborsInFootprint(h, tacticalSet) {
-    const out = [];
-    try {
-      for (const n of gridDisk(h, 1)) {
-        if (n !== h && tacticalSet.has(n)) out.push(n);
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
-  function tacticalTransportMaskHasAnyRoadOrRail(masks, ringLen) {
-    const { roadSides, railSides } = masks;
-    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
-    for (let i = 0; i < ringLen; i++) {
-      if (roadSides[i] || railSides[i]) return true;
-    }
-    return false;
-  }
-  function tacticalTransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
-    const masks = roadRailByH3.get(h3);
-    if (!masks) return false;
-    const ring = tacticalGridDiskNeighborsOrdered(h3);
-    return tacticalTransportMaskHasAnyRoadOrRail(masks, ring.length);
-  }
-  function tacticalTransportMarchAdjacentPairAllowsStep(args) {
-    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
-    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
-    const ring = tacticalGridDiskNeighborsOrdered(fromH3);
-    if (ring.indexOf(toH3) < 0) return false;
-    return tacticalTransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalTransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
-  }
-  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
-  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
-
-  // src/shared/tacticalTerrainMovement.ts
-  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
-    const k = (effectiveKind || "").toLowerCase();
-    const pt = (parentTerrain || "").toLowerCase();
-    if (k === "water") return "water";
-    if (k === "coastal") return "coastal";
-    if (k === "forest" || k === "forests") return "forests";
-    if (k === "mountain" || k === "mountains") return "mountains";
-    if (k === "wetland" || k === "wetlands") return "wetlands";
-    if (k === "desert") return "desert";
-    if (k === "arctic") return "arctic";
-    if (k === "plains" || k === "land") return "plains";
-    if (k.length > 0) return "plains";
-    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
-    return "plains";
-  }
-  function nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(kind) {
-    const k = (kind || "").toLowerCase();
-    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
-  }
-  function isInfantryOrArmorTacticalSpawnCell(args) {
-    const k = args.resolvedKindForCell || args.parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
-    return cat !== "water" && cat !== "arctic";
-  }
-  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
-    if (unitType !== "infantry" && unitType !== "armor") return false;
-    if (terrain.isUrbanTactical?.(cellH3) || terrain.isRubbleTactical?.(cellH3)) return true;
-    const raw = terrain.effectiveKindForTacticalHex(cellH3);
-    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
-  }
-  function isNavalTacticalCellNavigable(args) {
-    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
-    if (isSeaportCell) return true;
-    if (nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
-    void parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return cat === "water" || cat === "coastal";
-  }
-  function buildRoadRailMapFromTacticalRoadRailRecords(roadBy, railBy) {
-    const roadRailByH3 = /* @__PURE__ */ new Map();
-    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
-    for (const h3 of transportKeys) {
-      const r = roadBy[h3];
-      const l = railBy[h3];
-      if (!r && !l) continue;
-      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
-      if (n === 0) continue;
-      const roadSides = r ?? Array.from({ length: n }, () => false);
-      const railSides = l ?? Array.from({ length: n }, () => false);
-      if (roadSides.length !== railSides.length) continue;
-      roadRailByH3.set(h3, { roadSides, railSides });
-    }
-    return roadRailByH3;
-  }
-  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
-    if (roadRailByH3.size === 0) {
-      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
-    }
-    const transportFromTo = (fromH3, toH3) => tacticalTransportMarchAdjacentPairAllowsStep({
-      fromH3,
-      toH3,
-      roadRailByH3,
-      rubbleByH3
-    });
-    return {
-      transportFromTo,
-      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
-    };
-  }
-  function tacticalEnterHexMovementCost(unitType, category) {
-    if (unitType === "infantry") {
-      switch (category) {
-        case "plains":
-        case "desert":
-        case "wetlands":
-        case "arctic":
-        case "coastal":
-          return 1;
-        case "forests":
-        case "mountains":
-          return 2;
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "armor") {
-      switch (category) {
-        case "plains":
-        case "desert":
-          return 1;
-        case "forests":
-        case "coastal":
-          return 2;
-        case "mountains":
-        case "wetlands":
-        case "arctic":
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "naval") {
-      switch (category) {
-        case "water":
-        case "coastal":
-          return 1;
-        default:
-          return Infinity;
-      }
-    }
-    return Infinity;
-  }
-  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    const parentKind = battle.strategicHexTerrainKind ?? "plains";
-    const map = battle.tacticalTerrainKindByH3 ?? {};
-    const seaportMap = battle.tacticalIsSeaportByH3 ?? {};
-    const urbanMap = battle.tacticalIsUrbanByH3 ?? {};
-    const rubbleMap = battle.tacticalIsRubbleByH3 ?? {};
-    const roadBy = battle.tacticalRoadSidesByH3 ?? {};
-    const railBy = battle.tacticalRailSidesByH3 ?? {};
-    const roadRailByH3 = buildRoadRailMapFromTacticalRoadRailRecords(roadBy, railBy);
-    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
-    return {
-      parentTerrain,
-      parentTerrainKind: parentKind,
-      transportFromTo: transportFromToFn,
-      landTransportMarchContext,
-      effectiveKindForTacticalHex(h3) {
-        const raw = map[h3];
-        if (raw == null) return parentKind;
-        const trimmed = String(raw).trim();
-        return trimmed.length > 0 ? trimmed : parentKind;
-      },
-      isSeaportTactical(h3) {
-        return !!seaportMap[h3];
-      },
-      isUrbanTactical(h3) {
-        return !!urbanMap[h3];
-      },
-      isRubbleTactical(h3) {
-        return !!rubbleMap[h3];
-      }
-    };
-  }
-  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
-    void _toH3Index;
-    if (unit.unitType === "air") return "air";
-    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
-    if (embarked) {
-      return "naval";
-    }
-    return unit.unitType;
-  }
-  function tacticalTerrainLayerSignature(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "";
-    const parentKind = battle.strategicHexTerrainKind ?? "";
-    const map = battle.tacticalTerrainKindByH3;
-    const sp = battle.tacticalIsSeaportByH3;
-    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const urban = battle.tacticalIsUrbanByH3;
-    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const rubble = battle.tacticalIsRubbleByH3;
-    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const road = battle.tacticalRoadSidesByH3;
-    const rail = battle.tacticalRailSidesByH3;
-    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
-    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
-      const r = road?.[h3] ?? [];
-      const l = rail?.[h3] ?? [];
-      const n = Math.max(r.length, l.length);
-      let s = `${h3}:`;
-      for (let i = 0; i < n; i++) {
-        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
-      }
-      return s;
-    }).join(";");
-    if (!map || Object.keys(map).length === 0) {
-      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-    }
-    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
-    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-  }
-
-  // src/shared/tacticalTerrainCombatModifiers.ts
-  function effectiveTacticalTerrainKindString(battle, tacticalH3) {
-    const fromMap = battle.tacticalTerrainKindByH3?.[tacticalH3];
-    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
-      return String(fromMap);
-    }
-    return battle.strategicHexTerrainKind ?? "plains";
-  }
-  function tacticalMovementCategory(battle, tacticalH3) {
-    const kind = effectiveTacticalTerrainKindString(battle, tacticalH3);
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
-  }
-  function tacticalCellIsMountain(battle, tacticalH3) {
-    return tacticalMovementCategory(battle, tacticalH3) === "mountains";
-  }
-  function tacticalCellIsUrbanOrRubble(battle, tacticalH3) {
-    return !!battle.tacticalIsRubbleByH3?.[tacticalH3] || !!battle.tacticalIsUrbanByH3?.[tacticalH3];
-  }
-  function tacticalCellIsForestClass(battle, tacticalH3) {
-    return tacticalMovementCategory(battle, tacticalH3) === "forests";
-  }
-  function tacticalMovementTerrainAnchorH3(u, subUnits) {
-    const emb = u.embarkedOnSubUnitId;
-    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
-      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
-      if (naval) return naval.h3Index;
-    }
-    return u.h3Index;
-  }
-  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
-    if (tacticalCellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
-    return tacticalCellIsForestClass(battle, attackerAnchorH3);
-  }
-  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
-    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
-      return Math.min(baseline, 1);
-    }
-    return baseline;
-  }
-  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
-    const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
-    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
-    let budget;
-    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
-      if (tacticalCellIsUrbanOrRubble(battle, anchor2)) {
-        budget = Math.max(0, 1);
-      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) {
-        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
-        budget = Math.max(0, inf);
-      } else {
-        budget = Math.max(0, base);
-      }
-    } else {
-      budget = Math.max(0, base);
-    }
-    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
-      return 1;
-    }
-    return tacticalWeatherMovementBudget({
-      unitType: subUnit.unitType,
-      printedBudget: budget,
-      weather: battle.weather,
-      tags: subUnit.weatherTags,
-      level: weatherBonusLevelOf(battle)
-    });
-  }
-
-  // src/shared/originBonusRules.ts
-  var ORIGIN_HIT_BONUS_BY_LEVEL = Object.freeze({
-    low: 2,
-    high: 4
-  });
-  var ORIGIN_BONUS_OFF = Object.freeze({
-    originBonusEnabled: false,
-    terrainBonusEnabled: false
-  });
-  var TERRAIN_KIND_ALIASES = Object.freeze({
-    ocean: "water",
-    sea: "water",
-    forests: "forest",
-    mountains: "mountain",
-    wetland: "wetlands"
-  });
-  function normalizeOriginTerrainKind(raw) {
-    const kind = (raw ?? "").trim().toLowerCase();
-    if (kind.length === 0) return null;
-    const aliased = TERRAIN_KIND_ALIASES[kind] ?? kind;
-    return isPipelineTerrainKind(aliased) ? aliased : null;
-  }
-
-  // src/shared/techBonusRules.ts
-  var TECH_ADVANCED_MIN_URBAN_HEX_COUNT = GLOBAL_GAME_MAP.rules.advancedMinUrbanCells;
-  var TECH_HIT_BONUS = Object.freeze({ attack: 2, defense: 2 });
-  function techLevelFromUrbanHexCount(urbanHexCount) {
-    if (urbanHexCount == null || !Number.isFinite(urbanHexCount)) return "basic";
-    return urbanHexCount >= advancedTechMinUrbanCells() ? "advanced" : "basic";
-  }
-
-  // src/shared/featureIconHtml.ts
-  var FEATURE_ICON_CLASS_NAME = "feature-icon";
-  function formatFeatureIconHtml(src, label) {
-    return `<img class="${FEATURE_ICON_CLASS_NAME}" src="${escapeHtmlText(src)}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
-  }
-  function transportLineSpecified(input) {
-    return input.road === true || input.rail === true || input.roadRail === true;
-  }
-  function formatTransportIconsHtml(input) {
-    const specified = input.road === true || input.rail === true;
-    const road = specified ? input.road === true : input.roadRail === true;
-    const rail = specified ? input.rail === true : input.roadRail === true;
-    const parts = [];
-    if (road) parts.push(formatFeatureIconHtml("transport/road.svg", "Road"));
-    if (rail) parts.push(formatFeatureIconHtml("transport/rail.svg", "Rail"));
-    return parts.join(", ");
-  }
-  function formatFeatureLabelHtml(label) {
-    if (label === "Road") return formatFeatureIconHtml("transport/road.svg", "Road");
-    if (label === "Rail") return formatFeatureIconHtml("transport/rail.svg", "Rail");
-    if (label === "Rubble") return `${formatRubbleSwatchHtml()}${escapeHtmlText("Rubble")}`;
-    return escapeHtmlText(label);
-  }
-  function formatTechTierHtml(level) {
-    if (level === "advanced") return formatFeatureIconHtml("tech/tech_advanced.svg", "Advanced");
-    return formatFeatureIconHtml("tech/tech_basic.svg", "Basic");
-  }
-  function formatProducedUnitTechLineHtml(input) {
-    if (input.techBonusEnabled !== true) return null;
-    if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
-    const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
-    return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
-  }
-  function formatSelectedHexTechLineHtml(input) {
-    if (input.techBonusEnabled !== true) return null;
-    let hasBasic = false;
-    let hasAdvanced = false;
-    for (const count of input.baselineUrbanHexCounts) {
-      if (!Number.isFinite(count) || count <= 0) continue;
-      if (techLevelFromUrbanHexCount(count) === "advanced") hasAdvanced = true;
-      else hasBasic = true;
-    }
-    const parts = [];
-    if (hasBasic) parts.push(formatTechTierHtml("basic"));
-    if (hasAdvanced) parts.push(formatTechTierHtml("advanced"));
-    if (parts.length === 0) return null;
-    return `<strong>Tech:</strong> ${parts.join(", ")}`;
-  }
-
-  // src/shared/unitOriginTooltipText.ts
-  function unitOriginsPresentTheSame(left, right) {
-    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode && left.birthAreaId === right.birthAreaId && left.birthAreaName === right.birthAreaName && left.birthSubdivisionCode === right.birthSubdivisionCode && (left.birthOriginCountryName ?? null) === (right.birthOriginCountryName ?? null);
-  }
-  function bonusRow(label, value) {
-    return `<strong>${label}:</strong> ${value}`;
-  }
-  function formationTurnForUnit(unitId, formedTurnById2) {
-    const direct = formedTurnById2.get(unitId);
-    if (direct != null) return direct;
-    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
-    if (!parentUnitId) return null;
-    return formedTurnById2.get(parentUnitId) ?? null;
-  }
-  function identityLines(origin, identity) {
-    if (!identity) return [];
-    const lines = [];
-    const displayName = identity.displayName.trim();
-    if (displayName.length > 0) {
-      lines.push(
-        `<strong>Unit:</strong> ${originFlagImgHtml({
-          subdivisionCode: origin.birthSubdivisionCode ?? null,
-          countryCode: origin.birthCountryCode
-        })}${escapeHtmlText(displayName)}`
-      );
-    }
-    const formedLabel = identity.formedLabel?.trim() ?? "";
-    if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
-    return lines;
-  }
-  function formatUnitOriginTooltipHtml(input) {
-    const rows = [];
-    const placeLabel = originPlaceLabelFor(input.origin);
-    if (input.bonuses.originEnabled && placeLabel.length > 0) {
-      rows.push(
-        bonusRow(
-          "Origin",
-          `${originFlagImgHtml({
-            subdivisionCode: input.origin.birthSubdivisionCode ?? null,
-            countryCode: input.origin.birthCountryCode
-          })}${escapeHtmlText(placeLabel)}`
-        )
-      );
-    }
-    const terrainKind = input.origin.birthTerrainKind?.trim() ?? "";
-    if (input.bonuses.terrainEnabled && terrainKind.length > 0) {
-      rows.push(bonusRow("Terrain", formatTerrainKindHtml(terrainKind)));
-    }
-    if (input.bonuses.weatherEnabled) {
-      const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
-      if (tags.length > 0) rows.push(bonusRow("Weather", tags.map((tag) => formatWeatherIconHtml(tag)).join(", ")));
-    }
-    if (input.bonuses.techEnabled && (input.bonuses.techLevel === "basic" || input.bonuses.techLevel === "advanced")) {
-      rows.push(bonusRow("Tech", formatTechTierHtml(input.bonuses.techLevel)));
-    }
-    const body = rows.length > 0 ? rows.join("\n") : "None";
-    const bonuses = `<strong>Bonuses:</strong>
-${body}`;
-    const head = identityLines(input.origin, input.identity);
-    if (head.length === 0) return bonuses;
-    return `${head.join("\n")}
-
-${bonuses}`;
-  }
-
-  // src/renderer/core/unitOriginFlags.ts
-  var unitOriginById = /* @__PURE__ */ new Map();
-  var formedTurnById = /* @__PURE__ */ new Map();
-  var weatherTagsByBirthHex = /* @__PURE__ */ new Map();
-  var techLevelByBirthHex = /* @__PURE__ */ new Map();
-  function rememberUnitOrigins(units) {
-    for (const unit of units) {
-      if (unit.origin) unitOriginById.set(unit.id, unit.origin);
-      if (typeof unit.formedTurn === "number") formedTurnById.set(unit.id, unit.formedTurn);
-      if (unit.origin?.birthH3Index && unit.weatherTags) {
-        weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
-      }
-      if (unit.origin?.birthH3Index && unit.techLevel) {
-        techLevelByBirthHex.set(unit.origin.birthH3Index, unit.techLevel);
-      }
-    }
-  }
-  function clearRememberedUnitOrigins() {
-    unitOriginById.clear();
-    formedTurnById.clear();
-    weatherTagsByBirthHex.clear();
-    techLevelByBirthHex.clear();
-  }
-  function resolveUnitOrigin(unitId) {
-    const direct = unitOriginById.get(unitId);
-    if (direct) return direct;
-    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
-    return parentUnitId ? unitOriginById.get(parentUnitId) ?? null : null;
-  }
-  function formedLabelFor(unitId) {
-    const formedTurn = formationTurnForUnit(unitId, formedTurnById);
-    const state = rendererSharedState.gameState;
-    if (formedTurn == null || !state) return null;
-    return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? "global"));
-  }
-  function tooltipIdentityFor(unitId) {
-    return {
-      displayName: rendererSharedState.unitDisplayNameById.get(unitId) ?? "",
-      formedLabel: formedLabelFor(unitId)
-    };
-  }
-  function selectedBonusOptions() {
-    const state = rendererSharedState.gameState;
-    return {
-      originEnabled: state?.originBonusEnabled === true,
-      terrainEnabled: state?.terrainBonusEnabled === true,
-      weatherEnabled: state?.weatherBonusEnabled === true,
-      techEnabled: state?.techBonusEnabled === true
-    };
-  }
-  function bonusesForLiveUnit(unitId, origin) {
-    const options = selectedBonusOptions();
-    return {
-      ...options,
-      weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : void 0,
-      techLevel: techLevelFor(unitId, origin)
-    };
-  }
-  function bonusesForAbsentUnit(origin) {
-    const options = selectedBonusOptions();
-    return {
-      ...options,
-      weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : void 0,
-      techLevel: techLevelByBirthHex.get(origin.birthH3Index)
-    };
-  }
-  function techLevelFor(unitId, origin) {
-    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
-    if (battleUnit?.techLevel) return battleUnit.techLevel;
-    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
-    if (strategicUnit?.techLevel) return strategicUnit.techLevel;
-    return techLevelByBirthHex.get(origin.birthH3Index);
-  }
-  function weatherTagsFor(unitId, origin) {
-    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
-    if (battleUnit?.weatherTags) return battleUnit.weatherTags;
-    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
-    if (strategicUnit?.weatherTags) return strategicUnit.weatherTags;
-    return weatherTagsByBirthHex.get(origin.birthH3Index) ?? [];
-  }
-  function createUnitOriginFlagImage(input) {
-    const img = document.createElement("img");
-    img.className = COUNTRY_FLAG_CLASS_NAME;
-    img.src = originFlagAssetPath({
-      subdivisionCode: input.origin.birthSubdivisionCode ?? null,
-      countryCode: input.origin.birthCountryCode
-    });
-    img.alt = "";
-    img.setAttribute("aria-hidden", "true");
-    img.draggable = false;
-    img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml({
-      origin: input.origin,
-      bonuses: input.bonuses,
-      ...input.identity ? { identity: input.identity } : {}
-    });
-    return img;
-  }
-  function createAbsentUnitOriginFlagImage(flag, displayName) {
-    return createUnitOriginFlagImage({
-      origin: flag.origin,
-      bonuses: bonusesForAbsentUnit(flag.origin),
-      identity: { displayName, formedLabel: flag.formedLabel }
-    });
-  }
-  function formatLiveUnitOriginTooltipHtml(unitId) {
-    const origin = resolveUnitOrigin(unitId);
-    if (!origin) return null;
-    return formatUnitOriginTooltipHtml({
-      origin,
-      bonuses: bonusesForLiveUnit(unitId, origin),
-      identity: tooltipIdentityFor(unitId)
-    });
-  }
-  function setUnitNameContent(target, unitId, text) {
-    target.replaceChildren();
-    const origin = resolveUnitOrigin(unitId);
-    if (origin) {
-      target.appendChild(createUnitOriginFlagImage({
-        origin,
-        bonuses: bonusesForLiveUnit(unitId, origin),
-        identity: tooltipIdentityFor(unitId)
-      }));
-    }
-    target.appendChild(document.createTextNode(text));
-  }
-  function buildUnitOriginByLossDisplayName(summary) {
-    const flagByName = /* @__PURE__ */ new Map();
-    const ambiguousNames = /* @__PURE__ */ new Set();
-    const victims = Object.values(summary.byOwner).flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
-    for (const victim of victims) {
-      const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
-      if (!origin || !victim.unitId) continue;
-      const flag = { origin, formedLabel: formedLabelFor(victim.unitId) };
-      const existing = flagByName.get(victim.displayName);
-      const sameFlag = existing != null && unitOriginsPresentTheSame(existing.origin, flag.origin) && existing.formedLabel === flag.formedLabel;
-      if (existing && !sameFlag) ambiguousNames.add(victim.displayName);
-      else flagByName.set(victim.displayName, flag);
-    }
-    for (const name of ambiguousNames) flagByName.delete(name);
-    return flagByName;
-  }
-
-  // src/shared/lossToastUnitSegments.ts
-  var VICTIM_SEPARATOR = ", ";
-  var BULLET_PREFIX = "\u2022 ";
-  function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
-    const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
-    const body = line.slice(bullet.length);
-    const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
-    if (!label) return [{ text: line, unitDisplayName: null }];
-    const prefix = `${bullet}${label}: `;
-    const tokens = body.slice(label.length + 2).split(VICTIM_SEPARATOR);
-    const segments = [{ text: prefix, unitDisplayName: null }];
-    tokens.forEach((token, index) => {
-      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
-      segments.push({ text: token, unitDisplayName: knownDisplayNames.has(token) ? token : null });
-    });
-    return segments;
-  }
-
-  // src/shared/commanderMessageTabs.ts
-  function initialCommanderMessageTabs(seats) {
-    const tabs = seats.map((seat) => ({
-      seatId: seat.seatId,
-      label: seat.label,
-      enabled: false,
-      message: null,
-      strategy: null
-    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
-    return { tabs, selectedSeatId: null };
-  }
-  function applyCommanderMessage(state, arrival) {
-    const message = proseOrNull(arrival.message);
-    const strategy = proseOrNull(arrival.strategy);
-    if (!message && !strategy) return state;
-    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
-    if (index < 0) return state;
-    const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
-    );
-    return { tabs, selectedSeatId: arrival.seatId };
-  }
-  function commanderDispatchHasProse(message, strategy) {
-    return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
-  }
-  function proseOrNull(value) {
-    const trimmed = value?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  // src/renderer/core/matchEpoch.ts
-  var rendererMatchEpoch = 0;
-  function advanceRendererMatchEpoch() {
-    rendererMatchEpoch += 1;
-    return rendererMatchEpoch;
-  }
-  function currentRendererMatchEpoch() {
-    return rendererMatchEpoch;
-  }
-  function rendererMatchEpochCurrent(captured) {
-    return captured === rendererMatchEpoch;
-  }
-
-  // src/shared/seatRoster.ts
-  var HUMAN_SEAT_KIND = "human";
-  var AI_SEAT_KIND = "ai";
-  var DOCTRINES = ["aggressive", "balanced", "cautious"];
-  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
-  function sortSeatsByOrder(seats) {
-    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
-  }
-  function isSeatActive(seat) {
-    return seat.outTurn === null;
-  }
-  function activeAiSeats(seats) {
-    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
-  }
-  function findHumanSeat(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
-  }
-  var COMPASS_PREFIXES = [
-    ["Northern", "N."],
-    ["Southern", "S."],
-    ["Eastern", "E."],
-    ["Western", "W."],
-    ["Central", "C."],
-    ["North", "N."],
-    ["South", "S."],
-    ["East", "E."],
-    ["West", "W."]
-  ];
-  function cutAtFirstSeparator(displayName) {
-    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
-    if (separatorAt.length === 0) return displayName;
-    return displayName.slice(0, Math.min(...separatorAt));
-  }
-  function shortenLeadingCompass(name) {
-    for (const [word, short] of COMPASS_PREFIXES) {
-      if (name === word) return short;
-      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
-    }
-    return name;
-  }
-  function shortSideName(displayName) {
-    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
-  }
-
-  // src/shared/observeModeControls.ts
-  function activeHumanSeatId(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
-  }
-  function isObservingRoster(seats) {
-    return seats.length > 0 && activeHumanSeatId(seats) === null;
-  }
-  function observeModeControls(seats) {
-    const observing = isObservingRoster(seats);
-    return {
-      observing,
-      ordersEnabled: !observing,
-      buildEnabled: false,
-      forcesEnabled: false,
-      unitSelectionEnabled: !observing,
-      magnifierEnabled: !observing,
-      hexOnlySelection: observing
-    };
-  }
-  function readoutViewerSeatId(seats, viewAs) {
-    if (seats.length === 0) return void 0;
-    if (!observeModeControls(seats).observing) {
-      return activeHumanSeatId(seats);
-    }
-    if (viewAs === "all") return null;
-    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
-    return chosen?.seatId ?? null;
-  }
-  function staleIntelViewer(playerPerspective) {
-    if (playerPerspective === "all") return null;
-    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
-    return HUMAN_SEAT_ID;
-  }
-
-  // src/renderer/core/matchSnapshotClient.ts
-  function matchViewArgument() {
-    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return void 0;
-    return rendererSharedState.viewAs;
-  }
-  function fetchMatchSnapshot() {
-    const api = window.gameApi;
-    if (!api?.getGameState) return Promise.reject(new Error("getGameState is unavailable"));
-    return api.getGameState(matchViewArgument());
-  }
-
-  // src/shared/newGameBannerText.ts
-  function newGameBannerText(kind, tab) {
-    if (kind === "startup") return `Start the ${tab} game when ready.`;
-    return `Start a new ${tab} game when ready.`;
-  }
-
-  // src/renderer/gameplay/newGameBanner.ts
-  var bannerKind = null;
-  function writeNewGameBanner(text) {
-    const messageEl = document.getElementById("game-over-message");
-    if (!messageEl) return;
-    messageEl.textContent = text;
-    messageEl.style.display = "";
-  }
-  function showNewGameBanner(kind, tab) {
-    bannerKind = kind;
-    writeNewGameBanner(newGameBannerText(kind, tab));
-  }
-  function showGameOverBanner(text) {
-    bannerKind = null;
-    writeNewGameBanner(text);
-  }
-  function syncNewGameBannerToTab(tab) {
-    if (bannerKind === null) return;
-    writeNewGameBanner(newGameBannerText(bannerKind, tab));
-  }
-  function isNewGameOverlayOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
+  };
+  var activeProfile = GLOBAL_GAME_MAP;
+  var profileResetters = [];
+  function registerActiveGameMapReset(reset) {
+    profileResetters.push(reset);
+  }
+  function assignActiveProfile(profile) {
+    activeProfile = profile;
+    for (const reset of profileResetters) reset();
+  }
+  function activeGameMap() {
+    return activeProfile;
+  }
+  function setActiveGameMap(profile) {
+    assignActiveProfile(profile);
   }
 
   // src/shared/loadedStrategicFootprint.ts
@@ -18800,137 +15692,6 @@ ${bonuses}`;
   }
   function isNeutralBorderHex(h3Index) {
     return loadedHexRole(h3Index) === "neutral_border";
-  }
-
-  // src/shared/hexLlmCodeAssignment.ts
-  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  var strategicH3ToCodeSingleton = null;
-  function indexToCode(index) {
-    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
-      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
-    }
-    const hi = Math.floor(index / CODE_ALPHABET.length);
-    const lo = index % CODE_ALPHABET.length;
-    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
-  }
-  function sortCellsForStableLlmCodes(cells) {
-    const decorated = cells.map((h3) => {
-      const [lat, lng] = cellToLatLng(h3);
-      return { h3, lat, lng };
-    });
-    decorated.sort((a, b) => {
-      if (a.lat !== b.lat) return b.lat - a.lat;
-      if (a.lng !== b.lng) return a.lng - b.lng;
-      return a.h3.localeCompare(b.h3);
-    });
-    return decorated.map((d) => d.h3);
-  }
-  function buildStrategicH3ToCodeMap() {
-    const footprint2 = loadedStrategicFootprint();
-    const strategicSet = new Set(footprint2 ?? []);
-    if (!footprint2) {
-      const res0 = getRes0Cells();
-      for (const r0 of res0) {
-        for (const child of cellToChildren(r0, strategicH3Resolution())) {
-          strategicSet.add(child);
-        }
-      }
-    }
-    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
-    const h3ToCode = /* @__PURE__ */ new Map();
-    for (let i = 0; i < sorted.length; i++) {
-      h3ToCode.set(sorted[i], indexToCode(i));
-    }
-    return h3ToCode;
-  }
-  function getStrategicH3ToCodeMap() {
-    if (!strategicH3ToCodeSingleton) {
-      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
-    }
-    return strategicH3ToCodeSingleton;
-  }
-  function resetStrategicHexCodeCache() {
-    strategicH3ToCodeSingleton = null;
-  }
-  registerActiveGameMapReset(resetStrategicHexCodeCache);
-  function getStrategicHexCode(h3Index) {
-    return getStrategicH3ToCodeMap().get(h3Index);
-  }
-  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
-    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
-    const idx = children.indexOf(childTacticalH3Index);
-    if (idx < 0) return void 0;
-    return indexToCode(idx);
-  }
-  function getLlmHexLocationParenLabelForNamingTarget(target) {
-    if (target.resolution === 1) {
-      const c = getStrategicHexCode(target.h3Index);
-      return c ? `(${c})` : null;
-    }
-    const parent = strategicParentOf(target.h3Index);
-    const parentCode = getStrategicHexCode(parent);
-    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
-    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
-  }
-
-  // src/shared/tacticalBattleFootprint.ts
-  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
-  var footprintByKey = /* @__PURE__ */ new Map();
-  function resetTacticalBattleFootprintCache() {
-    footprintByKey.clear();
-  }
-  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
-  function frozenCodeMap(entries) {
-    const map = new Map(entries);
-    const reject = () => {
-      throw new TypeError("tactical battle footprint code map is frozen");
-    };
-    map.set = reject;
-    map.delete = reject;
-    map.clear = reject;
-    return map;
-  }
-  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
-    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
-    const coreSet = new Set(coreChildH3Indexes);
-    const cells = new Set(coreChildH3Indexes);
-    for (const cell of coreChildH3Indexes) {
-      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
-        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
-      }
-    }
-    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
-    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
-    return { coreChildH3Indexes, h3Indexes, codeByH3 };
-  }
-  function tacticalBattleFootprint(enclosingStrategicH3Index) {
-    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
-    const cached = footprintByKey.get(key);
-    if (cached) return cached;
-    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
-    footprintByKey.set(key, built);
-    return built;
-  }
-  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
-    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
-  }
-  function tacticalBattleTerrainKindByCell(args) {
-    const kinds = {};
-    for (const cell of args.cells) {
-      const tacticalKind = args.tacticalKindByH3.get(cell);
-      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
-        kinds[cell] = tacticalKind;
-        continue;
-      }
-      let parentKind;
-      try {
-        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
-      } catch {
-        parentKind = void 0;
-      }
-      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
-    }
-    return kinds;
   }
 
   // src/shared/mapExtent.ts
@@ -19701,6 +16462,3845 @@ ${bonuses}`;
       if (p.y > maxY) maxY = p.y;
     }
     return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
+
+  // src/renderer/rendering/unitDrawing.ts
+  var TOKEN_ICON_FIT_RATIO = 0.9;
+  var UNIT_ICON_FILE_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'infantry.svg').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "infantry.svg",
+    /**
+       * Documents the object literal property `armor` (armor: 'armor.svg').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "armor.svg",
+    /**
+       * Documents the object literal property `naval` (naval: 'naval.svg').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "naval.svg",
+    /**
+       * Documents the object literal property `air` (air: 'air.svg').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "air.svg",
+    /**
+       * Documents the object literal property `mixed` (mixed: 'mixed.svg').
+    
+       * Purpose: Supports maintainability by documenting why `mixed` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    mixed: "mixed.svg"
+  };
+  var unitIconCache = /* @__PURE__ */ new Map();
+  function iconPathForType(unitType) {
+    return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+  }
+  function unitIconPathForUnitType(unitType) {
+    const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
+    return iconPathForType(known ? unitType : "mixed");
+  }
+  function getOrStartUnitIconLoad(unitType) {
+    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+    };
+    img.onerror = () => {
+      unitIconCache.set(unitType, null);
+    };
+    img.src = iconPathForType(unitType);
+    unitIconCache.set(unitType, img);
+    return img;
+  }
+  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
+    const img = getOrStartUnitIconLoad(unitType);
+    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
+    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
+    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
+    const width = img.naturalWidth * iconScale;
+    const height = img.naturalHeight * iconScale;
+    const drawX = centerX - width / 2;
+    const drawY = centerY - height / 2;
+    const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== "" && unitPlayer !== HUMAN_SEAT_ID;
+    const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
+    ctx.save();
+    if (neutralGlyph) ctx.filter = "brightness(0.85)";
+    if (shouldFlip) {
+      ctx.translate(centerX, centerY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -width / 2, -height / 2, width, height);
+    } else {
+      ctx.drawImage(img, drawX, drawY, width, height);
+    }
+    ctx.restore();
+    return true;
+  }
+  function drawUnitTypeGlyph(ctx, centerX, centerY, unitType, sizePx, player) {
+    if (unitType !== "infantry" && unitType !== "armor" && unitType !== "naval" && unitType !== "air") return false;
+    const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
+    return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
+  }
+  function drawSelectionRing(ctx, x, y) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = SELECTION_RING_COLOR;
+    ctx.lineWidth = SELECTION_RING_WIDTH;
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
+    const stackedNeutral = color === MULTI_PLAYER_FILL;
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (strokeColor === SELECTION_RING_COLOR) {
+      drawSelectionRing(ctx, x, y);
+    } else {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.save();
+    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
+    ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : "#fff";
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
+    if (!drewIcon) ctx.fillText(label, x, y);
+    ctx.restore();
+  }
+  function drawUnits(ctx, units, movingUnitIds) {
+    const byHex = /* @__PURE__ */ new Map();
+    for (const u of units) {
+      if (movingUnitIds?.has(u.id)) continue;
+      const list = byHex.get(u.h3Index) ?? [];
+      list.push(u);
+      byHex.set(u.h3Index, list);
+    }
+    const selectedUnitIds = new Set(rendererSharedState.selectedUnitIds);
+    const tokens = [...byHex].map(([h3Index, hexUnits]) => {
+      const { x, y } = hexCenterPx(h3Index);
+      const count = hexUnits.length;
+      return {
+        x,
+        y,
+        count,
+        top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
+        selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
+        units: hexUnits
+      };
+    });
+    for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
+      const types = new Set(hexUnits.map((u) => u.unitType));
+      const players = new Set(hexUnits.map((u) => u.player));
+      const mixedType = types.size > 1;
+      const multiPlayer = players.size > 1;
+      const ownerId = hexUnits[0].player;
+      const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
+      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId)?.map ?? "#333";
+      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : "#fff";
+      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
+      const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
+      drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
+      if (count > 1) {
+        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0].player);
+      }
+    }
+    for (const { x, y, count } of tokens) {
+      if (count < 2) continue;
+      const badgeX = x + COUNT_BADGE_OFFSET;
+      const badgeY = y - COUNT_BADGE_OFFSET;
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.strokeText(String(count), badgeX, badgeY);
+      ctx.fillStyle = "#000";
+      ctx.fillText(String(count), badgeX, badgeY);
+    }
+  }
+  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
+    const viewer = staleIntelViewer(state.playerPerspective);
+    if (viewer === null) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+      return;
+    }
+    const hasFogData = Array.isArray(state.visibleHexes);
+    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
+    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
+    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
+      if (currentlyVisibleEnemyIds.has(unitId)) continue;
+      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
+        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
+        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
+          unitId,
+          lastKnownH3Index: prevSeen.h3Index,
+          lastSeenTurn,
+          staleUntilTurn: lastSeenTurn + 2
+        });
+      }
+    }
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    for (const enemy of currentlyVisibleEnemies) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
+        h3Index: enemy.h3Index,
+        lastSeenTurn: state.turnNumber
+      });
+    }
+    if (shouldHideStrategicMapUnitsForZoom()) return;
+    if (!hasFogData) return;
+    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
+    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
+      unitId: row.unitId,
+      lastKnownH3Index: row.lastKnownH3Index,
+      intelState: "stale",
+      lastSeenTurn: row.lastSeenTurn,
+      staleUntilTurn: row.staleUntilTurn
+    }));
+    const byUnitId = /* @__PURE__ */ new Map();
+    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
+    for (const row of persistedIntel) {
+      if (row.intelState !== "stale") continue;
+      byUnitId.set(row.unitId, {
+        unitId: row.unitId,
+        lastKnownH3Index: row.lastKnownH3Index,
+        intelState: "stale",
+        lastSeenTurn: row.lastSeenTurn,
+        staleUntilTurn: row.staleUntilTurn
+      });
+    }
+    const intel = Array.from(byUnitId.values());
+    if (intel.length === 0) return;
+    const visibleHexes = new Set(state.visibleHexes);
+    const stale = intel.filter((row) => row.intelState === "stale");
+    if (stale.length === 0) return;
+    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
+    const staleByHex = /* @__PURE__ */ new Map();
+    for (const row of stale) {
+      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
+      if (visibleHexes.has(row.lastKnownH3Index)) continue;
+      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
+      list.push(row);
+      staleByHex.set(row.lastKnownH3Index, list);
+    }
+    for (const [h3Index, rows] of staleByHex) {
+      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
+      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
+      if (alpha <= 0) continue;
+      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
+      const label = types.size === 1 ? [...types][0] : "*";
+      const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+      const ownerId = owners.size === 1 ? [...owners][0] : null;
+      const mixedOwners = owners.size > 1;
+      const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
+      const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : "#fff";
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
+      ctx.restore();
+    }
+  }
+  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
+    if (hexes.length === 0 || opacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    for (const h3Index of hexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
+    }
+    ctx.restore();
+  }
+
+  // src/renderer/chrome/toastInlineMarks.ts
+  function createLossTypeToken(unitType, ownerId, seats) {
+    const palette = paletteForOwner(ownerId, seats);
+    const colors = palette == null ? null : miniTokenColors(palette);
+    const token = document.createElement("span");
+    token.className = "loss-type-token";
+    token.style.background = colors?.fill ?? "#333";
+    token.style.borderColor = colors?.ring ?? "#f4f6f8";
+    token.setAttribute("aria-hidden", "true");
+    const image = document.createElement("img");
+    image.src = unitIconPathForUnitType(unitType);
+    image.alt = "";
+    image.setAttribute("aria-hidden", "true");
+    image.draggable = false;
+    if (colors != null && ownerId !== HUMAN_SEAT_ID) image.style.transform = "scaleX(-1)";
+    token.appendChild(image);
+    return token;
+  }
+  function createSideNumberFlag(seatId, seats) {
+    const index = aiIndexForSeatId(seatId);
+    const palette = paletteForOwner(seatId, seats);
+    if (index == null || palette == null) return null;
+    const flag = document.createElement("span");
+    flag.className = "side-number-flag";
+    flag.style.background = palette.map;
+    flag.setAttribute("aria-hidden", "true");
+    const digit = document.createElement("span");
+    digit.textContent = String(index);
+    digit.style.color = "#ffffff";
+    flag.appendChild(digit);
+    return flag;
+  }
+
+  // src/shared/htmlTextFormatting.ts
+  function escapeHtmlText(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+
+  // src/shared/countryFlags.ts
+  var AVAILABLE_COUNTRY_FLAG_CODES = /* @__PURE__ */ new Set([
+    "AD",
+    "AE",
+    "AF",
+    "AG",
+    "AI",
+    "AL",
+    "AM",
+    "AO",
+    "AQ",
+    "AR",
+    "AS",
+    "AT",
+    "AU",
+    "AW",
+    "AX",
+    "AZ",
+    "BA",
+    "BB",
+    "BD",
+    "BE",
+    "BF",
+    "BG",
+    "BH",
+    "BI",
+    "BJ",
+    "BL",
+    "BM",
+    "BN",
+    "BO",
+    "BQ",
+    "BR",
+    "BS",
+    "BT",
+    "BV",
+    "BW",
+    "BY",
+    "BZ",
+    "CA",
+    "CC",
+    "CD",
+    "CF",
+    "CG",
+    "CH",
+    "CI",
+    "CK",
+    "CL",
+    "CM",
+    "CN",
+    "CO",
+    "CR",
+    "CU",
+    "CV",
+    "CW",
+    "CX",
+    "CY",
+    "CZ",
+    "DE",
+    "DJ",
+    "DK",
+    "DM",
+    "DO",
+    "DZ",
+    "EC",
+    "EE",
+    "EG",
+    "EH",
+    "ER",
+    "ES",
+    "ET",
+    "EU",
+    "FI",
+    "FJ",
+    "FK",
+    "FM",
+    "FO",
+    "FR",
+    "GA",
+    "GB",
+    "GD",
+    "GE",
+    "GF",
+    "GG",
+    "GH",
+    "GI",
+    "GL",
+    "GM",
+    "GN",
+    "GP",
+    "GQ",
+    "GR",
+    "GS",
+    "GT",
+    "GU",
+    "GW",
+    "GY",
+    "HK",
+    "HM",
+    "HN",
+    "HR",
+    "HT",
+    "HU",
+    "ID",
+    "IE",
+    "IL",
+    "IM",
+    "IN",
+    "IO",
+    "IQ",
+    "IR",
+    "IS",
+    "IT",
+    "JE",
+    "JM",
+    "JO",
+    "JP",
+    "KE",
+    "KG",
+    "KH",
+    "KI",
+    "KM",
+    "KN",
+    "KP",
+    "KR",
+    "KW",
+    "KY",
+    "KZ",
+    "LA",
+    "LB",
+    "LC",
+    "LI",
+    "LK",
+    "LR",
+    "LS",
+    "LT",
+    "LU",
+    "LV",
+    "LY",
+    "MA",
+    "MC",
+    "MD",
+    "ME",
+    "MF",
+    "MG",
+    "MH",
+    "MK",
+    "ML",
+    "MM",
+    "MN",
+    "MO",
+    "MP",
+    "MQ",
+    "MR",
+    "MS",
+    "MT",
+    "MU",
+    "MV",
+    "MW",
+    "MX",
+    "MY",
+    "MZ",
+    "NA",
+    "NC",
+    "NE",
+    "NF",
+    "NG",
+    "NI",
+    "NL",
+    "NO",
+    "NP",
+    "NR",
+    "NU",
+    "NZ",
+    "OM",
+    "PA",
+    "PE",
+    "PF",
+    "PG",
+    "PH",
+    "PK",
+    "PL",
+    "PM",
+    "PN",
+    "PR",
+    "PS",
+    "PT",
+    "PW",
+    "PY",
+    "QA",
+    "RE",
+    "RO",
+    "RS",
+    "RU",
+    "RW",
+    "SA",
+    "SB",
+    "SC",
+    "SD",
+    "SE",
+    "SG",
+    "SH",
+    "SI",
+    "SJ",
+    "SK",
+    "SL",
+    "SM",
+    "SN",
+    "SO",
+    "SR",
+    "SS",
+    "ST",
+    "SV",
+    "SX",
+    "SY",
+    "SZ",
+    "TC",
+    "TD",
+    "TF",
+    "TG",
+    "TH",
+    "TJ",
+    "TK",
+    "TL",
+    "TM",
+    "TN",
+    "TO",
+    "TR",
+    "TT",
+    "TV",
+    "TW",
+    "TZ",
+    "UA",
+    "UG",
+    "UM",
+    "US",
+    "UY",
+    "UZ",
+    "VA",
+    "VC",
+    "VE",
+    "VG",
+    "VI",
+    "VN",
+    "VU",
+    "WF",
+    "WS",
+    "XK",
+    "YE",
+    "YT",
+    "ZA",
+    "ZM",
+    "ZW"
+  ]);
+  var UNKNOWN_COUNTRY_FLAG_PATH = "flag-unknown.svg";
+  var COUNTRY_FLAG_CLASS_NAME = "country-flag";
+  function countryFlagAssetPath(countryCode) {
+    const code = countryCode?.trim().toUpperCase() ?? "";
+    return AVAILABLE_COUNTRY_FLAG_CODES.has(code) ? `flags/${code.toLowerCase()}.svg` : UNKNOWN_COUNTRY_FLAG_PATH;
+  }
+  function countryFlagImgHtml(countryCode) {
+    const src = escapeHtmlText(countryFlagAssetPath(countryCode));
+    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
+  }
+
+  // src/shared/subdivisionFlagCodes.ts
+  var SUBDIVISION_FLAG_CODES = /* @__PURE__ */ new Set([
+    "ad-02",
+    "ad-03",
+    "ad-05",
+    "ad-06",
+    "ad-07",
+    "ad-08",
+    "ae-aj",
+    "ae-az",
+    "ae-du",
+    "ae-fu",
+    "ae-sh",
+    "ae-uq",
+    "af-kab",
+    "af-pan",
+    "ag-10",
+    "al-01",
+    "al-02",
+    "al-03",
+    "al-06",
+    "al-07",
+    "al-11",
+    "al-12",
+    "am-er",
+    "ar-a",
+    "ar-b",
+    "ar-c",
+    "ar-d",
+    "ar-e",
+    "ar-f",
+    "ar-g",
+    "ar-h",
+    "ar-j",
+    "ar-k",
+    "ar-n",
+    "ar-p",
+    "ar-q",
+    "ar-r",
+    "ar-s",
+    "ar-t",
+    "ar-u",
+    "ar-v",
+    "ar-w",
+    "ar-x",
+    "ar-y",
+    "ar-z",
+    "at-2",
+    "at-3",
+    "at-4",
+    "at-5",
+    "at-6",
+    "at-7",
+    "at-8",
+    "at-9",
+    "au-act",
+    "au-nsw",
+    "au-nt",
+    "au-qld",
+    "au-sa",
+    "au-tas",
+    "au-vic",
+    "au-wa",
+    "az-ba",
+    "az-nx",
+    "ba-brc",
+    "ba-srp",
+    "be-bru",
+    "be-van",
+    "be-vbr",
+    "be-vlg",
+    "be-vli",
+    "be-vov",
+    "be-vwv",
+    "be-wal",
+    "be-wbr",
+    "be-wht",
+    "be-wlg",
+    "be-wlx",
+    "be-wna",
+    "bh-13",
+    "bh-14",
+    "bh-15",
+    "bh-17",
+    "bo-b",
+    "bo-c",
+    "bo-h",
+    "bo-l",
+    "bo-n",
+    "bo-o",
+    "bo-p",
+    "bo-s",
+    "bo-t",
+    "bq-bo",
+    "bq-sa",
+    "bq-se",
+    "br-ac",
+    "br-al",
+    "br-am",
+    "br-ap",
+    "br-ba",
+    "br-ce",
+    "br-df",
+    "br-es",
+    "br-go",
+    "br-ma",
+    "br-mg",
+    "br-ms",
+    "br-mt",
+    "br-pa",
+    "br-pb",
+    "br-pe",
+    "br-pi",
+    "br-pr",
+    "br-rn",
+    "br-ro",
+    "br-rr",
+    "br-rs",
+    "br-sc",
+    "br-se",
+    "br-sp",
+    "br-to",
+    "bw-ga",
+    "by-br",
+    "by-hm",
+    "by-ho",
+    "by-hr",
+    "by-ma",
+    "by-mi",
+    "by-vi",
+    "ca-ab",
+    "ca-bc",
+    "ca-mb",
+    "ca-nb",
+    "ca-nl",
+    "ca-ns",
+    "ca-nt",
+    "ca-nu",
+    "ca-on",
+    "ca-qc",
+    "ca-sk",
+    "ca-yt",
+    "cd-kn",
+    "cd-sa",
+    "cg-16",
+    "ch-ag",
+    "ch-ai",
+    "ch-ar",
+    "ch-be",
+    "ch-bl",
+    "ch-bs",
+    "ch-fr",
+    "ch-ge",
+    "ch-gl",
+    "ch-gr",
+    "ch-ju",
+    "ch-lu",
+    "ch-ne",
+    "ch-nw",
+    "ch-ow",
+    "ch-sg",
+    "ch-sh",
+    "ch-so",
+    "ch-sz",
+    "ch-tg",
+    "ch-ti",
+    "ch-ur",
+    "ch-vd",
+    "ch-vs",
+    "ch-zg",
+    "ch-zh",
+    "cl-ai",
+    "cl-an",
+    "cl-ap",
+    "cl-at",
+    "cl-bi",
+    "cl-co",
+    "cl-li",
+    "cl-ll",
+    "cl-lr",
+    "cl-ma",
+    "cl-ml",
+    "cl-nb",
+    "cl-rm",
+    "cl-ta",
+    "cl-vs",
+    "cn-hk",
+    "cn-mo",
+    "co-ama",
+    "co-ant",
+    "co-ara",
+    "co-atl",
+    "co-bol",
+    "co-boy",
+    "co-cal",
+    "co-caq",
+    "co-cas",
+    "co-cau",
+    "co-ces",
+    "co-cho",
+    "co-cor",
+    "co-cun",
+    "co-dc",
+    "co-gua",
+    "co-guv",
+    "co-hui",
+    "co-lag",
+    "co-mag",
+    "co-met",
+    "co-nar",
+    "co-nsa",
+    "co-put",
+    "co-qui",
+    "co-ris",
+    "co-san",
+    "co-sap",
+    "co-suc",
+    "co-tol",
+    "co-vac",
+    "co-vau",
+    "co-vid",
+    "cr-a",
+    "cr-c",
+    "cr-g",
+    "cr-l",
+    "cr-p",
+    "cr-sj",
+    "cu-06",
+    "cu-11",
+    "cu-14",
+    "cv-mo",
+    "cv-pr",
+    "cv-sm",
+    "cz-10",
+    "cz-20",
+    "cz-31",
+    "cz-32",
+    "cz-41",
+    "cz-42",
+    "cz-51",
+    "cz-52",
+    "cz-53",
+    "cz-63",
+    "cz-64",
+    "cz-71",
+    "cz-72",
+    "cz-80",
+    "de-bb",
+    "de-be",
+    "de-bw",
+    "de-by",
+    "de-hb",
+    "de-he",
+    "de-hh",
+    "de-mv",
+    "de-ni",
+    "de-nw",
+    "de-rp",
+    "de-sh",
+    "de-sl",
+    "de-sn",
+    "de-st",
+    "de-th",
+    "dk-81",
+    "dk-82",
+    "dk-83",
+    "dk-84",
+    "dk-85",
+    "do-18",
+    "do-23",
+    "do-28",
+    "ec-a",
+    "ec-b",
+    "ec-c",
+    "ec-d",
+    "ec-e",
+    "ec-f",
+    "ec-g",
+    "ec-i",
+    "ec-l",
+    "ec-m",
+    "ec-n",
+    "ec-o",
+    "ec-r",
+    "ec-s",
+    "ec-sd",
+    "ec-se",
+    "ec-t",
+    "ec-u",
+    "ec-w",
+    "ec-x",
+    "ec-y",
+    "ec-z",
+    "ee-130",
+    "ee-141",
+    "ee-142",
+    "ee-171",
+    "ee-184",
+    "ee-191",
+    "ee-198",
+    "ee-214",
+    "ee-245",
+    "ee-247",
+    "ee-251",
+    "ee-255",
+    "ee-272",
+    "ee-283",
+    "ee-284",
+    "ee-291",
+    "ee-293",
+    "ee-296",
+    "ee-303",
+    "ee-305",
+    "ee-317",
+    "ee-321",
+    "ee-338",
+    "ee-353",
+    "ee-37",
+    "ee-39",
+    "ee-424",
+    "ee-430",
+    "ee-431",
+    "ee-432",
+    "ee-442",
+    "ee-446",
+    "ee-45",
+    "ee-478",
+    "ee-480",
+    "ee-50",
+    "ee-503",
+    "ee-511",
+    "ee-514",
+    "ee-52",
+    "ee-528",
+    "ee-557",
+    "ee-56",
+    "ee-567",
+    "ee-586",
+    "ee-60",
+    "ee-615",
+    "ee-618",
+    "ee-622",
+    "ee-624",
+    "ee-638",
+    "ee-64",
+    "ee-651",
+    "ee-653",
+    "ee-661",
+    "ee-663",
+    "ee-668",
+    "ee-68",
+    "ee-689",
+    "ee-698",
+    "ee-708",
+    "ee-71",
+    "ee-712",
+    "ee-714",
+    "ee-719",
+    "ee-726",
+    "ee-732",
+    "ee-735",
+    "ee-74",
+    "ee-784",
+    "ee-79",
+    "ee-793",
+    "ee-796",
+    "ee-803",
+    "ee-809",
+    "ee-81",
+    "ee-824",
+    "ee-834",
+    "ee-84",
+    "ee-855",
+    "ee-87",
+    "ee-890",
+    "ee-897",
+    "ee-901",
+    "ee-903",
+    "ee-907",
+    "ee-917",
+    "ee-919",
+    "ee-928",
+    "eg-alx",
+    "eg-asn",
+    "eg-bh",
+    "eg-bns",
+    "eg-dk",
+    "eg-dt",
+    "eg-js",
+    "eg-kfs",
+    "eg-pts",
+    "eg-shr",
+    "eg-sin",
+    "eg-suz",
+    "es-a",
+    "es-ab",
+    "es-an",
+    "es-ar",
+    "es-as",
+    "es-b",
+    "es-ba",
+    "es-bi",
+    "es-bu",
+    "es-cb",
+    "es-cc",
+    "es-ce",
+    "es-cl",
+    "es-cm",
+    "es-cn",
+    "es-co",
+    "es-cs",
+    "es-ct",
+    "es-cu",
+    "es-ex",
+    "es-ga",
+    "es-gc",
+    "es-gi",
+    "es-gr",
+    "es-ib",
+    "es-l",
+    "es-le",
+    "es-lo",
+    "es-lu",
+    "es-m",
+    "es-mc",
+    "es-md",
+    "es-ml",
+    "es-mu",
+    "es-na",
+    "es-nc",
+    "es-o",
+    "es-or",
+    "es-pm",
+    "es-po",
+    "es-pv",
+    "es-ri",
+    "es-s",
+    "es-sa",
+    "es-ss",
+    "es-t",
+    "es-te",
+    "es-v",
+    "es-vc",
+    "es-vi",
+    "es-z",
+    "es-za",
+    "et-aa",
+    "et-af",
+    "et-am",
+    "et-be",
+    "et-ga",
+    "et-ha",
+    "et-or",
+    "et-si",
+    "et-sn",
+    "et-so",
+    "et-sw",
+    "et-ti",
+    "fi-01",
+    "fi-03",
+    "fi-04",
+    "fi-05",
+    "fi-06",
+    "fi-07",
+    "fi-08",
+    "fi-11",
+    "fi-13",
+    "fi-15",
+    "fi-16",
+    "fi-17",
+    "fi-18",
+    "fm-ksa",
+    "fm-pni",
+    "fm-trk",
+    "fm-yap",
+    "fr-01",
+    "fr-02",
+    "fr-03",
+    "fr-04",
+    "fr-05",
+    "fr-06",
+    "fr-07",
+    "fr-09",
+    "fr-10",
+    "fr-11",
+    "fr-12",
+    "fr-13",
+    "fr-14",
+    "fr-15",
+    "fr-16",
+    "fr-17",
+    "fr-18",
+    "fr-19",
+    "fr-20r",
+    "fr-21",
+    "fr-22",
+    "fr-23",
+    "fr-24",
+    "fr-25",
+    "fr-26",
+    "fr-27",
+    "fr-28",
+    "fr-29",
+    "fr-2a",
+    "fr-2b",
+    "fr-30",
+    "fr-31",
+    "fr-32",
+    "fr-33",
+    "fr-34",
+    "fr-35",
+    "fr-36",
+    "fr-37",
+    "fr-38",
+    "fr-39",
+    "fr-40",
+    "fr-41",
+    "fr-42",
+    "fr-43",
+    "fr-44",
+    "fr-45",
+    "fr-46",
+    "fr-47",
+    "fr-48",
+    "fr-49",
+    "fr-50",
+    "fr-51",
+    "fr-52",
+    "fr-53",
+    "fr-54",
+    "fr-55",
+    "fr-56",
+    "fr-57",
+    "fr-58",
+    "fr-59",
+    "fr-60",
+    "fr-61",
+    "fr-63",
+    "fr-64",
+    "fr-65",
+    "fr-66",
+    "fr-68",
+    "fr-69",
+    "fr-69m",
+    "fr-6ae",
+    "fr-70",
+    "fr-71",
+    "fr-72",
+    "fr-73",
+    "fr-74",
+    "fr-75c",
+    "fr-76",
+    "fr-77",
+    "fr-78",
+    "fr-79",
+    "fr-80",
+    "fr-81",
+    "fr-82",
+    "fr-83",
+    "fr-84",
+    "fr-85",
+    "fr-86",
+    "fr-87",
+    "fr-88",
+    "fr-89",
+    "fr-90",
+    "fr-91",
+    "fr-92",
+    "fr-93",
+    "fr-94",
+    "fr-95",
+    "fr-971",
+    "fr-972",
+    "fr-973",
+    "fr-974",
+    "fr-976",
+    "fr-ara",
+    "fr-bfc",
+    "fr-bl",
+    "fr-bre",
+    "fr-cp",
+    "fr-cvl",
+    "fr-ges",
+    "fr-hdf",
+    "fr-idf",
+    "fr-mf",
+    "fr-naq",
+    "fr-nc",
+    "fr-nor",
+    "fr-occ",
+    "fr-pac",
+    "fr-pdl",
+    "fr-pf",
+    "fr-pm",
+    "fr-tf",
+    "fr-wf",
+    "ga-1",
+    "ga-2",
+    "ga-3",
+    "ga-4",
+    "ga-5",
+    "ga-6",
+    "ga-7",
+    "ga-8",
+    "ga-9",
+    "gb-abd",
+    "gb-abe",
+    "gb-agy",
+    "gb-ann",
+    "gb-bdf",
+    "gb-bir",
+    "gb-bkm",
+    "gb-bns",
+    "gb-cam",
+    "gb-cbf",
+    "gb-cgn",
+    "gb-chw",
+    "gb-cma",
+    "gb-con",
+    "gb-cov",
+    "gb-crf",
+    "gb-dby",
+    "gb-dev",
+    "gb-dor",
+    "gb-dur",
+    "gb-edh",
+    "gb-eln",
+    "gb-els",
+    "gb-eng",
+    "gb-erw",
+    "gb-ery",
+    "gb-ess",
+    "gb-esx",
+    "gb-fal",
+    "gb-fln",
+    "gb-fmo",
+    "gb-glg",
+    "gb-gls",
+    "gb-gwn",
+    "gb-ham",
+    "gb-hef",
+    "gb-hrt",
+    "gb-ios",
+    "gb-iow",
+    "gb-ken",
+    "gb-lan",
+    "gb-lec",
+    "gb-lin",
+    "gb-lnd",
+    "gb-man",
+    "gb-mon",
+    "gb-mry",
+    "gb-nbl",
+    "gb-nfk",
+    "gb-ngm",
+    "gb-nir",
+    "gb-nnh",
+    "gb-ntt",
+    "gb-ork",
+    "gb-pem",
+    "gb-ply",
+    "gb-por",
+    "gb-pow",
+    "gb-rct",
+    "gb-rut",
+    "gb-sct",
+    "gb-sfk",
+    "gb-shr",
+    "gb-som",
+    "gb-sry",
+    "gb-stg",
+    "gb-sts",
+    "gb-vgl",
+    "gb-war",
+    "gb-wbk",
+    "gb-wil",
+    "gb-wls",
+    "gb-wnh",
+    "gb-wor",
+    "gb-wsx",
+    "gb-yor",
+    "gb-zet",
+    "ge-ab",
+    "ge-aj",
+    "ge-gu",
+    "ge-im",
+    "ge-ka",
+    "ge-rl",
+    "ge-sj",
+    "ge-sk",
+    "ge-tb",
+    "gh-aa",
+    "gh-ah",
+    "gh-ep",
+    "gl-ku",
+    "gl-qe",
+    "gl-sm",
+    "gm-b",
+    "gr-69",
+    "gr-a",
+    "gr-b",
+    "gr-c",
+    "gt-01",
+    "gt-03",
+    "gt-05",
+    "gt-07",
+    "gt-08",
+    "gt-16",
+    "gt-21",
+    "gy-cu",
+    "gy-de",
+    "gy-eb",
+    "gy-es",
+    "gy-ma",
+    "gy-pm",
+    "gy-pt",
+    "gy-ud",
+    "gy-ut",
+    "hn-cp",
+    "hn-oc",
+    "hn-sb",
+    "hn-yo",
+    "hr-01",
+    "hr-02",
+    "hr-04",
+    "hr-09",
+    "hr-12",
+    "hr-14",
+    "hr-15",
+    "hr-16",
+    "hr-17",
+    "hr-18",
+    "hr-20",
+    "hr-21",
+    "hu-ba",
+    "hu-bk",
+    "hu-de",
+    "hu-du",
+    "hu-er",
+    "hu-gs",
+    "hu-gy",
+    "hu-he",
+    "hu-hv",
+    "hu-kv",
+    "hu-nk",
+    "hu-ny",
+    "hu-sd",
+    "hu-sf",
+    "hu-sh",
+    "hu-sk",
+    "hu-sn",
+    "hu-ss",
+    "hu-st",
+    "hu-tb",
+    "hu-ve",
+    "hu-vm",
+    "hu-ze",
+    "id-ac",
+    "id-ba",
+    "id-bb",
+    "id-be",
+    "id-bt",
+    "id-go",
+    "id-ja",
+    "id-jb",
+    "id-ji",
+    "id-jk",
+    "id-jt",
+    "id-kb",
+    "id-ki",
+    "id-kr",
+    "id-ks",
+    "id-kt",
+    "id-ku",
+    "id-ma",
+    "id-mu",
+    "id-nb",
+    "id-nt",
+    "id-pa",
+    "id-pb",
+    "id-ri",
+    "id-sb",
+    "id-sg",
+    "id-sn",
+    "id-sr",
+    "id-ss",
+    "id-st",
+    "id-yo",
+    "ie-c",
+    "ie-l",
+    "ie-m",
+    "ie-u",
+    "il-jm",
+    "il-ta",
+    "iq-ba",
+    "iq-kr",
+    "iq-sd",
+    "is-rkv",
+    "it-21",
+    "it-23",
+    "it-25",
+    "it-32",
+    "it-36",
+    "it-42",
+    "it-45",
+    "it-55",
+    "it-57",
+    "it-62",
+    "it-65",
+    "it-67",
+    "it-72",
+    "it-75",
+    "it-77",
+    "it-78",
+    "it-82",
+    "it-88",
+    "it-al",
+    "it-an",
+    "it-aq",
+    "it-at",
+    "it-av",
+    "it-ba",
+    "it-bg",
+    "it-bo",
+    "it-br",
+    "it-bz",
+    "it-cb",
+    "it-co",
+    "it-ct",
+    "it-cz",
+    "it-fe",
+    "it-fi",
+    "it-go",
+    "it-kr",
+    "it-lc",
+    "it-le",
+    "it-li",
+    "it-lo",
+    "it-mb",
+    "it-me",
+    "it-mi",
+    "it-ms",
+    "it-na",
+    "it-nu",
+    "it-or",
+    "it-pc",
+    "it-pe",
+    "it-pi",
+    "it-pr",
+    "it-pt",
+    "it-pz",
+    "it-ra",
+    "it-re",
+    "it-rn",
+    "it-sa",
+    "it-so",
+    "it-ss",
+    "it-su",
+    "it-sv",
+    "it-ta",
+    "it-tn",
+    "it-to",
+    "it-tr",
+    "it-ud",
+    "it-va",
+    "it-vb",
+    "it-ve",
+    "it-vr",
+    "jp-01",
+    "jp-02",
+    "jp-03",
+    "jp-04",
+    "jp-05",
+    "jp-06",
+    "jp-07",
+    "jp-08",
+    "jp-09",
+    "jp-10",
+    "jp-11",
+    "jp-12",
+    "jp-13",
+    "jp-14",
+    "jp-15",
+    "jp-16",
+    "jp-17",
+    "jp-18",
+    "jp-19",
+    "jp-20",
+    "jp-21",
+    "jp-22",
+    "jp-23",
+    "jp-24",
+    "jp-25",
+    "jp-26",
+    "jp-27",
+    "jp-28",
+    "jp-29",
+    "jp-30",
+    "jp-31",
+    "jp-32",
+    "jp-33",
+    "jp-34",
+    "jp-35",
+    "jp-36",
+    "jp-37",
+    "jp-38",
+    "jp-39",
+    "jp-40",
+    "jp-41",
+    "jp-42",
+    "jp-43",
+    "jp-44",
+    "jp-45",
+    "jp-46",
+    "jp-47",
+    "ke-04",
+    "ke-13",
+    "ke-19",
+    "ke-24",
+    "ke-28",
+    "ke-30",
+    "ke-45",
+    "ke-46",
+    "kg-b",
+    "kg-c",
+    "kg-gb",
+    "kg-go",
+    "kg-n",
+    "kg-o",
+    "kg-t",
+    "kg-y",
+    "km-a",
+    "km-g",
+    "km-m",
+    "kn-n",
+    "kr-11",
+    "kr-26",
+    "kr-27",
+    "kr-28",
+    "kr-29",
+    "kr-30",
+    "kr-31",
+    "kr-41",
+    "kr-42",
+    "kr-43",
+    "kr-44",
+    "kr-45",
+    "kr-46",
+    "kr-47",
+    "kr-48",
+    "kr-49",
+    "kr-50",
+    "kz-23",
+    "kz-35",
+    "kz-55",
+    "kz-71",
+    "kz-75",
+    "li-01",
+    "li-02",
+    "li-03",
+    "li-04",
+    "li-05",
+    "li-06",
+    "li-07",
+    "li-08",
+    "li-09",
+    "li-10",
+    "li-11",
+    "lk-4",
+    "lk-6",
+    "lk-8",
+    "lr-bg",
+    "lr-bm",
+    "lr-cm",
+    "lr-gb",
+    "lr-gg",
+    "lr-gk",
+    "lr-gp",
+    "lr-lo",
+    "lr-mg",
+    "lr-mo",
+    "lr-my",
+    "lr-ni",
+    "lr-rg",
+    "lr-ri",
+    "lr-si",
+    "lt-01",
+    "lt-04",
+    "lt-08",
+    "lt-09",
+    "lt-10",
+    "lt-15",
+    "lt-20",
+    "lt-25",
+    "lt-28",
+    "lt-32",
+    "lt-33",
+    "lt-35",
+    "lt-37",
+    "lt-40",
+    "lt-43",
+    "lt-45",
+    "lt-47",
+    "lt-49",
+    "lt-51",
+    "lt-52",
+    "lt-53",
+    "lt-54",
+    "lt-55",
+    "lt-56",
+    "lt-57",
+    "lt-58",
+    "lt-59",
+    "lt-al",
+    "lt-kl",
+    "lt-ku",
+    "lt-mr",
+    "lt-sa",
+    "lt-ut",
+    "lt-vl",
+    "lu-wi",
+    "lv-011",
+    "lv-022",
+    "lv-041",
+    "lv-042",
+    "lv-050",
+    "lv-052",
+    "lv-062",
+    "lv-077",
+    "lv-080",
+    "lv-106",
+    "lv-111",
+    "lv-113",
+    "lv-jel",
+    "lv-jur",
+    "lv-lpx",
+    "lv-rez",
+    "lv-rix",
+    "lv-ven",
+    "ma-07",
+    "md-br",
+    "md-ca",
+    "md-cu",
+    "md-du",
+    "md-ed",
+    "md-fl",
+    "md-ga",
+    "md-re",
+    "md-sn",
+    "md-so",
+    "md-un",
+    "me-06",
+    "me-15",
+    "me-16",
+    "me-17",
+    "me-18",
+    "me-19",
+    "me-20",
+    "me-24",
+    "mh-alk",
+    "mh-ebo",
+    "mh-kwa",
+    "mh-maj",
+    "mh-mil",
+    "mh-nmk",
+    "mh-uja",
+    "mh-wth",
+    "mk-101",
+    "mk-103",
+    "mk-104",
+    "mk-105",
+    "mk-106",
+    "mk-109",
+    "mk-201",
+    "mk-202",
+    "mk-203",
+    "mk-204",
+    "mk-205",
+    "mk-206",
+    "mk-207",
+    "mk-208",
+    "mk-210",
+    "mk-211",
+    "mk-301",
+    "mk-303",
+    "mk-304",
+    "mk-307",
+    "mk-308",
+    "mk-311",
+    "mk-312",
+    "mk-313",
+    "mk-401",
+    "mk-402",
+    "mk-403",
+    "mk-404",
+    "mk-407",
+    "mk-408",
+    "mk-409",
+    "mk-410",
+    "mk-501",
+    "mk-502",
+    "mk-503",
+    "mk-504",
+    "mk-506",
+    "mk-507",
+    "mk-508",
+    "mk-509",
+    "mk-601",
+    "mk-602",
+    "mk-603",
+    "mk-605",
+    "mk-606",
+    "mk-607",
+    "mk-608",
+    "mk-609",
+    "mk-701",
+    "mk-702",
+    "mk-703",
+    "mk-704",
+    "mk-705",
+    "mk-706",
+    "mk-802",
+    "mk-803",
+    "mk-805",
+    "mk-806",
+    "mk-807",
+    "mk-808",
+    "mk-809",
+    "mk-810",
+    "mk-811",
+    "mk-812",
+    "mk-815",
+    "mk-817",
+    "mm-01",
+    "mm-03",
+    "mm-04",
+    "mm-06",
+    "mm-07",
+    "mm-11",
+    "mm-12",
+    "mm-13",
+    "mm-14",
+    "mm-15",
+    "mm-16",
+    "mm-17",
+    "mm-18",
+    "mn-035",
+    "mn-037",
+    "mn-039",
+    "mn-041",
+    "mn-043",
+    "mn-046",
+    "mn-047",
+    "mn-049",
+    "mn-051",
+    "mn-053",
+    "mn-055",
+    "mn-057",
+    "mn-059",
+    "mn-061",
+    "mn-063",
+    "mn-064",
+    "mn-065",
+    "mn-067",
+    "mn-071",
+    "mn-1",
+    "mt-01",
+    "mt-02",
+    "mt-03",
+    "mt-04",
+    "mt-06",
+    "mt-07",
+    "mt-08",
+    "mt-09",
+    "mt-10",
+    "mt-11",
+    "mt-12",
+    "mt-13",
+    "mt-14",
+    "mt-15",
+    "mt-16",
+    "mt-17",
+    "mt-18",
+    "mt-19",
+    "mt-20",
+    "mt-22",
+    "mt-23",
+    "mt-24",
+    "mt-25",
+    "mt-26",
+    "mt-27",
+    "mt-28",
+    "mt-29",
+    "mt-30",
+    "mt-31",
+    "mt-32",
+    "mt-33",
+    "mt-34",
+    "mt-35",
+    "mt-36",
+    "mt-37",
+    "mt-38",
+    "mt-40",
+    "mt-41",
+    "mt-42",
+    "mt-43",
+    "mt-44",
+    "mt-45",
+    "mt-46",
+    "mt-47",
+    "mt-48",
+    "mt-49",
+    "mt-50",
+    "mt-51",
+    "mt-52",
+    "mt-53",
+    "mt-54",
+    "mt-55",
+    "mt-56",
+    "mt-57",
+    "mt-58",
+    "mt-59",
+    "mt-60",
+    "mt-61",
+    "mt-62",
+    "mt-63",
+    "mt-64",
+    "mt-65",
+    "mt-66",
+    "mt-67",
+    "mt-68",
+    "mu-pl",
+    "mu-ro",
+    "mx-bcn",
+    "mx-bcs",
+    "mx-chh",
+    "mx-gro",
+    "mx-gua",
+    "mx-jal",
+    "mx-mic",
+    "mx-mor",
+    "mx-nle",
+    "mx-pue",
+    "mx-roo",
+    "mx-son",
+    "mx-tab",
+    "mx-tam",
+    "mx-tla",
+    "mx-yuc",
+    "my-01",
+    "my-02",
+    "my-03",
+    "my-04",
+    "my-05",
+    "my-06",
+    "my-07",
+    "my-08",
+    "my-09",
+    "my-10",
+    "my-11",
+    "my-12",
+    "my-13",
+    "my-14",
+    "my-15",
+    "my-16",
+    "ng-ak",
+    "ng-by",
+    "ng-fc",
+    "ng-go",
+    "ng-kt",
+    "ng-os",
+    "ng-oy",
+    "ng-ta",
+    "ni-an",
+    "ni-as",
+    "ni-bo",
+    "ni-ca",
+    "ni-ci",
+    "ni-co",
+    "ni-es",
+    "ni-le",
+    "ni-md",
+    "ni-mn",
+    "ni-mt",
+    "ni-ri",
+    "ni-sj",
+    "nl-aw",
+    "nl-bq1",
+    "nl-bq2",
+    "nl-bq3",
+    "nl-cw",
+    "nl-dr",
+    "nl-fl",
+    "nl-fr",
+    "nl-ge",
+    "nl-gr",
+    "nl-li",
+    "nl-nb",
+    "nl-nh",
+    "nl-ov",
+    "nl-sx",
+    "nl-ut",
+    "nl-ze",
+    "nl-zh",
+    "no-03",
+    "no-11",
+    "no-15",
+    "no-18",
+    "no-34",
+    "no-38",
+    "no-46",
+    "no-50",
+    "no-54",
+    "nz-auk",
+    "nz-cit",
+    "nz-nsn",
+    "nz-ota",
+    "pa-1",
+    "pa-10",
+    "pa-2",
+    "pa-3",
+    "pa-4",
+    "pa-5",
+    "pa-6",
+    "pa-7",
+    "pa-9",
+    "pa-em",
+    "pa-ky",
+    "pa-nb",
+    "pe-ama",
+    "pe-anc",
+    "pe-apu",
+    "pe-aya",
+    "pe-caj",
+    "pe-cal",
+    "pe-cus",
+    "pe-huc",
+    "pe-huv",
+    "pe-ica",
+    "pe-jun",
+    "pe-lal",
+    "pe-lam",
+    "pe-lim",
+    "pe-lma",
+    "pe-lor",
+    "pe-mdd",
+    "pe-moq",
+    "pe-pas",
+    "pe-piu",
+    "pe-pun",
+    "pe-tac",
+    "pe-tum",
+    "pg-cpk",
+    "pg-cpm",
+    "pg-ebr",
+    "pg-ehg",
+    "pg-hla",
+    "pg-jwk",
+    "pg-mba",
+    "pg-mpm",
+    "pg-mrl",
+    "pg-ncd",
+    "pg-nik",
+    "pg-nsb",
+    "pg-san",
+    "pg-shm",
+    "pg-wbk",
+    "pg-whm",
+    "pg-wpd",
+    "ph-14",
+    "ph-bas",
+    "ph-boh",
+    "ph-buk",
+    "ph-cag",
+    "ph-que",
+    "ph-slu",
+    "ph-sun",
+    "pk-ba",
+    "pk-gb",
+    "pk-jk",
+    "pk-kp",
+    "pk-pb",
+    "pk-sd",
+    "pl-02",
+    "pl-04",
+    "pl-06",
+    "pl-08",
+    "pl-10",
+    "pl-12",
+    "pl-14",
+    "pl-16",
+    "pl-18",
+    "pl-20",
+    "pl-22",
+    "pl-24",
+    "pl-26",
+    "pl-28",
+    "pl-30",
+    "pl-32",
+    "pt-20",
+    "pt-30",
+    "pw-002",
+    "pw-010",
+    "pw-050",
+    "pw-100",
+    "pw-214",
+    "pw-218",
+    "pw-224",
+    "pw-226",
+    "pw-227",
+    "pw-350",
+    "pw-370",
+    "py-1",
+    "py-10",
+    "py-11",
+    "py-12",
+    "py-13",
+    "py-14",
+    "py-15",
+    "py-16",
+    "py-19",
+    "py-4",
+    "py-5",
+    "py-6",
+    "py-8",
+    "py-asu",
+    "ro-ab",
+    "ro-ar",
+    "ro-b",
+    "ro-bh",
+    "ro-cv",
+    "ro-gr",
+    "ro-il",
+    "rs-00",
+    "rs-14",
+    "rs-km",
+    "rs-vo",
+    "ru-ad",
+    "ru-al",
+    "ru-alt",
+    "ru-amu",
+    "ru-ast",
+    "ru-ba",
+    "ru-bel",
+    "ru-bry",
+    "ru-bu",
+    "ru-ce",
+    "ru-che",
+    "ru-chu",
+    "ru-cu",
+    "ru-da",
+    "ru-in",
+    "ru-irk",
+    "ru-kam",
+    "ru-kb",
+    "ru-kc",
+    "ru-kem",
+    "ru-kgd",
+    "ru-kgn",
+    "ru-kha",
+    "ru-khm",
+    "ru-kir",
+    "ru-kk",
+    "ru-kl",
+    "ru-klu",
+    "ru-ko",
+    "ru-kos",
+    "ru-kr",
+    "ru-krs",
+    "ru-kya",
+    "ru-len",
+    "ru-lip",
+    "ru-mag",
+    "ru-me",
+    "ru-mo",
+    "ru-mos",
+    "ru-mow",
+    "ru-mur",
+    "ru-nen",
+    "ru-ngr",
+    "ru-niz",
+    "ru-nvs",
+    "ru-oms",
+    "ru-per",
+    "ru-pri",
+    "ru-psk",
+    "ru-ros",
+    "ru-rya",
+    "ru-sa",
+    "ru-sak",
+    "ru-sam",
+    "ru-se",
+    "ru-smo",
+    "ru-spe",
+    "ru-sta",
+    "ru-sve",
+    "ru-ta",
+    "ru-tam",
+    "ru-tul",
+    "ru-tve",
+    "ru-ty",
+    "ru-tyu",
+    "ru-ud",
+    "ru-uly",
+    "ru-vgg",
+    "ru-vla",
+    "ru-vlg",
+    "ru-vor",
+    "ru-yan",
+    "ru-yar",
+    "ru-yev",
+    "ru-zab",
+    "sb-ct",
+    "sb-ml",
+    "sb-rb",
+    "sb-te",
+    "se-ab",
+    "se-ac",
+    "se-bd",
+    "se-c",
+    "se-d",
+    "se-e",
+    "se-f",
+    "se-g",
+    "se-h",
+    "se-i",
+    "se-k",
+    "se-m",
+    "se-n",
+    "se-o",
+    "se-s",
+    "se-t",
+    "se-u",
+    "se-w",
+    "se-x",
+    "se-y",
+    "se-z",
+    "sh-hl",
+    "sh-ta",
+    "si-002",
+    "si-003",
+    "si-004",
+    "si-011",
+    "si-012",
+    "si-013",
+    "si-017",
+    "si-022",
+    "si-023",
+    "si-026",
+    "si-027",
+    "si-029",
+    "si-030",
+    "si-032",
+    "si-033",
+    "si-034",
+    "si-036",
+    "si-040",
+    "si-041",
+    "si-043",
+    "si-047",
+    "si-048",
+    "si-050",
+    "si-052",
+    "si-057",
+    "si-061",
+    "si-069",
+    "si-070",
+    "si-071",
+    "si-080",
+    "si-082",
+    "si-085",
+    "si-090",
+    "si-094",
+    "si-096",
+    "si-099",
+    "si-104",
+    "si-106",
+    "si-108",
+    "si-109",
+    "si-122",
+    "si-125",
+    "si-128",
+    "si-132",
+    "si-133",
+    "si-147",
+    "si-150",
+    "si-151",
+    "si-158",
+    "si-160",
+    "si-163",
+    "si-167",
+    "si-168",
+    "si-172",
+    "si-192",
+    "si-200",
+    "si-204",
+    "si-206",
+    "si-208",
+    "si-211",
+    "si-213",
+    "sk-bc",
+    "sk-bl",
+    "sk-ki",
+    "sk-ni",
+    "sk-pv",
+    "sk-ta",
+    "sk-tc",
+    "sk-zi",
+    "sm-01",
+    "sm-02",
+    "sm-03",
+    "sm-04",
+    "sm-05",
+    "sm-06",
+    "sm-07",
+    "sm-08",
+    "sm-09",
+    "so-bk",
+    "so-bn",
+    "so-br",
+    "so-by",
+    "so-ga",
+    "so-hi",
+    "so-jd",
+    "so-jh",
+    "so-mu",
+    "so-nu",
+    "so-sd",
+    "so-sh",
+    "st-p",
+    "sv-ca",
+    "sv-ch",
+    "sv-li",
+    "sv-mo",
+    "sv-sa",
+    "sv-sv",
+    "sv-un",
+    "sv-us",
+    "th-10",
+    "th-12",
+    "th-13",
+    "th-14",
+    "th-15",
+    "th-21",
+    "th-22",
+    "th-26",
+    "th-33",
+    "th-34",
+    "th-35",
+    "th-41",
+    "th-42",
+    "th-45",
+    "th-46",
+    "th-48",
+    "th-50",
+    "th-51",
+    "th-53",
+    "th-54",
+    "th-55",
+    "th-57",
+    "th-62",
+    "th-64",
+    "th-65",
+    "th-67",
+    "th-70",
+    "th-71",
+    "th-73",
+    "th-74",
+    "th-76",
+    "th-77",
+    "th-80",
+    "th-81",
+    "th-82",
+    "th-83",
+    "th-85",
+    "th-90",
+    "th-92",
+    "th-93",
+    "th-94",
+    "th-96",
+    "tw-cha",
+    "tw-cyi",
+    "tw-cyq",
+    "tw-hsq",
+    "tw-hsz",
+    "tw-hua",
+    "tw-ila",
+    "tw-kee",
+    "tw-khh",
+    "tw-kin",
+    "tw-lie",
+    "tw-mia",
+    "tw-nan",
+    "tw-nwt",
+    "tw-pen",
+    "tw-pif",
+    "tw-tao",
+    "tw-tnn",
+    "tw-tpe",
+    "tw-ttt",
+    "tw-txg",
+    "tw-yun",
+    "ua-05",
+    "ua-07",
+    "ua-09",
+    "ua-12",
+    "ua-14",
+    "ua-18",
+    "ua-21",
+    "ua-23",
+    "ua-26",
+    "ua-30",
+    "ua-32",
+    "ua-35",
+    "ua-40",
+    "ua-43",
+    "ua-46",
+    "ua-51",
+    "ua-53",
+    "ua-56",
+    "ua-59",
+    "ua-61",
+    "ua-63",
+    "ua-65",
+    "ua-68",
+    "ua-71",
+    "ua-74",
+    "ua-77",
+    "us-ak",
+    "us-al",
+    "us-ar",
+    "us-as",
+    "us-az",
+    "us-ca",
+    "us-co",
+    "us-ct",
+    "us-dc",
+    "us-de",
+    "us-ga",
+    "us-gu",
+    "us-hi",
+    "us-ia",
+    "us-il",
+    "us-in",
+    "us-ks",
+    "us-ky",
+    "us-ma",
+    "us-md",
+    "us-me",
+    "us-mi",
+    "us-mn",
+    "us-mo",
+    "us-mp",
+    "us-ms",
+    "us-mt",
+    "us-nc",
+    "us-nd",
+    "us-nh",
+    "us-nj",
+    "us-nm",
+    "us-nv",
+    "us-ny",
+    "us-oh",
+    "us-ok",
+    "us-or",
+    "us-pr",
+    "us-ri",
+    "us-sc",
+    "us-sd",
+    "us-tn",
+    "us-tx",
+    "us-um",
+    "us-ut",
+    "us-vi",
+    "us-wa",
+    "us-wy",
+    "uy-ar",
+    "uy-ca",
+    "uy-cl",
+    "uy-co",
+    "uy-du",
+    "uy-la",
+    "uy-pa",
+    "uy-rn",
+    "uy-ro",
+    "uy-sa",
+    "uy-sj",
+    "uy-so",
+    "uy-tt",
+    "uz-qr",
+    "uz-tk",
+    "ve-a",
+    "ve-b",
+    "ve-c",
+    "ve-e",
+    "ve-f",
+    "ve-g",
+    "ve-h",
+    "ve-i",
+    "ve-j",
+    "ve-k",
+    "ve-l",
+    "ve-m",
+    "ve-n",
+    "ve-o",
+    "ve-p",
+    "ve-s",
+    "ve-t",
+    "ve-u",
+    "ve-v",
+    "ve-w",
+    "ve-x",
+    "ve-z",
+    "vu-map",
+    "vu-pam",
+    "vu-sam",
+    "vu-see",
+    "vu-tae",
+    "wf-al",
+    "wf-sg",
+    "wf-uv",
+    "za-mp",
+    "zm-01",
+    "zm-02",
+    "zm-03",
+    "zm-04",
+    "zm-05",
+    "zm-06",
+    "zm-07",
+    "zm-10"
+  ]);
+
+  // src/shared/originArea.ts
+  function originFlagAssetPath(input) {
+    const subdivision = input.subdivisionCode?.trim().toLowerCase() ?? "";
+    if (subdivision.length > 0 && SUBDIVISION_FLAG_CODES.has(subdivision)) {
+      return `flags/subdivisions/${subdivision}.svg`;
+    }
+    return countryFlagAssetPath(input.countryCode);
+  }
+  function originFlagImgHtml(input) {
+    const src = escapeHtmlText(originFlagAssetPath(input));
+    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
+  }
+  function formatOriginPlaceLabel(input) {
+    const areaName = input.areaName?.trim() ?? "";
+    const countryName = input.countryName?.trim() ?? "";
+    if (!input.hasSubdivision) return countryName.length > 0 ? countryName : areaName;
+    if (areaName.length > 0 && countryName.length > 0 && areaName !== countryName) return `${areaName}, ${countryName}`;
+    return areaName.length > 0 ? areaName : countryName;
+  }
+  function originPlaceLabelFor(origin) {
+    const subdivisionCode = origin.birthSubdivisionCode?.trim() ?? "";
+    return formatOriginPlaceLabel({
+      areaName: origin.birthAreaName ?? origin.birthCountryName,
+      countryName: origin.birthOriginCountryName,
+      hasSubdivision: subdivisionCode.length > 0
+    });
+  }
+
+  // src/shared/lossFlagIndex.ts
+  function indexLossFlagsByOwner(rows, same) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const dropped = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      if (row.value == null) continue;
+      const dropKey = `${row.ownerId}\0${row.name}`;
+      if (dropped.has(dropKey)) continue;
+      let ownerMap = byOwner.get(row.ownerId);
+      if (!ownerMap) {
+        ownerMap = /* @__PURE__ */ new Map();
+        byOwner.set(row.ownerId, ownerMap);
+      }
+      const existing = ownerMap.get(row.name);
+      if (existing === void 0) ownerMap.set(row.name, row.value);
+      else if (!same(existing, row.value)) {
+        ownerMap.delete(row.name);
+        dropped.add(dropKey);
+      }
+    }
+    return byOwner;
+  }
+
+  // src/shared/unitDisplayNames.ts
+  var UNIT_TYPE_NOUN_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'Infantry').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "Infantry",
+    /**
+       * Documents the object literal property `armor` (armor: 'Armored').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "Armored",
+    /**
+       * Documents the object literal property `naval` (naval: 'Fleet').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "Fleet",
+    /**
+       * Documents the object literal property `air` (air: 'Squadron').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "Squadron"
+  };
+  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
+  function capitalizeWord(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function ordinalSuffix(value) {
+    const abs = Math.abs(Math.trunc(value));
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    const mod10 = abs % 10;
+    if (mod10 === 1) return "st";
+    if (mod10 === 2) return "nd";
+    if (mod10 === 3) return "rd";
+    return "th";
+  }
+  function toRomanNumeral(value) {
+    let remaining = Math.max(1, Math.trunc(value));
+    const numerals = [
+      [1e3, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"]
+    ];
+    let out = "";
+    for (const [unit, symbol] of numerals) {
+      while (remaining >= unit) {
+        out += symbol;
+        remaining -= unit;
+      }
+    }
+    return out;
+  }
+  function unitDisplayOwner(unit) {
+    if (unit.player !== void 0 && isSeatId(unit.player)) return unit.player;
+    return unitIdOwnerFromId(unit.id) ?? "other";
+  }
+  function formatUnitNumberLabel(unit, value, locale) {
+    const owner = unitDisplayOwner(unit);
+    return owner !== "other" && isAiSeatId(owner) ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  }
+  function parseSeedUnitIdParts(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+    if (!match) return null;
+    const ordinal3 = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal3) || ordinal3 <= 0) return null;
+    return { unitType: match[2], ordinal: ordinal3 };
+  }
+  function productionSpawnSequenceFromUnitId(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+    if (!match) return null;
+    const sequence = Number.parseInt(match[3], 10);
+    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+  }
+  function resolvePersistedDisplayOrderForUnitLabel(unit) {
+    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
+    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
+    return unit.displayOrder;
+  }
+  function unitDisplaySequenceGroupKey(unit) {
+    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+  }
+  function uniqueUnitsPreferringPersistedOrder(units) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const existing = byId.get(unit.id);
+      if (!existing) {
+        byId.set(unit.id, unit);
+        continue;
+      }
+      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+    }
+    return [...byId.values()];
+  }
+  function formatOrdinalLabel(value, locale) {
+    const normalized = Math.max(1, Math.trunc(value));
+    const numberText = new Intl.NumberFormat(locale).format(normalized);
+    return `${numberText}${ordinalSuffix(normalized)}`;
+  }
+  function getUnitDisplayNoun(unitType) {
+    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
+  }
+  function buildUnitDisplayNameLookup(units, locale) {
+    const byGroup = /* @__PURE__ */ new Map();
+    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+      const key = unitDisplaySequenceGroupKey(unit);
+      const existing = byGroup.get(key);
+      if (existing) existing.push(unit);
+      else byGroup.set(key, [unit]);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const group of byGroup.values()) {
+      const unitType = group[0]?.unitType ?? "";
+      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
+        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
+      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const noun = getUnitDisplayNoun(unitType);
+      for (const unit of withPersisted) {
+        const ordinal3 = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal3, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+      let fallbackOrdinal = withPersisted.reduce(
+        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        0
+      );
+      for (const unit of withoutPersisted) {
+        fallbackOrdinal += 1;
+        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+    }
+    return result;
+  }
+  function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+    }
+    const seed = parseSeedUnitIdParts(unitId);
+    if (seed) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+    }
+    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+    return unitId;
+  }
+
+  // src/shared/gameCalendar.ts
+  var GAME_MONTH_NAMES = Object.freeze([
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ]);
+  var DAYS_IN_COMMON_YEAR = Object.freeze([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
+  function parseStartMonth(raw) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
+    const text = String(raw ?? "").trim();
+    if (/^\d+$/.test(text)) {
+      const numeric = Number(text);
+      return numeric >= 1 && numeric <= 12 ? numeric : 1;
+    }
+    const index = GAME_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
+    return index >= 0 ? index + 1 : 1;
+  }
+  function gameCalendarKindForMap(gameMapId) {
+    return gameMapId === "global" ? "monthly" : "weekly";
+  }
+  function isLeapGameYear(year) {
+    const normalized = Number.isFinite(year) ? Math.floor(year) : 1;
+    return (normalized - 1) % 4 === 0;
+  }
+  function daysInGameMonth(year, monthIndex) {
+    const index = monthIndex === 1 ? 1 : Math.min(11, Math.max(0, monthIndex));
+    if (index === 1 && isLeapGameYear(year)) return 29;
+    return DAYS_IN_COMMON_YEAR[index] ?? 31;
+  }
+  function normalizedTurn(turnNumber) {
+    return Number.isFinite(turnNumber) && turnNumber >= 1 ? Math.floor(turnNumber) : 1;
+  }
+  function weeklyDate(turn, startMonth) {
+    let year = 1;
+    let monthIndex = startMonth - 1;
+    let day = 1;
+    let monthsElapsed = 0;
+    for (let step = 1; step < turn; step += 1) {
+      day += 7;
+      while (day > daysInGameMonth(year, monthIndex)) {
+        day -= daysInGameMonth(year, monthIndex);
+        monthsElapsed += 1;
+        year = Math.floor(monthsElapsed / 12) + 1;
+        monthIndex = (startMonth - 1 + monthsElapsed) % 12;
+      }
+    }
+    return { year, monthIndex, day };
+  }
+  function gameDateForTurn(turnNumber, startMonth, kind) {
+    const turn = normalizedTurn(turnNumber);
+    const start = parseStartMonth(startMonth);
+    if (kind === "weekly") return weeklyDate(turn, start);
+    return {
+      year: Math.floor((turn - 1) / 12) + 1,
+      monthIndex: (turn - 1 + start - 1) % 12,
+      day: null
+    };
+  }
+  function formatGameDate(date) {
+    const monthName = GAME_MONTH_NAMES[date.monthIndex] ?? "January";
+    const yearLabel = `Year ${date.year}`;
+    if (date.day == null) return `${monthName}, ${yearLabel}`;
+    return `${monthName} ${formatOrdinalLabel(date.day, "en-US")}, ${yearLabel}`;
+  }
+  function formatGameDateForTurn(turnNumber, startMonth, kind) {
+    return formatGameDate(gameDateForTurn(turnNumber, startMonth, kind));
+  }
+
+  // src/shared/pipelineTerrain.ts
+  var PIPELINE_TERRAIN_KINDS = [
+    "water",
+    "coastal",
+    "wetlands",
+    "plains",
+    "forest",
+    "mountain",
+    "desert",
+    "arctic"
+  ];
+  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
+  function isPipelineTerrainKind(s) {
+    return KIND_SET.has(s);
+  }
+
+  // src/shared/terrainKindLabel.ts
+  function formatTerrainKindLabel(kind) {
+    if (!kind) return "Unknown";
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
+  }
+
+  // src/shared/terrainSwatchHtml.ts
+  var TERRAIN_SWATCH_CLASS_NAME = "terrain-swatch";
+  var DISPLAY_LABEL_TO_KIND = Object.freeze({
+    Water: "water",
+    Coastal: "coastal",
+    Wetlands: "wetlands",
+    Plains: "plains",
+    Forest: "forest",
+    Mountain: "mountain",
+    Desert: "desert",
+    Arctic: "arctic"
+  });
+  function pipelineKindFromRaw(kind) {
+    if (kind == null) return null;
+    const normalized = kind.trim().toLowerCase();
+    return isPipelineTerrainKind(normalized) ? normalized : null;
+  }
+  function formatTerrainSwatchHtml(kind) {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="${kind}" aria-hidden="true"></span>`;
+  }
+  function formatUrbanSwatchHtml() {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="urban" aria-hidden="true"></span>`;
+  }
+  function formatRubbleSwatchHtml() {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="rubble" aria-hidden="true"></span>`;
+  }
+  function rubbleSwatchBackgroundImage() {
+    const line = "rgba(110, 22, 18, 0.95)";
+    const slash = `repeating-linear-gradient(45deg, transparent 0 2px, ${line} 2px 3px)`;
+    const backslash = `repeating-linear-gradient(-45deg, transparent 0 2px, ${line} 2px 3px)`;
+    return `${slash}, ${backslash}`;
+  }
+  function formatTerrainKindHtml(kind) {
+    const label = formatTerrainKindLabel(kind ?? null);
+    const pipeline = pipelineKindFromRaw(kind);
+    if (!pipeline) return escapeHtmlText(label);
+    return `${formatTerrainSwatchHtml(pipeline)}${escapeHtmlText(label)}`;
+  }
+  function formatTerrainNameListHtml(text) {
+    return text.split(", ").map(formatTerrainNameTokenHtml).join(", ");
+  }
+  function formatTerrainNameTokenHtml(token) {
+    const match = /^([A-Za-z]+)([\s\S]*)$/.exec(token);
+    const word = match?.[1] ?? "";
+    if (match && word === "Urban") {
+      return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+    }
+    if (match && word === "Rubble") {
+      return `${formatRubbleSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+    }
+    const kind = DISPLAY_LABEL_TO_KIND[word];
+    if (!match || !kind) return escapeHtmlText(token);
+    return `${formatTerrainSwatchHtml(kind)}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+  }
+
+  // src/shared/bonusLevel.ts
+  var BONUS_LEVELS = Object.freeze(["off", "low", "high"]);
+  var DEFAULT_BONUS_LEVEL = "low";
+  function parseBonusLevel(raw, fallback) {
+    if (typeof raw !== "string") return fallback;
+    const normalized = raw.trim().toLowerCase();
+    return BONUS_LEVELS.find((level) => level === normalized) ?? fallback;
+  }
+  function bonusLevelOf(enabled, level) {
+    return enabled === true ? level ?? "low" : "off";
+  }
+
+  // src/shared/weatherBonusRules.ts
+  var STRATEGIC_MOVEMENT_HEXES = Object.freeze({
+    infantry: 1,
+    armor: 2,
+    naval: 2,
+    air: 0
+  });
+  var OPEN_GROUND_CATEGORIES = /* @__PURE__ */ new Set(["plains", "desert", "wetlands", "arctic", "coastal"]);
+  var WEATHER_SLOWING_STATES = Object.freeze({
+    low: Object.freeze({ armor: Object.freeze(["snow", "rain"]), naval: Object.freeze(["snow"]) }),
+    high: Object.freeze({
+      armor: Object.freeze(["snow", "rain", "heat"]),
+      naval: Object.freeze(["snow", "rain"])
+    })
+  });
+  var SLOWED_STRATEGIC_MOVEMENT_HEXES = 1;
+  var TACTICAL_WEATHER_BUDGET_CAP = Object.freeze({
+    low: 2,
+    high: 1
+  });
+  var WEATHER_ATTACK_PENALTY_BY_LEVEL = Object.freeze({
+    low: 3,
+    high: 5
+  });
+  var TAG_TIE_ORDER = Object.freeze(["snow", "heat", "rain"]);
+  var TAG_DISPLAY_ORDER = Object.freeze(["snow", "rain", "heat"]);
+  function weatherTagsInDisplayOrder(tags) {
+    const present = new Set(tags ?? []);
+    return TAG_DISPLAY_ORDER.filter((state) => present.has(state)).slice();
+  }
+  function weatherBonusLevelOf(source) {
+    return bonusLevelOf(source.weatherBonusEnabled, source.weatherBonusLevel);
+  }
+  function strategicMovementHexes(unitType) {
+    return STRATEGIC_MOVEMENT_HEXES[unitType] ?? 1;
+  }
+  function weatherSlowsMovement(input) {
+    const { unitType, weather, tags, level } = input;
+    if (level === "off" || !weather || hasWeatherTag(tags, weather)) return false;
+    return WEATHER_SLOWING_STATES[level][unitType]?.includes(weather) === true;
+  }
+  function strategicMovementHexesFor(input) {
+    return weatherSlowsMovement(input) ? SLOWED_STRATEGIC_MOVEMENT_HEXES : strategicMovementHexes(input.unitType);
+  }
+  function tacticalWeatherMovementBudget(input) {
+    const { printedBudget, level } = input;
+    if (level === "off" || !weatherSlowsMovement(input)) return printedBudget;
+    return Math.max(1, Math.min(printedBudget, TACTICAL_WEATHER_BUDGET_CAP[level]));
+  }
+  function tacticalWeatherOpenGroundCost(input) {
+    if (!input.enabled || input.unitType !== "infantry" || !input.weather) return input.baseCost;
+    if (input.weather !== "snow" && input.weather !== "rain") return input.baseCost;
+    if (hasWeatherTag(input.tags, input.weather)) return input.baseCost;
+    if (!OPEN_GROUND_CATEGORIES.has(input.category)) return input.baseCost;
+    return Math.max(input.baseCost, 2);
+  }
+  function weatherAttackPenalty(input) {
+    const { level } = input;
+    if (level === "off") return 0;
+    const penalized = input.kind === "ranged" ? penalizesRangedAttack(input.unitType, input.weatherAtUnit, input.tags) : input.unitType === "air" && [input.weatherAtUnit, input.weatherAtTarget].some((weather) => penalizesAirStrike(weather, input.tags));
+    return penalized ? WEATHER_ATTACK_PENALTY_BY_LEVEL[level] : 0;
+  }
+  function strategicFerryRangeHexes(input) {
+    if (input.enabled && input.weatherAtDestination === "snow" && !hasWeatherTag(input.tags, "snow")) return 2;
+    return 4;
+  }
+  function formatWeatherLabel(weather) {
+    switch (weather) {
+      case "rain":
+        return "Rain";
+      case "snow":
+        return "Snow";
+      case "heat":
+        return "Heat";
+      default:
+        return "Mild";
+    }
+  }
+  function hasWeatherTag(tags, weather) {
+    return tags?.includes(weather) === true;
+  }
+  function penalizesRangedAttack(unitType, weather, tags) {
+    if (unitType !== "armor" || weather !== "snow" && weather !== "heat") return false;
+    return !hasWeatherTag(tags, weather);
+  }
+  function penalizesAirStrike(weather, tags) {
+    if (weather !== "snow" && weather !== "rain" && weather !== "heat") return false;
+    return !hasWeatherTag(tags, weather);
+  }
+
+  // src/shared/weatherIcons.ts
+  var WEATHER_ICON_CLASS_NAME = "weather-icon";
+  var WEATHER_ICON_FILE = Object.freeze({
+    mild: "mild.svg",
+    rain: "rain.svg",
+    snow: "snow.svg",
+    heat: "heat.svg"
+  });
+  function weatherIconAssetPath(weather) {
+    const file = weather ? WEATHER_ICON_FILE[weather] : WEATHER_ICON_FILE.mild;
+    return `weather/${file ?? WEATHER_ICON_FILE.mild}`;
+  }
+  function formatWeatherIconHtml(weather) {
+    const label = formatWeatherLabel(weather);
+    const src = escapeHtmlText(weatherIconAssetPath(weather));
+    return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
+  }
+
+  // src/shared/gameRules.ts
+  function unitCostFor(unitType) {
+    const rules = activeGameMap().rules;
+    switch (unitType) {
+      case "infantry":
+        return rules.infantryCost;
+      case "armor":
+        return rules.armorCost;
+      case "naval":
+        return rules.navalCost;
+      case "air":
+        return rules.airCost;
+      default: {
+        const unexpected = unitType;
+        throw new Error(`Unknown unit type ${String(unexpected)}`);
+      }
+    }
+  }
+  function advancedTechMinUrbanCells() {
+    return activeGameMap().rules.advancedMinUrbanCells;
+  }
+
+  // src/shared/tacticalRanges.ts
+  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 4,
+    naval: 3,
+    air: 0
+  });
+  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 5,
+    naval: 10,
+    air: 99
+  });
+  function unitHasTacticalRangedBaseline(unitType) {
+    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
+  }
+  var AIR_STRIKE_RANGE_HEXES = 3;
+
+  // src/shared/tacticalTransportLink.ts
+  var orderedRingMemo = /* @__PURE__ */ new Map();
+  var ORDERED_RING_MEMO_CAPACITY = 1e3;
+  function tacticalGridDiskNeighborsOrdered(fromH3) {
+    const cached = orderedRingMemo.get(fromH3);
+    if (cached !== void 0) return cached;
+    let ring;
+    try {
+      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
+    } catch {
+      ring = [];
+    }
+    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
+      const oldest = orderedRingMemo.keys().next().value;
+      if (oldest !== void 0) orderedRingMemo.delete(oldest);
+    }
+    orderedRingMemo.set(fromH3, ring);
+    return ring;
+  }
+  function tacticalNeighborsInFootprint(h, tacticalSet) {
+    const out = [];
+    try {
+      for (const n of gridDisk(h, 1)) {
+        if (n !== h && tacticalSet.has(n)) out.push(n);
+      }
+    } catch {
+      return out;
+    }
+    return out;
+  }
+  function tacticalTransportMaskHasAnyRoadOrRail(masks, ringLen) {
+    const { roadSides, railSides } = masks;
+    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
+    for (let i = 0; i < ringLen; i++) {
+      if (roadSides[i] || railSides[i]) return true;
+    }
+    return false;
+  }
+  function tacticalTransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
+    const masks = roadRailByH3.get(h3);
+    if (!masks) return false;
+    const ring = tacticalGridDiskNeighborsOrdered(h3);
+    return tacticalTransportMaskHasAnyRoadOrRail(masks, ring.length);
+  }
+  function tacticalTransportMarchAdjacentPairAllowsStep(args) {
+    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
+    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
+    const ring = tacticalGridDiskNeighborsOrdered(fromH3);
+    if (ring.indexOf(toH3) < 0) return false;
+    return tacticalTransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalTransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
+  }
+  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
+  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
+
+  // src/shared/tacticalTerrainMovement.ts
+  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
+    const k = (effectiveKind || "").toLowerCase();
+    const pt = (parentTerrain || "").toLowerCase();
+    if (k === "water") return "water";
+    if (k === "coastal") return "coastal";
+    if (k === "forest" || k === "forests") return "forests";
+    if (k === "mountain" || k === "mountains") return "mountains";
+    if (k === "wetland" || k === "wetlands") return "wetlands";
+    if (k === "desert") return "desert";
+    if (k === "arctic") return "arctic";
+    if (k === "plains" || k === "land") return "plains";
+    if (k.length > 0) return "plains";
+    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
+    return "plains";
+  }
+  function nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(kind) {
+    const k = (kind || "").toLowerCase();
+    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
+  }
+  function isInfantryOrArmorTacticalSpawnCell(args) {
+    const k = args.resolvedKindForCell || args.parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
+    return cat !== "water" && cat !== "arctic";
+  }
+  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
+    if (unitType !== "infantry" && unitType !== "armor") return false;
+    if (terrain.isUrbanTactical?.(cellH3) || terrain.isRubbleTactical?.(cellH3)) return true;
+    const raw = terrain.effectiveKindForTacticalHex(cellH3);
+    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
+    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
+  }
+  function isNavalTacticalCellNavigable(args) {
+    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
+    if (isSeaportCell) return true;
+    if (nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
+    void parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
+    return cat === "water" || cat === "coastal";
+  }
+  function buildRoadRailMapFromTacticalRoadRailRecords(roadBy, railBy) {
+    const roadRailByH3 = /* @__PURE__ */ new Map();
+    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+    for (const h3 of transportKeys) {
+      const r = roadBy[h3];
+      const l = railBy[h3];
+      if (!r && !l) continue;
+      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+      if (n === 0) continue;
+      const roadSides = r ?? Array.from({ length: n }, () => false);
+      const railSides = l ?? Array.from({ length: n }, () => false);
+      if (roadSides.length !== railSides.length) continue;
+      roadRailByH3.set(h3, { roadSides, railSides });
+    }
+    return roadRailByH3;
+  }
+  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
+    if (roadRailByH3.size === 0) {
+      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
+    }
+    const transportFromTo = (fromH3, toH3) => tacticalTransportMarchAdjacentPairAllowsStep({
+      fromH3,
+      toH3,
+      roadRailByH3,
+      rubbleByH3
+    });
+    return {
+      transportFromTo,
+      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
+    };
+  }
+  function tacticalEnterHexMovementCost(unitType, category) {
+    if (unitType === "infantry") {
+      switch (category) {
+        case "plains":
+        case "desert":
+        case "wetlands":
+        case "arctic":
+        case "coastal":
+          return 1;
+        case "forests":
+        case "mountains":
+          return 2;
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "armor") {
+      switch (category) {
+        case "plains":
+        case "desert":
+          return 1;
+        case "forests":
+        case "coastal":
+          return 2;
+        case "mountains":
+        case "wetlands":
+        case "arctic":
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "naval") {
+      switch (category) {
+        case "water":
+        case "coastal":
+          return 1;
+        default:
+          return Infinity;
+      }
+    }
+    return Infinity;
+  }
+  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    const parentKind = battle.strategicHexTerrainKind ?? "plains";
+    const map = battle.tacticalTerrainKindByH3 ?? {};
+    const seaportMap = battle.tacticalIsSeaportByH3 ?? {};
+    const urbanMap = battle.tacticalIsUrbanByH3 ?? {};
+    const rubbleMap = battle.tacticalIsRubbleByH3 ?? {};
+    const roadBy = battle.tacticalRoadSidesByH3 ?? {};
+    const railBy = battle.tacticalRailSidesByH3 ?? {};
+    const roadRailByH3 = buildRoadRailMapFromTacticalRoadRailRecords(roadBy, railBy);
+    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
+    return {
+      parentTerrain,
+      parentTerrainKind: parentKind,
+      transportFromTo: transportFromToFn,
+      landTransportMarchContext,
+      effectiveKindForTacticalHex(h3) {
+        const raw = map[h3];
+        if (raw == null) return parentKind;
+        const trimmed = String(raw).trim();
+        return trimmed.length > 0 ? trimmed : parentKind;
+      },
+      isSeaportTactical(h3) {
+        return !!seaportMap[h3];
+      },
+      isUrbanTactical(h3) {
+        return !!urbanMap[h3];
+      },
+      isRubbleTactical(h3) {
+        return !!rubbleMap[h3];
+      }
+    };
+  }
+  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
+    void _toH3Index;
+    if (unit.unitType === "air") return "air";
+    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
+    if (embarked) {
+      return "naval";
+    }
+    return unit.unitType;
+  }
+  function tacticalTerrainLayerSignature(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "";
+    const parentKind = battle.strategicHexTerrainKind ?? "";
+    const map = battle.tacticalTerrainKindByH3;
+    const sp = battle.tacticalIsSeaportByH3;
+    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const urban = battle.tacticalIsUrbanByH3;
+    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const rubble = battle.tacticalIsRubbleByH3;
+    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const road = battle.tacticalRoadSidesByH3;
+    const rail = battle.tacticalRailSidesByH3;
+    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
+    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
+      const r = road?.[h3] ?? [];
+      const l = rail?.[h3] ?? [];
+      const n = Math.max(r.length, l.length);
+      let s = `${h3}:`;
+      for (let i = 0; i < n; i++) {
+        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
+      }
+      return s;
+    }).join(";");
+    if (!map || Object.keys(map).length === 0) {
+      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+    }
+    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
+    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+  }
+
+  // src/shared/tacticalTerrainCombatModifiers.ts
+  function effectiveTacticalTerrainKindString(battle, tacticalH3) {
+    const fromMap = battle.tacticalTerrainKindByH3?.[tacticalH3];
+    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
+      return String(fromMap);
+    }
+    return battle.strategicHexTerrainKind ?? "plains";
+  }
+  function tacticalMovementCategory(battle, tacticalH3) {
+    const kind = effectiveTacticalTerrainKindString(battle, tacticalH3);
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
+  }
+  function tacticalCellIsMountain(battle, tacticalH3) {
+    return tacticalMovementCategory(battle, tacticalH3) === "mountains";
+  }
+  function tacticalCellIsUrbanOrRubble(battle, tacticalH3) {
+    return !!battle.tacticalIsRubbleByH3?.[tacticalH3] || !!battle.tacticalIsUrbanByH3?.[tacticalH3];
+  }
+  function tacticalCellIsForestClass(battle, tacticalH3) {
+    return tacticalMovementCategory(battle, tacticalH3) === "forests";
+  }
+  function tacticalMovementTerrainAnchorH3(u, subUnits) {
+    const emb = u.embarkedOnSubUnitId;
+    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
+      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
+      if (naval) return naval.h3Index;
+    }
+    return u.h3Index;
+  }
+  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
+    if (tacticalCellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
+    return tacticalCellIsForestClass(battle, attackerAnchorH3);
+  }
+  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
+    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
+    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
+      return Math.min(baseline, 1);
+    }
+    return baseline;
+  }
+  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
+    const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
+    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
+    let budget;
+    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
+      if (tacticalCellIsUrbanOrRubble(battle, anchor2)) {
+        budget = Math.max(0, 1);
+      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) {
+        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
+        budget = Math.max(0, inf);
+      } else {
+        budget = Math.max(0, base);
+      }
+    } else {
+      budget = Math.max(0, base);
+    }
+    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
+      return 1;
+    }
+    return tacticalWeatherMovementBudget({
+      unitType: subUnit.unitType,
+      printedBudget: budget,
+      weather: battle.weather,
+      tags: subUnit.weatherTags,
+      level: weatherBonusLevelOf(battle)
+    });
+  }
+
+  // src/shared/originBonusRules.ts
+  var ORIGIN_HIT_BONUS_BY_LEVEL = Object.freeze({
+    low: 2,
+    high: 4
+  });
+  var ORIGIN_BONUS_OFF = Object.freeze({
+    originBonusEnabled: false,
+    terrainBonusEnabled: false
+  });
+  var TERRAIN_KIND_ALIASES = Object.freeze({
+    ocean: "water",
+    sea: "water",
+    forests: "forest",
+    mountains: "mountain",
+    wetland: "wetlands"
+  });
+  function normalizeOriginTerrainKind(raw) {
+    const kind = (raw ?? "").trim().toLowerCase();
+    if (kind.length === 0) return null;
+    const aliased = TERRAIN_KIND_ALIASES[kind] ?? kind;
+    return isPipelineTerrainKind(aliased) ? aliased : null;
+  }
+
+  // src/shared/techBonusRules.ts
+  var TECH_ADVANCED_MIN_URBAN_HEX_COUNT = GLOBAL_GAME_MAP.rules.advancedMinUrbanCells;
+  var TECH_HIT_BONUS = Object.freeze({ attack: 2, defense: 2 });
+  function techLevelFromUrbanHexCount(urbanHexCount) {
+    if (urbanHexCount == null || !Number.isFinite(urbanHexCount)) return "basic";
+    return urbanHexCount >= advancedTechMinUrbanCells() ? "advanced" : "basic";
+  }
+
+  // src/shared/featureIconHtml.ts
+  var FEATURE_ICON_CLASS_NAME = "feature-icon";
+  function formatFeatureIconHtml(src, label) {
+    return `<img class="${FEATURE_ICON_CLASS_NAME}" src="${escapeHtmlText(src)}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
+  }
+  function transportLineSpecified(input) {
+    return input.road === true || input.rail === true || input.roadRail === true;
+  }
+  function formatTransportIconsHtml(input) {
+    const specified = input.road === true || input.rail === true;
+    const road = specified ? input.road === true : input.roadRail === true;
+    const rail = specified ? input.rail === true : input.roadRail === true;
+    const parts = [];
+    if (road) parts.push(formatFeatureIconHtml("transport/road.svg", "Road"));
+    if (rail) parts.push(formatFeatureIconHtml("transport/rail.svg", "Rail"));
+    return parts.join(", ");
+  }
+  function formatFeatureLabelHtml(label) {
+    if (label === "Road") return formatFeatureIconHtml("transport/road.svg", "Road");
+    if (label === "Rail") return formatFeatureIconHtml("transport/rail.svg", "Rail");
+    if (label === "Rubble") return `${formatRubbleSwatchHtml()}${escapeHtmlText("Rubble")}`;
+    return escapeHtmlText(label);
+  }
+  function formatTechTierHtml(level) {
+    if (level === "advanced") return formatFeatureIconHtml("tech/tech_advanced.svg", "Advanced");
+    return formatFeatureIconHtml("tech/tech_basic.svg", "Basic");
+  }
+  function formatProducedUnitTechLineHtml(input) {
+    if (input.techBonusEnabled !== true) return null;
+    if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
+    const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
+    return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
+  }
+  function formatSelectedHexTechLineHtml(input) {
+    if (input.techBonusEnabled !== true) return null;
+    let hasBasic = false;
+    let hasAdvanced = false;
+    for (const count of input.baselineUrbanHexCounts) {
+      if (!Number.isFinite(count) || count <= 0) continue;
+      if (techLevelFromUrbanHexCount(count) === "advanced") hasAdvanced = true;
+      else hasBasic = true;
+    }
+    const parts = [];
+    if (hasBasic) parts.push(formatTechTierHtml("basic"));
+    if (hasAdvanced) parts.push(formatTechTierHtml("advanced"));
+    if (parts.length === 0) return null;
+    return `<strong>Tech:</strong> ${parts.join(", ")}`;
+  }
+
+  // src/shared/unitOriginTooltipText.ts
+  function unitOriginsPresentTheSame(left, right) {
+    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode && left.birthAreaId === right.birthAreaId && left.birthAreaName === right.birthAreaName && left.birthSubdivisionCode === right.birthSubdivisionCode && (left.birthOriginCountryName ?? null) === (right.birthOriginCountryName ?? null);
+  }
+  function bonusRow(label, value) {
+    return `<strong>${label}:</strong> ${value}`;
+  }
+  function formationTurnForUnit(unitId, formedTurnById2) {
+    const direct = formedTurnById2.get(unitId);
+    if (direct != null) return direct;
+    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
+    if (!parentUnitId) return null;
+    return formedTurnById2.get(parentUnitId) ?? null;
+  }
+  function identityLines(origin, identity) {
+    if (!identity) return [];
+    const lines = [];
+    const displayName = identity.displayName.trim();
+    if (displayName.length > 0) {
+      lines.push(
+        `<strong>Unit:</strong> ${originFlagImgHtml({
+          subdivisionCode: origin.birthSubdivisionCode ?? null,
+          countryCode: origin.birthCountryCode
+        })}${escapeHtmlText(displayName)}`
+      );
+    }
+    const formedLabel = identity.formedLabel?.trim() ?? "";
+    if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
+    return lines;
+  }
+  function formatUnitOriginTooltipHtml(input) {
+    const rows = [];
+    const placeLabel = originPlaceLabelFor(input.origin);
+    if (input.bonuses.originEnabled && placeLabel.length > 0) {
+      rows.push(
+        bonusRow(
+          "Origin",
+          `${originFlagImgHtml({
+            subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+            countryCode: input.origin.birthCountryCode
+          })}${escapeHtmlText(placeLabel)}`
+        )
+      );
+    }
+    const terrainKind = input.origin.birthTerrainKind?.trim() ?? "";
+    if (input.bonuses.terrainEnabled && terrainKind.length > 0) {
+      rows.push(bonusRow("Terrain", formatTerrainKindHtml(terrainKind)));
+    }
+    if (input.bonuses.weatherEnabled) {
+      const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
+      if (tags.length > 0) rows.push(bonusRow("Weather", tags.map((tag) => formatWeatherIconHtml(tag)).join(", ")));
+    }
+    if (input.bonuses.techEnabled && (input.bonuses.techLevel === "basic" || input.bonuses.techLevel === "advanced")) {
+      rows.push(bonusRow("Tech", formatTechTierHtml(input.bonuses.techLevel)));
+    }
+    const body = rows.length > 0 ? rows.join("\n") : "None";
+    const bonuses = `<strong>Bonuses:</strong>
+${body}`;
+    const head = identityLines(input.origin, input.identity);
+    if (head.length === 0) return bonuses;
+    return `${head.join("\n")}
+
+${bonuses}`;
+  }
+
+  // src/renderer/core/unitOriginFlags.ts
+  var unitOriginById = /* @__PURE__ */ new Map();
+  var formedTurnById = /* @__PURE__ */ new Map();
+  var weatherTagsByBirthHex = /* @__PURE__ */ new Map();
+  var techLevelByBirthHex = /* @__PURE__ */ new Map();
+  function rememberUnitOrigins(units) {
+    for (const unit of units) {
+      if (unit.origin) unitOriginById.set(unit.id, unit.origin);
+      if (typeof unit.formedTurn === "number") formedTurnById.set(unit.id, unit.formedTurn);
+      if (unit.origin?.birthH3Index && unit.weatherTags) {
+        weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
+      }
+      if (unit.origin?.birthH3Index && unit.techLevel) {
+        techLevelByBirthHex.set(unit.origin.birthH3Index, unit.techLevel);
+      }
+    }
+  }
+  function clearRememberedUnitOrigins() {
+    unitOriginById.clear();
+    formedTurnById.clear();
+    weatherTagsByBirthHex.clear();
+    techLevelByBirthHex.clear();
+  }
+  function resolveUnitOrigin(unitId) {
+    const direct = unitOriginById.get(unitId);
+    if (direct) return direct;
+    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
+    return parentUnitId ? unitOriginById.get(parentUnitId) ?? null : null;
+  }
+  function formedLabelFor(unitId) {
+    const formedTurn = formationTurnForUnit(unitId, formedTurnById);
+    const state = rendererSharedState.gameState;
+    if (formedTurn == null || !state) return null;
+    return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? "global"));
+  }
+  function tooltipIdentityFor(unitId) {
+    return {
+      displayName: rendererSharedState.unitDisplayNameById.get(unitId) ?? "",
+      formedLabel: formedLabelFor(unitId)
+    };
+  }
+  function selectedBonusOptions() {
+    const state = rendererSharedState.gameState;
+    return {
+      originEnabled: state?.originBonusEnabled === true,
+      terrainEnabled: state?.terrainBonusEnabled === true,
+      weatherEnabled: state?.weatherBonusEnabled === true,
+      techEnabled: state?.techBonusEnabled === true
+    };
+  }
+  function bonusesForLiveUnit(unitId, origin) {
+    const options = selectedBonusOptions();
+    return {
+      ...options,
+      weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : void 0,
+      techLevel: techLevelFor(unitId, origin)
+    };
+  }
+  function bonusesForAbsentUnit(origin) {
+    const options = selectedBonusOptions();
+    return {
+      ...options,
+      weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : void 0,
+      techLevel: techLevelByBirthHex.get(origin.birthH3Index)
+    };
+  }
+  function techLevelFor(unitId, origin) {
+    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+    if (battleUnit?.techLevel) return battleUnit.techLevel;
+    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
+    if (strategicUnit?.techLevel) return strategicUnit.techLevel;
+    return techLevelByBirthHex.get(origin.birthH3Index);
+  }
+  function weatherTagsFor(unitId, origin) {
+    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+    if (battleUnit?.weatherTags) return battleUnit.weatherTags;
+    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
+    if (strategicUnit?.weatherTags) return strategicUnit.weatherTags;
+    return weatherTagsByBirthHex.get(origin.birthH3Index) ?? [];
+  }
+  function createUnitOriginFlagImage(input) {
+    const img = document.createElement("img");
+    img.className = COUNTRY_FLAG_CLASS_NAME;
+    img.src = originFlagAssetPath({
+      subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+      countryCode: input.origin.birthCountryCode
+    });
+    img.alt = "";
+    img.setAttribute("aria-hidden", "true");
+    img.draggable = false;
+    img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml({
+      origin: input.origin,
+      bonuses: input.bonuses,
+      ...input.identity ? { identity: input.identity } : {}
+    });
+    return img;
+  }
+  function createAbsentUnitOriginFlagImage(flag, displayName) {
+    return createUnitOriginFlagImage({
+      origin: flag.origin,
+      bonuses: bonusesForAbsentUnit(flag.origin),
+      identity: { displayName, formedLabel: flag.formedLabel }
+    });
+  }
+  function formatLiveUnitOriginTooltipHtml(unitId) {
+    const origin = resolveUnitOrigin(unitId);
+    if (!origin) return null;
+    return formatUnitOriginTooltipHtml({
+      origin,
+      bonuses: bonusesForLiveUnit(unitId, origin),
+      identity: tooltipIdentityFor(unitId)
+    });
+  }
+  function setUnitNameContent(target, unitId, text) {
+    target.replaceChildren();
+    const origin = resolveUnitOrigin(unitId);
+    if (origin) {
+      target.appendChild(createUnitOriginFlagImage({
+        origin,
+        bonuses: bonusesForLiveUnit(unitId, origin),
+        identity: tooltipIdentityFor(unitId)
+      }));
+    }
+    target.appendChild(document.createTextNode(text));
+  }
+  function buildUnitOriginByLossDisplayName(summary) {
+    const rows = Object.entries(summary.byOwner).flatMap(
+      ([ownerId, player]) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]).map((victim) => {
+        const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
+        const value = origin && victim.unitId ? { origin, formedLabel: formedLabelFor(victim.unitId) } : null;
+        return { ownerId, name: victim.displayName, value };
+      })
+    );
+    return indexLossFlagsByOwner(
+      rows,
+      (left, right) => unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel
+    );
+  }
+
+  // src/renderer/openRouter/mapToastBody.ts
+  var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
+  function appendMapToastBulletLine(target, line, indent, context) {
+    const bulleted = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
+    const span = document.createElement("span");
+    span.style.display = "block";
+    if (indent) span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+    const ownerFlags = context.ownerId == null ? void 0 : context.unitOriginByDisplayName?.get(context.ownerId);
+    const segments = splitLossCauseLineForUnitFlags(bulleted, new Set(ownerFlags == null ? [] : ownerFlags.keys()));
+    const onlyPlain = segments.length === 1 && segments[0]?.unitDisplayName == null && segments[0]?.group == null;
+    if (onlyPlain) appendPlainBullet(span, line, bulleted, context.seats);
+    else {
+      for (const segment of segments) appendCauseSegment(span, segment, context.ownerId, ownerFlags, context.seats);
+    }
+    target.appendChild(span);
+  }
+  function appendPlainBullet(span, rawLine, bulleted, seats) {
+    const mark = sideNameMarksForLine(rawLine, seats)[0];
+    const flag = mark ? createSideNumberFlag(mark.seatId, seats) : null;
+    if (!mark || !flag) {
+      span.textContent = bulleted;
+      return;
+    }
+    const start = mark.start + (rawLine.startsWith("\u2022 ") ? 0 : 2);
+    span.append(
+      document.createTextNode(bulleted.slice(0, start)),
+      flag,
+      document.createTextNode(bulleted.slice(start))
+    );
+  }
+  function appendCauseSegment(span, segment, ownerId, ownerFlags, seats) {
+    if (segment.unitDisplayName && ownerFlags) {
+      const flag = ownerFlags.get(segment.unitDisplayName);
+      if (flag) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
+    }
+    if (segment.group && ownerId != null) {
+      span.appendChild(createLossTypeToken(segment.group.unitType, ownerId, seats));
+    }
+    span.appendChild(document.createTextNode(segment.text));
+  }
+  function appendMapToastSectionHeader(target, title, leading) {
+    const strong = document.createElement("strong");
+    strong.style.display = "block";
+    const label = title.endsWith(":") ? title : `${title}:`;
+    if (leading) strong.append(leading, document.createTextNode(label));
+    else strong.textContent = label;
+    target.appendChild(strong);
+  }
+  function appendMapToastMessageBody(target, message, options) {
+    const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    const seats = options?.seats ?? [];
+    const viewerSeatId2 = options?.viewerSeatId ?? null;
+    let ownerId = null;
+    let inSection = false;
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        inSection = true;
+        if (target.childNodes.length > 0) target.appendChild(document.createElement("br"));
+        const title = line.slice(3);
+        ownerId = lossSectionOwnerId(title, viewerSeatId2, seats);
+        const mark = sideNameMarksForLine(title, seats)[0];
+        const flag = mark ? createSideNumberFlag(mark.seatId, seats) : null;
+        appendMapToastSectionHeader(target, title, flag != null && mark != null && mark.start === 0 ? flag : void 0);
+        continue;
+      }
+      appendMapToastBulletLine(target, line, inSection, {
+        ownerId,
+        unitOriginByDisplayName: options?.unitOriginByDisplayName,
+        seats
+      });
+    }
+  }
+
+  // src/shared/commanderMessageTabs.ts
+  function initialCommanderMessageTabs(seats) {
+    const tabs = seats.map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      enabled: false,
+      message: null,
+      strategy: null
+    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
+    return { tabs, selectedSeatId: null };
+  }
+  function applyCommanderMessage(state, arrival) {
+    const message = proseOrNull(arrival.message);
+    const strategy = proseOrNull(arrival.strategy);
+    if (!message && !strategy) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
+    if (index < 0) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
+    );
+    return { tabs, selectedSeatId: arrival.seatId };
+  }
+  function commanderDispatchHasProse(message, strategy) {
+    return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
+  }
+  function proseOrNull(value) {
+    const trimmed = value?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  // src/renderer/core/matchEpoch.ts
+  var rendererMatchEpoch = 0;
+  function advanceRendererMatchEpoch() {
+    rendererMatchEpoch += 1;
+    return rendererMatchEpoch;
+  }
+  function currentRendererMatchEpoch() {
+    return rendererMatchEpoch;
+  }
+  function rendererMatchEpochCurrent(captured) {
+    return captured === rendererMatchEpoch;
+  }
+
+  // src/renderer/core/matchSnapshotClient.ts
+  function matchViewArgument() {
+    if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return void 0;
+    return rendererSharedState.viewAs;
+  }
+  function fetchMatchSnapshot() {
+    const api = window.gameApi;
+    if (!api?.getGameState) return Promise.reject(new Error("getGameState is unavailable"));
+    return api.getGameState(matchViewArgument());
+  }
+
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
+  }
+
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
+  }
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
+  }
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
+  }
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
+  }
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+
+  // src/shared/hexLlmCodeAssignment.ts
+  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  var strategicH3ToCodeSingleton = null;
+  function indexToCode(index) {
+    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
+      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
+    }
+    const hi = Math.floor(index / CODE_ALPHABET.length);
+    const lo = index % CODE_ALPHABET.length;
+    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
+  }
+  function sortCellsForStableLlmCodes(cells) {
+    const decorated = cells.map((h3) => {
+      const [lat, lng] = cellToLatLng(h3);
+      return { h3, lat, lng };
+    });
+    decorated.sort((a, b) => {
+      if (a.lat !== b.lat) return b.lat - a.lat;
+      if (a.lng !== b.lng) return a.lng - b.lng;
+      return a.h3.localeCompare(b.h3);
+    });
+    return decorated.map((d) => d.h3);
+  }
+  function buildStrategicH3ToCodeMap() {
+    const footprint2 = loadedStrategicFootprint();
+    const strategicSet = new Set(footprint2 ?? []);
+    if (!footprint2) {
+      const res0 = getRes0Cells();
+      for (const r0 of res0) {
+        for (const child of cellToChildren(r0, strategicH3Resolution())) {
+          strategicSet.add(child);
+        }
+      }
+    }
+    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
+    const h3ToCode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < sorted.length; i++) {
+      h3ToCode.set(sorted[i], indexToCode(i));
+    }
+    return h3ToCode;
+  }
+  function getStrategicH3ToCodeMap() {
+    if (!strategicH3ToCodeSingleton) {
+      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
+    }
+    return strategicH3ToCodeSingleton;
+  }
+  function resetStrategicHexCodeCache() {
+    strategicH3ToCodeSingleton = null;
+  }
+  registerActiveGameMapReset(resetStrategicHexCodeCache);
+  function getStrategicHexCode(h3Index) {
+    return getStrategicH3ToCodeMap().get(h3Index);
+  }
+  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
+    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
+    const idx = children.indexOf(childTacticalH3Index);
+    if (idx < 0) return void 0;
+    return indexToCode(idx);
+  }
+  function getLlmHexLocationParenLabelForNamingTarget(target) {
+    if (target.resolution === 1) {
+      const c = getStrategicHexCode(target.h3Index);
+      return c ? `(${c})` : null;
+    }
+    const parent = strategicParentOf(target.h3Index);
+    const parentCode = getStrategicHexCode(parent);
+    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
+    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+  }
+
+  // src/shared/tacticalBattleFootprint.ts
+  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
+  var footprintByKey = /* @__PURE__ */ new Map();
+  function resetTacticalBattleFootprintCache() {
+    footprintByKey.clear();
+  }
+  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
+  function frozenCodeMap(entries) {
+    const map = new Map(entries);
+    const reject = () => {
+      throw new TypeError("tactical battle footprint code map is frozen");
+    };
+    map.set = reject;
+    map.delete = reject;
+    map.clear = reject;
+    return map;
+  }
+  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
+    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
+    const coreSet = new Set(coreChildH3Indexes);
+    const cells = new Set(coreChildH3Indexes);
+    for (const cell of coreChildH3Indexes) {
+      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
+        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
+      }
+    }
+    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
+    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
+    return { coreChildH3Indexes, h3Indexes, codeByH3 };
+  }
+  function tacticalBattleFootprint(enclosingStrategicH3Index) {
+    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
+    const cached = footprintByKey.get(key);
+    if (cached) return cached;
+    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
+    footprintByKey.set(key, built);
+    return built;
+  }
+  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
+    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
+  }
+  function tacticalBattleTerrainKindByCell(args) {
+    const kinds = {};
+    for (const cell of args.cells) {
+      const tacticalKind = args.tacticalKindByH3.get(cell);
+      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
+        kinds[cell] = tacticalKind;
+        continue;
+      }
+      let parentKind;
+      try {
+        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
+      } catch {
+        parentKind = void 0;
+      }
+      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
+    }
+    return kinds;
   }
 
   // src/shared/hexNamingCaption.ts
@@ -21731,28 +22331,6 @@ ${bonuses}`;
     return DOCTRINE_CHOICE_LABELS[choice];
   }
 
-  // src/shared/seatPalette.ts
-  var SEAT_PALETTES = [
-    { map: "#115E59", forceBar: "#1B8A82", text: "#7DCEC8" },
-    { map: "#9D174D", forceBar: "#B02A62", text: "#F0B4C8" },
-    { map: "#C2410C", forceBar: "#EA580C", text: "#FDBA74" },
-    { map: "#2563EB", forceBar: "#3B82F6", text: "#A9C1F5" }
-  ];
-  var NEUTRAL_PALETTE = {
-    map: "#141414",
-    heldHexOutline: "#1F1F1F",
-    forceBar: "#9CA3AF",
-    text: "#D9D9D9"
-  };
-  function paletteForOwner(ownerId, seats) {
-    if (ownerId == null) return null;
-    if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;
-    const seat = seats.find((row) => row.seatId === ownerId);
-    if (!seat) return null;
-    const palette = SEAT_PALETTES[seat.seatOrder - 1];
-    return palette ?? null;
-  }
-
   // src/shared/newGameSides.ts
   function initialSidesState(args) {
     const requested = args.rowCount ?? MIN_SEATS;
@@ -22561,16 +23139,19 @@ ${bonuses}`;
     const wrap = document.createElement("div");
     const line = document.createElement("div");
     line.className = "console-report-sender";
-    const dot = document.createElement("span");
-    dot.className = "console-report-dot";
     const seats = rendererSharedState.gameState?.seats ?? [];
     const seat = seats.find((row) => row.seatId === meta.senderSeatId);
-    dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
+    const flag = meta.senderSeatId ? createSideNumberFlag(meta.senderSeatId, seats) : null;
+    const mark = flag ?? document.createElement("span");
+    if (!flag) {
+      mark.className = "console-report-dot";
+      mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
+    }
     const name = document.createElement("span");
     const message = meta.messageText?.trim() ?? "";
     const home = seat?.homeRegion ?? "Commander";
     name.textContent = message.length > 0 ? `${home} "${message}"` : home;
-    line.append(dot, name);
+    line.append(mark, name);
     wrap.append(line);
     const strategyText = meta.strategyText?.trim() ?? "";
     if (strategyText.length > 0) {
@@ -22806,46 +23387,6 @@ ${bonuses}`;
     const el = document.getElementById("openrouter-log");
     if (el) el.textContent = "";
   }
-  var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
-  function appendMapToastBulletLine(target, line, indent, unitOriginByDisplayName) {
-    const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
-    const span = document.createElement("span");
-    span.style.display = "block";
-    if (indent) {
-      span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
-    }
-    if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
-      for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
-        const flag = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
-        if (flag && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
-        span.appendChild(document.createTextNode(segment.text));
-      }
-    } else {
-      span.textContent = text;
-    }
-    target.appendChild(span);
-  }
-  function appendMapToastSectionHeader(target, title) {
-    const strong = document.createElement("strong");
-    strong.style.display = "block";
-    strong.textContent = title.endsWith(":") ? title : `${title}:`;
-    target.appendChild(strong);
-  }
-  function appendMapToastMessageBody(target, message, unitOriginByDisplayName) {
-    const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-    let inSection = false;
-    for (const line of lines) {
-      if (line.startsWith("## ")) {
-        inSection = true;
-        if (target.childNodes.length > 0) {
-          target.appendChild(document.createElement("br"));
-        }
-        appendMapToastSectionHeader(target, line.slice(3));
-        continue;
-      }
-      appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
-    }
-  }
   function showToast2(el, textEl, textContentBuilder, isInfo) {
     textEl.textContent = "";
     textContentBuilder(textEl);
@@ -22864,7 +23405,7 @@ ${bonuses}`;
         el,
         textEl,
         (target) => {
-          appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
+          appendMapToastMessageBody(target, message, options);
         },
         options?.isError === false
       );
@@ -22896,10 +23437,22 @@ ${bonuses}`;
       showToast2(el, textEl, build, true);
       if (fileReport) recordConsoleReport("message", currentConsoleReportTag(), textEl);
     }
+    scheduleAiStrategyToastHide();
+  }
+  function scheduleAiStrategyToastHide() {
+    if (rendererSharedState.aiStrategyToastHideTimer !== null) {
+      clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
+      rendererSharedState.aiStrategyToastHideTimer = null;
+    }
     rendererSharedState.aiStrategyToastHideTimer = setTimeout(() => {
       rendererSharedState.aiStrategyToastHideTimer = null;
       hideAiStrategyToast();
     }, TOAST_DURATION_MS);
+  }
+  function restartAiStrategyToastTimer() {
+    const el = document.getElementById("ai-strategy-toast");
+    if (!(el instanceof HTMLElement) || el.classList.contains("hidden")) return;
+    scheduleAiStrategyToastHide();
   }
   var onStrategyToastHidden = null;
   function setAiStrategyToastHiddenListener(listener) {
@@ -26282,19 +26835,6 @@ ${bonuses}`;
     }
   }
 
-  // src/renderer/rendering/ownerColors.ts
-  function paletteSeats() {
-    return rendererSharedState.gameState?.seats ?? [];
-  }
-  function paletteForCurrentOwner(ownerId) {
-    if (ownerId == null || ownerId === "") return null;
-    const seats = paletteSeats();
-    const palette = paletteForOwner(ownerId, seats);
-    if (palette) return palette;
-    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
-    return null;
-  }
-
   // src/renderer/rendering/homeRegionBorderDrawing.ts
   function resolveControllerBorderColor(controllerPlayerId) {
     if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
@@ -28532,280 +29072,6 @@ ${bonuses}`;
     return chips;
   }
 
-  // src/renderer/rendering/unitDrawing.ts
-  var TOKEN_ICON_FIT_RATIO = 0.9;
-  var UNIT_ICON_FILE_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'infantry.svg').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "infantry.svg",
-    /**
-       * Documents the object literal property `armor` (armor: 'armor.svg').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "armor.svg",
-    /**
-       * Documents the object literal property `naval` (naval: 'naval.svg').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "naval.svg",
-    /**
-       * Documents the object literal property `air` (air: 'air.svg').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "air.svg",
-    /**
-       * Documents the object literal property `mixed` (mixed: 'mixed.svg').
-    
-       * Purpose: Supports maintainability by documenting why `mixed` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    mixed: "mixed.svg"
-  };
-  var unitIconCache = /* @__PURE__ */ new Map();
-  function iconPathForType(unitType) {
-    return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
-  }
-  function unitIconPathForUnitType(unitType) {
-    const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
-    return iconPathForType(known ? unitType : "mixed");
-  }
-  function getOrStartUnitIconLoad(unitType) {
-    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-    };
-    img.onerror = () => {
-      unitIconCache.set(unitType, null);
-    };
-    img.src = iconPathForType(unitType);
-    unitIconCache.set(unitType, img);
-    return img;
-  }
-  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
-    const img = getOrStartUnitIconLoad(unitType);
-    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
-    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
-    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
-    const width = img.naturalWidth * iconScale;
-    const height = img.naturalHeight * iconScale;
-    const drawX = centerX - width / 2;
-    const drawY = centerY - height / 2;
-    const shouldFlip = flipForOpponent && unitPlayer != null && unitPlayer !== "" && unitPlayer !== HUMAN_SEAT_ID;
-    const neutralGlyph = unitPlayer != null && isNeutralOwnerId(unitPlayer);
-    ctx.save();
-    if (neutralGlyph) ctx.filter = "brightness(0.85)";
-    if (shouldFlip) {
-      ctx.translate(centerX, centerY);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, -width / 2, -height / 2, width, height);
-    } else {
-      ctx.drawImage(img, drawX, drawY, width, height);
-    }
-    ctx.restore();
-    return true;
-  }
-  function drawUnitTypeGlyph(ctx, centerX, centerY, unitType, sizePx, player) {
-    if (unitType !== "infantry" && unitType !== "armor" && unitType !== "naval" && unitType !== "air") return false;
-    const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
-    return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
-  }
-  function drawSelectionRing(ctx, x, y) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
-    ctx.strokeStyle = SELECTION_RING_COLOR;
-    ctx.lineWidth = SELECTION_RING_WIDTH;
-    ctx.stroke();
-    ctx.restore();
-  }
-  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
-    const stackedNeutral = color === MULTI_PLAYER_FILL;
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    if (strokeColor === SELECTION_RING_COLOR) {
-      drawSelectionRing(ctx, x, y);
-    } else {
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    ctx.save();
-    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
-    ctx.fillStyle = color === NEUTRAL_PALETTE.map ? NEUTRAL_PALETTE.text : "#fff";
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
-    if (!drewIcon) ctx.fillText(label, x, y);
-    ctx.restore();
-  }
-  function drawUnits(ctx, units, movingUnitIds) {
-    const byHex = /* @__PURE__ */ new Map();
-    for (const u of units) {
-      if (movingUnitIds?.has(u.id)) continue;
-      const list = byHex.get(u.h3Index) ?? [];
-      list.push(u);
-      byHex.set(u.h3Index, list);
-    }
-    const selectedUnitIds = new Set(rendererSharedState.selectedUnitIds);
-    const tokens = [...byHex].map(([h3Index, hexUnits]) => {
-      const { x, y } = hexCenterPx(h3Index);
-      const count = hexUnits.length;
-      return {
-        x,
-        y,
-        count,
-        top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
-        selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
-        units: hexUnits
-      };
-    });
-    for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
-      const types = new Set(hexUnits.map((u) => u.unitType));
-      const players = new Set(hexUnits.map((u) => u.player));
-      const mixedType = types.size > 1;
-      const multiPlayer = players.size > 1;
-      const ownerId = hexUnits[0].player;
-      const neutralOnly = !multiPlayer && isNeutralOwnerId(ownerId);
-      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId)?.map ?? "#333";
-      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : neutralOnly ? NEUTRAL_PALETTE.text : "#fff";
-      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
-      const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
-      drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
-      if (count > 1) {
-        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0].player);
-      }
-    }
-    for (const { x, y, count } of tokens) {
-      if (count < 2) continue;
-      const badgeX = x + COUNT_BADGE_OFFSET;
-      const badgeY = y - COUNT_BADGE_OFFSET;
-      ctx.font = "bold 13px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
-      ctx.strokeText(String(count), badgeX, badgeY);
-      ctx.fillStyle = "#000";
-      ctx.fillText(String(count), badgeX, badgeY);
-    }
-  }
-  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
-    const viewer = staleIntelViewer(state.playerPerspective);
-    if (viewer === null) {
-      rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-      return;
-    }
-    const hasFogData = Array.isArray(state.visibleHexes);
-    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== viewer);
-    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
-    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
-      if (currentlyVisibleEnemyIds.has(unitId)) continue;
-      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
-        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
-        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
-          unitId,
-          lastKnownH3Index: prevSeen.h3Index,
-          lastSeenTurn,
-          staleUntilTurn: lastSeenTurn + 2
-        });
-      }
-    }
-    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-    for (const enemy of currentlyVisibleEnemies) {
-      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
-        h3Index: enemy.h3Index,
-        lastSeenTurn: state.turnNumber
-      });
-    }
-    if (shouldHideStrategicMapUnitsForZoom()) return;
-    if (!hasFogData) return;
-    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
-    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
-      unitId: row.unitId,
-      lastKnownH3Index: row.lastKnownH3Index,
-      intelState: "stale",
-      lastSeenTurn: row.lastSeenTurn,
-      staleUntilTurn: row.staleUntilTurn
-    }));
-    const byUnitId = /* @__PURE__ */ new Map();
-    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
-    for (const row of persistedIntel) {
-      if (row.intelState !== "stale") continue;
-      byUnitId.set(row.unitId, {
-        unitId: row.unitId,
-        lastKnownH3Index: row.lastKnownH3Index,
-        intelState: "stale",
-        lastSeenTurn: row.lastSeenTurn,
-        staleUntilTurn: row.staleUntilTurn
-      });
-    }
-    const intel = Array.from(byUnitId.values());
-    if (intel.length === 0) return;
-    const visibleHexes = new Set(state.visibleHexes);
-    const stale = intel.filter((row) => row.intelState === "stale");
-    if (stale.length === 0) return;
-    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
-    const staleByHex = /* @__PURE__ */ new Map();
-    for (const row of stale) {
-      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
-      if (visibleHexes.has(row.lastKnownH3Index)) continue;
-      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
-      list.push(row);
-      staleByHex.set(row.lastKnownH3Index, list);
-    }
-    for (const [h3Index, rows] of staleByHex) {
-      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
-      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
-      if (alpha <= 0) continue;
-      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
-      const label = types.size === 1 ? [...types][0] : "*";
-      const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
-      const ownerId = owners.size === 1 ? [...owners][0] : null;
-      const mixedOwners = owners.size > 1;
-      const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
-      const strokeColor = !mixedOwners && ownerId != null && isNeutralOwnerId(ownerId) ? NEUTRAL_PALETTE.text : "#fff";
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, ownerId ?? AI_SEAT_IDS[0]);
-      ctx.restore();
-    }
-  }
-  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
-    if (hexes.length === 0 || opacity <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    for (const h3Index of hexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
-    }
-    ctx.restore();
-  }
-
   // src/shared/mapOrderGestureGate.ts
   function resolutionPlaybackBlocksMapOrders(animation) {
     return animation != null;
@@ -29427,11 +29693,12 @@ ${bonuses}`;
   function paintMiniToken(ctx, centerX, centerY, segment) {
     const player = segment.player ?? "";
     const palette = paletteForCurrentOwner(player);
+    const colors = palette ? miniTokenColors(palette) : null;
     ctx.beginPath();
     ctx.arc(centerX, centerY, CHIP_LAYOUT.tokenRadius, 0, Math.PI * 2);
-    ctx.fillStyle = palette?.map ?? "#333";
+    ctx.fillStyle = colors?.fill ?? "#333";
     ctx.fill();
-    ctx.strokeStyle = palette?.text ?? CHIP_COLORS.border;
+    ctx.strokeStyle = colors?.ring ?? CHIP_COLORS.border;
     ctx.lineWidth = 1;
     ctx.stroke();
     const unitType = segment.unitType ?? "";
@@ -34661,80 +34928,6 @@ ${bonuses}`;
     return unknownContinentNames;
   }
 
-  // src/shared/turnReportLines.ts
-  function buildTurnReportLines(input) {
-    return [...hexLines(input), ...input.otherLines];
-  }
-  function ownerName(ownerId, seats) {
-    if (isNeutralOwnerId(ownerId)) return "Neutral";
-    const seat = seats.find((row) => row.seatId === ownerId);
-    return seat ? shortSideName(seat.homeRegion) : ownerId;
-  }
-  function compareOwners(left, right, seats) {
-    const rank = (ownerId) => {
-      if (isNeutralOwnerId(ownerId)) return 1e4;
-      return seats.find((row) => row.seatId === ownerId)?.seatOrder ?? 9e3;
-    };
-    return rank(left) - rank(right) || left.localeCompare(right);
-  }
-  function hexLines(input) {
-    const viewer = input.viewerSeatId;
-    if (viewer === null) return [];
-    const taken = /* @__PURE__ */ new Map();
-    const lost = /* @__PURE__ */ new Map();
-    for (const row of input.transitions) {
-      if (row.to === viewer && row.from !== null && row.from !== viewer) taken.set(row.from, (taken.get(row.from) ?? 0) + 1);
-      if (row.from === viewer && row.to !== null && row.to !== viewer) lost.set(row.to, (lost.get(row.to) ?? 0) + 1);
-    }
-    const lines = [];
-    for (const ownerId of [...taken.keys()].sort((left, right) => compareOwners(left, right, input.seats))) {
-      const count = taken.get(ownerId) ?? 0;
-      const hexWord = count === 1 ? "hex" : "hexes";
-      lines.push(`You took ${count} ${hexWord} from ${ownerName(ownerId, input.seats)}.`);
-    }
-    for (const ownerId of [...lost.keys()].sort((left, right) => compareOwners(left, right, input.seats))) {
-      const count = lost.get(ownerId) ?? 0;
-      lines.push(`${ownerName(ownerId, input.seats)} took ${count} of your hexes.`);
-    }
-    return lines;
-  }
-
-  // src/shared/turnLossSections.ts
-  var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats) {
-    const lines = [];
-    if (viewerSeatId2 !== null) lines.push(...sectionLines(summary, viewerSeatId2, "Your Losses"));
-    const others = Object.keys(summary.byOwner).filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID).sort((left, right) => compareOwners2(left, right, seats));
-    for (const ownerId of others) {
-      const seat = seats.find((row) => row.seatId === ownerId);
-      lines.push(...sectionLines(summary, ownerId, lossSectionTitle(seat, ownerId)));
-    }
-    lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, "Neutral Losses"));
-    return lines;
-  }
-  function lossSectionTitle(seat, ownerId) {
-    const name = seat?.homeRegion.trim() ?? "";
-    return `${name.length > 0 ? name : ownerId} Losses`;
-  }
-  function sectionLines(summary, ownerId, header) {
-    const buckets = summary.byOwner[ownerId];
-    if (!buckets) return [];
-    const causes = formatPlayerLossLinesMultiline(buckets);
-    if (causes.length === 0) return [];
-    return [
-      `${SECTION_HEADER_PREFIX}${header}`,
-      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`)
-    ];
-  }
-  function compareOwners2(left, right, seats) {
-    const leftSeat = seats.find((row) => row.seatId === left);
-    const rightSeat = seats.find((row) => row.seatId === right);
-    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
-    if (leftSeat) return -1;
-    if (rightSeat) return 1;
-    return left.localeCompare(right, "en");
-  }
-
   // src/shared/consolidatedTurnUpdateToast.ts
   var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
   var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
@@ -34787,11 +34980,9 @@ ${bonuses}`;
       turnReport?.viewerSeatId ?? null,
       turnReport?.seats ?? []
     );
-    sections.push(...reportLines);
     sections.push(...lossSections);
-    const hasLossSections = reportLines.length > 0 || lossSections.length > 0;
-    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
-    if (!hasLossSections && otherLines.length === 0) {
+    let otherLines = [...reportLines, ...buildOtherTurnUpdatePrimaryLines(readyResult)];
+    if (lossSections.length === 0 && otherLines.length === 0) {
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }
     const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
@@ -34895,7 +35086,7 @@ ${bonuses}`;
     };
   }
   function buildPopupTurnLossSummary(args) {
-    const { readySlice, knownVictimIds, formatUnitName, killsByMelee, killsByAirStrike } = args;
+    const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
     const removed = readySlice.removedUnits ?? [];
     const metaMap = /* @__PURE__ */ new Map();
     for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
@@ -34913,7 +35104,7 @@ ${bonuses}`;
       resolveDisplayName: (id) => {
         const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);
         if (snap?.displayName) return snap.displayName;
-        return formatUnitName(id);
+        return formatBaseUnitName(id);
       },
       resolveUnitMeta: (id) => metaMap.get(id),
       isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
@@ -34943,7 +35134,7 @@ ${bonuses}`;
     const turnLossSummary = buildPopupTurnLossSummary({
       readySlice,
       knownVictimIds,
-      formatUnitName: killToastFormatter.formatUnitName,
+      formatBaseUnitName: killToastFormatter.formatBaseUnitName,
       ...extraKills !== void 0 ? extraKills : {}
     });
     const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
@@ -34982,7 +35173,13 @@ ${bonuses}`;
     });
     if (updateText) {
       const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-      deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: "turn", tag: reportTag } });
+      deps.showMapToast(updateText, {
+        isError: false,
+        unitOriginByDisplayName,
+        seats,
+        viewerSeatId: viewerSeatId2,
+        report: { kind: "turn", tag: reportTag }
+      });
       deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
     }
   }
@@ -35104,8 +35301,9 @@ ${bonuses}`;
     for (const row of tacticalSubUnitsForKillLabels ?? []) {
       displayNameById.set(row.id, row.displayName);
     }
+    const formatBaseUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
     const formatDisplayUnitName = (unitId) => {
-      const baseName = displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+      const baseName = formatBaseUnitName(unitId);
       const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
       if (!ownerId) return baseName;
       return formatUnitNameForViewer({
@@ -35116,7 +35314,7 @@ ${bonuses}`;
       });
     };
     const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
-    return { formatUnitName: formatDisplayUnitName, formatKillLine };
+    return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
   }
   function syncUiAfterSelectionChange2(deps, options = {}) {
     if (options.refreshHoverPreview !== false) {
@@ -36447,12 +36645,15 @@ ${bonuses}`;
       const button = document.createElement("button");
       button.type = "button";
       button.setAttribute("role", "tab");
-      button.textContent = tab.label;
+      const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
+      if (flag) button.appendChild(flag);
+      button.appendChild(document.createTextNode(tab.label));
       button.disabled = !tab.enabled;
       button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
       button.addEventListener("click", () => {
         if (!tab.enabled || !tabState) return;
         tabState = { ...tabState, selectedSeatId: tab.seatId };
+        restartAiStrategyToastTimer();
         renderCommanderMessageTabs();
       });
       list.append(button);

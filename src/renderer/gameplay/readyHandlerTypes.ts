@@ -169,7 +169,11 @@ buildKillToastFormatterBundle: (
     removedUnits?: RemovedUnitSnapshot[],
     tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
     killLabelUnits?: readonly { id: string; unitType: string; displayOrder?: number }[]
-  ) => { formatKillLine: (entry: KillEdge) => string; formatUnitName: (unitId: string) => string };
+  ) => {
+    formatKillLine: (entry: KillEdge) => string;
+    formatUnitName: (unitId: string) => string;
+    formatBaseUnitName: (unitId: string) => string;
+  };
     /**
    * Specifies the contract for the `formatUnknownBattleAnnouncement` member (formatUnknownBattleAnnouncement: (continentNames: string[]) => string;).
 

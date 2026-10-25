@@ -13,6 +13,7 @@ import {
   type CombatDicePlaybackPhaseKey,
 } from '../../shared/combatDiceChips';
 import type { CombatDiceInfrastructureType, CombatDiceRoll } from '../../shared/ipcTypes';
+import { miniTokenColors } from '../../shared/seatPalette';
 import { UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
 import { paletteForCurrentOwner } from './ownerColors';
 import type { ResolutionMoveAnimationState } from '../core/state';
@@ -309,7 +310,9 @@ function clampToCanvas(value: number, size: number, extent: number): number {
  *
  * Purpose: Shows who rolled with the same fill and glyph as the map token, at chip size.
  * When to use: For `token` segments.
- * Expected outcome: A filled, outlined circle with the unit glyph, or the unit's letter while the glyph loads.
+ * Expected outcome: A filled, outlined circle. Fill and ring come from `miniTokenColors` when the owner has a palette.
+ *   A missing palette keeps fill `#333` and the chip border, and does not call that helper. The glyph is the unit icon,
+ *   or the unit's letter in `#f4f6f8` while the glyph loads.
  * Exceptions: None.
  */
 function paintMiniToken(
@@ -320,11 +323,12 @@ function paintMiniToken(
 ): void {
   const player = segment.player ?? '';
   const palette = paletteForCurrentOwner(player);
+  const colors = palette ? miniTokenColors(palette) : null;
   ctx.beginPath();
   ctx.arc(centerX, centerY, CHIP_LAYOUT.tokenRadius, 0, Math.PI * 2);
-  ctx.fillStyle = palette?.map ?? '#333';
+  ctx.fillStyle = colors?.fill ?? '#333';
   ctx.fill();
-  ctx.strokeStyle = palette?.text ?? CHIP_COLORS.border;
+  ctx.strokeStyle = colors?.ring ?? CHIP_COLORS.border;
   ctx.lineWidth = 1;
   ctx.stroke();
   const unitType = segment.unitType ?? '';

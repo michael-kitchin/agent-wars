@@ -2,11 +2,21 @@
  * Shared types and formatters for consolidated per-player, per-cause loss reporting in popups and AI prompts.
  */
 
-/** Maximum victim count before switching from name lists to grouped type totals. */
+/** Maximum victim count on a prompt loss line before that line uses grouped type totals. */
 export const LOSS_ENTRY_LIST_MAX = 5;
 
 /**
- * Unit type labels for grouped loss totals when a cause line exceeds {@link LOSS_ENTRY_LIST_MAX} entries.
+ * Maximum count of one unit type that a popup loss line still names one by one.
+ *
+ * Purpose: A cause line collapses only the types that are crowded, and leaves the others named.
+ * When to use: `formatLossEntries` for the map toast. Prompt lines keep {@link LOSS_ENTRY_LIST_MAX}.
+ * Expected outcome: 3. A type with this many victims, or fewer, stays a name list.
+ * Exceptions: None.
+ */
+export const LOSS_TYPE_NAME_LIST_MAX = 3;
+
+/**
+ * Unit type labels for grouped loss totals.
  */
 const GROUP_LABEL_BY_TYPE: Record<LostUnitType, string> = {
   naval: 'Naval',
@@ -45,7 +55,7 @@ export interface LostUnit {
    * Human-readable unit label for short loss lists.
    *
    * Contract: Stable display string (ordinal/Roman name or tactical sub-unit label).
-   * When to use: When `formatLossEntries` lists individual victims (≤ threshold).
+   * When to use: When `formatLossEntries` lists individual victims of a type at or under the popup cap.
    * Expected outcome: Shown comma-separated in popup loss lines.
    * Exceptions: None.
    */
@@ -196,19 +206,43 @@ export function playerHasAnyLoss(summary: PlayerLossSummary): boolean {
 }
 
 /**
- * Formats victim entries for one cause line using list or grouped-type rules.
+ * Whether a victim type is one of the four that can collapse on a popup line.
  *
- * Purpose: Implements the ≤5 name list vs >5 grouped totals contract.
- * When to use: Inside `formatPlayerLossLinesMultiline` and `formatPlayerLossInline`.
- * Expected outcome: Comma-separated names when `units.length <= LOSS_ENTRY_LIST_MAX`; otherwise `N Naval, N Air, ...` with zero groups omitted.
+ * Purpose: An unexpected type stays a name so a loss is not dropped.
+ * When to use: `formatLossEntries` only.
+ * Expected outcome: True for naval, air, armor, and infantry.
+ * Exceptions: None.
+ */
+function isKnownLossType(unitType: string): unitType is LostUnitType {
+  return unitType === 'naval' || unitType === 'air' || unitType === 'armor' || unitType === 'infantry';
+}
+
+/**
+ * Formats victim entries for one popup cause line.
+ *
+ * Purpose: Names a type that lost three or fewer units, and collapses a type that lost more.
+ * When to use: `formatPlayerLossLinesMultiline` only. Prompt lines use `formatLossEntriesForPrompt`.
+ * Expected outcome: Named units first, in input order, then `4x Infantry` groups in naval, air, armor, infantry order.
+ *   A type outside those four stays a name. An empty list is an empty string.
  * Exceptions: None.
  */
 export function formatLossEntries(units: readonly LostUnit[]): string {
   if (units.length === 0) return '';
-  if (units.length <= LOSS_ENTRY_LIST_MAX) {
-    return units.map((u) => u.displayName).join(', ');
+  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0 };
+  for (const unit of units) {
+    if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
   }
-  return formatGroupedTypeTotals(units);
+  const parts: string[] = [];
+  for (const unit of units) {
+    if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
+      parts.push(unit.displayName);
+    }
+  }
+  for (const unitType of GROUP_ORDER) {
+    const count = counts[unitType];
+    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
+  }
+  return parts.join(', ');
 }
 
 /**
@@ -231,8 +265,8 @@ function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
 /**
  * Groups victims by type for crowded or id-less prompt lines.
  *
- * Purpose: Shared by popup overflow and prompt fallback when ids are missing.
- * When to use: `formatLossEntries` overflow and `formatLossEntriesForPrompt` fallback.
+ * Purpose: Prompt fallback when a cause line is long or a victim has no id. Popup lines do not use this.
+ * When to use: `formatLossEntriesForPrompt` when the line is long or a victim has no id.
  * Expected outcome: `N Naval, N Air, ...` with zero groups omitted.
  * Exceptions: None.
  */

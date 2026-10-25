@@ -540,6 +540,7 @@ function buildKillToastFormatterBundle(
 ): {
   formatKillLine: (kill: KillEdge) => string;
   formatUnitName: (unitId: string) => string;
+  formatBaseUnitName: (unitId: string) => string;
 } {
   return buildKillToastFormatterBundleFromModule(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits);
 }

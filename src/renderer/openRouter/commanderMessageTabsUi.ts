@@ -17,7 +17,8 @@ import {
 import type { CommanderDispatch } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
-import { appendMapToastSectionHeader, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
+import { createSideNumberFlag } from '../chrome/toastInlineMarks';
+import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
 
 /**
  * Tabs for the dialog that is open, or null after it hides.
@@ -73,9 +74,9 @@ export function showCommanderMessageTabs(dispatches: readonly CommanderDispatch[
 /**
  * Paints the tab bar and the selected panel.
  *
- * Purpose: A tab click uses this alone so the 24 second timer does not restart.
+ * Purpose: A tab click repaints the panel and restarts the 24 second timer.
  * When to use: `showFilledAiStrategyToast`, and a click on an enabled tab.
- * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Disabled tabs stay disabled.
+ * Expected outcome: A tablist and, when a tab is selected, one tabpanel. Each tab starts with that opponent's number flag. Disabled tabs stay disabled.
  * Exceptions: None. A missing host is skipped.
  */
 export function renderCommanderMessageTabs(target?: HTMLElement): void {
@@ -90,12 +91,15 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
     const button = document.createElement('button');
     button.type = 'button';
     button.setAttribute('role', 'tab');
-    button.textContent = tab.label;
+    const flag = createSideNumberFlag(tab.seatId, S.gameState?.seats ?? []);
+    if (flag) button.appendChild(flag);
+    button.appendChild(document.createTextNode(tab.label));
     button.disabled = !tab.enabled;
     button.setAttribute('aria-selected', tab.seatId === state.selectedSeatId ? 'true' : 'false');
     button.addEventListener('click', () => {
       if (!tab.enabled || !tabState) return;
       tabState = { ...tabState, selectedSeatId: tab.seatId };
+      restartAiStrategyToastTimer();
       renderCommanderMessageTabs();
     });
     list.append(button);

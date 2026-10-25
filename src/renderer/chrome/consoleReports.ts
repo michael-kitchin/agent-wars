@@ -12,6 +12,7 @@ import {
   type ConsoleReportKind,
 } from '../../shared/consoleReportLog';
 import { paletteForOwner } from '../../shared/seatPalette';
+import { createSideNumberFlag } from './toastInlineMarks';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
 
@@ -107,23 +108,26 @@ const listeners: Array<() => void> = [];
  *
  * Purpose: The row names the side and quotes the message. Strategy follows when the consult sent it.
  * When to use: `recordConsoleReport` when `messageText` is set.
- * Expected outcome: A dot, the full name, the message in quotes when it is non-empty, and a strategy line when strategy is non-empty.
+ * Expected outcome: The opponent's number flag when that sender has one, otherwise the color dot. Then the full name, the message in quotes when it is non-empty, and a strategy line when strategy is non-empty.
  * Exceptions: None.
  */
 function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
   const wrap = document.createElement('div');
   const line = document.createElement('div');
   line.className = 'console-report-sender';
-  const dot = document.createElement('span');
-  dot.className = 'console-report-dot';
   const seats = S.gameState?.seats ?? [];
   const seat = seats.find((row) => row.seatId === meta.senderSeatId);
-  dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? '#9D174D';
+  const flag = meta.senderSeatId ? createSideNumberFlag(meta.senderSeatId, seats) : null;
+  const mark = flag ?? document.createElement('span');
+  if (!flag) {
+    mark.className = 'console-report-dot';
+    mark.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? '#9D174D';
+  }
   const name = document.createElement('span');
   const message = meta.messageText?.trim() ?? '';
   const home = seat?.homeRegion ?? 'Commander';
   name.textContent = message.length > 0 ? `${home} "${message}"` : home;
-  line.append(dot, name);
+  line.append(mark, name);
   wrap.append(line);
   const strategyText = meta.strategyText?.trim() ?? '';
   if (strategyText.length > 0) {

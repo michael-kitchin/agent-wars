@@ -2,7 +2,7 @@
  * Per-side loss sections for the turn-update popup.
  *
  * Purpose: The popup names each side that lost a visible unit, with the cause labels and unit names.
- * When to use: After the hex sentences and before Updates.
+ * When to use: Before the Updates section of a turn-update toast.
  * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral.
  * Exceptions: None. This module does not import the logger.
  */
@@ -83,6 +83,33 @@ export function buildTurnLossSections(
   }
   lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, 'Neutral Losses'));
   return lines;
+}
+
+/**
+ * The owner a loss-section header names.
+ *
+ * Purpose: Origin flags and type icons need the side that lost the units, and the header is the only place the toast string says who that is.
+ * When to use: While painting a `## ` line in the turn-update toast.
+ * Expected outcome: The viewer seat for `Your Losses` (null when there is no viewer). `neutral` for `Neutral Losses`.
+ *   The matching seat id for `{name} Losses`. Null for `Updates` and every other title. Two seats with the same name: the lower `seatOrder`.
+ * Exceptions: None.
+ */
+export function lossSectionOwnerId(
+  headerTitle: string,
+  viewerSeatId: string | null,
+  seats: readonly TurnLossSectionSeat[]
+): string | null {
+  if (headerTitle === 'Your Losses') return viewerSeatId;
+  if (headerTitle === 'Neutral Losses') return NEUTRAL_OWNER_ID;
+  if (!headerTitle.endsWith(' Losses')) return null;
+  const name = headerTitle.slice(0, -' Losses'.length);
+  const matches = seats
+    .filter((seat) => {
+      const home = seat.homeRegion.trim();
+      return (home.length > 0 ? home : seat.seatId) === name;
+    })
+    .sort((left, right) => left.seatOrder - right.seatOrder);
+  return matches[0]?.seatId ?? null;
 }
 
 /**

@@ -333,7 +333,11 @@ export function buildKillToastFormatterBundle(
   removedUnits: RemovedUnitSnapshot[] | undefined,
   tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
   killLabelUnits?: readonly UnitDisplayIdentity[]
-): { formatUnitName: (unitId: string) => string; formatKillLine: (kill: KillEdge) => string } {
+): {
+  formatUnitName: (unitId: string) => string;
+  formatBaseUnitName: (unitId: string) => string;
+  formatKillLine: (kill: KillEdge) => string;
+} {
   const removedUnitsForDisplay = removedUnits ?? [];
   const rosterFromRemoved = removedUnitsForDisplay
     .filter((u) => !u.displayName)
@@ -373,8 +377,18 @@ export function buildKillToastFormatterBundle(
   for (const row of tacticalSubUnitsForKillLabels ?? []) {
     displayNameById.set(row.id, row.displayName);
   }
+  /**
+   * The unit name without a side prefix.
+   *
+   * Purpose: A loss line names the unit. Stack callouts and the selection panel keep the prefixed name.
+   * When to use: `buildPopupTurnLossSummary` when a removed unit has no `displayName`.
+   * Expected outcome: The roster or casualty name, or the id fallback. It does not call `formatUnitNameForViewer`.
+   * Exceptions: None.
+   */
+  const formatBaseUnitName = (unitId: string): string =>
+    displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   const formatDisplayUnitName = (unitId: string): string => {
-    const baseName = displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const baseName = formatBaseUnitName(unitId);
     const ownerId = rosterForDisplay.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
     if (!ownerId) return baseName;
     return formatUnitNameForViewer({
@@ -386,7 +400,7 @@ export function buildKillToastFormatterBundle(
   };
   const formatKillLine = (kill: KillEdge): string =>
     formatKillToastLine(kill, formatDisplayUnitName);
-  return { formatUnitName: formatDisplayUnitName, formatKillLine };
+  return { formatUnitName: formatDisplayUnitName, formatBaseUnitName, formatKillLine };
 }
 
 /**

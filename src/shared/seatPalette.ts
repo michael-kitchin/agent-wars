@@ -1,4 +1,3 @@
-import type { SeatSnapshot } from './seatRoster';
 import { isNeutralOwnerId } from './seatIds';
 
 /**
@@ -70,6 +69,18 @@ export const NEUTRAL_PALETTE: OwnerPalette & { readonly heldHexOutline: string }
 };
 
 /**
+ * Fill, glyph, and ring for a miniature unit token.
+ *
+ * Purpose: Dice chips and a collapsed loss group use one statement of those colors.
+ * When to use: When the owner has a palette. A missing palette keeps the caller's own fallback and does not call this.
+ * Expected outcome: `fill` is the owner's map color, `glyph` is white, and `ring` is the owner's text color.
+ * Exceptions: None.
+ */
+export function miniTokenColors(palette: OwnerPalette): { readonly fill: string; readonly glyph: string; readonly ring: string } {
+  return { fill: palette.map, glyph: '#ffffff', ring: palette.text };
+}
+
+/**
  * Palette for a unit owner or hex controller.
  *
  * Purpose: Drawing code asks for a color by owner id instead of two fixed player names.
@@ -80,7 +91,7 @@ export const NEUTRAL_PALETTE: OwnerPalette & { readonly heldHexOutline: string }
  */
 export function paletteForOwner(
   ownerId: string | null,
-  seats: readonly Pick<SeatSnapshot, 'seatId' | 'seatOrder'>[]
+  seats: readonly { readonly seatId: string; readonly seatOrder: number }[]
 ): OwnerPalette | null {
   if (ownerId == null) return null;
   if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;

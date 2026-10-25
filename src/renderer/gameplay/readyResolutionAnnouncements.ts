@@ -202,11 +202,11 @@ export function buildTacticalCommitReadyResultForToast(playback: TacticalCommitR
 function buildPopupTurnLossSummary(args: {
   readySlice: ReadyResult;
   knownVictimIds: Set<string>;
-  formatUnitName: (unitId: string) => string;
+  formatBaseUnitName: (unitId: string) => string;
   killsByMelee?: readonly { victimId: string }[];
   killsByAirStrike?: readonly { victimId: string }[];
 }): ReturnType<typeof buildTurnLossSummaryFromReadyShape> {
-  const { readySlice, knownVictimIds, formatUnitName, killsByMelee, killsByAirStrike } = args;
+  const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
   const removed = readySlice.removedUnits ?? [];
   const metaMap = new Map<string, { player: string; unitType: string }>();
   for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
@@ -225,7 +225,7 @@ function buildPopupTurnLossSummary(args: {
       const snap =
         removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);
       if (snap?.displayName) return snap.displayName;
-      return formatUnitName(id);
+      return formatBaseUnitName(id);
     },
     resolveUnitMeta: (id) => metaMap.get(id),
     isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id),
@@ -314,7 +314,7 @@ export async function announceResolutionTurnUpdate(
   const turnLossSummary = buildPopupTurnLossSummary({
     readySlice,
     knownVictimIds,
-    formatUnitName: killToastFormatter.formatUnitName,
+    formatBaseUnitName: killToastFormatter.formatBaseUnitName,
     ...(extraKills !== undefined ? extraKills : {}),
   });
   const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
@@ -354,7 +354,13 @@ export async function announceResolutionTurnUpdate(
   });
   if (updateText) {
     const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-    deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: 'turn', tag: reportTag } });
+    deps.showMapToast(updateText, {
+      isError: false,
+      unitOriginByDisplayName,
+      seats,
+      viewerSeatId,
+      report: { kind: 'turn', tag: reportTag },
+    });
     deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
   }
 }

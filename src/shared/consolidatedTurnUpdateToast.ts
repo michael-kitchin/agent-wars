@@ -122,7 +122,7 @@ export interface ConsolidatedTurnUpdateToastArgs {
    *
    * Contract: The viewer's seat, the roster, and transitions. Omit `otherLines`; this builder appends Updates itself.
    * When to use: Strategic Ready and a tactical commit.
-   * Expected outcome: Hex sentences lead the toast. Loss sections follow. A missing report uses no viewer.
+   * Expected outcome: Loss sections come first. Hex sentences are the first Updates lines. A missing report uses no viewer.
    * Exceptions: None.
    */
   turnReport?: Omit<TurnReportInput, 'otherLines'>;
@@ -155,7 +155,7 @@ function stripLeadingBullet(line: string): string {
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
  * When to use: Strategic Ready and tactical commit paths in `readyHandler` before `showMapToast`.
  * Expected outcome: Newline-separated message with `##` section headers; `null` when all sections would be empty.
- *   A non-empty `unknownBattleLine` is the last Updates line.
+ *   Loss sections come first. Hex sentences are the first Updates lines. A non-empty `unknownBattleLine` is the last Updates line.
  * Exceptions: None.
  */
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
@@ -167,11 +167,9 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     turnReport?.viewerSeatId ?? null,
     turnReport?.seats ?? []
   );
-  sections.push(...reportLines);
   sections.push(...lossSections);
-  const hasLossSections = reportLines.length > 0 || lossSections.length > 0;
-  let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
-  if (!hasLossSections && otherLines.length === 0) {
+  let otherLines = [...reportLines, ...buildOtherTurnUpdatePrimaryLines(readyResult)];
+  if (lossSections.length === 0 && otherLines.length === 0) {
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
   const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';

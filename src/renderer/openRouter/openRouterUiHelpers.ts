@@ -1,8 +1,12 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { createAbsentUnitOriginFlagImage, type LossFlagIdentity } from '../core/unitOriginFlags';
-import { splitLossCauseLineForUnitFlags } from '../../shared/lossToastUnitSegments';
+import {
+  MAP_TOAST_SECTION_BULLET_INDENT,
+  appendMapToastMessageBody,
+  appendMapToastSectionHeader,
+  type MapToastBodyOptions,
+} from './mapToastBody';
 import {
   isDeferredResolutionConsultRunning,
   isDeferredResolutionPlaybackConsultPending,
@@ -254,8 +258,7 @@ export function clearOpenRouterLog(): void {
   if (el) el.textContent = '';
 }
 
-/** Left margin applied to sub-bullets under a `##` section header in `#map-toast`. */
-export const MAP_TOAST_SECTION_BULLET_INDENT = '1.25em';
+export { MAP_TOAST_SECTION_BULLET_INDENT, appendMapToastMessageBody, appendMapToastSectionHeader };
 
 /**
  * Options for `showMapToast`.
@@ -265,7 +268,7 @@ export const MAP_TOAST_SECTION_BULLET_INDENT = '1.25em';
  * Expected outcome: Omitted fields keep the default error styling and plain-text bullets.
  * Exceptions: None.
  */
-export type MapToastOptions = {
+export type MapToastOptions = MapToastBodyOptions & {
   /**
    * Whether the toast uses error styling.
    *
@@ -275,15 +278,6 @@ export type MapToastOptions = {
    * Exceptions: None.
    */
   readonly isError?: boolean;
-  /**
-   * Birth origins keyed by victim display name, for flags in loss bullets.
-   *
-   * Contract: Optional; when present and non-empty, named victims in loss-cause bullets get their country flag.
-   * When to use: For toasts built from a turn loss summary.
-   * Expected outcome: Matching names gain a flag; all other text renders exactly as without this map.
-   * Exceptions: None.
-   */
-  readonly unitOriginByDisplayName?: ReadonlyMap<string, LossFlagIdentity>;
   /**
    * How the Reports tab files this toast.
    *
@@ -304,87 +298,6 @@ export type MapToastOptions = {
    */
   readonly skipReport?: boolean;
 };
-
-/**
- * Appends one bullet line, optionally indented and with flags before named loss victims.
- *
- * Purpose: Implements the indented sub-bullet layout under Human/AI/Other headers.
- * When to use: From `appendMapToastMessageBody` for non-header lines.
- * Expected outcome: Block-level row with left margin when `indent` is true. With a non-empty
- *   `unitOriginByDisplayName`, victim names on loss-cause lines are preceded by their flags; otherwise the row
- *   is a single text node.
- * Exceptions: None.
- */
-function appendMapToastBulletLine(
-  target: HTMLElement,
-  line: string,
-  indent: boolean,
-  unitOriginByDisplayName?: ReadonlyMap<string, LossFlagIdentity>
-): void {
-  const text = line.startsWith('•') ? line : `• ${line}`;
-  const span = document.createElement('span');
-  span.style.display = 'block';
-  if (indent) {
-    span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
-  }
-  if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
-    for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
-      const flag = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : undefined;
-      if (flag && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
-      span.appendChild(document.createTextNode(segment.text));
-    }
-  } else {
-    span.textContent = text;
-  }
-  target.appendChild(span);
-}
-
-/**
- * Appends a bold block section title with a trailing colon, matching lower-right map-toast headers.
- *
- * Purpose: Shared title styling for `#map-toast` and `#ai-strategy-toast`.
- * When to use: From `appendMapToastMessageBody` and the opponent message dialog.
- * Expected outcome: A `display:block` `<strong>` whose text ends with `:`.
- * Exceptions: None.
- */
-export function appendMapToastSectionHeader(target: HTMLElement, title: string): void {
-  const strong = document.createElement('strong');
-  strong.style.display = 'block';
-  strong.textContent = title.endsWith(':') ? title : `${title}:`;
-  target.appendChild(strong);
-}
-
-/**
- * Appends consolidated map toast body lines to a DOM parent, rendering `##` lines as bold section headers.
- *
- * Purpose: Supports per-side loss sections and the Updates section in `#map-toast`.
- * When to use: From `showMapToast` instead of plain text bulletization.
- * Expected outcome: Section headers render with a trailing colon. A blank line comes before a header when the body already has lines.
- *   When `unitOriginByDisplayName` is given, named loss victims get flags (see `appendMapToastBulletLine`).
- * Exceptions: None.
- */
-export function appendMapToastMessageBody(
-  target: HTMLElement,
-  message: string,
-  unitOriginByDisplayName?: ReadonlyMap<string, LossFlagIdentity>
-): void {
-  const lines = message
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  let inSection = false;
-  for (const line of lines) {
-    if (line.startsWith('## ')) {
-      inSection = true;
-      if (target.childNodes.length > 0) {
-        target.appendChild(document.createElement('br'));
-      }
-      appendMapToastSectionHeader(target, line.slice(3));
-      continue;
-    }
-    appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
-  }
-}
 
 /**
  * Fills one toast element and shows it.
@@ -412,7 +325,8 @@ function showToast(
  * Purpose: The single entry point for turn updates, validation messages, and other map notices.
  * When to use: Whenever the player needs a transient notice on the map.
  * Expected outcome: The toast shows `message` (see `appendMapToastMessageBody`) and hides after the standard
- *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims. An informational toast
+ *   duration. `options.unitOriginByDisplayName`, `options.seats`, and `options.viewerSeatId` add origin flags,
+ *   type icons, and opponent number flags. An informational toast
  *   (`isError: false`) is also filed on the Reports tab, as `options.report` says.
  * Exceptions: None.
  */
@@ -428,7 +342,7 @@ export function showMapToast(message: string, options?: MapToastOptions): void {
       el,
       textEl,
       (target) => {
-        appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
+        appendMapToastMessageBody(target, message, options);
       },
       options?.isError === false
     );
@@ -478,10 +392,40 @@ export function showFilledAiStrategyToast(build: (target: HTMLElement) => void, 
     showToast(el, textEl, build, true);
     if (fileReport) recordConsoleReport('message', currentConsoleReportTag(), textEl);
   }
+  scheduleAiStrategyToastHide();
+}
+
+/**
+ * Starts the strategy toast's hide timer over.
+ *
+ * Purpose: A new message and a click on an enabled tab both give the dialog another full interval.
+ * When to use: `showFilledAiStrategyToast`, and `restartAiStrategyToastTimer` when the dialog is on screen.
+ * Expected outcome: Any pending hide is cancelled. The toast hides after `TOAST_DURATION_MS`.
+ * Exceptions: None.
+ */
+function scheduleAiStrategyToastHide(): void {
+  if (S.aiStrategyToastHideTimer !== null) {
+    clearTimeout(S.aiStrategyToastHideTimer);
+    S.aiStrategyToastHideTimer = null;
+  }
   S.aiStrategyToastHideTimer = setTimeout(() => {
     S.aiStrategyToastHideTimer = null;
     hideAiStrategyToast();
   }, TOAST_DURATION_MS);
+}
+
+/**
+ * Gives the open message dialog another full interval.
+ *
+ * Purpose: Switching tabs, including back to the tab that is already selected, should not leave the remaining time.
+ * When to use: The click handler on an enabled message tab.
+ * Expected outcome: The hide timer restarts. A missing or hidden dialog is left alone. Tabs are not rebuilt and no Reports entry is filed.
+ * Exceptions: None.
+ */
+export function restartAiStrategyToastTimer(): void {
+  const el = document.getElementById('ai-strategy-toast');
+  if (!(el instanceof HTMLElement) || el.classList.contains('hidden')) return;
+  scheduleAiStrategyToastHide();
 }
 
 /**

@@ -65,8 +65,10 @@ When this guide and the running app disagree, the app wins until this file is up
 | Order-line casing | `#ffffff` at 80% | A solid outline 1.5 px wider than the line on each side, under every movement, ranged, and air-strike line and its arrowhead (`ORDER_LINE_CASING_COLOR`, `ORDER_LINE_CASING_PAD`) |
 | Combat lightning | `#F5C400` | Resolution overlay. The bolt is `resolution/lightning_bolt.svg`, with a `#8A6D00` outline. It is drawn smaller than a unit token |
 | Casualty X | `#E53935` | Removal overlay. The mark is `resolution/x_destroyed.svg`, with an `#8E1C1A` outline. It is drawn a little larger than the bolt |
-| Dice chip bg / border | `#1b2838` at 92% / `#5a7090` | Resolution dice chips, with the chrome text and muted colors for text and tags. Mini-token fill is the owner's map color and the outline is that owner's text color (`paletteForOwner` in `src/shared/seatPalette.ts`). See `src/renderer/rendering/combatDiceChipDrawing.ts` |
+| Dice chip bg / border | `#1b2838` at 92% / `#5a7090` | Resolution dice chips, with the chrome text and muted colors for text and tags. Mini-token fill is the owner's map color, the glyph is white, and the ring is that owner's text color (`miniTokenColors` in `src/shared/seatPalette.ts`). See `src/renderer/rendering/combatDiceChipDrawing.ts` |
 | Dice hit / miss | `#86efac` / `#8aa0b8` | Die faces on resolution dice chips |
+| Opponent number flag | Side map color, white digit | The size of a country flag. The digit is the opponent index, 1–4 (`aiIndexForSeatId`). Human and Neutral have none. Message tabs, opponent loss headers, hex-sentence names, and Reports message rows (`createSideNumberFlag`) |
+| Loss type token | Side map color, white glyph, text-color ring | A 12px circle before a collapsed loss group such as `4x Infantry` (`createLossTypeToken`). The glyph is mirrored for every side except the human seat, including Neutral. |
 | Mixed stack fill / stroke | `#b0b0b0` / `#222222` | Multi-player hex |
 
 **Suggested palette reference if a dark theme is added later:**

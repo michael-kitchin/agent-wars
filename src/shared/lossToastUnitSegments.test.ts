@@ -17,10 +17,23 @@ test('a loss line with two known victims marks both names and keeps the rest pla
 test('grouped totals on a loss line are not marked as names', () => {
   const segments = splitLossCauseLineForUnitFlags('\u2022 Ranged attack: 3 Infantry, 2 Armored', KNOWN);
   assert.equal(
-    segments.every((segment) => segment.unitDisplayName === null),
+    segments.every((segment) => segment.unitDisplayName === null && segment.group === undefined),
     true
   );
   assert.equal(segments.map((segment) => segment.text).join(''), '\u2022 Ranged attack: 3 Infantry, 2 Armored');
+});
+
+test('a collapsed group is marked, and a known name with that shape stays a unit', () => {
+  const line = '\u2022 Ranged attack: 1st Armor, 4x Infantry';
+  const segments = splitLossCauseLineForUnitFlags(line, new Set(['1st Armor']));
+  assert.equal(segments.map((segment) => segment.text).join(''), line);
+  assert.equal(segments[1]?.unitDisplayName, '1st Armor');
+  assert.equal(segments[1]?.group, undefined);
+  assert.deepEqual(segments[3]?.group, { unitType: 'infantry', count: 4 });
+  assert.equal(segments[3]?.unitDisplayName, null);
+  const knownGroup = splitLossCauseLineForUnitFlags(line, new Set(['1st Armor', '4x Infantry']));
+  assert.equal(knownGroup[3]?.unitDisplayName, '4x Infantry');
+  assert.equal(knownGroup[3]?.group, undefined);
 });
 
 test('a line that is not a loss cause line stays one plain segment', () => {

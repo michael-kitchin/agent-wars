@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID, type SeatId } from './seatIds';
-import { NEUTRAL_PALETTE, SEAT_PALETTES, paletteForOwner } from './seatPalette';
+import { miniTokenColors, NEUTRAL_PALETTE, SEAT_PALETTES, paletteForOwner } from './seatPalette';
 
 /**
  * Roster rows whose only job is to map an id to a seat order.
@@ -36,4 +36,12 @@ test('seat orders 1 to 4 use the seat palette and Neutral is separate', () => {
   assert.equal(NEUTRAL_PALETTE.text, '#D9D9D9');
   assert.equal(paletteForOwner(null, roster), null);
   assert.equal(paletteForOwner(AI_SEAT_IDS[3], roster), null);
+  const seat = miniTokenColors(SEAT_PALETTES[0]!);
+  assert.equal(seat.fill, SEAT_PALETTES[0]!.map);
+  assert.equal(seat.glyph, '#ffffff');
+  assert.equal(seat.ring, SEAT_PALETTES[0]!.text);
+  const neutral = miniTokenColors(NEUTRAL_PALETTE);
+  assert.equal(neutral.fill, NEUTRAL_PALETTE.map);
+  assert.equal(neutral.glyph, '#ffffff');
+  assert.equal(neutral.ring, NEUTRAL_PALETTE.text);
 });

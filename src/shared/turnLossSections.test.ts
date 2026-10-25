@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { emptyPlayerLossSummary } from './lossSummary';
 import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
-import { buildTurnLossSections } from './turnLossSections';
+import { buildTurnLossSections, lossSectionOwnerId } from './turnLossSections';
 
 const western = 'opponent';
 
@@ -61,4 +61,17 @@ test('a blank home name uses the seat id', () => {
     [{ seatId: western, seatOrder: 1, homeRegion: '   ' }]
   );
   assert.equal(lines[0], '## opponent Losses');
+});
+
+test('lossSectionOwnerId reads the header and breaks a shared name by seat order', () => {
+  const roster = [
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
+    { seatId: 'opponent2', seatOrder: 3, homeRegion: 'Eastern Turkey' },
+    { seatId: western, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+  ];
+  assert.equal(lossSectionOwnerId('Your Losses', HUMAN_SEAT_ID, roster), HUMAN_SEAT_ID);
+  assert.equal(lossSectionOwnerId('Your Losses', null, roster), null);
+  assert.equal(lossSectionOwnerId('Neutral Losses', HUMAN_SEAT_ID, roster), NEUTRAL_OWNER_ID);
+  assert.equal(lossSectionOwnerId('Eastern Turkey Losses', null, roster), western);
+  assert.equal(lossSectionOwnerId('Updates', HUMAN_SEAT_ID, roster), null);
 });
