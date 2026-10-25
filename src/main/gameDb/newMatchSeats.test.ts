@@ -125,10 +125,32 @@ test('the snapshot reports the win rule for the map', (t) => {
   const regions = largestHomeRegions(2);
   withSeatedTempGameDb('aw-victory-global-', {
     gameMapId: 'global',
+    victoryRule: 'most_city_hexes_at_turn_limit',
     turnLimit: 40,
     seats: [
       { kind: 'human', homeRegion: regions[0] },
       { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    assert.deepEqual(getGameState().victory, { rule: 'most_city_hexes_at_turn_limit', turnLimit: 40 });
+  });
+  withSeatedTempGameDb('aw-victory-global-default-', {
+    gameMapId: 'global',
+    turnLimit: 40,
+    seats: [
+      { kind: 'human', homeRegion: regions[0] },
+      { kind: 'ai', homeRegion: regions[1] },
+    ],
+  }, () => {
+    assert.deepEqual(getGameState().victory, { rule: 'last_side_standing', turnLimit: null });
+  });
+  withSeatedTempGameDb('aw-victory-regional-cities-', {
+    gameMapId: regional.id,
+    victoryRule: 'most_city_hexes_at_turn_limit',
+    turnLimit: 40,
+    seats: [
+      { kind: 'human', sideGroupId: regional.sideGroupIds[0] },
+      { kind: 'ai', sideGroupId: regional.sideGroupIds[1] },
     ],
   }, () => {
     assert.deepEqual(getGameState().victory, { rule: 'most_city_hexes_at_turn_limit', turnLimit: 40 });

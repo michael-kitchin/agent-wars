@@ -2,6 +2,7 @@ import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { commanderApiKey } from '../../shared/commanderSetupCopy';
 import { DOCTRINE_CHOICE_DESCRIPTIONS, DOCTRINE_CHOICE_LABELS } from '../../shared/doctrineDescriptions';
 import { listSelectableReasoningEfforts } from '../../shared/openRouterReasoningEffort';
+import { placeBelowAnchor } from '../../shared/popoverPlacement';
 import { DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
 import { apiKeyTooltipText, refreshModelsTooltipText } from '../chrome/controlTooltipText';
 import {
@@ -360,6 +361,7 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     reasoningRow.hidden = efforts.length === 0;
     const modelKnown = modelId.length > 0 && record != null;
     if (!modelId || (modelKnown && efforts.length === 0)) draft.reasoningEffort = null;
+    placeCommanderPopover();
   };
   model.addEventListener('change', () => {
     draft.modelId = model.value ? model.value : null;
@@ -536,9 +538,12 @@ function saveAppWideModel(modelId: string | null): void {
 function placeCommanderPopover(): void {
   if (!popover || !anchor) return;
   const rect = anchor.getBoundingClientRect();
-  popover.style.top = `${rect.bottom + 6}px`;
-  popover.style.left = `${Math.max(8, rect.left)}px`;
   const box = popover.getBoundingClientRect();
-  if (box.right > window.innerWidth - 8) popover.style.left = `${Math.max(8, window.innerWidth - box.width - 8)}px`;
-  if (box.bottom > window.innerHeight - 8) popover.style.top = `${Math.max(8, rect.top - box.height - 6)}px`;
+  const placed = placeBelowAnchor(
+    { top: rect.top, bottom: rect.bottom, left: rect.left },
+    { width: box.width, height: box.height },
+    { width: window.innerWidth, height: window.innerHeight }
+  );
+  popover.style.top = `${placed.top}px`;
+  popover.style.left = `${placed.left}px`;
 }

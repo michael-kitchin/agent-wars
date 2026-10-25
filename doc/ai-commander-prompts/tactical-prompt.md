@@ -1,6 +1,6 @@
 # Tactical prompt
 
-The tactical beat system prompt as the builders emit it. The preamble states that the battle map is the enclosing strategic hex's tactical cells plus up to three neighboring rings, and that cells beyond a regional map's edge are not part of the battle. A formatted snapshot of one consultation is in [`example-tactical-prompt.md`](example-tactical-prompt.md). The runtime capture `debug-last-tactical-prompt.txt` is not a source for this catalog. If this file disagrees with the builders, the builders win.
+The tactical beat system prompt as the builders emit it. The preamble states that the battle map is the enclosing strategic hex's tactical cells plus up to three neighboring rings, and that cells beyond a regional map's edge are not part of the battle. A formatted snapshot of one consultation is in [`example-tactical-prompt.md`](example-tactical-prompt.md). The runtime capture `debug-last-tactical-prompt-N.txt` is not a source for this catalog. N is `aiIndexForSeatId` of the seat being consulted. Opponent 1 writes `debug-last-strategic-prompt-1.txt`. If this file disagrees with the builders, the builders win.
 
 Shared rules come from [`assembly-contract.md`](assembly-contract.md). Differences from the strategic contract are stated as differences; everything not called out here follows [`strategic-prompt.md`](strategic-prompt.md) only where [`assembly-contract.md`](assembly-contract.md) marks the section as shared.
 

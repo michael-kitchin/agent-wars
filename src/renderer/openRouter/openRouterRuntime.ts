@@ -1,5 +1,4 @@
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
-import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { rendererSharedState as S } from '../core/state';
 import { startCommanderPlanningIfAllowed, stopCommanderPlanningFromScreen } from './commanderPoolClient';
 import { toolGroupTooltipText } from '../chrome/controlTooltipText';
@@ -111,15 +110,6 @@ updateOpenRouterCostLabel: () => void;
    * Exceptions: None.
    */
   showSidebarError: (message: string) => void;
-    /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
-
-   * Contract: Displays Message and Strategy sections from a finished commander consult.
-   * When to use: After a drained dispatch or a consultation push that has either field.
-   * Expected outcome: Non-empty fields become visible until timeout or dismiss.
-   * Exceptions: None.
-   */
-  showAiStrategyToast: (content: AiStrategyToastFields) => void;
     /**
    * Specifies the contract for the `requestRedraw` member (requestRedraw?: () => void;).
 

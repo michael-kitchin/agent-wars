@@ -60,7 +60,7 @@ Run and the cost readout work in both theaters. Each commander's key and model a
 
 ## Commander Popover
 
-The same key, model, reasoning, and doctrine choices, opened from a commander's card on this tab and from a side's commander button on the new-game screen.
+The same key, model, reasoning, and doctrine choices, opened from a commander's card on this tab and from a side's commander button on the new-game screen. It is 380 px wide. Its fields and the refresh button are 30 px tall. It opens under the button that opened it, and above that button when there is no room below (`placeBelowAnchor` in `src/shared/popoverPlacement.ts`).
 
 - The popover is titled "{row name} commander". The first field is the API key, a password field whose value is the key, masked. The model select uses the shared model list, including "— Select model —", and the refresh button sits on its right. Reasoning uses that model's levels and hides when the model has none. Doctrine lists Aggressive, Balanced, Cautious, and Random, with the selected choice's description from `DOCTRINE_CHOICE_DESCRIPTIONS`.
 - The button that opened it shows `formatCommanderSummary`: "No model · standing orders only", or the model name, the effort when one is set, and the doctrine. A provider prefix on the model name is left off. The summary does not show the key.
@@ -103,6 +103,7 @@ None.
 - `src/renderer/openRouter/modelDescriptionTooltip.ts`
 - `src/renderer/openRouter/aiPlanningState.ts`
 - `src/renderer/openRouter/commanderPopover.ts`
+- `src/shared/popoverPlacement.ts` (`placeBelowAnchor`)
 - `src/renderer/openRouter/commanderCardsUi.ts`
 - `src/main/openRouter/commanderKeyMemory.ts` (`readSeatApiKey`, `readCommanderKeyMemory`)
 - `src/main/openRouter/secretConfig.ts`

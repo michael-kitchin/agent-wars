@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { NEUTRAL_OWNER_ID } from './seatIds';
-import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, rankSeatsByCityHexes, victorySettingsForMapKind } from './victoryRules';
+import { countCityHexesBySeat, DEFAULT_TURN_LIMIT, rankSeatsByCityHexes, victorySettingsForRequest } from './victoryRules';
 
-test('a regional match has no turn limit and a global match uses the requested one', () => {
-  assert.deepEqual(victorySettingsForMapKind('regional', 40), { rule: 'last_side_standing', turnLimit: null });
-  assert.deepEqual(victorySettingsForMapKind('global', 40), { rule: 'most_city_hexes_at_turn_limit', turnLimit: 40 });
-  assert.deepEqual(victorySettingsForMapKind('global', 15), {
+test('an omitted rule is Deathmatch and a city-hex rule keeps a listed limit', () => {
+  assert.deepEqual(victorySettingsForRequest(undefined, 40), { rule: 'last_side_standing', turnLimit: null });
+  assert.deepEqual(victorySettingsForRequest('most_city_hexes_at_turn_limit', 40), {
+    rule: 'most_city_hexes_at_turn_limit',
+    turnLimit: 40,
+  });
+  assert.deepEqual(victorySettingsForRequest('most_city_hexes_at_turn_limit', 15), {
     rule: 'most_city_hexes_at_turn_limit',
     turnLimit: DEFAULT_TURN_LIMIT,
   });

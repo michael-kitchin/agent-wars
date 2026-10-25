@@ -28,8 +28,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Observe only: Leave this checked to watch. An AI commander plays every side, including the first.
 - Add another opponent, or Add another side: Add a side on the next free home. While the button is disabled the tip is "Up to 4 sides" or "No free side on this map".
 - Commander button: Change this side's API key, model, reasoning, and doctrine.
-- Victory rule: Regional matches end when one side remains. Global matches end at the turn limit, and the side holding the most city hexes wins.
-- Turn limit: The global match ends after this many turns. 30 is the usual length.
+- Victory rule: Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins.
+- Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
 - Origin bonus: Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.

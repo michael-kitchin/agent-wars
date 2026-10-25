@@ -339,6 +339,7 @@ function registerIpcHandlers(): void {
       gameMapId: payload?.gameMapId ?? null,
       seatCount: payload?.seats?.length ?? null,
       turnLimit: payload?.turnLimit ?? null,
+      victoryRule: payload?.victoryRule ?? null,
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
@@ -351,6 +352,7 @@ function registerIpcHandlers(): void {
       gameMapId: payload?.gameMapId,
       seats: payload?.seats,
       turnLimit: payload?.turnLimit,
+      victoryRule: payload?.victoryRule,
     });
     storeNewMatchCommanderKeys(payload?.seats, loadKey());
     if (!payload?.seats) applyAppWideCommanderToLegacySeat();

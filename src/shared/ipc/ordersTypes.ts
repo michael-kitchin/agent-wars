@@ -1,6 +1,7 @@
 import type { BonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
 import type { DoctrineChoice, SeatKind } from '../seatRoster';
+import type { VictoryRule } from '../victoryRules';
 
 export interface MovementOrder {
     /**
@@ -493,14 +494,23 @@ techBonusLevel?: BonusLevel;
    */
 gameMapId?: string;
     /**
-   * Requested length of a global match.
+   * Requested length of a city-hex match.
    *
-   * Contract: Used only for the global map. A value outside 20, 30, 40, and 50 becomes 30.
+   * Contract: Used only when `victoryRule` is `most_city_hexes_at_turn_limit`. A value outside 20, 30, 40, and 50 becomes 30.
    * When to use: The new-game dialog's turn-limit control.
-   * Expected outcome: Stored as `turn_limit`. A regional start ignores it.
+   * Expected outcome: Stored as `turn_limit`. Deathmatch ignores it.
    * Exceptions: None.
    */
 turnLimit?: number;
+    /**
+   * Requested win rule.
+   *
+   * Contract: Omitted means Deathmatch. `most_city_hexes_at_turn_limit` stores a listed turn limit.
+   * When to use: The new-game dialog's Rule control.
+   * Expected outcome: Stored as `victory_rule`.
+   * Exceptions: None.
+   */
+victoryRule?: VictoryRule;
     /**
    * One entry per side, in row order.
    *

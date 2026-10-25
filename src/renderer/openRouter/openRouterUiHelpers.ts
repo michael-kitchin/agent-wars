@@ -1,9 +1,4 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
-import {
-  buildAiStrategyToastSections,
-  hasAiStrategyToastContent,
-  type AiStrategyToastFields,
-} from '../../shared/aiStrategyToastContent';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { createAbsentUnitOriginFlagImage, type LossFlagIdentity } from '../core/unitOriginFlags';
@@ -348,7 +343,7 @@ function appendMapToastBulletLine(
  * Appends a bold block section title with a trailing colon, matching lower-right map-toast headers.
  *
  * Purpose: Shared title styling for `#map-toast` and `#ai-strategy-toast`.
- * When to use: From `appendMapToastMessageBody` and `showAiStrategyToast`.
+ * When to use: From `appendMapToastMessageBody` and the opponent message dialog.
  * Expected outcome: A `display:block` `<strong>` whose text ends with `:`.
  * Exceptions: None.
  */
@@ -362,9 +357,9 @@ export function appendMapToastSectionHeader(target: HTMLElement, title: string):
 /**
  * Appends consolidated map toast body lines to a DOM parent, rendering `##` lines as bold section headers.
  *
- * Purpose: Supports Human Losses / AI Losses / Updates section layout in `#map-toast`.
+ * Purpose: Supports per-side loss sections and the Updates section in `#map-toast`.
  * When to use: From `showMapToast` instead of plain text bulletization.
- * Expected outcome: Section headers render with a trailing colon; a blank line separates each section after the first.
+ * Expected outcome: Section headers render with a trailing colon. A blank line comes before a header when the body already has lines.
  *   When `unitOriginByDisplayName` is given, named loss victims get flags (see `appendMapToastBulletLine`).
  * Exceptions: None.
  */
@@ -378,14 +373,12 @@ export function appendMapToastMessageBody(
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   let inSection = false;
-  let isFirstSection = true;
   for (const line of lines) {
     if (line.startsWith('## ')) {
       inSection = true;
-      if (!isFirstSection) {
+      if (target.childNodes.length > 0) {
         target.appendChild(document.createElement('br'));
       }
-      isFirstSection = false;
       appendMapToastSectionHeader(target, line.slice(3));
       continue;
     }
@@ -469,9 +462,9 @@ export function hideMapToast(): void {
 /**
  * Shows the strategy toast from a builder.
  *
- * Purpose: Ready's one-consult toast and the pool's Messages toast share the timer.
- * When to use: `showAiStrategyToast` and `showCommanderMessagesToast`.
- * Expected outcome: The toast shows. `fileReport` copies it onto the Reports tab as a Message.
+ * Purpose: The opponent message dialog uses this timer.
+ * When to use: After a dispatch enables a tab.
+ * Expected outcome: The toast shows and the timer restarts. `fileReport` copies it onto the Reports tab. The dialog passes false.
  * Exceptions: None.
  */
 export function showFilledAiStrategyToast(build: (target: HTMLElement) => void, fileReport: boolean): void {
@@ -492,29 +485,25 @@ export function showFilledAiStrategyToast(build: (target: HTMLElement) => void, 
 }
 
 /**
- * Shows the AI strategy toast with Message then Strategy sections, or hides it when both are empty.
+ * Clears the message tabs when the dialog hides.
  *
- * Purpose: Surfaces one consult's message after Ready or a tactical commit.
- * When to use: After Ready, tactical commit, or a deferred consult push. Pool dispatches use `showCommanderMessagesToast`.
- * Expected outcome: Bold section titles; empty sections omitted. A shown toast is filed on the Reports tab as a Message.
+ * Purpose: The next appearance must start with every tab disabled.
+ * When to use: `bindCommanderMessageTabs`, once.
+ * Expected outcome: `hideAiStrategyToast` calls this listener after the element is hidden.
  * Exceptions: None.
  */
-export function showAiStrategyToast(content: AiStrategyToastFields): void {
-  if (!hasAiStrategyToastContent(content)) {
-    hideAiStrategyToast();
-    return;
-  }
-  showFilledAiStrategyToast((target) => {
-    const sections = buildAiStrategyToastSections(content);
-    sections.forEach((section, index) => {
-      if (index > 0) target.appendChild(document.createElement('br'));
-      appendMapToastSectionHeader(target, section.title);
-      const span = document.createElement('span');
-      span.style.display = 'block';
-      span.textContent = section.body;
-      target.appendChild(span);
-    });
-  }, true);
+let onStrategyToastHidden: (() => void) | null = null;
+
+/**
+ * Remembers the listener that drops the message tabs.
+ *
+ * Purpose: The tab module must not be imported from this file.
+ * When to use: `bindCommanderMessageTabs`.
+ * Expected outcome: The previous listener is replaced.
+ * Exceptions: None.
+ */
+export function setAiStrategyToastHiddenListener(listener: () => void): void {
+  onStrategyToastHidden = listener;
 }
 
 /**
@@ -522,7 +511,7 @@ export function showAiStrategyToast(content: AiStrategyToastFields): void {
  *
  * Purpose: An empty consult and the planning-chrome clear both start from a hidden strategy toast.
  * When to use: When the timer fires, when a consult has nothing to show, and from `hidePlanningChromeToasts`.
- * Expected outcome: `#ai-strategy-toast` has `hidden`. The timer id is null.
+ * Expected outcome: `#ai-strategy-toast` has `hidden`. The timer id is null. The message tabs are dropped.
  * Exceptions: None. A missing element is skipped.
  */
 export function hideAiStrategyToast(): void {
@@ -532,13 +521,14 @@ export function hideAiStrategyToast(): void {
   }
   const el = document.getElementById('ai-strategy-toast');
   if (el) el.classList.add('hidden');
+  onStrategyToastHidden?.();
 }
 
 /**
  * Dismisses the map toast and the AI strategy toast together.
  *
  * Purpose: Gives planning entry points one call that clears both chrome toasts without
- * suppressing later `showMapToast` / `showAiStrategyToast` traffic.
+ * suppressing later `showMapToast` or message-dialog traffic.
  * When to use: At the start of human planning initiations (unit selection change, build
  * popup open, ranged/air targeting arm, tactical zoom-in entry).
  * Expected outcome: Both toast elements are hidden and their auto-hide timers are cleared;

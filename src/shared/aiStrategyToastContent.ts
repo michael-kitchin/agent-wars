@@ -6,7 +6,7 @@
  * Player-facing taunt/threat and plan-summary fields shown in `#ai-strategy-toast`.
  *
  * Purpose: One object for IPC, prefetch cache, and toast rendering so call sites cannot swap two strings.
- * When to use: `showAiStrategyToast` and IPC mapping helpers.
+ * When to use: The opponent message dialog and IPC mapping helpers.
  * Expected outcome: Empty/whitespace fields are omitted from rendered sections.
  * Exceptions: None.
  */
@@ -100,7 +100,7 @@ export function buildAiStrategyToastSections(fields: AiStrategyToastFields): AiS
  * Returns whether the toast has any section to display.
  *
  * Purpose: Callers show when true and hide when false (clears a stale previous toast).
- * When to use: `showAiStrategyToast` and prefetch/consult listeners.
+ * When to use: Before showing the opponent message dialog.
  * Expected outcome: True if either trimmed field is non-empty.
  * Exceptions: None.
  */

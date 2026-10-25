@@ -180,8 +180,8 @@ export function mergePlayerLossSummaries(parts: readonly PlayerLossSummary[]): P
 /**
  * Returns whether a player lost any units across all five cause buckets.
  *
- * Purpose: Suppresses empty `Human Losses` / `AI Losses` popup and prompt lines.
- * When to use: Before rendering player-specific sections or bullets.
+ * Purpose: Tells a caller whether this side's buckets are empty.
+ * When to use: Before emitting a loss line for that side.
  * Expected outcome: `true` when any bucket has at least one `LostUnit`.
  * Exceptions: None.
  */
@@ -255,7 +255,7 @@ export interface PlayerLossCauseLine {
    * Display label for the cause (e.g. `Ranged attack`).
    *
    * Contract: One of the five canonical cause labels defined in this module.
-   * When to use: Popup sub-bullets under `Human Losses` / `AI Losses`.
+   * When to use: A cause line under a side's loss section.
    * Expected outcome: Shown before `: ` and the formatted victim text.
    * Exceptions: None.
    */
@@ -303,7 +303,7 @@ export const LOSS_CAUSE_KEYS: ReadonlyArray<keyof PlayerLossSummary> = CAUSE_SPE
  * Builds non-empty cause lines for one player's losses (multiline popup use).
  *
  * Purpose: Produces ordered cause sub-bullets under a player section header.
- * When to use: `buildConsolidatedTurnUpdateSections` when rendering Human/AI Losses.
+ * When to use: `buildTurnLossSections` when rendering one side's loss section.
  * Expected outcome: One entry per non-empty bucket in canonical cause order.
  * Exceptions: None.
  */

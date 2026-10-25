@@ -7,6 +7,8 @@
  * Exceptions: None.
  */
 
+import { readyAiWaitLabel } from '../../shared/readyAiWaitLabel';
+
 /**
  * Formats an elapsed wait as MM:SS.
  *
@@ -75,12 +77,12 @@ export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
  *
  * Purpose: Tells the player that Ready is waiting on opponent planning, and for how long.
  * When to use: From `updateReadyButtonState` while opponent planning holds the button.
- * Expected outcome: One `span.ready-btn-ai-label`, "AI: " plus MM:SS, then " · {k} planning". No check mark.
+ * Expected outcome: One `span.ready-btn-ai-label`, "AI: " plus MM:SS, then " (xN)". N is how many commanders are still planning. A count below 1 is shown as 1. No check mark.
  *   An existing span only updates the text.
  * Exceptions: None.
  */
 export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number, planningCount = 1): void {
-  const text = `AI: ${formatElapsedMmSs(elapsedMs)} · ${planningCount} planning`;
+  const text = readyAiWaitLabel(formatElapsedMmSs(elapsedMs), planningCount);
   let label = readyBtn.querySelector<HTMLElement>('.ready-btn-ai-label');
   if (!label) {
     label = document.createElement('span');

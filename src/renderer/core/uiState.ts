@@ -75,13 +75,15 @@ export function blurMapChromeIfFocused(): void {
 /**
  * Turns pointer input on or off for the map, the top bar, and the console.
  *
- * Purpose: The new-game overlay, the annihilation dialog, and the knocked-out dialog stay clickable while the match controls do not.
+ * Purpose: The new-game overlay, the annihilation dialog, the knocked-out dialog, and the no-models question stay
+ *   clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than the annihilation dialog and the knocked-out dialog, and the console, ignore the pointer
- *   while `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar
- *   then, and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its
- *   New game item follows the overlay. The new-game overlay floats over the map pane but is not inside it, so this
- *   never turns it off. While it is open, the main map takes the pointer again so drag and the wheel move the preview.
+ * Expected outcome: While `enabled` is false, children of the map pane ignore the pointer, except the annihilation
+ *   dialog, the knocked-out dialog, and the no-models question. The console ignores the pointer too. The top bar
+ *   ignores the pointer except while the new-game overlay is open: it is the new-game bar then, and its game menu
+ *   keeps working. The game menu closes whenever the top bar stops taking the pointer, and its New game item follows
+ *   the overlay. The new-game overlay floats over the map pane but is not inside it, so this never turns it off.
+ *   While it is open, the main map takes the pointer again so drag and the wheel move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -89,7 +91,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog') continue;
+      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog' || id === 'start-confirm-dialog') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }

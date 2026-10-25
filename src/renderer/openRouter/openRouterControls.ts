@@ -1,5 +1,4 @@
 import type { PostResolutionConsultationPushPayload } from '../../shared/ipcTypes';
-import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
 import { clearOpenRouterModelCatalog, openRouterModelById, replaceOpenRouterModelCatalog } from './openRouterModelCatalog';
 import { rendererSharedState as S } from '../core/state';
@@ -9,11 +8,11 @@ import {
 } from '../gameplay/tacticalBattlePromptPreference';
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { renderOpponentStatus, updateOpenRouterCostLabel } from './openRouterUiHelpers';
-import { showCommanderMessagesToast } from './commanderMessagesToast';
+import { bindCommanderMessageTabs, showCommanderMessageTabs } from './commanderMessageTabsUi';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
-import { anyCommanderIsPlanning, bindCommanderPoolScreen, refreshCommanderSeatCosts } from './commanderPoolClient';
+import { anyCommanderIsPlanning, bindCommanderPoolScreen, readCommanderPoolAndApply, refreshCommanderSeatCosts } from './commanderPoolClient';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
@@ -102,15 +101,6 @@ openNewGameOverlayFromModelTab: () => void;
    */
 startBackgroundRequestIfAllowed: () => void;
     /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
-
-   * Contract: Displays Message and Strategy sections from consultation IPC when either field is present.
-   * When to use: Strategic Ready handler, tactical Ready handler, or deferred consultation listeners.
-   * Expected outcome: Non-empty fields become visible until timeout or dismiss; both empty hides a stale toast.
-   * Exceptions: None.
-   */
-showAiStrategyToast: (content: AiStrategyToastFields) => void;
-    /**
    * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
 
    * Contract: Refreshes per-tool invocation count labels after consultation telemetry merges.
@@ -190,12 +180,13 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     if (!S.gameState || payload.planningTurnNumber !== S.gameState.turnNumber) {
       deps.appendOpenRouterLog('Ignored stale post-resolution consultation push.', false);
       S.pendingDeferredStrategicPostResolutionConsult = false;
+      void readCommanderPoolAndApply(true, false);
       startTacticalOpponentPlanAfterStrategicConsult(deps);
       deps.updateReadyButtonState();
       return;
     }
     S.pendingDeferredStrategicPostResolutionConsult = false;
-    deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
+    void readCommanderPoolAndApply(true);
     if (payload.toolInvocationCounts) {
       S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
@@ -224,14 +215,13 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     ) {
       deps.appendOpenRouterLog('Ignored stale tactical post-beat consultation push.', false);
       S.pendingDeferredTacticalPostBeatConsult = false;
+      void readCommanderPoolAndApply(true, false);
       deps.updateReadyButtonState();
       return;
     }
     S.pendingDeferredTacticalPostBeatConsult = false;
     applyTacticalPostBeatConsultSideEffects(fields, {
       startBackgroundRequestIfAllowed: deps.startBackgroundRequestIfAllowed,
-      showAiStrategyToast: deps.showAiStrategyToast,
-      hideAiStrategyToast: deps.hideAiStrategyToast,
       updateOpenRouterToolCountLabels: deps.updateOpenRouterToolCountLabels,
       appendOpenRouterLog: deps.appendOpenRouterLog,
       redraw: deps.requestRedraw,
@@ -256,6 +246,7 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
     S.pendingDeferredStrategicPostResolutionConsult = false;
     if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
   }
+  void readCommanderPoolAndApply(true, false);
   deps.requestRedraw();
   deps.updateReadyButtonState();
 }
@@ -270,8 +261,9 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
  */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
+  bindCommanderMessageTabs();
   bindCommanderPoolScreen({
-    showCommanderMessages: showCommanderMessagesToast,
+    showCommanderMessages: showCommanderMessageTabs,
     fileCommanderMessage: (dispatch) => {
       const body = document.createElement('div');
       recordConsoleReport('message', currentConsoleReportTag(), body, {

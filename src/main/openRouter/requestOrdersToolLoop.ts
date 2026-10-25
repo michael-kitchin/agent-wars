@@ -12,6 +12,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { coordinateContextSeatId, type CoordinateContext } from '../briefing/map/coordinateContext';
+import { aiIndexForSeatId } from '../../shared/seatIds';
 import { createPathfindingSession, executePathfinding } from '../tools/pathfinding';
 import { executeAssessment } from '../tools/assessment';
 import { executeCombatEstimation } from '../tools/combatEstimation';
@@ -418,7 +419,12 @@ export async function runRequestOrdersToolLoop(
       if (onLog && chatResponse.error !== 'Cancelled') onLog(chatResponse.error, true);
       return { kind: 'fail', error: chatResponse.error };
     }
-    logResponsePreview('openRouter requestOrders: raw response body', chatResponse.bodyText);
+    const responseSeatId = coordinateContextSeatId(coordinateContext);
+    const responseAiIndex = aiIndexForSeatId(responseSeatId);
+    if (responseAiIndex === null) {
+      logError('openRouter requestOrders: seat has no opponent index; response log uses opponent 1', { seatId: responseSeatId });
+    }
+    logResponsePreview('openRouter requestOrders: raw response body', chatResponse.bodyText, responseAiIndex ?? 1);
     let json: {
       choices?: Array<{
         message?: {

@@ -51,6 +51,15 @@
 .knockout-dialog.game-over-overlay {
   z-index: 7010;
 }
+.start-confirm-dialog.game-over-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 7070;
+}
+.start-confirm-dialog .start-confirm-note {
+  font-size: 13px;
+  font-weight: 400;
+}
 .knockout-dialog-copy {
   font-weight: 400;
   font-size: 14px;
@@ -83,4 +92,38 @@
   padding: 0.1rem 0.35rem;
   font-size: 1.1rem;
   line-height: 1;
+}
+#ai-strategy-toast .ai-strategy-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid var(--chrome-border);
+  margin: 0 0 0.5rem 0;
+}
+#ai-strategy-toast .ai-strategy-tab-bar button {
+  padding: 0.35rem 0.75rem;
+  font-size: 12px;
+  background: var(--button-off-bg);
+  color: var(--button-off-text);
+  border: 1px solid var(--button-off-border);
+  border-bottom: 2px solid transparent;
+  border-radius: 2px 2px 0 0;
+  margin-bottom: -1px;
+}
+#ai-strategy-toast .ai-strategy-tab-bar button:hover {
+  background: var(--button-off-bg-hover);
+}
+#ai-strategy-toast .ai-strategy-tab-bar button:disabled {
+  color: var(--chrome-disabled);
+  cursor: default;
+}
+#ai-strategy-toast .ai-strategy-tab-bar button[aria-selected="true"] {
+  font-weight: 600;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-border);
+  border-bottom-color: var(--chrome-accent-edge);
+}
+#ai-strategy-toast .ai-strategy-tab-bar button[aria-selected="true"]:hover {
+  background: var(--button-bg-hover);
 }

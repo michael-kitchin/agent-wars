@@ -485,13 +485,20 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
         request.seatId
       );
       if (!post.tacticalOpponentPlan) {
-        return emptyConsultOutcome({ costUsd: finiteCost(post.cost), modelId });
+        return emptyConsultOutcome({
+          costUsd: finiteCost(post.cost),
+          modelId,
+          message: post.message ?? null,
+          strategy: post.strategy ?? null,
+        });
       }
       return emptyConsultOutcome({
         finished: true,
         tacticalPlan: post.tacticalOpponentPlan,
         costUsd: finiteCost(post.cost),
         modelId,
+        message: post.message ?? null,
+        strategy: post.strategy ?? null,
       });
     } catch (err) {
       logError(args.errorLogMessage, err);
@@ -578,7 +585,7 @@ async function consultSeatsThroughPool(
 /**
  * Toast fields from the first seat that consulted, plus the sum of reported costs.
  *
- * Purpose: A two-sided match still returns one strategy and one message. Extra seats add their cost.
+ * Purpose: The Ready result still carries the first seat's message for callers that read the IPC payload. The message dialog reads the pool, not this field.
  * When to use: After every post-resolution runner has stored its result.
  * Expected outcome: Omitted prose stays omitted. Cost is present only when at least one consult reported a finite cost.
  * Exceptions: None.

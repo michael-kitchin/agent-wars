@@ -100,6 +100,15 @@ export interface ParseRepairExchangeArgs {
    */
   readonly tacticalBattleId: string | null;
   /**
+   * Opponent number for the response log filename.
+   *
+   * Contract: Same index the main consultation used for its prompt files.
+   * When to use: `logResponsePreview` for the repair body.
+   * Expected outcome: The repair overwrites that opponent's response file.
+   * Exceptions: None.
+   */
+  readonly aiIndex: number;
+  /**
    * Cost and token accumulator shared with the main loop.
    *
    * Contract: Mutated in place when the repair HTTP call succeeds.
@@ -207,7 +216,7 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
   }
   const repairText = repairResponse.bodyText;
   if (onLog) onLog('Repair API call completed; parsing repair JSON…');
-  logResponsePreview('openRouter requestOrders repair: raw response body', repairText);
+  logResponsePreview('openRouter requestOrders repair: raw response body', repairText, args.aiIndex);
   const repairJson = JSON.parse(repairText) as {
     choices?: Array<{ message?: { content?: string | null } }>;
     usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };

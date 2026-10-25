@@ -13,7 +13,7 @@ import { replaceSeatRoster } from './seatRosterStore';
 import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolution';
 import { createSeededRng } from '../seededRng';
 import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
-import { victorySettingsForMapKind } from '../../shared/victoryRules';
+import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
   ensureGameMapLoaded,
@@ -172,14 +172,23 @@ export interface ResetGameForNewMatchOptions {
    */
   readonly fogOfWarEnabled?: boolean;
   /**
-   * Requested length of a global match.
+   * Requested length of a city-hex match.
    *
-   * Contract: Used only when the map is global. A value outside 20, 30, 40, and 50 becomes 30.
+   * Contract: Used only when `victoryRule` is `most_city_hexes_at_turn_limit`. A value outside 20, 30, 40, and 50 becomes 30.
    * When to use: The new-game dialog's turn-limit control.
-   * Expected outcome: Stored as `turn_limit`. A regional match stores no turn limit.
+   * Expected outcome: Stored as `turn_limit`. Deathmatch stores no turn limit.
    * Exceptions: None.
    */
   readonly turnLimit?: number;
+  /**
+   * Requested win rule.
+   *
+   * Contract: Omitted or any value other than `most_city_hexes_at_turn_limit` stores Deathmatch.
+   * When to use: The new-game dialog's Rule control.
+   * Expected outcome: Stored as `victory_rule`.
+   * Exceptions: None.
+   */
+  readonly victoryRule?: VictoryRule;
   /**
    * Match seed to store instead of a random one.
    *
@@ -410,7 +419,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM hexes');
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['game_map_id', mapId]);
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
-  const victory = victorySettingsForMapKind(mapKind, options?.turnLimit);
+  const victory = victorySettingsForRequest(options?.victoryRule, options?.turnLimit);
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['victory_rule', victory.rule]);
   if (victory.turnLimit === null) {
     run("DELETE FROM game_config WHERE key = 'turn_limit'");

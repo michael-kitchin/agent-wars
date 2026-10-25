@@ -122,11 +122,11 @@
         <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>
         <div class="new-game-rows">
           <label for="new-game-victory-select">Rule</label>
-          <select id="new-game-victory-select" data-control-tooltip="Regional matches end when one side remains. Global matches end at the turn limit, and the side holding the most city hexes wins."></select>
+          <select id="new-game-victory-select" data-control-tooltip="Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins."></select>
         </div>
         <div id="new-game-turn-limit-row" class="new-game-rows">
           <label for="new-game-turn-limit-select">Turn limit</label>
-          <select id="new-game-turn-limit-select" data-control-tooltip="The global match ends after this many turns. 30 is the usual length."></select>
+          <select id="new-game-turn-limit-select" data-control-tooltip="How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit."></select>
         </div>
       </section>
       <section class="new-game-section" aria-labelledby="new-game-section-forces">
@@ -260,6 +260,23 @@
         <div class="knockout-dialog-actions">
           <button type="button" id="knockout-dialog-watch">Watch the rest</button>
           <button type="button" id="knockout-dialog-end">End game</button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="start-confirm-dialog"
+      class="start-confirm-dialog game-over-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="start-confirm-title"
+    >
+      <div class="game-over-box">
+        <p id="start-confirm-title">No models set</p>
+        <p>Start the game with no models set?</p>
+        <p class="start-confirm-note">This means no model calls will be made during the game.</p>
+        <div class="knockout-dialog-actions">
+          <button type="button" id="start-confirm-yes">Yes</button>
+          <button type="button" id="start-confirm-no">No</button>
         </div>
       </div>
     </div>

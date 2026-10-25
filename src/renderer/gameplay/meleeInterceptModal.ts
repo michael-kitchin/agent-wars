@@ -6,14 +6,11 @@ import type { MeleeCandidateRow } from '../../shared/ipcTypes';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
-import { activeHumanSeatId } from '../../shared/observeModeControls';
 import { shortSideName } from '../../shared/seatRoster';
-import { formatHexControlLabel, homeSeatIdsAtHex } from '../../shared/sideLabels';
-import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
-import { formatWeatherLabel } from '../../shared/weatherBonusRules';
 import { fightTooltipText, ignoreTooltipText } from '../chrome/controlTooltipText';
 import { rendererSharedState as S } from '../core/state';
 import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
+import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 
 /**
  * Arguments for opening the melee intercept modal.
@@ -213,7 +210,19 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       tr.appendChild(tdRadio);
 
       const tdHex = document.createElement('td');
-      tdHex.append(hexCell(row.h3Index));
+      const hexCode = getStrategicHexCode(row.h3Index);
+      tdHex.textContent = hexCode ? `(${hexCode})` : row.h3Index;
+      void args.buildHexPopupHtml(row.h3Index).then(
+        (html) => {
+          if (!tdHex.isConnected) return;
+          tdHex.replaceChildren();
+          tdHex.innerHTML = html;
+          paintTerrainSwatches(tdHex);
+        },
+        () => {
+          /* keep the plain code already shown */
+        }
+      );
       tr.appendChild(tdHex);
 
       const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
@@ -239,53 +248,6 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     detachFrame = attachFrameToVisibleMap(frame);
     radios[0]?.focus();
   });
-}
-
-/**
- * The hex code and the muted control, terrain, and weather line.
- *
- * Purpose: The choice row names the hex without the full tooltip.
- * When to use: Each eligible row.
- * Expected outcome: The code, then "Control: … · Terrain: …", and weather when the hex has it.
- * Exceptions: None. A missing snapshot shows the hex id.
- */
-function hexCell(h3Index: string): HTMLElement {
-  const wrap = document.createElement('div');
-  const code = document.createElement('div');
-  const hexCode = getStrategicHexCode(h3Index);
-  code.textContent = hexCode ? `(${hexCode})` : h3Index;
-  const detail = document.createElement('div');
-  detail.className = 'melee-intercept-muted';
-  detail.textContent = hexDetailLine(h3Index);
-  wrap.append(code, detail);
-  return wrap;
-}
-
-/**
- * Control, terrain, and weather for one world hex.
- *
- * Purpose: The muted line uses the same control words as the map, with short side names.
- * When to use: `hexCell`.
- * Expected outcome: A single line. Weather is omitted when the hex has none.
- * Exceptions: None.
- */
-function hexDetailLine(h3Index: string): string {
-  const state = S.gameState;
-  const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
-  const viewer = activeHumanSeatId(seats);
-  const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
-  const control = formatHexControlLabel({
-    controllerId: controller,
-    homeSeatIds: homeSeatIdsAtHex(h3Index, {
-      homeRegionHexesBySeat: state?.homeRegionHexesBySeat,
-    }),
-    viewerSeatId: viewer,
-    seats,
-  });
-  const hex = state?.hexes.find((row) => row.h3Index === h3Index);
-  const terrain = formatTerrainKindLabel(hex?.terrainKind ?? null);
-  const weather = hex?.weather ? ` · Weather: ${formatWeatherLabel(hex.weather)}` : '';
-  return `Control: ${control} · Terrain: ${terrain}${weather}`;
 }
 
 /**

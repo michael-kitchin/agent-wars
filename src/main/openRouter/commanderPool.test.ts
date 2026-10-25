@@ -231,6 +231,52 @@ describe('commander pool', { concurrency: 1 }, () => {
   });
 
   /**
+   * A follow-up consult does not finish with orders, and its prose still has to reach the screen.
+   *
+   * Purpose: An unfinished result used to drop the message.
+   * When to use: After `applyConsultOutcome` changes.
+   * Expected outcome: A draining read has the message and the strategy. An error and a blank message store nothing.
+   * Exceptions: Skips when no regional map is installed.
+   */
+  test('an unfinished consult keeps its message and a blank one does not', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    await withMatch(['model-a', 'model-a'], async () => {
+      setCommanderConsultRunnerForTests(async () =>
+        emptyConsultOutcome({
+          finished: false,
+          message: 'You cannot hide.',
+          strategy: 'Hold the coast.',
+          costUsd: 0,
+          modelId: 'model-a',
+        })
+      );
+      startStrategicPlanning();
+      await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+      const drained = readCommanderPoolSnapshot(true);
+      assert.equal(drained.dispatches.length, 2);
+      assert.equal(drained.dispatches[0]?.message, 'You cannot hide.');
+      assert.equal(drained.dispatches[0]?.strategy, 'Hold the coast.');
+    });
+    await withMatch(['model-a', 'model-a'], async () => {
+      setCommanderConsultRunnerForTests(async () => emptyConsultOutcome({ finished: false, errorMessage: 'nope' }));
+      startStrategicPlanning();
+      await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+      assert.equal(readCommanderPoolSnapshot(true).dispatches.length, 0);
+    });
+    await withMatch(['model-a', 'model-a'], async () => {
+      setCommanderConsultRunnerForTests(async () =>
+        emptyConsultOutcome({ finished: false, message: '   ', strategy: null })
+      );
+      startStrategicPlanning();
+      await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+      assert.equal(readCommanderPoolSnapshot(true).dispatches.length, 0);
+    });
+  });
+
+  /**
    * A seat with no model is not consulted.
    *
    * Purpose: Standing orders are that seat's whole turn.

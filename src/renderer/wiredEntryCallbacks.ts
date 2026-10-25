@@ -35,7 +35,6 @@ import {
   callReadyWithTimeout,
   hideAiStrategyToast,
   hideMapToast,
-  showAiStrategyToast,
   showMapToast,
   updateOpenRouterCostLabel,
   updateOpenRouterToolCountLabels,
@@ -397,7 +396,6 @@ export function createReadyHandlerDeps(): ReadyHandlerDeps {
     applyGameStateSnapshot,
     buildAirStrikeOutboundPlaybackMoves,
     buildAirStrikeReturnPlaybackMoves,
-    showAiStrategyToast,
     hideAiStrategyToast,
     updateOpenRouterCostLabel,
     appendOpenRouterLog,
@@ -540,7 +538,6 @@ export function initOpenRouterUI(): void {
     startBackgroundRequestIfAllowed,
     updateReadyButtonState,
     syncOpenRouterRunToggleInteractable,
-    showAiStrategyToast,
     updateOpenRouterToolCountLabels,
     requestRedraw,
   });

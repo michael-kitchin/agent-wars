@@ -22,12 +22,13 @@ import {
   setRowHome,
   sidesCaption,
   startBlockedReason,
+  sidesHaveAnyModel,
   type HomeOption,
   type NewGameSidesState,
 } from '../../shared/newGameSides';
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
-import { DEFAULT_TURN_LIMIT, TURN_LIMIT_OPTIONS } from '../../shared/victoryRules';
+import { bindNewGameVictory, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
 import { regionalHomeOptions, selectedNewGameTab, setNewGameHomesChangedListener } from './newGameMapUi';
@@ -65,6 +66,18 @@ export async function loadCommanderKeyMemory(): Promise<void> {
   } catch (err) {
     console.error('getCommanderKeyMemory failed', err);
   }
+}
+
+/**
+ * Whether any AI row on this screen has a model.
+ *
+ * Purpose: Start asks only when every opponent would use standing orders.
+ * When to use: The Start click, before the confirm dialog.
+ * Expected outcome: False when no AI `modelId` is set. Keys do not matter.
+ * Exceptions: None.
+ */
+export function newGameHasAnyModel(): boolean {
+  return sidesHaveAnyModel(sidesState);
 }
 
 /**
@@ -172,7 +185,10 @@ function commanderButtonLabel(commander: NewGameCommanderInput | null): string {
  */
 export function refreshNewGameSides(options?: { readonly reset?: boolean }): void {
   closeCommanderPopover();
-  if (options?.reset) requestedRows = MIN_SEATS;
+  if (options?.reset) {
+    requestedRows = MIN_SEATS;
+    resetNewGameVictory();
+  }
   const homes = homesForTab();
   const mapKind = selectedNewGameTab();
   const commander = defaultCommander();
@@ -194,7 +210,7 @@ export function refreshNewGameSides(options?: { readonly reset?: boolean }): voi
  * Exceptions: None.
  */
 export function bindNewGameSides(): void {
-  fillVictoryControls();
+  bindNewGameVictory();
   setPreviewHomeKeyReader(previewHomeKeys);
   document.getElementById('new-game-observe-only')?.addEventListener('change', () => {
     if (!sidesState) return;
@@ -226,19 +242,21 @@ export function bindNewGameSides(): void {
  *
  * Purpose: The click handler stays free of row markup.
  * When to use: The Start click.
- * Expected outcome: `blocked` is set when the rows cannot start. Otherwise `seats` follows the rows and `turnLimit` is the global select.
+ * Expected outcome: `blocked` is set when the rows cannot start. Otherwise `seats` follows the rows, and the rule and limit come from the Victory section.
  * Exceptions: None.
  */
 export function readNewGameSeatsStart(): {
   readonly seats: readonly NewGameSeatInput[];
   readonly turnLimit: number;
+  readonly victoryRule: ReturnType<typeof readNewGameVictory>['victoryRule'];
   readonly blocked: string | null;
 } {
   const blocked = startBlockedReason(sidesState);
-  const turnLimit = readTurnLimit();
+  const victory = readNewGameVictory();
   return {
     seats: sidesState && !blocked ? buildSeatsPayload(sidesState) : [],
-    turnLimit,
+    turnLimit: victory.turnLimit,
+    victoryRule: victory.victoryRule,
     blocked,
   };
 }
@@ -256,53 +274,11 @@ export function previewHomeKeys(): readonly string[] {
 }
 
 /**
- * Fills the victory rule and the turn-limit list.
- *
- * Purpose: The rule follows the tab. The limit is only offered on the global map.
- * When to use: Once from `bindNewGameSides`.
- * Expected outcome: One victory option. Turn-limit options are 20, 30, 40, and 50, with 30 selected.
- * Exceptions: None.
- */
-function fillVictoryControls(): void {
-  const victory = document.getElementById('new-game-victory-select') as HTMLSelectElement | null;
-  if (victory && victory.options.length === 0) {
-    const option = document.createElement('option');
-    option.value = 'rule';
-    option.textContent = 'Last side standing';
-    victory.appendChild(option);
-  }
-  const limit = document.getElementById('new-game-turn-limit-select') as HTMLSelectElement | null;
-  if (limit && limit.options.length === 0) {
-    for (const turns of TURN_LIMIT_OPTIONS) {
-      const option = document.createElement('option');
-      option.value = String(turns);
-      option.textContent = `${turns} turns`;
-      if (turns === DEFAULT_TURN_LIMIT) option.selected = true;
-      limit.appendChild(option);
-    }
-  }
-}
-
-/**
- * The selected global turn limit.
- *
- * Purpose: Start sends the number the player picked.
- * When to use: `readNewGameSeatsStart`.
- * Expected outcome: 30 when the control is missing or the value is not a listed limit.
- * Exceptions: None.
- */
-function readTurnLimit(): number {
-  const limit = document.getElementById('new-game-turn-limit-select') as HTMLSelectElement | null;
-  const parsed = Number(limit?.value);
-  return (TURN_LIMIT_OPTIONS as readonly number[]).includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
-}
-
-/**
  * Paints the Sides and Victory sections from `sidesState`.
  *
  * Purpose: The DOM is a view of the model.
  * When to use: After every edit.
- * Expected outcome: One row per side, the caption, the add button's hint, and the victory wording for the tab.
+ * Expected outcome: One row per side, the caption, the add button's hint, and the turn-limit control for the current rule.
  * Exceptions: None.
  */
 function renderNewGameSides(): void {
@@ -346,13 +322,7 @@ function renderNewGameSides(): void {
       startBlocked ?? newGameButtonTooltipText(start.textContent !== 'New game')
     );
   }
-  const global = selectedNewGameTab() === 'global';
-  const victory = document.getElementById('new-game-victory-select') as HTMLSelectElement | null;
-  if (victory && victory.options[0]) {
-    victory.options[0].textContent = global ? 'Most city hexes at turn limit' : 'Last side standing';
-  }
-  const limitRow = document.getElementById('new-game-turn-limit-row');
-  if (limitRow) limitRow.hidden = !global;
+  renderNewGameVictory();
 }
 
 /**

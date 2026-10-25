@@ -281,28 +281,43 @@ export type PromptLogArtifactKind = 'user' | CoordinateContextMode;
  * Purpose: Keeps strategic and tactical system prompts on separate last-write files, and keeps the
  * user message on its own file, without inferring names from debug labels.
  * When to use: Before `writeFullLogArtifact` in `logPromptPreview`.
- * Expected outcome: `'user'` → `debug-last-user-prompt.txt`; `'strategic'` →
- * `debug-last-strategic-prompt.txt`; `'tactical'` → `debug-last-tactical-prompt.txt`.
+ * Expected outcome: `'user'` and index 1 → `debug-last-user-prompt-1.txt`; `'strategic'` and index 2 →
+ * `debug-last-strategic-prompt-2.txt`; `'tactical'` and index 3 → `debug-last-tactical-prompt-3.txt`.
  * Exceptions: Throws if `kind` is not a supported artifact kind (exhaustive-check fallback).
  */
-export function resolveFullPromptLogFileName(kind: PromptLogArtifactKind): string {
-  let fileName: string;
+export function resolveFullPromptLogFileName(kind: PromptLogArtifactKind, aiIndex: number): string {
+  let stem: string;
   switch (kind) {
     case 'user':
-      fileName = 'debug-last-user-prompt.txt';
+      stem = 'debug-last-user-prompt';
       break;
     case 'strategic':
-      fileName = 'debug-last-strategic-prompt.txt';
+      stem = 'debug-last-strategic-prompt';
       break;
     case 'tactical':
-      fileName = 'debug-last-tactical-prompt.txt';
+      stem = 'debug-last-tactical-prompt';
       break;
     default: {
       const exhaustive: never = kind;
       throw new Error(`Unsupported prompt log artifact kind: ${String(exhaustive)}`);
     }
   }
-  logTrace('openRouter resolveFullPromptLogFileName', { kind, fileName });
+  const fileName = `${stem}-${aiIndex}.txt`;
+  logTrace('openRouter resolveFullPromptLogFileName', { kind, aiIndex, fileName });
+  return fileName;
+}
+
+/**
+ * Maps an opponent index to the cwd filename used when full response logging is enabled.
+ *
+ * Purpose: Each consulted seat overwrites its own last response, not another seat's.
+ * When to use: Before `writeFullLogArtifact` in `logResponsePreview`.
+ * Expected outcome: Index 1 → `debug-last-openrouter-response-body-1.txt`.
+ * Exceptions: None.
+ */
+export function resolveFullResponseLogFileName(aiIndex: number): string {
+  const fileName = `debug-last-openrouter-response-body-${aiIndex}.txt`;
+  logTrace('openRouter resolveFullResponseLogFileName', { aiIndex, fileName });
   return fileName;
 }
 
@@ -327,6 +342,15 @@ export interface LogPromptPreviewOptions {
    */
   artifactKind: PromptLogArtifactKind;
   /**
+   * Opponent number for the filename, from `aiIndexForSeatId`.
+   *
+   * Contract: 1 for `opponent`, 2 for `opponent2`, and so on. Callers pass 1 when the seat has no index.
+   * When to use: Every `logPromptPreview` call.
+   * Expected outcome: Appended before `.txt` so two seats do not share a file.
+   * Exceptions: None.
+   */
+  aiIndex: number;
+  /**
    * Diagnostic text appended to the disk file only (not sent to the model).
    *
    * Contract: Optional; ignored when empty or whitespace. Used for the strategic operational-map
@@ -344,11 +368,11 @@ export interface LogPromptPreviewOptions {
  * Purpose: Keeps default logs small while allowing full capture when explicitly enabled.
  * When to use: After system and user prompts are finalized for the OpenRouter request.
  * Expected outcome: `logDebug` with preview or full metadata; optional write to
- * `debug-last-user-prompt.txt`, `debug-last-strategic-prompt.txt`, or `debug-last-tactical-prompt.txt`.
+ * `debug-last-user-prompt-1.txt`, `debug-last-strategic-prompt-2.txt`, or `debug-last-tactical-prompt-3.txt`.
  * Exceptions: None.
  */
 export function logPromptPreview(label: string, content: string, options: LogPromptPreviewOptions): void {
-  const fileName = resolveFullPromptLogFileName(options.artifactKind);
+  const fileName = resolveFullPromptLogFileName(options.artifactKind, options.aiIndex);
   const fullPromptLoggingEnabled = isEnvFlagEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
     const supplementalDiskOnlyBody = options.supplementalDiskOnlyBody;
@@ -378,13 +402,14 @@ export function logPromptPreview(label: string, content: string, options: LogPro
  *
  * Purpose: Same policy as prompts for raw JSON bodies including tool-call payloads.
  * When to use: After a successful chat completion response or repair pass body is available.
- * Expected outcome: `logDebug` with preview or full metadata; optional file write.
+ * Expected outcome: `logDebug` with preview or full metadata; optional write to
+ * `debug-last-openrouter-response-body-N.txt` for opponent N.
  * Exceptions: None.
  */
-export function logResponsePreview(label: string, content: string): void {
+export function logResponsePreview(label: string, content: string, aiIndex: number): void {
   const fullResponseLoggingEnabled = isEnvFlagEnabled(FULL_RESPONSE_LOG_ENV_FLAG);
   if (fullResponseLoggingEnabled) {
-    const absPath = writeFullLogArtifact('debug-last-openrouter-response-body.txt', content);
+    const absPath = writeFullLogArtifact(resolveFullResponseLogFileName(aiIndex), content);
     logDebug(`${label} (full)`, { chars: content.length, writtenTo: absPath ?? '(write failed)' });
     return;
   }

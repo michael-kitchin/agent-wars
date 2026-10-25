@@ -47,7 +47,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
  * Expected outcome: One toast per dispatch that has text.
  * Exceptions: None.
  */
-let showToast: ((lines: readonly string[]) => void) | null = null;
+let showToast: ((dispatches: readonly CommanderDispatch[]) => void) | null = null;
 let fileMessage: ((dispatch: CommanderDispatch) => void) | null = null;
 
 /**
@@ -92,7 +92,7 @@ function notifyPoolChanged(): void {
  * Exceptions: None.
  */
 export function bindCommanderPoolScreen(deps: {
-  showCommanderMessages: (lines: readonly string[]) => void;
+  showCommanderMessages: (dispatches: readonly CommanderDispatch[]) => void;
   fileCommanderMessage: (dispatch: CommanderDispatch) => void;
   updateReadyButtonState: () => void;
 }): void {
@@ -219,23 +219,23 @@ export async function stopCommanderPlanningFromScreen(reason: ModelCallCancelRea
 }
 
 /**
- * Files each kept dispatch and returns the toast lines.
+ * Files each kept dispatch and returns those dispatches.
  *
- * Purpose: A message is a toast line and a Reports entry. Strategy is a Reports line only while observing, and never a toast line.
+ * Purpose: Each kept dispatch is its own Reports entry. The dialog paints the tabs.
  * When to use: A draining pool read.
- * Expected outcome: Lines are "{full name}: {message}". A dispatch with neither a message nor an observed strategy is skipped.
+ * Expected outcome: A dispatch with neither a message nor an observed strategy is skipped.
  * Exceptions: None.
  */
-function messageLines(dispatches: readonly CommanderDispatch[]): string[] {
+function messageLines(dispatches: readonly CommanderDispatch[]): CommanderDispatch[] {
   const observing = matchIsObserving();
-  const lines: string[] = [];
+  const kept: CommanderDispatch[] = [];
   for (const dispatch of dispatches) {
-    const keep = Boolean(dispatch.message) || (observing && Boolean(dispatch.strategy));
+    const keep = Boolean(dispatch.message?.trim()) || (observing && Boolean(dispatch.strategy?.trim()));
     if (!keep) continue;
     fileMessage?.(dispatch);
-    if (dispatch.message) lines.push(`${dispatchSeatName(dispatch.seatId)}: ${dispatch.message}`);
+    kept.push(dispatch);
   }
-  return lines;
+  return kept;
 }
 
 /**
@@ -251,26 +251,14 @@ function matchIsObserving(): boolean {
 }
 
 /**
- * The full name of a dispatch's seat.
- *
- * Purpose: The Messages toast names the side, not the seat id.
- * When to use: `messageLines`.
- * Expected outcome: `homeRegion`, or the seat id when the roster has no row.
- * Exceptions: None.
- */
-function dispatchSeatName(seatId: string): string {
-  return S.gameState?.seats?.find((row) => row.seatId === seatId)?.homeRegion ?? seatId;
-}
-
-/**
  * Reads the pool once and shows any drained prose.
  *
  * Purpose: Ready needs a fresh status when it returns, and the poll needs the same read.
- * When to use: The one-second poll, and once after Ready returns.
- * Expected outcome: The snapshot updates. A draining read files one Reports entry per kept message and shows one Messages toast. Seat cost refreshes when a dispatch arrives or the last planning seat finishes.
+ * When to use: The one-second poll, and once after Ready returns. Pass false for `showMessages` when a stale consult should be filed and not shown.
+ * Expected outcome: The snapshot updates. A draining read files one Reports entry per kept dispatch. When `showMessages` is true and a dispatch was kept, the message dialog opens. Seat cost refreshes when a dispatch arrives or the last planning seat finishes.
  * Exceptions: A rejected IPC is logged and does not throw. A reply that arrives after Start is ignored.
  */
-export async function readCommanderPoolAndApply(drain: boolean): Promise<void> {
+export async function readCommanderPoolAndApply(drain: boolean, showMessages = true): Promise<void> {
   if (!window.gameApi?.readCommanderPool) return;
   const matchEpoch = currentRendererMatchEpoch();
   const wasPlanning = anyCommanderIsPlanning();
@@ -280,8 +268,8 @@ export async function readCommanderPoolAndApply(drain: boolean): Promise<void> {
     snapshot = next;
     const consultFinished = wasPlanning && !anyCommanderIsPlanning();
     if (drain && (next.dispatches.length > 0 || consultFinished)) {
-      const lines = messageLines(next.dispatches);
-      if (lines.length > 0) showToast?.(lines);
+      const kept = messageLines(next.dispatches);
+      if (showMessages && kept.length > 0) showToast?.(kept);
       await refreshSeatCosts();
     }
   } catch (err) {

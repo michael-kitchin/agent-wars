@@ -4,6 +4,7 @@ import type { NewGameCommanderInput } from './ipc/ordersTypes';
 import {
   addRowBlockedReason,
   addSideRow,
+  sidesHaveAnyModel,
   buildSeatsPayload,
   homeOptionsForRow,
   initialSidesState,
@@ -56,6 +57,57 @@ test('a three-home map caps at three rows and the caption counts them', () => {
   const full = addSideRow(addSideRow(started, fourHomes, COMMANDER), fourHomes, COMMANDER);
   assert.equal(full.rows.length, 4);
   assert.equal(addRowBlockedReason(full, fourHomes), 'Up to 4 sides');
+});
+
+/**
+ * The key in this case is a fake value for testing.
+ *
+ * Purpose: The copy must keep the key without using a real credential.
+ * When to use: The add-row copy case.
+ * Expected outcome: The new row matches this commander and is a different object.
+ * Exceptions: None.
+ */
+const COPIED_COMMANDER: NewGameCommanderInput = {
+  modelId: 'test-model',
+  reasoningEffort: 'high',
+  doctrineChoice: 'aggressive',
+  apiKey: 'test-openrouter-key',
+};
+
+test('adding a side copies the previous AI commander onto a new object', () => {
+  const homes: HomeOption[] = [...THREE, { key: 'd', label: 'Delta' }];
+  const started = initialSidesState({ mapKind: 'global', homes, defaultCommander: COMMANDER });
+  const tuned = setRowCommander(started, 1, COPIED_COMMANDER);
+  const added = addSideRow(tuned, homes, COMMANDER);
+  assert.deepEqual(added.rows[2]?.commander, COPIED_COMMANDER);
+  assert.notEqual(added.rows[2]?.commander, tuned.rows[1]?.commander);
+  assert.equal(added.rows[1]?.commander, tuned.rows[1]?.commander);
+  assert.equal(added.rows[2]?.homeKey, 'c');
+});
+
+test('a model on an AI row is enough, and a human row is ignored', () => {
+  const started = initialSidesState({ mapKind: 'global', homes: THREE, defaultCommander: COMMANDER });
+  assert.equal(sidesHaveAnyModel(null), false);
+  assert.equal(sidesHaveAnyModel(started), false);
+  const tuned = setRowCommander(started, 1, COPIED_COMMANDER);
+  assert.equal(sidesHaveAnyModel(tuned), true);
+  const humanOnly = setRowCommander(tuned, 0, COPIED_COMMANDER);
+  const clearedAi: typeof humanOnly = {
+    ...humanOnly,
+    rows: humanOnly.rows.map((row, index) => (index === 1 ? { ...row, commander: { ...COPIED_COMMANDER, modelId: null } } : row)),
+  };
+  assert.equal(sidesHaveAnyModel(clearedAi), false);
+});
+
+test('adding a side uses the fallback when no AI commander exists', () => {
+  const homes: HomeOption[] = [...THREE, { key: 'd', label: 'Delta' }];
+  const started = initialSidesState({ mapKind: 'global', homes, defaultCommander: COMMANDER });
+  const cleared: typeof started = {
+    ...started,
+    rows: started.rows.map((row) => (row.kind === 'ai' ? { ...row, commander: null } : row)),
+  };
+  const added = addSideRow(cleared, homes, COMMANDER);
+  assert.equal(added.rows[2]?.commander, COMMANDER);
 });
 
 test('Observe keeps homes and turns You into Side 1', () => {

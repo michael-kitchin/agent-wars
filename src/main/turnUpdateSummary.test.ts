@@ -28,7 +28,6 @@ function testSectionOrderAndEmptySuppression(): void {
       viewerSeatId: HUMAN_SEAT_ID,
       seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
-      losses: [],
     },
   });
   assert.ok(text);

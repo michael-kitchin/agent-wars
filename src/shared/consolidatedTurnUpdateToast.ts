@@ -8,6 +8,7 @@ import type { BuildUnitType, ReadyResult } from './ipcTypes';
 import { type TurnLossSummary } from './lossSummary';
 import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
 import { buildTurnReportLines, type TurnReportInput } from './turnReportLines';
+import { buildTurnLossSections } from './turnLossSections';
 
 /** Prefix for bold section headers in `#map-toast` consolidated update messages. */
 export const MAP_TOAST_SECTION_HEADER_PREFIX = '## ';
@@ -16,7 +17,7 @@ export const MAP_TOAST_SECTION_HEADER_PREFIX = '## ';
 export const MAP_TOAST_UPDATES_SECTION_TITLE = 'Updates';
 
 /**
- * Builds the deployment summary line for the Other toast section when new units entered play.
+ * Builds the deployment summary line for the Updates section when new units entered play.
  *
  * Purpose: Surfaces production/deployment outcomes separate from combat losses.
  * When to use: `buildOtherTurnUpdatePrimaryLines` for strategic Ready results with `deployedUnitsByType`.
@@ -45,7 +46,7 @@ function formatDeployedUnitsLine(
 /**
  * Builds the human deployment cap message when a unit type hit its on-map limit.
  *
- * Purpose: Alerts the player in the Other section without mixing into loss buckets.
+ * Purpose: Alerts the player in the Updates section without mixing into loss buckets.
  * When to use: When `humanDeploymentCapReachedUnitTypes` is populated on Ready results.
  * Expected outcome: Single sentence listing capped types or null when none capped.
  * Exceptions: None.
@@ -86,11 +87,11 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
 }
 
 /**
- * Arguments for building a consolidated Human/AI/Other map toast after turn or beat resolution.
+ * Arguments for building a consolidated map toast after turn or beat resolution.
  */
 export interface ConsolidatedTurnUpdateToastArgs {
   /**
-   * Ready-shaped resolution slice for non-loss "Other" lines (deployment, infrastructure, hexes lost).
+   * Ready-shaped resolution slice for non-loss Updates lines (deployment, infrastructure, hexes lost).
    *
    * Contract: Same fields as strategic `ReadyResult` or tactical toast adapter output.
    * When to use: Pass the same object used for visibility classification.
@@ -102,8 +103,8 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Per-player loss summary after fog filtering (popup) or full record (not used in renderer with filter).
    *
    * Contract: Output of `buildTurnLossSummary` with visibility predicate applied for opponent victims.
-   * When to use: Required for Human Losses and AI Losses sections.
-   * Expected outcome: Empty player sections are omitted from the toast.
+   * When to use: Required for the per-side loss sections.
+   * Expected outcome: A side with no losses is omitted. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
    * Exceptions: None.
    */
   turnLossSummary: TurnLossSummary;
@@ -111,27 +112,27 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Combat-activity fallback lines when no losses or primary other content exists.
    *
    * Contract: Output of `buildCombatActivityFallbackBullets`; engagement-only lines may be suppressed.
-   * When to use: Appended into `Other` when appropriate via `composeResolutionMapToastBullets` policy.
+   * When to use: Appended into Updates when appropriate via `composeResolutionMapToastBullets` policy.
    * Expected outcome: May be empty; never duplicates loss cause lines.
    * Exceptions: None.
    */
   combatFallbackBullets: string[];
   /**
-   * Who took hexes and who lost units, for the sentences that replace the two loss sections.
+   * Who took hexes, and which seat the loss sections call "you".
    *
-   * Contract: The viewer's seat, the roster, transitions, and visible losses. Omit `otherLines`; this builder appends them.
+   * Contract: The viewer's seat, the roster, and transitions. Omit `otherLines`; this builder appends Updates itself.
    * When to use: Strategic Ready and a tactical commit.
-   * Expected outcome: Those sentences lead the toast. A null viewer writes only "Seen:" lines.
+   * Expected outcome: Hex sentences lead the toast. Loss sections follow. A missing report uses no viewer.
    * Exceptions: None.
    */
   turnReport?: Omit<TurnReportInput, 'otherLines'>;
 }
 
 /**
- * Strips a leading bullet character from fallback combat-activity lines before Other section insertion.
+ * Strips a leading bullet character from fallback combat-activity lines before Updates insertion.
  *
  * Purpose: Normalizes `composeResolutionMapToastBullets` output for consolidated section layout.
- * When to use: When promoting fallback lines into the Other section body.
+ * When to use: When promoting fallback lines into the Updates section body.
  * Expected outcome: Plain text without a leading `•`.
  * Exceptions: None.
  */
@@ -151,8 +152,14 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
   const { readyResult, combatFallbackBullets, turnReport } = args;
   const sections: string[] = [];
   const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
+  const lossSections = buildTurnLossSections(
+    args.turnLossSummary,
+    turnReport?.viewerSeatId ?? null,
+    turnReport?.seats ?? []
+  );
   sections.push(...reportLines);
-  const hasLossSections = reportLines.length > 0;
+  sections.push(...lossSections);
+  const hasLossSections = reportLines.length > 0 || lossSections.length > 0;
   let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
   if (!hasLossSections && otherLines.length === 0) {
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);

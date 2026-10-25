@@ -23,7 +23,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - While observing, the Orders tab is disabled. If it was the selected tab, the console moves to Commanders. Build and Forces stay disabled.
 - The opponent status line, read-only and with no tip:
   - A dot: grey while planning is off, teal while it is on, and rose while the opponent plans.
-  - A label: "Commanders off" while Run is off, "Commanders planning · {ready} of {active} ready" while any commander is planning, and "Commanders ready" otherwise. While observing, the planning label is "Planning · {ready} of {active} ready". Ready's wait label is "AI: {m:ss} · {k} planning".
+  - A label: "Commanders off" while Run is off, "Commanders planning · {ready} of {active} ready" while any commander is planning, and "Commanders ready" otherwise. While observing, the planning label is "Planning · {ready} of {active} ready". Ready's wait label is "AI: {m:ss} (x{n})", and `{n}` is how many commanders are still planning.
   - The selected model's name: the model option's text before " [", or "No model". A long name is cut short with an ellipsis.
   - The match cost, the sum of the seats' stored cost.
   - The labels come from `src/shared/commanderPlanningStatus.ts`.

@@ -202,11 +202,24 @@ export function setObserveOnly(
 }
 
 /**
+ * Whether any AI row has a model selected.
+ *
+ * Purpose: Start asks before a match that would make no model calls.
+ * When to use: The Start click, before the match epoch advances.
+ * Expected outcome: True when some AI row's `modelId` is non-empty after trim. A null state and a human row are false.
+ * Exceptions: None.
+ */
+export function sidesHaveAnyModel(state: NewGameSidesState | null): boolean {
+  if (!state) return false;
+  return state.rows.some((row) => row.kind === AI_SEAT_KIND && Boolean(row.commander?.modelId?.trim()));
+}
+
+/**
  * Adds an AI row on the first free home.
  *
  * Purpose: The add button grows the match by one side.
  * When to use: When `addRowBlockedReason` is null.
- * Expected outcome: The same state when no home is free or four sides are already listed. Otherwise one new AI row.
+ * Expected outcome: The same state when no home is free or four sides are already listed. Otherwise one new AI row whose commander is a copy of the last AI commander, or `defaultCommander` when none exists. The home is the next free home.
  * Exceptions: None.
  */
 export function addSideRow(
@@ -218,7 +231,17 @@ export function addSideRow(
   const taken = new Set(state.rows.map((row) => row.homeKey));
   const free = homes.find((home) => !taken.has(home.key));
   if (!free) return state;
-  const row: NewGameSideRow = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander };
+  const source = [...state.rows].reverse().find((row) => row.kind === AI_SEAT_KIND && row.commander != null);
+  const copied = source?.commander;
+  const commander: NewGameCommanderInput = copied
+    ? {
+        modelId: copied.modelId,
+        reasoningEffort: copied.reasoningEffort,
+        doctrineChoice: copied.doctrineChoice,
+        apiKey: (copied.apiKey ?? '').trim(),
+      }
+    : defaultCommander;
+  const row: NewGameSideRow = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
   return { ...state, rows: [...state.rows, row] };
 }
 

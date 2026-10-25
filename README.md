@@ -107,20 +107,20 @@ The game's "working directory" is:
 - **macOS:** Not verified, but opening the app from Finder probably won't pick up `.env`. I'll provide an update when I can.
 - **Linux:** Wherever the executable is invoked from.
 
-When the `.env` file is present at runtime, the game will create the following files in the same directory:
+When the `.env` file is present at runtime, the game will create one set of these files per opponent in the same directory. The number is `aiIndexForSeatId` of the seat being consulted. Opponent 1 writes `debug-last-strategic-prompt-1.txt`.
 
 ```
-debug-last-openrouter-response-body.txt
-debug-last-strategic-prompt.txt
-debug-last-tactical-prompt.txt
-debug-last-user-prompt.txt
+debug-last-openrouter-response-body-1.txt
+debug-last-strategic-prompt-1.txt
+debug-last-tactical-prompt-1.txt
+debug-last-user-prompt-1.txt
 debug.log
 ```
 
-- **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls. A formatted example of one strategic reply is [doc/ai-commander-prompts/example-strategic-response.md](doc/ai-commander-prompts/example-strategic-response.md).
-- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-strategic-prompt.md](doc/ai-commander-prompts/example-strategic-prompt.md).
-- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-tactical-prompt.md](doc/ai-commander-prompts/example-tactical-prompt.md).
-- **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
+- **debug-last-openrouter-response-body-N.txt**: That opponent's last response from OpenRouter, including tool calls. A formatted example of one strategic reply is [doc/ai-commander-prompts/example-strategic-response.md](doc/ai-commander-prompts/example-strategic-response.md).
+- **debug-last-strategic-prompt-N.txt**: That opponent's last system prompt sent during a strategic game. This doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-strategic-prompt.md](doc/ai-commander-prompts/example-strategic-prompt.md).
+- **debug-last-tactical-prompt-N.txt**: That opponent's last system prompt sent during a tactical battle. This also doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-tactical-prompt.md](doc/ai-commander-prompts/example-tactical-prompt.md).
+- **debug-last-user-prompt-N.txt**: That opponent's stock prompt suffix, sent after the strategic/tactical prompts.
 - **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 
 See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) for what goes into these prompts and how they're assembled and used.

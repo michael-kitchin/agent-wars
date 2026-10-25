@@ -957,25 +957,6 @@
     return after.some((id) => !beforeSet.has(id));
   }
 
-  // src/shared/aiStrategyToastContent.ts
-  var AI_STRATEGY_TOAST_MESSAGE_TITLE = "Message";
-  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
-  function trimToastField(raw) {
-    const trimmed = raw?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : void 0;
-  }
-  function buildAiStrategyToastSections(fields) {
-    const sections = [];
-    const message = trimToastField(fields.message);
-    const strategy = trimToastField(fields.strategy);
-    if (message) sections.push({ title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: message });
-    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
-    return sections;
-  }
-  function hasAiStrategyToastContent(fields) {
-    return buildAiStrategyToastSections(fields).length > 0;
-  }
-
   // src/shared/htmlTextFormatting.ts
   function escapeHtmlText(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
@@ -3107,11 +3088,38 @@
   }
 
   // src/shared/lossSummary.ts
+  var LOSS_ENTRY_LIST_MAX = 5;
+  var GROUP_LABEL_BY_TYPE = {
+    naval: "Naval",
+    air: "Air",
+    armor: "Armored",
+    infantry: "Infantry"
+  };
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry"];
   function emptyPlayerLossSummary() {
     return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
   }
   function emptyTurnLossSummary() {
     return { byOwner: {} };
+  }
+  function formatLossEntries(units) {
+    if (units.length === 0) return "";
+    if (units.length <= LOSS_ENTRY_LIST_MAX) {
+      return units.map((u) => u.displayName).join(", ");
+    }
+    return formatGroupedTypeTotals(units);
+  }
+  function formatGroupedTypeTotals(units) {
+    const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
+    for (const u of units) {
+      if (u.unitType in counts) counts[u.unitType] += 1;
+    }
+    const parts = [];
+    for (const t of GROUP_ORDER) {
+      const n = counts[t];
+      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
+    }
+    return parts.join(", ");
   }
   var CAUSE_SPECS = [
     { key: "ranged", label: "Ranged attack" },
@@ -3122,6 +3130,16 @@
   ];
   var LOSS_CAUSE_LABELS = CAUSE_SPECS.map((spec) => spec.label);
   var LOSS_CAUSE_KEYS = CAUSE_SPECS.map((spec) => spec.key);
+  function formatPlayerLossLinesMultiline(summary) {
+    const lines = [];
+    for (const spec of CAUSE_SPECS) {
+      const units = summary[spec.key];
+      if (units.length === 0) continue;
+      const text = formatLossEntries(units);
+      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
+    }
+    return lines;
+  }
 
   // src/shared/seatIds.ts
   var HUMAN_SEAT_ID = "human";
@@ -19969,10 +19987,6 @@ ${bonuses}`;
       addSymbol(rangeByUnit, "Infantry", "-");
       addSymbol(rangeByUnit, "Armored", "-");
     }
-    if (cat === "mountains") {
-      addSymbol(rangeByUnit, "Armored", "x");
-      addSymbol(rangeByUnit, "Naval", "x");
-    }
   }
   function addSymbol(map, unit, symbol) {
     const existing = map.get(unit) ?? /* @__PURE__ */ new Set();
@@ -21460,22 +21474,19 @@ ${bonuses}`;
   }
   function messageLines(dispatches) {
     const observing = matchIsObserving();
-    const lines = [];
+    const kept = [];
     for (const dispatch of dispatches) {
-      const keep = Boolean(dispatch.message) || observing && Boolean(dispatch.strategy);
+      const keep = Boolean(dispatch.message?.trim()) || observing && Boolean(dispatch.strategy?.trim());
       if (!keep) continue;
       fileMessage?.(dispatch);
-      if (dispatch.message) lines.push(`${dispatchSeatName(dispatch.seatId)}: ${dispatch.message}`);
+      kept.push(dispatch);
     }
-    return lines;
+    return kept;
   }
   function matchIsObserving() {
     return isObservingRoster(rendererSharedState.gameState?.seats ?? []);
   }
-  function dispatchSeatName(seatId) {
-    return rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId)?.homeRegion ?? seatId;
-  }
-  async function readCommanderPoolAndApply(drain) {
+  async function readCommanderPoolAndApply(drain, showMessages = true) {
     if (!window.gameApi?.readCommanderPool) return;
     const matchEpoch = currentRendererMatchEpoch();
     const wasPlanning = anyCommanderIsPlanning();
@@ -21485,8 +21496,8 @@ ${bonuses}`;
       snapshot = next;
       const consultFinished = wasPlanning && !anyCommanderIsPlanning();
       if (drain && (next.dispatches.length > 0 || consultFinished)) {
-        const lines = messageLines(next.dispatches);
-        if (lines.length > 0) showToast?.(lines);
+        const kept = messageLines(next.dispatches);
+        if (showMessages && kept.length > 0) showToast?.(kept);
         await refreshSeatCosts();
       }
     } catch (err) {
@@ -21731,12 +21742,24 @@ ${bonuses}`;
     const nextFirst = on ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
     return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
   }
+  function sidesHaveAnyModel(state) {
+    if (!state) return false;
+    return state.rows.some((row) => row.kind === AI_SEAT_KIND && Boolean(row.commander?.modelId?.trim()));
+  }
   function addSideRow(state, homes, defaultCommander2) {
     if (addRowBlockedReason(state, homes)) return state;
     const taken = new Set(state.rows.map((row2) => row2.homeKey));
     const free = homes.find((home) => !taken.has(home.key));
     if (!free) return state;
-    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander: defaultCommander2 };
+    const source = [...state.rows].reverse().find((row2) => row2.kind === AI_SEAT_KIND && row2.commander != null);
+    const copied = source?.commander;
+    const commander = copied ? {
+      modelId: copied.modelId,
+      reasoningEffort: copied.reasoningEffort,
+      doctrineChoice: copied.doctrineChoice,
+      apiKey: (copied.apiKey ?? "").trim()
+    } : defaultCommander2;
+    const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
     return { ...state, rows: [...state.rows, row] };
   }
   function removeSideRow(state, index) {
@@ -21841,6 +21864,17 @@ ${bonuses}`;
       return { label: `Copy from Last Game (${rowLabel(state, index)})`, disabled: false, source: "previous-match" };
     }
     return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
+  }
+
+  // src/shared/popoverPlacement.ts
+  function placeBelowAnchor(anchor2, popover2, viewport) {
+    const gap = 6;
+    const margin = 8;
+    const left = Math.max(margin, Math.min(anchor2.left, viewport.width - popover2.width - margin));
+    let top = anchor2.bottom + gap;
+    if (top + popover2.height > viewport.height - margin) top = anchor2.top - popover2.height - gap;
+    if (top < margin) top = margin;
+    return { top, left };
   }
 
   // src/renderer/chrome/controlTooltipText.ts
@@ -22105,6 +22139,7 @@ ${bonuses}`;
       reasoningRow.hidden = efforts.length === 0;
       const modelKnown = modelId.length > 0 && record != null;
       if (!modelId || modelKnown && efforts.length === 0) draft.reasoningEffort = null;
+      placeCommanderPopover();
     };
     model.addEventListener("change", () => {
       draft.modelId = model.value ? model.value : null;
@@ -22223,11 +22258,14 @@ ${bonuses}`;
   function placeCommanderPopover() {
     if (!popover || !anchor) return;
     const rect = anchor.getBoundingClientRect();
-    popover.style.top = `${rect.bottom + 6}px`;
-    popover.style.left = `${Math.max(8, rect.left)}px`;
     const box = popover.getBoundingClientRect();
-    if (box.right > window.innerWidth - 8) popover.style.left = `${Math.max(8, window.innerWidth - box.width - 8)}px`;
-    if (box.bottom > window.innerHeight - 8) popover.style.top = `${Math.max(8, rect.top - box.height - 6)}px`;
+    const placed = placeBelowAnchor(
+      { top: rect.top, bottom: rect.bottom, left: rect.left },
+      { width: box.width, height: box.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    popover.style.top = `${placed.top}px`;
+    popover.style.left = `${placed.left}px`;
   }
 
   // src/renderer/openRouter/openRouterRunToggle.ts
@@ -22402,6 +22440,12 @@ ${bonuses}`;
     renderCommanderCards();
   });
 
+  // src/shared/readyAiWaitLabel.ts
+  function readyAiWaitLabel(elapsedLabel, pendingCount) {
+    const shown = pendingCount < 1 ? 1 : pendingCount;
+    return `AI: ${elapsedLabel} (x${shown})`;
+  }
+
   // src/renderer/openRouter/readyButtonLabel.ts
   function formatElapsedMmSs(ms) {
     const totalSeconds = Math.floor(ms / 1e3);
@@ -22429,7 +22473,7 @@ ${bonuses}`;
     readyBtn.replaceChildren(buildReadyCheckIcon(), label);
   }
   function setReadyButtonLabelAiWait(readyBtn, elapsedMs, planningCount = 1) {
-    const text = `AI: ${formatElapsedMmSs(elapsedMs)} \xB7 ${planningCount} planning`;
+    const text = readyAiWaitLabel(formatElapsedMmSs(elapsedMs), planningCount);
     let label = readyBtn.querySelector(".ready-btn-ai-label");
     if (!label) {
       label = document.createElement("span");
@@ -22760,14 +22804,12 @@ ${bonuses}`;
   function appendMapToastMessageBody(target, message, unitOriginByDisplayName) {
     const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
     let inSection = false;
-    let isFirstSection = true;
     for (const line of lines) {
       if (line.startsWith("## ")) {
         inSection = true;
-        if (!isFirstSection) {
+        if (target.childNodes.length > 0) {
           target.appendChild(document.createElement("br"));
         }
-        isFirstSection = false;
         appendMapToastSectionHeader(target, line.slice(3));
         continue;
       }
@@ -22829,22 +22871,9 @@ ${bonuses}`;
       hideAiStrategyToast();
     }, TOAST_DURATION_MS);
   }
-  function showAiStrategyToast(content) {
-    if (!hasAiStrategyToastContent(content)) {
-      hideAiStrategyToast();
-      return;
-    }
-    showFilledAiStrategyToast((target) => {
-      const sections = buildAiStrategyToastSections(content);
-      sections.forEach((section, index) => {
-        if (index > 0) target.appendChild(document.createElement("br"));
-        appendMapToastSectionHeader(target, section.title);
-        const span = document.createElement("span");
-        span.style.display = "block";
-        span.textContent = section.body;
-        target.appendChild(span);
-      });
-    }, true);
+  var onStrategyToastHidden = null;
+  function setAiStrategyToastHiddenListener(listener) {
+    onStrategyToastHidden = listener;
   }
   function hideAiStrategyToast() {
     if (rendererSharedState.aiStrategyToastHideTimer !== null) {
@@ -22853,6 +22882,7 @@ ${bonuses}`;
     }
     const el = document.getElementById("ai-strategy-toast");
     if (el) el.classList.add("hidden");
+    onStrategyToastHidden?.();
   }
   function hidePlanningChromeToasts() {
     hideMapToast();
@@ -26962,6 +26992,12 @@ ${bonuses}`;
   // src/shared/victoryRules.ts
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
+  var DEFAULT_VICTORY_RULE = "last_side_standing";
+  var VICTORY_RULE_LABELS = {
+    last_side_standing: "Deathmatch",
+    most_city_hexes_at_turn_limit: "Most city hexes at turn limit"
+  };
+  var UNLIMITED_TURN_LIMIT_LABEL = "Unlimited";
   function countCityHexesBySeat(control, infrastructure) {
     const urbanByHex = new Map(infrastructure.map((row) => [row.h3Index, row.urbanHexCount]));
     const counts = /* @__PURE__ */ new Map();
@@ -26982,6 +27018,76 @@ ${bonuses}`;
     return places;
   }
 
+  // src/renderer/gameplay/newGameVictoryUi.ts
+  var rememberedTurnLimit = DEFAULT_TURN_LIMIT;
+  function bindNewGameVictory() {
+    const victory = document.getElementById("new-game-victory-select");
+    if (victory instanceof HTMLSelectElement && victory.options.length === 0) {
+      for (const rule of ["last_side_standing", "most_city_hexes_at_turn_limit"]) {
+        const option2 = document.createElement("option");
+        option2.value = rule;
+        option2.textContent = VICTORY_RULE_LABELS[rule];
+        if (rule === DEFAULT_VICTORY_RULE) option2.selected = true;
+        victory.appendChild(option2);
+      }
+      victory.addEventListener("change", () => {
+        renderNewGameVictory();
+      });
+    }
+    renderNewGameVictory();
+  }
+  function renderNewGameVictory() {
+    const limit = document.getElementById("new-game-turn-limit-select");
+    if (!(limit instanceof HTMLSelectElement)) return;
+    const parsed = Number(limit.value);
+    if (TURN_LIMIT_OPTIONS.includes(parsed)) rememberedTurnLimit = parsed;
+    const rule = selectedVictoryRule();
+    if (rule !== "most_city_hexes_at_turn_limit") {
+      limit.replaceChildren();
+      const option2 = document.createElement("option");
+      option2.value = "";
+      option2.textContent = UNLIMITED_TURN_LIMIT_LABEL;
+      option2.selected = true;
+      limit.appendChild(option2);
+      limit.disabled = true;
+      return;
+    }
+    const selected = rememberedTurnLimit;
+    limit.replaceChildren();
+    for (const turns of TURN_LIMIT_OPTIONS) {
+      const option2 = document.createElement("option");
+      option2.value = String(turns);
+      option2.textContent = `${turns} turns`;
+      if (turns === selected) option2.selected = true;
+      limit.appendChild(option2);
+    }
+    limit.value = String(selected);
+    limit.disabled = false;
+  }
+  function readNewGameVictory() {
+    const victoryRule = selectedVictoryRule();
+    if (victoryRule !== "most_city_hexes_at_turn_limit") {
+      return { victoryRule, turnLimit: rememberedTurnLimit };
+    }
+    const limit = document.getElementById("new-game-turn-limit-select");
+    const parsed = limit instanceof HTMLSelectElement ? Number(limit.value) : Number.NaN;
+    const turnLimit = TURN_LIMIT_OPTIONS.includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
+    return { victoryRule, turnLimit };
+  }
+  function resetNewGameVictory() {
+    rememberedTurnLimit = DEFAULT_TURN_LIMIT;
+    const victory = document.getElementById("new-game-victory-select");
+    if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
+    renderNewGameVictory();
+  }
+  function selectedVictoryRule() {
+    const victory = document.getElementById("new-game-victory-select");
+    if (victory instanceof HTMLSelectElement && victory.value === "most_city_hexes_at_turn_limit") {
+      return "most_city_hexes_at_turn_limit";
+    }
+    return DEFAULT_VICTORY_RULE;
+  }
+
   // src/renderer/gameplay/newGameSidesUi.ts
   var rememberedCommanders = { hasPreviousMatch: false, prefillApiKey: "", previousMatch: [] };
   async function loadCommanderKeyMemory() {
@@ -26991,6 +27097,9 @@ ${bonuses}`;
     } catch (err) {
       console.error("getCommanderKeyMemory failed", err);
     }
+  }
+  function newGameHasAnyModel() {
+    return sidesHaveAnyModel(sidesState);
   }
   function newGameHasRunnableCommander() {
     return (sidesState?.rows ?? []).some(
@@ -27024,7 +27133,10 @@ ${bonuses}`;
   }
   function refreshNewGameSides(options) {
     closeCommanderPopover();
-    if (options?.reset) requestedRows = MIN_SEATS;
+    if (options?.reset) {
+      requestedRows = MIN_SEATS;
+      resetNewGameVictory();
+    }
     const homes = homesForTab();
     const mapKind = selectedNewGameTab();
     const commander = defaultCommander();
@@ -27037,7 +27149,7 @@ ${bonuses}`;
     renderNewGameSides();
   }
   function bindNewGameSides() {
-    fillVictoryControls();
+    bindNewGameVictory();
     setPreviewHomeKeyReader(previewHomeKeys);
     document.getElementById("new-game-observe-only")?.addEventListener("change", () => {
       if (!sidesState) return;
@@ -27065,39 +27177,16 @@ ${bonuses}`;
   }
   function readNewGameSeatsStart() {
     const blocked = startBlockedReason(sidesState);
-    const turnLimit = readTurnLimit();
+    const victory = readNewGameVictory();
     return {
       seats: sidesState && !blocked ? buildSeatsPayload(sidesState) : [],
-      turnLimit,
+      turnLimit: victory.turnLimit,
+      victoryRule: victory.victoryRule,
       blocked
     };
   }
   function previewHomeKeys() {
     return (sidesState?.rows ?? []).map((row) => row.homeKey ?? "");
-  }
-  function fillVictoryControls() {
-    const victory = document.getElementById("new-game-victory-select");
-    if (victory && victory.options.length === 0) {
-      const option2 = document.createElement("option");
-      option2.value = "rule";
-      option2.textContent = "Last side standing";
-      victory.appendChild(option2);
-    }
-    const limit = document.getElementById("new-game-turn-limit-select");
-    if (limit && limit.options.length === 0) {
-      for (const turns of TURN_LIMIT_OPTIONS) {
-        const option2 = document.createElement("option");
-        option2.value = String(turns);
-        option2.textContent = `${turns} turns`;
-        if (turns === DEFAULT_TURN_LIMIT) option2.selected = true;
-        limit.appendChild(option2);
-      }
-    }
-  }
-  function readTurnLimit() {
-    const limit = document.getElementById("new-game-turn-limit-select");
-    const parsed = Number(limit?.value);
-    return TURN_LIMIT_OPTIONS.includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
   }
   function renderNewGameSides() {
     const homes = homesForTab();
@@ -27140,13 +27229,7 @@ ${bonuses}`;
         startBlocked ?? newGameButtonTooltipText(start.textContent !== "New game")
       );
     }
-    const global = selectedNewGameTab() === "global";
-    const victory = document.getElementById("new-game-victory-select");
-    if (victory && victory.options[0]) {
-      victory.options[0].textContent = global ? "Most city hexes at turn limit" : "Last side standing";
-    }
-    const limitRow = document.getElementById("new-game-turn-limit-row");
-    if (limitRow) limitRow.hidden = !global;
+    renderNewGameVictory();
   }
   function copyCommanderFrom(index, source) {
     if (!sidesState) return;
@@ -29055,7 +29138,7 @@ ${bonuses}`;
     if (container) {
       for (const child of container.children) {
         const id = child.id;
-        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog") continue;
+        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog" || id === "start-confirm-dialog") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
@@ -33009,6 +33092,59 @@ ${bonuses}`;
     setLoadedStrategicFootprint(state.hexes.map((hex) => hex.h3Index), roles);
   }
 
+  // src/renderer/gameplay/startConfirmDialog.ts
+  var pendingAnswer = null;
+  var buttonsBound = false;
+  function confirmStartWithNoModels() {
+    const dialog = document.getElementById("start-confirm-dialog");
+    if (!(dialog instanceof HTMLElement)) {
+      console.error("start confirm dialog is missing");
+      return Promise.resolve(false);
+    }
+    if (pendingAnswer) {
+      const previous = pendingAnswer;
+      pendingAnswer = null;
+      previous(false);
+    }
+    bindStartConfirmDialog(dialog);
+    dialog.classList.remove("hidden");
+    const yes = document.getElementById("start-confirm-yes");
+    if (yes instanceof HTMLElement) yes.focus();
+    return new Promise((resolve) => {
+      pendingAnswer = resolve;
+    });
+  }
+  function bindStartConfirmDialog(dialog) {
+    if (buttonsBound) return;
+    buttonsBound = true;
+    document.getElementById("start-confirm-yes")?.addEventListener("click", () => {
+      finishStartConfirm(true);
+    });
+    document.getElementById("start-confirm-no")?.addEventListener("click", () => {
+      finishStartConfirm(false);
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) finishStartConfirm(false);
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "Escape") return;
+        if (dialog.classList.contains("hidden")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        finishStartConfirm(false);
+      },
+      true
+    );
+  }
+  function finishStartConfirm(answer) {
+    document.getElementById("start-confirm-dialog")?.classList.add("hidden");
+    const resolve = pendingAnswer;
+    pendingAnswer = null;
+    resolve?.(answer);
+  }
+
   // src/renderer/gameplay/observeIntent.ts
   var watchTheRest = false;
   function chooseWatchTheRest() {
@@ -33102,6 +33238,11 @@ ${bonuses}`;
         showMapToast(seatsStart.blocked);
         return;
       }
+      if (!newGameHasAnyModel()) {
+        closeCommanderPopover();
+        const startAnyway = await confirmStartWithNoModels();
+        if (!startAnyway) return;
+      }
       const matchEpoch = advanceRendererMatchEpoch();
       stopMatchWaitingUnderNewGame();
       const cameraHold = holdNewGameMapPreviewCamera();
@@ -33112,6 +33253,7 @@ ${bonuses}`;
           ...readNewGameMapChoice(),
           seats: seatsStart.seats,
           turnLimit: seatsStart.turnLimit,
+          victoryRule: seatsStart.victoryRule,
           gameSize: readSelectedGameSizeFromDocument()
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -33147,6 +33289,7 @@ ${bonuses}`;
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
         clearOpenRouterLog();
+        hideAiStrategyToast();
         clearConsoleReports();
         deps.updateOpenRouterCostLabel();
         deps.updateGameStateSidebar(state);
@@ -34266,7 +34409,7 @@ ${bonuses}`;
     } else if (rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
       deps.startBackgroundRequestIfAllowed();
     }
-    deps.showAiStrategyToast({ message: payload2.aiMessage, strategy: payload2.aiStrategy });
+    void readCommanderPoolAndApply(true);
     if (payload2.toolInvocationCounts) {
       rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload2.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
@@ -34489,15 +34632,8 @@ ${bonuses}`;
   }
 
   // src/shared/turnReportLines.ts
-  var TYPE_ORDER = ["infantry", "armor", "naval", "air"];
   function buildTurnReportLines(input) {
-    const lines = [
-      ...hexLines(input),
-      ...viewerLossLines(input),
-      ...seenLines(input),
-      ...input.otherLines
-    ];
-    return lines;
+    return [...hexLines(input), ...input.otherLines];
   }
   function ownerName(ownerId, seats) {
     if (isNeutralOwnerId(ownerId)) return "Neutral";
@@ -34510,28 +34646,6 @@ ${bonuses}`;
       return seats.find((row) => row.seatId === ownerId)?.seatOrder ?? 9e3;
     };
     return rank(left) - rank(right) || left.localeCompare(right);
-  }
-  function joinNames(names) {
-    if (names.length <= 1) return names[0] ?? "";
-    if (names.length === 2) return `${names[0]} and ${names[1]}`;
-    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-  }
-  function typeList(types) {
-    const counts = /* @__PURE__ */ new Map();
-    for (const unitType of types) counts.set(unitType, (counts.get(unitType) ?? 0) + 1);
-    const parts = [];
-    for (const unitType of TYPE_ORDER) {
-      const count = counts.get(unitType) ?? 0;
-      if (count === 0) continue;
-      parts.push(typePhrase(unitType, count));
-    }
-    return joinNames(parts);
-  }
-  function typePhrase(unitType, count) {
-    if (unitType === "infantry") return `${count} infantry`;
-    if (unitType === "armor") return count === 1 ? "1 armored unit" : `${count} armored units`;
-    if (unitType === "naval") return count === 1 ? "1 naval unit" : `${count} naval units`;
-    return count === 1 ? "1 air unit" : `${count} air units`;
   }
   function hexLines(input) {
     const viewer = input.viewerSeatId;
@@ -34554,77 +34668,41 @@ ${bonuses}`;
     }
     return lines;
   }
-  function viewerLossLines(input) {
-    const viewer = input.viewerSeatId;
-    if (viewer === null) return [];
+
+  // src/shared/turnLossSections.ts
+  var SECTION_HEADER_PREFIX = "## ";
+  function buildTurnLossSections(summary, viewerSeatId2, seats) {
     const lines = [];
-    const lostGroups = groupLosses(input.losses.filter((row) => row.victimOwnerId === viewer), (row) => `${row.killerOwnerId ?? ""}|${row.hexLabel}`);
-    for (const group of sortGroups(lostGroups, input.seats, (row) => row.killerOwnerId ?? "")) {
-      const killer = group[0]?.killerOwnerId;
-      const hex = group[0]?.hexLabel ?? "";
-      const toSide = killer && killer !== viewer ? ` to ${ownerName(killer, input.seats)}` : "";
-      lines.push(`You lost ${typeList(group.map((row) => row.unitType))}${toSide} at (${hex}).`);
+    if (viewerSeatId2 !== null) lines.push(...sectionLines(summary, viewerSeatId2, "Your Losses"));
+    const others = Object.keys(summary.byOwner).filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID).sort((left, right) => compareOwners2(left, right, seats));
+    for (const ownerId of others) {
+      const seat = seats.find((row) => row.seatId === ownerId);
+      lines.push(...sectionLines(summary, ownerId, lossSectionTitle(seat, ownerId)));
     }
-    const destroyed = groupLosses(
-      input.losses.filter((row) => row.killerOwnerId === viewer && row.victimOwnerId !== viewer),
-      (row) => `${row.victimOwnerId}|${row.hexLabel}`
-    );
-    for (const group of sortGroups(destroyed, input.seats, (row) => row.victimOwnerId)) {
-      const victim = group[0]?.victimOwnerId ?? "";
-      const hex = group[0]?.hexLabel ?? "";
-      lines.push(`You destroyed ${typeList(group.map((row) => row.unitType))} of ${ownerName(victim, input.seats)} at (${hex}).`);
-    }
+    lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, "Neutral Losses"));
     return lines;
   }
-  function seenLines(input) {
-    const byHex = groupLosses(input.losses, (row) => row.hexLabel);
-    const lines = [];
-    for (const hex of [...byHex.keys()].sort((left, right) => left.localeCompare(right))) {
-      const rows = byHex.get(hex) ?? [];
-      const parties = fightParties(rows);
-      if (input.viewerSeatId !== null && parties.includes(input.viewerSeatId)) continue;
-      if (parties.length < 2) continue;
-      const ordered = [...parties].sort((left, right) => compareOwners(left, right, input.seats));
-      const names = ordered.map((ownerId) => ownerName(ownerId, input.seats));
-      const lists = ordered.map((ownerId) => typeList(rows.filter((row) => row.victimOwnerId === ownerId).map((row) => row.unitType)));
-      const fought = `Seen: ${joinNames(names)} fought at (${hex}).`;
-      if (ordered.length === 2 && lists[0] && lists[0] === lists[1]) {
-        lines.push(`${fought} Each lost ${lists[0]}.`);
-        continue;
-      }
-      const clauses = ordered.flatMap((ownerId, index) => {
-        const list = lists[index];
-        if (!list) return [];
-        return [`${ownerName(ownerId, input.seats)} lost ${list}`];
-      });
-      lines.push(clauses.length > 0 ? `${fought} ${clauses.join("; ")}.` : fought);
-    }
-    return lines;
+  function lossSectionTitle(seat, ownerId) {
+    const name = seat?.homeRegion.trim() ?? "";
+    return `${name.length > 0 ? name : ownerId} Losses`;
   }
-  function fightParties(rows) {
-    const ids = /* @__PURE__ */ new Set();
-    for (const row of rows) {
-      ids.add(row.victimOwnerId);
-      if (row.killerOwnerId) ids.add(row.killerOwnerId);
-    }
-    return [...ids];
+  function sectionLines(summary, ownerId, header) {
+    const buckets = summary.byOwner[ownerId];
+    if (!buckets) return [];
+    const causes = formatPlayerLossLinesMultiline(buckets);
+    if (causes.length === 0) return [];
+    return [
+      `${SECTION_HEADER_PREFIX}${header}`,
+      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`)
+    ];
   }
-  function groupLosses(rows, keyOf) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const row of rows) {
-      const key = keyOf(row);
-      const list = groups.get(key);
-      if (list) list.push(row);
-      else groups.set(key, [row]);
-    }
-    return groups;
-  }
-  function sortGroups(groups, seats, ownerOf) {
-    return [...groups.values()].sort((left, right) => {
-      const owner = compareOwners(ownerOf(left[0]), ownerOf(right[0]), seats);
-      if (owner !== 0) return owner;
-      return (left[0]?.hexLabel ?? "").localeCompare(right[0]?.hexLabel ?? "");
-    });
+  function compareOwners2(left, right, seats) {
+    const leftSeat = seats.find((row) => row.seatId === left);
+    const rightSeat = seats.find((row) => row.seatId === right);
+    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
+    if (leftSeat) return -1;
+    if (rightSeat) return 1;
+    return left.localeCompare(right, "en");
   }
 
   // src/shared/consolidatedTurnUpdateToast.ts
@@ -34674,8 +34752,14 @@ ${bonuses}`;
     const { readyResult, combatFallbackBullets, turnReport } = args;
     const sections = [];
     const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
+    const lossSections = buildTurnLossSections(
+      args.turnLossSummary,
+      turnReport?.viewerSeatId ?? null,
+      turnReport?.seats ?? []
+    );
     sections.push(...reportLines);
-    const hasLossSections = reportLines.length > 0;
+    sections.push(...lossSections);
+    const hasLossSections = reportLines.length > 0 || lossSections.length > 0;
     let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
     if (!hasLossSections && otherLines.length === 0) {
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
@@ -34821,37 +34905,6 @@ ${bonuses}`;
     const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
     return viewer ?? null;
   }
-  function turnReportLosses(readySlice, knownVictimIds, extraKills) {
-    const removed = [...readySlice.removedUnits ?? [], ...readySlice.airStrikeRemovedUnits ?? []];
-    const killerByVictim = /* @__PURE__ */ new Map();
-    const edges = [
-      ...readySlice.kills ?? [],
-      ...readySlice.killsByDirectFire ?? [],
-      ...readySlice.killsByReturnFire ?? [],
-      ...extraKills
-    ];
-    for (const edge of edges) {
-      const killerId = edge.killerIds?.[0];
-      killerByVictim.set(edge.victimId, killerId ? unitIdOwnerFromId(killerId) : null);
-    }
-    const losses = [];
-    for (const unit of removed) {
-      if (!knownVictimIds.has(unit.id)) continue;
-      const unitType = reportUnitType(unit.unitType);
-      if (!unitType) continue;
-      losses.push({
-        victimOwnerId: unit.player,
-        killerOwnerId: killerByVictim.get(unit.id) ?? null,
-        hexLabel: getStrategicHexCode(unit.h3Index) ?? unit.h3Index,
-        unitType
-      });
-    }
-    return losses;
-  }
-  function reportUnitType(unitType) {
-    if (unitType === "infantry" || unitType === "armor" || unitType === "naval" || unitType === "air") return unitType;
-    return null;
-  }
   async function announceResolutionTurnUpdate(args, deps) {
     const { readySlice, visibility, killToastFormatter, extraKills, reportTag } = args;
     const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
@@ -34874,11 +34927,7 @@ ${bonuses}`;
       turnReport: {
         viewerSeatId: reportViewerSeatId(),
         seats,
-        transitions: readySlice.controlTransitions ?? [],
-        losses: turnReportLosses(readySlice, knownVictimIds, [
-          ...extraKills?.killsByMelee ?? [],
-          ...extraKills?.killsByAirStrike ?? []
-        ])
+        transitions: readySlice.controlTransitions ?? []
       }
     });
     if (updateText) {
@@ -35183,7 +35232,7 @@ ${bonuses}`;
       if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && rendererSharedState.runButtonOn && tacticalBattleHasAiSide()) {
         deps.startBackgroundRequestIfAllowed();
       }
-      deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
+      void readCommanderPoolAndApply(true);
     }
     applyToolInvocationCountsAfterReady({
       fromResult: commitResult.toolInvocationCounts,
@@ -35570,7 +35619,6 @@ ${bonuses}`;
       const resolutionMoves = [...humanMoves, ...aiMoves];
       const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
       const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
-      deps.showAiStrategyToast({ message: readyResult.aiMessage, strategy: readyResult.aiStrategy });
       applyToolInvocationCountsAfterReady({
         fromResult: readyResult.toolInvocationCounts,
         cachedPrecomputed: cachedPrecomputedToolCounts,
@@ -36119,7 +36167,6 @@ ${bonuses}`;
       updateOpenRouterToolCountLabels,
       updateOpenRouterCostLabel,
       showSidebarError: showSidebarError2,
-      showAiStrategyToast,
       requestRedraw: requestRedraw2
     });
   }
@@ -36129,8 +36176,7 @@ ${bonuses}`;
       updateReadyButtonState,
       updateOpenRouterToolCountLabels,
       updateOpenRouterCostLabel,
-      showSidebarError: showSidebarError2,
-      showAiStrategyToast
+      showSidebarError: showSidebarError2
     });
   }
   function refreshStrategicOrderSidebars() {
@@ -36311,18 +36357,116 @@ ${bonuses}`;
     return `${model.name ?? model.id}${formatModelOptionSuffix(model)}`;
   }
 
-  // src/renderer/openRouter/commanderMessagesToast.ts
-  function showCommanderMessagesToast(lines) {
-    if (lines.length === 0) return;
-    showFilledAiStrategyToast((target) => {
-      appendMapToastSectionHeader(target, `Messages (${lines.length})`);
-      for (const line of lines) {
-        const span = document.createElement("span");
-        span.style.display = "block";
-        span.textContent = line;
-        target.appendChild(span);
-      }
-    }, false);
+  // src/shared/aiStrategyToastContent.ts
+  var AI_STRATEGY_TOAST_MESSAGE_TITLE = "Message";
+  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
+  function trimToastField(raw) {
+    const trimmed = raw?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function buildAiStrategyToastSections(fields) {
+    const sections = [];
+    const message = trimToastField(fields.message);
+    const strategy = trimToastField(fields.strategy);
+    if (message) sections.push({ title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: message });
+    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
+    return sections;
+  }
+
+  // src/shared/commanderMessageTabs.ts
+  function initialCommanderMessageTabs(seats) {
+    const tabs = seats.map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      enabled: false,
+      message: null,
+      strategy: null
+    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
+    return { tabs, selectedSeatId: null };
+  }
+  function applyCommanderMessage(state, arrival) {
+    const message = proseOrNull(arrival.message);
+    const strategy = proseOrNull(arrival.strategy);
+    if (!message && !strategy) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
+    if (index < 0) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
+    );
+    return { tabs, selectedSeatId: arrival.seatId };
+  }
+  function proseOrNull(value) {
+    const trimmed = value?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  // src/renderer/openRouter/commanderMessageTabsUi.ts
+  var tabState = null;
+  function bindCommanderMessageTabs() {
+    setAiStrategyToastHiddenListener(() => {
+      tabState = null;
+    });
+  }
+  function showCommanderMessageTabs(dispatches) {
+    if (strategyToastHidden() || tabState === null) {
+      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
+      tabState = initialCommanderMessageTabs(seats);
+    }
+    const observing = isObservingRoster(rendererSharedState.gameState?.seats ?? []);
+    for (const dispatch of dispatches) {
+      const strategy = observing ? dispatch.strategy : null;
+      if (!dispatch.message?.trim() && !strategy?.trim()) continue;
+      tabState = applyCommanderMessage(tabState, {
+        seatId: dispatch.seatId,
+        message: dispatch.message,
+        strategy
+      });
+    }
+    if (!tabState.tabs.some((tab) => tab.enabled)) return;
+    showFilledAiStrategyToast(renderCommanderMessageTabs, false);
+  }
+  function renderCommanderMessageTabs(target) {
+    const host = target ?? document.getElementById("ai-strategy-toast-text");
+    if (!(host instanceof HTMLElement) || !tabState) return;
+    const state = tabState;
+    host.replaceChildren();
+    const list = document.createElement("div");
+    list.className = "ai-strategy-tab-bar";
+    list.setAttribute("role", "tablist");
+    for (const tab of state.tabs) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "tab");
+      button.textContent = tab.label;
+      button.disabled = !tab.enabled;
+      button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
+      button.addEventListener("click", () => {
+        if (!tab.enabled || !tabState) return;
+        tabState = { ...tabState, selectedSeatId: tab.seatId };
+        renderCommanderMessageTabs();
+      });
+      list.append(button);
+    }
+    host.append(list);
+    const selected = state.tabs.find((tab) => tab.seatId === state.selectedSeatId);
+    if (!selected?.enabled) return;
+    const sections = buildAiStrategyToastSections({ message: selected.message, strategy: selected.strategy });
+    if (sections.length === 0) return;
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "tabpanel");
+    sections.forEach((section, index) => {
+      if (index > 0) panel.appendChild(document.createElement("br"));
+      appendMapToastSectionHeader(panel, section.title);
+      const span = document.createElement("span");
+      span.style.display = "block";
+      span.textContent = section.body;
+      panel.append(span);
+    });
+    host.append(panel);
+  }
+  function strategyToastHidden() {
+    const toast = document.getElementById("ai-strategy-toast");
+    return !(toast instanceof HTMLElement) || toast.classList.contains("hidden");
   }
 
   // src/renderer/openRouter/modelDescriptionTooltip.ts
@@ -36457,12 +36601,13 @@ ${bonuses}`;
       if (!rendererSharedState.gameState || payload2.planningTurnNumber !== rendererSharedState.gameState.turnNumber) {
         deps.appendOpenRouterLog("Ignored stale post-resolution consultation push.", false);
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+        void readCommanderPoolAndApply(true, false);
         startTacticalOpponentPlanAfterStrategicConsult(deps);
         deps.updateReadyButtonState();
         return;
       }
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-      deps.showAiStrategyToast({ message: payload2.aiMessage, strategy: payload2.aiStrategy });
+      void readCommanderPoolAndApply(true);
       if (payload2.toolInvocationCounts) {
         rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload2.toolInvocationCounts };
         deps.updateOpenRouterToolCountLabels();
@@ -36488,14 +36633,13 @@ ${bonuses}`;
       if (fields.kind !== "tactical" || fields.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) {
         deps.appendOpenRouterLog("Ignored stale tactical post-beat consultation push.", false);
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+        void readCommanderPoolAndApply(true, false);
         deps.updateReadyButtonState();
         return;
       }
       rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
       applyTacticalPostBeatConsultSideEffects(fields, {
         startBackgroundRequestIfAllowed: deps.startBackgroundRequestIfAllowed,
-        showAiStrategyToast: deps.showAiStrategyToast,
-        hideAiStrategyToast: deps.hideAiStrategyToast,
         updateOpenRouterToolCountLabels: deps.updateOpenRouterToolCountLabels,
         appendOpenRouterLog: deps.appendOpenRouterLog,
         redraw: deps.requestRedraw,
@@ -36511,13 +36655,15 @@ ${bonuses}`;
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
       if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
     }
+    void readCommanderPoolAndApply(true, false);
     deps.requestRedraw();
     deps.updateReadyButtonState();
   }
   function initOpenRouterUI(deps) {
     setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
+    bindCommanderMessageTabs();
     bindCommanderPoolScreen({
-      showCommanderMessages: showCommanderMessagesToast,
+      showCommanderMessages: showCommanderMessageTabs,
       fileCommanderMessage: (dispatch) => {
         const body = document.createElement("div");
         recordConsoleReport("message", currentConsoleReportTag(), body, {
@@ -37050,7 +37196,18 @@ ${bonuses}`;
         tdRadio.appendChild(radio);
         tr.appendChild(tdRadio);
         const tdHex = document.createElement("td");
-        tdHex.append(hexCell(row.h3Index));
+        const hexCode = getStrategicHexCode(row.h3Index);
+        tdHex.textContent = hexCode ? `(${hexCode})` : row.h3Index;
+        void args.buildHexPopupHtml(row.h3Index).then(
+          (html) => {
+            if (!tdHex.isConnected) return;
+            tdHex.replaceChildren();
+            tdHex.innerHTML = html;
+            paintTerrainSwatches(tdHex);
+          },
+          () => {
+          }
+        );
         tr.appendChild(tdHex);
         const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
         const enemy = row.parties.find((party) => party.ownerId !== HUMAN_SEAT_ID);
@@ -37071,35 +37228,6 @@ ${bonuses}`;
       detachFrame = attachFrameToVisibleMap(frame);
       radios[0]?.focus();
     });
-  }
-  function hexCell(h3Index) {
-    const wrap = document.createElement("div");
-    const code = document.createElement("div");
-    const hexCode = getStrategicHexCode(h3Index);
-    code.textContent = hexCode ? `(${hexCode})` : h3Index;
-    const detail = document.createElement("div");
-    detail.className = "melee-intercept-muted";
-    detail.textContent = hexDetailLine(h3Index);
-    wrap.append(code, detail);
-    return wrap;
-  }
-  function hexDetailLine(h3Index) {
-    const state = rendererSharedState.gameState;
-    const seats = (state?.seats ?? []).map((seat) => ({ ...seat, homeRegion: shortSideName(seat.homeRegion) }));
-    const viewer = activeHumanSeatId(seats);
-    const controller = state?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
-    const control = formatHexControlLabel({
-      controllerId: controller,
-      homeSeatIds: homeSeatIdsAtHex(h3Index, {
-        homeRegionHexesBySeat: state?.homeRegionHexesBySeat
-      }),
-      viewerSeatId: viewer,
-      seats
-    });
-    const hex = state?.hexes.find((row) => row.h3Index === h3Index);
-    const terrain = formatTerrainKindLabel(hex?.terrainKind ?? null);
-    const weather = hex?.weather ? ` \xB7 Weather: ${formatWeatherLabel(hex.weather)}` : "";
-    return `Control: ${control} \xB7 Terrain: ${terrain}${weather}`;
   }
   function enemyCell(ownerId, unitSummary) {
     const wrap = document.createElement("div");
@@ -37283,7 +37411,6 @@ ${bonuses}`;
       applyGameStateSnapshot: applyGameStateSnapshot2,
       buildAirStrikeOutboundPlaybackMoves,
       buildAirStrikeReturnPlaybackMoves,
-      showAiStrategyToast,
       hideAiStrategyToast,
       updateOpenRouterCostLabel,
       appendOpenRouterLog,
@@ -37363,7 +37490,6 @@ ${bonuses}`;
       startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
       updateReadyButtonState,
       syncOpenRouterRunToggleInteractable,
-      showAiStrategyToast,
       updateOpenRouterToolCountLabels,
       requestRedraw: requestRedraw2
     });

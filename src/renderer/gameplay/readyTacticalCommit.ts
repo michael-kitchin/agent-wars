@@ -17,6 +17,7 @@ import { rendererSharedState as S } from '../core/state';
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
+import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 import {
   applyTacticalPostBeatConsultSideEffects,
@@ -229,7 +230,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     if (!tacticalOpponentPlanPayloadHasAnyOrders(plan) && S.runButtonOn && tacticalBattleHasAiSide()) {
       deps.startBackgroundRequestIfAllowed();
     }
-    deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
+    void readCommanderPoolAndApply(true);
   }
   // Same rule as strategic Ready: prefer this beat's consult counts, else keep prefetch telemetry visible.
   applyToolInvocationCountsAfterReady({

@@ -1,7 +1,7 @@
 /**
  * Win rule and turn limit for a match, and the city-hex count those rules use.
  *
- * Purpose: The global map ends on a turn limit. A regional map ends when one side is left.
+ * Purpose: The player picks Deathmatch or a city-hex turn limit on either map.
  * When to use: Starting a match, reading the snapshot, and ranking seats by city hexes.
  * Expected outcome: Helpers do not read the database. Callers pass the rows they already have.
  * Exceptions: None. This module does not import the main-process logger.
@@ -12,7 +12,7 @@ import { isSeatId, type SeatId } from './seatIds';
 /**
  * The two ways a match can end by the rules.
  *
- * Purpose: One id is stored for the match. The interface offers the turn limit only on the global map.
+ * Purpose: One id is stored for the match. The new-game control labels `last_side_standing` as Deathmatch.
  * When to use: New-game persistence and the end-of-turn check.
  * Expected outcome: `'last_side_standing'` or `'most_city_hexes_at_turn_limit'`.
  * Exceptions: None.
@@ -32,7 +32,7 @@ export type VictoryRule = (typeof VICTORY_RULES)[number];
 /**
  * Turn limits the global map offers.
  *
- * Purpose: The new-game control and the stored limit share this list.
+ * Purpose: The new-game control and the stored city-hex limit share this list.
  * When to use: Validating a requested limit.
  * Expected outcome: 20, 30, 40, and 50.
  * Exceptions: None.
@@ -42,12 +42,45 @@ export const TURN_LIMIT_OPTIONS = [20, 30, 40, 50] as const;
 /**
  * Turn limit used when a global match does not name one of the offered values.
  *
- * Purpose: An absent or unknown request still starts a bounded match.
- * When to use: `victorySettingsForMapKind` for the global map.
+ * Purpose: An absent or unknown city-hex request still starts a bounded match.
+ * When to use: `victorySettingsForRequest` when the rule is city hexes.
  * Expected outcome: 30.
  * Exceptions: None.
  */
 export const DEFAULT_TURN_LIMIT = 30;
+
+/**
+ * Win rule stored when a start does not name the city-hex rule.
+ *
+ * Purpose: Deathmatch is the default on both maps.
+ * When to use: `victorySettingsForRequest` and the new-game Rule control.
+ * Expected outcome: `last_side_standing`.
+ * Exceptions: None.
+ */
+export const DEFAULT_VICTORY_RULE: VictoryRule = 'last_side_standing';
+
+/**
+ * Labels for the new-game Rule control.
+ *
+ * Purpose: The stored id stays `last_side_standing`. The control says Deathmatch.
+ * When to use: Filling `#new-game-victory-select`.
+ * Expected outcome: Deathmatch, and Most city hexes at turn limit.
+ * Exceptions: None.
+ */
+export const VICTORY_RULE_LABELS: Readonly<Record<VictoryRule, string>> = {
+  last_side_standing: 'Deathmatch',
+  most_city_hexes_at_turn_limit: 'Most city hexes at turn limit',
+};
+
+/**
+ * Text shown in the turn-limit control while Deathmatch is selected.
+ *
+ * Purpose: The control stays visible and tells the player there is no limit.
+ * When to use: `renderNewGameVictory` when the rule is not city hexes.
+ * Expected outcome: The single choice "Unlimited".
+ * Exceptions: None.
+ */
+export const UNLIMITED_TURN_LIMIT_LABEL = 'Unlimited';
 
 /**
  * Why a finished match ended.
@@ -72,16 +105,16 @@ export type GameEndReason = (typeof GAME_END_REASONS)[number];
 /**
  * The win rule and turn limit stored for one match.
  *
- * Contract: A regional match has a null turn limit. A global match has one of `TURN_LIMIT_OPTIONS`.
+ * Contract: Deathmatch has a null turn limit. City hexes has one of `TURN_LIMIT_OPTIONS`.
  * When to use: The snapshot and the end-of-turn check.
- * Expected outcome: `rule` and `turnLimit` agree with `victorySettingsForMapKind`.
+ * Expected outcome: `rule` and `turnLimit` agree with `victorySettingsForRequest`.
  * Exceptions: None.
  */
 export interface VictorySettings {
   /**
    * Which rule ends the match.
    *
-   * Contract: `'last_side_standing'` on a regional map. `'most_city_hexes_at_turn_limit'` on the global map.
+   * Contract: `'last_side_standing'` for Deathmatch. `'most_city_hexes_at_turn_limit'` for a city-hex match.
    * When to use: Deciding whether the turn limit can end the match.
    * Expected outcome: One of `VICTORY_RULES`.
    * Exceptions: None.
@@ -102,7 +135,7 @@ export interface VictorySettings {
  * Whether a number is one of the offered turn limits.
  *
  * Purpose: An unlisted request must not be stored.
- * When to use: `victorySettingsForMapKind`.
+ * When to use: `victorySettingsForRequest`.
  * Expected outcome: True for 20, 30, 40, and 50.
  * Exceptions: None.
  */
@@ -111,18 +144,19 @@ function isTurnLimitOption(value: number): value is (typeof TURN_LIMIT_OPTIONS)[
 }
 
 /**
- * The win settings for a map kind.
+ * The win settings for a requested rule.
  *
- * Purpose: A regional match has no turn limit. A global match ends by city hexes at a chosen limit.
+ * Purpose: Deathmatch is the default on either map. City hexes stores a listed turn limit.
  * When to use: When a match is started, before the settings are stored.
- * Expected outcome: Regional settings ignore the requested limit. A global limit that is not offered becomes 30.
+ * Expected outcome: Any rule other than city hexes is Deathmatch and ignores the requested limit.
+ *   A city-hex limit that is not offered becomes 30.
  * Exceptions: None.
  */
-export function victorySettingsForMapKind(
-  mapKind: 'global' | 'regional',
+export function victorySettingsForRequest(
+  rule: VictoryRule | undefined,
   requestedTurnLimit: number | undefined
 ): VictorySettings {
-  if (mapKind === 'regional') return { rule: 'last_side_standing', turnLimit: null };
+  if (rule !== 'most_city_hexes_at_turn_limit') return { rule: 'last_side_standing', turnLimit: null };
   const turnLimit = requestedTurnLimit !== undefined && isTurnLimitOption(requestedTurnLimit)
     ? requestedTurnLimit
     : DEFAULT_TURN_LIMIT;

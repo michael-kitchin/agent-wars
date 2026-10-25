@@ -13,7 +13,7 @@ import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../sh
 
 import { TOOLTIP_OFFSET_PX } from './core/constants';
 import { runButtonTooltipText } from './chrome/controlTooltipText';
-import { appendOpenRouterLog, showAiStrategyToast, showMapToast, updateOpenRouterCostLabel, updateOpenRouterToolCountLabels, updateReadyButtonState } from './openRouter/openRouterUiHelpers';
+import { appendOpenRouterLog, showMapToast, updateOpenRouterCostLabel, updateOpenRouterToolCountLabels, updateReadyButtonState } from './openRouter/openRouterUiHelpers';
 import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './map/mapHelpers';
 import { shouldRenderTacticalHexes } from './map/terrainView';
 
@@ -675,7 +675,6 @@ export function startBackgroundRequestIfAllowed(): void {
     updateOpenRouterToolCountLabels,
     updateOpenRouterCostLabel,
     showSidebarError,
-    showAiStrategyToast,
     requestRedraw,
   });
 }
@@ -695,7 +694,6 @@ export function renderOpenRouterToolsList(): void {
     updateOpenRouterToolCountLabels,
     updateOpenRouterCostLabel,
     showSidebarError,
-    showAiStrategyToast,
   });
 }
 

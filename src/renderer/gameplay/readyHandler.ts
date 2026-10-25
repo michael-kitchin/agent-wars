@@ -243,8 +243,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
     const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
 
-    deps.showAiStrategyToast({ message: readyResult.aiMessage, strategy: readyResult.aiStrategy });
-
     applyToolInvocationCountsAfterReady({
       fromResult: readyResult.toolInvocationCounts,
       cachedPrecomputed: cachedPrecomputedToolCounts,

@@ -304,7 +304,7 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .commander-popover {
   position: fixed;
   z-index: 7060;
-  width: 280px;
+  width: 380px;
   padding: 10px;
   background: var(--chrome-bg, #1b2838);
   color: var(--chrome-text);
@@ -344,24 +344,37 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .commander-popover-field select,
 .commander-popover-field input {
-  width: 160px;
+  flex: 1;
   min-width: 0;
+  width: auto;
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-size: 13px;
 }
 .commander-popover-model-controls {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 160px;
+  flex: 1;
+  width: auto;
   min-width: 0;
 }
 .commander-popover-field .commander-popover-model-controls select {
   flex: 1;
   min-width: 0;
   width: auto;
+  height: 30px;
+}
+.commander-popover .openrouter-refresh-btn {
+  height: 30px;
+  width: 30px;
+  padding: 0;
+  font-size: 13px;
 }
 .commander-popover-doctrine {
   margin: 0;
@@ -369,12 +382,13 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   font-size: 12px;
 }
 .commander-popover-apply {
-  height: 28px;
+  height: 30px;
+  padding: 0 12px;
   background: var(--button-bg);
   color: var(--button-text);
   border: 1px solid var(--button-border);
   border-radius: 2px;
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 /* Two classes, so the shared tip host's inline display does not win: the slot spans the section. */

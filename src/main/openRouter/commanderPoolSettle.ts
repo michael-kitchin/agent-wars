@@ -112,7 +112,7 @@ export function expireConsult(
  *
  * Purpose: A timeout or a cancel that already settled the seat must win over a late reply.
  * When to use: The runner's resolve and reject handlers.
- * Expected outcome: Success stores orders, cost, and one dispatch. A timeout clears orders. Any other failure stores nothing and leaves the seat ready.
+ * Expected outcome: Success stores orders, cost, and one dispatch. A timeout clears orders. An unfinished consult stores a dispatch when it sent prose, and leaves the seat ready.
  * Exceptions: A database error is logged by the write queue.
  */
 export function applyConsultOutcome(
@@ -141,6 +141,17 @@ export function applyConsultOutcome(
     if (!outcome.finished) {
       if (outcome.errorMessage) logError('commanderPool consult failed', new Error(outcome.errorMessage));
       if (outcome.costUsd > 0) recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
+      const message = outcome.message?.trim() ? outcome.message.trim() : null;
+      const strategy = outcome.strategy?.trim() ? outcome.strategy.trim() : null;
+      if (message || strategy) {
+        context.dispatches.push({
+          seatId,
+          message,
+          strategy,
+          modelLabel: modelLabel(outcome.modelId),
+          turnNumber: entry.turnNumber,
+        });
+      }
       entry.status = 'ready';
       entry.planningStartedAt = null;
       context.notify();

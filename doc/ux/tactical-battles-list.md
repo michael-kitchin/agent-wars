@@ -13,7 +13,7 @@ Opens in the Tactical battles list mode, after Ready reports at least one battle
 ## Information Displayed
 
 - A navy panel, using the chrome in the [UI style guide](../ui-style-guide.md), titled "Tactical Battles (N)", where N is the number of battles the player can fight. Under the title: "Choose one battle to fight. The others resolve on the world map."
-- One choice row per eligible hex. The columns are Hex, Yours, and Enemy. The hex cell shows the hex code and a muted line "Control: {label} · Terrain: {kind} · Weather: {weather}" (`formatHexControlLabel` in `src/shared/sideLabels.ts`, with short side names). Weather is left off when the hex has none. Yours is the human seat's unit summary. Enemy is that party's dot and short name, or "Neutral" with the Neutral dot, and its unit summary. A Neutral summary ends ", defends in place". An empty summary shows an em dash.
+- One choice row per eligible hex. The columns are Hex, Yours, and Enemy. The hex cell is the world-hex tooltip, in the same line order as [hex-tooltips.md](hex-tooltips.md): the hex code and place name, a country flag before each country name, then Control, Production, Tech, Features, Terrain, Weather, and Effects. A legend chip comes before each terrain kind. A line that does not apply is left out. The cell shows the hex code while that tooltip loads. Yours is the human seat's unit summary. Enemy is that party's dot and short name, or "Neutral" with the Neutral dot, and its unit summary. A Neutral summary ends ", defends in place". An empty summary shows an em dash.
 - Below the choice rows, when any contested hex cannot be fought: "Resolve on the world map this turn", then each such hex. A hex with the human seat and two other sides reads "Three sides: you, {A}, {B}". A hex with two sides reads "{A} vs {B}". Each name has that side's dot.
 - Fight, disabled until a row is chosen.
 - Ignore.
@@ -26,7 +26,7 @@ Opens in the Tactical battles list mode, after Ready reports at least one battle
 - When the player chooses a row, Fight becomes enabled. Only one row is chosen.
 - When the player clicks Fight, the dialog closes, the strategic turn finishes, and a tactical battle starts on that hex.
 - When the player clicks Ignore, or clicks the dimmed backdrop, the dialog closes and melee resolves without a battle.
-- When the hex information for a row fails to load, that cell shows the hex id instead.
+- When the hex information for a row fails to load, the cell keeps the hex code it showed while loading.
 
 ### Keyboard
 

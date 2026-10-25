@@ -78,11 +78,11 @@ export type CommanderStatusRow = {
 };
 
 /**
- * Prose from one finished consult, for the player-facing toast.
+ * Prose from one consult, for the player-facing toast.
  *
  * Purpose: The pending-order table stores orders, not this prose.
  * When to use: A drained or peeked snapshot.
- * Expected outcome: One dispatch per successful consult until a draining read.
+ * Expected outcome: One dispatch per consult that sent a message or a strategy, until a draining read.
  * Exceptions: None.
  */
 export type CommanderDispatch = {

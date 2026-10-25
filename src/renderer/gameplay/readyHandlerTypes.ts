@@ -6,7 +6,6 @@ import type {
   ReadyResult,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
-import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import type { ResolutionPlaybackMove } from '../core/types';
 import type { MapToastOptions } from '../openRouter/openRouterUiHelpers';
@@ -112,15 +111,6 @@ buildAirStrikeOutboundPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefine
    * Exceptions: None.
    */
 buildAirStrikeReturnPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
-    /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
-
-   * Contract: Displays Message and Strategy sections from consultation IPC when either field is present.
-   * When to use: Strategic Ready handler, tactical Ready handler, or other consultation merge sites.
-   * Expected outcome: Non-empty fields become visible until timeout or dismiss; both empty hides a stale toast.
-   * Exceptions: None.
-   */
-showAiStrategyToast: (content: AiStrategyToastFields) => void;
     /**
    * Specifies the contract for the `hideAiStrategyToast` member (hideAiStrategyToast: () => void;).
 

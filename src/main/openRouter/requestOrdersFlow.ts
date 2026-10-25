@@ -1,6 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import { isLikelyAbortError } from '../../shared/abortError';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { AI_SEAT_IDS, aiIndexForSeatId } from '../../shared/seatIds';
 import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
@@ -88,6 +88,11 @@ export async function requestOrdersFlow(
   } = deps;
 
   const seatId = options?.seatId ?? AI_SEAT_IDS[0];
+  const resolvedAiIndex = aiIndexForSeatId(seatId);
+  if (resolvedAiIndex === null) {
+    logError('openRouter requestOrders: seat has no opponent index; prompt logs use opponent 1', { seatId });
+  }
+  const aiIndex = resolvedAiIndex ?? 1;
   const tacticalBattle = options?.tacticalAiBattle;
   const requestedToolNames = options?.enabledToolNames;
   const signal = options?.signal;
@@ -122,6 +127,7 @@ export async function requestOrdersFlow(
   if (onLog) onLog('Requesting AI orders…');
   logDebug('openRouter requestOrders', {
     modelId,
+    aiIndex,
     turnNumber: state.turnNumber,
     enabledToolsRequested: requestedToolNames === undefined ? 'all' : requestedToolNames.length,
     enabledToolsEffective: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
@@ -338,10 +344,12 @@ export async function requestOrdersFlow(
   }
   logPromptPreview('openRouter requestOrders: system prompt', systemPrompt, {
     artifactKind: coordinateContext.mode,
+    aiIndex,
     supplementalDiskOnlyBody: fullLogOperationalMapSupplement,
   });
   logPromptPreview('openRouter requestOrders: user message', userMessage, {
     artifactKind: 'user',
+    aiIndex,
   });
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
@@ -468,6 +476,7 @@ export async function requestOrdersFlow(
         signal,
         onLog,
         tacticalBattleId: tacticalBattle?.battleId ?? null,
+        aiIndex,
         usage,
         postOpenRouterChatWithTimeoutAndRetry,
         resolveOrderFlowMaxTokens,

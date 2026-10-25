@@ -5,9 +5,7 @@ import {
 } from '../../shared/lossSummaryFromResolution';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleContinentNames';
-import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { isHumanSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
-import type { TurnReportLoss } from '../../shared/turnReportLines';
 import { readoutViewerSeatId } from '../../shared/observeModeControls';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 import { buildUnitOriginByLossDisplayName } from '../core/unitOriginFlags';
@@ -274,19 +272,9 @@ function buildCombatActivityFallbackBullets(readyResult: CombatActivityFallbackS
 }
 
 /**
- * Shows the consolidated turn-update toast and, when combat is fogged, the unknown-battle toast.
- *
- * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast order.
- * When to use: After the caller has already classified visibility and built its kill-toast formatter. Do not classify visibility here.
- *   Pass `reportTag`, the tag of the turn or beat that just resolved, captured before Ready resolved it.
- * Expected outcome: One update toast and log line when there is text, then an unknown-battle toast when any unknown
- *   hex or victim remains. The Reports tab files them as a Turn report and a Notice under `reportTag`.
- * Exceptions: None. Continent-name lookup failures follow `collectUnknownBattleContinentNames`.
- */
-/**
  * The seat the turn report calls "you".
  *
- * Purpose: A watch uses View as. All sides has no "you", so the report is Seen lines only.
+ * Purpose: A watch uses View as. All sides has no "you", so loss sections use each side's full name.
  * When to use: Visibility and the turn-report sentences.
  * Expected outcome: The active human seat while one is playing. While watching, the chosen seat, or null for All sides.
  * Exceptions: None.
@@ -298,58 +286,15 @@ export function reportViewerSeatId(): string | null {
 }
 
 /**
- * Losses the turn report may name, limited to victims the viewer can see.
+ * Shows the consolidated turn-update toast and, when combat is fogged, the unknown-battle toast.
  *
- * Purpose: Each sentence needs the victim, the killer's side, and a hex label.
- * When to use: `announceResolutionTurnUpdate`.
- * Expected outcome: One row per known removed unit of a build type. The hex label is the strategic code when one exists.
- * Exceptions: None.
+ * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast order.
+ * When to use: After the caller has already classified visibility and built its kill-toast formatter. Do not classify visibility here.
+ *   Pass `reportTag`, the tag of the turn or beat that just resolved, captured before Ready resolved it.
+ * Expected outcome: One update toast and log line when there is text, then an unknown-battle toast when any unknown
+ *   hex or victim remains. The Reports tab files them as a Turn report and a Notice under `reportTag`.
+ * Exceptions: None. Continent-name lookup failures follow `collectUnknownBattleContinentNames`.
  */
-function turnReportLosses(
-  readySlice: ReadyResult,
-  knownVictimIds: ReadonlySet<string>,
-  extraKills: readonly { victimId: string; killerIds?: readonly string[] }[]
-): TurnReportLoss[] {
-  const removed = [...(readySlice.removedUnits ?? []), ...(readySlice.airStrikeRemovedUnits ?? [])];
-  const killerByVictim = new Map<string, string | null>();
-  const edges = [
-    ...(readySlice.kills ?? []),
-    ...(readySlice.killsByDirectFire ?? []),
-    ...(readySlice.killsByReturnFire ?? []),
-    ...extraKills,
-  ];
-  for (const edge of edges) {
-    const killerId = edge.killerIds?.[0];
-    killerByVictim.set(edge.victimId, killerId ? unitIdOwnerFromId(killerId) : null);
-  }
-  const losses: TurnReportLoss[] = [];
-  for (const unit of removed) {
-    if (!knownVictimIds.has(unit.id)) continue;
-    const unitType = reportUnitType(unit.unitType);
-    if (!unitType) continue;
-    losses.push({
-      victimOwnerId: unit.player,
-      killerOwnerId: killerByVictim.get(unit.id) ?? null,
-      hexLabel: getStrategicHexCode(unit.h3Index) ?? unit.h3Index,
-      unitType,
-    });
-  }
-  return losses;
-}
-
-/**
- * Keeps a removed unit's type when the report can name it.
- *
- * Purpose: The count list only covers the four build types.
- * When to use: `turnReportLosses`.
- * Expected outcome: The type, or null.
- * Exceptions: None.
- */
-function reportUnitType(unitType: string): TurnReportLoss['unitType'] | null {
-  if (unitType === 'infantry' || unitType === 'armor' || unitType === 'naval' || unitType === 'air') return unitType;
-  return null;
-}
-
 export async function announceResolutionTurnUpdate(
   args: {
     readySlice: ReadyResult;
@@ -385,10 +330,6 @@ export async function announceResolutionTurnUpdate(
       viewerSeatId: reportViewerSeatId(),
       seats,
       transitions: readySlice.controlTransitions ?? [],
-      losses: turnReportLosses(readySlice, knownVictimIds, [
-        ...(extraKills?.killsByMelee ?? []),
-        ...(extraKills?.killsByAirStrike ?? []),
-      ]),
     },
   });
   if (updateText) {

@@ -1,7 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
-import { clearOpenRouterLog } from '../openRouter/openRouterUiHelpers';
+import { clearOpenRouterLog, hideAiStrategyToast } from '../openRouter/openRouterUiHelpers';
 import { clearConsoleReports } from '../chrome/consoleReports';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
@@ -26,7 +26,9 @@ import {
 } from './newGameReturn';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
-import { bindNewGameSides, loadCommanderKeyMemory, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
+import { bindNewGameSides, loadCommanderKeyMemory, newGameHasAnyModel, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
+import { confirmStartWithNoModels } from './startConfirmDialog';
+import { closeCommanderPopover } from '../openRouter/commanderPopover';
 import { showNewGameBanner } from './newGameBanner';
 import { clearObserveAfterKnockout } from './observeIntent';
 import { chooseStartMatchAi } from '../../shared/startMatchAiChoice';
@@ -280,7 +282,8 @@ function stopMatchWaitingUnderNewGame(): void {
  * Purpose: Starts a match from the dialog's choices and resets every renderer cache the old match left behind.
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons, the game-size caps, the panel's grip, and its close control are live. Close
- *   goes back to a match waiting under the screen. Clicking Start stops that match, if any, then sends
+ *   goes back to a match waiting under the screen. When no AI row has a model, Start asks first. No, Escape, and the
+ *   backdrop leave the screen open and do not advance the match epoch. Clicking Start stops that match, if any, then sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`. Auto-start AI is not sent.
  *   A successful start then applies that click-time choice: planning turns on, or Run turns off and the Commanders tab opens.
  *   A failure leaves Run and the console unchanged. Start reloads the map,
@@ -310,6 +313,11 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       showMapToast(seatsStart.blocked);
       return;
     }
+    if (!newGameHasAnyModel()) {
+      closeCommanderPopover();
+      const startAnyway = await confirmStartWithNoModels();
+      if (!startAnyway) return;
+    }
     const matchEpoch = advanceRendererMatchEpoch();
     stopMatchWaitingUnderNewGame();
     const cameraHold = holdNewGameMapPreviewCamera();
@@ -320,6 +328,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         ...readNewGameMapChoice(),
         seats: seatsStart.seats,
         turnLimit: seatsStart.turnLimit,
+        victoryRule: seatsStart.victoryRule,
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -355,6 +364,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.pendingDeferredStrategicPostResolutionConsult = false;
       S.pendingDeferredTacticalPostBeatConsult = false;
       clearOpenRouterLog();
+      hideAiStrategyToast();
       clearConsoleReports();
       deps.updateOpenRouterCostLabel();
       deps.updateGameStateSidebar(state);
