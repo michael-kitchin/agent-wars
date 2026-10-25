@@ -34,7 +34,7 @@ Shown while the console's Reports tab is selected and the console is expanded, i
 
 ### Other
 
-- Every informational map toast is filed when it appears, except a knockout toast whose notices were already filed one per seat. Error toasts are not filed. Each kept commander dispatch is its own Message entry. The message dialog is not filed. A stale or abandoned consult is filed and does not open the dialog. See [notifications-and-feedback.md](notifications-and-feedback.md).
+- Every informational map toast is filed when it appears, except a knockout toast whose notices were already filed one per seat. Error toasts are not filed. Each kept commander dispatch is its own Message entry. The message dialog is not filed. An absence line shown on a message tab is not a Reports entry. A stale or abandoned consult is filed and does not open the dialog. See [notifications-and-feedback.md](notifications-and-feedback.md).
 - An entry is unread until the Reports tab is shown. Showing the tab marks every entry read. Entries filed while the tab is shown are never unread.
 - The list keeps the newest 200 entries (`MAX_CONSOLE_REPORTS`).
 - Starting a new match clears the list, as it clears the AI activity log. The list is not saved. After the app restarts it starts empty, and a toast shown once the app is up, such as a basemap failure, can file a new entry.

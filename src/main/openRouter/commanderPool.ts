@@ -8,7 +8,7 @@
  */
 
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS, AI_CONSULTATION_WALL_CLOCK_MS } from '../../shared/aiConsultationLimits';
-import type { CommanderDispatch, CommanderPoolSnapshot, CommanderStatus } from '../../shared/commanderStatus';
+import type { CommanderAbsenceReason, CommanderDispatch, CommanderPoolSnapshot, CommanderStatus } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
 import { AI_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
@@ -80,6 +80,15 @@ export type PoolSeat = {
   generation: number;
   launchId: number;
   timers: { cancel: () => void }[];
+  /**
+   * Why the last unfinished consult produced no prose.
+   *
+   * Purpose: The message dialog explains a skip without treating it as a model reply.
+   * When to use: Set when a consult settles unfinished with no prose. Clear it when a launch starts, when a consult finishes or sends prose, and when a consult times out.
+   * Expected outcome: Null while planning, after a finished consult, and after a timeout. A roster knockout is not stored here.
+   * Exceptions: None.
+   */
+  absenceReason: CommanderAbsenceReason | null;
 };
 
 /**
@@ -512,6 +521,7 @@ function launch(
   entry.settled = false;
   entry.planningStartedAt = timing.nowMs();
   entry.timedOutTurn = null;
+  entry.absenceReason = null;
   entry.turnNumber = turnNumber;
   entry.theater = theater;
   entry.battleId = battle?.battleId ?? null;
@@ -526,6 +536,7 @@ function launch(
     entry.status = 'ready';
     entry.planningStartedAt = null;
     entry.controller = null;
+    entry.absenceReason = 'consult_failed';
     notifyWaiters(waiters);
     return;
   }

@@ -896,6 +896,37 @@ function testFormatBriefingGridProximityHonestyLine(): void {
 }
 
 /**
+ * A commander with no units is still told to set production, and is not told to scout.
+ *
+ * Purpose: A side with cities and no units remains in the match. The scout clause applies only when that side still has units and sees no enemy.
+ * When to use: After edits to the first sentences of `buildStrategicNarrative`.
+ * Expected outcome: Zero own units include the still-in-match sentence and omit the scout clause, with or without observed enemies. Own units and zero observed enemies still include the scout clause.
+ * Exceptions: None.
+ */
+function testStrategicNarrativeKeepsUnitlessSideInMatch(): void {
+  const stillInMatch = 'You have no units in play. You are still in the match, so set production on the cities you still hold.';
+  const scout = 'scout and preserve contact';
+  const noOwnUnits = buildStrategicNarrative(
+    { ...fixtureState, units: [{ id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: fixtureNeighborH3 }] },
+    [],
+    true
+  );
+  assert.ok(noOwnUnits.includes(stillInMatch), noOwnUnits);
+  assert.ok(!noOwnUnits.includes(scout), noOwnUnits);
+  const emptyMap = buildStrategicNarrative({ ...fixtureState, units: [] }, [], true);
+  assert.ok(emptyMap.includes('currently observed enemy units: 0.'), emptyMap);
+  assert.ok(emptyMap.includes(stillInMatch), emptyMap);
+  assert.ok(!emptyMap.includes(scout), emptyMap);
+  const ownUnitsNoEnemy = buildStrategicNarrative(
+    { ...fixtureState, units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 }] },
+    [],
+    true
+  );
+  assert.ok(ownUnitsNoEnemy.includes(scout), ownUnitsNoEnemy);
+  assert.ok(!ownUnitsNoEnemy.includes(stillInMatch), ownUnitsNoEnemy);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -928,6 +959,10 @@ const tests = [
   {
     name: 'strategic narrative critical sentence matches needsAction',
     fn: testStrategicNarrativeCriticalSentenceMatchesNeedsAction,
+  },
+  {
+    name: 'strategic narrative keeps a unitless side in the match',
+    fn: testStrategicNarrativeKeepsUnitlessSideInMatch,
   },
   {
     name: 'unit that can close this turn is not hidden by a healthy march',

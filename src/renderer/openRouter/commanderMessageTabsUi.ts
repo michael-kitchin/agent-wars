@@ -9,12 +9,18 @@
 
 import { buildAiStrategyToastSections } from '../../shared/aiStrategyToastContent';
 import {
+  applyCommanderAbsence,
   applyCommanderMessage,
   commanderDispatchHasProse,
+  formatCommanderAbsenceMessage,
   initialCommanderMessageTabs,
+  noteCommanderConsultWithoutProse,
+  resetCommanderConsultMarks,
+  resolveCommanderTabAbsence,
+  seatOutsideTacticalConsult,
   type CommanderMessageTabState,
 } from '../../shared/commanderMessageTabs';
-import type { CommanderDispatch } from '../../shared/commanderStatus';
+import type { CommanderDispatch, CommanderStatusRow } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
@@ -49,26 +55,81 @@ export function bindCommanderMessageTabs(): void {
  *
  * Purpose: The pool's screen callback. This function does not file Reports.
  * When to use: `readCommanderPoolAndApply` when messages should show.
- * Expected outcome: The selected panel is that dispatch's Message, then Strategy, when the consult sent them. An empty batch does not show.
+ * Expected outcome: The selected panel is that dispatch's Message, then Strategy, when the consult sent them. A skip enables its tab with one line and does not change the selection. An appearance with no prose does not open the dialog.
  * Exceptions: None.
  */
-export function showCommanderMessageTabs(dispatches: readonly CommanderDispatch[]): void {
-  if (strategyToastHidden() || tabState === null) {
+export function showCommanderMessageTabs(
+  dispatches: readonly CommanderDispatch[],
+  statuses: readonly CommanderStatusRow[] = []
+): void {
+  const opening = strategyToastHidden() || tabState === null;
+  if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch.message, dispatch.strategy))) return;
+  if (opening) {
     const seats = (S.gameState?.seats ?? [])
       .filter((seat) => seat.kind === AI_SEAT_KIND)
       .map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
     tabState = initialCommanderMessageTabs(seats);
+  } else if (tabState) {
+    tabState = resetCommanderConsultMarks(tabState);
   }
+  if (!tabState) return;
   for (const dispatch of dispatches) {
-    if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
-    tabState = applyCommanderMessage(tabState, {
-      seatId: dispatch.seatId,
-      message: dispatch.message,
-      strategy: dispatch.strategy,
-    });
+    tabState = commanderDispatchHasProse(dispatch.message, dispatch.strategy)
+      ? applyCommanderMessage(tabState, {
+          seatId: dispatch.seatId,
+          message: dispatch.message,
+          strategy: dispatch.strategy,
+        })
+      : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
   }
+  tabState = applyOpenTabAbsences(tabState, statuses);
   if (!tabState.tabs.some((tab) => tab.enabled)) return;
   showFilledAiStrategyToast(renderCommanderMessageTabs, false);
+}
+
+/**
+ * Enables tabs that this appearance did not consult.
+ *
+ * Purpose: A knocked-out or skipped seat gets one line without replacing a consult that sent prose.
+ * When to use: After the dispatches for this appearance have been applied.
+ * Expected outcome: Each unresolved tab that has a reason is enabled. Selection is unchanged.
+ * Exceptions: None.
+ */
+function applyOpenTabAbsences(
+  state: CommanderMessageTabState,
+  statuses: readonly CommanderStatusRow[]
+): CommanderMessageTabState {
+  let next = state;
+  for (const tab of state.tabs) {
+    const seat = (S.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
+    const status = statuses.find((row) => row.seatId === tab.seatId);
+    const reason = resolveCommanderTabAbsence({
+      outTurn: seat?.outTurn ?? null,
+      status: status?.status ?? null,
+      storedReason: status?.absenceReason ?? null,
+      tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
+      consultedWithoutProse: tab.consultedWithoutProse,
+    });
+    if (!reason) continue;
+    const turnNumber =
+      reason === 'knocked_out' ? (seat?.outTurn ?? null) : reason === 'timed_out' ? (status?.timedOutTurn ?? null) : null;
+    next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
+  }
+  return next;
+}
+
+/**
+ * Whether this seat is not the party being consulted in the open battle.
+ *
+ * Purpose: The other commanders were not asked for a battle plan.
+ * When to use: While the opposing party's latest consult is the battle consult.
+ * Expected outcome: True for every other seat. False when that consult is strategic, including when a battle is still open.
+ * Exceptions: None.
+ */
+function seatIsOutsideThisBattle(seatId: string, statuses: readonly CommanderStatusRow[]): boolean {
+  const opposingPartyId = S.tacticalBattleSnapshot?.opposingPartyId;
+  const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : undefined;
+  return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
 }
 
 /**

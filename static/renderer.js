@@ -20099,7 +20099,9 @@ ${bonuses}`;
       label: shortSideName(seat.label),
       enabled: false,
       message: null,
-      strategy: null
+      strategy: null,
+      consultedWithoutProse: false,
+      fromAbsence: false
     })).sort(compareCommanderMessageTabs);
     return { tabs, selectedSeatId: null };
   }
@@ -20110,7 +20112,7 @@ ${bonuses}`;
     const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
     if (index < 0) return state;
     const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy, consultedWithoutProse: false, fromAbsence: false } : tab
     );
     return { tabs, selectedSeatId: arrival.seatId };
   }
@@ -20120,6 +20122,76 @@ ${bonuses}`;
   function proseOrNull(value) {
     const trimmed = value?.trim() ?? "";
     return trimmed.length > 0 ? trimmed : null;
+  }
+  function seatOutsideTacticalConsult(seatId, opposingPartyId, opponentTheater) {
+    if (!opposingPartyId || seatId === opposingPartyId) return false;
+    return opponentTheater === "tactical";
+  }
+  function resolveCommanderTabAbsence(input) {
+    if (input.outTurn !== null || input.status === "out") return "knocked_out";
+    if (input.status === "no_model") return "no_model";
+    if (input.status === "timed_out") return "timed_out";
+    if (input.consultedWithoutProse) return null;
+    if (input.status === "planning") return null;
+    if (input.tacticalOtherSeat) return "not_in_battle";
+    return input.storedReason;
+  }
+  function formatCommanderAbsenceMessage(reason, turnNumber) {
+    const turn = turnNumber !== null && Number.isFinite(turnNumber) && turnNumber > 0 ? turnNumber : null;
+    switch (reason) {
+      case "knocked_out":
+        return turn === null ? "Knocked out." : `Knocked out on turn ${turn}.`;
+      case "no_model":
+        return "No commander model is set.";
+      case "timed_out":
+        return turn === null ? "No reply in time, so its standing orders ran instead." : `No reply in time on turn ${turn}, so its standing orders ran instead.`;
+      case "no_new_consult":
+        return "No new consult was required, so its standing orders still apply.";
+      case "not_in_battle":
+        return "Not in this battle.";
+      case "no_units_in_battle":
+        return "No units left in this battle.";
+      case "consult_failed":
+        return "The consult failed.";
+    }
+  }
+  function noteCommanderConsultWithoutProse(state, seatId) {
+    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+    if (index < 0) return state;
+    const current = state.tabs[index];
+    if (!current || current.enabled && !current.fromAbsence) return state;
+    if (current.consultedWithoutProse && !current.fromAbsence) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? {
+        ...tab,
+        consultedWithoutProse: true,
+        enabled: false,
+        message: current.fromAbsence ? null : tab.message,
+        strategy: null,
+        fromAbsence: false
+      } : tab
+    );
+    const selectedSeatId = state.selectedSeatId === seatId && current.fromAbsence ? null : state.selectedSeatId;
+    return { tabs, selectedSeatId };
+  }
+  function applyCommanderAbsence(state, seatId, message) {
+    const line = proseOrNull(message);
+    if (!line) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+    if (index < 0) return state;
+    const current = state.tabs[index];
+    if (!current || current.enabled && !current.fromAbsence) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message: line, strategy: null, fromAbsence: true, consultedWithoutProse: false } : tab
+    );
+    return { tabs, selectedSeatId: state.selectedSeatId };
+  }
+  function resetCommanderConsultMarks(state) {
+    if (!state.tabs.some((tab) => tab.consultedWithoutProse)) return state;
+    return {
+      tabs: state.tabs.map((tab) => tab.consultedWithoutProse ? { ...tab, consultedWithoutProse: false } : tab),
+      selectedSeatId: state.selectedSeatId
+    };
   }
 
   // src/renderer/core/matchEpoch.ts
@@ -22160,8 +22232,8 @@ ${bonuses}`;
       snapshot = next;
       const consultFinished = wasPlanning && !anyCommanderIsPlanning();
       if (drain && (next.dispatches.length > 0 || consultFinished)) {
-        const kept = messageLines(next.dispatches);
-        if (showMessages && kept.length > 0) showToast?.(kept);
+        messageLines(next.dispatches);
+        if (showMessages) showToast?.(next.dispatches, next.statuses);
         await refreshSeatCosts();
       }
     } catch (err) {
@@ -28865,6 +28937,10 @@ ${bonuses}`;
     if (match == null || match.hexCount === 0 || match.gameOver) return null;
     return "console-tab-commanders";
   }
+  function collapseOpenConsoleTab(current, tabId) {
+    if (current.collapsed || current.activeTabId !== tabId) return current;
+    return { activeTabId: current.activeTabId, collapsed: true };
+  }
   function nextConsoleTabState(current, clickedTabId) {
     if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
     if (clickedTabId === current.activeTabId) return { activeTabId: current.activeTabId, collapsed: true };
@@ -28970,6 +29046,17 @@ ${bonuses}`;
     setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === "console-tab-reports");
     refreshConsoleHeader();
     if (!consoleState.collapsed) active2?.onShow?.();
+  }
+  function collapseConsoleTab(tabId) {
+    if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+      console.error("[agent-wars] collapseConsoleTab unknown tab", tabId);
+      return;
+    }
+    const next = collapseOpenConsoleTab(consoleState, tabId);
+    console.debug("[agent-wars] collapseConsoleTab", { tabId, collapsed: next !== consoleState });
+    if (next === consoleState) return;
+    consoleState = next;
+    applyConsoleState();
   }
   function showConsoleTab(tabId) {
     if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
@@ -36662,21 +36749,49 @@ ${bonuses}`;
       tabState = null;
     });
   }
-  function showCommanderMessageTabs(dispatches) {
-    if (strategyToastHidden() || tabState === null) {
+  function showCommanderMessageTabs(dispatches, statuses = []) {
+    const opening = strategyToastHidden() || tabState === null;
+    if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch.message, dispatch.strategy))) return;
+    if (opening) {
       const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
       tabState = initialCommanderMessageTabs(seats);
+    } else if (tabState) {
+      tabState = resetCommanderConsultMarks(tabState);
     }
+    if (!tabState) return;
     for (const dispatch of dispatches) {
-      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
-      tabState = applyCommanderMessage(tabState, {
+      tabState = commanderDispatchHasProse(dispatch.message, dispatch.strategy) ? applyCommanderMessage(tabState, {
         seatId: dispatch.seatId,
         message: dispatch.message,
         strategy: dispatch.strategy
-      });
+      }) : noteCommanderConsultWithoutProse(tabState, dispatch.seatId);
     }
+    tabState = applyOpenTabAbsences(tabState, statuses);
     if (!tabState.tabs.some((tab) => tab.enabled)) return;
     showFilledAiStrategyToast(renderCommanderMessageTabs, false);
+  }
+  function applyOpenTabAbsences(state, statuses) {
+    let next = state;
+    for (const tab of state.tabs) {
+      const seat = (rendererSharedState.gameState?.seats ?? []).find((row) => row.seatId === tab.seatId);
+      const status = statuses.find((row) => row.seatId === tab.seatId);
+      const reason = resolveCommanderTabAbsence({
+        outTurn: seat?.outTurn ?? null,
+        status: status?.status ?? null,
+        storedReason: status?.absenceReason ?? null,
+        tacticalOtherSeat: seatIsOutsideThisBattle(tab.seatId, statuses),
+        consultedWithoutProse: tab.consultedWithoutProse
+      });
+      if (!reason) continue;
+      const turnNumber = reason === "knocked_out" ? seat?.outTurn ?? null : reason === "timed_out" ? status?.timedOutTurn ?? null : null;
+      next = applyCommanderAbsence(next, tab.seatId, formatCommanderAbsenceMessage(reason, turnNumber));
+    }
+    return next;
+  }
+  function seatIsOutsideThisBattle(seatId, statuses) {
+    const opposingPartyId = rendererSharedState.tacticalBattleSnapshot?.opposingPartyId;
+    const opponent = opposingPartyId ? statuses.find((row) => row.seatId === opposingPartyId) : void 0;
+    return seatOutsideTacticalConsult(seatId, opposingPartyId, opponent?.theater ?? null);
   }
   function renderCommanderMessageTabs(target) {
     const host = target ?? document.getElementById("ai-strategy-toast-text");
@@ -36838,6 +36953,39 @@ ${bonuses}`;
     return { clear };
   }
 
+  // src/shared/mapToastWheel.ts
+  function mapToastWheelReachesMap(scrollTop, scrollHeight, clientHeight, deltaY) {
+    if (!(scrollHeight > clientHeight)) return true;
+    if (deltaY < 0) return scrollTop <= 0;
+    if (deltaY > 0) return scrollTop + clientHeight >= scrollHeight - 1;
+    return true;
+  }
+
+  // src/renderer/openRouter/mapToastWheel.ts
+  function bindMapToastWheel() {
+    const toast = document.getElementById("map-toast");
+    const map = document.getElementById("main-map");
+    if (!(toast instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
+    toast.addEventListener("wheel", (event) => {
+      if (!mapToastWheelReachesMap(toast.scrollTop, toast.scrollHeight, toast.clientHeight, event.deltaY)) return;
+      event.preventDefault();
+      map.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        deltaZ: event.deltaZ,
+        deltaMode: event.deltaMode,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey
+      }));
+    }, { passive: false });
+  }
+
   // src/renderer/openRouter/openRouterControls.ts
   function startTacticalOpponentPlanAfterStrategicConsult(deps) {
     if (!rendererSharedState.tacticalBattleSnapshot || !rendererSharedState.tacticalPhasePlanning) return;
@@ -36918,6 +37066,7 @@ ${bonuses}`;
   function initOpenRouterUI(deps) {
     setOpenRouterPopoverLog((line, isError) => deps.appendOpenRouterLog(line, isError));
     bindCommanderMessageTabs();
+    bindMapToastWheel();
     bindCommanderPoolScreen({
       showCommanderMessages: showCommanderMessageTabs,
       fileCommanderMessage: (dispatch) => {
@@ -37132,6 +37281,7 @@ ${bonuses}`;
         rendererSharedState.runButtonOn = !rendererSharedState.runButtonOn;
         setPlanningTogglePressed(runBtn, rendererSharedState.runButtonOn);
         if (rendererSharedState.runButtonOn) {
+          collapseConsoleTab("console-tab-commanders");
           deps.updateReadyButtonState();
           deps.startBackgroundRequestIfAllowed();
         } else {

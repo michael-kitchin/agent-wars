@@ -57,7 +57,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | Coordinate preamble | always (strategic wording) | always (tactical wording) | n/a |
 | Combat and attack rules | always | always | n/a |
 | `# Commander's Briefing` | when a briefing body is supplied | when a briefing body is supplied | omit the heading and emit the standalone sections instead |
-| Narrative paragraph | always inside the briefing | always inside the briefing | never empty |
+| Narrative paragraph | always inside the briefing | always inside the briefing | never empty; own count 0 omits the scout clause and adds the still-in-match sentence ([`strategic-prompt.md`](strategic-prompt.md)) |
 | `## Unit Status and Threats` | always inside the briefing | always inside the briefing | header row plus `(No AI units)` |
 | Distance-basis caveat line | fog off on the strategic map: hop-count honesty line; fog on: path-vs-Best-Options line (after the staleness sentence) | never | omit |
 | `## Attention Flags` | always inside the briefing | always inside the briefing | `None.` |

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { consoleTabIdForLiveMatchLaunch, expandedConsoleTabState, nextConsoleTabState } from './consoleTabState';
+import {
+  collapseOpenConsoleTab,
+  consoleTabIdForLiveMatchLaunch,
+  expandedConsoleTabState,
+  nextConsoleTabState,
+} from './consoleTabState';
 
 test('nextConsoleTabState switches tabs while expanded', () => {
   assert.deepEqual(nextConsoleTabState({ activeTabId: 'orders', collapsed: false }, 'opponent'), {
@@ -32,6 +37,17 @@ test('consoleTabIdForLiveMatchLaunch opens Opponent only for a live match', () =
   assert.equal(consoleTabIdForLiveMatchLaunch(null), null);
   assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 0, gameOver: false }), null);
   assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: true }), null);
+});
+
+test('collapseOpenConsoleTab hides the named tab and leaves every other state', () => {
+  assert.deepEqual(collapseOpenConsoleTab({ activeTabId: 'console-tab-commanders', collapsed: false }, 'console-tab-commanders'), {
+    activeTabId: 'console-tab-commanders',
+    collapsed: true,
+  });
+  const orders = { activeTabId: 'console-tab-orders', collapsed: false };
+  assert.equal(collapseOpenConsoleTab(orders, 'console-tab-commanders'), orders);
+  const already = { activeTabId: 'console-tab-commanders', collapsed: true };
+  assert.equal(collapseOpenConsoleTab(already, 'console-tab-commanders'), already);
 });
 
 test('nextConsoleTabState expands on the clicked tab while collapsed', () => {

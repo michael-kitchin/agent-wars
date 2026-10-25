@@ -409,7 +409,7 @@ export async function runEventDrivenAfterResolutionConsultation(
   const results = new Map<AiSeatId, AfterResolutionResult>();
   await consultSeatsThroughPool(seatIds, 'strategic', null, args.timeoutMs, async (request) => {
     const modelId = modelIdForSeat(request.seatId, args.modelId);
-    if (!modelId) return emptyConsultOutcome();
+    if (!modelId) return emptyConsultOutcome({ absenceReason: 'consult_failed' });
     try {
       const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });
       const result = await afterResolution(
@@ -431,6 +431,7 @@ export async function runEventDrivenAfterResolutionConsultation(
         message: result.message ?? null,
         strategy: result.strategy ?? null,
         modelId,
+        absenceReason: result.consulted ? null : (result.absenceReason ?? null),
       });
     } catch (err) {
       logError(args.errorLogMessage, err);
@@ -467,7 +468,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
   let post: AfterTacticalBeatResolutionResult | undefined;
   await consultSeatsThroughPool([seatId], 'tactical', args.tacticalBattle, args.timeoutMs, async (request) => {
     const modelId = modelIdForSeat(request.seatId, args.modelId);
-    if (!modelId) return emptyConsultOutcome();
+    if (!modelId) return emptyConsultOutcome({ absenceReason: 'consult_failed' });
     try {
       const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });
       post = await afterTacticalBeatResolution(
@@ -490,6 +491,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
           modelId,
           message: post.message ?? null,
           strategy: post.strategy ?? null,
+          absenceReason: post.consulted ? null : (post.absenceReason ?? null),
         });
       }
       return emptyConsultOutcome({
@@ -499,6 +501,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
         modelId,
         message: post.message ?? null,
         strategy: post.strategy ?? null,
+        absenceReason: null,
       });
     } catch (err) {
       logError(args.errorLogMessage, err);

@@ -70,9 +70,9 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 #### Narrative paragraph
 
-- **Shape:** at most five sentences. Sentence one is always the turn number, own unit count, and observed enemy count; when the observed count is zero it also states that enemy forces may be out of view and that contact must be regained. Optional middle sentences report units in or near contact, units lacking a standing order when those tools are enabled, and units under critical threat. The closing sentence directs the model to the unit table, attention flags, and map, and names the order kinds available this turn.
+- **Shape:** at most five sentences. Sentence one is always the turn number, own unit count, and observed enemy count. When the own count is greater than zero and the observed count is zero, sentence one also states that enemy forces may be out of view and that contact must be regained. When the own count is zero, sentence one stops after the counts, and the next sentence says the side has no units in play, is still in the match, and should set production on the cities it still holds. Optional middle sentences report units in or near contact, units lacking a standing order when those tools are enabled, and units under critical threat. The closing sentence directs the model to the unit table, attention flags, and map, and names the order kinds available this turn.
 - **Items:** `TURN_CLOCK`, `ENEMY_ROSTER_OBSERVED`, `FOG_MODE`, `ACTION_NEEDED_FLAG`.
-- **Include:** always inside the briefing. **Empty-state:** not possible; the first and last sentences are unconditional.
+- **Include:** always inside the briefing. **Empty-state:** the first and last sentences are unconditional. The still-in-match sentence appears only when the own count is zero. The scout clause appears only when the own count is greater than zero and the observed count is zero.
 - **Model use:** a five-second orientation before the tables.
 
 #### `## Unit Status and Threats`

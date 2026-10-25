@@ -10,6 +10,7 @@
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipc/ordersTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import type { AiSeatId } from '../../shared/seatIds';
 import { logError } from '../logger';
 
@@ -204,6 +205,15 @@ export type CommanderConsultOutcome = {
    * Exceptions: None.
    */
   readonly errorMessage: string | null;
+  /**
+   * Why this consult produced no plan and no prose.
+   *
+   * Contract: Null when the consult finished, timed out, or failed without a classified reason. `errorMessage` still means `consult_failed` when this is null.
+   * When to use: An unfinished consult that the message dialog should explain.
+   * Expected outcome: A `CommanderAbsenceReason`, or null. Not a player-facing sentence.
+   * Exceptions: None.
+   */
+  readonly absenceReason: CommanderAbsenceReason | null;
 };
 
 /**
@@ -231,6 +241,7 @@ export function emptyConsultOutcome(
     modelId: null,
     tacticalPlan: null,
     errorMessage: null,
+    absenceReason: null,
     ...overrides,
   };
 }

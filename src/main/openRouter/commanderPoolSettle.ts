@@ -101,6 +101,7 @@ export function expireConsult(
     clearAiPendingOrders(seatId);
     entry.status = 'timed_out';
     entry.timedOutTurn = entry.turnNumber;
+    entry.absenceReason = null;
     entry.planningStartedAt = null;
     entry.controller = null;
     context.notify();
@@ -134,6 +135,7 @@ export function applyConsultOutcome(
       if (outcome.costUsd > 0) recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
       entry.status = 'timed_out';
       entry.timedOutTurn = entry.turnNumber;
+      entry.absenceReason = null;
       entry.planningStartedAt = null;
       context.notify();
       return;
@@ -151,6 +153,12 @@ export function applyConsultOutcome(
           modelLabel: modelLabel(outcome.modelId),
           turnNumber: entry.turnNumber,
         });
+        entry.absenceReason = null;
+      } else {
+        entry.absenceReason = outcome.absenceReason ?? (outcome.errorMessage ? 'consult_failed' : null);
+        if (entry.absenceReason) {
+          logDebug('commanderPool recorded consult absence', { seatId, absenceReason: entry.absenceReason });
+        }
       }
       entry.status = 'ready';
       entry.planningStartedAt = null;
@@ -177,6 +185,7 @@ export function applyConsultOutcome(
       modelLabel: modelLabel(outcome.modelId),
       turnNumber: entry.turnNumber,
     });
+    entry.absenceReason = null;
     entry.status = 'ready';
     entry.planningStartedAt = null;
     context.notify();

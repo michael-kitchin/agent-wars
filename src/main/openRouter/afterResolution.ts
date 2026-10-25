@@ -6,6 +6,7 @@
  */
 
 import { isLikelyAbortError } from '../../shared/abortError';
+import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
 import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
@@ -154,6 +155,15 @@ toolInvocationCounts?: Record<string, number>;
    * Exceptions: None.
    */
 cost?: number;
+  /**
+   * Why this consult did not call the model, when the skip has a player-facing reason.
+   *
+   * Contract: Omitted when the consult ran, and when a cancel should leave the tab disabled. `consult_failed` covers a missing model or key, a failed request, and an exception.
+   * When to use: The post-resolution runner copies this onto the pool outcome.
+   * Expected outcome: A `CommanderAbsenceReason`, or absent.
+   * Exceptions: None.
+   */
+  absenceReason?: CommanderAbsenceReason;
 }
 
 /**
@@ -172,7 +182,7 @@ export async function afterResolution(
 ): Promise<AfterResolutionResult> {
   if (!resolutionResult.success || !deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterResolution: skip (no success, no model, or no key)');
-    return { consulted: false };
+    return { consulted: false, absenceReason: 'consult_failed' };
   }
 
   const opponentCombatants = [...(resolutionResult.combatParticipantUnitIdsBySeat?.[seatId] ?? [])];
@@ -234,6 +244,14 @@ export async function afterResolution(
         return { consulted: false };
       }
       if (result.success === true) {
+        if (result.absenceReason) {
+          logDebug('afterResolution: requestOrders reported an absence', {
+            turnNumber: state.turnNumber,
+            seatId,
+            absenceReason: result.absenceReason,
+          });
+          return { consulted: false, absenceReason: result.absenceReason };
+        }
         setAiPendingOrders(
           seatId,
           result.orders,
@@ -263,7 +281,7 @@ export async function afterResolution(
         error: (result as { error?: string }).error,
       });
       clearAiPendingOrders(seatId);
-      return { consulted: false };
+      return { consulted: false, absenceReason: 'consult_failed' };
     } catch (err) {
       if (deps.signal?.aborted || isLikelyAbortError(err)) {
         logDebug('afterResolution: consultation cancelled', { turnNumber: state.turnNumber });
@@ -271,7 +289,7 @@ export async function afterResolution(
       }
       logError('afterResolution: requestOrders exception', err);
       clearAiPendingOrders(seatId);
-      return { consulted: false };
+      return { consulted: false, absenceReason: 'consult_failed' };
     }
   } else {
     clearAiPendingOrders(seatId);
@@ -280,7 +298,7 @@ export async function afterResolution(
       opponentHadUnitActions,
       humanHadObservableActions,
     });
-    return { consulted: false };
+    return { consulted: false, absenceReason: 'no_new_consult' };
   }
 }
 
@@ -456,6 +474,15 @@ export interface AfterTacticalBeatResolutionResult {
    * Exceptions: None.
    */
   attachTacticalOpponentPlanToIpc?: boolean;
+  /**
+   * Why this beat did not call the model, when the skip has a player-facing reason.
+   *
+   * Contract: Omitted for a cancel and for a neutral party. `no_units_in_battle` is the annihilation skip. `no_new_consult` is a beat that did not require a new plan.
+   * When to use: The post-beat runner copies this onto the pool outcome.
+   * Expected outcome: A `CommanderAbsenceReason`, or absent.
+   * Exceptions: None.
+   */
+  absenceReason?: CommanderAbsenceReason;
 }
 
 /**
@@ -482,7 +509,7 @@ export async function afterTacticalBeatResolution(
       hasModel: Boolean(deps.modelId?.trim()),
       hasKey: deps.hasKey(),
     });
-    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false, absenceReason: 'consult_failed' };
   }
   if (getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
@@ -490,7 +517,7 @@ export async function afterTacticalBeatResolution(
       turnNumber: state.turnNumber,
       battleId: tacticalBattle.battleId,
     });
-    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false, absenceReason: 'no_units_in_battle' };
   }
   if (tacticalBattle.opposingPartyId !== undefined && isNeutralOwnerId(tacticalBattle.opposingPartyId)) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
@@ -537,7 +564,7 @@ export async function afterTacticalBeatResolution(
       humanHadObservableBeatActions,
       opponentIdle: consultBecauseOpponentIdle,
     });
-    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false, absenceReason: 'no_new_consult' };
   }
   if (policyOnlyConsult) {
     logDebug('afterTacticalBeatResolution: invoking LLM from post-beat policy', {
@@ -559,6 +586,14 @@ export async function afterTacticalBeatResolution(
       return { consulted: false, attachTacticalOpponentPlanToIpc: false };
     }
     if (result.success === true) {
+      if (result.absenceReason) {
+        logDebug('afterTacticalBeatResolution: requestOrders reported an absence', {
+          turnNumber: state.turnNumber,
+          battleId: tacticalBattle.battleId,
+          absenceReason: result.absenceReason,
+        });
+        return { consulted: false, attachTacticalOpponentPlanToIpc: false, absenceReason: result.absenceReason };
+      }
       const tacticalOpponentPlan =
         result.tacticalOpponentPlan ?? tacticalOpponentPlanFromRequestOrdersSuccess(result);
       setAiLastConsultationTurn(seatId, state.turnNumber);
@@ -581,14 +616,14 @@ export async function afterTacticalBeatResolution(
       };
     }
     logDebug('afterTacticalBeatResolution: requestOrders failed', { success: result.success });
-    return { consulted: false, attachTacticalOpponentPlanToIpc: true };
+    return { consulted: false, attachTacticalOpponentPlanToIpc: true, absenceReason: 'consult_failed' };
   } catch (err) {
     if (deps.signal?.aborted || isLikelyAbortError(err)) {
       logDebug('afterTacticalBeatResolution: consultation cancelled', { turnNumber: state.turnNumber });
       return { consulted: false, attachTacticalOpponentPlanToIpc: false };
     }
     logError('afterTacticalBeatResolution: requestOrders exception', err);
-    return { consulted: false, attachTacticalOpponentPlanToIpc: true };
+    return { consulted: false, attachTacticalOpponentPlanToIpc: true, absenceReason: 'consult_failed' };
   }
 }
 

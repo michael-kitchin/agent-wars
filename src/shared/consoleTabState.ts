@@ -56,6 +56,19 @@ export function consoleTabIdForLiveMatchLaunch(
 }
 
 /**
+ * Collapses the console when the named tab is the one on screen.
+ *
+ * Purpose: Start is on the Commanders panel. Turning planning on should hide that panel and widen the map.
+ * When to use: From the Start click, with the Commanders tab id.
+ * Expected outcome: The named tab stays selected and the console collapses. A different tab, and a console that is already collapsed, stay as they were.
+ * Exceptions: None.
+ */
+export function collapseOpenConsoleTab(current: ConsoleTabState, tabId: string): ConsoleTabState {
+  if (current.collapsed || current.activeTabId !== tabId) return current;
+  return { activeTabId: current.activeTabId, collapsed: true };
+}
+
+/**
  * Applies one click on a console tab.
  *
  * Purpose: A click on the active tab of an expanded console collapses it; any click on a collapsed console expands it.

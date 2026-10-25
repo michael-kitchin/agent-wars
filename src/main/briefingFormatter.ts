@@ -150,7 +150,7 @@ export function markdownHeading2(title: string): string {
  *
  * Purpose: Short turn-opening sentences for the Commander briefing (contact, optional standing-order gaps, critical threats).
  * When to use: Strategic `formatBriefing` after assessments are ready.
- * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; names air strikes only when the opponent roster includes air; the critical-threat sentence counts only units that also need Action when standing orders are active.
+ * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; names air strikes only when the opponent roster includes air; the critical-threat sentence counts only units that also need Action when standing orders are active. When the commander has no units, the scout clause is omitted and the next sentence says the side is still in the match and should set production.
  * Exceptions: None.
  */
 export function buildStrategicNarrative(
@@ -175,10 +175,11 @@ export function buildStrategicNarrative(
     if (!isCritical) return false;
     return standingOrdersActive ? needsAction(a, true, true) : true;
   }).length;
+  const countSentence = `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed enemy units: ${humanUnits.length}.`;
   const observedEnemySentence =
-    humanUnits.length > 0
-      ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed enemy units: ${humanUnits.length}.`
-      : `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed enemy units: 0. Enemy forces may still be out of view, so scout and preserve contact.`;
+    aiUnits.length > 0 && humanUnits.length === 0
+      ? `${countSentence} Enemy forces may still be out of view, so scout and preserve contact.`
+      : countSentence;
   const hasAir = aiUnits.some((u) => u.unitType === 'air');
   logDebug('briefingFormatter buildStrategicNarrative', {
     turnNumber: state.turnNumber,
@@ -189,6 +190,9 @@ export function buildStrategicNarrative(
   });
   const sentences: string[] = [];
   sentences.push(observedEnemySentence);
+  if (aiUnits.length === 0) {
+    sentences.push('You have no units in play. You are still in the match, so set production on the cities you still hold.');
+  }
   if (inContact > 0) {
     sentences.push(`${inContact} of your units are in or near direct combat range.`);
   }

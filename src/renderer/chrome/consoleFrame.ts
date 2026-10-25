@@ -4,7 +4,7 @@
  *
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
-import { expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
+import { collapseOpenConsoleTab, expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
 import { isObservingRoster, observeModeControls } from '../../shared/observeModeControls';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
@@ -175,6 +175,26 @@ function applyConsoleState(): void {
   setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === 'console-tab-reports');
   refreshConsoleHeader();
   if (!consoleState.collapsed) active?.onShow?.();
+}
+
+/**
+ * Collapses the console when the named tab is the one on screen.
+ *
+ * Purpose: Clicking Start on the Commanders tab hides that panel. Stop does not call this.
+ * When to use: After Start turns planning on.
+ * Expected outcome: The named tab stays selected and the console collapses. Another tab, or a console that is already collapsed, is left as it was. An unknown id is logged and the console stays as it was.
+ * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
+ */
+export function collapseConsoleTab(tabId: string): void {
+  if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+    console.error('[agent-wars] collapseConsoleTab unknown tab', tabId);
+    return;
+  }
+  const next = collapseOpenConsoleTab(consoleState, tabId);
+  console.debug('[agent-wars] collapseConsoleTab', { tabId, collapsed: next !== consoleState });
+  if (next === consoleState) return;
+  consoleState = next;
+  applyConsoleState();
 }
 
 /**

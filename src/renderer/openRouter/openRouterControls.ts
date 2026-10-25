@@ -9,6 +9,7 @@ import {
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { renderOpponentStatus, updateOpenRouterCostLabel } from './openRouterUiHelpers';
 import { bindCommanderMessageTabs, showCommanderMessageTabs } from './commanderMessageTabsUi';
+import { collapseConsoleTab } from '../chrome/consoleFrame';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
@@ -520,6 +521,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       S.runButtonOn = !S.runButtonOn;
       setPlanningTogglePressed(runBtn, S.runButtonOn);
       if (S.runButtonOn) {
+        collapseConsoleTab('console-tab-commanders');
         deps.updateReadyButtonState();
         deps.startBackgroundRequestIfAllowed();
       } else {

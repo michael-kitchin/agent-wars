@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -92,6 +93,15 @@ export interface RequestOrdersResult {
    * Exceptions: None.
    */
   message?: string;
+  /**
+   * Why this success stored no plan and called no model.
+   *
+   * Contract: Set only for a tactical consult whose own roster is empty. A strategic consult with no units omits this and continues.
+   * When to use: Callers must not store orders when this is set. The commander pool records it as an absence.
+   * Expected outcome: `no_units_in_battle`, or omitted when the model was called.
+   * Exceptions: None.
+   */
+  absenceReason?: CommanderAbsenceReason;
   /**
    * Count of tool rows dropped during validation.
    *

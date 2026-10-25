@@ -38,8 +38,8 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - When the player clicks the selected tab, the console collapses to its rail.
 - When the player clicks any tab while the console is collapsed, the console expands on that tab.
 - The map takes the width the console gives up, and gives it back when the console expands.
-- Clicking Start or Stop does not change the selected tab. See [opponent-tab-commander.md](opponent-tab-commander.md).
-- A successful start that does not turn planning on expands the console on the Commanders tab. That open does not collapse the console when Commanders was already selected. A start that turns planning on leaves the tab and the collapsed state as they were.
+- Clicking Start while the Commanders tab is open collapses the console. The selected tab stays Commanders. Clicking Stop does not change the tab or the collapsed state. See [opponent-tab-commander.md](opponent-tab-commander.md).
+- Starting a match without turning planning on expands the console on the Commanders tab. That open does not collapse the console when Commanders was already selected. Starting a match with planning on leaves the tab and the collapsed state as they were. That path is not a click on Start.
 
 ### Keyboard
 

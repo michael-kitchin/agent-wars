@@ -7,6 +7,7 @@ import type {
 } from './ordersTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { TacticalOpponentPlanPayload } from './consultationPushTypes';
+import type { CommanderAbsenceReason } from '../commanderStatus';
 
 /**
  * Documents the `OpenRouterModel` interface as a named contract surface (export interface OpenRouterModel).
@@ -239,6 +240,15 @@ strategy?: string;
        * Exceptions: None.
        */
 message?: string;
+            /**
+       * Why this success stored no plan and called no model.
+
+       * Contract: Set only for a tactical consult whose own roster is empty. Omitted when the model was called.
+       * When to use: Do not store orders when this is set.
+       * Expected outcome: `no_units_in_battle`, or omitted.
+       * Exceptions: None.
+       */
+absenceReason?: CommanderAbsenceReason;
             /**
        * Specifies the contract for the `dropped` member (dropped?: number;).
 

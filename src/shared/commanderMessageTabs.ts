@@ -7,6 +7,7 @@
  * Exceptions: None. This module does not import the logger.
  */
 
+import type { CommanderAbsenceReason, CommanderConsultTheater, CommanderStatus } from './commanderStatus';
 import { aiIndexForSeatId } from './seatIds';
 import { shortSideName } from './seatRoster';
 
@@ -15,7 +16,7 @@ import { shortSideName } from './seatRoster';
  *
  * Purpose: The dialog needs the label, whether the player can open it, and the prose it shows.
  * When to use: `CommanderMessageTabState.tabs`.
- * Expected outcome: Disabled until a non-empty message or strategy arrives.
+ * Expected outcome: Disabled until a non-empty message, a strategy, or an absence line arrives.
  * Exceptions: None.
  */
 export interface CommanderMessageTab {
@@ -40,9 +41,9 @@ export interface CommanderMessageTab {
   /**
    * Whether the player can open this tab.
    *
-   * Contract: False until a non-empty message or strategy is stored.
+   * Contract: False until a non-empty message, a strategy, or an absence line is stored.
    * When to use: The button's disabled state.
-   * Expected outcome: True after `applyCommanderMessage` keeps prose for this seat.
+   * Expected outcome: True after `applyCommanderMessage` keeps prose, or after `applyCommanderAbsence` stores a line.
    * Exceptions: None.
    */
   readonly enabled: boolean;
@@ -64,6 +65,24 @@ export interface CommanderMessageTab {
    * Exceptions: None.
    */
   readonly strategy: string | null;
+  /**
+   * Whether this appearance already consulted the seat and got no prose.
+   *
+   * Contract: True only after a finished consult with an empty message and strategy. False again when prose arrives.
+   * When to use: Before an absence line. A silent consult must stay disabled.
+   * Expected outcome: The absence pass skips this tab.
+   * Exceptions: None.
+   */
+  readonly consultedWithoutProse: boolean;
+  /**
+   * Whether the current line is an explanation rather than a consult.
+   *
+   * Contract: True only after `applyCommanderAbsence`. False after real prose, and false while the tab is disabled.
+   * When to use: A later explanation may replace this line. Real prose must not be replaced.
+   * Expected outcome: The Message section is the explanation, and Strategy is empty.
+   * Exceptions: None.
+   */
+  readonly fromAbsence: boolean;
 }
 
 /**
@@ -71,7 +90,7 @@ export interface CommanderMessageTab {
  *
  * Purpose: The screen paints this and does not sort it again.
  * When to use: After `initialCommanderMessageTabs` and each `applyCommanderMessage`.
- * Expected outcome: `selectedSeatId` is null until a message arrives.
+ * Expected outcome: `selectedSeatId` is null until a message or strategy arrives. An absence line does not change it.
  * Exceptions: None.
  */
 export interface CommanderMessageTabState {
@@ -130,6 +149,8 @@ export function initialCommanderMessageTabs(
       enabled: false,
       message: null,
       strategy: null,
+      consultedWithoutProse: false,
+      fromAbsence: false,
     }))
     .sort(compareCommanderMessageTabs);
   return { tabs, selectedSeatId: null };
@@ -157,7 +178,9 @@ export function applyCommanderMessage(
   const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
   if (index < 0) return state;
   const tabs = state.tabs.map((tab, tabIndex) =>
-    tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
+    tabIndex === index
+      ? { ...tab, enabled: true, message, strategy, consultedWithoutProse: false, fromAbsence: false }
+      : tab
   );
   return { tabs, selectedSeatId: arrival.seatId };
 }
@@ -188,4 +211,201 @@ export function commanderDispatchHasProse(
 function proseOrNull(value: string | null): string | null {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Facts the message dialog uses to decide whether a tab gets an absence line.
+ *
+ * Purpose: Knockout, a missing model, a timeout, a silent consult, and a seat outside the battle outrank a stored skip.
+ * When to use: `resolveCommanderTabAbsence`.
+ * Expected outcome: One object per tab on each dialog appearance.
+ * Exceptions: None.
+ */
+export interface CommanderTabAbsenceInput {
+  /**
+   * The turn the seat was knocked out, or null while it is still in the match.
+   *
+   * Contract: The roster's `outTurn`.
+   * When to use: A non-null value selects `knocked_out` ahead of every other reason.
+   * Expected outcome: The turn number, or null.
+   * Exceptions: None.
+   */
+  readonly outTurn: number | null;
+  /**
+   * The pool status for this seat, or null when the snapshot has no row.
+   *
+   * Contract: A `CommanderStatus`, or null.
+   * When to use: `out`, `no_model`, `timed_out`, and `planning` are decided here.
+   * Expected outcome: The status at the moment of the read.
+   * Exceptions: None.
+   */
+  readonly status: CommanderStatus | null;
+  /**
+   * The reason the pool stored for an unfinished consult.
+   *
+   * Contract: A `CommanderAbsenceReason`, or null.
+   * When to use: Only after roster status, a timeout, a silent consult, and a seat outside this battle.
+   * Expected outcome: The stored reason, or null.
+   * Exceptions: None.
+   */
+  readonly storedReason: CommanderAbsenceReason | null;
+  /**
+   * Whether a tactical consult is open and this seat is not the opposing party.
+   *
+   * Contract: True while a battle snapshot is on screen, the battle names an opposing party, and this seat is not that party. Beat resolution counts, because that consult is still the battle.
+   * When to use: After the status checks and before the stored reason.
+   * Expected outcome: True selects `not_in_battle`.
+   * Exceptions: None.
+   */
+  readonly tacticalOtherSeat: boolean;
+  /**
+   * Whether this appearance already received a finished consult with no prose.
+   *
+   * Contract: The tab's `consultedWithoutProse` flag.
+   * When to use: After knockout, a missing model, and a timeout. A silent consult stays disabled.
+   * Expected outcome: True yields no absence line.
+   * Exceptions: None.
+   */
+  readonly consultedWithoutProse: boolean;
+}
+
+/**
+ * Whether this seat was left out of the battle consult.
+ *
+ * Purpose: A strategic consult can finish while a battle is still open. Those commanders were asked, so the battle line must not replace their own skip.
+ * When to use: Before `resolveCommanderTabAbsence`, for a seat other than the battle's opposing party.
+ * Expected outcome: True only when the opposing party's latest consult is tactical. False when that consult is strategic, when this seat is the opposing party, and when the battle names no party.
+ * Exceptions: None.
+ */
+export function seatOutsideTacticalConsult(
+  seatId: string,
+  opposingPartyId: string | null | undefined,
+  opponentTheater: CommanderConsultTheater | null
+): boolean {
+  if (!opposingPartyId || seatId === opposingPartyId) return false;
+  return opponentTheater === 'tactical';
+}
+
+/**
+ * The absence reason for one tab, if this appearance should explain a skip.
+ *
+ * Purpose: A real consult, a seat that is still planning, and a silent reply must not be replaced by a stored skip.
+ * When to use: After prose dispatches have been applied for this appearance.
+ * Expected outcome: Null when the tab should stay disabled. Otherwise the reason to format.
+ * Exceptions: None.
+ */
+export function resolveCommanderTabAbsence(input: CommanderTabAbsenceInput): CommanderAbsenceReason | null {
+  if (input.outTurn !== null || input.status === 'out') return 'knocked_out';
+  if (input.status === 'no_model') return 'no_model';
+  if (input.status === 'timed_out') return 'timed_out';
+  if (input.consultedWithoutProse) return null;
+  if (input.status === 'planning') return null;
+  if (input.tacticalOtherSeat) return 'not_in_battle';
+  return input.storedReason;
+}
+
+/**
+ * The one-line Message body for an absence reason.
+ *
+ * Purpose: The tab explains the skip in one sentence and does not invent a strategy.
+ * When to use: After `resolveCommanderTabAbsence` returns a reason. Pass the knockout turn or the timeout turn. Other reasons ignore the turn.
+ * Expected outcome: One sentence. The turn number is included only when it is a finite number greater than zero.
+ * Exceptions: None.
+ */
+export function formatCommanderAbsenceMessage(reason: CommanderAbsenceReason, turnNumber: number | null): string {
+  const turn = turnNumber !== null && Number.isFinite(turnNumber) && turnNumber > 0 ? turnNumber : null;
+  switch (reason) {
+    case 'knocked_out':
+      return turn === null ? 'Knocked out.' : `Knocked out on turn ${turn}.`;
+    case 'no_model':
+      return 'No commander model is set.';
+    case 'timed_out':
+      return turn === null
+        ? 'No reply in time, so its standing orders ran instead.'
+        : `No reply in time on turn ${turn}, so its standing orders ran instead.`;
+    case 'no_new_consult':
+      return 'No new consult was required, so its standing orders still apply.';
+    case 'not_in_battle':
+      return 'Not in this battle.';
+    case 'no_units_in_battle':
+      return 'No units left in this battle.';
+    case 'consult_failed':
+      return 'The consult failed.';
+  }
+}
+
+/**
+ * Marks a finished consult that sent no prose.
+ *
+ * Purpose: A silent reply must not be described as a skip, and must not replace prose already shown.
+ * When to use: A dispatch in this appearance whose message and strategy are both empty.
+ * Expected outcome: A tab that already shows real prose is unchanged. An explanation is cleared and the tab is disabled. Selection changes only when that explanation was the selected tab.
+ * Exceptions: None. An unknown seat id leaves the state unchanged.
+ */
+export function noteCommanderConsultWithoutProse(
+  state: CommanderMessageTabState,
+  seatId: string
+): CommanderMessageTabState {
+  const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+  if (index < 0) return state;
+  const current = state.tabs[index];
+  if (!current || (current.enabled && !current.fromAbsence)) return state;
+  if (current.consultedWithoutProse && !current.fromAbsence) return state;
+  const tabs = state.tabs.map((tab, tabIndex) =>
+    tabIndex === index
+      ? {
+          ...tab,
+          consultedWithoutProse: true,
+          enabled: false,
+          message: current.fromAbsence ? null : tab.message,
+          strategy: null,
+          fromAbsence: false,
+        }
+      : tab
+  );
+  const selectedSeatId = state.selectedSeatId === seatId && current.fromAbsence ? null : state.selectedSeatId;
+  return { tabs, selectedSeatId };
+}
+
+/**
+ * Enables one tab with an absence line and leaves the selection alone.
+ *
+ * Purpose: The player can open the explanation without leaving the consult that actually replied.
+ * When to use: After `resolveCommanderTabAbsence` returns a reason and the tab is not already showing prose.
+ * Expected outcome: That tab is enabled, its message is the line, and its strategy is null. A later explanation replaces an earlier one. Real prose is left as it is. `selectedSeatId` is unchanged.
+ * Exceptions: None. An unknown seat id or a blank line leaves the state unchanged.
+ */
+export function applyCommanderAbsence(
+  state: CommanderMessageTabState,
+  seatId: string,
+  message: string
+): CommanderMessageTabState {
+  const line = proseOrNull(message);
+  if (!line) return state;
+  const index = state.tabs.findIndex((tab) => tab.seatId === seatId);
+  if (index < 0) return state;
+  const current = state.tabs[index];
+  if (!current || (current.enabled && !current.fromAbsence)) return state;
+  const tabs = state.tabs.map((tab, tabIndex) =>
+    tabIndex === index
+      ? { ...tab, enabled: true, message: line, strategy: null, fromAbsence: true, consultedWithoutProse: false }
+      : tab
+  );
+  return { tabs, selectedSeatId: state.selectedSeatId };
+}
+
+/**
+ * Clears silent-consult marks from the open dialog.
+ *
+ * Purpose: A mark from the previous batch must not hide a later skip while the dialog stays open.
+ * When to use: At the start of an update that does not rebuild the tabs.
+ * Expected outcome: `consultedWithoutProse` is false. Enabled lines and the selection stay as they are.
+ * Exceptions: None.
+ */
+export function resetCommanderConsultMarks(state: CommanderMessageTabState): CommanderMessageTabState {
+  if (!state.tabs.some((tab) => tab.consultedWithoutProse)) return state;
+  return {
+    tabs: state.tabs.map((tab) => (tab.consultedWithoutProse ? { ...tab, consultedWithoutProse: false } : tab)),
+    selectedSeatId: state.selectedSeatId,
+  };
 }

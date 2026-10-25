@@ -81,6 +81,13 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       return emptyConsultOutcome({ errorMessage: attempt.value.error, modelId: usedModelId });
     }
     const value = attempt.value;
+    if (value.absenceReason) {
+      logDebug('commanderPoolConsult requestOrders skipped', {
+        seatId: request.seatId,
+        absenceReason: value.absenceReason,
+      });
+      return emptyConsultOutcome({ absenceReason: value.absenceReason, modelId: usedModelId });
+    }
     const prose = (text: string | undefined): string | null => {
       const trimmed = text?.trim() ?? '';
       return trimmed.length > 0 ? trimmed : null;
@@ -99,6 +106,7 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       modelId: usedModelId,
       tacticalPlan: request.theater === 'tactical' ? tacticalOpponentPlanFromRequestOrdersSuccess(value) : null,
       errorMessage: null,
+      absenceReason: null,
     };
   } catch (err) {
     logError('commanderPoolConsult runCommanderConsult failed', err);

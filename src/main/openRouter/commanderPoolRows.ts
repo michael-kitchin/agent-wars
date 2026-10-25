@@ -68,7 +68,7 @@ export function entryIsPlanning(entry: PoolSeat | undefined): boolean {
  *
  * Purpose: Knockout and a cleared model show even if the memory still says ready.
  * When to use: `readCommanderPoolSnapshot`.
- * Expected outcome: Elapsed time is set only while the visible status is `planning`.
+ * Expected outcome: Elapsed time is set only while the visible status is `planning`. `theater` is the pool seat's latest consult, or `strategic` when the seat has no entry.
  * Exceptions: None.
  */
 export function commanderStatusRow(seat: SeatRecord, entry: PoolSeat | undefined, nowMs: number): CommanderStatusRow {
@@ -81,6 +81,8 @@ export function commanderStatusRow(seat: SeatRecord, entry: PoolSeat | undefined
     status,
     planningElapsedMs: planning && entry?.planningStartedAt != null ? Math.max(0, nowMs - entry.planningStartedAt) : null,
     timedOutTurn: status === 'timed_out' ? entry?.timedOutTurn ?? null : null,
+    absenceReason: status === 'ready' ? (entry?.absenceReason ?? null) : null,
+    theater: entry?.theater ?? 'strategic',
   };
 }
 
@@ -106,6 +108,7 @@ export function idlePoolSeat(seatId: AiSeatId, status: CommanderStatus, generati
     generation,
     launchId: 0,
     timers: [],
+    absenceReason: null,
   };
 }
 

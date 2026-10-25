@@ -1,5 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import { isLikelyAbortError } from '../../shared/abortError';
+import { emptyRosterAbsenceReason } from '../../shared/commanderStatus';
 import { AI_SEAT_IDS, aiIndexForSeatId } from '../../shared/seatIds';
 import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
@@ -151,10 +152,11 @@ export async function requestOrdersFlow(
   }
 
   const opponentUnits = planState.units.filter((u) => u.player === seatId);
-  if (opponentUnits.length === 0) {
-    logDebug('openRouter requestOrders: no opponent units remain, skipping LLM call');
-    if (onLog) onLog('No opponent units remain.');
-    return { success: true, orders: [] };
+  const rosterAbsence = emptyRosterAbsenceReason(Boolean(tacticalBattle), opponentUnits.length);
+  if (rosterAbsence) {
+    logDebug('openRouter requestOrders: no units remain in this battle', { seatId, absenceReason: rosterAbsence });
+    if (onLog) onLog('No units remain in this battle.');
+    return { success: true, orders: [], absenceReason: rosterAbsence };
   }
 
   const requestProfile = resolveOrdersRequestProfile?.(modelId, seatId) ?? BASELINE_ORDERS_REQUEST_PROFILE;

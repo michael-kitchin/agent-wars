@@ -8,8 +8,7 @@
  */
 
 import { commanderDispatchHasProse } from '../../shared/commanderMessageTabs';
-import type { CommanderDispatch } from '../../shared/commanderStatus';
-import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../../shared/commanderStatus';
+import type { CommanderDispatch, CommanderPlanningMode, CommanderPoolSnapshot, CommanderStatusRow } from '../../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
@@ -44,10 +43,10 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
  *
  * Purpose: The pool stores the prose. The screen shows it.
  * When to use: A draining read.
- * Expected outcome: One toast per dispatch that has text.
+ * Expected outcome: The dialog opens when a dispatch has prose. Status rows explain seats this appearance did not consult.
  * Exceptions: None.
  */
-let showToast: ((dispatches: readonly CommanderDispatch[]) => void) | null = null;
+let showToast: ((dispatches: readonly CommanderDispatch[], statuses: readonly CommanderStatusRow[]) => void) | null = null;
 let fileMessage: ((dispatch: CommanderDispatch) => void) | null = null;
 
 /**
@@ -92,7 +91,10 @@ function notifyPoolChanged(): void {
  * Exceptions: None.
  */
 export function bindCommanderPoolScreen(deps: {
-  showCommanderMessages: (dispatches: readonly CommanderDispatch[]) => void;
+  showCommanderMessages: (
+    dispatches: readonly CommanderDispatch[],
+    statuses: readonly CommanderStatusRow[]
+  ) => void;
   fileCommanderMessage: (dispatch: CommanderDispatch) => void;
   updateReadyButtonState: () => void;
 }): void {
@@ -223,7 +225,7 @@ export async function stopCommanderPlanningFromScreen(reason: ModelCallCancelRea
  *
  * Purpose: Each kept dispatch is its own Reports entry. The dialog paints the tabs.
  * When to use: A draining pool read.
- * Expected outcome: A dispatch with neither a message nor a strategy is skipped.
+ * Expected outcome: A dispatch with neither a message nor a strategy is skipped. An absence line is not a dispatch and is not filed.
  * Exceptions: None.
  */
 function messageLines(dispatches: readonly CommanderDispatch[]): CommanderDispatch[] {
@@ -241,7 +243,7 @@ function messageLines(dispatches: readonly CommanderDispatch[]): CommanderDispat
  *
  * Purpose: Ready needs a fresh status when it returns, and the poll needs the same read.
  * When to use: The one-second poll, and once after Ready returns. Pass false for `showMessages` when a stale consult should be filed and not shown.
- * Expected outcome: The snapshot updates. A draining read files one Reports entry per kept dispatch. When `showMessages` is true and a dispatch was kept, the message dialog opens. Seat cost refreshes when a dispatch arrives or the last planning seat finishes.
+ * Expected outcome: The snapshot updates. A draining read files one Reports entry per kept dispatch. When `showMessages` is true, the dialog opens for prose in that batch and can explain a seat that was not consulted. Seat cost refreshes when a dispatch arrives or the last planning seat finishes.
  * Exceptions: A rejected IPC is logged and does not throw. A reply that arrives after Start is ignored.
  */
 export async function readCommanderPoolAndApply(drain: boolean, showMessages = true): Promise<void> {
@@ -254,8 +256,8 @@ export async function readCommanderPoolAndApply(drain: boolean, showMessages = t
     snapshot = next;
     const consultFinished = wasPlanning && !anyCommanderIsPlanning();
     if (drain && (next.dispatches.length > 0 || consultFinished)) {
-      const kept = messageLines(next.dispatches);
-      if (showMessages && kept.length > 0) showToast?.(kept);
+      messageLines(next.dispatches);
+      if (showMessages) showToast?.(next.dispatches, next.statuses);
       await refreshSeatCosts();
     }
   } catch (err) {

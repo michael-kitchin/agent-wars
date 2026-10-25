@@ -131,7 +131,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | Include the scouting directive. The narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. Nearest-enemy cells in the unit table are em dashes. Suggested Destination follows section 3.5. The observed-enemy roster line uses its empty phrasing. |
+| system | Include the scouting directive. When the commander still has units, the narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. When the commander has no units, that sentence stops after the counts, the scout clause is omitted, and the next sentence says the side is still in the match and should set production on the cities it still holds. Nearest-enemy cells in the unit table are em dashes. Suggested Destination follows section 3.5. The observed-enemy roster line uses its empty phrasing. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
@@ -270,8 +270,8 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 
 | Combination | Resolution |
 | --- | --- |
-| Fog on **and** no observed enemy | Both apply. Nearest-enemy cells are dashes, the narrative says forces may be out of view, and the scouting directive is present. The staleness rule still appears, because dropped reports are why the roster is empty. |
-| Fog off **and** no observed enemy | Both apply, but the scouting rule is redundant and must not contradict the goal statement: with full visibility an empty roster means no enemy units exist. Emit the directive from the roster gate and let the goal statement carry the meaning; do not add a second sentence claiming the enemy is hidden. |
+| Fog on **and** no observed enemy | Both apply. Nearest-enemy cells are dashes. When the commander still has units, the narrative says forces may be out of view. When the commander has no units, the narrative omits that clause and says the side is still in the match. The scouting directive is present. The staleness rule still appears, because dropped reports are why the roster is empty. |
+| Fog off **and** no observed enemy | Both apply, but the scouting rule is redundant and must not contradict the goal statement: with full visibility an empty roster means no enemy units exist. Emit the directive from the roster gate and let the goal statement carry the meaning; do not add a second sentence claiming the enemy is hidden. When the commander has no units, the narrative omits the scout clause and says the side is still in the match. |
 | Largest size **and** no air units | Caps for air still print with a count of zero, and the air section is still omitted. Cap printing and section inclusion are separate gates and must not be collapsed. |
 | Tactical **and** production flag enabled | Tactical wins. No production section, no production tail, no production coaching, no production tool, and the forbidden-marker guard applies. |
 | Event-driven **and** empty callback list | Both apply. The list is legitimately empty and the coaching states the consequence: only engine-forced consultations remain. |
