@@ -40,6 +40,54 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: [],
   });
   assert.strictEqual(empty, null);
+  const unknownSentence = 'Unknown battle observed in Africa, Europe.';
+  const withDeployment = buildConsolidatedTurnUpdateToastMessage({
+    readyResult: { success: true, deployedUnitsByType: { infantry: 2 } },
+    turnLossSummary: emptyTurnLossSummary(),
+    combatFallbackBullets: [],
+    turnReport: {
+      viewerSeatId: HUMAN_SEAT_ID,
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
+    },
+    unknownBattleLine: unknownSentence,
+  });
+  assert.ok(withDeployment);
+  const updatesHeader = `${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`;
+  const headerAt = withDeployment!.indexOf(updatesHeader);
+  const deployedAt = withDeployment!.indexOf('2 infantry units deployed');
+  const unknownAt = withDeployment!.indexOf(unknownSentence);
+  assert.ok(withDeployment!.indexOf('You took 1 hex from E. Turkey.') < headerAt);
+  assert.ok(headerAt < deployedAt && deployedAt < unknownAt);
+  assert.ok(withDeployment!.endsWith(unknownSentence));
+  const onlyUnknown = buildConsolidatedTurnUpdateToastMessage({
+    readyResult: { success: true },
+    turnLossSummary: emptyTurnLossSummary(),
+    combatFallbackBullets: [],
+    unknownBattleLine: unknownSentence,
+  });
+  assert.strictEqual(onlyUnknown, `${updatesHeader}\n${unknownSentence}`);
+  for (const blank of ['   ', null, undefined] as const) {
+    assert.strictEqual(
+      buildConsolidatedTurnUpdateToastMessage({
+        readyResult: { success: true },
+        turnLossSummary: emptyTurnLossSummary(),
+        combatFallbackBullets: [],
+        unknownBattleLine: blank,
+      }),
+      null
+    );
+  }
+  const withFallback = buildConsolidatedTurnUpdateToastMessage({
+    readyResult: { success: true },
+    turnLossSummary: emptyTurnLossSummary(),
+    combatFallbackBullets: ['Casualty outcomes at 2 hexes.'],
+    unknownBattleLine: unknownSentence,
+  });
+  assert.strictEqual(
+    withFallback,
+    `${updatesHeader}\nCasualty outcomes at 2 hexes.\n${unknownSentence}`
+  );
 }
 
 function run(): void {

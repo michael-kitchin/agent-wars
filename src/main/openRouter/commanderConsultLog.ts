@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { logDebug, logTrace } from '../logger';
+import { logTrace } from '../logger';
 
 /**
  * One activity-log line for a seat.
@@ -66,7 +66,8 @@ let sender: ((payload: CommanderConsultLogLine) => void) | null = null;
  * Exceptions: None.
  */
 export function setCommanderConsultLogSender(next: ((payload: CommanderConsultLogLine) => void) | null): void {
-  logDebug('commanderConsultLog setCommanderConsultLogSender', { listening: next !== null });
+  // About once a second while the pool is polled. Trace so a debug log is not filled by the poll.
+  logTrace('commanderConsultLog setCommanderConsultLogSender', { listening: next !== null });
   sender = next;
 }
 

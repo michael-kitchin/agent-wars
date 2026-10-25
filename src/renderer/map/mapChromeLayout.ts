@@ -4,8 +4,8 @@
  *
  * Purpose: The legend's width comes from the page, so it is measured, not assumed. The toast band's right edge is the map's.
  * When to use: Through `layoutMapChrome`.
- * Expected outcome: Inline `left`, `top`, and `right` on `#terrain-legend` and `#map-toast-band`. While the new-game
- *   setup panel is open over the map, the band also keeps clear of it.
+ * Expected outcome: Inline `left` and `top` on `#terrain-legend`. The message band gets `left: auto`, a pixel `width`,
+ *   and `right`. While the new-game setup panel is open over the map, the band also keeps clear of it.
  * Exceptions: None; missing elements are skipped.
  */
 import { legendPopoverPosition, toastBandSpan } from '../../shared/mapChromePlacement';
@@ -14,13 +14,13 @@ import { legendPopoverPosition, toastBandSpan } from '../../shared/mapChromePlac
  * Moves the open legend beside or under the minimap panel, then fits the toast band between the chrome on the left
  * and the map's right edge.
  *
- * Purpose: Keeps the legend on the map and the toasts clear of the panel and the legend, with the same right inset
- *   whether the console is open or collapsed.
+ * Purpose: Keeps the legend on the map and the message band clear of the panel and the legend, with the same right inset
+ *   whether the console is open or collapsed. The update toast anchors itself at the lower right and is not placed here.
  * When to use: After the maps are created, after the legend opens or closes, and whenever the map changes size.
- * Expected outcome: An open legend sits beside the panel when it fits, otherwise under it. The band sits right of the
- *   panel, or of the legend when the legend is beside it, or of the open new-game panel when that reaches farther,
- *   and `MAP_CHROME_INSET` in from the map's right edge. On a narrow map the offsets let the toast overlap the left
- *   chrome; the toast's own width stays within one third of the map. A closed legend is left where it was.
+ * Expected outcome: An open legend sits beside the panel when it fits, otherwise under it. The band's width is the gap
+ *   beside that chrome, or one third of the map, whichever is smaller, anchored on the right inset. A longer message
+ *   does not change that width. On a narrow map the message band may overlap the left chrome and still stays within one third
+ *   of the map. A closed legend is left where it was.
  * Exceptions: None. Does nothing without `#canvas-container` or `#minimap-panel`.
  */
 export function layoutMapChrome(): void {
@@ -56,6 +56,9 @@ export function layoutMapChrome(): void {
     leftObstacleRight,
     rightObstacleLeft: mapBox.width,
   });
-  band.style.left = `${span.left}px`;
+  const available = mapBox.width - span.left - span.right;
+  const width = Math.max(0, Math.min(available, mapBox.width / 3));
+  band.style.left = 'auto';
   band.style.right = `${span.right}px`;
+  band.style.width = `${width}px`;
 }

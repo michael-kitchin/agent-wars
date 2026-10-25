@@ -126,6 +126,15 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None.
    */
   turnReport?: Omit<TurnReportInput, 'otherLines'>;
+  /**
+   * Unknown-battle sentence for the end of the Updates section.
+   *
+   * Contract: Output of `formatUnknownBattleAnnouncement`, or omitted when combat was inside vision.
+   * When to use: Pass it only when a hex or victim was outside vision. A blank or whitespace value is omitted.
+   * Expected outcome: The last Updates line, after deployments, caps, hexes lost, and any combat-activity fallback.
+   * Exceptions: None. It does not replace loss sections or deployment lines.
+   */
+  unknownBattleLine?: string | null;
 }
 
 /**
@@ -146,6 +155,7 @@ function stripLeadingBullet(line: string): string {
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
  * When to use: Strategic Ready and tactical commit paths in `readyHandler` before `showMapToast`.
  * Expected outcome: Newline-separated message with `##` section headers; `null` when all sections would be empty.
+ *   A non-empty `unknownBattleLine` is the last Updates line.
  * Exceptions: None.
  */
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
@@ -164,6 +174,8 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
   if (!hasLossSections && otherLines.length === 0) {
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
+  const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';
+  if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
     sections.push(...otherLines);

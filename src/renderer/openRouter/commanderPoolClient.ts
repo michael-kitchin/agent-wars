@@ -7,6 +7,7 @@
  * Exceptions: A failed IPC call is logged and leaves the last snapshot in place.
  */
 
+import { commanderDispatchHasProse } from '../../shared/commanderMessageTabs';
 import type { CommanderDispatch } from '../../shared/commanderStatus';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
@@ -15,7 +16,6 @@ import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { rendererSharedState as S } from '../core/state';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
-import { isObservingRoster } from '../../shared/observeModeControls';
 
 const POLL_MS = 1000;
 
@@ -223,31 +223,17 @@ export async function stopCommanderPlanningFromScreen(reason: ModelCallCancelRea
  *
  * Purpose: Each kept dispatch is its own Reports entry. The dialog paints the tabs.
  * When to use: A draining pool read.
- * Expected outcome: A dispatch with neither a message nor an observed strategy is skipped.
+ * Expected outcome: A dispatch with neither a message nor a strategy is skipped.
  * Exceptions: None.
  */
 function messageLines(dispatches: readonly CommanderDispatch[]): CommanderDispatch[] {
-  const observing = matchIsObserving();
   const kept: CommanderDispatch[] = [];
   for (const dispatch of dispatches) {
-    const keep = Boolean(dispatch.message?.trim()) || (observing && Boolean(dispatch.strategy?.trim()));
-    if (!keep) continue;
+    if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
     fileMessage?.(dispatch);
     kept.push(dispatch);
   }
   return kept;
-}
-
-/**
- * True when the loaded roster has no human seat that can still give orders.
- *
- * Purpose: Strategy prose is shown only while observing. An empty roster is the start screen, not a watch.
- * When to use: `messageLines`.
- * Expected outcome: True when the roster has seats and none is an active human. False when the roster is empty.
- * Exceptions: None.
- */
-function matchIsObserving(): boolean {
-  return isObservingRoster(S.gameState?.seats ?? []);
 }
 
 /**

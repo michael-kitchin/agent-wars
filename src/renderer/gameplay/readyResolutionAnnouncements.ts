@@ -286,14 +286,15 @@ export function reportViewerSeatId(): string | null {
 }
 
 /**
- * Shows the consolidated turn-update toast and, when combat is fogged, the unknown-battle toast.
+ * Shows the consolidated turn-update toast, including an unknown battle as an Updates line.
  *
- * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast order.
+ * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast.
  * When to use: After the caller has already classified visibility and built its kill-toast formatter. Do not classify visibility here.
  *   Pass `reportTag`, the tag of the turn or beat that just resolved, captured before Ready resolved it.
- * Expected outcome: One update toast and log line when there is text, then an unknown-battle toast when any unknown
- *   hex or victim remains. The Reports tab files them as a Turn report and a Notice under `reportTag`.
- * Exceptions: None. Continent-name lookup failures follow `collectUnknownBattleContinentNames`.
+ * Expected outcome: One update toast and one log line when there is text. An unknown battle is the last Updates line.
+ *   The Reports tab files that toast as one turn report under `reportTag`. A name-lookup failure uses the
+ *   unidentified-continent sentence and still shows the toast.
+ * Exceptions: A rejected continent lookup is logged and becomes the unidentified-continent sentence. It is not rethrown.
  */
 export async function announceResolutionTurnUpdate(
   args: {
@@ -322,34 +323,39 @@ export async function announceResolutionTurnUpdate(
     seatOrder: seat.seatOrder,
     homeRegion: seat.homeRegion,
   }));
+  const viewerSeatId = reportViewerSeatId();
+  const hasUnknownBattle =
+    unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+  let unknownBattleLine: string | undefined;
+  if (hasUnknownBattle) {
+    try {
+      const getContinentNames = window.gameApi?.getHexContinentNames;
+      const unknownContinentNames = await collectUnknownBattleContinentNames(
+        unknownCombatHexes,
+        unknownCasualtyHexes,
+        getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : undefined
+      );
+      unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
+    } catch (err) {
+      console.error('unknown battle continent names failed', err);
+      unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
+    }
+  }
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
     turnLossSummary,
     combatFallbackBullets,
     turnReport: {
-      viewerSeatId: reportViewerSeatId(),
+      viewerSeatId,
       seats,
       transitions: readySlice.controlTransitions ?? [],
     },
+    unknownBattleLine,
   });
   if (updateText) {
     const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
     deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: 'turn', tag: reportTag } });
     deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
-  }
-  const hasUnknownBattle =
-    unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
-  if (hasUnknownBattle) {
-    const getContinentNames = window.gameApi?.getHexContinentNames;
-    const unknownContinentNames = await collectUnknownBattleContinentNames(
-      unknownCombatHexes,
-      unknownCasualtyHexes,
-      getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : undefined
-    );
-    deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), {
-      isError: false,
-      report: { kind: 'notice', tag: reportTag },
-    });
   }
 }
 

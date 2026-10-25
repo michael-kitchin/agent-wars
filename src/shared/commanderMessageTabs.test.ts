@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyCommanderMessage, initialCommanderMessageTabs } from './commanderMessageTabs';
+import { applyCommanderMessage, commanderDispatchHasProse, initialCommanderMessageTabs } from './commanderMessageTabs';
 
 const seats = [
   { seatId: 'opponent', label: 'Northern America' },
@@ -24,13 +24,34 @@ test('tabs start in alphabetical order and a message selects that tab', () => {
   assert.equal(applied.tabs[0]?.enabled, false);
   assert.equal(applied.tabs[1]?.enabled, true);
   assert.equal(applied.tabs[1]?.message, 'Hold the coast.');
+  assert.equal(applied.tabs[1]?.strategy, 'Watch the strait.');
   const replaced = applyCommanderMessage(applied, {
     seatId: 'opponent',
     message: 'The coast is ours.',
     strategy: null,
   });
   assert.equal(replaced.tabs[1]?.message, 'The coast is ours.');
+  assert.equal(replaced.tabs[1]?.strategy, null);
   assert.equal(replaced.tabs[1]?.message?.includes('Hold the coast.'), false);
+  const strategyOnly = applyCommanderMessage(initial, {
+    seatId: 'opponent2',
+    message: null,
+    strategy: 'Hold the river.',
+  });
+  assert.equal(strategyOnly.selectedSeatId, 'opponent2');
+  assert.equal(strategyOnly.tabs[0]?.enabled, true);
+  assert.equal(strategyOnly.tabs[1]?.enabled, false);
+  assert.equal(strategyOnly.tabs[0]?.message, null);
+  assert.equal(strategyOnly.tabs[0]?.strategy, 'Hold the river.');
+});
+
+test('commanderDispatchHasProse keeps a message, a strategy, or both', () => {
+  assert.equal(commanderDispatchHasProse('Hold the coast.', null), true);
+  assert.equal(commanderDispatchHasProse(null, 'Watch the strait.'), true);
+  assert.equal(commanderDispatchHasProse(null, null), false);
+  assert.equal(commanderDispatchHasProse('   ', '\n'), false);
+  assert.equal(commanderDispatchHasProse(undefined, undefined), false);
+  assert.equal(commanderDispatchHasProse(undefined, 'Watch the strait.'), true);
 });
 
 test('whitespace and an unknown seat do not enable or add a tab', () => {

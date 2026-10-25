@@ -53,11 +53,11 @@ const TOAST_BAND_MIN_WIDTH = 280;
 /**
  * Works out where the toast band may sit, from the boxes of the chrome around it.
  *
- * Purpose: The toast sits between the minimap panel (or the legend, when it is open beside the panel) and the map's
- *   right edge, each 12 px away. On a map too narrow for that, the allowed range starts at the map's left inset.
+ * Purpose: The message band sits between the minimap panel (or the legend, when it is open beside the panel) and the
+ *   map's right edge, each 12 px away. On a map too narrow for that, the allowed range starts at the map's left inset.
  * When to use: The toast band check, with probed boxes in window coordinates.
- * Expected outcome: `{ left, right }`, the x range the toast must fit in. Its right edge is the map's right inset. A
- *   short toast may start to the right of `left`.
+ * Expected outcome: `{ left, right }`, the x range the band must fit in. Its right edge is the map's right inset. A
+ *   short band may start to the right of `left`.
  * Exceptions: None.
  */
 function toastBandSpace(map, panel, legend) {
@@ -118,12 +118,23 @@ const SELECTION_BAR_HEIGHT = 50;
  *
  * Purpose: The selection panel sits this far from the map's left and bottom edges, and the toast band this far from the
  *   map's top and from the chrome beside it.
- * When to use: The selection panel and toast band checks.
+ * When to use: The selection panel check, and the message-band and update-toast check.
  * Expected outcome: Matches `.selection-panel` in `static/selectionChrome.css` and `MAP_CHROME_INSET` in
  *   `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
  */
 const MAP_OVERLAY_INSET = 12;
+
+/**
+ * Distance from the map's bottom edge to the map toast's bottom edge, in CSS pixels.
+ *
+ * Purpose: The update toast sits above the zoom buttons.
+ * When to use: The message-band and update-toast check, for the update toast's lower-right anchor.
+ * Expected outcome: Matches `bottom` on `#map-toast` in `static/feedbackChrome.css`: 12 px inset, plus the 63 px zoom
+ *   stack, plus an 8 px gap.
+ * Exceptions: None.
+ */
+const MAP_TOAST_BOTTOM = 83;
 
 /**
  * Checks that the selection panel is anchored at the map's bottom-left at the given size.
@@ -448,14 +459,22 @@ const CONSOLE_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'toast-band-top-right',
+    name: 'message-band-and-update-toast',
     scenes: [SCENES.turnResolved, SCENES.reportsTab],
     needs: ['#canvas-container', '#map-toast-band', '#map-toast', '#minimap-panel', '#terrain-legend'],
     run: (p, el) => {
       const c = el('#canvas-container');
       const band = el('#map-toast-band');
       const toast = el('#map-toast');
-      if (!toast.shown || !toast.ancestorIds.includes('map-toast-band')) return 'the map toast is not shown in the toast band';
+      if (!toast.shown || !toast.ancestorIds.includes('canvas-container')) return 'the map toast is not shown on the map';
+      if (toast.ancestorIds.includes('map-toast-band')) return 'the map toast is inside the message band';
+      const maxToastWidth = c.w / 3;
+      if (toast.w > maxToastWidth + 1) {
+        return `the map toast is ${Math.round(toast.w)} wide, more than one third of the map (${Math.round(maxToastWidth)})`;
+      }
+      if (!near(toast.x + toast.w, c.x + c.w - MAP_OVERLAY_INSET) || !near(toast.y + toast.h, c.y + c.h - MAP_TOAST_BOTTOM)) {
+        return `the map toast is at ${fmt(toast)}, expected its right edge ${MAP_OVERLAY_INSET} px in and its bottom ${MAP_TOAST_BOTTOM} px above the map's bottom`;
+      }
       if (!near(band.y, c.y + MAP_OVERLAY_INSET)) return `the toast band is at ${fmt(band)}, expected its top ${MAP_OVERLAY_INSET} px below the map's top`;
       const maxWidth = c.w / 3;
       if (band.w > maxWidth + 1) {

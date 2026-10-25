@@ -14,7 +14,6 @@ import {
 import { paletteForOwner } from '../../shared/seatPalette';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
-import { isObservingRoster } from '../../shared/observeModeControls';
 
 /**
  * Extra facts a message entry can name.
@@ -56,8 +55,8 @@ export interface ConsoleReportMeta {
    * Strategy prose.
    *
    * Contract: Plain text, or omitted.
-   * When to use: Observe mode only.
-   * Expected outcome: A muted "Strategy:" line. Hidden while a human seat is playing.
+   * When to use: When the consult sent a strategy, including while a human seat is playing.
+   * Expected outcome: A muted "Strategy:" line. A blank value is omitted.
    * Exceptions: None.
    */
   readonly strategyText?: string;
@@ -106,9 +105,9 @@ const listeners: Array<() => void> = [];
 /**
  * The sender line for a message entry.
  *
- * Purpose: The row names the side and quotes the message. Strategy shows only while observing.
+ * Purpose: The row names the side and quotes the message. Strategy follows when the consult sent it.
  * When to use: `recordConsoleReport` when `messageText` is set.
- * Expected outcome: A dot, the full name, the message in quotes, and a strategy line while observing.
+ * Expected outcome: A dot, the full name, the message in quotes when it is non-empty, and a strategy line when strategy is non-empty.
  * Exceptions: None.
  */
 function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
@@ -121,14 +120,16 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
   const seat = seats.find((row) => row.seatId === meta.senderSeatId);
   dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? '#9D174D';
   const name = document.createElement('span');
-  name.textContent = `${seat?.homeRegion ?? 'Commander'} "${meta.messageText ?? ''}"`;
+  const message = meta.messageText?.trim() ?? '';
+  const home = seat?.homeRegion ?? 'Commander';
+  name.textContent = message.length > 0 ? `${home} "${message}"` : home;
   line.append(dot, name);
   wrap.append(line);
-  const observing = isObservingRoster(seats);
-  if (observing && meta.strategyText) {
+  const strategyText = meta.strategyText?.trim() ?? '';
+  if (strategyText.length > 0) {
     const strategy = document.createElement('p');
     strategy.className = 'console-report-strategy';
-    strategy.textContent = `Strategy: ${meta.strategyText}`;
+    strategy.textContent = `Strategy: ${strategyText}`;
     wrap.append(strategy);
   }
   return wrap;
@@ -255,7 +256,7 @@ export function currentConsoleReportTag(): string {
  * When to use: Right after a map toast or the AI strategy toast is filled. `body` is the toast's text element;
  *   it is copied, not moved.
  * Expected outcome: A new first entry with the tag and the kind. Without `messageText`, the body is a copy of the toast.
- *   With `messageText`, the body is the sender's name and the quoted message, plus a strategy line while observing.
+ *   With `messageText`, the body is the sender's name and the quoted message when that message is non-empty, plus a strategy line when the consult sent one.
  *   A message can show a model label. A turn report also gets a disabled Replay placeholder. The entry is marked new
  *   until the player next leaves the Reports tab, and counts as unread unless the tab is on screen. Past
  *   `MAX_CONSOLE_REPORTS` the oldest entry is dropped. A sender filter hides a new message from another seat.

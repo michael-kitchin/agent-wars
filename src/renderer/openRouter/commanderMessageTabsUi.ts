@@ -3,18 +3,18 @@
  *
  * Purpose: Later opponents update their own tab instead of replacing the dialog.
  * When to use: A draining pool read that has kept dispatches.
- * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. Strategy shows only while observing.
+ * Expected outcome: Tabs start disabled. A dispatch enables and selects its tab. The panel shows Message, then Strategy, when that consult sent them.
  * Exceptions: None. A missing toast is skipped.
  */
 
 import { buildAiStrategyToastSections } from '../../shared/aiStrategyToastContent';
 import {
   applyCommanderMessage,
+  commanderDispatchHasProse,
   initialCommanderMessageTabs,
   type CommanderMessageTabState,
 } from '../../shared/commanderMessageTabs';
 import type { CommanderDispatch } from '../../shared/commanderStatus';
-import { isObservingRoster } from '../../shared/observeModeControls';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { rendererSharedState as S } from '../core/state';
 import { appendMapToastSectionHeader, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
@@ -48,7 +48,7 @@ export function bindCommanderMessageTabs(): void {
  *
  * Purpose: The pool's screen callback. This function does not file Reports.
  * When to use: `readCommanderPoolAndApply` when messages should show.
- * Expected outcome: The selected panel is that dispatch's Message, and Strategy while observing. An empty batch does not show.
+ * Expected outcome: The selected panel is that dispatch's Message, then Strategy, when the consult sent them. An empty batch does not show.
  * Exceptions: None.
  */
 export function showCommanderMessageTabs(dispatches: readonly CommanderDispatch[]): void {
@@ -58,14 +58,12 @@ export function showCommanderMessageTabs(dispatches: readonly CommanderDispatch[
       .map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
     tabState = initialCommanderMessageTabs(seats);
   }
-  const observing = isObservingRoster(S.gameState?.seats ?? []);
   for (const dispatch of dispatches) {
-    const strategy = observing ? dispatch.strategy : null;
-    if (!dispatch.message?.trim() && !strategy?.trim()) continue;
+    if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
     tabState = applyCommanderMessage(tabState, {
       seatId: dispatch.seatId,
       message: dispatch.message,
-      strategy,
+      strategy: dispatch.strategy,
     });
   }
   if (!tabState.tabs.some((tab) => tab.enabled)) return;

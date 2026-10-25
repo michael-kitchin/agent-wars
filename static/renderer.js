@@ -18588,6 +18588,36 @@ ${bonuses}`;
     return segments;
   }
 
+  // src/shared/commanderMessageTabs.ts
+  function initialCommanderMessageTabs(seats) {
+    const tabs = seats.map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      enabled: false,
+      message: null,
+      strategy: null
+    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
+    return { tabs, selectedSeatId: null };
+  }
+  function applyCommanderMessage(state, arrival) {
+    const message = proseOrNull(arrival.message);
+    const strategy = proseOrNull(arrival.strategy);
+    if (!message && !strategy) return state;
+    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
+    if (index < 0) return state;
+    const tabs = state.tabs.map(
+      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
+    );
+    return { tabs, selectedSeatId: arrival.seatId };
+  }
+  function commanderDispatchHasProse(message, strategy) {
+    return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
+  }
+  function proseOrNull(value) {
+    const trimmed = value?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   // src/renderer/core/matchEpoch.ts
   var rendererMatchEpoch = 0;
   function advanceRendererMatchEpoch() {
@@ -21219,8 +21249,11 @@ ${bonuses}`;
       leftObstacleRight,
       rightObstacleLeft: mapBox.width
     });
-    band.style.left = `${span.left}px`;
+    const available = mapBox.width - span.left - span.right;
+    const width = Math.max(0, Math.min(available, mapBox.width / 3));
+    band.style.left = "auto";
     band.style.right = `${span.right}px`;
+    band.style.width = `${width}px`;
   }
 
   // src/renderer/gameplay/newGameDialogMove.ts
@@ -21473,18 +21506,13 @@ ${bonuses}`;
     }
   }
   function messageLines(dispatches) {
-    const observing = matchIsObserving();
     const kept = [];
     for (const dispatch of dispatches) {
-      const keep = Boolean(dispatch.message?.trim()) || observing && Boolean(dispatch.strategy?.trim());
-      if (!keep) continue;
+      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
       fileMessage?.(dispatch);
       kept.push(dispatch);
     }
     return kept;
-  }
-  function matchIsObserving() {
-    return isObservingRoster(rendererSharedState.gameState?.seats ?? []);
   }
   async function readCommanderPoolAndApply(drain, showMessages = true) {
     if (!window.gameApi?.readCommanderPool) return;
@@ -22539,14 +22567,16 @@ ${bonuses}`;
     const seat = seats.find((row) => row.seatId === meta.senderSeatId);
     dot.style.background = paletteForOwner(meta.senderSeatId ?? null, seats)?.map ?? "#9D174D";
     const name = document.createElement("span");
-    name.textContent = `${seat?.homeRegion ?? "Commander"} "${meta.messageText ?? ""}"`;
+    const message = meta.messageText?.trim() ?? "";
+    const home = seat?.homeRegion ?? "Commander";
+    name.textContent = message.length > 0 ? `${home} "${message}"` : home;
     line.append(dot, name);
     wrap.append(line);
-    const observing = isObservingRoster(seats);
-    if (observing && meta.strategyText) {
+    const strategyText = meta.strategyText?.trim() ?? "";
+    if (strategyText.length > 0) {
       const strategy = document.createElement("p");
       strategy.className = "console-report-strategy";
-      strategy.textContent = `Strategy: ${meta.strategyText}`;
+      strategy.textContent = `Strategy: ${strategyText}`;
       wrap.append(strategy);
     }
     return wrap;
@@ -34764,6 +34794,8 @@ ${bonuses}`;
     if (!hasLossSections && otherLines.length === 0) {
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }
+    const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
+    if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
     if (otherLines.length > 0) {
       sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
       sections.push(...otherLines);
@@ -34920,33 +34952,38 @@ ${bonuses}`;
       seatOrder: seat.seatOrder,
       homeRegion: seat.homeRegion
     }));
+    const viewerSeatId2 = reportViewerSeatId();
+    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+    let unknownBattleLine;
+    if (hasUnknownBattle) {
+      try {
+        const getContinentNames = window.gameApi?.getHexContinentNames;
+        const unknownContinentNames = await collectUnknownBattleContinentNames(
+          unknownCombatHexes,
+          unknownCasualtyHexes,
+          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+        );
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
+      } catch (err) {
+        console.error("unknown battle continent names failed", err);
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
+      }
+    }
     const updateText = buildConsolidatedTurnUpdateToastMessage({
       readyResult: readySlice,
       turnLossSummary,
       combatFallbackBullets,
       turnReport: {
-        viewerSeatId: reportViewerSeatId(),
+        viewerSeatId: viewerSeatId2,
         seats,
         transitions: readySlice.controlTransitions ?? []
-      }
+      },
+      unknownBattleLine
     });
     if (updateText) {
       const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
       deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: "turn", tag: reportTag } });
       deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
-    }
-    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
-    if (hasUnknownBattle) {
-      const getContinentNames = window.gameApi?.getHexContinentNames;
-      const unknownContinentNames = await collectUnknownBattleContinentNames(
-        unknownCombatHexes,
-        unknownCasualtyHexes,
-        getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
-      );
-      deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), {
-        isError: false,
-        report: { kind: "notice", tag: reportTag }
-      });
     }
   }
   function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
@@ -35906,6 +35943,15 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/unknownBattleAnnouncement.ts
+  function formatUnknownBattleAnnouncement(continentNames) {
+    const clean = [...new Set(continentNames.map((name) => name.trim()).filter((name) => name.length > 0))].sort(
+      (left, right) => left.localeCompare(right, "en")
+    );
+    if (clean.length === 0) return "Unknown battle observed in an unidentified continent.";
+    return `Unknown battle observed in ${clean.join(", ")}.`;
+  }
+
   // src/renderer/entryCallbacks.ts
   var maybeScheduleTacticalAnnihilationExit2 = () => {
     throw new Error("entry callbacks host is not bound");
@@ -36153,13 +36199,6 @@ ${bonuses}`;
       seats: rendererSharedState.gameState?.seats ?? []
     });
   }
-  function formatUnknownBattleAnnouncement(continentNames) {
-    const clean = continentNames.map((s) => s.trim()).filter((s) => s.length > 0).filter((name, idx, arr) => arr.indexOf(name) === idx);
-    if (clean.length === 0) return "Unknown battle observed in an unidentified continent.";
-    if (clean.length === 1) return `Unknown battle observed in ${clean[0]}.`;
-    if (clean.length === 2) return `Unknown battle observed in ${clean[0]} or ${clean[1]}.`;
-    return `Unknown battle observed in ${clean.slice(0, -1).join(", ")}, or ${clean[clean.length - 1]}.`;
-  }
   function startBackgroundRequestIfAllowed2() {
     return startBackgroundRequestIfAllowed({
       appendOpenRouterLog,
@@ -36373,33 +36412,6 @@ ${bonuses}`;
     return sections;
   }
 
-  // src/shared/commanderMessageTabs.ts
-  function initialCommanderMessageTabs(seats) {
-    const tabs = seats.map((seat) => ({
-      seatId: seat.seatId,
-      label: seat.label,
-      enabled: false,
-      message: null,
-      strategy: null
-    })).sort((left, right) => left.label.localeCompare(right.label, "en") || left.seatId.localeCompare(right.seatId, "en"));
-    return { tabs, selectedSeatId: null };
-  }
-  function applyCommanderMessage(state, arrival) {
-    const message = proseOrNull(arrival.message);
-    const strategy = proseOrNull(arrival.strategy);
-    if (!message && !strategy) return state;
-    const index = state.tabs.findIndex((tab) => tab.seatId === arrival.seatId);
-    if (index < 0) return state;
-    const tabs = state.tabs.map(
-      (tab, tabIndex) => tabIndex === index ? { ...tab, enabled: true, message, strategy } : tab
-    );
-    return { tabs, selectedSeatId: arrival.seatId };
-  }
-  function proseOrNull(value) {
-    const trimmed = value?.trim() ?? "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
   // src/renderer/openRouter/commanderMessageTabsUi.ts
   var tabState = null;
   function bindCommanderMessageTabs() {
@@ -36412,14 +36424,12 @@ ${bonuses}`;
       const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
       tabState = initialCommanderMessageTabs(seats);
     }
-    const observing = isObservingRoster(rendererSharedState.gameState?.seats ?? []);
     for (const dispatch of dispatches) {
-      const strategy = observing ? dispatch.strategy : null;
-      if (!dispatch.message?.trim() && !strategy?.trim()) continue;
+      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
       tabState = applyCommanderMessage(tabState, {
         seatId: dispatch.seatId,
         message: dispatch.message,
-        strategy
+        strategy: dispatch.strategy
       });
     }
     if (!tabState.tabs.some((tab) => tab.enabled)) return;

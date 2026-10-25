@@ -3,7 +3,7 @@
  *
  * Purpose: One dialog lists every AI opponent. A tab turns on when that opponent sends prose.
  * When to use: The message dialog, before it paints.
- * Expected outcome: Tabs stay in alphabetical order. A later message from the same seat replaces the body.
+ * Expected outcome: Tabs stay in alphabetical order. A later consult from the same seat replaces that tab's message and strategy.
  * Exceptions: None. This module does not import the logger.
  */
 
@@ -53,10 +53,10 @@ export interface CommanderMessageTab {
    */
   readonly message: string | null;
   /**
-   * The seat's latest strategy, or null when the player is not observing.
+   * The seat's latest strategy.
    *
-   * Contract: Trimmed text, or null.
-   * When to use: The Strategy section.
+   * Contract: Trimmed text, or null when that consult sent none.
+   * When to use: The Strategy section. Stored whether or not a human seat is playing.
    * Expected outcome: Null hides that section.
    * Exceptions: None.
    */
@@ -86,7 +86,7 @@ export interface CommanderMessageTabState {
    *
    * Contract: A seat id from `tabs`, or null when every tab is disabled.
    * When to use: `aria-selected` and the panel.
-   * Expected outcome: The seat of the last applied message.
+   * Expected outcome: The seat of the last consult that sent a message, a strategy, or both.
    * Exceptions: None.
    */
   readonly selectedSeatId: string | null;
@@ -120,7 +120,7 @@ export function initialCommanderMessageTabs(
  *
  * Purpose: A new dispatch must not append to the previous message.
  * When to use: Each kept dispatch, in arrival order.
- * Expected outcome: That tab is enabled and selected. Whitespace and an unknown seat id leave the state unchanged.
+ * Expected outcome: That tab is enabled and selected. Its message and strategy are replaced by this consult. A consult with no prose, and an unknown seat id, leave the state unchanged.
  * Exceptions: None.
  */
 export function applyCommanderMessage(
@@ -143,10 +143,25 @@ export function applyCommanderMessage(
 }
 
 /**
+ * Whether a consult sent player-facing prose.
+ *
+ * Purpose: The message popup and Reports keep a consult that sent a message, a strategy, or both.
+ * When to use: Before enabling a tab or filing a Reports entry. This function does not read observe mode.
+ * Expected outcome: True when either trimmed value is non-empty.
+ * Exceptions: None.
+ */
+export function commanderDispatchHasProse(
+  message: string | null | undefined,
+  strategy: string | null | undefined
+): boolean {
+  return proseOrNull(message ?? null) !== null || proseOrNull(strategy ?? null) !== null;
+}
+
+/**
  * Trims prose and treats a blank string as absent.
  *
  * Purpose: A whitespace message must not enable a tab.
- * When to use: `applyCommanderMessage`.
+ * When to use: `applyCommanderMessage` and `commanderDispatchHasProse`.
  * Expected outcome: Null when the text is null or only whitespace.
  * Exceptions: None.
  */

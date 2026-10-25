@@ -642,23 +642,14 @@ export function formatUnitDisplayName(unitId: string): string {
 }
 
 /**
- * Defines the `formatUnknownBattleAnnouncement` function shape (function formatUnknownBattleAnnouncement(continentNames: string[]): string).
-
- * Purpose: Supports maintainability by documenting why `formatUnknownBattleAnnouncement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Re-exports the unknown-battle sentence.
+ *
+ * Purpose: `wiredEntryCallbacks` imports this name from here and passes it to Ready.
+ * When to use: Leave this export in place. The sentence is implemented in `unknownBattleAnnouncement.ts`.
+ * Expected outcome: Ready receives the shared formatter.
  * Exceptions: None.
  */
-export function formatUnknownBattleAnnouncement(continentNames: string[]): string {
-  const clean = continentNames
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .filter((name, idx, arr) => arr.indexOf(name) === idx);
-  if (clean.length === 0) return 'Unknown battle observed in an unidentified continent.';
-  if (clean.length === 1) return `Unknown battle observed in ${clean[0]}.`;
-  if (clean.length === 2) return `Unknown battle observed in ${clean[0]} or ${clean[1]}.`;
-  return `Unknown battle observed in ${clean.slice(0, -1).join(', ')}, or ${clean[clean.length - 1]}.`;
-}
+export { formatUnknownBattleAnnouncement } from '../shared/unknownBattleAnnouncement';
 
 /**
  * Defines the `startBackgroundRequestIfAllowed` function shape (function startBackgroundRequestIfAllowed(): void).

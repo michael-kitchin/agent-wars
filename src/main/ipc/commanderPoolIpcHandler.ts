@@ -12,7 +12,7 @@ import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../../shared/
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
 import { parseModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
 import { stopModelWork } from './modelWorkCancellation';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { readCommanderPoolSnapshot, startStrategicPlanning, startTacticalPlanning, stopAllPlanning } from '../openRouter/commanderPool';
 import { setCommanderConsultLogSender } from '../openRouter/commanderConsultLog';
 import { installCommanderConsultRunner } from '../openRouter/commanderPoolConsult';
@@ -59,7 +59,8 @@ export function registerCommanderPoolIpcHandler(ipcMain: IpcMain): void {
   ipcMain.handle(IPC_GAME.readCommanderPool, (event, payload: unknown): CommanderPoolSnapshot => {
     rememberLogWindow(event.sender);
     const drain = drainPayload(payload);
-    logDebug('commanderPoolIpcHandler read', { drain });
+    // About once a second while the pool is polled. Trace so a debug log is not filled by the poll.
+    logTrace('commanderPoolIpcHandler read', { drain });
     return readCommanderPoolSnapshot(drain);
   });
 }
