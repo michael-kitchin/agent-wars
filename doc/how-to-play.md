@@ -1,6 +1,6 @@
 # How to play
 
-> **Note:** Some of the screenshots are out of date, since the v2.6.0 facelift. I'll replace them as soon as I can.
+> **Note:** Some of the screenshots are out of date, since the v2.6.0 and v2.8.0 facelifts. I'll replace them as soon as I can.
 
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up each opponent's OpenRouter key are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 

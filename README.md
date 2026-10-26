@@ -53,35 +53,38 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 - **macOS:** unzip, then open `Agent Wars v2.8.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
-The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
+### Getting started
 
-1. When you first run Agent Wars, you'll see the start game screen. Explore the options, assign sides, and click the **Start game** button.
+1. When you first run Agent Wars, you'll see the **New game** screen. Explore the options and add AI opponents (up to 3).
 
-![Start game screen.](doc/media/first-start-game-1.png)
+![New game screen.](doc/media/first-start-game-1.png)
 
-2. The console on the right starts collapsed. Click **Command** to open a commander's settings.
+2. For each AI opponent, click on **No model - standing orders only** to enter your [OpenRouter](https://openrouter.ai) API key, select a model, reasoning, and doctrine:
 
-![Command tab.](doc/media/first-start-game-2.png)
+  - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
+  - Ollama/other local model support is on my radar (pun intended, I guess).
 
-3. Open a commander's card. The popover's first field is that opponent's **API key**. Paste the OpenRouter key, then click outside the field or press Enter. The key stays masked. Each opponent has its own key. A new game fills only the first opponent from the key you used last.
-4. In that same popover, choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button to the right of the model list reloads the list with the key in the popover. Each commander can use a different model, reasoning effort, and doctrine.
-    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
-    - Ollama/other local model support is on my radar (pun intended, I guess).
-5. Click **Start**, at the top of the Command tab, to start planning. The button then reads **Stop**. It stays on Start until at least one commander has both a key and a model. A commander with a model and an empty key does not call the model.
-    - You can change a commander's model at any time, or stop planning by clicking **Stop**.
+![Model selection.](doc/media/first-start-game-2.png)
+    
+3. Click **Start game** and play. See [doc/how-to-play.md](doc/how-to-play.md) for the rest.
 
-![Command tab after a model is chosen. The API key is entered in the commander popover.](doc/media/first-start-game-3.png)
+4. When the game is over, the **New game** will include a summary of the results.
 
-6. Then click **Command** to close the tab. You can explore the map, plan movement, etc. while the commanders are planning.
-7. When the AI is done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn.
-    - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
+![Game summary.](doc/media/first-end-game-1.png)
 
-![Ready button when the commanders are done (Command tab open).](doc/media/ready-done-open.png)
+### Notes
 
-Each opponent's OpenRouter key is stored locally in the Electron user-data directory. The screen receives a key only to fill that opponent's password field, and the key is not written to the activity log. Without a key and a model on at least one commander the app still runs, **Start** stays disabled, and that opponent makes no model calls.
+- At any time you can change models, stop and restart AI reasoning, or check on spend by opening the **Command** tab.
 
-See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
+![Command tab.](doc/media/command-tab.png)
 
+- When the AIs are done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn. You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
+
+![Ready button.](doc/media/ready-done-open.png)
+
+- Each opponent's OpenRouter key is stored locally in the Electron user-data directory. The screen receives a key only to fill that opponent's password field, and the key is not written to the activity log. Without a key and a model on at least one commander the app still runs, **Start** stays disabled, and that opponent makes no model calls.
+
+See [doc/how-to-play.md](doc/how-to-play.md) for more on how to play the game.
 
 ### See the Prompts (and Everything Else)
 
