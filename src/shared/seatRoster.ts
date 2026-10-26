@@ -1,8 +1,8 @@
 /**
  * Roster types and pure helpers for a match of two to four seats.
  *
- * Purpose: Ordering, activity, enemies, short names, and the snapshot the renderer sees
- * live here so the database module is not required to answer them.
+ * Purpose: Ordering, activity, enemies, and the snapshot the renderer sees live here so the
+ * database module is not required to answer them. Short names are re-exported from shortSideName.ts.
  * When to use: After a roster has been read, and while building prompts or labels.
  * Expected outcome: Helpers do not mutate the roster they are given.
  * Exceptions: None. This module does not import the main-process logger.
@@ -425,62 +425,12 @@ export function toSeatSnapshot(seat: SeatRecord, revealDoctrine: boolean, hasApi
   };
 }
 
-const COMPASS_PREFIXES: readonly (readonly [string, string])[] = [
-  ['Northern', 'N.'],
-  ['Southern', 'S.'],
-  ['Eastern', 'E.'],
-  ['Western', 'W.'],
-  ['Central', 'C.'],
-  ['North', 'N.'],
-  ['South', 'S.'],
-  ['East', 'E.'],
-  ['West', 'W.'],
-];
-
 /**
- * Cuts a home display name at the first list separator.
+ * Re-exports the short home name used on chips and unit labels.
  *
- * Purpose: "Eastern Turkey & Caucasus" shortens from "Eastern Turkey", not from the whole string.
- * When to use: `shortSideName` only.
- * Expected outcome: The substring before the first " & ", ", ", or " and ".
- * Exceptions: None.
- */
-function cutAtFirstSeparator(displayName: string): string {
-  const separatorAt = [' & ', ', ', ' and ']
-    .map((separator) => displayName.indexOf(separator))
-    .filter((index) => index >= 0);
-  if (separatorAt.length === 0) return displayName;
-  return displayName.slice(0, Math.min(...separatorAt));
-}
-
-/**
- * Shortens a leading compass word.
- *
- * Purpose: "Western Turkey" reads "W. Turkey" on chips. Longer words are tried first so
- * "Northern" does not become "N.ern".
- * When to use: `shortSideName` only.
- * Expected outcome: A leading compass word becomes its initial and a period. Other names
- * are unchanged.
- * Exceptions: None.
- */
-function shortenLeadingCompass(name: string): string {
-  for (const [word, short] of COMPASS_PREFIXES) {
-    if (name === word) return short;
-    if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
-  }
-  return name;
-}
-
-/**
- * Makes the short side name used on chips and unit labels.
- *
- * Purpose: Full home names do not fit on a unit token once a match has three or more seats.
+ * Purpose: Callers already import `shortSideName` from this module. The rule lives in `shortSideName.ts`.
  * When to use: Labels shown to someone other than the unit's owner.
- * Expected outcome: The name is cut at the first " & ", ", ", or " and ", then a leading
- * compass word is shortened. "Western Turkey" → "W. Turkey". "Eastern Turkey & Caucasus"
- * → "E. Turkey". "Levant & Cyprus" → "Levant". "Southern Asia" → "S. Asia".
+ * Expected outcome: The same string `shortSideName` returns from that module.
  * Exceptions: None.
  */
-export function shortSideName(displayName: string): string {
-  return shortenLeadingCompass(cutAtFirstSeparator(displayName));
-}
+export { shortSideName } from './shortSideName';

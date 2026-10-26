@@ -57,6 +57,35 @@ describe('shortSideName', () => {
     assert.equal(shortSideName('Central America'), 'C. America');
     assert.equal(shortSideName('Iraq'), 'Iraq');
   });
+
+  it('uses a letter form when the cut name is only single letters', () => {
+    const letterForms: readonly (readonly [string, string])[] = [
+      ['South & east China, Taiwan', 'SECT'],
+      ['Southern & eastern Germany, Austria, Switzerland', 'SEGAS'],
+      ['Northern & western Iran', 'NWI'],
+      ['Southern & eastern Iran', 'SEI'],
+      ['North & East India, Bangladesh, Nepal, Bhutan', 'NEIBNB'],
+      ['Central & western Mexico', 'CWM'],
+      ['Central & northwestern Russia', 'CNWR'],
+      ['Central & northern Brazil, Paraguay', 'CNBP'],
+      ['Central & western Cameroon', 'CWC'],
+      ['Northern & eastern Nigeria', 'NEN'],
+      ['Northern & western DR Congo, Congo', 'NWDRCC'],
+      ['Western & central Algeria', 'WCA'],
+    ];
+    for (const [name, short] of letterForms) {
+      assert.equal(shortSideName(name), short);
+      assert.equal(shortSideName(`${name} (${short})`), short);
+    }
+    assert.equal(shortSideName('East'), 'East');
+    assert.equal(shortSideName('Northwestern Italy'), 'Northwestern Italy');
+    assert.equal(shortSideName('NE Mexico & the Bajio'), 'NE Mexico');
+    assert.equal(shortSideName('Southern France'), 'S. France');
+    assert.equal(shortSideName('Tasman (Victoria, Tasmania, NZ)'), 'TVTNZ');
+    assert.equal(shortSideName('Tasman (Victoria, Tasmania, NZ) (TVTNZ)'), 'TVTNZ');
+    assert.equal(shortSideName('Q (alpha, beta)'), 'Q (alpha, beta)');
+    assert.equal(shortSideName(''), '');
+  });
 });
 
 describe('enemySeatIdsOf', () => {

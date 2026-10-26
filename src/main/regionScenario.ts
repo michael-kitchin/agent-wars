@@ -2,6 +2,7 @@ import { logDebug, logError, logTrace } from './logger';
 import { loadTerrainStrategicNamingFromPath } from './terrainNamingLoad';
 import { resolveBundledGlobalStrategicNamingPath } from './terrainMetadataPaths';
 import { GLOBAL_STRATEGIC_H3_RESOLUTION } from '../shared/h3Resolutions';
+import { sideHomeNameKey } from '../shared/shortSideName';
 
 /**
  * Documents the module-scope binding `PASSABLE_LAND_TERRAIN_KINDS` (PASSABLE_LAND_TERRAIN_KINDS).
@@ -168,18 +169,21 @@ export function listScenarioHomeRegions(): string[] {
 }
 
 /**
- * Defines the `getScenarioHomeRegionHexes` function shape (export function getScenarioHomeRegionHexes(regionName: string): string[]).
-
- * Purpose: Supports maintainability by documenting why `getScenarioHomeRegionHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Lists the strategic hexes of one home.
+ *
+ * Purpose: Win checks, fog, and the map outline need the cells of the home a seat stored.
+ * When to use: With a side-group id, a side-group display name, or a global UN subregion name.
+ * Expected outcome: The installed side group's hexes when the trimmed name is that group's id, its display name,
+ * or the same display name with one trailing abbreviation parenthesis removed. Otherwise the global naming-cache
+ * cells for that trimmed name, or an empty list.
+ * Exceptions: Rethrows a naming-file failure from the cache builder. An unknown name returns an empty list.
  */
 export function getScenarioHomeRegionHexes(regionName: string): string[] {
   logTrace('regionScenario getScenarioHomeRegionHexes', { regionName });
   const key = regionName.trim();
   if (!key) return [];
-  const group = sideGroupHomes?.find((entry) => entry.id === key || entry.displayName === key);
+  const group = sideGroupHomes?.find((entry) =>
+    entry.id === key || sideHomeNameKey(entry.displayName) === sideHomeNameKey(key));
   if (group) return [...group.hexes];
   return [...(getRegionHexCache().get(key) ?? [])];
 }

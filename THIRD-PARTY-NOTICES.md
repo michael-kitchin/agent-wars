@@ -320,7 +320,7 @@ https://github.com/uber/h3-js
 
 ## electron
 
-The application runs in Electron. Version 40.8.0.
+The application runs in Electron. Version 40.10.6.
 
 License: MIT
 

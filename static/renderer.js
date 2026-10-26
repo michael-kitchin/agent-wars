@@ -1137,6 +1137,96 @@
     return left.localeCompare(right, "en");
   }
 
+  // src/shared/shortSideName.ts
+  var COMPASS_PREFIXES = [
+    ["Northern", "N."],
+    ["Southern", "S."],
+    ["Eastern", "E."],
+    ["Western", "W."],
+    ["Central", "C."],
+    ["North", "N."],
+    ["South", "S."],
+    ["East", "E."],
+    ["West", "W."]
+  ];
+  var DIRECTION_STEMS = [
+    ["central", "C"],
+    ["north", "N"],
+    ["south", "S"],
+    ["east", "E"],
+    ["west", "W"]
+  ];
+  var TRAILING_ABBREVIATION = / \([A-Z]{2,}\)$/;
+  function sideHomeNameKey(displayName) {
+    return displayName.trim().replace(TRAILING_ABBREVIATION, "");
+  }
+  function cutAtFirstSeparator(displayName) {
+    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
+    if (separatorAt.length === 0) return displayName;
+    return displayName.slice(0, Math.min(...separatorAt));
+  }
+  function shortenLeadingCompass(name) {
+    for (const [word, short] of COMPASS_PREFIXES) {
+      if (name === word) return short;
+      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+    }
+    return name;
+  }
+  function isOnlySingleLetterWords(value) {
+    const words = value.split(/\s+/).map((word) => word.replace(/[^A-Za-z]/g, "")).filter((word) => word.length > 0);
+    return words.length > 0 && words.every((word) => word.length === 1);
+  }
+  function hasUnclosedParenthesis(value) {
+    let open = 0;
+    for (const char of value) {
+      if (char === "(") open += 1;
+      else if (char === ")") open -= 1;
+      if (open < 0) return true;
+    }
+    return open !== 0;
+  }
+  function compassLetters(lettersOnly) {
+    let rest = lettersOnly.toLowerCase();
+    if (rest.length === 0) return null;
+    let letters = "";
+    while (rest.length > 0) {
+      const stem = DIRECTION_STEMS.find(([name]) => rest.startsWith(name));
+      if (!stem) return null;
+      letters += stem[1];
+      rest = rest.slice(stem[0].length);
+      if (rest.startsWith("ern")) rest = rest.slice(3);
+    }
+    return letters.length > 0 ? letters : null;
+  }
+  function lettersFromFullName(body) {
+    let letters = "";
+    for (const token of body.split(/\s+/)) {
+      const lettersOnly = token.replace(/[^A-Za-z]/g, "");
+      if (lettersOnly.length === 0) continue;
+      const compass = compassLetters(lettersOnly);
+      if (compass !== null) {
+        letters += compass;
+        continue;
+      }
+      for (const char of token) {
+        if (char >= "A" && char <= "Z") letters += char;
+      }
+    }
+    return letters;
+  }
+  function shortSideName(displayName) {
+    const body = sideHomeNameKey(displayName);
+    const shortened = shortenLeadingCompass(cutAtFirstSeparator(body));
+    const candidate = isOnlySingleLetterWords(shortened) || hasUnclosedParenthesis(shortened) ? letterFormOrBody(body, shortened) : shortened;
+    if (body.length > 0 && candidate.length > body.length) return body;
+    return candidate;
+  }
+  function letterFormOrBody(body, shortened) {
+    const letters = lettersFromFullName(body);
+    if (letters.length <= 1) return body.length > 0 ? body : shortened;
+    return letters;
+  }
+
   // src/shared/seatRoster.ts
   var HUMAN_SEAT_KIND = "human";
   var AI_SEAT_KIND = "ai";
@@ -1153,32 +1243,6 @@
   }
   function findHumanSeat(seats) {
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
-  }
-  var COMPASS_PREFIXES = [
-    ["Northern", "N."],
-    ["Southern", "S."],
-    ["Eastern", "E."],
-    ["Western", "W."],
-    ["Central", "C."],
-    ["North", "N."],
-    ["South", "S."],
-    ["East", "E."],
-    ["West", "W."]
-  ];
-  function cutAtFirstSeparator(displayName) {
-    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
-    if (separatorAt.length === 0) return displayName;
-    return displayName.slice(0, Math.min(...separatorAt));
-  }
-  function shortenLeadingCompass(name) {
-    for (const [word, short] of COMPASS_PREFIXES) {
-      if (name === word) return short;
-      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
-    }
-    return name;
-  }
-  function shortSideName(displayName) {
-    return shortenLeadingCompass(cutAtFirstSeparator(displayName));
   }
 
   // src/shared/turnReportLines.ts

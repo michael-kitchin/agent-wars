@@ -15,6 +15,7 @@ import { installedSideGroups } from './regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID, type ScenarioStateSnapshot } from './gameDb/scenarioState';
 import { readSeatRoster } from './gameDb/seatRosterStore';
 import type { SeatRecord } from '../shared/seatRoster';
+import { sideHomeNameKey } from '../shared/shortSideName';
 import { type AiSeatId, type SeatId, HUMAN_SEAT_ID } from '../shared/seatIds';
 import type { GameMapId } from '../shared/gameMapTypes';
 import { logDebug, logError, logTrace } from './logger';
@@ -336,7 +337,7 @@ function loadStoredGameMap(): boolean {
  *
  * Purpose: An old save must fail with a clear message instead of resolving a dead name through the global naming cache.
  * When to use: After a regional pack has been installed. The default reader loads the scenario from the open database. Tests pass a stub.
- * Expected outcome: Returns when side groups are not installed, the scenario is not region-versus-region, or each stored home matches an installed id or display name.
+ * Expected outcome: Returns when side groups are not installed, the scenario is not region-versus-region, or each stored home matches an installed id or display name. The stored home is trimmed. A display name with one trailing abbreviation parenthesis matches the same name without it.
  * Exceptions: Throws when a stored home matches neither an installed id nor a display name.
  */
 export function assertStoredSideGroupsExist(
@@ -350,7 +351,11 @@ export function assertStoredSideGroupsExist(
   const scenario = readScenario();
   if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return;
   const stored = readHomes();
-  const missing = stored.filter((name) => !groups.some((group) => group.id === name || group.displayName === name));
+  const missing = stored.filter((name) => {
+    const key = name.trim();
+    return !groups.some((group) =>
+      group.id === key || sideHomeNameKey(group.displayName) === sideHomeNameKey(key));
+  });
   if (missing.length === 0) return;
   const err = new Error(
     `This saved ${activeGameMap().displayName} game uses side groups that no longer exist. Start a new game.`

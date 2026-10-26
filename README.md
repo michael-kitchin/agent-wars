@@ -12,9 +12,13 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![Beat 8 of a tactical battle in Colombia and Venezuela](doc/media/front-page-battle-large.png)
+![A tactical battle in Colombia and Venezuela](doc/media/front-page-battle-1-large.png)
 
-*Beat 8 of a tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
+*A tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
+
+![A 4-way regional "deathmatch" in east Asia (1 human, 3 AIs)](doc/media/front-page-battle-2-large.png)
+
+*A 4-way regional "deathmatch" in east Asia (1 human, 3 AIs).*
 
 ## Why This Exists
 

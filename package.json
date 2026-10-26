@@ -92,9 +92,9 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
     "@types/node": "^22.10.1",
-    "electron": "^40.0.0",
+    "electron": "^40.10.6",
     "electron-builder": "^25.0.0",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.2",
     "eslint": "^9.16.0",
     "playwright-core": "1.62.0",
     "typescript": "^5.7.2",

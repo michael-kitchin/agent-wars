@@ -170,17 +170,17 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", iso_codes=frozenset({"CN-SD", "CN-HA"})),
         _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", countries=frozenset({"MNG"})),
         _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", regions=_regions("CHN", "North China", "Northwest China")),
-        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", countries=frozenset({"TWN", "HKG", "MAC"})),
-        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", regions=_regions(
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan (SECT)", countries=frozenset({"TWN", "HKG", "MAC"})),
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan (SECT)", regions=_regions(
             "CHN", "East China", "South Central China", "Southwest China",
         )),
-        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", countries=frozenset({"CHN"}), missing_region=True),
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan (SECT)", countries=frozenset({"CHN"}), missing_region=True),
     ),
     "western_europe": (
-        _rule(_SOUTH_GERMANY, "Southern & eastern Germany, Austria, Switzerland", iso_codes=frozenset({
+        _rule(_SOUTH_GERMANY, "Southern & eastern Germany, Austria, Switzerland (SEGAS)", iso_codes=frozenset({
             "DE-BY", "DE-BW", "DE-SN", "DE-TH", "DE-ST", "DE-BB", "DE-BE", "DE-HE", "DE-RP", "DE-SL",
         })),
-        _rule(_SOUTH_GERMANY, "Southern & eastern Germany, Austria, Switzerland", countries=frozenset({"AUT", "CHE", "LIE"})),
+        _rule(_SOUTH_GERMANY, "Southern & eastern Germany, Austria, Switzerland (SEGAS)", countries=frozenset({"AUT", "CHE", "LIE"})),
         _rule(_NORTH_GERMANY, "Netherlands & northern Germany", iso_codes=frozenset({
             "DE-SH", "DE-NI", "DE-NW", "DE-MV", "DE-HB", "DE-HH",
         })),
@@ -226,8 +226,8 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("levant_cyprus", "Levant & Cyprus", countries=frozenset({"ISR", "JOR", "LBN", "PSX", "SYR", "CYP"})),
     ),
     "southern_asia_west": (
-        _rule("northern_western_iran", "Northern & western Iran", countries=frozenset({"IRN"}), lat_min=33.0, lon_max=54.5),
-        _rule("southern_eastern_iran", "Southern & eastern Iran", countries=frozenset({"IRN"})),
+        _rule("northern_western_iran", "Northern & western Iran (NWI)", countries=frozenset({"IRN"}), lat_min=33.0, lon_max=54.5),
+        _rule("southern_eastern_iran", "Southern & eastern Iran (SEI)", countries=frozenset({"IRN"})),
         _rule("pakistan_afghanistan", "Pakistan & Afghanistan", countries=frozenset({"PAK", "AFG"})),
     ),
     "northern_america": (
@@ -247,15 +247,15 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
     ),
     "southern_asia_east": (
         _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", iso_codes=frozenset({"IN-CT"})),
-        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", iso_codes=frozenset({"IN-UT"})),
+        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan (NEIBNB)", iso_codes=frozenset({"IN-UT"})),
         _rule("west_india", "West India", regions=_regions("IND", "West")),
         _rule("central_india", "Central India", regions=_regions("IND", "Central")),
         _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", regions=_regions("IND", "South")),
         _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", countries=frozenset({"LKA"})),
-        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", regions=_regions(
+        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan (NEIBNB)", regions=_regions(
             "IND", "North", "Northeast", "East",
         )),
-        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", countries=frozenset({"BGD", "NPL", "BTN", "IND", "KAS"})),
+        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan (NEIBNB)", countries=frozenset({"BGD", "NPL", "BTN", "IND", "KAS"})),
     ),
     "central_asia": (
         _rule("kazakhstan_northern_kyrgyzstan", "Kazakhstan & northern Kyrgyzstan", iso_codes=frozenset({
@@ -273,7 +273,7 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("ne_mexico_bajio", "NE Mexico & the Bajio", iso_codes=frozenset({
             "MX-TAM", "MX-NLE", "MX-SLP", "MX-HID", "MX-QUE", "MX-GUA", "MX-ZAC", "MX-AGU",
         })),
-        _rule("central_western_mexico", "Central & western Mexico", iso_codes=frozenset({
+        _rule("central_western_mexico", "Central & western Mexico (CWM)", iso_codes=frozenset({
             "MX-MEX", "MX-DIF", "MX-MOR", "MX-PUE", "MX-TLA", "MX-JAL", "MX-MIC", "MX-COL",
         })),
         _rule("southern_mexico_isthmus", "Southern Mexico & the isthmus", countries=frozenset({
@@ -310,14 +310,14 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
             "DZ-04", "DZ-05", "DZ-07", "DZ-12", "DZ-18", "DZ-19", "DZ-21",
             "DZ-23", "DZ-24", "DZ-25", "DZ-36", "DZ-40", "DZ-41", "DZ-43",
         })),
-        _rule("western_central_algeria", "Western & central Algeria", countries=frozenset({"DZA"})),
+        _rule("western_central_algeria", "Western & central Algeria (WCA)", countries=frozenset({"DZA"})),
         _rule("tunisia_eastern_algeria", "Tunisia & eastern Algeria", countries=frozenset({"TUN"})),
     ),
     "west_africa_coast": (
         _rule("western_nigeria", "Western Nigeria", iso_codes=frozenset({
             "NG-LA", "NG-OG", "NG-OY", "NG-OS", "NG-ON", "NG-EK", "NG-ED", "NG-KW",
         })),
-        _rule("northern_eastern_nigeria", "Northern & eastern Nigeria", countries=frozenset({"NGA"})),
+        _rule("northern_eastern_nigeria", "Northern & eastern Nigeria (NEN)", countries=frozenset({"NGA"})),
         _rule("western_ghana_to_senegal", "Western Ghana to Senegal", iso_codes=frozenset({"GH-WP"})),
         _rule("ghana_togo_benin", "Ghana, Togo & Benin", countries=frozenset({"GHA", "TGO", "BEN"})),
         _rule("western_ghana_to_senegal", "Western Ghana to Senegal", countries=frozenset({
@@ -325,13 +325,13 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         })),
     ),
     "eastern_europe": (
-        _rule("central_northwestern_russia", "Central & northwestern Russia", iso_codes=frozenset({
+        _rule("central_northwestern_russia", "Central & northwestern Russia (CNWR)", iso_codes=frozenset({
             "RU-VOR", "RU-NIZ", "RU-KIR", "RU-PNZ", "RU-MO", "RU-CU", "RU-ME",
         })),
         _rule("ukraine_belarus_lower_danube", "Ukraine, Belarus, Moldova, Romania & Bulgaria", iso_codes=frozenset({"UA-43", "UA-40"})),
         _rule("volga_russia", "Volga Russia", regions=_regions("RUS", "Volga")),
         _rule("urals_siberia_far_east", "Urals, Siberia & Far East", regions=_regions("RUS", "Urals", "Siberian", "Far Eastern")),
-        _rule("central_northwestern_russia", "Central & northwestern Russia", regions=_regions("RUS", "Central", "Northwestern")),
+        _rule("central_northwestern_russia", "Central & northwestern Russia (CNWR)", regions=_regions("RUS", "Central", "Northwestern")),
         _rule("ukraine_belarus_lower_danube", "Ukraine, Belarus, Moldova, Romania & Bulgaria", countries=frozenset({
             "UKR", "BLR", "MDA", "ROU", "BGR",
         })),
@@ -342,7 +342,7 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
             "BR-SP", "BR-RJ", "BR-ES", "BR-PR", "BR-SC", "BR-RS",
         })),
         _rule("venezuela_colombia_ecuador_guianas", "Venezuela, Colombia, Ecuador & the Guianas", iso_codes=frozenset({"BR-RR", "BR-AP"})),
-        _rule("central_northern_brazil_paraguay", "Central & northern Brazil, Paraguay", countries=frozenset({"BRA", "PRY"})),
+        _rule("central_northern_brazil_paraguay", "Central & northern Brazil, Paraguay (CNBP)", countries=frozenset({"BRA", "PRY"})),
         _rule("argentina_uruguay", "Argentina & Uruguay", countries=frozenset({"ARG", "URY", "SPI"})),
         _rule("andes", "Chile, Bolivia & Peru", countries=frozenset({"CHL", "BOL", "PER"})),
         _rule("venezuela_colombia_ecuador_guianas", "Venezuela, Colombia, Ecuador & the Guianas", countries=frozenset({
@@ -378,8 +378,8 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         })),
     ),
     "australia_new_zealand": (
-        _rule("tasman", "Tasman (Victoria, Tasmania, NZ)", iso_codes=frozenset({"AU-VIC", "AU-TAS"})),
-        _rule("tasman", "Tasman (Victoria, Tasmania, NZ)", countries=frozenset({"NZL"})),
+        _rule("tasman", "Tasman (Victoria, Tasmania, NZ) (TVTNZ)", iso_codes=frozenset({"AU-VIC", "AU-TAS"})),
+        _rule("tasman", "Tasman (Victoria, Tasmania, NZ) (TVTNZ)", countries=frozenset({"NZL"})),
         _rule("new_south_wales_act", "New South Wales & ACT", iso_codes=frozenset({"AU-NSW", "AU-ACT", "AU-X02~"})),
         _rule("north_west_australia", "Queensland, NT, WA & SA", iso_codes=frozenset({"AU-QLD", "AU-WA", "AU-SA", "AU-NT"})),
     ),
@@ -387,14 +387,14 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("northern_cameroon_chad", "Northern Cameroon & Chad", iso_codes=frozenset({"CM-EN", "CM-NO", "CM-AD"})),
         _rule("northern_cameroon_chad", "Northern Cameroon & Chad", countries=frozenset({"TCD"})),
         _rule("gulf_of_guinea_coast", "Gabon, Equatorial Guinea & coastal Cameroon", iso_codes=frozenset({"CM-LT", "CM-SU"})),
-        _rule("central_western_cameroon", "Central & western Cameroon", countries=frozenset({"CMR"})),
+        _rule("central_western_cameroon", "Central & western Cameroon (CWC)", countries=frozenset({"CMR"})),
         _rule("gulf_of_guinea_coast", "Gabon, Equatorial Guinea & coastal Cameroon", countries=frozenset({"GAB", "GNQ"})),
         _rule("central_african_republic", "Central African Republic", countries=frozenset({"CAF"})),
     ),
     "middle_africa_south": (
         _rule("katanga_kasai", "Katanga & Kasai", iso_codes=frozenset({"CD-KA", "CD-KW", "CD-KE"})),
         _rule("angola", "Angola", countries=frozenset({"AGO"})),
-        _rule("northern_western_dr_congo", "Northern & western DR Congo, Congo", countries=frozenset({"COD", "COG"})),
+        _rule("northern_western_dr_congo", "Northern & western DR Congo, Congo (NWDRCC)", countries=frozenset({"COD", "COG"})),
     ),
     "southern_east_africa": (
         _rule("zambia", "Zambia", countries=frozenset({"ZMB"})),
