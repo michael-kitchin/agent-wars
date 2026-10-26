@@ -1,9 +1,9 @@
 /**
  * Per-side loss sections for the turn-update popup.
  *
- * Purpose: The popup names each side that lost a visible unit or changed hexes, with the cause labels, unit names, and hex sentences.
+ * Purpose: The popup names each side that lost a visible unit or lost hexes, with the cause labels, unit names, and hex sentences.
  * When to use: Before the Updates section of a turn-update toast.
- * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral. A side that only changed hexes is included.
+ * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral. A side that only lost hexes is included. A side that only gained hexes is omitted.
  * Exceptions: None. This module does not import the logger.
  */
 
@@ -69,7 +69,7 @@ export interface TurnLossSectionSeat {
 }
 
 /**
- * Writes one section per owner that lost a visible unit or changed hexes.
+ * Writes one section per owner that lost a visible unit or lost hexes.
  *
  * Purpose: Unit losses and territory changes for one side stay together.
  * When to use: `buildConsolidatedTurnUpdateToastMessage`.
@@ -94,7 +94,7 @@ export function buildTurnLossSections(
 /**
  * The owners that have a section, in toast order.
  *
- * Purpose: A side that only gained or lost hexes still appears between the viewer and Neutral.
+ * Purpose: A side that only lost hexes still appears between the viewer and Neutral.
  * When to use: `buildTurnLossSections`.
  * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in neither source is absent.
  * Exceptions: None.
@@ -172,7 +172,7 @@ function lossSectionTitle(seat: TurnLossSectionSeat | undefined, ownerId: string
 /**
  * One owner's header, cause lines, and hex sentences, or nothing when that owner has none of them.
  *
- * Purpose: Empty buckets must not open a section, and a hex-only change still does.
+ * Purpose: Empty buckets must not open a section, and a side that only lost hexes still does.
  * When to use: Each owner in `buildTurnLossSections`.
  * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the hex sentences.
  * Exceptions: None.

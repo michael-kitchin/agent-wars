@@ -91,10 +91,8 @@ test('hex sentences follow cause lines, and a hex-only side still gets a section
     '## Your Losses',
     'Ranged attack: 1st Infantry',
     'You lost 1 hex to W. Turkey.',
-    'You took 1 hex from W. Turkey.',
     '## Western Turkey Losses',
     'W. Turkey lost 1 hex to you.',
-    'W. Turkey took 1 hex from you.',
   ]);
 });
 

@@ -1,9 +1,9 @@
 /**
  * Hex sentences for one turn report when more than one side can win or lose territory.
  *
- * Purpose: The toast and the Reports entry name who took hexes, once per side.
+ * Purpose: The toast and the Reports entry name who lost hexes, once per side.
  * When to use: After Ready, for the turn-report viewer, or with a null viewer while observing every side.
- * Expected outcome: Each owner that gained or lost hexes gets one total for that direction. A null viewer writes no "You".
+ * Expected outcome: Each owner that lost hexes gets one total. A null viewer writes no "You".
  * Exceptions: None.
  */
 
@@ -51,7 +51,7 @@ export interface TurnReportSeat {
 /**
  * One hex whose controller changed.
  *
- * Purpose: Loss and gain sentences count these.
+ * Purpose: Loss sentences count these.
  * When to use: `hexChangeLinesByOwner`.
  * Expected outcome: `from` or `to` null is unowned land and does not get a sentence.
  * Exceptions: None.
@@ -70,7 +70,7 @@ export interface TurnReportTransition {
    * The previous controller.
    *
    * Contract: A seat id, the neutral owner id, or null.
-   * When to use: Who the viewer took the hex from.
+   * When to use: The owner who lost the hex.
    * Expected outcome: Null is skipped.
    * Exceptions: None.
    */
@@ -79,8 +79,8 @@ export interface TurnReportTransition {
    * The new controller.
    *
    * Contract: A seat id, the neutral owner id, or null.
-   * When to use: Who took the viewer's hex.
-   * Expected outcome: Null is skipped.
+   * When to use: The owner who received this hex.
+   * Expected outcome: Null is skipped. Several flips can name that owner once in the loss sentence.
    * Exceptions: None.
    */
   readonly to: string | null;
@@ -91,7 +91,7 @@ export interface TurnReportTransition {
  *
  * Purpose: The function does not read the match.
  * When to use: `hexChangeLinesByOwner`.
- * Expected outcome: One loss sentence and one gain sentence for each owner that had that kind of change.
+ * Expected outcome: One loss sentence for each owner that lost hexes.
  * Exceptions: None.
  */
 export interface TurnReportInput {
@@ -119,36 +119,30 @@ export interface TurnReportInput {
    *
    * Contract: Rows from Ready. A null side is unowned land.
    * When to use: The hex sentences.
-   * Expected outcome: A flip with a null side, or the same side on both ends, is skipped. Every other flip counts for both owners.
+   * Expected outcome: A flip with a null side, or the same side on both ends, is skipped. Every other flip counts for the owner who lost it.
    * Exceptions: None.
    */
   readonly transitions: readonly TurnReportTransition[];
 }
 
 /**
- * Writes one loss sentence and one gain sentence per owner.
+ * Writes one loss sentence per owner.
  *
- * Purpose: The side sections name territory once per direction, instead of once per other owner.
+ * Purpose: The side sections name territory once for the owner who lost it, instead of once per other owner.
  * When to use: `buildTurnLossSections`, after Ready has transitions and the viewer's seat.
- * Expected outcome: A map from owner id to that owner's sentences. The loss sentence comes before the gain sentence.
- *   An owner with neither change is absent. The count is the total, and the other owners are named once.
+ * Expected outcome: A map from owner id to that owner's loss sentence. An owner who only gained hexes is absent.
+ *   The count is the total, and the other owners are named once.
  * Exceptions: None.
  */
 export function hexChangeLinesByOwner(input: TurnReportInput): ReadonlyMap<string, readonly string[]> {
   const lostTo = new Map<string, Map<string, number>>();
-  const tookFrom = new Map<string, Map<string, number>>();
   for (const row of input.transitions) {
     if (row.from === null || row.to === null || row.from === row.to) continue;
     addHexCount(lostTo, row.from, row.to);
-    addHexCount(tookFrom, row.to, row.from);
   }
   const lines = new Map<string, readonly string[]>();
-  for (const ownerId of new Set<string>([...lostTo.keys(), ...tookFrom.keys()])) {
-    const sentences = [
-      hexSentence(ownerId, lostTo.get(ownerId), 'lost', input),
-      hexSentence(ownerId, tookFrom.get(ownerId), 'took', input),
-    ].filter((sentence): sentence is string => sentence !== null);
-    if (sentences.length > 0) lines.set(ownerId, sentences);
+  for (const [ownerId, counterparts] of lostTo) {
+    lines.set(ownerId, [hexSentence(ownerId, counterparts, input)]);
   }
   return lines;
 }
@@ -156,8 +150,8 @@ export function hexChangeLinesByOwner(input: TurnReportInput): ReadonlyMap<strin
 /**
  * Adds one hex to an owner's count against another owner.
  *
- * Purpose: Loss and gain totals share one tally.
- * When to use: Each counted transition, once for the loser and once for the gainer.
+ * Purpose: One tally holds every hex an owner lost, grouped by who received it.
+ * When to use: Each counted transition, for the owner who lost the hex.
  * Expected outcome: `counts` holds one nested map per owner, and that owner's counterpart is one higher.
  * Exceptions: None.
  */
@@ -168,10 +162,10 @@ function addHexCount(counts: Map<string, Map<string, number>>, ownerId: string, 
 }
 
 /**
- * One direction's sentence, or nothing when that owner had no such change.
+ * The loss sentence for one owner.
  *
  * Purpose: "You lost 3 hexes to E. Turkey and W. Turkey." is the whole loss, not one line per capturer.
- * When to use: After the tallies are complete.
+ * When to use: After the tallies are complete. The tally has at least one hex.
  * Expected outcome: The viewer's subject is "You" and their list word is "you", placed first. Other names are short
  *   names in `localeCompare('en')` order, then seat order. One hex uses "hex". Two names use "and". Three or more
  *   use commas and a final "and".
@@ -179,20 +173,16 @@ function addHexCount(counts: Map<string, Map<string, number>>, ownerId: string, 
  */
 function hexSentence(
   ownerId: string,
-  counterparts: ReadonlyMap<string, number> | undefined,
-  direction: 'lost' | 'took',
+  counterparts: ReadonlyMap<string, number>,
   input: TurnReportInput
-): string | null {
-  if (!counterparts || counterparts.size === 0) return null;
+): string {
   let total = 0;
   for (const count of counterparts.values()) total += count;
   const names = [...counterparts.keys()]
     .sort((left, right) => compareCounterparts(left, right, input))
     .map((counterpartId) => partyLabel(counterpartId, input, 'list'));
   const hexWord = total === 1 ? 'hex' : 'hexes';
-  const verb = direction === 'lost' ? 'lost' : 'took';
-  const preposition = direction === 'lost' ? 'to' : 'from';
-  return `${partyLabel(ownerId, input, 'subject')} ${verb} ${total} ${hexWord} ${preposition} ${joinPartyNames(names)}.`;
+  return `${partyLabel(ownerId, input, 'subject')} lost ${total} ${hexWord} to ${joinPartyNames(names)}.`;
 }
 
 /**
@@ -413,6 +403,7 @@ function markInBody(body: string, seats: readonly SideNameMarkSeat[], sectionOwn
  * Marks every opponent name in a hex sentence.
  *
  * Purpose: The flag belongs on each opponent, including the subject of that side's own sentence.
+ *   The popup writes loss sentences only. A gain sentence still gets flags when one is painted.
  * When to use: `markInBody` before the loss-header check.
  * Expected outcome: Null when `body` is not a hex sentence. Otherwise one mark per opponent name, in sentence order.
  *   The subject uses `sectionOwnerId` when two seats share that short name. List names then take the remaining seats

@@ -31,10 +31,11 @@ function testSectionOrderAndEmptySuppression(): void {
     },
   });
   assert.ok(text);
-  const took = text!.indexOf('You took 1 hex from E. Turkey.');
+  const lost = text!.indexOf('E. Turkey lost 1 hex to you.');
   const otherIdx = text!.indexOf(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
   const deployedInFirst = text!.indexOf('2 infantry units deployed');
-  assert.ok(took >= 0 && took < otherIdx && otherIdx < deployedInFirst);
+  assert.equal(text!.includes('took'), false);
+  assert.ok(lost >= 0 && lost < otherIdx && otherIdx < deployedInFirst);
   const updatesBody = text!.slice(otherIdx);
   assert.equal(updatesBody.includes('took'), false);
   assert.equal(updatesBody.includes('hexes lost'), false);
@@ -62,8 +63,9 @@ function testSectionOrderAndEmptySuppression(): void {
   const headerAt = withDeployment!.indexOf(updatesHeader);
   const deployedAt = withDeployment!.indexOf('2 infantry units deployed');
   const unknownAt = withDeployment!.indexOf(unknownSentence);
-  const tookAt = withDeployment!.indexOf('You took 1 hex from E. Turkey.');
-  assert.ok(tookAt >= 0 && tookAt < headerAt && headerAt < deployedAt && deployedAt < unknownAt);
+  const lostAt = withDeployment!.indexOf('E. Turkey lost 1 hex to you.');
+  assert.equal(withDeployment!.includes('took'), false);
+  assert.ok(lostAt >= 0 && lostAt < headerAt && headerAt < deployedAt && deployedAt < unknownAt);
   assert.ok(withDeployment!.endsWith(unknownSentence));
   const onlyUnknown = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },
@@ -103,7 +105,7 @@ function testSectionOrderAndEmptySuppression(): void {
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
   });
-  assert.strictEqual(hexAndFallback, '## Your Losses\nYou took 1 hex from E. Turkey.\n## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.');
+  assert.strictEqual(hexAndFallback, '## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.');
   assert.ok(!hexAndFallback!.includes('Casualty'));
   const lossesOnly = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },
@@ -142,7 +144,8 @@ function testSectionOrderAndEmptySuppression(): void {
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
   });
-  assert.ok(lossesAndHex!.startsWith('## Your Losses\nRanged attack: 1st Infantry\nYou took 1 hex from E. Turkey.\n## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.\n## Updates\n2 infantry units deployed'));
+  assert.equal(lossesAndHex!.includes('took'), false);
+  assert.ok(lossesAndHex!.startsWith('## Your Losses\nRanged attack: 1st Infantry\n## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.\n## Updates\n2 infantry units deployed'));
   const lossesUpdates = lossesAndHex!.slice(lossesAndHex!.indexOf('## Updates'));
   assert.equal(lossesUpdates.includes('took'), false);
   assert.equal(lossesUpdates.includes('hexes lost'), false);

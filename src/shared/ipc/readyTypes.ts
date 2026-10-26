@@ -600,7 +600,7 @@ humanHexesLostCount?: number;
    * Hexes whose controller changed this turn.
    *
    * Contract: `from` and `to` are owner ids, or null when the hex was or became unowned. Absent when nothing changed.
-   * When to use: The turn report's "took" sentences.
+   * When to use: The turn report's loss sentences.
    * Expected outcome: The same flips control resolution returned.
    * Exceptions: None.
    */

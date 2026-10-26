@@ -100,7 +100,7 @@ export interface ConsolidatedTurnUpdateToastArgs {
    *
    * Contract: Output of `buildTurnLossSummary` with visibility predicate applied for opponent victims.
    * When to use: Required for the per-side loss sections.
-   * Expected outcome: A side with no unit losses is omitted here. Hex-only sides are added from `turnReport`. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
+   * Expected outcome: A side with no unit losses is omitted here. A side that lost hexes is added from `turnReport`. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
    * Exceptions: None.
    */
   turnLossSummary: TurnLossSummary;
@@ -114,7 +114,7 @@ export interface ConsolidatedTurnUpdateToastArgs {
    */
   combatFallbackBullets: string[];
   /**
-   * Who took hexes, and which seat the loss sections call "you".
+   * Who lost hexes, and which seat the loss sections call "you".
    *
    * Contract: The viewer's seat, the roster, and transitions. This builder puts the hex sentences in the side sections.
    * When to use: Strategic Ready and a tactical commit.

@@ -29,13 +29,9 @@ test('hex sentences total the turn and name the other sides once, in name order'
   });
   assert.deepEqual(lines.get(HUMAN_SEAT_ID), [
     'You lost 3 hexes to E. Turkey and W. Turkey.',
-    'You took 2 hexes from E. Turkey and Neutral.',
   ]);
-  assert.deepEqual(lines.get(eastern), [
-    'E. Turkey lost 1 hex to you.',
-    'E. Turkey took 1 hex from you.',
-  ]);
-  assert.deepEqual(lines.get(western), ['W. Turkey took 2 hexes from you.']);
+  assert.deepEqual(lines.get(eastern), ['E. Turkey lost 1 hex to you.']);
+  assert.equal(lines.has(western), false);
   assert.deepEqual(lines.get(NEUTRAL_OWNER_ID), ['Neutral lost 1 hex to you.']);
 });
 
@@ -72,7 +68,7 @@ test('a null viewer names every seat and writes no You', () => {
     transitions: [{ h3Index: 'a', from: eastern, to: western }],
   });
   assert.deepEqual(lines.get(eastern), ['E. Turkey lost 1 hex to W. Turkey.']);
-  assert.deepEqual(lines.get(western), ['W. Turkey took 1 hex from E. Turkey.']);
+  assert.equal(lines.has(western), false);
   for (const row of lines.values()) {
     assert.equal(row.some((line) => line.includes('You') || line.includes('you')), false);
   }
@@ -88,11 +84,12 @@ test('a blank home is the seat id in a hex sentence and in its mark', () => {
     seats: blankSeats,
     transitions: [{ h3Index: 'a', from: 'opponent2', to: HUMAN_SEAT_ID }],
   });
-  assert.deepEqual(lines.get(HUMAN_SEAT_ID), ['You took 1 hex from opponent2.']);
-  const gained = lines.get(HUMAN_SEAT_ID)?.[0] ?? '';
-  const fromAt = gained.indexOf('opponent2');
-  assert.deepEqual(sideNameMarksForLine(gained, blankSeats, HUMAN_SEAT_ID), [
-    { seatId: 'opponent2', start: fromAt, end: fromAt + 'opponent2'.length },
+  assert.equal(lines.has(HUMAN_SEAT_ID), false);
+  assert.deepEqual(lines.get('opponent2'), ['opponent2 lost 1 hex to you.']);
+  const lost = lines.get('opponent2')?.[0] ?? '';
+  const nameAt = lost.indexOf('opponent2');
+  assert.deepEqual(sideNameMarksForLine(lost, blankSeats, 'opponent2'), [
+    { seatId: 'opponent2', start: nameAt, end: nameAt + 'opponent2'.length },
   ]);
 });
 

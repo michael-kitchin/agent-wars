@@ -1184,19 +1184,13 @@
   // src/shared/turnReportLines.ts
   function hexChangeLinesByOwner(input) {
     const lostTo = /* @__PURE__ */ new Map();
-    const tookFrom = /* @__PURE__ */ new Map();
     for (const row of input.transitions) {
       if (row.from === null || row.to === null || row.from === row.to) continue;
       addHexCount(lostTo, row.from, row.to);
-      addHexCount(tookFrom, row.to, row.from);
     }
     const lines = /* @__PURE__ */ new Map();
-    for (const ownerId of /* @__PURE__ */ new Set([...lostTo.keys(), ...tookFrom.keys()])) {
-      const sentences = [
-        hexSentence(ownerId, lostTo.get(ownerId), "lost", input),
-        hexSentence(ownerId, tookFrom.get(ownerId), "took", input)
-      ].filter((sentence) => sentence !== null);
-      if (sentences.length > 0) lines.set(ownerId, sentences);
+    for (const [ownerId, counterparts] of lostTo) {
+      lines.set(ownerId, [hexSentence(ownerId, counterparts, input)]);
     }
     return lines;
   }
@@ -1205,15 +1199,12 @@
     row.set(counterpartId, (row.get(counterpartId) ?? 0) + 1);
     counts.set(ownerId, row);
   }
-  function hexSentence(ownerId, counterparts, direction, input) {
-    if (!counterparts || counterparts.size === 0) return null;
+  function hexSentence(ownerId, counterparts, input) {
     let total = 0;
     for (const count of counterparts.values()) total += count;
     const names = [...counterparts.keys()].sort((left, right) => compareCounterparts(left, right, input)).map((counterpartId) => partyLabel(counterpartId, input, "list"));
     const hexWord = total === 1 ? "hex" : "hexes";
-    const verb = direction === "lost" ? "lost" : "took";
-    const preposition = direction === "lost" ? "to" : "from";
-    return `${partyLabel(ownerId, input, "subject")} ${verb} ${total} ${hexWord} ${preposition} ${joinPartyNames(names)}.`;
+    return `${partyLabel(ownerId, input, "subject")} lost ${total} ${hexWord} to ${joinPartyNames(names)}.`;
   }
   function ownerName(ownerId, seats) {
     if (isNeutralOwnerId(ownerId)) return "Neutral";

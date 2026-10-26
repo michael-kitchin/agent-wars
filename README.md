@@ -12,9 +12,9 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![Tactical planning over central Mexico](doc/media/central-mexico-battle-animated.png)
+![Beat 8 of a tactical battle in Colombia and Venezuela](doc/media/front-page-battle-large.png)
 
-*Beat 3 of a tactical battle in central Mexico during combat resolution, showing animated hits, movement, and dice rolls. Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
+*Beat 8 of a tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
 
 ## Why This Exists
 
