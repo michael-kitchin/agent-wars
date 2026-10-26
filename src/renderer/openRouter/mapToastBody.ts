@@ -126,8 +126,9 @@ function appendMapToastBulletLine(
  *
  * Purpose: A hex sentence can name several opponents. Deployment lines and the unknown-battle sentence name none.
  * When to use: When the splitter returns a single plain segment.
- * Expected outcome: The bullet text, with a number flag immediately before each matched name. No flag when the line has no mark.
- *   `sectionOwnerId` is the loss header above this bullet, so a shared short name flags that side as the subject.
+ * Expected outcome: The bullet text, with a number flag immediately before each matched short name, and that name still
+ *   written after the flag. No flag when the line has no mark. `sectionOwnerId` is the loss header above this bullet,
+ *   so a shared short name flags that side as the subject.
  * Exceptions: None.
  */
 function appendPlainBullet(
@@ -140,7 +141,7 @@ function appendPlainBullet(
   const extra = rawLine.startsWith('\u2022 ') ? 0 : 2;
   const placed = sideNameMarksForLine(rawLine, seats, sectionOwnerId).flatMap((mark) => {
     const flag = createSideNumberFlag(mark.seatId, seats);
-    return flag ? [{ start: mark.start + extra, end: mark.end + extra, flag }] : [];
+    return flag ? [{ start: mark.start + extra, flag }] : [];
   });
   if (placed.length === 0) {
     span.textContent = bulleted;
@@ -149,7 +150,7 @@ function appendPlainBullet(
   let cursor = 0;
   for (const mark of placed) {
     span.append(document.createTextNode(bulleted.slice(cursor, mark.start)), mark.flag);
-    cursor = mark.end;
+    cursor = mark.start;
   }
   span.append(document.createTextNode(bulleted.slice(cursor)));
 }

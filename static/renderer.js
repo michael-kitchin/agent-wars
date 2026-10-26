@@ -20107,7 +20107,7 @@ ${bonuses}`;
     const extra = rawLine.startsWith("\u2022 ") ? 0 : 2;
     const placed = sideNameMarksForLine(rawLine, seats, sectionOwnerId).flatMap((mark) => {
       const flag = createSideNumberFlag(mark.seatId, seats);
-      return flag ? [{ start: mark.start + extra, end: mark.end + extra, flag }] : [];
+      return flag ? [{ start: mark.start + extra, flag }] : [];
     });
     if (placed.length === 0) {
       span.textContent = bulleted;
@@ -20116,7 +20116,7 @@ ${bonuses}`;
     let cursor = 0;
     for (const mark of placed) {
       span.append(document.createTextNode(bulleted.slice(cursor, mark.start)), mark.flag);
-      cursor = mark.end;
+      cursor = mark.start;
     }
     span.append(document.createTextNode(bulleted.slice(cursor)));
   }
