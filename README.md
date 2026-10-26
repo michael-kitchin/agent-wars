@@ -12,13 +12,13 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![A tactical battle in Colombia and Venezuela](doc/media/front-page-battle-1-large.png)
+![Tactical battle in Colombia and Venezuela](doc/media/front-page-battle-1-large.png)
 
-*A tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
+*Tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
 
-![A 4-way regional "deathmatch" in east Asia (1 human, 3 AIs)](doc/media/front-page-battle-2-large.png)
+![4-way regional "deathmatch" in east Asia (1 human, 3 AIs)](doc/media/front-page-battle-2-large.png)
 
-*A 4-way regional "deathmatch" in east Asia (1 human, 3 AIs).*
+*4-way regional "deathmatch" in east Asia (1 human, 3 AIs).*
 
 ## Why This Exists
 
@@ -53,8 +53,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v2.8.3.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v2.8.3.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v2.8.4.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.8.4.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -146,7 +146,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1102 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1104 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -282,8 +282,8 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 ## Status
 
-- **Version:** 2.8.3, distributed as side-load builds only (no store, signing, or notarization).
-- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Release 2.6.0 redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left. Release 2.8.0 adds matches of two to four sides, each AI side with its own commander. Release 2.8.1 lines up the commander popover and collapses the console when a match starts. Release 2.8.2 puts hex changes in each side's turn report and opens the new-game screen at the top. Release 2.8.3 keeps that report to the hexes each side lost. Player-facing save/load and session management, the development plan's milestone 2.6, isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
+- **Version:** 2.8.4, distributed as side-load builds only (no store, signing, or notarization).
+- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Release 2.6.0 redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left. Release 2.8.0 adds matches of two to four sides, each AI side with its own commander. Release 2.8.1 lines up the commander popover and collapses the console when a match starts. Release 2.8.2 puts hex changes in each side's turn report and opens the new-game screen at the top. Release 2.8.3 keeps that report to the hexes each side lost. Release 2.8.4 replaces an unreadable short home name with a letter form of that name. Player-facing save/load and session management, the development plan's milestone 2.6, isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
 - **Security:** To report a vulnerability or other security problem, see [SECURITY.md](SECURITY.md).
