@@ -84,7 +84,7 @@ function isElectronInstalled(version, platformPath) {
 /**
  * Downloads and extracts the Electron zip, then writes `path.txt`.
  *
- * Purpose: Single awaited install path for CI; avoids `electron/install.js` early-exit races under `spawnSync`.
+ * Purpose: Single awaited install path for CI; avoids `electron/install.js` early-exit races under `spawnSync`. The zip is extracted with `@electron-internal/extract-zip`, the same module `electron/install.js` uses.
  * When to use: From `.github/workflows/build.yml` before Electron-native rebuild and packaging.
  * Expected outcome: Resolves when the binary exists on disk.
  * Exceptions: Propagates download, extract, or filesystem errors to the caller.
@@ -125,7 +125,7 @@ async function downloadAndExtractElectron() {
 
   console.log(`install-electron-binary: downloading Electron ${version} for ${platform}/${arch}…`);
   const { downloadArtifact } = require('@electron/get');
-  const extract = require('extract-zip');
+  const { extract } = require('@electron-internal/extract-zip');
 
   const zipPath = await downloadArtifact({
     version,
