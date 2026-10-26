@@ -18,7 +18,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![4-way regional "deathmatch" in east Asia (1 human, 3 AIs)](doc/media/front-page-battle-2-large.png)
 
-*4-way regional "deathmatch" in east Asia (1 human, 3 AIs).*
+*4-way regional "deathmatch" in east Asia (1 human, 3 AIs). "Fog of war" has been turned off, revealing every unit on the map.*
 
 ## Why This Exists
 
