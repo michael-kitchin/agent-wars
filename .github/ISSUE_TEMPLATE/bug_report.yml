@@ -14,7 +14,7 @@ body:
     attributes:
       label: Version
       description: The release you downloaded, or `version` in package.json if you built from source.
-      placeholder: "2.8.4"
+      placeholder: "2.8.5"
     validations:
       required: true
 

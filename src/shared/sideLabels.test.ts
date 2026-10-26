@@ -32,30 +32,43 @@ const threeSeats = [
   seat(AI_SEAT_IDS[1], 3, 'Southern Asia', 4),
 ];
 
-test('control labels name the viewer, other homes, Neutral, a knockout, and a shared home', () => {
+test('control labels use short names, and a home suffix only when the hex is a home', () => {
   assert.equal(
     formatHexControlLabel({
       controllerId: HUMAN_SEAT_ID,
       homeSeatIds: [HUMAN_SEAT_ID],
-      viewerSeatId: HUMAN_SEAT_ID,
       seats: twoSeats,
     }),
-    'You (your home)'
+    'Iraq (home)'
   );
   assert.equal(
     formatHexControlLabel({
       controllerId: AI_SEAT_IDS[0],
       homeSeatIds: [AI_SEAT_IDS[0]],
-      viewerSeatId: HUMAN_SEAT_ID,
       seats: twoSeats,
     }),
-    'Western Turkey (Western Turkey home)'
+    'W. Turkey (home)'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: HUMAN_SEAT_ID,
+      homeSeatIds: [AI_SEAT_IDS[0]],
+      seats: twoSeats,
+    }),
+    'Iraq (W. Turkey home)'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: AI_SEAT_IDS[0],
+      homeSeatIds: [],
+      seats: twoSeats,
+    }),
+    'W. Turkey'
   );
   assert.equal(
     formatHexControlLabel({
       controllerId: null,
       homeSeatIds: [],
-      viewerSeatId: HUMAN_SEAT_ID,
       seats: twoSeats,
     }),
     'Neutral'
@@ -64,28 +77,68 @@ test('control labels name the viewer, other homes, Neutral, a knockout, and a sh
     formatHexControlLabel({
       controllerId: NEUTRAL_OWNER_ID,
       homeSeatIds: [AI_SEAT_IDS[1]],
-      viewerSeatId: HUMAN_SEAT_ID,
       seats: threeSeats,
     }),
-    'Neutral (was Southern Asia)'
+    'Neutral (S. Asia home)'
   );
   assert.equal(
     formatHexControlLabel({
-      controllerId: HUMAN_SEAT_ID,
-      homeSeatIds: [HUMAN_SEAT_ID, AI_SEAT_IDS[0]],
-      viewerSeatId: HUMAN_SEAT_ID,
-      seats: twoSeats,
+      controllerId: AI_SEAT_IDS[1],
+      homeSeatIds: [AI_SEAT_IDS[1]],
+      seats: threeSeats,
     }),
-    'You (You & Western Turkey homes)'
+    'S. Asia (home)'
   );
   assert.equal(
     formatHexControlLabel({
       controllerId: AI_SEAT_IDS[0],
-      homeSeatIds: [AI_SEAT_IDS[0]],
-      viewerSeatId: null,
+      homeSeatIds: [AI_SEAT_IDS[0], HUMAN_SEAT_ID],
       seats: twoSeats,
     }),
-    'Western Turkey (Western Turkey home)'
+    'W. Turkey (Iraq & W. Turkey homes)'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: HUMAN_SEAT_ID,
+      homeSeatIds: [AI_SEAT_IDS[0]],
+      seats: [
+        seat(HUMAN_SEAT_ID, 1, 'Western Turkey'),
+        seat(AI_SEAT_IDS[0], 2, 'Western Turkey'),
+      ],
+    }),
+    'W. Turkey (W. Turkey home)'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: HUMAN_SEAT_ID,
+      homeSeatIds: [AI_SEAT_IDS[1]],
+      seats: twoSeats,
+    }),
+    'Iraq'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: 'not-a-seat',
+      homeSeatIds: [],
+      seats: twoSeats,
+    }),
+    'Neutral'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: HUMAN_SEAT_ID,
+      homeSeatIds: [HUMAN_SEAT_ID],
+      seats: [seat(HUMAN_SEAT_ID, 1, '   ')],
+    }),
+    'human (home)'
+  );
+  assert.equal(
+    formatHexControlLabel({
+      controllerId: AI_SEAT_IDS[1],
+      homeSeatIds: [],
+      seats: twoSeats,
+    }),
+    AI_SEAT_IDS[1]
   );
 });
 

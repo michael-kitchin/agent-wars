@@ -14,7 +14,7 @@ import { getLlmHexLocationParenLabelForNamingTarget, getStrategicHexCode } from 
 import { tacticalBattleHexCode } from '../../shared/tacticalBattleFootprint';
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
 import { isHexOwnershipVisibleToPerspective, ownershipPerspective } from '../../shared/homeRegionRules';
-import { formatHexControlLabel, homeSeatIdsAtHex, viewerSeatIdForRoster } from '../../shared/sideLabels';
+import { formatHexControlLabel, homeSeatIdsAtHex } from '../../shared/sideLabels';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
@@ -89,8 +89,8 @@ function resolveStrategicHexForControlLine(namingTarget: NamingLookupTarget | nu
 /**
  * Computes human-facing control label text for terrain tooltip content.
  *
- * Purpose: Shows perspective-aware ownership (`Human`/`AI`) while respecting hidden ownership as unknown.
- * When to use: Tooltip HTML formatting and cache-key derivation for strategic/tactical terrain popups.
+ * Purpose: Shows the short control line while respecting hidden ownership as unknown.
+ * When to use: Tooltip HTML formatting and cache-key derivation for strategic terrain popups and the tactical battles list.
  * Expected outcome: The roster's control line, or `Unknown` when the hex is hidden and is not a home.
  * Exceptions: None. Missing game state returns `Unknown`.
  */
@@ -103,7 +103,6 @@ function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string
   const label = formatHexControlLabel({
     controllerId: controller,
     homeSeatIds,
-    viewerSeatId: viewerSeatIdForRoster(S.gameState.seats ?? []),
     seats: S.gameState.seats ?? [],
   });
   if (homeSeatIds.length > 0) return label;
@@ -214,7 +213,7 @@ function formatTerrainTooltipHtml(
   const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
   const techLine = producedUnitTechLineHtml(namingTarget);
   const showControlLine = namingTarget?.resolution === 1;
-  const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
+  const controlLine = showControlLine ? `<strong>Control:</strong> ${escapeHtmlText(getTooltipControlLabel(namingTarget))}` : null;
   const terrainValue = state.strategicTerrainSummary != null
     ? formatTerrainNameListHtml(state.strategicTerrainSummary)
     : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;

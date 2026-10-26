@@ -50,8 +50,8 @@ export function homeSeatIdsAtHex(h3Index: string, lists: HomeHexLists): string[]
 /**
  * The human seat when the match has one.
  *
- * Purpose: Observe mode has no viewer, so no side reads as "You".
- * When to use: Any label that says "You" or "your home".
+ * Purpose: Observe mode has no human seat, so a label can tell the player's seat from the others.
+ * When to use: The home chip and a unit name. The control line names every seat by its short name.
  * Expected outcome: The human seat id, or null when every seat is AI.
  * Exceptions: None.
  */
@@ -60,17 +60,29 @@ export function viewerSeatIdForRoster(seats: readonly Pick<SeatSnapshot, 'seatId
 }
 
 /**
- * Full name of a seat as one viewer should read it.
+ * Short name of one seat on the control line.
  *
- * Purpose: The viewer's own side is "You". Everyone else is the home name.
- * When to use: Control lines and home suffixes.
- * Expected outcome: "You" or `homeRegion`. A missing seat returns its id.
+ * Purpose: Hex descriptions use the same cut as the top-bar chips.
+ * When to use: The controller and each home inside `formatHexControlLabel`.
+ * Expected outcome: `shortSideName` of the home. A blank or whitespace home returns the seat id.
  * Exceptions: None.
  */
-function sideDisplayName(seatId: string, seats: readonly SideLabelSeat[], viewerSeatId: string | null): string {
-  const seat = seats.find((row) => row.seatId === seatId);
-  if (viewerSeatId != null && seatId === viewerSeatId) return 'You';
-  return seat?.homeRegion ?? seatId;
+function abbreviatedSideName(seat: SideLabelSeat): string {
+  return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+}
+
+/**
+ * Controller text before any home suffix.
+ *
+ * Purpose: A seat reads as its short name. Nobody and Neutral stay the word Neutral.
+ * When to use: `formatHexControlLabel` only.
+ * Expected outcome: The short name, the seat id when that seat is missing or its home is blank, or `Neutral`.
+ * Exceptions: None.
+ */
+function controllerSideLabel(controllerId: string | null, seats: readonly SideLabelSeat[]): string {
+  if (controllerId == null || !isSeatId(controllerId)) return 'Neutral';
+  const seat = seats.find((row) => row.seatId === controllerId);
+  return seat ? abbreviatedSideName(seat) : controllerId;
 }
 
 /**
@@ -91,32 +103,31 @@ function homesInOrder(homeSeatIds: readonly string[], seats: readonly SideLabelS
 /**
  * "Control:" text for a world hex the viewer can see.
  *
- * Purpose: Replaces the two fixed words Human and AI with the roster.
+ * Purpose: Names the controller and any home with the short side name.
  * When to use: After the caller has decided the hex is visible, or that it is a home hex.
- * Expected outcome: The controller's name, then a home suffix. A null or Neutral controller reads "Neutral".
- *   No home means no suffix.
+ * Expected outcome: The controller's short name. One home that belongs to that same seat ends " (home)",
+ *   including after that seat is knocked out. One home of another seat ends " ({short name} home)".
+ *   Two or more homes list every short name in seat order, including the controller.
+ *   The same short name on two seats still uses the other-side form. A null, Neutral, or non-seat
+ *   controller reads "Neutral". No known home means no suffix. A home seat missing from the roster
+ *   is left off. A knocked-out seat uses the same words as a living one.
  * Exceptions: None. A hidden hex is the caller's "Unknown", not this function's.
  */
 export function formatHexControlLabel(args: {
   readonly controllerId: string | null;
   readonly homeSeatIds: readonly string[];
-  readonly viewerSeatId: string | null;
   readonly seats: readonly SideLabelSeat[];
 }): string {
   const homes = homesInOrder(args.homeSeatIds, args.seats);
-  const controllerIsSeat = args.controllerId != null && isSeatId(args.controllerId);
-  const controllerName = controllerIsSeat
-    ? sideDisplayName(args.controllerId!, args.seats, args.viewerSeatId)
-    : 'Neutral';
+  const controllerName = controllerSideLabel(args.controllerId, args.seats);
   if (homes.length === 0) return controllerName;
   if (homes.length >= 2) {
-    const names = homes.map((seat) => sideDisplayName(seat.seatId, args.seats, args.viewerSeatId));
+    const names = homes.map((seat) => abbreviatedSideName(seat));
     return `${controllerName} (${names.join(' & ')} homes)`;
   }
   const home = homes[0]!;
-  if (args.viewerSeatId != null && home.seatId === args.viewerSeatId) return `${controllerName} (your home)`;
-  if (home.outTurn != null) return `${controllerName} (was ${home.homeRegion})`;
-  return `${controllerName} (${home.homeRegion} home)`;
+  if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
+  return `${controllerName} (${abbreviatedSideName(home)} home)`;
 }
 
 /**

@@ -20622,27 +20622,28 @@ ${bonuses}`;
   function viewerSeatIdForRoster(seats) {
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
   }
-  function sideDisplayName(seatId, seats, viewerSeatId2) {
-    const seat = seats.find((row) => row.seatId === seatId);
-    if (viewerSeatId2 != null && seatId === viewerSeatId2) return "You";
-    return seat?.homeRegion ?? seatId;
+  function abbreviatedSideName(seat) {
+    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+  }
+  function controllerSideLabel(controllerId, seats) {
+    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === controllerId);
+    return seat ? abbreviatedSideName(seat) : controllerId;
   }
   function homesInOrder(homeSeatIds, seats) {
     return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
   }
   function formatHexControlLabel(args) {
     const homes = homesInOrder(args.homeSeatIds, args.seats);
-    const controllerIsSeat = args.controllerId != null && isSeatId(args.controllerId);
-    const controllerName = controllerIsSeat ? sideDisplayName(args.controllerId, args.seats, args.viewerSeatId) : "Neutral";
+    const controllerName = controllerSideLabel(args.controllerId, args.seats);
     if (homes.length === 0) return controllerName;
     if (homes.length >= 2) {
-      const names = homes.map((seat) => sideDisplayName(seat.seatId, args.seats, args.viewerSeatId));
+      const names = homes.map((seat) => abbreviatedSideName(seat));
       return `${controllerName} (${names.join(" & ")} homes)`;
     }
     const home = homes[0];
-    if (args.viewerSeatId != null && home.seatId === args.viewerSeatId) return `${controllerName} (your home)`;
-    if (home.outTurn != null) return `${controllerName} (was ${home.homeRegion})`;
-    return `${controllerName} (${home.homeRegion} home)`;
+    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
+    return `${controllerName} (${abbreviatedSideName(home)} home)`;
   }
   function formatUnitNameForViewer(args) {
     if (isNeutralOwnerId(args.ownerId)) return `Neutral \xB7 ${args.baseName}`;
@@ -21029,7 +21030,6 @@ ${bonuses}`;
     const label = formatHexControlLabel({
       controllerId: controller,
       homeSeatIds,
-      viewerSeatId: viewerSeatIdForRoster(rendererSharedState.gameState.seats ?? []),
       seats: rendererSharedState.gameState.seats ?? []
     });
     if (homeSeatIds.length > 0) return label;
@@ -21085,7 +21085,7 @@ ${bonuses}`;
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
     const techLine = producedUnitTechLineHtml(namingTarget);
     const showControlLine = namingTarget?.resolution === 1;
-    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
+    const controlLine = showControlLine ? `<strong>Control:</strong> ${escapeHtmlText(getTooltipControlLabel(namingTarget))}` : null;
     const terrainValue = state.strategicTerrainSummary != null ? formatTerrainNameListHtml(state.strategicTerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
     const weather = tooltipWeather(namingTarget);
