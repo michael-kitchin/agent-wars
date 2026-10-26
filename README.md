@@ -57,20 +57,24 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 1. When you first run Agent Wars, you'll see the **New game** screen. Explore the options and add AI opponents (up to 3).
 
-![New game screen.](doc/media/first-start-game-1.png)
+![New game screen.](doc/media/first-start-game.png)
 
 2. For each AI opponent, click on **No model - standing orders only** to enter your [OpenRouter](https://openrouter.ai) API key, select a model, reasoning, and doctrine:
 
   - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
   - Ollama/other local model support is on my radar (pun intended, I guess).
 
-![Model selection.](doc/media/first-start-game-2.png)
+![No model button.](doc/media/no-model-button.png)
+
+![Model popover.](doc/media/model-popover.png)
     
 3. Click **Start game** and play. See [doc/how-to-play.md](doc/how-to-play.md) for the rest.
 
+![Start game button.](doc/media/start-game-button.png)
+
 4. When the game is over, the **New game** will include a summary of the results.
 
-![Game summary.](doc/media/first-end-game-1.png)
+![Game summary.](doc/media/first-end-game.png)
 
 ### Notes
 
