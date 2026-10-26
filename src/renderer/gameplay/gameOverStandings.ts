@@ -17,7 +17,7 @@ import type { SeatSnapshot } from '../../shared/seatRoster';
  * Hides the standings section.
  *
  * Purpose: A new-game screen does not keep the previous match's result.
- * When to use: `updateGameOverUI` when the overlay is a new-game screen.
+ * When to use: `updateGameOverUI` when the overlay is not showing a finished match, and `openNewGameOverlayFromModelTab`.
  * Expected outcome: `#game-over-standings` is hidden and empty.
  * Exceptions: None.
  */

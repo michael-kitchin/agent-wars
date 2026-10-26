@@ -16,7 +16,7 @@ import {
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { installRendererGameMap } from '../core/installRendererGameMap';
 import { blurMapChromeIfFocused } from '../core/uiState';
-import { expandNewGameDialog, toggleNewGameDialogCollapsed } from './newGameDialogCollapse';
+import { expandNewGameDialog, scrollNewGameDialogToTop, toggleNewGameDialogCollapsed } from './newGameDialogCollapse';
 import { placeNewGameDialogAtInset, wireNewGameDialogMove } from './newGameDialogMove';
 import {
   closeNewGameOverlayToMatch,
@@ -30,6 +30,7 @@ import { bindNewGameSides, loadCommanderKeyMemory, newGameHasAnyModel, readNewGa
 import { confirmStartWithNoModels } from './startConfirmDialog';
 import { closeCommanderPopover } from '../openRouter/commanderPopover';
 import { showNewGameBanner } from './newGameBanner';
+import { hideGameOverStandings } from './gameOverStandings';
 import { clearObserveAfterKnockout } from './observeIntent';
 import { chooseStartMatchAi } from '../../shared/startMatchAiChoice';
 import { applyStartMatchAiChoice, readStartMatchAiInput } from './newGameAiStart';
@@ -399,8 +400,9 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  *   retires a Ready, battle-exit, or battle-start handler that is still awaiting its reply, so its result cannot land
  *   on the match after close or on the new match after Start. A reply already in flight when the screen opened is
  *   discarded rather than applied. Fog of war, Auto-start AI, and the bonus dropdowns return to their defaults, the home regions,
- *   starting month, and map preview are drawn again, the panel opens expanded at the map's corner, and the overlay
- *   opens. Returns true only when this call removes `hidden` from `#game-over-overlay`.
+ *   starting month, and map preview are drawn again, the panel opens expanded at the map's corner, the choice list
+ *   scrolls to the top, any previous Result section is cleared, and the overlay opens. Returns true only when this
+ *   call removes `hidden` from `#game-over-overlay`.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): boolean {
@@ -413,6 +415,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     holdMatchUnderNewGame();
     advanceRendererMatchEpoch();
   }
+  hideGameOverStandings();
   showNewGameBanner('newGame', selectedNewGameTab());
   if (newGameBtn) {
     newGameBtn.textContent = 'Start game';
@@ -427,6 +430,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');
   expandNewGameDialog();
+  if (opened) scrollNewGameDialogToTop();
   placeNewGameDialogAtInset();
   blurMapChromeIfFocused();
   resetNewGameMapPreviewFrame();

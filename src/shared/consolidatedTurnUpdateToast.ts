@@ -7,7 +7,7 @@ import { ALL_BUILD_UNIT_TYPES } from './ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from './ipcTypes';
 import { type TurnLossSummary } from './lossSummary';
 import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
-import { buildTurnReportLines, type TurnReportInput } from './turnReportLines';
+import { hexChangeLinesByOwner, type TurnReportInput } from './turnReportLines';
 import { buildTurnLossSections } from './turnLossSections';
 
 /** Prefix for bold section headers in `#map-toast` consolidated update messages. */
@@ -66,11 +66,11 @@ function formatDeploymentCapReachedLine(
 }
 
 /**
- * Builds non-loss "Updates" section lines (deployment, caps, hexes lost).
+ * Builds the deployment lines for the Updates section.
  *
- * Purpose: Feeds the consolidated popup Updates section without duplicating unit loss reporting.
+ * Purpose: Feeds the consolidated popup Updates section without repeating territory changes, which live in the side sections.
  * When to use: Inside `buildConsolidatedTurnUpdateToastMessage` before optional combat fallbacks.
- * Expected outcome: Plain strings without leading bullets. A count of one uses the singular noun.
+ * Expected outcome: Plain strings without leading bullets. A count of one uses the singular noun. A hex-lost count on the result is ignored.
  * Exceptions: None.
  */
 export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): string[] {
@@ -79,10 +79,6 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   if (deployedLine) lines.push(deployedLine);
   const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
   if (deploymentCapLine) lines.push(deploymentCapLine);
-  const hexesLost = readyResult.humanHexesLostCount ?? 0;
-  if (hexesLost > 0) {
-    lines.push(`${hexesLost.toLocaleString()} ${hexesLost === 1 ? 'hex' : 'hexes'} lost to opponent`);
-  }
   return lines;
 }
 
@@ -91,11 +87,11 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
  */
 export interface ConsolidatedTurnUpdateToastArgs {
   /**
-   * Ready-shaped resolution slice for non-loss Updates lines (deployment, infrastructure, hexes lost).
+   * Ready-shaped resolution slice for deployment Updates lines.
    *
    * Contract: Same fields as strategic `ReadyResult` or tactical toast adapter output.
    * When to use: Pass the same object used for visibility classification.
-   * Expected outcome: Drives `buildOtherTurnUpdatePrimaryLines` only; unit losses come from `turnLossSummary`.
+   * Expected outcome: Drives `buildOtherTurnUpdatePrimaryLines` only. Unit losses come from `turnLossSummary`. Hex changes come from `turnReport`.
    * Exceptions: None.
    */
   readyResult: ReadyResult;
@@ -104,7 +100,7 @@ export interface ConsolidatedTurnUpdateToastArgs {
    *
    * Contract: Output of `buildTurnLossSummary` with visibility predicate applied for opponent victims.
    * When to use: Required for the per-side loss sections.
-   * Expected outcome: A side with no losses is omitted. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
+   * Expected outcome: A side with no unit losses is omitted here. Hex-only sides are added from `turnReport`. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
    * Exceptions: None.
    */
   turnLossSummary: TurnLossSummary;
@@ -120,18 +116,18 @@ export interface ConsolidatedTurnUpdateToastArgs {
   /**
    * Who took hexes, and which seat the loss sections call "you".
    *
-   * Contract: The viewer's seat, the roster, and transitions. Omit `otherLines`; this builder appends Updates itself.
+   * Contract: The viewer's seat, the roster, and transitions. This builder puts the hex sentences in the side sections.
    * When to use: Strategic Ready and a tactical commit.
-   * Expected outcome: Loss sections come first. Hex sentences are the first Updates lines. A missing report uses no viewer.
+   * Expected outcome: Loss sections come first and include that side's hex sentences. A missing report uses no viewer and no hex sentences.
    * Exceptions: None.
    */
-  turnReport?: Omit<TurnReportInput, 'otherLines'>;
+  turnReport?: TurnReportInput;
   /**
    * Unknown-battle sentence for the end of the Updates section.
    *
    * Contract: Output of `formatUnknownBattleAnnouncement`, or omitted when combat was inside vision.
    * When to use: Pass it only when a hex or victim was outside vision. A blank or whitespace value is omitted.
-   * Expected outcome: The last Updates line, after deployments, caps, hexes lost, and any combat-activity fallback.
+   * Expected outcome: The last Updates line, after deployments, caps, and any combat-activity fallback.
    * Exceptions: None. It does not replace loss sections or deployment lines.
    */
   unknownBattleLine?: string | null;
@@ -155,20 +151,21 @@ function stripLeadingBullet(line: string): string {
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
  * When to use: Strategic Ready and tactical commit paths in `readyHandler` before `showMapToast`.
  * Expected outcome: Newline-separated message with `##` section headers; `null` when all sections would be empty.
- *   Loss sections come first. Hex sentences are the first Updates lines. A non-empty `unknownBattleLine` is the last Updates line.
+ *   Side sections come first, with hex sentences after that side's cause lines. Updates holds deployments, caps, and the fallback.
+ *   A non-empty `unknownBattleLine` is the last Updates line.
  * Exceptions: None.
  */
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
   const { readyResult, combatFallbackBullets, turnReport } = args;
   const sections: string[] = [];
-  const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
   const lossSections = buildTurnLossSections(
     args.turnLossSummary,
     turnReport?.viewerSeatId ?? null,
-    turnReport?.seats ?? []
+    turnReport?.seats ?? [],
+    turnReport ? hexChangeLinesByOwner(turnReport) : undefined
   );
   sections.push(...lossSections);
-  let otherLines = [...reportLines, ...buildOtherTurnUpdatePrimaryLines(readyResult)];
+  let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
   if (lossSections.length === 0 && otherLines.length === 0) {
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }

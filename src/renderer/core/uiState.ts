@@ -10,7 +10,7 @@ import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
-import { expandNewGameDialog, newGameOverlayIsOpen, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
+import { expandNewGameDialog, newGameOverlayIsOpen, scrollNewGameDialogToTop, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 import { placeNewGameDialogAtInset } from '../gameplay/newGameDialogMove';
 import { forgetMatchUnderNewGame, isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 import { renderTopBarStatus } from '../chrome/topBar';
@@ -121,8 +121,9 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *   enabled. Otherwise the overlay shows standings or a start message. Fog of war, Auto-start AI, and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
  *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
- *   top-left corner, only on that open. A later refresh leaves a collapsed or moved panel as it is. While a match
- *   waits under the screen the player opened from the game menu, a refresh of that live match leaves the screen and
+ *   top-left corner, only on that open, and the choice list scrolls to the top. A match that ends while the screen is
+ *   already open scrolls there too, so Result is in view. A later refresh leaves a collapsed, moved, or scrolled panel
+ *   as it is. While a match waits under the screen the player opened from the game menu, a refresh of that live match leaves the screen and
  *   the controls as they are and returns false; a refresh in which that match has ended forgets it, so the close
  *   control hides, and the screen shows the result.
  * Exceptions: None.
@@ -146,7 +147,10 @@ export function updateGameOverUI(
   }
 
   const wasHidden = overlay?.classList.contains('hidden') !== false;
+  const standings = document.getElementById('game-over-standings');
+  const standingsWereHidden = !(standings instanceof HTMLElement) || standings.hidden;
   if (!showOverlay) {
+    hideGameOverStandings();
     overlay?.classList.add('hidden');
     setMainUIControlsEnabled(true);
     updateReadyButtonState();
@@ -180,6 +184,7 @@ export function updateGameOverUI(
     newGameBtn.textContent = noGame ? 'Start game' : 'New game';
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(noGame));
   }
+  if (wasHidden || (gameOver && standingsWereHidden)) scrollNewGameDialogToTop();
   updateReadyButtonState();
   return overlay != null && wasHidden === true;
 }

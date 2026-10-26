@@ -141,12 +141,14 @@ function placeStartButton(state: NewGamePanelState): void {
  * Purpose: The only writer of `data-state`, so the button cannot be left in the wrong bar.
  * When to use: From `settle` and from both branches of `toggleNewGameDialogCollapsed`. Callers that measure the
  *   panel's height do it after this returns.
- * Expected outcome: The button is moved, then `data-state` is set, both before this returns.
+ * Expected outcome: The button is moved, then `data-state` is set, both before this returns. A scroll to the top that
+ *   was requested while the choices were hidden is applied once the body is on screen.
  * Exceptions: None. A missing button or destination still sets `data-state`.
  */
 function setPanelState(panel: HTMLElement, state: NewGamePanelState): void {
   placeStartButton(state);
   panel.dataset.state = state;
+  applyPendingNewGameScroll();
 }
 
 /**
@@ -228,6 +230,50 @@ export function toggleNewGameDialogCollapsed(): void {
   setPanelState(panel, 'collapsing');
   const borders = panel.offsetHeight - panel.clientHeight;
   slideTo(panel, from, header.offsetHeight + borders);
+}
+
+/**
+ * Whether a scroll to the top is waiting for the choice list to be on screen.
+ *
+ * Purpose: Setting `scrollTop` does nothing while the body is `display: none`, and the old position returns when the
+ *   choices are shown. That hides Result after a match ends with the choices hidden.
+ * When to use: Set by `scrollNewGameDialogToTop` and cleared by `applyPendingNewGameScroll`.
+ * Expected outcome: True only until the body is on screen and has been moved to the top.
+ * Exceptions: None.
+ */
+let scrollToTopWhenShown = false;
+
+/**
+ * Moves the choice list to the top once it is on screen.
+ *
+ * Purpose: One place applies a scroll that was requested while the overlay or the choices were hidden.
+ * When to use: From `scrollNewGameDialogToTop`, and from `setPanelState` after the body can be shown.
+ * Expected outcome: `#game-over-dialog` is at scroll position 0 and the wait is cleared. A hidden body keeps the wait.
+ *   A missing body leaves the wait unchanged.
+ * Exceptions: None.
+ */
+function applyPendingNewGameScroll(): void {
+  if (!scrollToTopWhenShown) return;
+  const body = document.getElementById('game-over-dialog');
+  if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
+  body.scrollTop = 0;
+  scrollToTopWhenShown = false;
+}
+
+/**
+ * Scrolls the setup choices back to the top of the panel.
+ *
+ * Purpose: The body keeps its scroll position while the overlay is hidden, which hides Result when the match ends.
+ * When to use: When the overlay opens, and when a match ends while the overlay is already open.
+ * Expected outcome: `#game-over-dialog` is at scroll position 0 when it is on screen. When it is hidden, the scroll is
+ *   applied the next time the choices are shown. A missing body is ignored. Showing or hiding the choices does not call this.
+ * Exceptions: None.
+ */
+export function scrollNewGameDialogToTop(): void {
+  const body = document.getElementById('game-over-dialog');
+  if (!(body instanceof HTMLElement)) return;
+  scrollToTopWhenShown = true;
+  applyPendingNewGameScroll();
 }
 
 /**

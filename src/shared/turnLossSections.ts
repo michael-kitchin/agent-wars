@@ -1,14 +1,24 @@
 /**
  * Per-side loss sections for the turn-update popup.
  *
- * Purpose: The popup names each side that lost a visible unit, with the cause labels and unit names.
+ * Purpose: The popup names each side that lost a visible unit or changed hexes, with the cause labels, unit names, and hex sentences.
  * When to use: Before the Updates section of a turn-update toast.
- * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral.
+ * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral. A side that only changed hexes is included.
  * Exceptions: None. This module does not import the logger.
  */
 
 import { formatPlayerLossLinesMultiline, type TurnLossSummary } from './lossSummary';
 import { NEUTRAL_OWNER_ID } from './seatIds';
+
+/**
+ * An empty hex-line map for a toast that has no territory changes.
+ *
+ * Purpose: Callers that only have unit losses can omit the map. One shared instance stays immutable.
+ * When to use: The default of `buildTurnLossSections`.
+ * Expected outcome: No hex sentences are appended.
+ * Exceptions: None.
+ */
+const NO_HEX_LINES: ReadonlyMap<string, readonly string[]> = new Map();
 
 /**
  * The same prefix `MAP_TOAST_SECTION_HEADER_PREFIX` uses for a bold toast header.
@@ -59,30 +69,64 @@ export interface TurnLossSectionSeat {
 }
 
 /**
- * Writes one loss section per owner that lost a visible unit.
+ * Writes one section per owner that lost a visible unit or changed hexes.
  *
- * Purpose: The popup replaces the old "You lost" and "Seen:" sentences with these sections.
+ * Purpose: Unit losses and territory changes for one side stay together.
  * When to use: `buildConsolidatedTurnUpdateToastMessage`.
- * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`. An owner with empty buckets is omitted.
- *   A null viewer does not get `Your Losses`.
+ * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`, then that owner's hex sentences.
+ *   An owner with empty buckets and no hex sentences is omitted. A null viewer does not get `Your Losses`.
  * Exceptions: None.
  */
 export function buildTurnLossSections(
   summary: TurnLossSummary,
   viewerSeatId: string | null,
-  seats: readonly TurnLossSectionSeat[]
+  seats: readonly TurnLossSectionSeat[],
+  hexLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_HEX_LINES
 ): string[] {
   const lines: string[] = [];
-  if (viewerSeatId !== null) lines.push(...sectionLines(summary, viewerSeatId, 'Your Losses'));
-  const others = Object.keys(summary.byOwner)
-    .filter((ownerId) => ownerId !== viewerSeatId && ownerId !== NEUTRAL_OWNER_ID)
-    .sort((left, right) => compareOwners(left, right, seats));
-  for (const ownerId of others) {
-    const seat = seats.find((row) => row.seatId === ownerId);
-    lines.push(...sectionLines(summary, ownerId, lossSectionTitle(seat, ownerId)));
+  for (const ownerId of orderedOwners(summary, viewerSeatId, seats, hexLinesByOwner)) {
+    const header = headerFor(ownerId, viewerSeatId, seats);
+    lines.push(...sectionLines(summary, ownerId, header, hexLinesByOwner.get(ownerId) ?? []));
   }
-  lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, 'Neutral Losses'));
   return lines;
+}
+
+/**
+ * The owners that have a section, in toast order.
+ *
+ * Purpose: A side that only gained or lost hexes still appears between the viewer and Neutral.
+ * When to use: `buildTurnLossSections`.
+ * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in neither source is absent.
+ * Exceptions: None.
+ */
+function orderedOwners(
+  summary: TurnLossSummary,
+  viewerSeatId: string | null,
+  seats: readonly TurnLossSectionSeat[],
+  hexLinesByOwner: ReadonlyMap<string, readonly string[]>
+): string[] {
+  const ids = new Set<string>([...Object.keys(summary.byOwner), ...hexLinesByOwner.keys()]);
+  const ordered: string[] = [];
+  if (viewerSeatId !== null && ids.has(viewerSeatId)) ordered.push(viewerSeatId);
+  const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId && ownerId !== NEUTRAL_OWNER_ID);
+  others.sort((left, right) => compareOwners(left, right, seats));
+  ordered.push(...others);
+  if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
+  return ordered;
+}
+
+/**
+ * The header for one owner.
+ *
+ * Purpose: The viewer and Neutral keep their fixed headers. Every other owner uses the full home name.
+ * When to use: Each id from `orderedOwners`.
+ * Expected outcome: `Your Losses`, `Neutral Losses`, or `{home} Losses`.
+ * Exceptions: None.
+ */
+function headerFor(ownerId: string, viewerSeatId: string | null, seats: readonly TurnLossSectionSeat[]): string {
+  if (viewerSeatId !== null && ownerId === viewerSeatId) return 'Your Losses';
+  if (ownerId === NEUTRAL_OWNER_ID) return 'Neutral Losses';
+  return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
 }
 
 /**
@@ -126,21 +170,26 @@ function lossSectionTitle(seat: TurnLossSectionSeat | undefined, ownerId: string
 }
 
 /**
- * One owner's header and cause lines, or nothing when that owner lost no unit.
+ * One owner's header, cause lines, and hex sentences, or nothing when that owner has none of them.
  *
- * Purpose: Empty buckets must not open a section.
+ * Purpose: Empty buckets must not open a section, and a hex-only change still does.
  * When to use: Each owner in `buildTurnLossSections`.
- * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause.
+ * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the hex sentences.
  * Exceptions: None.
  */
-function sectionLines(summary: TurnLossSummary, ownerId: string, header: string): string[] {
+function sectionLines(
+  summary: TurnLossSummary,
+  ownerId: string,
+  header: string,
+  hexLines: readonly string[]
+): string[] {
   const buckets = summary.byOwner[ownerId];
-  if (!buckets) return [];
-  const causes = formatPlayerLossLinesMultiline(buckets);
-  if (causes.length === 0) return [];
+  const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
+  if (causes.length === 0 && hexLines.length === 0) return [];
   return [
     `${SECTION_HEADER_PREFIX}${header}`,
     ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+    ...hexLines,
   ];
 }
 

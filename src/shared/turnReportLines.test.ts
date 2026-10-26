@@ -4,75 +4,77 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { aiSeatIdForIndex, HUMAN_SEAT_ID } from './seatIds';
-import { buildTurnReportLines, sideNameMarksForLine, type TurnReportInput, type TurnReportSeat } from './turnReportLines';
+import { aiSeatIdForIndex, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
+import { hexChangeLinesByOwner, sideNameMarksForLine, type TurnReportSeat } from './turnReportLines';
 
+const western = 'opponent';
 const eastern = aiSeatIdForIndex(2);
 const seats: TurnReportSeat[] = [
   { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-  { seatId: 'opponent', seatOrder: 2, homeRegion: 'Western Turkey' },
+  { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
   { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey' },
 ];
 
-const image: TurnReportInput = {
-  viewerSeatId: HUMAN_SEAT_ID,
-  seats,
-  transitions: [
-    { h3Index: 'a', from: eastern, to: HUMAN_SEAT_ID },
-    { h3Index: 'b', from: eastern, to: HUMAN_SEAT_ID },
-  ],
-  otherLines: [],
-};
-
-test('buildTurnReportLines writes the hex sentence', () => {
-  const lines = buildTurnReportLines(image);
-  assert.equal(lines[0], 'You took 2 hexes from E. Turkey.');
-  const withDeployment = buildTurnReportLines({ ...image, otherLines: ['1 infantry unit deployed'] });
-  assert.equal(withDeployment.at(-1), '1 infantry unit deployed');
+test('hex sentences total the turn and name the other sides once, in name order', () => {
+  const lines = hexChangeLinesByOwner({
+    viewerSeatId: HUMAN_SEAT_ID,
+    seats,
+    transitions: [
+      { h3Index: 'a', from: HUMAN_SEAT_ID, to: western },
+      { h3Index: 'b', from: HUMAN_SEAT_ID, to: eastern },
+      { h3Index: 'c', from: HUMAN_SEAT_ID, to: western },
+      { h3Index: 'd', from: eastern, to: HUMAN_SEAT_ID },
+      { h3Index: 'e', from: NEUTRAL_OWNER_ID, to: HUMAN_SEAT_ID },
+    ],
+  });
+  assert.deepEqual(lines.get(HUMAN_SEAT_ID), [
+    'You lost 3 hexes to E. Turkey and W. Turkey.',
+    'You took 2 hexes from E. Turkey and Neutral.',
+  ]);
+  assert.deepEqual(lines.get(eastern), [
+    'E. Turkey lost 1 hex to you.',
+    'E. Turkey took 1 hex from you.',
+  ]);
+  assert.deepEqual(lines.get(western), ['W. Turkey took 2 hexes from you.']);
+  assert.deepEqual(lines.get(NEUTRAL_OWNER_ID), ['Neutral lost 1 hex to you.']);
 });
 
-test('sideNameMarksForLine marks an opponent name and skips Your, Neutral, and other lines', () => {
-  const markSeats = [
-    { seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' },
-    { seatId: 'opponent2', seatOrder: 4, homeRegion: '   ' },
-  ];
-  const from = 'You took 1 hex from E. Turkey.';
-  const fromAt = from.indexOf('E. Turkey');
-  assert.deepEqual(sideNameMarksForLine(from, markSeats), [
-    { seatId: 'opponent', start: fromAt, end: fromAt + 'E. Turkey'.length },
-  ]);
-  const bulleted = `\u2022 ${from}`;
-  assert.deepEqual(sideNameMarksForLine(bulleted, markSeats), [
-    { seatId: 'opponent', start: fromAt + 2, end: fromAt + 2 + 'E. Turkey'.length },
-  ]);
-  const took = 'E. Turkey took 2 of your hexes.';
-  assert.deepEqual(sideNameMarksForLine(took, markSeats), [
-    { seatId: 'opponent', start: 0, end: 'E. Turkey'.length },
-  ]);
-  const tied = [
-    { seatId: 'opponent', seatOrder: 4, homeRegion: 'Eastern Turkey' },
-    { seatId: 'opponent3', seatOrder: 2, homeRegion: 'Eastern Turkey & Caucasus' },
-  ];
-  assert.deepEqual(sideNameMarksForLine(from, tied), [
-    { seatId: 'opponent3', start: fromAt, end: fromAt + 'E. Turkey'.length },
-  ]);
-  const header = '## Eastern Turkey Losses';
-  const headerAt = header.indexOf('Eastern Turkey');
-  assert.equal(headerAt, 3);
-  assert.deepEqual(sideNameMarksForLine(header, markSeats), [
-    { seatId: 'opponent', start: headerAt, end: headerAt + 'Eastern Turkey'.length },
-  ]);
-  const blankHome = 'opponent2 Losses';
-  assert.deepEqual(sideNameMarksForLine(blankHome, markSeats), [
-    { seatId: 'opponent2', start: 0, end: 'opponent2'.length },
-  ]);
-  for (const plain of [
-    'Your Losses',
-    'Neutral Losses',
-    'You took 1 hex from Neutral.',
-    'Unknown battle observed in Europe.',
-  ]) {
-    assert.deepEqual(sideNameMarksForLine(plain, markSeats), []);
+test('the viewer is named first in a list, ahead of alphabetical order', () => {
+  const lines = hexChangeLinesByOwner({
+    viewerSeatId: HUMAN_SEAT_ID,
+    seats,
+    transitions: [
+      { h3Index: 'a', from: eastern, to: HUMAN_SEAT_ID },
+      { h3Index: 'b', from: eastern, to: western },
+      { h3Index: 'c', from: eastern, to: NEUTRAL_OWNER_ID },
+    ],
+  });
+  assert.deepEqual(lines.get(eastern), ['E. Turkey lost 3 hexes to you, Neutral, and W. Turkey.']);
+});
+
+test('a null side and a flip back to the same side are skipped', () => {
+  const lines = hexChangeLinesByOwner({
+    viewerSeatId: HUMAN_SEAT_ID,
+    seats,
+    transitions: [
+      { h3Index: 'a', from: null, to: HUMAN_SEAT_ID },
+      { h3Index: 'b', from: HUMAN_SEAT_ID, to: null },
+      { h3Index: 'c', from: eastern, to: eastern },
+    ],
+  });
+  assert.equal(lines.size, 0);
+});
+
+test('a null viewer names every seat and writes no You', () => {
+  const lines = hexChangeLinesByOwner({
+    viewerSeatId: null,
+    seats,
+    transitions: [{ h3Index: 'a', from: eastern, to: western }],
+  });
+  assert.deepEqual(lines.get(eastern), ['E. Turkey lost 1 hex to W. Turkey.']);
+  assert.deepEqual(lines.get(western), ['W. Turkey took 1 hex from E. Turkey.']);
+  for (const row of lines.values()) {
+    assert.equal(row.some((line) => line.includes('You') || line.includes('you')), false);
   }
 });
 
@@ -81,31 +83,80 @@ test('a blank home is the seat id in a hex sentence and in its mark', () => {
     { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
     { seatId: 'opponent2', seatOrder: 4, homeRegion: '   ' },
   ];
-  const tookFrom = buildTurnReportLines({
+  const lines = hexChangeLinesByOwner({
     viewerSeatId: HUMAN_SEAT_ID,
     seats: blankSeats,
     transitions: [{ h3Index: 'a', from: 'opponent2', to: HUMAN_SEAT_ID }],
-    otherLines: [],
   });
-  assert.deepEqual(tookFrom, ['You took 1 hex from opponent2.']);
-  const fromAt = tookFrom[0]?.indexOf('opponent2') ?? -1;
-  assert.deepEqual(sideNameMarksForLine(tookFrom[0] ?? '', blankSeats), [
+  assert.deepEqual(lines.get(HUMAN_SEAT_ID), ['You took 1 hex from opponent2.']);
+  const gained = lines.get(HUMAN_SEAT_ID)?.[0] ?? '';
+  const fromAt = gained.indexOf('opponent2');
+  assert.deepEqual(sideNameMarksForLine(gained, blankSeats, HUMAN_SEAT_ID), [
     { seatId: 'opponent2', start: fromAt, end: fromAt + 'opponent2'.length },
-  ]);
-  const lost = buildTurnReportLines({
-    viewerSeatId: HUMAN_SEAT_ID,
-    seats: blankSeats,
-    transitions: [{ h3Index: 'b', from: HUMAN_SEAT_ID, to: 'opponent2' }],
-    otherLines: [],
-  });
-  assert.deepEqual(lost, ['opponent2 took 1 of your hexes.']);
-  assert.deepEqual(sideNameMarksForLine(lost[0] ?? '', blankSeats), [
-    { seatId: 'opponent2', start: 0, end: 'opponent2'.length },
   ]);
 });
 
-test('buildTurnReportLines with a null viewer writes no You line and no fight line', () => {
-  const lines = buildTurnReportLines({ ...image, viewerSeatId: null });
-  assert.equal(lines.some((line) => line.startsWith('You ')), false);
-  assert.equal(lines.some((line) => line.includes('fought at')), false);
+test('sideNameMarksForLine marks every opponent and skips You, you, and Neutral', () => {
+  const markSeats = [
+    { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
+    { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey' },
+  ];
+  const sentence = 'E. Turkey lost 3 hexes to you, Neutral, and W. Turkey.';
+  const easternAt = sentence.indexOf('E. Turkey');
+  const westernAt = sentence.indexOf('W. Turkey');
+  assert.deepEqual(sideNameMarksForLine(sentence, markSeats, eastern), [
+    { seatId: eastern, start: easternAt, end: easternAt + 'E. Turkey'.length },
+    { seatId: western, start: westernAt, end: westernAt + 'W. Turkey'.length },
+  ]);
+  const bulleted = `\u2022 ${sentence}`;
+  assert.deepEqual(sideNameMarksForLine(bulleted, markSeats, eastern), [
+    { seatId: eastern, start: easternAt + 2, end: easternAt + 2 + 'E. Turkey'.length },
+    { seatId: western, start: westernAt + 2, end: westernAt + 2 + 'W. Turkey'.length },
+  ]);
+  for (const plain of ['Your Losses', 'Neutral Losses', 'You took 1 hex from Neutral.', 'Unknown battle observed in Europe.']) {
+    assert.deepEqual(sideNameMarksForLine(plain, markSeats), []);
+  }
+});
+
+test('a short name that contains to or from still receives its flag', () => {
+  const rome = 'opponent2';
+  const home = 'opponent3';
+  const named = [
+    { seatId: rome, seatOrder: 2, homeRegion: 'Road to Rome' },
+    { seatId: home, seatOrder: 3, homeRegion: 'Far from Home' },
+  ];
+  const lost = 'You lost 1 hex to Road to Rome.';
+  const lostAt = lost.indexOf('Road to Rome');
+  assert.deepEqual(sideNameMarksForLine(lost, named, HUMAN_SEAT_ID), [
+    { seatId: rome, start: lostAt, end: lostAt + 'Road to Rome'.length },
+  ]);
+  const took = 'Road to Rome took 1 hex from Far from Home.';
+  const subjectAt = took.indexOf('Road to Rome');
+  const homeAt = took.indexOf('Far from Home');
+  assert.deepEqual(sideNameMarksForLine(took, named, rome), [
+    { seatId: rome, start: subjectAt, end: subjectAt + 'Road to Rome'.length },
+    { seatId: home, start: homeAt, end: homeAt + 'Far from Home'.length },
+  ]);
+});
+
+test('a shared short name flags the section owner as the subject', () => {
+  const early = 'opponent';
+  const late = 'opponent3';
+  const shared = [
+    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey & Caucasus' },
+  ];
+  const sentence = 'E. Turkey lost 1 hex to E. Turkey.';
+  assert.deepEqual(sideNameMarksForLine(sentence, shared, late), [
+    { seatId: late, start: 0, end: 'E. Turkey'.length },
+    { seatId: early, start: sentence.lastIndexOf('E. Turkey'), end: sentence.lastIndexOf('E. Turkey') + 'E. Turkey'.length },
+  ]);
+  const headerSeats = [
+    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey' },
+    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+  ];
+  const header = '## Eastern Turkey Losses';
+  assert.deepEqual(sideNameMarksForLine(header, headerSeats), [
+    { seatId: early, start: 3, end: 3 + 'Eastern Turkey'.length },
+  ]);
 });

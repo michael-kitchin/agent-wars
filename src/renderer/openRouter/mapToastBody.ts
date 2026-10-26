@@ -94,11 +94,11 @@ interface MapToastBulletContext {
 }
 
 /**
- * Appends one bullet line, with loss marks or one opponent flag.
+ * Appends one bullet line, with loss marks or an opponent flag before each named opponent.
  *
  * Purpose: Implements the indented sub-bullet layout under a section header.
  * When to use: From `appendMapToastMessageBody` for a line that is not a header.
- * Expected outcome: A block row. A cause line splits into names and groups. A plain line may place one number flag before an opponent name.
+ * Expected outcome: A block row. A cause line splits into names and groups. A plain line places a number flag before each opponent name.
  * Exceptions: None.
  */
 function appendMapToastBulletLine(
@@ -114,7 +114,7 @@ function appendMapToastBulletLine(
   const ownerFlags = context.ownerId == null ? undefined : context.unitOriginByDisplayName?.get(context.ownerId);
   const segments = splitLossCauseLineForUnitFlags(bulleted, new Set(ownerFlags == null ? [] : ownerFlags.keys()));
   const onlyPlain = segments.length === 1 && segments[0]?.unitDisplayName == null && segments[0]?.group == null;
-  if (onlyPlain) appendPlainBullet(span, line, bulleted, context.seats);
+  if (onlyPlain) appendPlainBullet(span, line, bulleted, context.seats, context.ownerId);
   else {
     for (const segment of segments) appendCauseSegment(span, segment, context.ownerId, ownerFlags, context.seats);
   }
@@ -122,31 +122,36 @@ function appendMapToastBulletLine(
 }
 
 /**
- * Writes a bullet that is not a loss cause line, inserting one opponent flag when the line names one.
+ * Writes a bullet that is not a loss cause line, inserting a flag before each opponent name.
  *
- * Purpose: Hex sentences name a side. Deployment lines and the unknown-battle sentence do not.
+ * Purpose: A hex sentence can name several opponents. Deployment lines and the unknown-battle sentence name none.
  * When to use: When the splitter returns a single plain segment.
- * Expected outcome: The bullet text, with a number flag immediately before the matched name. No flag when the line has no mark.
+ * Expected outcome: The bullet text, with a number flag immediately before each matched name. No flag when the line has no mark.
+ *   `sectionOwnerId` is the loss header above this bullet, so a shared short name flags that side as the subject.
  * Exceptions: None.
  */
 function appendPlainBullet(
   span: HTMLElement,
   rawLine: string,
   bulleted: string,
-  seats: readonly SideNameMarkSeat[]
+  seats: readonly SideNameMarkSeat[],
+  sectionOwnerId: string | null
 ): void {
-  const mark = sideNameMarksForLine(rawLine, seats)[0];
-  const flag = mark ? createSideNumberFlag(mark.seatId, seats) : null;
-  if (!mark || !flag) {
+  const extra = rawLine.startsWith('\u2022 ') ? 0 : 2;
+  const placed = sideNameMarksForLine(rawLine, seats, sectionOwnerId).flatMap((mark) => {
+    const flag = createSideNumberFlag(mark.seatId, seats);
+    return flag ? [{ start: mark.start + extra, end: mark.end + extra, flag }] : [];
+  });
+  if (placed.length === 0) {
     span.textContent = bulleted;
     return;
   }
-  const start = mark.start + (rawLine.startsWith('\u2022 ') ? 0 : 2);
-  span.append(
-    document.createTextNode(bulleted.slice(0, start)),
-    flag,
-    document.createTextNode(bulleted.slice(start))
-  );
+  let cursor = 0;
+  for (const mark of placed) {
+    span.append(document.createTextNode(bulleted.slice(cursor, mark.start)), mark.flag);
+    cursor = mark.end;
+  }
+  span.append(document.createTextNode(bulleted.slice(cursor)));
 }
 
 /**

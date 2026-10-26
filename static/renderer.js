@@ -1078,17 +1078,30 @@
   }
 
   // src/shared/turnLossSections.ts
+  var NO_HEX_LINES = /* @__PURE__ */ new Map();
   var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats) {
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES) {
     const lines = [];
-    if (viewerSeatId2 !== null) lines.push(...sectionLines(summary, viewerSeatId2, "Your Losses"));
-    const others = Object.keys(summary.byOwner).filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID).sort((left, right) => compareOwners(left, right, seats));
-    for (const ownerId of others) {
-      const seat = seats.find((row) => row.seatId === ownerId);
-      lines.push(...sectionLines(summary, ownerId, lossSectionTitle(seat, ownerId)));
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner)) {
+      const header = headerFor(ownerId, viewerSeatId2, seats);
+      lines.push(...sectionLines(summary, ownerId, header, hexLinesByOwner.get(ownerId) ?? []));
     }
-    lines.push(...sectionLines(summary, NEUTRAL_OWNER_ID, "Neutral Losses"));
     return lines;
+  }
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner) {
+    const ids = /* @__PURE__ */ new Set([...Object.keys(summary.byOwner), ...hexLinesByOwner.keys()]);
+    const ordered = [];
+    if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
+    const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
+    others.sort((left, right) => compareOwners(left, right, seats));
+    ordered.push(...others);
+    if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
+    return ordered;
+  }
+  function headerFor(ownerId, viewerSeatId2, seats) {
+    if (viewerSeatId2 !== null && ownerId === viewerSeatId2) return "Your Losses";
+    if (ownerId === NEUTRAL_OWNER_ID) return "Neutral Losses";
+    return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
   }
   function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
     if (headerTitle === "Your Losses") return viewerSeatId2;
@@ -1105,14 +1118,14 @@
     const name = seat?.homeRegion.trim() ?? "";
     return `${name.length > 0 ? name : ownerId} Losses`;
   }
-  function sectionLines(summary, ownerId, header) {
+  function sectionLines(summary, ownerId, header, hexLines) {
     const buckets = summary.byOwner[ownerId];
-    if (!buckets) return [];
-    const causes = formatPlayerLossLinesMultiline(buckets);
-    if (causes.length === 0) return [];
+    const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
+    if (causes.length === 0 && hexLines.length === 0) return [];
     return [
       `${SECTION_HEADER_PREFIX}${header}`,
-      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`)
+      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+      ...hexLines
     ];
   }
   function compareOwners(left, right, seats) {
@@ -1169,8 +1182,38 @@
   }
 
   // src/shared/turnReportLines.ts
-  function buildTurnReportLines(input) {
-    return [...hexLines(input), ...input.otherLines];
+  function hexChangeLinesByOwner(input) {
+    const lostTo = /* @__PURE__ */ new Map();
+    const tookFrom = /* @__PURE__ */ new Map();
+    for (const row of input.transitions) {
+      if (row.from === null || row.to === null || row.from === row.to) continue;
+      addHexCount(lostTo, row.from, row.to);
+      addHexCount(tookFrom, row.to, row.from);
+    }
+    const lines = /* @__PURE__ */ new Map();
+    for (const ownerId of /* @__PURE__ */ new Set([...lostTo.keys(), ...tookFrom.keys()])) {
+      const sentences = [
+        hexSentence(ownerId, lostTo.get(ownerId), "lost", input),
+        hexSentence(ownerId, tookFrom.get(ownerId), "took", input)
+      ].filter((sentence) => sentence !== null);
+      if (sentences.length > 0) lines.set(ownerId, sentences);
+    }
+    return lines;
+  }
+  function addHexCount(counts, ownerId, counterpartId) {
+    const row = counts.get(ownerId) ?? /* @__PURE__ */ new Map();
+    row.set(counterpartId, (row.get(counterpartId) ?? 0) + 1);
+    counts.set(ownerId, row);
+  }
+  function hexSentence(ownerId, counterparts, direction, input) {
+    if (!counterparts || counterparts.size === 0) return null;
+    let total = 0;
+    for (const count of counterparts.values()) total += count;
+    const names = [...counterparts.keys()].sort((left, right) => compareCounterparts(left, right, input)).map((counterpartId) => partyLabel(counterpartId, input, "list"));
+    const hexWord = total === 1 ? "hex" : "hexes";
+    const verb = direction === "lost" ? "lost" : "took";
+    const preposition = direction === "lost" ? "to" : "from";
+    return `${partyLabel(ownerId, input, "subject")} ${verb} ${total} ${hexWord} ${preposition} ${joinPartyNames(names)}.`;
   }
   function ownerName(ownerId, seats) {
     if (isNeutralOwnerId(ownerId)) return "Neutral";
@@ -1180,33 +1223,24 @@
   function hexLabelForSeat(seat) {
     return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
   }
-  function compareOwners2(left, right, seats) {
-    const rank = (ownerId) => {
-      if (isNeutralOwnerId(ownerId)) return 1e4;
-      return seats.find((row) => row.seatId === ownerId)?.seatOrder ?? 9e3;
-    };
-    return rank(left) - rank(right) || left.localeCompare(right);
+  function partyLabel(ownerId, input, place) {
+    if (input.viewerSeatId !== null && ownerId === input.viewerSeatId) return place === "subject" ? "You" : "you";
+    return ownerName(ownerId, input.seats);
   }
-  function hexLines(input) {
-    const viewer = input.viewerSeatId;
-    if (viewer === null) return [];
-    const taken = /* @__PURE__ */ new Map();
-    const lost = /* @__PURE__ */ new Map();
-    for (const row of input.transitions) {
-      if (row.to === viewer && row.from !== null && row.from !== viewer) taken.set(row.from, (taken.get(row.from) ?? 0) + 1);
-      if (row.from === viewer && row.to !== null && row.to !== viewer) lost.set(row.to, (lost.get(row.to) ?? 0) + 1);
-    }
-    const lines = [];
-    for (const ownerId of [...taken.keys()].sort((left, right) => compareOwners2(left, right, input.seats))) {
-      const count = taken.get(ownerId) ?? 0;
-      const hexWord = count === 1 ? "hex" : "hexes";
-      lines.push(`You took ${count} ${hexWord} from ${ownerName(ownerId, input.seats)}.`);
-    }
-    for (const ownerId of [...lost.keys()].sort((left, right) => compareOwners2(left, right, input.seats))) {
-      const count = lost.get(ownerId) ?? 0;
-      lines.push(`${ownerName(ownerId, input.seats)} took ${count} of your hexes.`);
-    }
-    return lines;
+  function compareCounterparts(left, right, input) {
+    const leftViewer = input.viewerSeatId !== null && left === input.viewerSeatId;
+    const rightViewer = input.viewerSeatId !== null && right === input.viewerSeatId;
+    if (leftViewer !== rightViewer) return leftViewer ? -1 : 1;
+    const byName = ownerName(left, input.seats).localeCompare(ownerName(right, input.seats), "en");
+    if (byName !== 0) return byName;
+    const leftOrder = input.seats.find((row) => row.seatId === left)?.seatOrder ?? 9e3;
+    const rightOrder = input.seats.find((row) => row.seatId === right)?.seatOrder ?? 9e3;
+    return leftOrder - rightOrder || left.localeCompare(right, "en");
+  }
+  function joinPartyNames(names) {
+    if (names.length <= 1) return names[0] ?? "";
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
   }
   function hexNameForSeat(seat) {
     if (aiIndexForSeatId(seat.seatId) == null) return null;
@@ -1221,29 +1255,68 @@
     const matches = seats.filter((seat) => nameOf(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
     return matches[0] ?? null;
   }
-  function markInBody(body, seats) {
-    const from = /^You took \d+ hex(?:es)? from (.+)\.$/.exec(body);
-    if (from) {
-      const name2 = from[1] ?? "";
-      const seat2 = seatForDisplayedName(seats, name2, hexNameForSeat);
-      if (!seat2) return [];
-      const start = body.length - name2.length - 1;
-      return [{ seatId: seat2.seatId, start, end: start + name2.length }];
-    }
-    const took = /^(.+) took \d+ of your hexes\.$/.exec(body);
-    if (took) {
-      const name2 = took[1] ?? "";
-      const seat2 = seatForDisplayedName(seats, name2, hexNameForSeat);
-      if (!seat2 || !body.startsWith(`${name2} took `)) return [];
-      return [{ seatId: seat2.seatId, start: 0, end: name2.length }];
-    }
+  function markInBody(body, seats, sectionOwnerId) {
+    const hexMarks = hexSentenceMarks(body, seats, sectionOwnerId);
+    if (hexMarks !== null) return hexMarks;
     if (body === "Your Losses" || body === "Neutral Losses" || !body.endsWith(" Losses")) return [];
     const name = body.slice(0, -" Losses".length);
     const seat = seatForDisplayedName(seats, name, headerNameForSeat);
     if (!seat) return [];
     return [{ seatId: seat.seatId, start: 0, end: name.length }];
   }
-  function sideNameMarksForLine(line, seats) {
+  function hexSentenceMarks(body, seats, sectionOwnerId) {
+    const loss = /^(.+) lost (\d+) hex(?:es)? to (.+)\.$/.exec(body);
+    const gain = loss ? null : /^(.+) took (\d+) hex(?:es)? from (.+)\.$/.exec(body);
+    const match = loss ?? gain;
+    if (!match) return null;
+    const subject = match[1] ?? "";
+    const verb = loss ? "lost" : "took";
+    if (!body.startsWith(`${subject} ${verb} `)) return null;
+    const marks = [];
+    const used = /* @__PURE__ */ new Set();
+    const subjectSeat = seatForHexName(subject, seats, used, sectionOwnerId);
+    if (subjectSeat) {
+      used.add(subjectSeat.seatId);
+      marks.push({ seatId: subjectSeat.seatId, start: 0, end: subject.length });
+    }
+    const list = match[3] ?? "";
+    if (!body.endsWith(`${list}.`)) return marks;
+    let cursor = body.length - (list.length + 1);
+    for (const name of splitJoinedNames(list)) {
+      if (!body.startsWith(name, cursor)) return marks;
+      const seat = seatForHexName(name, seats, used, null);
+      if (seat) {
+        used.add(seat.seatId);
+        marks.push({ seatId: seat.seatId, start: cursor, end: cursor + name.length });
+      }
+      cursor += name.length;
+      if (body.startsWith(", and ", cursor)) cursor += ", and ".length;
+      else if (body.startsWith(", ", cursor)) cursor += 2;
+      else if (body.startsWith(" and ", cursor)) cursor += " and ".length;
+    }
+    return marks;
+  }
+  function splitJoinedNames(list) {
+    if (!list.includes(", ")) {
+      const andAt = list.indexOf(" and ");
+      if (andAt < 0) return [list];
+      return [list.slice(0, andAt), list.slice(andAt + " and ".length)];
+    }
+    const parts = list.split(", ");
+    const last = parts[parts.length - 1] ?? "";
+    if (last.startsWith("and ")) parts[parts.length - 1] = last.slice("and ".length);
+    return parts;
+  }
+  function seatForHexName(name, seats, used, preferredId) {
+    if (name === "You" || name === "you" || name === "Neutral") return null;
+    const matches = seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    if (preferredId) {
+      const preferred = matches.find((seat) => seat.seatId === preferredId);
+      if (preferred) return preferred;
+    }
+    return matches[0] ?? null;
+  }
+  function sideNameMarksForLine(line, seats, sectionOwnerId = null) {
     let offset = 0;
     let body = line;
     if (body.startsWith("\u2022 ")) {
@@ -1254,7 +1327,7 @@
       offset += 3;
       body = body.slice(3);
     }
-    return markInBody(body, seats).map((mark) => ({
+    return markInBody(body, seats, sectionOwnerId).map((mark) => ({
       seatId: mark.seatId,
       start: mark.start + offset,
       end: mark.end + offset
@@ -20024,25 +20097,28 @@ ${bonuses}`;
     const ownerFlags = context.ownerId == null ? void 0 : context.unitOriginByDisplayName?.get(context.ownerId);
     const segments = splitLossCauseLineForUnitFlags(bulleted, new Set(ownerFlags == null ? [] : ownerFlags.keys()));
     const onlyPlain = segments.length === 1 && segments[0]?.unitDisplayName == null && segments[0]?.group == null;
-    if (onlyPlain) appendPlainBullet(span, line, bulleted, context.seats);
+    if (onlyPlain) appendPlainBullet(span, line, bulleted, context.seats, context.ownerId);
     else {
       for (const segment of segments) appendCauseSegment(span, segment, context.ownerId, ownerFlags, context.seats);
     }
     target.appendChild(span);
   }
-  function appendPlainBullet(span, rawLine, bulleted, seats) {
-    const mark = sideNameMarksForLine(rawLine, seats)[0];
-    const flag = mark ? createSideNumberFlag(mark.seatId, seats) : null;
-    if (!mark || !flag) {
+  function appendPlainBullet(span, rawLine, bulleted, seats, sectionOwnerId) {
+    const extra = rawLine.startsWith("\u2022 ") ? 0 : 2;
+    const placed = sideNameMarksForLine(rawLine, seats, sectionOwnerId).flatMap((mark) => {
+      const flag = createSideNumberFlag(mark.seatId, seats);
+      return flag ? [{ start: mark.start + extra, end: mark.end + extra, flag }] : [];
+    });
+    if (placed.length === 0) {
       span.textContent = bulleted;
       return;
     }
-    const start = mark.start + (rawLine.startsWith("\u2022 ") ? 0 : 2);
-    span.append(
-      document.createTextNode(bulleted.slice(0, start)),
-      flag,
-      document.createTextNode(bulleted.slice(start))
-    );
+    let cursor = 0;
+    for (const mark of placed) {
+      span.append(document.createTextNode(bulleted.slice(cursor, mark.start)), mark.flag);
+      cursor = mark.end;
+    }
+    span.append(document.createTextNode(bulleted.slice(cursor)));
   }
   function appendCauseSegment(span, segment, ownerId, ownerFlags, seats) {
     if (segment.unitDisplayName && ownerFlags) {
@@ -22060,6 +22136,7 @@ ${bonuses}`;
   function setPanelState(panel, state) {
     placeStartButton(state);
     panel.dataset.state = state;
+    applyPendingNewGameScroll();
   }
   function settle(panel) {
     slide?.cancel();
@@ -22100,6 +22177,20 @@ ${bonuses}`;
     setPanelState(panel, "collapsing");
     const borders = panel.offsetHeight - panel.clientHeight;
     slideTo(panel, from, header.offsetHeight + borders);
+  }
+  var scrollToTopWhenShown = false;
+  function applyPendingNewGameScroll() {
+    if (!scrollToTopWhenShown) return;
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
+    body.scrollTop = 0;
+    scrollToTopWhenShown = false;
+  }
+  function scrollNewGameDialogToTop() {
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement)) return;
+    scrollToTopWhenShown = true;
+    applyPendingNewGameScroll();
   }
   function syncNewGameDialogMapPointer() {
     const overlay = document.getElementById("game-over-overlay");
@@ -29654,7 +29745,10 @@ ${bonuses}`;
       forgetMatchUnderNewGame();
     }
     const wasHidden = overlay?.classList.contains("hidden") !== false;
+    const standings = document.getElementById("game-over-standings");
+    const standingsWereHidden = !(standings instanceof HTMLElement) || standings.hidden;
     if (!showOverlay) {
+      hideGameOverStandings();
       overlay?.classList.add("hidden");
       setMainUIControlsEnabled(true);
       updateReadyButtonState2();
@@ -29687,6 +29781,7 @@ ${bonuses}`;
       newGameBtn.textContent = noGame ? "Start game" : "New game";
       newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(noGame));
     }
+    if (wasHidden || gameOver && standingsWereHidden) scrollNewGameDialogToTop();
     updateReadyButtonState2();
     return overlay != null && wasHidden === true;
   }
@@ -33801,6 +33896,7 @@ ${bonuses}`;
       holdMatchUnderNewGame();
       advanceRendererMatchEpoch();
     }
+    hideGameOverStandings();
     showNewGameBanner("newGame", selectedNewGameTab());
     if (newGameBtn) {
       newGameBtn.textContent = "Start game";
@@ -33815,6 +33911,7 @@ ${bonuses}`;
     syncGameSizeCapPreview();
     overlay?.classList.remove("hidden");
     expandNewGameDialog();
+    if (opened) scrollNewGameDialogToTop();
     placeNewGameDialogAtInset();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
@@ -35146,10 +35243,6 @@ ${bonuses}`;
     if (deployedLine) lines.push(deployedLine);
     const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
     if (deploymentCapLine) lines.push(deploymentCapLine);
-    const hexesLost = readyResult.humanHexesLostCount ?? 0;
-    if (hexesLost > 0) {
-      lines.push(`${hexesLost.toLocaleString()} ${hexesLost === 1 ? "hex" : "hexes"} lost to opponent`);
-    }
     return lines;
   }
   function stripLeadingBullet(line) {
@@ -35158,14 +35251,14 @@ ${bonuses}`;
   function buildConsolidatedTurnUpdateToastMessage(args) {
     const { readyResult, combatFallbackBullets, turnReport } = args;
     const sections = [];
-    const reportLines = turnReport ? buildTurnReportLines({ ...turnReport, otherLines: [] }) : [];
     const lossSections = buildTurnLossSections(
       args.turnLossSummary,
       turnReport?.viewerSeatId ?? null,
-      turnReport?.seats ?? []
+      turnReport?.seats ?? [],
+      turnReport ? hexChangeLinesByOwner(turnReport) : void 0
     );
     sections.push(...lossSections);
-    let otherLines = [...reportLines, ...buildOtherTurnUpdatePrimaryLines(readyResult)];
+    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
     if (lossSections.length === 0 && otherLines.length === 0) {
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }

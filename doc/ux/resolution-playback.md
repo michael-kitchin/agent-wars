@@ -29,7 +29,7 @@ Dice chips show every die rolled in air combat, ranged combat, and melee combat.
 - Rolls of the same kind, player, unit type, and hit number share a row. A row with more than three rolls shows a tally such as `2/5 ≤3` (hits, then rolls) instead of each face.
 - A chip shows at most four lines. When it has more rows, it shows three of them and a final `+N more` line.
 
-A map toast can summarize losses the player can see. Combat outside vision is one sentence at the end of that toast's Updates section. It names those continents in alphabetical order, separated by commas, or says the continent was unidentified when no name is known. The Reports tab keeps the summary and that sentence as one turn report, tagged with the turn or beat Ready just resolved. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
+A map toast can summarize losses the player can see, and the hex changes from that turn. Combat outside vision is one sentence at the end of that toast's Updates section. It names those continents in alphabetical order, separated by commas, or says the continent was unidentified when no name is known. The Reports tab keeps the summary and that sentence as one turn report, tagged with the turn or beat Ready just resolved. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
 
 ## Inputs and Responses
 
