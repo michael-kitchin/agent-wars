@@ -203,23 +203,23 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 
 #### Origin bonus and terrain bonus (optional)
 
-Two new-game dropdowns, **Origin bonus** and **Terrain bonus**, each offer Off, Low, and High, and default to Low. A match saved before levels existed plays at Low. Each dropdown is set independently. When a unit qualifies where it stands at the moment of a roll, it adds that bonus's amount to its attack or defense value for that roll (hit if `roll ≤ value + amount`). The number of dice never changes.
+Two new-game dropdowns, **Origin bonus** and **Terrain bonus**, each offer Off, Default, and High, and start at Default. A match saved before levels existed plays at Default. Each dropdown is set independently. When a unit qualifies where it stands at the moment of a roll, it adds that bonus's amount to its attack or defense value for that roll (hit if `roll ≤ value + amount`). The number of dice never changes.
 
 | Level | Added to a qualifying roll |
 |---|---|
-| Low | +2 |
+| Default | +2 |
 | High | +4 |
 
 The highest printed attack is 10, so origin alone reaches 14, under the cap of 17. The highest defense hit number from origin alone is 11.
 
 - **Origin bonus (strategic and tactical):** the unit's area id equals the place id where it rolls. On the global map that id is the country name, matched by the canonical name and not by code. On a regional map that id is the origin-unit id. On the strategic map, a hex's place id is the majority value among its tactical cells: the country name on the global map, or the origin id on a regional map. Ties go to the value that sorts first. A hex with no counted cells has no place id. In a battle, a cell's place id is that cell's own value, the same one used for unit births.
 - **Terrain bonus (tactical only):** the unit's birth terrain kind equals the cell's effective terrain kind. Urban and rubble are flags, not kinds, and never affect the match. The strategic map ignores this flag.
-- **No stacking:** a unit that qualifies on both counts adds only the larger of the two amounts. For example, country High and terrain Low add 4.
+- **No stacking:** a unit that qualifies on both counts adds only the larger of the two amounts. For example, country High and terrain Default add 4.
 - **Who qualifies:** a unit without a recorded origin never qualifies. A missing birth area skips the country test. A missing birth terrain skips the terrain test. Tactical sub-units use their parent unit's origin.
 - **Where a unit stands:** air strikes and ranged fire use pre-move positions; melee uses the melee hex or cell. An air unit is judged at its base, whatever it strikes. Cargo shares its carrier's position.
 - **Rolls that change:** ranged fire and return fire (including standing-order defend fire), both melee rolls, air strikes on units and on infrastructure, air-strike counter-fire by defending units, and tactical ranged fire at infrastructure.
 - **The origin bonus does not change:** infrastructure's fixed counter-fire, every casualty sort and air-strike victim pick (they keep the printed defense values), movement, ranges, enter costs, ferry range, sub-unit counts, and production. The terrain bonus leaves the same things alone, except for the battle movement step below. Weather, below, is a separate option.
-- **Terrain-bonus movement (tactical only):** while the terrain bonus is Low or High, a unit may enter one cell of its birth terrain category that the §12.4 table bars it from, unless that category is water. The entry uses the rest of the beat's movement points, and the unit stops on that cell. The next beat it may march on normally or make another such entry. Armor born on mountains, wetlands, or arctic terrain gets this step. A naval unit gets it only when born on wetlands, and only into wetlands. Infantry never needs it, because the table bars infantry only from water. Air does not march. Embarked cargo moves on the carrier's naval row and gets no step of its own.
+- **Terrain-bonus movement (tactical only):** while the terrain bonus is Default or High, a unit may enter one cell of its birth terrain category that the §12.4 table bars it from, unless that category is water. The entry uses the rest of the beat's movement points, and the unit stops on that cell. The next beat it may march on normally or make another such entry. Armor born on mountains, wetlands, or arctic terrain gets this step. A naval unit gets it only when born on wetlands, and only into wetlands. Infantry never needs it, because the table bars infantry only from water. Air does not march. Embarked cargo moves on the carrier's naval row and gets no step of its own.
   - Only the terrain-kind bar is lifted. Every step the existing rules price stays a normal step at its usual cost, so a road or rail through mountains still lets armor cross several cells in one beat. Urban cells, rubble, and the naval rule against stepping from one land seaport cell to another keep their own rules, and a naval unit never makes this entry onto a seaport cell.
   - A march uses these entries only when they arrive in strictly fewer beats than the best route without them. On a tie, the usual route stands. The rule is `terrainBonusMarchCategoryFor` in `src/shared/terrainBonusMarch.ts`; the route choice is `preferFasterTerrainBonusMarch` in `src/shared/tacticalMarchBeatSearch.ts`. Ready movement, hover previews, Best Options, and the battle tools all plan through it.
 
@@ -227,15 +227,15 @@ The highest printed attack is 10, so origin alone reaches 14, under the cap of 1
 
 #### Weather bonus (optional)
 
-**Weather bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low, with a starting month under the options. The dialog opens on a random month, and the player can pick another month or draw again. A global turn is one month, shown as `November, Year 3`. A regional turn is one week, shown as `November 22nd, Year 1`, and the match starts on the 1st of the selected month in a leap year. The year advances when that start month comes around again. February has 29 days in Years 1, 5, 9, and so on, and 28 days otherwise. Weather changes when the date enters a new month. Every beat of a battle stays on that date and uses the weather of the enclosing hex. The date is shown whether or not this bonus is on.
+**Weather bonus** is a new-game dropdown offering Off, Default, and High, and starts at Default, with a starting month under the options. The dialog opens on a random month, and the player can pick another month or draw again. A global turn is one month, shown as `November, Year 3`. A regional turn is one week, shown as `November 22nd, Year 1`, and the match starts on the 1st of the selected month in a leap year. The year advances when that start month comes around again. February has 29 days in Years 1, 5, 9, and so on, and 28 days otherwise. Weather changes when the date enters a new month. Every beat of a battle stays on that date and uses the weather of the enclosing hex. The date is shown whether or not this bonus is on.
 
 Weather is Mild, Rain, Snow, or Heat, from a fixed monthly climate, not a roll. A month is snow when its mean temperature is at or below 0°C; otherwise rain when precipitation is at least 120 mm; otherwise heat when the mean is at least 23°C; otherwise mild. A hot wet month displays as rain and still counts as heat. Land hexes are sampled at the centroid. A water hex copies the nearest land hex within two res1 steps, and is mild all year when no land is that close ([terrain pipeline](terrain-pipeline.md)).
 
 A unit is tagged for rain, snow, or heat when its birth hex has that condition in at least 3 of 12 months. Mild is never a tag. At most two tags. When three qualify, the two with more months are kept; equal counts keep snow, then heat, then rain. Tags are shown in the order snow, rain, heat. No birth hex means no tags. Sub-units inherit the parent.
 
-Penalties apply only to units that lack the tag. They never raise a printed stat. A match with no saved weather setting plays with the bonus off. A match saved before levels existed plays at Low. An unreadable start month is January. Turn 1 of a January match is January, Year 1. On a regional map that is January 1st.
+Penalties apply only to units that lack the tag. They never raise a printed stat. A match with no saved weather setting plays with the bonus off. A match saved before levels existed plays at Default. An unreadable start month is January. Turn 1 of a January match is January, Year 1. On a regional map that is January 1st.
 
-| Rule | Low | High |
+| Rule | Default | High |
 |---|---|---|
 | Weather that slows untagged armor | snow, rain | snow, rain, heat |
 | Weather that slows untagged naval | snow | snow, rain |
@@ -246,22 +246,22 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 | Infantry open-ground enter cost in snow or rain | 2 | 2 |
 | Strategic ferry into snow | 2 hexes | 2 hexes |
 
-- **Strategic movement** is always infantry 1, armor 2, naval 2, air 0, with the weather bonus off. At Low or High, armor and naval in weather that slows them move 1 hex. The weather is the hex the unit occupies now, so it can still enter a worse hex at full speed and is slowed on the next turn. Route and distance estimates use that same budget for the whole path.
-- **Tactical movement:** in weather that slows it, armor's or naval's budget becomes the level's cap (2 at Low, 1 at High), then the lower of that and the existing forest or urban budget. A slowed unit's budget is never below 1, and a march always makes at least one cell of progress. Infantry's budget stays 2. Snow or rain raises the cost of entering open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change.
-- **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is lower in snow or heat by the level's penalty (3 at Low, 5 at High). An air strike is lower by the same amount once when the base or the target is snow, rain, or heat the unit lacks. The attack is at least 2 after the penalty and any cover, and before the origin and tech bonuses. High origin and High weather do not cancel exactly: home armor firing in snow ends at `max(2, 10 − 5) + 4 = 9`, one below its printed 10. Rain does not cut armor attack. Infantry attack is unchanged.
+- **Strategic movement** is always infantry 1, armor 2, naval 2, air 0, with the weather bonus off. At Default or High, armor and naval in weather that slows them move 1 hex. The weather is the hex the unit occupies now, so it can still enter a worse hex at full speed and is slowed on the next turn. Route and distance estimates use that same budget for the whole path.
+- **Tactical movement:** in weather that slows it, armor's or naval's budget becomes the level's cap (2 at Default, 1 at High), then the lower of that and the existing forest or urban budget. A slowed unit's budget is never below 1, and a march always makes at least one cell of progress. Infantry's budget stays 2. Snow or rain raises the cost of entering open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change.
+- **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is lower in snow or heat by the level's penalty (3 at Default, 5 at High). An air strike is lower by the same amount once when the base or the target is snow, rain, or heat the unit lacks. The attack is at least 2 after the penalty and any cover, and before the origin and tech bonuses. High origin and High weather do not cancel exactly: home armor firing in snow ends at `max(2, 10 − 5) + 4 = 9`, one below its printed 10. Rain does not cut armor attack. Infantry attack is unchanged.
 - **Unchanged:** defense, melee dice, casualty order, and tactical ferry. A strategic ferry into snow is 2 hexes instead of 4 when the unit lacks the snow tag, at either level.
 
 `estimate_combat` uses the same attack thresholds. The turn line names the date whether or not this bonus is on. With the bonus on, the combat paragraph states the penalties for the chosen level.
 
 #### Tech bonus (optional)
 
-**Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits on the first bonus line, to the right of Origin bonus. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
+**Tech bonus** is a new-game dropdown offering Off, Default, and High, and starts at Default. It sits on the first bonus line, to the right of Origin bonus. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Default.
 
 A unit's tier is fixed from the generated urban-cell count of its birth strategic hex, not from the live count after air strikes destroy urban cells. The Advanced cutoff is `advancedTechMinUrbanCells()`: 21 urban cells on the global map, and that map's manifest threshold when a regional map is loaded. That many or more is Advanced. Fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
 
 | Level | Advanced attack | Advanced defense | Basic |
 |---|---|---|---|
-| Low | +2 | 0 | 0 |
+| Default | +2 | 0 | 0 |
 | High | +2 | +2 | 0 |
 
 The points are added after the floor of 2, in the same place as the origin bonus, and the cap of 17 still applies. Origin and tech are different bonuses and both apply. Real armor with High origin and High tech attacks at 16. Defense at High tech is the printed defense plus 2, so infantry and armor defend at 9 before any origin bonus.
@@ -299,10 +299,10 @@ Single-roll hit chances, useful for checking tests and play.
 |---|---|---|
 | Armor ranged, clear | 10 | 50% |
 | Armor ranged, High origin | 14 | 70% |
-| Armor ranged, untagged Low snow | 7 | 35% |
+| Armor ranged, untagged Default snow | 7 | 35% |
 | Armor ranged, untagged High snow | 5 | 25% |
 | Armor ranged, High snow and High origin | 9 | 45% |
-| Armor ranged at a forest hex, clear / Low snow / High snow | 8 / 5 / 3 | 40% / 25% / 15% |
+| Armor ranged at a forest hex, clear / Default snow / High snow | 8 / 5 / 3 | 40% / 25% / 15% |
 | Naval bombarding a forest coast | 5 | 25% |
 | Air strike, untagged High weather | 5 | 25% |
 | Air strike on units in forest | 9 | 45% |
@@ -475,7 +475,7 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This applies globa
 | Airport | 10 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 7 (35%) |
 | Seaport | 10 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 
-The values in §8 are the printed values. With an origin bonus on (§4.9), a qualifying air unit's strike roll and a qualifying defender's counter-fire roll each add the bonus amount (2 at Low, 4 at High). An Advanced unit also adds its tech bonus (§4.9). Infrastructure counter-fire never changes.
+The values in §8 are the printed values. With an origin bonus on (§4.9), a qualifying air unit's strike roll and a qualifying defender's counter-fire roll each add the bonus amount (2 at Default, 4 at High). An Advanced unit also adds its tech bonus (§4.9). Infrastructure counter-fire never changes.
 
 ### 8.6 Missile strikes
 
@@ -524,7 +524,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 
 - **A&A-style:** One d20 per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee). Attack is floored at 2 before any bonus; every hit number is capped at 17.
 - **Terrain cover:** The target's forest, mountain, or wetlands (plus urban and rubble in battles) lowers ranged and air-strike attack (§4.9).
-- **Origin bonus and terrain bonus (optional):** +2 (Low) or +4 (High) to that value for a unit rolling in its birth country; in battles, also on its birth terrain kind. The two never stack; the larger amount applies. In battles the terrain bonus also lets armor, and naval units born on wetlands, enter one cell of birth terrain they otherwise cannot enter, ending that beat there (§4.9).
+- **Origin bonus and terrain bonus (optional):** +2 (Default) or +4 (High) to that value for a unit rolling in its birth country; in battles, also on its birth terrain kind. The two never stack; the larger amount applies. In battles the terrain bonus also lets armor, and naval units born on wetlands, enter one cell of birth terrain they otherwise cannot enter, ending that beat there (§4.9).
 - **Caps:** Small 12/8/8/6 infantry/armor/naval/air, scaled by game size. Global costs are 20 / 40 / 100 / 60. A fortification costs the same as one infantry unit (`fortificationCostPerCell`) and is not capped. A regional map uses the costs in its manifest.
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. One action per turn: strike or ferry (range 4).
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes and by missile launches. A pick that lands on a fortified cell clears the fortification and keeps the facility. No rebuilding.
@@ -595,7 +595,7 @@ Tactical movement uses a per-beat **movement-point budget** consumed as sub-unit
 - Infantry or armor whose **current** cell is urban or rubble: budget **1** this beat, not the type baseline.
 - Armor whose current cell is forest: budget equals the **infantry** baseline (2).
 - A non-air unit always retains at least 1 point.
-- With the weather bonus on, the enclosing hex's weather applies after those terrain budgets (§4.9). In weather that slows it, armor's or naval's budget becomes the level's cap (2 at Low, 1 at High), then the lower of that and the urban, rubble, or forest budget, and never below 1. At Low, armor is slowed in snow or rain and naval in snow; at High, armor also in heat and naval also in rain. Infantry's budget stays 2. Snow or rain raises infantry's cost to enter open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change. The table above stays the printed costs.
+- With the weather bonus on, the enclosing hex's weather applies after those terrain budgets (§4.9). In weather that slows it, armor's or naval's budget becomes the level's cap (2 at Default, 1 at High), then the lower of that and the urban, rubble, or forest budget, and never below 1. At Default, armor is slowed in snow or rain and naval in snow; at High, armor also in heat and naval also in rain. Infantry's budget stays 2. Snow or rain raises infantry's cost to enter open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change. The table above stays the printed costs.
 - Entering an intact road cell costs half a point and an intact rail cell costs one third, for every terrain, for infantry and armor. The destination cell sets the rate (`1 / TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` and `1 / TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER`). A unit may enter that cell from a neighbor that is not on the line, and may leave only onto terrain it can enter off the line or onto another intact line cell.
 - Urban enter override: infantry/armor enter urban at 1 MP when the cell has no road or rail. Rubble with no road or rail still costs 2 MP. Rubble on a road or rail costs 1 MP where the unit could already enter, and does not open water for infantry or mountains, wetlands, arctic, or water for armor. Naval treats rubble as blocking land.
 - Terrain-bonus movement: with the terrain bonus on, armor may enter one blocked cell of its birth terrain category, and a wetlands-born naval unit one wetlands cell, by spending the rest of the beat and stopping there (§4.9, "Origin bonus and terrain bonus"). The table above stays the printed costs. Steps those rules price keep that cost, so roads and rails stay fast. Such a route replaces the usual one only when it arrives in strictly fewer beats.
@@ -622,7 +622,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - Legal targets include enemy-occupied cells anywhere in the footprint, including a margin cell, **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail) on the enclosing hex's own tactical cells. A margin city or road still slows movement and still gives cover. It is not a legal infrastructure target, and a shot there does not change a strategic hex. A fortified margin cell is never a target and never soaks.
 - A fortified core cell absorbs one hit aimed at the controller's sub-units on that cell, for ranged fire and for an air strike against units (`createTacticalFortificationHooks`). The sub-unit stays and `is_fortified` is cleared. The next hit is not absorbed. An attacker's sub-unit is never absorbed. Melee does not soak: two players cannot stand on the cell, so `runMeleePhase` is not given those hooks. Fire at the cell as infrastructure removes the fortification and leaves the city, airport, or seaport.
 
-Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonus or the terrain bonus on, a unit on a cell in the area where it was built, or on a cell whose terrain kind matches its birth terrain, adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonus and terrain bonus"). That area is its birth country on the global map and its origin area on a regional map. An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
+Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonus or the terrain bonus on, a unit on a cell in the area where it was built, or on a cell whose terrain kind matches its birth terrain, adds 2 (Default) or 4 (High) to its rolls there (§4.9, "Origin bonus and terrain bonus"). That area is its birth country on the global map and its origin area on a regional map. An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
 
 **Terrain cover in battles:** a shot at units on a forest, mountain, wetlands, urban, or rubble cell takes that cell's cover (§4.9, "Terrain cover"). The attacker-cell range cap above and the target-cell cover are separate rules and can both apply to one shot. Cover never applies to ranged fire at infrastructure. Infantry firing at an urban cell drops from 3 to the floor of 2.
 

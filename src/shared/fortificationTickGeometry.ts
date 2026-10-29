@@ -7,7 +7,14 @@
  * Exceptions: None. Fewer than three points yields no edges.
  */
 
-/** How many ticks sit on one lit edge. */
+/**
+ * The most ticks one edge shows.
+ *
+ * Purpose: A fully fortified hex or cell uses this many on every side. A partial hex uses fewer, from `fortificationTicksPerEdge`.
+ * When to use: Clamping the share, and drawing a cell or the legend swatch.
+ * Expected outcome: 4.
+ * Exceptions: None.
+ */
 export const FORTIFICATION_TICKS_PER_EDGE = 4;
 
 /**
@@ -200,48 +207,49 @@ export function fortificationEdges(points: readonly ScreenPoint[], cornerCount: 
 }
 
 /**
- * How many edges show ticks.
+ * How many ticks each edge shows.
  *
- * Purpose: A partly fortified city lights a share of its sides, and a fully fortified city lights all of them.
- * When to use: After counting fortified and intact city cells.
- * Expected outcome: 0 when nothing is fortified. Otherwise the rounded share, clamped to `1..edgeCount`.
- * Exceptions: None.
+ * Purpose: A partly fortified city shows the same share on every side, up to `FORTIFICATION_TICKS_PER_EDGE`.
+ * When to use: After counting fortified and intact city cells. The intact count is fortified cells plus cells that can still be fortified.
+ * Expected outcome: 0 when nothing is fortified. Otherwise `ceil(4 × fortified / max(intact, fortified))`, clamped to 1..4. 1–25% is one tick, 26–50% is two, 51–75% is three, and 76–100% is four.
+ * Exceptions: None. When the intact count is smaller than the fortified count, the fortified count is the denominator, so the share is 100% and every edge gets four ticks.
  */
-export function litFortificationEdgeCount(args: {
+export function fortificationTicksPerEdge(args: {
   readonly fortified: number;
   readonly intactCityCells: number;
-  readonly edgeCount: number;
 }): number {
-  if (args.fortified <= 0 || args.edgeCount <= 0) return 0;
-  const share = Math.round((args.edgeCount * args.fortified) / Math.max(args.intactCityCells, args.fortified));
-  return Math.min(args.edgeCount, Math.max(1, share));
+  if (!(args.fortified > 0)) return 0;
+  const intact = Math.max(args.intactCityCells, args.fortified);
+  const ticks = Math.ceil((FORTIFICATION_TICKS_PER_EDGE * args.fortified) / intact);
+  return Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(1, ticks));
 }
 
 /**
- * Places inward ticks on the first lit edges.
+ * Places inward ticks on every edge.
  *
- * Purpose: Each lit side gets the same number of ticks, spaced along its length.
- * When to use: After `fortificationEdges` and `litFortificationEdgeCount`.
- * Expected outcome: `litEdgeCount * FORTIFICATION_TICKS_PER_EDGE` segments. Each tick points toward the mean of the corners.
- * Exceptions: None. No edges yields no segments.
+ * Purpose: Each side gets the same number of ticks, on the boundaries of equal segments of its length.
+ * When to use: After `fortificationEdges`. Pass `fortificationTicksPerEdge` for a strategic hex, or `FORTIFICATION_TICKS_PER_EDGE` for a fortified cell.
+ * Expected outcome: One segment per tick on every edge, at `k / (n + 1)` along that edge's length, including bends. `n` is `ticksPerEdge` floored and capped at `FORTIFICATION_TICKS_PER_EDGE`. One tick is centered. Two sit at one third and two thirds. Three include the center. Four sit at the fifths, symmetric about the center. Each tick points toward the mean of the corners.
+ * Exceptions: None. No edges, a count below one, or a zero-length edge yields no segments for that case.
  */
 export function fortificationTickSegments(args: {
   readonly points: readonly ScreenPoint[];
   readonly cornerCount: number;
-  readonly litEdgeCount: number;
+  readonly ticksPerEdge: number;
   readonly tickLengthPx: number;
 }): TickSegment[] {
+  const tickCount = Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(0, Math.floor(args.ticksPerEdge)));
+  if (tickCount <= 0) return [];
   const edges = fortificationEdges(args.points, args.cornerCount);
   const corners = edges.map((edge) => edge[0]).filter((point): point is ScreenPoint => point != null);
-  const lit = edges.slice(0, Math.max(0, args.litEdgeCount));
   if (corners.length === 0) return [];
   const center = meanPoint(corners);
   const segments: TickSegment[] = [];
-  for (const edge of lit) {
+  for (const edge of edges) {
     const length = polylineLength(edge);
     if (length <= 0) continue;
-    for (let tick = 1; tick <= FORTIFICATION_TICKS_PER_EDGE; tick += 1) {
-      const at = pointAlong(edge, (length * tick) / (FORTIFICATION_TICKS_PER_EDGE + 1));
+    for (let tick = 1; tick <= tickCount; tick += 1) {
+      const at = pointAlong(edge, (length * tick) / (tickCount + 1));
       if (!at) continue;
       const inward = inwardNormal(at.dx, at.dy, at.point, center);
       segments.push({

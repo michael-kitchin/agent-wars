@@ -3,7 +3,7 @@
  *
  * Purpose: The pattern uses the controller's color and hides while terrain inspection is held.
  * When to use: The strategic scene pass, the zoomed-in cell loop, and the battle footprint.
- * Expected outcome: Ticks on explored fortified hexes and on fortified cells. A polygon smaller than the minimum radius is skipped.
+ * Expected outcome: A strategic hex shows one to four ticks on every edge, from its fortified share. A fortified cell shows four on every edge. A polygon smaller than the minimum radius is skipped.
  * Exceptions: None. A missing map or game state draws nothing.
  */
 
@@ -12,9 +12,10 @@ import { strategicParentOf } from '../../shared/h3Resolutions';
 import { isHexOwnershipVisibleToPerspective, ownershipPerspective } from '../../shared/homeRegionRules';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
+  FORTIFICATION_TICKS_PER_EDGE,
   fortificationEdges,
   fortificationTickSegments,
-  litFortificationEdgeCount,
+  fortificationTicksPerEdge,
   type ScreenPoint,
 } from '../../shared/fortificationTickGeometry';
 import { OWNERSHIP_BORDER_ALPHA } from '../core/constants';
@@ -89,8 +90,8 @@ let colorByParent = new Map<string, string>();
  * Strokes tick segments inside the current path state.
  *
  * Purpose: Map passes and the legend share the stroke. The legend is smaller than the map's radius limit, so this function does not check size.
- * When to use: After the caller has chosen color, width, and which edges are lit.
- * Expected outcome: The segments are stroked at ownership-border opacity with butt caps. The canvas state is restored.
+ * When to use: After the caller has chosen color, width, and how many ticks each edge gets.
+ * Expected outcome: The segments are stroked at ownership-border opacity with butt caps. The canvas state is restored. Zero ticks draws nothing.
  * Exceptions: None.
  */
 export function drawFortificationTicks(
@@ -98,7 +99,7 @@ export function drawFortificationTicks(
   args: {
     readonly points: readonly ScreenPoint[];
     readonly cornerCount: number;
-    readonly litEdgeCount: number;
+    readonly ticksPerEdge: number;
     readonly color: string;
     readonly tickLengthPx: number;
     readonly lineWidthPx: number;
@@ -186,7 +187,7 @@ export function fortificationCornerCount(h3Index: string): number {
  *
  * Purpose: The pattern sits above hex borders and hides at tactical zoom, during a battle, and while inspecting terrain.
  * When to use: The strategic branch of the scene, after home-region outlines.
- * Expected outcome: Each explored hex with a fortified cell shows its share of edges, in the controller's color.
+ * Expected outcome: Each explored hex with a fortified cell shows that share of ticks on every edge, in the controller's color.
  * Exceptions: None. A missing map draws nothing.
  */
 export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, deps: StrategicFortificationTickDeps): void {
@@ -222,10 +223,9 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
     drawScaledFortificationTicks(ctx, {
       points,
       cornerCount,
-      litEdgeCount: litFortificationEdgeCount({
+      ticksPerEdge: fortificationTicksPerEdge({
         fortified,
         intactCityCells: fortified + (row?.fortifiableCount ?? 0),
-        edgeCount: cornerCount,
       }),
       color: fortificationTickColor(control.get(hex.h3Index) ?? null, ownershipVisible),
       lengthRatio: STRATEGIC_FORTIFICATION_TICK_LENGTH_RATIO,
@@ -238,9 +238,9 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
 /**
  * Draws the full tick pattern on one fortified cell.
  *
- * Purpose: A cell is either fortified or not, so every side is lit.
+ * Purpose: A cell is either fortified or not, so every side shows the full pattern.
  * When to use: After the cell's stroke, when inspection is not held.
- * Expected outcome: Ticks in the parent hex's color, or nothing when the cell is smaller than the radius limit.
+ * Expected outcome: Four ticks on every side, in the parent hex's color, or nothing when the cell is smaller than the radius limit.
  * Exceptions: None.
  */
 export function drawFortifiedCellTicks(
@@ -253,7 +253,7 @@ export function drawFortifiedCellTicks(
   drawScaledFortificationTicks(ctx, {
     points,
     cornerCount,
-    litEdgeCount: cornerCount,
+    ticksPerEdge: FORTIFICATION_TICKS_PER_EDGE,
     color,
     lengthRatio: CELL_FORTIFICATION_TICK_LENGTH_RATIO,
     widthRatio: CELL_FORTIFICATION_TICK_WIDTH_RATIO,
@@ -261,12 +261,20 @@ export function drawFortifiedCellTicks(
   });
 }
 
+/**
+ * Draws ticks scaled to the polygon's radius.
+ *
+ * Purpose: Strategic hexes, cells, and the caller share one size rule.
+ * When to use: After the caller has chosen how many ticks each edge gets.
+ * Expected outcome: Ticks whose length and width follow the ratios, and nothing when the radius is below the minimum.
+ * Exceptions: None.
+ */
 function drawScaledFortificationTicks(
   ctx: CanvasRenderingContext2D,
   args: {
     readonly points: readonly ScreenPoint[];
     readonly cornerCount: number;
-    readonly litEdgeCount: number;
+    readonly ticksPerEdge: number;
     readonly color: string;
     readonly lengthRatio: number;
     readonly widthRatio: number;
@@ -292,7 +300,7 @@ function drawScaledFortificationTicks(
   drawFortificationTicks(ctx, {
     points: args.points,
     cornerCount: args.cornerCount,
-    litEdgeCount: args.litEdgeCount,
+    ticksPerEdge: args.ticksPerEdge,
     color: args.color,
     tickLengthPx: radius * args.lengthRatio,
     lineWidthPx: Math.max(args.minWidthPx, radius * args.widthRatio),

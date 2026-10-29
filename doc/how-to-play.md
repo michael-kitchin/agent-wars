@@ -94,8 +94,8 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 | Reach in a battle                     | Each unit's range after terrain limits | The whole battlefield                            |
 
 - **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Infantry can use ranged attacks in battles, however.
-- **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
-- **Hovering a valid target:** a dashed line in the attack's color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
+- **The outline:** a crimson dashed outline, with no fill, around the combined reach of every selected unit (`RANGE_PERIMETER_MISSILE_COLOR`). Its dashes drift slowly. Ranged fire and air strikes use the same outline.
+- **Hovering a valid target:** a crimson arrow runs from each selected unit to the target. A ranged arrow is solid, and an air-strike arrow is dashed. Both are partly transparent, the same as a valid movement preview (`MOVEMENT_HOVER_VALID_ALPHA`). A queued attack keeps that line.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming. An explored enemy hex with no units is a legal ranged target when it still has a fortification. There is no return fire. Air strikes are unchanged.
 - **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
@@ -104,7 +104,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 
 ### Aiming a missile launch
 
-On the world map, select only missiles, then click the reticle. It aims a launch, and there is no target-type list and no reach outline. Double-click any explored hex in range, including the missile's own hex. Each missile launches once and is then gone. That removal is not a combat loss. The reticle and the selection panel's border are crimson (`--order-missile`). A queued or hover launch line is the same crimson, drawn as one continuous arrow (`straightOrderLineShape` with `continuous`). During playback the flight uses that side's map color, still as one continuous arrow, and it does not return.
+On the world map, select only missiles, then click the reticle. It aims a launch, and there is no target-type list and no reach outline. Double-click any explored hex in range, including the missile's own hex. Each missile launches once and is then gone. That removal is not a combat loss. The reticle and the selection panel's border are crimson (`--order-missile`). A queued or hover launch line is the same crimson, dotted, and partly transparent like a valid movement preview (`MOVEMENT_HOVER_VALID_ALPHA`). It is one continuous arrow (`straightOrderLineShape` with `continuous`). During playback the flight uses that side's map color, still as one continuous arrow, and it does not return.
 
 The reticle is greyed out in a battle, with "Missiles cannot fire or launch during a battle." (`MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`). A selection that mixes missiles with other types is greyed out, with "A launch needs a selection of missiles only." (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`).
 
@@ -285,9 +285,9 @@ Hovering a unit's flag, in the stack list or anywhere else it appears, or the to
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Bonuses for the Mexican 5th Armored, near Mexico City](media/unit-bonuses-armored-mexico.png) | ![Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs](media/unit-origin-saskatchewan.png) |
 
-Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
+Each bonus is Off, Default, or High in the new-game dialog, and starts at Default.
 
-| Bonus   | Low          | High                     | When it counts                                                                                                                          |
+| Bonus   | Default      | High                     | When it counts                                                                                                                          |
 | ------- | ------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Origin  | +2 to rolls  | +4 to rolls              | Rolls in the unit's birth country, on the strategic map and in battles. On a regional map, its birth province or other origin area.     |
 | Terrain | +2 to rolls  | +4 to rolls              | Battle rolls on the unit's birth terrain. Also the terrain-bonus step under [How battles differ](#how-battles-differ).                  |
@@ -297,7 +297,7 @@ Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 - **Tech is fixed:** the tier comes from the birth hex's original city size. It doesn't change when the unit moves or the city is bombed.
 - **Where you build matters:** with tech on, big cities build better units, so the place matters as well as the points.
 
-Each hex has a fixed monthly climate of mild, rain, snow, or heat, and icons on the map show the current month's weather. A unit gets up to two weather tags, for the conditions its birth hex has at least 3 months a year. Mild is never a tag. Only a unit without the matching tag pays these penalties. An attack cut is the Low amount, with the High amount in parentheses. A slow that says "at High" applies only at High.
+Each hex has a fixed monthly climate of mild, rain, snow, or heat, and icons on the map show the current month's weather. A unit gets up to two weather tags, for the conditions its birth hex has at least 3 months a year. Mild is never a tag. Only a unit without the matching tag pays these penalties. An attack cut is the Default amount, with the High amount in parentheses. A slow that says "at High" applies only at High.
 
 | Unit type | Rain                                        | Snow                                              | Heat                                                      |
 | --------- | ------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------- |
@@ -306,7 +306,7 @@ Each hex has a fixed monthly climate of mild, rain, snow, or heat, and icons on 
 | Naval     | Slowed at High                              | Slowed                                            | None                                                      |
 | Air       | -3 to a strike (-5 at High)                 | -3 to a strike (-5 at High)                       | -3 to a strike (-5 at High)                               |
 
-Open ground is plains, desert, wetlands, arctic, or coastal. A slowed unit moves 1 hex on the strategic map. In a battle its budget is 2 points at Low and 1 at High, and no higher than the budget for the cell it starts on. An air strike takes its penalty once, when the base or the target has weather the unit isn't tagged for.
+Open ground is plains, desert, wetlands, arctic, or coastal. A slowed unit moves 1 hex on the strategic map. In a battle its budget is 2 points at Default and 1 at High, and no higher than the budget for the cell it starts on. An air strike takes its penalty once, when the base or the target has weather the unit isn't tagged for.
 
 The flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the map-mode buttons under it, then turn on **Tech**, or hold T, to see each hex's tech tier. **Weather** turns the weather icons on the map off and on. **Control** starts on and draws who holds each hex; turn it off to leave the plain grid. **Production** starts off; turn it on to label production on every hex.
 

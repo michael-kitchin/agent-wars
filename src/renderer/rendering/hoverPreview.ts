@@ -1,7 +1,7 @@
 import { strategicMovementHexesFor, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { tacticalHoverSolidEdgeCapByOriginH3 } from '../../shared/tacticalMarchHoverPreview';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
-import { ORDER_LINE_WIDTH } from '../core/constants';
+import { MOVEMENT_HOVER_VALID_ALPHA, ORDER_LINE_WIDTH } from '../core/constants';
 import { paletteForCurrentOwner } from './ownerColors';
 import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { strokeSupportOrderLines } from './orderDrawing';
@@ -21,8 +21,8 @@ import { getMainLeafletMap } from '../map/worldLeafletMap';
  *
  * Purpose: Shows where an order would go before the player commits it.
  * When to use: Once per scene draw while `S.hoverRoutePreview` is set.
- * Expected outcome: Ranged and strike targeting draw one dashed line per origin toward the hovered target, as a queued
- *   ranged or strike line looks. Otherwise each origin stack draws its route solid for the part it covers this turn or
+ * Expected outcome: Ranged, strike, and launch targeting draw one crimson arrow per origin toward the hovered target, as a
+ *   queued attack of that kind looks: solid, dashed, or dotted. Otherwise each origin stack draws its route solid for the part it covers this turn or
  *   beat and dashed beyond, with an arrowhead at the end. Every line has the order-line casing. Air routes are solid
  *   throughout. On the strategic map the solid part is the slowest selected unit's weather-adjusted movement; in battle
  *   it comes from `tacticalHoverSolidEdgeCapByOriginH3`. An X marks the hovered hex when the preview says the order is
@@ -144,7 +144,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       }
     }
     ctx.save();
-    ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+    ctx.globalAlpha = preview.valid ? MOVEMENT_HOVER_VALID_ALPHA : 0.75;
     drawOrderLine(ctx, { runs, arrow }, { color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? '#115E59', width: ORDER_LINE_WIDTH });
     ctx.restore();
   }

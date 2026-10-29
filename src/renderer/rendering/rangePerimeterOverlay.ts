@@ -197,9 +197,9 @@ function projectLoopsToScreen(
 /**
  * Draws the animated dashed range perimeter when ranged or air-strike planning is active.
  *
- * Purpose: Visualizes max range for the selected group without LOS or target validity filtering, using the same stroke as planned/hover support lines plus flowing dashes.
+ * Purpose: Visualizes max range for the selected group without LOS or target validity filtering. The outline uses the missile crimson and keeps the animated dash.
  * When to use: In both tactical and strategic `drawGameScene` branches before unit icons.
- * Expected outcome: Mode-colored flowing dashed outline around the union range hex perimeter; tactical width matches movement lines; strategic width uses the thicker home-border scale with butt caps and 2×-width dashes so the trough stays visible; no-op when mode off.
+ * Expected outcome: A crimson flowing dashed outline around the union range hex perimeter, the same dash for ranged and air strike. Tactical width matches movement lines. Strategic width uses the thicker home-border scale with butt caps and 2×-width dashes so the trough stays visible. No-op when the mode is off.
  * Exceptions: None; failures are logged and skipped.
  */
 export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {

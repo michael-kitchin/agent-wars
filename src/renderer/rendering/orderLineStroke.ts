@@ -1,5 +1,5 @@
 /**
- * Draws order lines (movement, ranged, and air strike; queued, previewed, and played back) the same way: a light casing
+ * Draws order lines (movement, ranged fire, air strike, and missile launch; queued, previewed, and played back) the same way: a light casing
  * first, then the colored line, and an optional arrowhead.
  *
  * Purpose: One drawing path, so every order line keeps the same outline and arrow.
@@ -19,6 +19,16 @@ import { orderArrowGeometry, orderEndsCoincide, type CanvasPoint } from '../../s
  * Exceptions: None.
  */
 export const ORDER_LINE_LATER_DASH: readonly number[] = [6, 4];
+
+/**
+ * The dash pattern for a planned missile launch, in CSS pixels.
+ *
+ * Purpose: A launch stays crimson with the other planned attacks, and the dot pattern is what tells it from a solid ranged arrow and a dashed air strike.
+ * When to use: As the `dash` of a planned or hover missile arrow. The connector cap is round, so each mark reads as a dot.
+ * Expected outcome: 2 px drawn, 6 px skipped.
+ * Exceptions: None.
+ */
+export const ATTACK_LINE_DOT_DASH: readonly number[] = [2, 6];
 
 /**
  * The dash pattern for a solid run.
@@ -105,7 +115,7 @@ function traceArrow(ctx: CanvasRenderingContext2D, arrow: ReturnType<typeof orde
  *
  * Purpose: Drawing every casing before any color keeps the outline from cutting across the line where an arrowhead or
  *   a dashed run begins.
- * When to use: For every movement, ranged, and air-strike line, queued, previewed, or played back. Set
+ * When to use: For every movement, ranged, air-strike, and missile line, queued, previewed, or played back. Set
  *   `globalAlpha` on the context first when the line is translucent.
  * Expected outcome: The runs are stroked with `style.color` at `style.width`, each with its own dash, and the
  *   arrowhead is filled and outlined in the same color at the movement line's width. Under all of it is a solid pale

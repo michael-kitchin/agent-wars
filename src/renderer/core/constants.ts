@@ -107,7 +107,7 @@ export const ORDER_ARROW_SIZE = 10;
 /**
  * The pale outline drawn under every order line, in CSS color.
  *
- * Purpose: A dashed teal, amber, or purple line can vanish on similar terrain; the casing keeps it readable anywhere.
+ * Purpose: A seat-colored or crimson order line can vanish on similar terrain; the casing keeps it readable anywhere.
  * When to use: Only by `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
  * Expected outcome: White at 80% opacity.
  * Exceptions: None.
@@ -380,31 +380,31 @@ export const MULTI_PLAYER_GLYPH_FILTER = 'brightness(0.133)';
 export const OWNERSHIP_BORDER_ALPHA = 0.75;
 
 /**
- * Stroke color for ranged-attack perimeter, planned, and planning-hover lines.
+ * Stroke color for a ranged shot line during resolution playback.
  *
- * Purpose: Distinguishes ranged targeting geometry from air-strike strokes at a glance.
- * When to use: Ranged branch of support-line drawing (`drawRangePerimeterOverlay`, `drawRangedAttackLines`, support hover).
- * Expected outcome: Burnt orange outline and connector lines for ranged planning.
+ * Purpose: Playback still tells ground fire from an air strike. Planned ranged arrows use `RANGE_PERIMETER_MISSILE_COLOR`.
+ * When to use: The resolution appearance of `strokeSupportOrderLines` for a ranged shot. The aim chrome uses the same hex as `--order-ranged`.
+ * Expected outcome: Burnt orange shot lines during the ranged window.
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
 
 /**
- * Stroke color for air-strike perimeter, planned, and planning-hover lines.
+ * Stroke color for an air-strike shot line during resolution playback.
  *
- * Purpose: Distinguishes air-strike targeting geometry from ranged strokes at a glance.
- * When to use: Air-strike branch of support-line drawing (`drawRangePerimeterOverlay`, `drawAirStrikeLines`, support hover).
- * Expected outcome: Violet outline and connector lines for air-strike planning.
+ * Purpose: Playback still tells an air strike from ground fire. Planned strike arrows use `RANGE_PERIMETER_MISSILE_COLOR`.
+ * When to use: The resolution appearance of `strokeSupportOrderLines` for an air-strike shot. The aim chrome uses the same hex as `--order-strike`.
+ * Expected outcome: Violet shot lines during the ranged window.
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
 
 /**
- * Stroke color for planned and played-back missile launches.
+ * Stroke color for planned attack arrows and for the reach outline.
  *
- * Purpose: A launch reads as its own order, apart from ranged fire and air strikes.
- * When to use: Missile branches of support-line drawing. Missiles have no range perimeter.
- * Expected outcome: Crimson connector lines for missile planning and playback.
+ * Purpose: Ranged fire, air strikes, and missile launches share one color while they are being planned. Dash tells them apart.
+ * When to use: Planned and hover attack arrows, and the ranged and air-strike reach outlines. A missile launch played back uses the launching seat's map color instead. Missiles have no reach outline.
+ * Expected outcome: Crimson `#B91C1C`, the same value as `--order-missile`.
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_MISSILE_COLOR = '#B91C1C';
@@ -442,9 +442,9 @@ export const RANGE_PERIMETER_LINE_CAP = 'butt';
 /**
  * Canvas line cap for planned, hover, and resolution ranged/air-strike connectors.
  *
- * Purpose: Keeps short hex-to-hex support segments rounded without affecting perimeter dash animation.
+ * Purpose: Keeps short hex-to-hex support segments rounded without affecting perimeter dash animation. A missile launch's short marks read as dots because of this cap.
  * When to use: `rangePerimeterStaticLineStyle` kind `'connector'`.
- * Expected outcome: Round end caps on planned, hover, and shot lines.
+ * Expected outcome: Round end caps on planned, hover, and shot lines, including a missile launch.
  * Exceptions: None.
  */
 export const RANGE_SUPPORT_CONNECTOR_LINE_CAP = 'round';
@@ -460,14 +460,24 @@ export const RANGE_SUPPORT_CONNECTOR_LINE_CAP = 'round';
 export const RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
 
 /**
- * Opacity for ranged/air-strike perimeter, planning hover, and planned support lines.
+ * Opacity for the animated reach outline and for shot lines during resolution playback.
  *
- * Purpose: Keeps support-attack overlay strokes at a consistent 75% opacity.
- * When to use: `drawRangePerimeterOverlay`, support hover in `drawHoverRoutePreview`, and `drawRangedAttackLines` / `drawAirStrikeLines`.
- * Expected outcome: `globalAlpha = 0.75` for perimeter, hover, and committed pending attack/strike connectors.
+ * Purpose: The outline and the playback shots stay at the opacity they had before planned arrows moved to `MOVEMENT_HOVER_VALID_ALPHA`.
+ * When to use: `drawRangePerimeterOverlay`, and `strokeSupportOrderLines` when the appearance is resolution.
+ * Expected outcome: `globalAlpha = 0.75`.
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_ALPHA = 0.75;
+
+/**
+ * Opacity of a valid movement hover and of a planned attack arrow.
+ *
+ * Purpose: Planned ranged, air-strike, and missile arrows match a valid movement preview. Dash is the only difference among those arrows.
+ * When to use: The valid branch of `drawHoverRoutePreview`, and `strokeSupportOrderLines` when the appearance is plan.
+ * Expected outcome: `globalAlpha = 0.55`. An invalid movement hover stays at 0.75 and does not use this.
+ * Exceptions: None.
+ */
+export const MOVEMENT_HOVER_VALID_ALPHA = 0.55;
 
 /**
  * Solid segment length as a fraction of perimeter line width (dash portion of 1:1 solid:gap).

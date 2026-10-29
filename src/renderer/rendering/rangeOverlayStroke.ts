@@ -25,7 +25,7 @@ import { getHomeRegionOwnershipLineWidth } from './terrainRendering';
 /**
  * Overlay stroke family that shares color/dash but may use a different width on the strategic map.
  *
- * Purpose: Distinguishes the animated range outline from planned/hover/resolution connectors.
+ * Purpose: Distinguishes the animated range outline from planned, hover, and playback connectors. Both can be crimson while aiming. The outline keeps its own dash.
  * When to use: Pass into `getCurrentRangeOverlayLineWidth` and `rangePerimeterStaticLineStyle`.
  * Expected outcome: `'perimeter'` is the targeting outline; `'connector'` is hex-to-hex support lines.
  * Exceptions: None.

@@ -11,7 +11,7 @@ Wait for the human before the next phase. If a phase fails, revert that phase. I
 
 ## Prerequisite
 
-Start only after every phase of the fortification plan is done, including its documentation phase, and `npm test` passes. The plan is [`.spec/fortifications-execution-plan.md`](fortifications-execution-plan.md), or [`.spec/completed/fortifications-execution-plan.md`](completed/fortifications-execution-plan.md) once it is filed there.
+The fortification work is finished, including its documentation. Before Phase 1, confirm that `npm test` passes on your tree. The fortification plan is [`.spec/fortifications-execution-plan.md`](fortifications-execution-plan.md), or [`.spec/completed/fortifications-execution-plan.md`](completed/fortifications-execution-plan.md) once it is filed there.
 
 This plan builds on that work:
 
@@ -22,13 +22,13 @@ This plan builds on that work:
 - `fortificationLines` on the turn-update toast, and `fortificationUpdateLinesFor`;
 - `EXPECTED_USER_VERSION = 25`.
 
-If any of these is missing, stop and report.
+If any of these is missing, or `npm test` fails before you change anything, stop and report.
 
 ## Goal
 
 A power can turn production into credits, hold them in a national treasury, and spend them on mercenaries.
 
-- **Credits.** A new build-queue item, `credits`, turns production points into credits one for one.
+- **Credits.** A new build-queue item, `credits`, costs one infantry's price in production on the active map and adds `CREDITS_PER_ITEM` (20) credits to the treasury on every map.
 - **Where you can build.** A side may build only on its home-region hexes and on hexes where it has a unit or a fortification at the end of the turn. Elsewhere its queue pauses and banks points.
 - **Hiring.** A side may raise new mercenaries on explored hexes outside other sides' home regions, or rehire a Neutral unit it can see. Hired units arrive at the end of the turn and take orders the next turn.
 - **Upkeep.** Each mercenary costs upkeep every turn. When the treasury cannot pay, random mercenaries desert to Neutral.
@@ -37,7 +37,7 @@ A power can turn production into credits, hold them in a national treasury, and 
 
 ## Background
 
-These facts were read from the branch with the fortification work partly applied. Re-check each one where a phase uses it.
+These facts were read from the branch with the fortification work finished. Re-check each one where a phase uses it.
 
 - **Units.** `units(id, player, unit_type, display_order, h3_index, birth_* …, formed_turn)` in [`src/main/gameDb/schema.ts`](../src/main/gameDb/schema.ts). `player` is a seat id or `'neutral'`. There is no migration code: a schema change edits `getFullDdl` and bumps `EXPECTED_USER_VERSION` in [`src/main/gameDb.ts`](../src/main/gameDb.ts). The one product-code `INSERT INTO units` is `insertUnitRow` in [`src/main/gameDb/unitInsert.ts`](../src/main/gameDb/unitInsert.ts).
 - **Unit ids** encode the side that first created the unit (`h1-i3`, `a2-t7`). `playerIdCodeFor` throws for Neutral, so Neutral can never mint an id. A unit keeps its id for life. Several places guess the owner from the id with `unitIdOwnerFromId`; Phase 4 fixes the ones a hired unit would mislead.
@@ -69,7 +69,7 @@ These came from the human. Do not reopen them.
 
 - **Treasury.** One treasury per seat, starting at 0, never negative. It is stored in a new table. Neutral has none. A knocked-out seat's treasury is deleted. Only the seat itself sees its treasury.
 - **Credits item.** `credits` is a build-queue item beside the unit types and `fortification`, listed last.
-  - One item costs the map's infantry cost (`1 ×`; 20 on the global map) and adds the same number of credits.
+  - One item costs the map's infantry price in production (`1 ×`; 20 on the global map, 60 on Western Europe, 8 on Middle Africa South) and adds `CREDITS_PER_ITEM` (20) credits on every map. A credit is therefore worth the same everywhere, and every credit price below is the same number on every map.
   - It is available wherever the hex has production. It is never capped and never pauses on its own. It may be the Keep-building choice.
   - Credits produced at the end of a turn reach the treasury before that turn's upkeep and hires.
 - **Where you can build.** A seat may build on a hex it controls only when, at the end of the turn, the hex is in its own home region, or holds at least one of its units (any type, mercenaries and units aboard ships included), or holds a fortification.
@@ -82,9 +82,10 @@ These came from the human. Do not reopen them.
   - Anyone who can see a unit can see that it is a mercenary.
   - A mercenary's token shows a small `$`, low and centered.
   - Control of a mercenary's birth hex never changes who owns the mercenary.
-- **Upkeep.** `ceil(unit cost × tech multiplier ÷ 8)`.
+- **Upkeep.** `ceil(reference cost × tech multiplier ÷ 8)` credits per turn.
+  - The reference cost is the unit type's global-map price (infantry 20, armor 40, naval 100, air 60), on every map. Regional maps scale their production prices, but credits do not scale, so upkeep in credits must not either. Pricing upkeep from each map's own costs would make whole-credit rounding up to 78% more expensive on the cheapest maps.
   - The tech multiplier is 2 for an Advanced unit when the tech bonus is on, and 1 otherwise.
-  - On the global map: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15).
+  - So upkeep is, on every map: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15).
 - **Fees.** Raising a mercenary costs one turn of upkeep. Rehiring a Neutral unit costs two turns of upkeep. The fee is the first turn's upkeep, so a unit hired this turn pays no other upkeep this turn.
 - **Raising** creates new units on a hex. All of these must hold:
   - the seat has explored the hex;
@@ -93,9 +94,10 @@ These came from the human. Do not reopen them.
   - the hex holds no fortification of another owner;
   - the hex's production can pay the unit.
 
-  The unit types are the ones the hex could build, minus missiles. Per turn, the unit cost of all units raised on one hex is at most twice its production (`urban_hex_count`; 0 on a neutral border hex). A raised unit belongs to the seat, is a mercenary, and its birth hex is the hex it was raised on.
+  The unit types are the ones the hex could build, minus missiles. Per turn, the unit cost of all units raised on one hex is at most twice its production (`urban_hex_count`; 0 on a neutral border hex). Capacity is measured in production points against the map's own unit prices, so it scales with each map the way building does. A raised unit belongs to the seat, is a mercenary, and its birth hex is the hex it was raised on.
 - **Rehiring** takes over a Neutral unit the seat can see.
-  - The unit must not be a missile, must not be in another active seat's home region, must not carry cargo, and must not be aboard a ship.
+  - The unit must not be a missile, must not be in another active seat's home region, must not be in a hex that holds another owner's fortification, must not carry cargo, and must not be aboard a ship. The fortification rule matches raising: control of such a hex cannot change, so a rehired air unit there would lose its base.
+  - A rehired unit that shares its hex with Neutral units or another side's units makes that hex contested, so it fights there at the next resolution. The seat sees that before it hires.
   - It keeps its id, birth origin, tech tier, and formation date. It gets a new display number under its new owner and becomes a mercenary.
   - Its Neutral standing order is deleted. The new owner gives it orders next turn.
 - **Hire orders** are placed during planning and resolve at the end of the turn.
@@ -110,6 +112,7 @@ These came from the human. Do not reopen them.
      - Mercenaries aboard any ship are never drawn on their own. Those aboard a ship that is not a mercenary can never desert: they are paid from whatever is left after the draw, and any shortfall on them is forgiven.
      - After the draw, any drawn unit whose upkeep still fits in what is left is kept and paid, latest drawn first, so the treasury pays as many as it can and loaded ships still go last.
      - Deserters become Neutral exactly as a knockout makes them: they keep their hex and get a Neutral `defend` order. They stop being mercenaries. Control does not change this turn.
+     - A deserter stays in its hex even when its old side still has units there. That hex then holds two owners, and it fights in melee at the next resolution unless one side leaves, as any hex with two owners does (the human may get the usual melee-intercept prompt). This is intended: unpaid troops turn on whoever they share a hex with.
   3. **Hires.** Every seat's orders are taken together in one seeded random order. Each order is checked again against the board as it now stands, charged, and filled.
      - When two seats want the same unit, the first in that order gets it. The other order is not filled and costs nothing.
      - A raise that runs out of credits or capacity fills as many units as it can.
@@ -149,7 +152,7 @@ These came from the human. Do not reopen them.
 - **Errors:** every caught error either becomes a message in a result object or is logged and rethrown. A catch that turns an error into a result also logs it with `logError`. Never swallow an error silently.
 - **Player-facing and model-facing text** is full sentences ending with a period. Exceptions follow the existing style there: tooltip label/value pairs, select-option labels, tab and button labels, table headers, and marker labels. Each string is a named exported constant, or a named function for a string with values in it, listed in the text table below. Tests and docs point at those names.
 - **Immutability:** `const` for bindings that are not reassigned, `readonly` on interface members and array types that are not mutated, `ReadonlyMap` and `ReadonlySet` where callers must not mutate. Where a `readonly` array meets an existing mutable field, copy it with `[...array]`.
-- **File size:** desirable 600 lines, hard limit 1000. New logic goes in the new files this plan names. When you replace a filler comment on a declaration you touch in a budgeted file, keep the new comment no longer than the old one. The files below are already past 600, or close to it, and may change only as stated. Before Phase 1, measure each one and put the numbers in your first report; the "Lines now" column was measured before the fortification work finished, so yours may differ. Report every file that crosses 600.
+- **File size:** desirable 600 lines, hard limit 1000. New logic goes in the new files this plan names. When you replace a filler comment on a declaration you touch in a budgeted file, keep the new comment no longer than the old one. The files below are already past 600, or close to it, and may change only as stated. Before Phase 1, measure each one and put the numbers in your first report. The "Lines now" column was measured on the finished fortification tree; if yours differ, report it. Report every file that crosses 600.
 
   | File | Lines now | Allowed change, summed over all phases |
   | --- | --- | --- |
@@ -163,16 +166,16 @@ These came from the human. Do not reopen them.
   | `src/main/preload.ts` | 767 | at most 36 lines |
   | `src/renderer/gameplay/buildQueuePopup.ts` | 765 | at most 16 lines |
   | `src/main/openRouter/orderResponseParsing.ts` | 736 | must end below its starting count (Phase 8 moves code out) |
-  | `src/main/gameActions/gameActionsCore.ts` (724), `src/main/gameActions/airStrikeResolution.ts` (702), `src/renderer/map/initCore.ts` (662) | — | none |
+  | `src/main/gameActions/gameActionsCore.ts` (724), `src/main/gameActions/airStrikeResolution.ts` (699), `src/renderer/map/initCore.ts` (662) | — | none |
   | `src/shared/ipc/gameApiTypes.ts` | 681 | at most 45 lines |
   | `src/main/gameActions/buildQueue.ts` | 666 | at most 20 lines |
   | `static/frameChrome.css` | 657 | at most 6 lines |
-  | `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` | 641 | at most 1 line |
+  | `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` | 691 | at most 1 line |
   | `src/main/ipc/readyIpcResolutionMapping.ts` | 628 | at most 14 lines |
-  | `src/main/openRouter/promptSpec/gameRuleText.ts` | 620 | at most 3 lines |
+  | `src/main/openRouter/promptSpec/gameRuleText.ts` | 632 | at most 3 lines |
   | `src/main/main.ts` | 611 | at most 2 lines |
   | `src/main/openRouter/requestOrdersToolLoop.ts` | 606 | at most 3 lines |
-  | `controlAndProduction.ts` (587), `fogState.ts` (586), `requestOrdersFlow.ts` (570), `promptText.ts` (558), `controlTooltipText.ts` (563), `wiredEntryCallbacks.ts` (544) | — | must stay at or under 600 |
+  | `controlAndProduction.ts` (587), `fogState.ts` (586), `requestOrdersFlow.ts` (571), `promptText.ts` (558), `controlTooltipText.ts` (563), `wiredEntryCallbacks.ts` (544) | — | must stay at or under 600 |
 
 - **Arguments:** at most 6 per function. Use an options object above that.
 - **Imports:**
@@ -191,7 +194,7 @@ These came from the human. Do not reopen them.
   - When a phase adds a module, also run `npm run check:circular`. It passes when its output is identical to the reference. If it differs in any way, stop and report it.
   - Do not refresh `scripts/circular-deps-baseline.json` or grow `scripts/renderer-typecheck-baseline.json`.
 - **Renderer build.** When a phase edits `src/renderer`, `src/shared`, or `static/`, also run `npm run build:renderer`. Leave `static/renderer.js` changed.
-- **No hiring, no change.** Apart from two deliberate changes, a match where nobody queues credits or places a hire order must resolve exactly as before: the same dice, the same placements, and the same turn-report text. The two changes are the where-you-can-build rule (Phase 3), and, after a knockout, Neutral units no longer counting as their old side when the AI decides whether to consult or when stale markers are colored (Phase 4). The end-of-turn step returns before opening a transaction or drawing a random number when no mercenary and no hire order exist. The build menus, the top bar, the map markers, and the AI's prompts do change by design.
+- **No hiring, no change.** Apart from two deliberate changes, a match where nobody queues credits or places a hire order must resolve exactly as before: the same dice, the same placements, and the same turn-report text. The two changes are the where-you-can-build rule (Phase 3), and, after a knockout, Neutral units no longer counting as their old side when the AI decides whether to consult, when the turn report decides whether a kill involved the viewer, or when stale markers are colored (Phase 4). The end-of-turn step returns before opening a transaction or drawing a random number when no mercenary and no hire order exist. The build menus, the top bar, the map markers, and the AI's prompts do change by design.
 - **Never commit or push.** Do not put phase numbers, or words from this plan's headings, into code, comments, tests, configuration, or `doc/`.
 - **Docs timing.** `doc/` is updated only in Phase 9. Every other phase ends with no `doc/` edits.
 
@@ -205,6 +208,7 @@ Spell these exactly. Later phases refer to them.
 | --- | --- |
 | `CREDITS_QUEUE_ITEM` (in new `src/shared/creditsRules.ts`) | `'credits'` (as const) |
 | `CREDITS_ITEM_INFANTRY_MULTIPLIER` (same file) | `1` |
+| `CREDITS_PER_ITEM` (same file) | `GLOBAL_GAME_MAP.rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER` (20), the credits one item adds on every map |
 | `MERCENARY_UPKEEP_DIVISOR` | `8` |
 | `MERCENARY_ADVANCED_TECH_MULTIPLIER` | `2` |
 | `MERCENARY_REHIRE_FEE_MULTIPLIER` | `2` |
@@ -215,10 +219,11 @@ Spell these exactly. Later phases refer to them.
 | `isHireableUnitType(value: unknown): value is HireableUnitType` | type guard |
 | `HireKind` | `'raise' \| 'rehire'` |
 | `mercenaryTechMultiplier(techLevel: TechLevel \| undefined): number` | `MERCENARY_ADVANCED_TECH_MULTIPLIER` for `'advanced'`, otherwise `1` |
-| `mercenaryUpkeepFor(unitType: HireableUnitType, techLevel: TechLevel \| undefined): number` | `Math.ceil(unitCostFor(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR)` |
+| `mercenaryReferenceCost(unitType: HireableUnitType): number` | the type's price in `GLOBAL_GAME_MAP.rules` (`infantryCost`, `armorCost`, `navalCost`, `airCost`), whatever map is active |
+| `mercenaryUpkeepFor(unitType: HireableUnitType, techLevel: TechLevel \| undefined): number` | `Math.ceil(mercenaryReferenceCost(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR)` |
 | `mercenaryHireFee(kind: HireKind, upkeep: number): number` | `upkeep` for `'raise'`, `upkeep * MERCENARY_REHIRE_FEE_MULTIPLIER` for `'rehire'` |
 | `raiseCapacityForHex(urbanHexCount: number, neutralBorder: boolean): number` | `0` on a neutral border, otherwise `max(0, trunc(urbanHexCount)) * MERCENARY_RAISE_CAPACITY_MULTIPLIER` |
-| `creditsItemCost(): number` (in `src/shared/gameRules.ts`) | `activeGameMap().rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER` |
+| `creditsItemCost(): number` (in `src/shared/gameRules.ts`) | `activeGameMap().rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER`, the production points one item costs on the active map |
 
 Callers pass `techLevel` only when the tech bonus is on. With the bonus off they pass `undefined`, so every unit uses multiplier 1.
 
@@ -317,21 +322,20 @@ All of these live in new [`src/shared/mercenaryRules.ts`](../src/shared/mercenar
 | `formatHireOrdersUnfilledLine(n)` | `1 hire order could not be filled, so it was not charged.` or ``${n} hire orders could not be filled, so they were not charged.`` |
 | `BUILD_PAUSED_NOTE` (in `src/shared/productionBuildability.ts`) | `Building is paused here: this hex is outside your home region and holds none of your units or fortifications. Its points still bank. Have a unit here at the end of a turn to build again.` |
 | `formatBuildPausedLine(placeNames)` (same file) | One name: ``Building is paused at ${name}, which holds none of your units or fortifications.``<br>Several: ``Building is paused at ${list}, which hold none of your units or fortifications.`` |
-| `BUILD_PAUSED_UNNAMED_PLACE` (same file) | `an unnamed hex` |
 | `formatCreditsUpkeepSuffix(upkeep)` | `''` when `upkeep` is 0, otherwise ``\u2212${upkeep}/turn`` |
-| `formatCreditsTooltip({ credits, upkeepPerTurn, pendingHireFees, mercenaryCount })` | ``Credits pay for mercenaries. You hold ${credits}. Upkeep for your ${mercenaryCount} ${mercenaryWord} is ${upkeepPerTurn} per turn, and this turn's hire orders cost ${pendingHireFees}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert.``<br>`mercenaryWord`: `mercenary` for 1, otherwise `mercenaries`. |
+| `formatCreditsTooltip({ credits, upkeepPerTurn, pendingHireFees, mercenaryCount })` | ``Credits pay for mercenaries. You hold ${credits}. Upkeep for your ${mercenaryCount} ${mercenaryWord} is ${upkeepPerTurn} per turn, and this turn's hire orders cost ${pendingHireFees}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.``<br>`mercenaryWord`: `mercenary` for 1, otherwise `mercenaries`. |
 | `BUILD_TAB_LABEL` | `Build` |
 | `HIRE_TAB_LABEL` | `Hire` |
-| `HIRE_ENTRY_LABEL` | `Hire` (marker label) |
+| `formatHireEntryLabel(productionText)` | ``${productionText} · Hire`` (marker label; `productionText` is the hex's `$N`) |
 | `HIRE_BUTTON_LABEL` | `Hire` |
 | `RAISE_SECTION_TITLE` | `Raise` |
 | `REHIRE_SECTION_TITLE` | `Neutral units` |
 | `PENDING_HIRE_SECTION_TITLE` | `Orders this turn` |
 | `CREDITS_LINE_LABEL`, `UPKEEP_LINE_LABEL`, `HIRE_FEES_LINE_LABEL` | `Credits`, `Upkeep`, `Hire orders` (label/value pairs; values ``${n}``, ``${n} / turn``, ``${n}``) |
-| `RAISE_CAPACITY_LABEL` and `formatRaiseCapacityValue(left, perTurn)` | `Capacity`, and ``${left} of ${perTurn} this turn`` (a label/value pair) |
-| `formatHireOptionLabel({ unitType, fee, upkeep })` | ``${Capitalized type} (fee ${fee}, upkeep ${upkeep})`` |
+| `RAISE_CAPACITY_LABEL` and `formatRaiseCapacityValue(left, perTurn)` | `Capacity`, and ``$${left} of $${perTurn} this turn`` (a label/value pair; production points, written with `$` as the build popup writes them) |
+| `formatHireOptionLabel({ unitType, unitCost, fee, upkeep })` | ``${Capitalized type} (capacity $${unitCost}, fee ${fee}, upkeep ${upkeep})`` |
 | `formatHireOrderLabel(order)` | Raise: ``Raise ${count} ${Capitalized type} (fee ${fee})``. Rehire: ``Rehire ${displayName} (fee ${fee})``. |
-| `HIRE_FUNDS_WARNING` | `Your credits do not cover upkeep plus these hire orders. Upkeep is paid first. If credits still run short, random mercenaries desert, and orders that cannot be paid are not filled.` |
+| `HIRE_FUNDS_WARNING` | `Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.` |
 | `HIRE_ARRIVAL_NOTE` | `Hired units arrive at the end of this turn and take orders next turn. Upkeep is due every turn after that.` |
 | `HIRE_VIEW_FAILED` | `Hiring information could not be loaded.` |
 | `HIRE_REASON_NOT_ACTIVE` | `Only a side still in the match can hire.` |
@@ -354,6 +358,7 @@ All of these live in new [`src/shared/mercenaryRules.ts`](../src/shared/mercenar
 | `HIRE_ORDER_UPDATE_FAILED` | `Failed to update hire orders.` |
 | `formatHireEntryAriaLabel(h3Index)` | ``Open hiring for ${h3Index}`` |
 | `MERCENARY_TOOLTIP_LABEL` | `Mercenary` |
+| `forcesStatTooltipLead` (in `src/renderer/chrome/frameTooltipText.ts`) | `Units you have fielded that count toward caps, out of the most this game size allows` (the existing tip's lead, before its breakdown) |
 | `formatMercenaryTooltipValue(upkeep)` | ``upkeep ${upkeep} credits per turn`` |
 | hire control tips (new `src/renderer/chrome/hireTooltipText.ts`) | `hireEntryTooltipText`: `Hire mercenaries in this hex.`<br>`hireTypeTooltipText`: `The kind of unit to raise, with its fee and upkeep.`<br>`hireCountTooltipText`: `How many units to raise.`<br>`hireRaiseButtonTooltipText`: `Order these mercenaries raised at the end of this turn.`<br>`hireRehireButtonTooltipText`: `Order this Neutral unit rehired at the end of this turn.`<br>`hireRemoveOrderTooltipText`: `Remove this hire order.` |
 | AI text (new `src/main/openRouter/promptSpec/gameRuleMercenaryText.ts`) | see Phase 7 and Phase 8 |
@@ -431,9 +436,9 @@ export interface HireMutationResult {
 
 **Goal.** The database, the shared rules, and the snapshot can hold mercenaries, treasuries, and hire orders. Mercenaries no longer count toward caps. Nothing creates any of them yet, so play is unchanged.
 
-**Create [`src/shared/creditsRules.ts`](../src/shared/creditsRules.ts)** in the shape of `fortificationRules.ts`. It imports nothing, and holds `CREDITS_QUEUE_ITEM`, `CREDITS_ITEM_INFANTRY_MULTIPLIER`, `CREDITS_QUEUE_ITEM_LABEL`, `CREDITS_NOT_AVAILABLE_REASON`, and `formatCreditsAddedLine`. `gameRules.ts` already imports from the leaf `fortificationRules.ts` in the same way. A credits constant kept in `mercenaryRules.ts` would make `gameRules.ts` and `mercenaryRules.ts` import each other.
+**Create [`src/shared/creditsRules.ts`](../src/shared/creditsRules.ts)** in the shape of `fortificationRules.ts`. It imports only `GLOBAL_GAME_MAP` from `./activeGameMap`, which imports nothing but a type, and holds `CREDITS_QUEUE_ITEM`, `CREDITS_ITEM_INFANTRY_MULTIPLIER`, `CREDITS_PER_ITEM`, `CREDITS_QUEUE_ITEM_LABEL`, `CREDITS_NOT_AVAILABLE_REASON`, and `formatCreditsAddedLine`. `gameRules.ts` already imports from the leaf `fortificationRules.ts` in the same way. A credits constant kept in `mercenaryRules.ts` would make `gameRules.ts` and `mercenaryRules.ts` import each other.
 
-**Create [`src/shared/mercenaryRules.ts`](../src/shared/mercenaryRules.ts)** with every other constant, guard, and function in the rules table, and every string and formatter in the text table that lives in this file. It imports `unitCostFor` from `./gameRules` and `TechLevel` (type) from `./techBonusTypes`, and nothing from `src/main` or `src/renderer`. It must not import `./ipc/mercenaryTypes`, which imports it; give `formatCreditsTooltip`, `formatHireOptionLabel`, and `formatHireOrderLabel` inline parameter types.
+**Create [`src/shared/mercenaryRules.ts`](../src/shared/mercenaryRules.ts)** with every other constant, guard, and function in the rules table, and every string and formatter in the text table that lives in this file. It imports `GLOBAL_GAME_MAP` from `./activeGameMap`, `CREDITS_PER_ITEM` from `./creditsRules`, and `TechLevel` (type) from `./techBonusTypes`, and nothing from `src/main` or `src/renderer`. Upkeep never reads the active map; that is the point of `mercenaryReferenceCost`. It must not import `./ipc/mercenaryTypes`, which imports it; give `formatCreditsTooltip`, `formatHireOptionLabel`, and `formatHireOrderLabel` inline parameter types.
 
 Add `creditsItemCost()` to `src/shared/gameRules.ts`, importing `CREDITS_ITEM_INFANTRY_MULTIPLIER` (and, in Phase 2, `CREDITS_QUEUE_ITEM`) from `./creditsRules` only.
 
@@ -515,7 +520,7 @@ Add thin wrappers that pass `gameDbOps` in [`src/main/gameDb/mercenaryStateAcces
   - `insertHireOrder`, `listHireOrdersForSeat`, and `deleteHireOrder` round-trip, and `deleteHireOrder` refuses another seat's order;
   - the `res_s_build_queue` table accepts a `credits` row;
   - **caps:** with the human's infantry count at its cap made up only of mercenaries, a home-hex queue of `infantry ×1` with enough stored points spawns one infantry after `processProductionAfterControlResolution()`.
-- [`src/shared/mercenaryRules.test.ts`](../src/shared/mercenaryRules.test.ts), on the global map: `mercenaryUpkeepFor` gives infantry 3, Advanced infantry 5, naval 13, Advanced naval 25; `mercenaryHireFee('rehire', 5)` is 10; `raiseCapacityForHex(12, false)` is 24, and with `true` it is 0.
+- [`src/shared/mercenaryRules.test.ts`](../src/shared/mercenaryRules.test.ts): `mercenaryUpkeepFor` gives infantry 3, Advanced infantry 5, naval 13, Advanced naval 25, on the global map and again inside `withGameMap` with a profile whose infantry price is 60; `mercenaryHireFee('rehire', 5)` is 10; `raiseCapacityForHex(12, false)` is 24, and with `true` it is 0.
 - `getPlayerUnitCountsByType` ignores a unit with `isMercenary: true` (add the case to its existing test, or to the shared rules test if it has none).
 
 **Verify:**
@@ -606,7 +611,7 @@ In `processProductionAfterControlResolution`:
     if (built <= 0) break;
     entry.remainingCount -= built;
     points -= built * cost;
-    creditsToAdd += built * cost;
+    creditsToAdd += built * CREDITS_PER_ITEM;
     if (entry.remainingCount <= 0) {
       lastDepletedUnitType = unitType;
       queueWorking.shift();
@@ -614,7 +619,7 @@ In `processProductionAfterControlResolution`:
     continue;
   }
   ```
-- After the fortification writes, when `creditsToAdd > 0`, call `addTreasuryCredits(controllerPlayerId, creditsToAdd)` and add the amount to the controller's entry in `creditsAddedByPlayer`.
+- After the fortification writes, when `creditsToAdd > 0`, call `addTreasuryCredits(controllerPlayerId, creditsToAdd)` and add the amount to the controller's entry in `creditsAddedByPlayer`. The points spent are `built × cost` on the active map; the credits added are `built × CREDITS_PER_ITEM` on every map.
 - The return type and value gain `creditsAddedByPlayer: ReadonlyMap<SeatId, number>`.
 
 Keep building with credits works through `computeKeepBuildingRefillCount('credits', points)`. The file must end at or under 600 lines.
@@ -631,7 +636,7 @@ Use them in place of `ALL_BUILD_QUEUE_ITEM_TYPES` and `isBuildQueueItemType` at 
 - `BUILD_QUEUE_ITEM_SCHEMA_ENUM` (`openRouterToolCatalog.ts`);
 - the `productionOrders` `unitType` enum (`envelopeJsonSchema.ts`);
 - `normalizeProductionOrders` (`productionOrders.ts`);
-- `setBuildQueue`'s type check and its error text (`productionTools.ts`);
+- `setBuildQueue`'s type check and its error text, and the list of available types in its "not available for this hex" message (filter that list with `isAiBuildQueueItemType`) (`productionTools.ts`);
 - `buildProductionSubmitClause` (`promptText.ts`).
 
 Then run `rg "ALL_BUILD_QUEUE_ITEM_TYPES|isBuildQueueItemType" src/main/openRouter src/main/tools src/main/productionOrders.ts`. Any other hit that offers items to the model or accepts them from it gets the same change; list it. `summarizeQueue` and the production table's available-types cell already list unit types plus `fortification` only, so they need no change.
@@ -652,6 +657,7 @@ export function withMercenaryEconomy(ops: GuardedDbOps, state: GameStateSnapshot
   - For a rehire, it reads `unit_type, birth_h3_index` of `order.neutralUnitId` and returns `mercenaryHireFee('rehire', mercenaryUpkeepForUnit(...))`. A missing unit gives 0, logged.
 - **`readMercenaryFunds`** sums the seat's mercenary upkeep from `listMercenaryUnitsForSeat`, sums `hireOrderFee` over `listHireOrdersForSeat`, and reads the treasury.
 - **`withMercenaryEconomy`** returns `state` unchanged when `!ops.hasDb()`. Otherwise it returns `{ ...state, mercenaryEconomy: readMercenaryFunds(ops, seatId) }`.
+- `GameStateSnapshot` (`gameStateTypes.ts`) gains `mercenaryEconomy?: MercenaryEconomySnapshot`, imported with `import type` from `./mercenaryTypes`.
 
 In the facade `getGameStateForPlayer` (`src/main/gameDb.ts`), apply `withMercenaryEconomy(gameDbOps, base, playerId)` after the human melee-candidate merge and before the tactical-session merge. The observe-all snapshot (`omniscientSnapshot`) gets no economy.
 
@@ -679,6 +685,7 @@ In the facade `getGameStateForPlayer` (`src/main/gameDb.ts`), apply `withMercena
   - Hide the host when `stats.credits` is null, and in the null-state branch.
   - Toggle `is-short` on the host from `short`.
   - Set the host's `data-control-tooltip` to `formatCreditsTooltip(stats.credits)`.
+- **Forces tip.** Forces now leaves mercenaries out, because Phase 1 removed them from the cap counts. Add `forcesStatTooltipLead` to `frameTooltipText.ts` (camelCase, like the file's other tooltip constants). `forcesStatTooltipText` uses it (``${forcesStatTooltipLead}: ${breakdown}.``), and its comment's Expected outcome example is updated. The static `data-control-tooltip` on `#topbar-stat-forces-host` in `static/index.html` gets the same sentence with a final period.
 - **CSS.** In `static/frameChrome.css`, after `.topbar-stat-suffix`, add `.topbar-stat.is-short .topbar-stat-value { color: var(--chrome-error); }`.
 - **Refresh.** `refreshGameStateAfterBuildQueueChange` (`stateSnapshot.ts`) sets `updateGameStateSidebarUi: true`, so a queue edit or a hire order refreshes the top bar. Update its comment.
 
@@ -686,10 +693,12 @@ In the facade `getGameStateForPlayer` (`src/main/gameDb.ts`), apply `withMercena
 
 - [`src/main/gameActions/creditsProduction.test.ts`](../src/main/gameActions/creditsProduction.test.ts): `creditsSpendStep` builds `min(remaining, affordable)` and returns 0 for a zero cost.
 - [`src/main/creditsProductionFlow.test.ts`](../src/main/creditsProductionFlow.test.ts), on a temp match, on a human home city hex, with the queue set by `replaceBuildQueueForHex` and points by `setBuildProgressPointsForHex`. First run `DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'`, as `gameActionsProduction.test.ts` does, so the infantry cap cannot block:
-  - `credits ×2` with `2 × creditsItemCost()` stored points empties the queue and adds `2 × creditsItemCost()` to the treasury and to `creditsAddedByPlayer`;
+  - `credits ×2` with `2 × creditsItemCost()` stored points empties the queue and adds `2 × CREDITS_PER_ITEM` to the treasury and to `creditsAddedByPlayer`;
   - `credits ×1` then `infantry ×1`, with points for both, does both;
-  - `getGameStateForPlayer(HUMAN_SEAT_ID).mercenaryEconomy?.credits` equals the treasury.
-- `src/main/productionRules.test.ts`: replace the existing assertion that `(1, 0, 0, 1)` ends with `'fortification'` with one that it ends with `'fortification', 'credits'`. Add: `(1, 0, 0, 0)` ends with `'credits'`; `(0, 0, 0, 0)` is empty.
+  - `getGameStateForPlayer(HUMAN_SEAT_ID).mercenaryEconomy?.credits` equals the treasury;
+  - inside `withGameMap` with a copy of `GLOBAL_GAME_MAP` whose `rules.infantryCost` is 60, `credits ×1` with 60 stored points adds `CREDITS_PER_ITEM` (20) to the treasury, not 60.
+- New [`src/shared/creditsRules.test.ts`](../src/shared/creditsRules.test.ts): inside `withGameMap` with a copy of `GLOBAL_GAME_MAP` whose `rules.infantryCost` is 60 (the pattern of `h3Resolutions.test.ts`), `buildQueueItemCostFor('credits')` is 60.
+- `src/main/productionRules.test.ts`: replace the existing assertion that `(1, 0, 0, 1)` ends with `'fortification'` with one that it ends with `'fortification', 'credits'`. Add: `(1, 0, 0, 0)` ends with `'credits'`. Keep the existing check that `(0, 0, 0, 0)` is empty.
 - `src/shared/consolidatedTurnUpdateToast.test.ts`: `humanCreditsAdded: 20` gives `20 credits added to the treasury.`
 - `src/shared/topBarStats.test.ts`: credits 5, upkeep 3, fees 4 is short; without an economy `credits` is null. Where an existing test compares a whole `TopBarStats` or `TopBarStatParts` object, add `credits: null` or the two empty parts to its expectation.
 
@@ -728,7 +737,7 @@ export function withBuildPausedFlags(state: GameStateSnapshot, viewerSeatId: str
 
   Marking only the viewer's own rows keeps fog intact: a flag on another side's hex would tell the viewer whether that side has units there. The viewer's own units are always in its snapshot, so its own flags are exact.
 
-Add `BUILD_PAUSED_NOTE`, `formatBuildPausedLine`, and `BUILD_PAUSED_UNNAMED_PLACE` to this file.
+Add `BUILD_PAUSED_NOTE` and `formatBuildPausedLine` to this file.
 
 **Main rule.** Create [`src/main/gameActions/productionBuildability.ts`](../src/main/gameActions/productionBuildability.ts):
 
@@ -780,7 +789,7 @@ export function isHexBuildableNow(seatId: SeatId, h3Index: string, fortifiedCoun
   ```ts
   export async function productionPauseUpdateLinesFor(readySlice: ReadyResult): Promise<string[]>
   ```
-  It looks up names as `fortificationUpdateLinesFor` does, falls back to `BUILD_PAUSED_UNNAMED_PLACE`, and returns one `formatBuildPausedLine(names)` line when any hex paused.
+  It returns one `formatBuildPausedLine(names)` line when any hex paused. Do not copy the name lookup: extract the caption loop of `fortificationUpdateLinesFor` (`fortificationUpdateLines.ts`) into an exported `placeNamesForHexes(hexes: readonly string[]): Promise<string[]>` in that file, which falls back to `FORTIFICATION_UNNAMED_PLACE` as it does today. Call it from `fortificationUpdateLinesFor` and from `productionPauseUpdateLinesFor`; leave `fortificationReportLinesFor` as it is. In the helper, log `'place name lookup failed'`, and widen the module's header comment to cover the other Updates lines it now serves.
 - **Toast argument.** `ConsolidatedTurnUpdateToastArgs` gains `productionPauseLines?: readonly string[]`. They are trimmed, blank ones dropped, and appended right after `fortificationLines`. `announceResolutionTurnUpdate` awaits the new function and passes them.
 
 **Existing tests.** A production test that queues on a seat-controlled hex outside that seat's home region, with none of its units there, now sees a pause.
@@ -829,7 +838,7 @@ export function transferNeutralUnitToSeat(unitId: string, seatId: SeatId): void
 
 None of them opens a transaction. Callers wrap them, as `applyKnockout` already does.
 
-Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into this file, and re-export it there with `export type { KnockoutCoordinates } from './unitOwnershipTransfer';`, so every existing importer keeps working and the two files do not import each other.
+Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into this file, and re-export it there with `export type { KnockoutCoordinates } from './unitOwnershipTransfer';`, so every existing importer keeps working and the two files do not import each other. `knockoutConsequences.ts` also needs `import type { KnockoutCoordinates } from './unitOwnershipTransfer';`, because a re-export does not bring the name into scope for `applyKnockout`'s own signature.
 
 - **`listCargoUnitIdsForShip`** returns `SELECT land_unit_id … FROM unit_transport_assignments WHERE naval_unit_id = ?`, ordered.
 - **`convertUnitsToNeutral`** returns 0 for an empty list. Otherwise:
@@ -859,11 +868,12 @@ Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into thi
 **Owners of stale intel.**
 
 - `refreshFogOfWarIntelForPlayer` (`fogState.ts`) writes `enemy_player` from the enemy unit's `player`, in both the insert and the update of `player_unit_intel`.
-- `getGameStateForPlayer` reads it into `enemyIntel[].player`. The fog-off branch sets `player: u.player`.
+- `GameStateSnapshot.enemyIntel[]` (`gameStateTypes.ts`) gains `player?: string`. `getGameStateForPlayer` reads the column into it. The fog-off branch sets `player: u.player`.
 - In the renderer:
-  - the `clientStaleEnemyIntelByUnitId` entry type (`core/state.ts`) gains `player?: string`;
+  - the `clientStaleEnemyIntelByUnitId` entry type (`core/state.ts`) gains `player?: string; // owner when known; the id prefix can be stale`, on one line, which is all that file's budget allows;
   - `updateClientStaleEnemyIntel` (`stateSnapshot.ts`) sets it from `enemy.player`;
-  - `drawStaleEnemyIntel` (`unitDrawing.ts`) carries `player` through both intel lists, and takes each row's owner as `row.player ?? unitIdOwnerFromId(row.unitId)`.
+  - `drawStaleEnemyIntel` (`unitDrawing.ts`) carries `player` through both intel lists, and takes each row's owner as `row.player ?? unitIdOwnerFromId(row.unitId)`;
+  - both `drawStaleEnemyIntel` and `updateClientStaleEnemyIntel` skip, and delete from the client map, any id that is now in `state.units` with `player === viewer`. Otherwise a unit the viewer just rehired could leave a faded ghost of itself where it was last seen as Neutral.
 
   A unit that changed owners is then drawn in its owner's color, not its id's.
 
@@ -934,7 +944,8 @@ export function listHireEntryHexes(context: HireContext): string[]
   - **Rehire candidates** are the hex's units with `player` Neutral that pass all of these:
     - `isHireableUnitType(unitType)`;
     - no `embarkedOnNavalUnitId`;
-    - no cargo.
+    - no cargo;
+    - the hex does not hold another owner's fortification (`fortifiedCount > 0` with a controller other than the seat), as for raising.
 
     Upkeep uses the unit's `techLevel`, and the fee is `mercenaryHireFee('rehire', upkeep)`. `displayName` comes from `buildStrategicUnitDisplayLabelResolver(state.units)`, built once in the context. Units the seat cannot see are not in its snapshot, so they are never candidates.
 - **`listHireEntryHexes`** returns, sorted, every hex of `state.exploredHexes` (every hex of `state.hexes` when that is absent) whose `blockedReason` is null and that has at least one raise option or candidate.
@@ -1103,15 +1114,15 @@ export function resolveMercenariesAtEndOfTurn(args: {
   - raising is allowed in a knocked-out seat's former home, and on the seat's own hex with its own units;
   - an unexplored hex is blocked;
   - capacity drops an option whose cost exceeds twice the production;
-  - a Neutral missile, a unit aboard a ship, and a loaded ship are not candidates.
+  - a Neutral missile, a unit aboard a ship, a loaded ship, and a Neutral unit in a Neutral-fortified hex are not candidates.
 - [`src/main/mercenaryTurnFlow.test.ts`](../src/main/mercenaryTurnFlow.test.ts), on a temp match.
   - **Setup.** Give seats credits with `setTreasuryCredits`. Store orders with `insertHireOrder`, so the step's own checks are what is tested. Make a Neutral unit by creating an AI-seat unit with `createStrategicUnit` and converting it with `convertUnitsToNeutral` inside `BEGIN`/`COMMIT`. Call `resolveMercenariesAtEndOfTurn` directly, with coordinates from `buildLatLngCoordinateMap(getOrderedHexList())`, as the knockout tests do.
-  - **Raise.** A raise order on an empty explored city hex creates human mercenaries there, with birth hex and formed turn set. It charges their fee, and deletes the order.
+  - **Raise.** A raise order on an empty explored city hex that can raise infantry (`urban_hex_count × MERCENARY_RAISE_CAPACITY_MULTIPLIER >= unitCostFor('infantry')`, so 10 or more city cells on the global map) creates human mercenaries there, with birth hex and formed turn set. It charges their fee, and deletes the order.
   - **Rehire.** A rehire of a Neutral unit makes it a human mercenary and charges twice its upkeep.
   - **Two seats, one unit.** Rehire orders by the human and an AI seat for the same Neutral unit: exactly one seat owns it afterwards, and the other seat's treasury is unchanged.
   - **Desertion.** Mercenaries whose upkeep exceeds the treasury desert until the rest fits. Deserters are Neutral, not mercenaries, and have a Neutral `defend` order.
   - **No change.** With no mercenary and no order, the treasury and every unit are unchanged.
-  - **Actions.** `executePlaceHireOrder` accepts a raise on an empty explored hex, rejects a raise on a hex with a visible AI unit, and rejects any order outside planning. `readHexHireView` lists the accepted order with its fee.
+  - **Actions.** `executePlaceHireOrder` accepts a raise on an empty explored city hex with 10 or more city cells, chosen as in the Raise bullet, rejects a raise on a hex with a visible AI unit, and rejects any order outside planning. `readHexHireView` lists the accepted order with its fee.
 - `src/shared/consolidatedTurnUpdateToast.test.ts`: the three new lines in order.
 
 **Verify:**
@@ -1166,7 +1177,7 @@ Otherwise it returns those hexes. Observing, or viewing as an AI seat, shows no 
 
   Keep `if (!explored) continue;` and the `isStrategicHexHumanUrbanProduction(S.gameState, hx)` call as written; two tests read them.
 - **Only markers in view.** With fog off, or late in a match, the hire set can hold hundreds of hexes, and this layer rebuilds its HTML on every pan frame. Skip a hire row whose center lies more than `HIRE_ENTRY_VIEW_MARGIN_PX` (40, a constant in new `src/renderer/gameplay/hireEntryMarkers.ts`) outside the map's size. Read the size with Leaflet's `map.getSize()`, adding `getSize: () => { x: number; y: number }` to the local cast type. The same module exports `isPointInMapView(point, size, margin)` for that test. Build rows are not culled.
-- **Hire rows.** The label is `HIRE_ENTRY_LABEL`, `hasCapacity` is false, and `selected` is false.
+- **Hire rows.** The label is `formatHireEntryLabel(capacityText)`, where `capacityText` is ``$${capacityPerTurn.toLocaleString()}``, the hex's production figure without the queue suffix the canvas label adds. The marker hides that canvas label, so it must carry the figure. `hasCapacity` is false, and `selected` is false.
 - **Markup.** A hire button gets the extra class `hire-entry-btn`, `data-control-tooltip` set to `hireEntryTooltipText`, and the aria label `formatHireEntryAriaLabel(h3)`. The kind joins the layer key.
 - **Canvas labels.** In `drawStrategicProductionOverlays`, compute the hire set once, and skip the canvas label also when `explored && hireSet.has(hx.h3Index) && shouldShowBuildEntryZoom()`. Otherwise it would sit under the marker.
 
@@ -1177,7 +1188,7 @@ Otherwise it returns those hexes. Observing, or viewing as an AI seat, shows no 
   export function isHumanBuildEntryHexIndex(state: GameStateSnapshot | null, h3Index: string): boolean
   ```
   It finds the hex in `state.hexes` and returns `isStrategicHexHumanUrbanProduction(state, hex)`, or false when the state or the hex is missing. Do not change `isStrategicHexHumanUrbanProduction`.
-- **Shift.** In `processBuildEntryClick` (`buildQueuePopup.ts`), honor Shift only when the clicked hex and every already selected hex pass `isHumanBuildEntryHexIndex`. Bind `const multiSelect = shiftKey && …` and use it in place of `shiftKey` below that line. A Hire marker never joins a multi-hex selection, and Shift on a build marker while a Hire popup is open acts as a plain click.
+- **Shift.** In `processBuildEntryClick` (`buildQueuePopup.ts`), honor Shift only when the clicked hex and every already selected hex pass `isHumanBuildEntryHexIndex`. Bind `const multiSelect = shiftKey && …` after the existing playback and hover-planning returns, and use it in place of `shiftKey` below that line. `mapGestureWiring.test.ts` requires the playback return to stay the function's first statement, and must pass unchanged. A Hire marker never joins a multi-hex selection, and Shift on a build marker while a Hire popup is open acts as a plain click.
 - **Add button.** The Add button's success handler re-renders into `mount`, not into `document.getElementById('build-popup-body')`. They are the same element today; in a tabbed popup the mount is the Build panel.
 - **Wrapper.** Create [`src/renderer/gameplay/buildHirePopup.ts`](../src/renderer/gameplay/buildHirePopup.ts):
   ```ts
@@ -1269,7 +1280,7 @@ It draws `MERCENARY_BADGE_TEXT` centered at `(x, y + UNIT_RADIUS * MERCENARY_BAD
 
 - [`src/shared/hireEntryHexes.test.ts`](../src/shared/hireEntryHexes.test.ts): the human perspective returns the hexes, and an AI perspective or a knocked-out human seat returns none.
 - `src/shared/unitOriginTooltipText.test.ts` (or its existing test file): a mercenary identity adds the Mercenary line.
-- The source-pinning tests (`rendererProductionAirConsolidation.test.ts`, `buildQueuePopupSourceContracts.test.ts`) pass unchanged.
+- The source-pinning tests (`rendererProductionAirConsolidation.test.ts`, `buildQueuePopupSourceContracts.test.ts`, `mapGestureWiring.test.ts`) pass unchanged.
 
 **Verify:**
 
@@ -1277,14 +1288,14 @@ It draws `MERCENARY_BADGE_TEXT` centered at `(x, y + UNIT_RADIUS * MERCENARY_BAD
 2. `npm run check:circular`.
 3. `npm run build:renderer`.
 4. `npm start`, in a global match:
-   1. Bank 40 credits, then zoom in near your border. Explored Neutral city hexes show Hire markers.
+   1. Queue two Credits items and end turns until you hold 40 credits, then zoom in near your border. Explored Neutral city hexes with 10 or more city cells show Hire markers, labeled with their production and `Hire`.
    2. Click one. The Hire popup shows credits, upkeep, and the raise options. Raise one infantry. The top bar's tip shows the hire fee.
    3. End the turn. A token with `$` appears there, and, if the turn has playback, Updates says `1 mercenary hired.`
    4. Hover the token. Its tip shows the Mercenary line.
-   5. On one of your build hexes, the popup has Build and Hire tabs.
-   6. Stop queuing credits, and raise mercenaries until their upkeep exceeds your credits. Keep one of your other units in sight of them. End turns until one deserts. Updates says so, and that token turns Neutral.
-   7. Open the deserter's hex: its Hire marker, or the Hire tab if you still control a city there. The deserter is listed under Neutral units. Rehire it, end the turn, and confirm it is yours again with a `$`.
-   8. Start a new match with fog of war off (if the new-game options offer it), bank credits, and pan across the map at build zoom. Hire markers appear only near the view, and panning stays smooth.
+   5. On one of your build hexes with 10 or more city cells, the popup has Build and Hire tabs.
+   6. Stop queuing credits. Raise mercenaries one per hex, on separate hexes, until their upkeep exceeds your credits. Keep one of your other units in sight of them. End turns until one deserts. That token turns Neutral, and, if the turn has playback, Updates says so. A deserter that shares a hex with your units fights them at the next resolution; that is intended.
+   7. Pick a deserter that is alone in its hex, and open that hex: its Hire marker, or the Hire tab if you still control a city there. The deserter is listed under Neutral units. Rehire it, end the turn, and confirm it is yours again with a `$`.
+   8. Start a new match with fog of war off (if the new-game options offer it), queue credits until you hold some, and pan across the map at build zoom. Hire markers appear only near the view, and panning stays smooth.
 
 No `doc/` edits.
 
@@ -1305,6 +1316,7 @@ No `doc/` edits.
 export function buildCreditsProductionRulePart(): string
 export function buildBuildabilityRule(): string
 export function buildMercenaryRule(): string
+export function buildMercenaryUpkeepRule(): string
 export function formatMercenaryFundsLine(funds: MercenaryFunds): string
 export const MERCENARY_FUNDS_WARNING: string
 export const NO_REHIRE_CANDIDATES_LINE: string
@@ -1314,18 +1326,20 @@ export const BUILD_STATUS_COLUMN_HEADER = 'Building';
 export const MERCENARY_BRIEFING_MAX_ROWS = 10;
 ```
 
-- **`buildCreditsProductionRulePart()`:** ``credits cost ${creditsItemCost()} per item and add ${creditsItemCost()} credits to your treasury (queue unitType "credits")``
+- **`buildCreditsProductionRulePart()`:** ``a credits item costs ${creditsItemCost()} production points and adds ${CREDITS_PER_ITEM} credits to your treasury (queue unitType "credits")``
 - **`buildBuildabilityRule()`:** `You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn. Elsewhere a queue pauses and keeps banking its points.`
-- **`buildMercenaryRule()`:** ``Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see. Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. After that each mercenary costs its upkeep every turn: its unit cost, doubled for Advanced tech when tech bonuses are on, divided by ${MERCENARY_UPKEEP_DIVISOR}, rounded up. Credits banked this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. Mercenaries do not count toward unit caps.``
+- **`buildMercenaryRule()`:** ``Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see. Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. After that each mercenary costs its upkeep every turn: ${upkeepList} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.``
+  `upkeepList` is built over `HIREABLE_UNIT_TYPES` from `mercenaryUpkeepFor(type, undefined)` and `mercenaryUpkeepFor(type, 'advanced')`, as `infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)`. The tech multiplier is applied before rounding up, so Advanced is not simply double.
+- **`buildMercenaryUpkeepRule()`:** the upkeep-only rule for a seat whose production tools are off: ``Your mercenaries cost upkeep every turn: ${upkeepList} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A deserter that shares a cell with your units fights them at the next resolution.``
 - **`formatMercenaryFundsLine(funds)`:** ``Treasury: ${credits} credits. Mercenary upkeep: ${upkeepPerTurn} credits per turn for ${mercenaryCount} ${word}. Hire orders this turn: ${pendingHireFees} credits.`` `word` is `mercenary` for 1, otherwise `mercenaries`.
-- **`MERCENARY_FUNDS_WARNING`:** `Warning: your treasury does not cover upkeep plus this turn's hire orders. Unless credits banked this turn cover the gap, random mercenaries desert and unpaid hire orders are not filled.`
+- **`MERCENARY_FUNDS_WARNING`:** `Warning: your treasury does not cover upkeep plus this turn's hire orders. Credits produced this turn arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.`
 - **`NO_REHIRE_CANDIDATES_LINE`:** `No Neutral unit you can see can be rehired.`
 - **`NO_RAISE_OPTIONS_LINE`:** `No explored cell can raise mercenaries for you now.`
-- **`MERCENARY_ID_PREFIX_NOTE`:** `A rehired unit keeps the id prefix of the side that first raised it. Who owns a unit comes from your roster and the enemy lists, not from its prefix.`
+- **`MERCENARY_ID_PREFIX_NOTE`:** `A rehired unit keeps the id prefix of the side that first created it. Who owns a unit comes from your roster and the enemy lists, not from its prefix.`
 
 **Wire it in.**
 
-- **Cost line.** `buildProductionCostRulesLine` appends `buildCreditsProductionRulePart()` after the fortification part.
+- **Cost line.** `buildProductionCostRulesLine` returns ``Rules: ${parts.join(', ')}. ${buildFortificationProductionRulePart()}. ${buildCreditsProductionRulePart()}.``
 - **Production block.** `buildProductionBriefingBlock` (`briefingSections.ts`) pushes `buildBuildabilityRule()` right after `buildProductionIncomeRule()`.
 - **Production table:**
   - it gains a last column, `BUILD_STATUS_COLUMN_HEADER`, valued `paused` when the row's `buildPaused` is true and `yes` otherwise;
@@ -1344,7 +1358,7 @@ export function buildMercenariesBriefingBlock(
 ): string
 ```
 
-It returns `''` in tactical mode, when `state.mercenaryEconomy` is absent, or when production is off and the seat has no mercenary. Without production it builds only items 1–3: a seat whose production tools are off still pays upkeep, so it still gets the warning. Otherwise it builds all five, with the heading made the way `buildMissileForcesBriefingBlock` makes its own:
+It returns `''` in tactical mode, when `state.mercenaryEconomy` is absent, or when production is off and the seat has no mercenary. Without production it builds only items 1–3, with `buildMercenaryUpkeepRule()` in place of item 1: a seat whose production tools are off still pays upkeep, so it still gets the warning, but it cannot hire, so it is not taught how. Otherwise it builds all five, with the heading made the way `buildMissileForcesBriefingBlock` makes its own:
 
 1. `buildMercenaryRule()`.
 2. `formatMercenaryFundsLine(economy)`, then `MERCENARY_FUNDS_WARNING` when `credits < upkeepPerTurn + pendingHireFees`.
@@ -1355,7 +1369,7 @@ It returns `''` in tactical mode, when `state.mercenaryEconomy` is absent, or wh
    - With none, write `NO_REHIRE_CANDIDATES_LINE`.
 5. **Raise options**: evaluate each hex of `listHireEntryHexes(context)` and keep those with raise options.
    - Sort the same way, by the hex's distance, then by hex.
-   - Keep `MERCENARY_BRIEFING_MAX_ROWS`, in a `Hex | Capacity | Options` table. Capacity is what is left after the seat's raise orders on that hex, as `readHexHireView` computes it, and options that no longer fit are left out. Options read like `infantry (fee 3, upkeep 3); armor (fee 5, upkeep 5)`.
+   - Keep `MERCENARY_BRIEFING_MAX_ROWS`, in a `Hex | Capacity | Options` table. Capacity is what is left after the seat's raise orders on that hex: subtract `unitCostFor(type) × count` over its `listHireOrdersForSeat` raise rows there. Do not call `readHexHireView` here; each call rebuilds the whole snapshot. Options that no longer fit are left out. Options read like `infantry (fee 3, upkeep 3); armor (fee 5, upkeep 5)`.
    - With none, write `NO_RAISE_OPTIONS_LINE`.
 
 In `openRouterBuildSystemPrompt.ts`:
@@ -1367,7 +1381,7 @@ In `openRouterBuildSystemPrompt.ts`:
 
 **Tests.**
 
-- [`src/main/openRouter/promptSpec/gameRuleMercenaryText.test.ts`](../src/main/openRouter/promptSpec/gameRuleMercenaryText.test.ts): the credits part contains `credits cost 20 per item` on the global map.
+- [`src/main/openRouter/promptSpec/gameRuleMercenaryText.test.ts`](../src/main/openRouter/promptSpec/gameRuleMercenaryText.test.ts): the credits part contains `costs 20 production points and adds 20 credits` on the global map, and the mercenary rule contains `infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)`.
 - [`src/main/openRouter/briefingSectionsMercenaries.test.ts`](../src/main/openRouter/briefingSectionsMercenaries.test.ts), on a temp match. Give an AI seat credits and one mercenary, and read its view with `getGameStateForPlayer`.
   - The block has the heading, the funds line, and the mercenary's row.
   - In tactical mode it is empty.
@@ -1448,9 +1462,9 @@ export function executeMercenaryTools(
   Bad rows are dropped with a reason, as today.
 - **Schema** (`envelopeJsonSchema.ts`):
   - `PRODUCTION_ORDER_ACTIONS` lists all three;
-  - the `productionOrders` row becomes `{ anyOf: [...] }` of three closed rows, one per action, each with its `action` as a one-value enum and all of its fields required.
+  - the `productionOrders` row becomes `{ anyOf: [...] }` of three closed rows, built by mapping `PRODUCTION_ORDER_ACTIONS`: each row has its own `action` as a one-value enum and all of its fields required. Mapping the constant keeps it in use, so lint passes.
 
-  In the test that reads the `productionOrders` `unitType` enum, find the `set_build_queue` row inside `anyOf`.
+  The existing test that checks the `productionOrders` enum for `fortification` reads the node as text, and should pass unchanged.
 - **Apply.** Move `processProductionOrdersArray` from `orderResponseParsing.ts` into new [`src/main/openRouter/productionOrdersApply.ts`](../src/main/openRouter/productionOrdersApply.ts), as `applyProductionOrdersFromEnvelope`. It takes the same five arguments plus a sixth, `executeProduction: typeof executeProductionTools`, typed with `import type { executeProductionTools } from '../tools/productionTools'`. `orderResponseParsing.ts` keeps its `executeProductionTools` import and passes it in. `productionOrdersApply.ts` must not import `productionTools.ts` at runtime, for the same cycle reason.
   - `set_build_queue` works as today.
   - `raise_mercenaries` translates its hex code the same way and calls `executeMercenaryTools(seat, 'hire_mercenaries', { action: 'raise', hex, unitType, count }, …)`.
@@ -1466,10 +1480,10 @@ export function executeMercenaryTools(
 
 **Tests.**
 
-- `src/main/productionOrders.test.ts`: a raise row and a rehire row are accepted, and a raise row without `count` is dropped.
+- `src/main/productionOrders.test.ts`: a raise row and a rehire row are accepted, and a raise row without `count` is dropped. The existing fortification test reads `parsed.validOrders[0]?.unitType`, which no longer compiles against the union. Narrow it first: `const order = parsed.validOrders[0]; assert.ok(order?.action === 'set_build_queue'); assert.strictEqual(order.unitType, 'fortification');`.
 - `src/main/openRouter/promptSpec/envelopeJsonSchema.test.ts`: the `productionOrders` items are an `anyOf` with three rows.
 - [`src/main/tools/mercenaryTools.test.ts`](../src/main/tools/mercenaryTools.test.ts), on a temp match. Placement judges occupancy on what the AI seat sees, so set up its view first. For an AI seat:
-  - `hire_mercenaries` raise on one of its home city hexes with no units returns `ok` and stores an order;
+  - `hire_mercenaries` raise on one of its home city hexes with no units and 10 or more city cells returns `ok` and stores an order;
   - `cancel` removes it;
   - put an AI unit next to a hex holding a human unit, call `refreshFogOfWarIntelFromCurrentState()`, and a raise on the human unit's hex returns `error`;
   - `query_mercenaries` with a hex returns `status: 'ok'` and a `position`.
@@ -1499,54 +1513,61 @@ No `doc/` edits.
 - Keep this plan's phase names and numbers out of every document.
 - No document here is generated. Edit only what changed, and make quoted prompt text match the builders' output exactly.
 
+**Where each price comes from.** Every document that states a credit or mercenary price must say it this way, and must never write "build cost × tier ÷ 8" from a regional map's costs:
+
+- a Credits item costs `creditsItemCost()` production points, the active map's infantry price;
+- it adds `CREDITS_PER_ITEM` (20) credits on every map;
+- fees and upkeep come from the global prices (`mercenaryReferenceCost`), so they are the same numbers on every map: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15);
+- raise capacity is production points, twice the hex's city cells, measured against the active map's unit prices (`unitCostFor`).
+
 **Update in place:**
 
 - **[`doc/combat-rules-v3.md`](../doc/combat-rules-v3.md):**
   - §2: the credits item; where a side may build, and the pause.
-  - **A new subsection on credits and mercenaries**, placed after production: the treasury, raising and rehiring with every condition, capacity, fees, upkeep, desertion order and forgiveness, and the seeded order of hires.
+  - **A new `### 2.1 Credits and mercenaries`** at the end of §2: the treasury; the price sources above; raising and rehiring with every condition; capacity; fees; upkeep; the desertion order, the second pass, and forgiveness for riders; and the seeded order of hires.
   - §5, flow: production, then payroll and hires, then knockouts.
   - §6, edge cases:
     - two seats hiring the same unit;
     - a loaded mercenary ship deserting with its cargo;
     - mercenaries aboard a regular ship;
     - a raise that meets hidden units;
-    - a deserter sharing a hex with its former side's units contests that hex from the next turn.
+    - a deserter sharing a hex with its former side's units, and a unit rehired into a hex with other owners' units: the hex has two owners and fights in melee at the next resolution.
   - §14.1, knockout and Neutral: a knocked-out seat's treasury and orders are deleted, and its mercenaries become ordinary Neutral units.
   - The caps text: mercenaries do not count.
 - **[`doc/how-to-play.md`](../doc/how-to-play.md):**
-  - "Building units": where you can build.
-  - A new section on credits and mercenaries.
+  - "Building units": where you can build; the "Build markers" bullet gains Hire markers; "Several hexes" gains the rule that a Hire marker, or a build marker while a Hire popup is open, acts as a plain click with Shift; and the queue table gains a Credits row.
+  - A new section on credits and mercenaries, with the price sources above.
   - "How a turn resolves".
-  - "Things that may surprise you": paused queues, desertion, and unfilled orders. Its "Reading the turn report" bullet gains the new Updates lines.
+  - "Things that may surprise you": paused queues, desertion, unfilled orders, and a deserter or rehired unit fighting the units it shares a hex with. Its "Reading the turn report" bullet gains the new Updates lines.
   - "Where messages appear".
-- **[`doc/README.md`](../doc/README.md):** engine constants rows for `CREDITS_ITEM_INFANTRY_MULTIPLIER`, `MERCENARY_UPKEEP_DIVISOR`, `MERCENARY_ADVANCED_TECH_MULTIPLIER`, `MERCENARY_REHIRE_FEE_MULTIPLIER`, and `MERCENARY_RAISE_CAPACITY_MULTIPLIER`.
+- **[`doc/README.md`](../doc/README.md):** engine constants rows for `CREDITS_ITEM_INFANTRY_MULTIPLIER` (naming `creditsItemCost`), `CREDITS_PER_ITEM`, `MERCENARY_UPKEEP_DIVISOR` (naming `mercenaryReferenceCost`), `MERCENARY_ADVANCED_TECH_MULTIPLIER`, `MERCENARY_REHIRE_FEE_MULTIPLIER`, and `MERCENARY_RAISE_CAPACITY_MULTIPLIER`, in the shape of the existing `fortificationCostPerCell` row.
 - **[`doc/save-files.md`](../doc/save-files.md):** `EXPECTED_USER_VERSION` is 26, and the two new tables are saved with the match.
 - **[`README.md`](../README.md):** "How the Economy Works" and the opponent's tools, only where they are now wrong, and the test count in "Guardrails" if it is stated (run `npm test` and use its count).
 - **`doc/ux/`:**
   - `build-popup.md`: the Credits item; the paused note; the Build and Hire tabs; the Hire-only popup and every part of the Hire panel; the Hire marker; Code Entry Points.
   - `multi-hex-build-popup.md`: it stays build-only; Shift on a Hire marker, or on a build marker while a Hire popup is open, acts as a plain click.
   - `top-bar.md`: the Credits readout, its tip, its short state, and when it is hidden; and that Forces counts only units that count toward caps, so mercenaries appear in the Credits tip instead.
-  - `map-surface.md`: Hire markers; the `$` on mercenary tokens; `∞t` also when building is paused.
+  - `map-surface.md`: Hire markers; the production-label sentence becomes "…or the build or Hire marker, which carries that figure"; the `$` on mercenary tokens; `∞t` also when building is paused.
   - `minimap.md`: `∞t` also when building is paused, if it describes the label.
   - The document that describes the token tooltip (`stack-callout.md` or `hex-tooltips.md`): the Mercenary line.
-  - `control-tooltips.md`: the new tips, and Source Anchors.
-  - `notifications-and-feedback.md` and `reports-tab.md`: the new Updates lines.
+  - `control-tooltips.md`: the new tips, the changed Forces tip, and Source Anchors.
+  - `notifications-and-feedback.md` and `reports-tab.md`: the new Updates lines; in `notifications-and-feedback.md`, the Bonuses tooltip row also gains the Mercenary line.
   - `input-map.md` and `selection-model.md`: Hire markers and the multi-hex selection.
 - **[`doc/ux-specification.md`](../doc/ux-specification.md):** glossary entries for credits, treasury, mercenary, raise, rehire, upkeep, and desertion, and a routing row for the Hire panel if the build-popup row does not cover it.
 - **[`doc/ui-style-guide.md`](../doc/ui-style-guide.md):**
   - §2.2 Units and Symbols: the `$` badge;
   - §2.3 Top Bar: the Credits readout and its short color;
   - §2.9 Production / Build UI: the tabs, the Hire marker, and the warning color.
-- **[`doc/ai-tools.md`](../doc/ai-tools.md):** "Production": the credits item, the Building status, and the two hire tools.
+- **[`doc/ai-tools.md`](../doc/ai-tools.md):** "Production": the credits item, the Building status, and the two hire tools; and the "Groups shown to the model" table's production row gains both hire tools.
 - **`doc/ai-commander-prompts/`:**
   - `strategic-prompt.md` and `example-strategic-prompt.md`;
   - `source-inventory.md`, `information-decision-model.md`, `crosswalk.md`, `assembly-contract.md`, and `variants.md`.
 
-  Update them wherever they mirror a builder this plan changed: the cost line, the buildability rule, the production table, the Mercenaries section, the sides note, the `productionOrders` actions and schema, the submit clause, and the tool catalog.
-- **`doc/region-summary-1.md`:** the cost-scale line, if it lists build costs.
+  Update them wherever they mirror a builder this plan changed: the cost line, the buildability rule, the production table, the Mercenaries section (and its upkeep-only form without production), the sides note, the `productionOrders` actions and schema, the submit clause, and the tool catalog. In `variants.md`, the production-off row now says all four production and hire tools are absent, and the Mercenaries section stays, in its upkeep-only form, when the seat has mercenaries.
+- **`doc/region-summary-1.md`:** Table 2's note: a Credits item costs that row's infantry price and yields 20 credits on every map, so mercenary fees and upkeep are the same on every map; raise capacity uses the row's prices.
 - **`doc/region-vs-region.md`:** the end-of-turn order, and the statement that a side can still build after losing ground.
 - **`doc/game-size-unit-caps.md`:** mercenaries do not count toward caps.
-- **`doc/hybrid-ai.md`:** the tools table gains the two hire tools.
+- **`doc/hybrid-ai.md`:** the tools table gains the two hire tools, and the sentence that production "also exposes `set_build_queue` as a tool" also names `hire_mercenaries`, which writes too.
 - **`doc/ux/order-lifecycle.md`:** hire orders as an order kind: placed in planning, removable until Ready, filled or dropped at the end of the turn.
 
 **Search** `doc/` and `README.md` for `build queue`, `Keep building`, `unitType`, `availableUnitTypes`, `cap`, `Neutral`, `knock`, `top bar`, `Updates`, `productionOrders`, `set_build_queue`, `user_version`, `EXPECTED_USER_VERSION`, and `∞t`. Fix every maintained document that is now wrong. Also check [`doc/project-instructions.md`](../doc/project-instructions.md) and [`doc/coding-prompts-1.md`](../doc/coding-prompts-1.md) for any fact this work made wrong, and change only that fact.
@@ -1570,11 +1591,12 @@ No `doc/` edits.
 - **Hidden units.** A raise placed on an explored hex can meet units the seat cannot see. It is then not filled and costs nothing, by design.
 - **Home hexes not yet in intel.** A forced-visible home hex can lack an intel row. The step treats the seat's own home region as explored for that reason.
 - **Owner from id.** A rehired unit keeps an id from another side. If a hired unit is drawn, counted, or reported as another side's, look for `unitIdOwnerFromId` first.
-- **Multi-hex selection.** A Hire marker must never join `S.selectedBuildHexH3s`. If the multi-hex popup shows a hire hex, the Shift check in `processBuildEntryClick` was missed.
-- **Tabs on most build hexes.** A side may raise mercenaries on its own hexes, so nearly every human city hex with enough production shows the Build and Hire tabs, not only capped ones. This follows the rules as written; confirm it with the human at the Phase 6 check.
-- **Marker clutter.** Hire markers appear on every eligible explored hex at build zoom. If that proves too busy, a follow-up can show them only when the treasury is above 0.
+- **Multi-hex selection.** A Hire hex may be selected alone by a plain click, but must never be part of a selection of two or more. If the multi-hex popup shows a hire hex, the Shift check in `processBuildEntryClick` was missed.
+- **Tabs on most build hexes.** A side may raise mercenaries on its own hexes, so nearly every human city hex with 10 or more city cells shows the Build and Hire tabs, not only capped ones. The human chose this.
+- **Marker clutter.** Hire markers appear on every eligible explored hex at build zoom, even with an empty treasury; the human chose this. Only markers near the view are built, so panning stays smooth. If the map still reads as too busy, report it rather than hiding markers.
 - **Quiet turns.** The Updates toast shows only on turns with playback, so a desertion on a quiet turn shows only on the map and in the top bar. This is the existing gate, left alone.
 - **AI view of credits.** Until Phase 7, the AI must not be offered `credits`. If an AI queues credits before then, a site missed the Phase 2 filter.
 - **Hiring before a battle.** On a melee-intercept Fight, the end-of-turn step runs before the battle starts, as knockout already does. Mercenaries in that hex can desert, or Neutral units there be rehired, just before the battle. This is accepted.
-- **Air mercenaries.** A raised air unit sits on an airport hex its owner may not control yet. Control resolution, which runs before `destroyAirUnitsWithInvalidBase`, gives a hex to its only occupant of any type, so the unit keeps its base. If air mercenaries vanish the turn after they are raised, check that order first.
+- **Air mercenaries.** A raised air unit sits on an airport hex its owner may not control yet. Control resolution, which runs before `destroyAirUnitsWithInvalidBase`, gives a hex to its only occupant of any type, so the unit keeps its base. If air mercenaries vanish the turn after they are raised, check that order first. Rehiring is refused in a hex another owner has fortified for the same reason: its control could not change, and a rehired air unit would lose its base.
+- **Split stacks.** A deserter, or a unit rehired into a hex with other owners' units, leaves that hex with two owners, and it fights at the next resolution. That is intended. A tester may report it as a bug; point them at the Locked decisions.
 - **Old saves.** The version bump makes every earlier save unloadable. That is accepted. Do not add a migration.

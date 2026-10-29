@@ -15,13 +15,13 @@ export const gameSizeSelectTooltipText =
   'Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.';
 
 /**
- * Purpose: Names Off, Low, and High and what Low and High add.
+ * Purpose: Names Off, Default, and High and what Default and High add.
  * When to use: `#new-game-origin-bonus-select`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const originBonusSelectTooltipText =
-  'Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.';
+  'Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.';
 
 /**
  * Purpose: Names who gains attack and defense, and that Basic units gain nothing.
@@ -30,7 +30,7 @@ export const originBonusSelectTooltipText =
  * Exceptions: None.
  */
 export const techBonusSelectTooltipText =
-  'Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.';
+  'Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.';
 
 /**
  * Purpose: Says the bonus is for battles and does not stack with the origin bonus.
@@ -39,7 +39,7 @@ export const techBonusSelectTooltipText =
  * Exceptions: None.
  */
 export const terrainBonusSelectTooltipText =
-  'In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.';
+  'In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.';
 
 /**
  * Purpose: Says Off ignores weather and that High is the harsher penalty.
@@ -48,7 +48,7 @@ export const terrainBonusSelectTooltipText =
  * Exceptions: None.
  */
 export const weatherBonusSelectTooltipText =
-  'Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.';
+  'Choose Off to ignore weather. Default and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.';
 
 /**
  * Purpose: Says what checked and unchecked do for the next match.

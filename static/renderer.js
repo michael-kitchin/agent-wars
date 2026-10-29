@@ -96,6 +96,7 @@
   var RANGE_SUPPORT_CONNECTOR_LINE_CAP = "round";
   var RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
   var RANGE_PERIMETER_ALPHA = 0.75;
+  var MOVEMENT_HOVER_VALID_ALPHA = 0.55;
   var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
   var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
   var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
@@ -24302,23 +24303,25 @@ ${bonuses}`;
       return edge;
     });
   }
-  function litFortificationEdgeCount(args) {
-    if (args.fortified <= 0 || args.edgeCount <= 0) return 0;
-    const share = Math.round(args.edgeCount * args.fortified / Math.max(args.intactCityCells, args.fortified));
-    return Math.min(args.edgeCount, Math.max(1, share));
+  function fortificationTicksPerEdge(args) {
+    if (!(args.fortified > 0)) return 0;
+    const intact = Math.max(args.intactCityCells, args.fortified);
+    const ticks = Math.ceil(FORTIFICATION_TICKS_PER_EDGE * args.fortified / intact);
+    return Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(1, ticks));
   }
   function fortificationTickSegments(args) {
+    const tickCount = Math.min(FORTIFICATION_TICKS_PER_EDGE, Math.max(0, Math.floor(args.ticksPerEdge)));
+    if (tickCount <= 0) return [];
     const edges = fortificationEdges(args.points, args.cornerCount);
     const corners = edges.map((edge) => edge[0]).filter((point) => point != null);
-    const lit = edges.slice(0, Math.max(0, args.litEdgeCount));
     if (corners.length === 0) return [];
     const center = meanPoint(corners);
     const segments = [];
-    for (const edge of lit) {
+    for (const edge of edges) {
       const length = polylineLength(edge);
       if (length <= 0) continue;
-      for (let tick = 1; tick <= FORTIFICATION_TICKS_PER_EDGE; tick += 1) {
-        const at = pointAlong(edge, length * tick / (FORTIFICATION_TICKS_PER_EDGE + 1));
+      for (let tick = 1; tick <= tickCount; tick += 1) {
+        const at = pointAlong(edge, length * tick / (tickCount + 1));
         if (!at) continue;
         const inward = inwardNormal(at.dx, at.dy, at.point, center);
         segments.push({
@@ -24536,10 +24539,9 @@ ${bonuses}`;
       drawScaledFortificationTicks(ctx, {
         points,
         cornerCount,
-        litEdgeCount: litFortificationEdgeCount({
+        ticksPerEdge: fortificationTicksPerEdge({
           fortified,
-          intactCityCells: fortified + (row?.fortifiableCount ?? 0),
-          edgeCount: cornerCount
+          intactCityCells: fortified + (row?.fortifiableCount ?? 0)
         }),
         color: fortificationTickColor(control.get(hex.h3Index) ?? null, ownershipVisible),
         lengthRatio: STRATEGIC_FORTIFICATION_TICK_LENGTH_RATIO,
@@ -24553,7 +24555,7 @@ ${bonuses}`;
     drawScaledFortificationTicks(ctx, {
       points,
       cornerCount,
-      litEdgeCount: cornerCount,
+      ticksPerEdge: FORTIFICATION_TICKS_PER_EDGE,
       color,
       lengthRatio: CELL_FORTIFICATION_TICK_LENGTH_RATIO,
       widthRatio: CELL_FORTIFICATION_TICK_WIDTH_RATIO,
@@ -24578,7 +24580,7 @@ ${bonuses}`;
     drawFortificationTicks(ctx, {
       points: args.points,
       cornerCount: args.cornerCount,
-      litEdgeCount: args.litEdgeCount,
+      ticksPerEdge: args.ticksPerEdge,
       color: args.color,
       tickLengthPx: radius * args.lengthRatio,
       lineWidthPx: Math.max(args.minWidthPx, radius * args.widthRatio)
@@ -24610,7 +24612,7 @@ ${bonuses}`;
       drawFortificationTicks(ctx, {
         points,
         cornerCount: 6,
-        litEdgeCount: 6,
+        ticksPerEdge: FORTIFICATION_TICKS_PER_EDGE,
         color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? SEAT_PALETTES[0].map,
         tickLengthPx: 2,
         lineWidthPx: 1
@@ -33074,6 +33076,7 @@ ${bonuses}`;
 
   // src/renderer/rendering/orderLineStroke.ts
   var ORDER_LINE_LATER_DASH = [6, 4];
+  var ATTACK_LINE_DOT_DASH = [2, 6];
   var ORDER_LINE_SOLID = [];
   function traceRun(ctx, points, continuous = false) {
     const wrapJumpPx = ctx.canvas.width * 0.5;
@@ -33335,22 +33338,29 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/orderDrawing.ts
-  function rangePerimeterStaticLineStyle(mode, kind = "connector") {
+  function planConnectorDash(mode, lineWidth2) {
+    if (mode === "ranged") return ORDER_LINE_SOLID;
+    if (mode === "missile") return ATTACK_LINE_DOT_DASH;
+    return buildRangeOverlayDashArray(lineWidth2, "connector", "airStrike");
+  }
+  function rangePerimeterStaticLineStyle(mode, kind = "connector", appearance = "plan") {
     const lineWidth2 = getCurrentRangeOverlayLineWidth(kind);
-    const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : mode === "missile" ? RANGE_PERIMETER_MISSILE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+    const planningColor = kind === "perimeter" || appearance === "plan";
+    const strokeColor = planningColor ? RANGE_PERIMETER_MISSILE_COLOR : mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : mode === "missile" ? RANGE_PERIMETER_MISSILE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+    const dash = kind === "perimeter" || appearance === "resolution" ? buildRangeOverlayDashArray(lineWidth2, kind, mode) : planConnectorDash(mode, lineWidth2);
     return {
       lineWidth: lineWidth2,
       strokeColor,
-      dash: buildRangeOverlayDashArray(lineWidth2, kind, mode),
+      dash,
       lineCap: getRangeOverlayLineCap(kind)
     };
   }
-  function strokeSupportOrderLines(ctx, mode, segments) {
+  function strokeSupportOrderLines(ctx, mode, segments, appearance = "plan") {
     if (segments.length === 0) return;
-    const style = rangePerimeterStaticLineStyle(mode);
+    const style = rangePerimeterStaticLineStyle(mode, "connector", appearance);
     const lineStyle = { color: style.strokeColor, width: style.lineWidth, cap: style.lineCap };
     ctx.save();
-    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.globalAlpha = appearance === "plan" ? MOVEMENT_HOVER_VALID_ALPHA : RANGE_PERIMETER_ALPHA;
     for (const segment of segments) {
       if (segment.fromH3Index === segment.toH3Index) continue;
       const from = hexCenterPx(segment.fromH3Index);
@@ -33389,7 +33399,8 @@ ${bonuses}`;
       strokeSupportOrderLines(
         ctx,
         mode,
-        group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index }))
+        group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index })),
+        "resolution"
       );
     }
   }
@@ -39283,7 +39294,7 @@ ${bonuses}`;
             }
           }
           ctx.save();
-          ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+          ctx.globalAlpha = preview.valid ? MOVEMENT_HOVER_VALID_ALPHA : 0.75;
           drawOrderLine(ctx, { runs, arrow }, { color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? "#115E59", width: ORDER_LINE_WIDTH });
           ctx.restore();
         }

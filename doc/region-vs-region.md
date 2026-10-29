@@ -18,9 +18,9 @@ In the Forces section the player picks:
 
 In the Rules section the player picks:
 
-- Origin bonus and Terrain bonus dropdowns (Off, Low, or High; both default to Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonus and terrain bonus")
-- Weather bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
-- Tech bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
+- Origin bonus and Terrain bonus dropdowns (Off, Default, or High; both start at Default; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonus and terrain bonus")
+- Weather bonus dropdown (Off, Default, or High; starts at Default; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
+- Tech bonus dropdown (Off, Default, or High; starts at Default; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
 - Fog of war (default on), on the line after the starting month, with Auto-start AI to its right. Auto-start AI is checked when the dialog opens. What it does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list. The engine does not store Auto-start AI.
 
 A global match stores one home-region name on each `seats` row. A regional match stores that side group's display name on the row. A display name whose short name is a letter form ends with that letter form in parentheses, such as `South & east China, Taiwan (SECT)`. `East` does not. The short-name rule is in [ux/top-bar.md](ux/top-bar.md). Win evaluation, forced visibility, and the home outlines use the hexes of the stored home. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.

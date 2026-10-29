@@ -146,7 +146,7 @@ export function randomizeNewGameStartMonth(): void {
  * Purpose: Each refresh while the overlay is showing turns both checkboxes on and sets every bonus to the default level.
  * The starting month is drawn when the dialog opens, and a refresh leaves that draw in place.
  * When to use: Whenever the overlay is shown, including a refresh that does not reopen it.
- * Expected outcome: Fog and Auto-start AI are checked, and each present bonus dropdown is Low. The month control is unchanged. Missing controls are skipped.
+ * Expected outcome: Fog and Auto-start AI are checked, and each present bonus dropdown shows Default. The stored value stays `low`. The month control is unchanged. Missing controls are skipped.
  * Exceptions: None.
  */
 export function resetNewGameOptionControls(): void {

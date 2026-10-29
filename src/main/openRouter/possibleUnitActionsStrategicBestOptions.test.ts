@@ -9,6 +9,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
+import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import type { GameStateSnapshot } from '../gameDb';
 import {
@@ -17,12 +18,13 @@ import {
 } from '../briefing/map/hexCoordinates';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { ensureTerrainClassificationCacheLoaded, getStrategicLandMassByH3 } from '../terrainClassificationCache';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
 import {
   buildLandChainState as chainState,
   findGeodesicLandMassChain,
 } from '../testSupport/strategicLandChainFixtures';
-import { collectAggregatedPossibleActionRows } from './possibleUnitActions';
+import { collectAggregatedPossibleActionRows, partitionHomelandNearestOther } from './possibleUnitActions';
 import { applyInterestOrApproach } from './possibleUnitActionsBestOptionsInterest';
 import { formatLatLng } from './promptText';
 import { getValidDestinations } from '../oneStepMoveDestinations';
@@ -519,6 +521,52 @@ function testStrategicBestOptionsApproachWhenGridDistanceThrows(): void {
 }
 
 /**
+ * Finds an air base whose ferry disk contains one airport H3 can measure to an enemy home hex and one it cannot.
+ *
+ * Purpose: The mixed case is what dropped legal ferry airports from Best Options. An all-unmeasurable set was already kept.
+ * When to use: The partition contract and the Best Options ferry row contract in this file.
+ * Expected outcome: `measurable` and `unmeasurable` are in `gridDisk(origin, AIR_FERRY_RANGE_HEXES)` and pass the same numeric ferry-range gate as order validation. They are distinct from `origin` and `homeland`. `gridDistance(unmeasurable, homeland)` throws. `gridDistance(measurable, homeland)` returns a number.
+ * Exceptions: Throws if no sampled enemy-home hex splits a ferry disk that way.
+ */
+function findMixedFerryHomelandFixture(): {
+  origin: string;
+  measurable: string;
+  unmeasurable: string;
+  homeland: string;
+} {
+  const cells = getOrderedHexList();
+  for (let i = 0; i < cells.length; i += 30) {
+    const homeland = cells[i]!;
+    for (const origin of cells) {
+      if (origin === homeland) continue;
+      let disk: string[];
+      try {
+        disk = gridDisk(origin, AIR_FERRY_RANGE_HEXES);
+      } catch {
+        continue;
+      }
+      let measurable: string | undefined;
+      let unmeasurable: string | undefined;
+      for (const h of disk) {
+        if (h === origin || h === homeland) continue;
+        const fromBase = computeGridDistancePure(origin, h);
+        if (fromBase !== null && fromBase > AIR_FERRY_RANGE_HEXES) continue;
+        try {
+          gridDistance(h, homeland);
+          if (!measurable) measurable = h;
+        } catch {
+          if (!unmeasurable) unmeasurable = h;
+        }
+        if (measurable && unmeasurable) {
+          return { origin, measurable, unmeasurable, homeland };
+        }
+      }
+    }
+  }
+  throw new Error('expected a ferry disk split by gridDistance to an enemy home hex');
+}
+
+/**
  * Finds two map hexes inside ferry range whose H3 `gridDistance` throws (icosahedron face crossing).
  *
  * Purpose: Best Options used to drop legal ferry dests when distance ranking threw, which hid whole air bases from the table.
@@ -654,9 +702,78 @@ function testStrategicBestOptionsApproachListsHexAFriendlyIsLeaving(): void {
 }
 
 /**
+ * Keeps a legal hex when H3 can measure some of its siblings to the enemy home region and not this one.
+ *
+ * Purpose: `partitionHomelandNearestOther` used to drop that hex, so Best Options never received it.
+ * When to use: After changing the mixed-distance branch of that partition.
+ * Expected outcome: The unmeasurable hex is in `other`, not `nearest` or `homeland`, and both inputs appear in exactly one bucket.
+ * Exceptions: Throws if the map has no split ferry disk.
+ */
+function testPartitionKeepsHexWhenDistanceToHomelandThrows(): void {
+  const { measurable, unmeasurable, homeland } = findMixedFerryHomelandFixture();
+  assert.throws(() => gridDistance(unmeasurable, homeland));
+  assert.doesNotThrow(() => gridDistance(measurable, homeland));
+  const parts = partitionHomelandNearestOther([measurable, unmeasurable], new Set([homeland]));
+  const placed = [...parts.homeland, ...parts.nearest, ...parts.other];
+  assert.deepStrictEqual(new Set(placed), new Set([measurable, unmeasurable]));
+  assert.equal(placed.length, 2);
+  assert.ok(parts.other.includes(unmeasurable));
+  assert.ok(!parts.nearest.includes(unmeasurable));
+  assert.ok(!parts.homeland.includes(unmeasurable));
+}
+
+/**
+ * Lists a ferry airport Best Options used to hide because every enemy-home distance threw.
+ *
+ * Purpose: Air Operations counted that airport while the table omitted it whenever another airport on the same disk still had a finite distance.
+ * When to use: After changing `partitionHomelandNearestOther` or strategic ferry row assembly.
+ * Expected outcome: This-turn rows include a ferry action to the unmeasurable airport and to the measurable one.
+ * Exceptions: Throws if the map has no split ferry disk.
+ */
+function testStrategicBestOptionsKeepsFerryDestWhenHomelandDistanceThrows(): void {
+  const { origin, measurable, unmeasurable, homeland } = findMixedFerryHomelandFixture();
+  const state: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    playerPerspective: 'opponent',
+    seats: [
+      { seatId: 'opponent', outTurn: null },
+      { seatId: HUMAN_SEAT_ID, outTurn: null },
+    ] as unknown as GameStateSnapshot['seats'],
+    homeRegionHexesBySeat: { [HUMAN_SEAT_ID]: [homeland] },
+    hexes: [origin, measurable, unmeasurable].map((h3Index) => ({
+      h3Index,
+      terrain: 'land' as const,
+      terrainKind: 'plains',
+    })),
+    units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: origin }],
+    pendingOrders: [],
+    strategicInfrastructure: [origin, measurable, unmeasurable].map((h3Index) => ({
+      h3Index,
+      urbanHexCount: 1,
+      airportCount: 1,
+      seaportCount: 0,
+    })),
+    strategicControl: [origin, measurable, unmeasurable].map((h3Index) => ({
+      h3Index,
+      controllerPlayerId: 'opponent',
+    })),
+  };
+  const thisTurn = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-air-1');
+  assert.ok(
+    thisTurn.some((r) => r.targetH3 === unmeasurable && r.actionTypes.includes('ferry')),
+    'Best Options must list the ferry dest H3 cannot measure against the enemy home region'
+  );
+  assert.ok(
+    thisTurn.some((r) => r.targetH3 === measurable && r.actionTypes.includes('ferry')),
+    'the measurable sibling must stay listed so this is the mixed case'
+  );
+}
+
+/**
  * Ensures a legal ferry destination still appears in Best Options when H3 cannot measure grid distance.
  *
- * Purpose: Turn 12 Air Operations listed ferry dests for bases FI/FM/F4, but Best Options omitted those air units because `gridDistance` threw and row assembly skipped the dest.
+ * Purpose: Best Options omitted air bases when `gridDistance` threw and row assembly skipped the dest.
  * When to use: After edits to `appendRowsForLegalHexes` distance handling.
  * Expected outcome: This-turn rows include a `ferry` action from origin to dest even though `gridDistance` throws for that pair.
  * Exceptions: Throws when the world map has no unmeasurable in-disk pair.
@@ -729,8 +846,16 @@ const tests = [
     fn: testStrategicBestOptionsAirStrikesOmitFriendlyAndUncontrolledInfra,
   },
   {
+    name: 'partitionHomelandNearestOther keeps a hex whose distance to the enemy home region throws',
+    fn: testPartitionKeepsHexWhenDistanceToHomelandThrows,
+  },
+  {
     name: 'collectAggregatedPossibleActionRows strategic Best Options keeps ferry dest when gridDistance throws',
     fn: testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows strategic Best Options keeps ferry dest when homeland distance throws',
+    fn: testStrategicBestOptionsKeepsFerryDestWhenHomelandDistanceThrows,
   },
   {
     name: 'collectAggregatedPossibleActionRows strategic Best Options approaches when gridDistance throws',

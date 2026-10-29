@@ -1,7 +1,7 @@
 /**
  * Strength levels for the optional country, terrain, and weather bonuses.
  *
- * Purpose: One vocabulary for the new-game dropdowns, `game_config`, snapshots, and the rule tables that scale by level.
+ * Purpose: One vocabulary for the new-game dropdowns, `game_config`, snapshots, and the rule tables that scale by level. The menus label `low` as Default.
  * When to use: Parsing a level from the dialog, IPC, a saved row, or a snapshot, and turning an on/off flag plus a level into one value.
  * Expected outcome: Deterministic results with no logging and no I/O.
  * Exceptions: None.
@@ -10,7 +10,7 @@
 /**
  * How strong one optional bonus is in a match.
  *
- * Purpose: Off disables the bonus. Low is the original rule. High makes the same rule stronger.
+ * Purpose: Off disables the bonus. `low` is the original rule, and the new-game menus label it Default. High makes the same rule stronger.
  * When to use: New-game choices and any rule lookup that scales by level.
  * Expected outcome: One of `off`, `low`, or `high`.
  * Exceptions: None; invalid values are coerced by `parseBonusLevel`.
@@ -40,7 +40,7 @@ export const BONUS_LEVELS: ReadonlyArray<BonusLevel> = Object.freeze(['off', 'lo
 /**
  * The level every new-game dropdown starts at.
  *
- * Purpose: Low keeps the original rules, so a player who changes nothing gets the familiar match.
+ * Purpose: `low` keeps the original rules, so a player who changes nothing gets the familiar match. The menus show that value as Default.
  * When to use: Resetting the new-game dropdowns.
  * Expected outcome: `low`.
  * Exceptions: None.

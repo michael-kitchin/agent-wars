@@ -14,7 +14,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-m
 
 - The legend opens 8 px right of the minimap panel, level with the panel's top. When the map is too narrow for it there, with 12 px to spare at the map's right edge, it opens at the map's left inset, 8 px under the panel instead (`legendPopoverPosition` in `src/shared/mapChromePlacement.ts`). It moves when the map changes size.
 - A terrain style dropdown, left-aligned, with no label beside it. The choices are Default, Atlas, Wargame, and Scientific. The key is only as wide as that dropdown and the rows under it. Its tip is in [control-tooltips.md](control-tooltips.md).
-- One row per terrain kind, in this order: Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, Arctic. An Urban row follows them, then a Rubble row, then a Fortified row (`FORTIFIED_LEGEND_LABEL`, from `appendFortifiedLegendRow`). Urban, Rubble, and Fortified are overlays, not one of those kinds. The Urban chip is the opaque form of that style's urban fill, flat, not hatched. The Rubble chip is that same opaque fill with a dark-red crosshatch. The Fortified chip draws the tick pattern on that urban fill.
+- One row per terrain kind, in this order: Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, Arctic. An Urban row follows them, then a Rubble row, then a Fortified row (`FORTIFIED_LEGEND_LABEL`, from `appendFortifiedLegendRow`). Urban, Rubble, and Fortified are overlays, not one of those kinds. The Urban chip is the opaque form of that style's urban fill, flat, not hatched. The Rubble chip is that same opaque fill with a dark-red crosshatch. The Fortified chip draws the full tick pattern, four ticks on every edge, on that urban fill.
 - Each row shows an opaque color chip for that kind under the active style. The chip is in the same family as that style's map fill and is stronger than the translucent hex paint. Coastal and wetlands use different chips. Mountain follows that style's hue. The same chip is drawn, at the size of a country flag, before each of these terrain names in the hex tooltip, the unit tooltip, and the blocked and effects order tooltips. The Rubble chip, hatch included, is drawn the same way before the word Rubble in a zoomed-cell or battle-cell hex tooltip, the blocked tooltip, and the effects tooltip. Snow, rain, and heat in those tooltips use a weather icon, as described in [hex-tooltips.md](hex-tooltips.md). An open tooltip keeps the chips it opened with. Hex paint stays the translucent fill.
 
 ## Inputs and Responses
@@ -72,6 +72,6 @@ None.
 - `src/renderer/rendering/terrainLegendUrban.ts`
 - `src/renderer/rendering/terrainLegendRubble.ts`
 - `src/renderer/rendering/terrainLegendFortified.ts` (`appendFortifiedLegendRow`)
-- `src/shared/fortificationTickGeometry.ts` (`litFortificationEdgeCount`)
+- `src/shared/fortificationTickGeometry.ts` (`FORTIFICATION_TICKS_PER_EDGE`)
 - `src/renderer/map/initCore.ts`
 - `src/shared/pipelineTerrain.ts`

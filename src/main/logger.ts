@@ -148,15 +148,74 @@ function getDebugLogPath(): string {
 }
 
 /**
- * Defines the `formatLine` function shape (function formatLine(level: string, message: string, args: unknown[]): string).
+ * Renders one log argument as a single line of text.
+ *
+ * Purpose: `JSON.stringify` drops `Error` `message` and `stack` because those fields are not enumerable, so failure logs showed `{}`.
+ * When to use: From `formatLine` for every argument. Tests call it directly and must not go through `logError`, which appends `debug.log`.
+ * Expected outcome: An `Error` contributes its name, message, and stack on one line. Any other object is JSON, and an `Error` nested inside that object keeps the same three fields, also on one line. `null` and non-objects use `String`.
+ * Exceptions: `JSON.stringify` still throws on a circular structure, the same as before this helper existed. This function does not log; it is on the logging path.
+ */
+export function formatLogArgument(value: unknown): string {
+  if (value instanceof Error) return formatErrorForLog(value);
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value, (_key, nested: unknown) => (nested instanceof Error ? errorLogFields(nested) : nested));
+  }
+  return String(value);
+}
 
- * Purpose: Supports maintainability by documenting why `formatLine` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Copies an `Error` into enumerable fields `JSON.stringify` will keep.
+ *
+ * Purpose: Nested exceptions are passed inside plain objects, and a non-enumerable `message` would otherwise be dropped.
+ * When to use: From `formatLogArgument` only.
+ * Expected outcome: `name`, `message`, and `stack`, each already flattened to one line. `stack` is omitted when absent.
  * Exceptions: None.
  */
+function errorLogFields(err: Error): { name: string; message: string; stack?: string } {
+  const fields: { name: string; message: string; stack?: string } = {
+    name: singleLogLine(err.name),
+    message: singleLogLine(err.message),
+  };
+  if (err.stack) fields.stack = singleLogLine(err.stack);
+  return fields;
+}
+
+/**
+ * Renders an `Error` as one readable log token.
+ *
+ * Purpose: Top-level `logError` arguments should stay readable without a JSON wrapper.
+ * When to use: From `formatLogArgument` only.
+ * Expected outcome: `Name: message` followed by the stack when present, with newlines turned into spaces.
+ * Exceptions: None.
+ */
+function formatErrorForLog(err: Error): string {
+  const fields = errorLogFields(err);
+  const stack = fields.stack ? ` ${fields.stack}` : '';
+  return `${fields.name}: ${fields.message}${stack}`;
+}
+
+/**
+ * Collapses a log fragment onto one physical line.
+ *
+ * Purpose: `debug.log` is line-oriented. A stack or message that contains newlines would split one event across several lines.
+ * When to use: From the error formatters in this file.
+ * Expected outcome: Newlines and the whitespace around them become a single space. Leading and trailing spaces are removed.
+ * Exceptions: None.
+ */
+function singleLogLine(text: string): string {
+  return text.replace(/\s*\n\s*/g, ' ').trim();
+}
+
+/**
+ * Builds one timestamped log line.
+ *
+ * Purpose: Shared text for the console and `debug.log` so both record the same arguments.
+ * When to use: From `appendToDebugLog` only.
+ * Expected outcome: `[iso] [agent-wars] [LEVEL] message` plus each argument rendered by `formatLogArgument`.
+ * Exceptions: Propagates a `JSON.stringify` failure from `formatLogArgument` on a circular argument.
+ */
 function formatLine(level: string, message: string, args: unknown[]): string {
-  const argsStr = args.length > 0 ? ' ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ') : '';
+  const argsStr = args.length > 0 ? ` ${args.map((a) => formatLogArgument(a)).join(' ')}` : '';
   return `[${iso8601()}] ${PREFIX} [${level}] ${message}${argsStr}`;
 }
 
