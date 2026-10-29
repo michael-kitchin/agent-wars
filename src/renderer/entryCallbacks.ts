@@ -512,6 +512,7 @@ export function applyTacticalTerrainOverrides(rows: Array<{
   isAirport?: boolean;
   isSeaport?: boolean;
   isRubble?: boolean;
+  isFortified?: boolean;
 }>): void {
   const nextState = deriveInfrastructureOverlayState(rows);
   S.tacticalTerrainOverridesByH3 = nextState.tacticalTerrainOverridesByH3;

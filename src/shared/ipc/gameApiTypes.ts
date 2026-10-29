@@ -11,7 +11,7 @@ import type {
 import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
-  BuildUnitType,
+  BuildQueueItemType,
   HexBuildQueueSnapshot,
   SetHexesKeepBuildingResult,
 } from './productionTypes';
@@ -482,14 +482,14 @@ getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapsho
    */
 addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;
     /**
-   * Specifies the contract for the `updateHexBuildQueueEntry` member (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{ success: boolean; reaso).
+   * Specifies the contract for the `updateHexBuildQueueEntry` member (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildQueueItemType; count: number }) => Promise<{ success: boolean; reaso).
 
    * Contract: Describes stable behavior for callers of `updateHexBuildQueueEntry` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{
+updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildQueueItemType; count: number }) => Promise<{
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;

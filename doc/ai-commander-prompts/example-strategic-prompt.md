@@ -44,6 +44,8 @@ Naval units fire on land targets within 2 cells (range 2). Add ranged_attack whe
 
 An air unit may strike a target within 3 cells of its base (strike radius of 3) and may ferry up to 4 cells. It cannot strike and ferry in the same turn.
 
+Fortifications: a hex's controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains. Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row. Air strikes and missiles remove a cell's fortification before they can destroy the cell.
+
 A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire.
 
 To move a naval unit toward a land target, copy a Best Options Target Hex for that naval unit if listed; otherwise call plan_route with that land unit's briefing hex code as the destination.
@@ -251,7 +253,7 @@ Turn 39:
 
 # Production Status
 
-Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21).
+Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item).
 
 Deployment caps (per side): infantry 12, armor 8, naval 8, air 6, missile 2.
 
@@ -267,18 +269,18 @@ Production progress/spawn resolves after Ready, after combat and control resolut
 
 ## Controlled Hex Queues
 
-| Hex | Urban Hexes | Airports | Seaports | Available Unit Types | Current Queue |
-| --- | --- | --- | --- | --- | --- |
-| EJ | 80 | 8 | 4 | armor | — |
-| FO | 65 | 2 | 2 | armor | — |
-| ER | 50 | 4 | 3 | armor | — |
-| FZ | 44 | 2 | 3 | armor | 1 air (blocked: at cap) |
-| DN | 39 | 4 | 2 | armor | 1 naval (blocked: at cap) |
-| EH | 39 | 4 | 4 | armor | 1 air (blocked: at cap) |
-| E0 | 34 | 4 | 2 | armor | 1 air (blocked: at cap) |
-| DJ | 33 | 4 | 4 | armor | 1 air (blocked: at cap) |
-| E3 | 27 | 1 | 0 | armor | 1 air (blocked: at cap) |
-| GF | 27 | 2 | 1 | armor | 1 air (blocked: at cap) |
+| Hex | Urban Hexes | Fortified | Airports | Seaports | Available Unit Types | Current Queue |
+| --- | --- | --- | --- | --- | --- | --- |
+| EJ | 80 | 0/80 | 8 | 4 | armor | — |
+| FO | 65 | 0/65 | 2 | 2 | armor | — |
+| ER | 50 | 0/50 | 4 | 3 | armor | — |
+| FZ | 44 | 0/44 | 2 | 3 | armor | 1 air (blocked: at cap) |
+| DN | 39 | 0/39 | 4 | 2 | armor | 1 naval (blocked: at cap) |
+| EH | 39 | 0/39 | 4 | 4 | armor | 1 air (blocked: at cap) |
+| E0 | 34 | 0/34 | 4 | 2 | armor | 1 air (blocked: at cap) |
+| DJ | 33 | 0/33 | 4 | 4 | armor | 1 air (blocked: at cap) |
+| E3 | 27 | 0/27 | 1 | 0 | armor | 1 air (blocked: at cap) |
+| GF | 27 | 0/27 | 2 | 1 | armor | 1 air (blocked: at cap) |
 
 # Your Strategic Memory
 
@@ -520,7 +522,7 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
-"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air|missile","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
+"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air|missile|fortification","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 

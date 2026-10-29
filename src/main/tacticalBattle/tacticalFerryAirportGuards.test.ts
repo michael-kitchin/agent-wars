@@ -3,7 +3,7 @@
  * Run: `npm run build:main` then `node dist/main/tacticalBattle/tacticalFerryAirportGuards.test.js`
  */
 
-import { type SeatId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
@@ -163,7 +163,7 @@ test('tacticalRes4CellHasIntactAirport is false for omitted, rubble, or missing 
   });
   assert.equal(tacticalCellHasIntactAirport(battle, origin), true);
   assert.equal(tacticalCellHasIntactAirport(battle, dest), false);
-  assert.equal(tacticalFerryAirportRejectionReason(battle, origin, dest), 'Destination airport is not intact');
+  assert.equal(tacticalFerryAirportRejectionReason(battle, origin, dest, HUMAN_SEAT_ID), 'Destination airport is not intact');
 });
 
 test('validateTacticalGroupFerryTarget rejects a dest without an intact airport', () => {
@@ -208,7 +208,7 @@ test('collectTacticalLegalFerryDestinationHexes lists other intact airport cells
     destAirport: true,
     player: 'human',
   });
-  const dests = collectTacticalLegalFerryDestinationHexes(battle, origin);
+  const dests = collectTacticalLegalFerryDestinationHexes(battle, origin, HUMAN_SEAT_ID);
   assert.deepEqual(dests, [dest]);
 });
 
@@ -219,7 +219,7 @@ test('collectTacticalLegalFerryDestinationHexes is empty when origin has no inta
     destAirport: true,
     player: 'human',
   });
-  assert.deepEqual(collectTacticalLegalFerryDestinationHexes(battle, origin), []);
+  assert.deepEqual(collectTacticalLegalFerryDestinationHexes(battle, origin, HUMAN_SEAT_ID), []);
 });
 
 test('tacticalFerryApplyOutcome is destroy when dest is illegal and origin is rubble', () => {
@@ -230,5 +230,5 @@ test('tacticalFerryApplyOutcome is destroy when dest is illegal and origin is ru
     originRubble: true,
     player: 'human',
   });
-  assert.equal(tacticalFerryApplyOutcome(battle, origin, dest), 'destroy');
+  assert.equal(tacticalFerryApplyOutcome(battle, origin, dest, HUMAN_SEAT_ID), 'destroy');
 });

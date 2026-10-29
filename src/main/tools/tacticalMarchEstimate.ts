@@ -5,6 +5,7 @@
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
+import { tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { logTrace } from '../logger';
@@ -93,7 +94,7 @@ export function estimateTacticalTurnsRequired(totalCost: number, budget: number,
  */
 export function estimateTacticalMarch(
   battle: TacticalBattleSnapshot,
-  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags' | 'origin'>,
+  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'player' | 'embarkedOnSubUnitId' | 'weatherTags' | 'origin'>,
   toH3: string,
   tacticalSet?: ReadonlySet<string>
 ): TacticalMarchEstimate {
@@ -121,7 +122,11 @@ export function estimateTacticalMarch(
   const plan = planTacticalMarchWithSessionCache(battle, {
     fromH3: mover.h3Index,
     toH3,
-    tacticalSet: tacticalSet ?? new Set(battle.tacticalChildH3Indexes),
+    tacticalSet: tacticalSet ?? tacticalMarchSetForMover({
+      battle,
+      moverPlayer: mover.player,
+      originH3: mover.h3Index,
+    }),
     unitTypeForMovement: mover.unitType,
     movementPointBudget: budget,
     weatherEnabled: battle.weatherBonusEnabled === true,

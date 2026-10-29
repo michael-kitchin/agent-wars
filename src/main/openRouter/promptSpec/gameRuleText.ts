@@ -54,6 +54,7 @@ import {
 import type { TacticalMovementCategory } from '../../../shared/tacticalTerrainMovement';
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
 import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
+import { buildFortificationProductionRulePart, buildFortificationRule } from './gameRuleFortificationText';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -101,6 +102,15 @@ export interface GameRuleTextGates {
    * Exceptions: None.
    */
   readonly hasMissileUnits?: boolean;
+  /**
+   * Whether the battle being briefed has a fortified cell.
+   *
+   * Contract: Omitted means false.
+   * When to use: Set from the tactical battle's fortification owner record.
+   * Expected outcome: False omits the tactical fortification sentence. Strategic text does not read this flag.
+   * Exceptions: None.
+   */
+  readonly hasFortifiedCells?: boolean;
   /**
    * Whether standing-order tools are enabled for this consultation.
    *
@@ -526,7 +536,7 @@ export function buildProductionCostRulesLine(): string {
     if (unitType === 'air') extras.push('requires airport');
     return `${unitType} cost ${cost} (${extras.join(' + ')})`;
   });
-  return `Rules: ${parts.join(', ')}.`;
+  return `Rules: ${parts.join(', ')}. ${buildFortificationProductionRulePart()}.`;
 }
 
 /**
@@ -615,6 +625,8 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   if (air) parts.push(air);
   const missile = buildMissileEmploymentRule(gates);
   if (missile) parts.push(missile);
+  const fortification = buildFortificationRule(gates);
+  if (fortification) parts.push(fortification);
   if (gates.ordersEnabled) parts.push(buildHoldFireRule());
   return parts.join(' ');
 }

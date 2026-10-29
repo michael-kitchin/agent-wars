@@ -3,6 +3,7 @@ export * from './terrainHexTypes';
 export * from './productionTypes';
 export * from './ordersTypes';
 export * from './missileTypes';
+export * from './fortificationTypes';
 export * from './gameStateTypes';
 export * from './openRouterTypes';
 export * from './combatResultTypes';

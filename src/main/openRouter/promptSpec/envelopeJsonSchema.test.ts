@@ -480,6 +480,7 @@ function run(): void {
   testTaughtExamplesFitSchema();
   testTaughtCallbackParametersFitSchema();
   testMissileLaunchesSchemaFollowsTheFlag();
+  testProductionOrderEnumIncludesFortification();
   console.log('envelopeJsonSchema.test.ts passed');
 }
 
@@ -504,6 +505,21 @@ function testMissileLaunchesSchemaFollowsTheFlag(): void {
     'properties'
   );
   assert.ok(!('missileLaunches' in tactical));
+}
+
+/**
+ * The production order schema accepts a fortification queue item.
+ *
+ * Purpose: Structured output must allow the queue name the production line teaches.
+ * When to use: After the productionOrders unitType enum changes.
+ * Expected outcome: The enum lists `fortification`.
+ * Exceptions: None.
+ */
+function testProductionOrderEnumIncludesFortification(): void {
+  const properties = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  const production = asRecord(properties.productionOrders, 'productionOrders');
+  const text = JSON.stringify(production);
+  assert.ok(text.includes('fortification'));
 }
 
 run();

@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
 import { missileRangeHexes } from '../../shared/gameRules';
 import { HUMAN_SEAT_ID, aiSeatIdForIndex } from '../../shared/seatIds';
-import { dbGetAll, dbGetOne, dbRun, getMapHexSet, listTacticalFeatureOverridesForGame } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getMapHexSet, listTacticalFeatureOverridesForGame, setTacticalCellFortified } from '../gameDb';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 import { resolveMissileLaunchPhase } from './missileLaunchResolution';
 import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
@@ -156,5 +156,49 @@ test('an unexplored launch changes nothing', () => {
     const result = resolveMissileLaunchPhase([{ unitId: 'h1-m1', targetH3Index: pair.target }], () => 0);
     assert.equal(result.launches.length, 0);
     assert.ok(dbGetOne('SELECT id FROM units WHERE id = ?', ['h1-m1']));
+  });
+});
+
+test('a fortified cell loses its fortification on a 1 and keeps the city', () => {
+  withSeatedTempGameDb('aw-missile-fort-hit-', { fogOfWarEnabled: false }, () => {
+    const { target, launch } = urbanAirportTarget();
+    const cell = listTacticalFeatureOverridesForGame().find(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isRubble
+    );
+    assert.ok(cell, 'expected an intact city cell');
+    setTacticalCellFortified(cell.h3Index, true);
+    const unfortifiedUrban = listTacticalFeatureOverridesForGame().filter(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isFortified
+    ).length;
+    placeMissileAndAir(launch, target);
+    const tally = new Map<string, number>();
+    const result = resolveMissileLaunchPhase([{ unitId: 'h1-m1', targetH3Index: target }], () => 0, tally);
+    const after = listTacticalFeatureOverridesForGame().find((row) => row.h3Index === cell.h3Index);
+    assert.equal(after?.isUrban, true);
+    assert.equal(after?.isFortified, false);
+    assert.equal(after?.isRubble, false);
+    const record = result.launches[0];
+    assert.equal(record?.fortificationsDestroyed, 1);
+    assert.equal(record?.fortificationsBefore, 1);
+    assert.equal(tally.get(target), 1);
+    assert.equal(record?.urbanBefore, unfortifiedUrban);
+  });
+});
+
+test('a fortified cell that rolls 20 keeps the fortification and the city', () => {
+  withSeatedTempGameDb('aw-missile-fort-save-', { fogOfWarEnabled: false }, () => {
+    const { target, launch } = urbanAirportTarget();
+    const cell = listTacticalFeatureOverridesForGame().find(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isRubble
+    );
+    assert.ok(cell);
+    setTacticalCellFortified(cell.h3Index, true);
+    placeMissileAndAir(launch, target);
+    const result = resolveMissileLaunchPhase([{ unitId: 'h1-m1', targetH3Index: target }], () => 0.999);
+    const after = listTacticalFeatureOverridesForGame().find((row) => row.h3Index === cell.h3Index);
+    assert.equal(after?.isUrban, true);
+    assert.equal(after?.isFortified, true);
+    assert.equal(result.launches[0]?.fortificationsDestroyed, 0);
+    assert.equal(result.launches[0]?.fortificationsBefore, 1);
   });
 });

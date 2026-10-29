@@ -4,7 +4,7 @@ import {
 } from '../terrainClassificationCache';
 import { logDebug, logTrace } from '../logger';
 import { getTacticalRendererOverrideRowsCached } from './tacticalRendererOverrideCache';
-import { isBuildUnitType, type BuildUnitType } from '../productionRules';
+import { isBuildQueueItemType, type BuildQueueItemType } from '../productionRules';
 import type { BasicDbOps } from './dbOps';
 
 /**
@@ -73,14 +73,14 @@ h3Index: string;
    */
 queueIndex: number;
     /**
-   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
 
    * Contract: Describes stable behavior for callers of `unitType` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-unitType: BuildUnitType;
+unitType: BuildQueueItemType;
     /**
    * Specifies the contract for the `remainingCount` member (remainingCount: number;).
 
@@ -137,6 +137,24 @@ airportCount: number;
    * Exceptions: None.
    */
 seaportCount: number;
+  /**
+   * Fortified intact city cells in this hex.
+   *
+   * Contract: Matches `res_s_infrastructure.fortified_count`.
+   * When to use: Soak, siege, and the build pause.
+   * Expected outcome: A non-negative integer. Missing rows read as 0.
+   * Exceptions: None.
+   */
+  fortifiedCount: number;
+  /**
+   * Intact city cells that are not fortified.
+   *
+   * Contract: Matches `res_s_infrastructure.fortifiable_count`.
+   * When to use: Production, when choosing cells that can still be fortified.
+   * Expected outcome: A non-negative integer. Missing rows read as 0.
+   * Exceptions: None.
+   */
+  fortifiableCount: number;
 }
 
 /**
@@ -211,6 +229,15 @@ isSeaport: boolean;
    * Exceptions: None.
    */
 isRubble: boolean;
+  /**
+   * True when this intact city cell is fortified.
+   *
+   * Contract: Matches `res_t_feature_overrides.is_fortified`.
+   * When to use: Strikes, missiles, and the renderer.
+   * Expected outcome: False on every non-urban or rubble cell.
+   * Exceptions: None.
+   */
+  isFortified: boolean;
 }
 
 /**
@@ -223,79 +250,6 @@ isRubble: boolean;
  */
 type ControlDbOps = BasicDbOps;
 
-/**
- * Documents the module-scope binding `TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES` (TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES).
-
- * Purpose: Supports maintainability by documenting why `TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES = {
-  afterInsert: 'res_t_sync_res_s_after_insert',
-  afterDelete: 'res_t_sync_res_s_after_delete',
-  afterUpdate: 'res_t_sync_res_s_after_update',
-} as const;
-
-/**
- * Documents the module-scope binding `TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL` (TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL).
-
- * Purpose: Supports maintainability by documenting why `TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL = `SELECT parent_h3_index AS h3Index,
-              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
-              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
-              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
-       FROM res_t_feature_overrides
-       GROUP BY parent_h3_index`;
-
-/**
- * Defines the `buildStrategicCountsMismatchPredicateSql` function shape (function buildStrategicCountsMismatchPredicateSql(strategicTableAlias: string, countsAlias: string): string).
-
- * Purpose: Supports maintainability by documenting why `buildStrategicCountsMismatchPredicateSql` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildStrategicCountsMismatchPredicateSql(strategicTableAlias: string, countsAlias: string): string {
-  return `${strategicTableAlias}.urban_hex_count != COALESCE(${countsAlias}.urbanHexCount, 0)
-       OR ${strategicTableAlias}.airport_count != COALESCE(${countsAlias}.airportCount, 0)
-       OR ${strategicTableAlias}.seaport_count != COALESCE(${countsAlias}.seaportCount, 0)`;
-}
-
-/**
- * Defines the `buildStrategicRollupUpdateSql` function shape (function buildStrategicRollupUpdateSql(parentH3Expression: string): string).
-
- * Purpose: Supports maintainability by documenting why `buildStrategicRollupUpdateSql` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildStrategicRollupUpdateSql(parentH3Expression: string): string {
-  return `UPDATE res_s_infrastructure
-          SET urban_hex_count = COALESCE(
-                (SELECT SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END)
-                 FROM res_t_feature_overrides
-                 WHERE parent_h3_index = ${parentH3Expression}),
-                0
-              ),
-              airport_count = COALESCE(
-                (SELECT SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END)
-                 FROM res_t_feature_overrides
-                 WHERE parent_h3_index = ${parentH3Expression}),
-                0
-              ),
-              seaport_count = COALESCE(
-                (SELECT SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END)
-                 FROM res_t_feature_overrides
-                 WHERE parent_h3_index = ${parentH3Expression}),
-                0
-              )
-          WHERE h3_index = ${parentH3Expression};`;
-}
 
 /**
  * Documents the `StrategicInfrastructureDbRow` interface as a named contract surface (interface StrategicInfrastructureDbRow extends Record<string, unknown>).
@@ -342,6 +296,24 @@ airportCount: number;
    * Exceptions: None.
    */
 seaportCount: number;
+  /**
+   * Fortified intact city cells on the hex.
+   *
+   * Contract: Column `fortified_count`.
+   * When to use: Tooltips, soak, and the turn report.
+   * Expected outcome: A count of cells with the fortification flag.
+   * Exceptions: None.
+   */
+  fortifiedCount: number;
+  /**
+   * Intact city cells that are not yet fortified.
+   *
+   * Contract: Column `fortifiable_count`.
+   * When to use: Production eligibility and the Fortified column.
+   * Expected outcome: Intact city cells minus `fortifiedCount`.
+   * Exceptions: None.
+   */
+  fortifiableCount: number;
 }
 
 /**
@@ -358,6 +330,8 @@ function mapStrategicInfrastructureDbRow(row: StrategicInfrastructureDbRow): Str
     urbanHexCount: Math.max(0, row.urbanHexCount),
     airportCount: Math.max(0, row.airportCount),
     seaportCount: Math.max(0, row.seaportCount),
+    fortifiedCount: Math.max(0, row.fortifiedCount),
+    fortifiableCount: Math.max(0, row.fortifiableCount),
   };
 }
 
@@ -379,7 +353,9 @@ function listStrategicInfrastructureRowsInternal(
     `SELECT h3_index AS h3Index,
             urban_hex_count AS urbanHexCount,
             airport_count AS airportCount,
-            seaport_count AS seaportCount
+            seaport_count AS seaportCount,
+            fortified_count AS fortifiedCount,
+            fortifiable_count AS fortifiableCount
      FROM res_s_infrastructure${whereClause}${orderByClause}`,
     options?.params ?? []
   ).map(mapStrategicInfrastructureDbRow);
@@ -453,7 +429,7 @@ export function listBuildQueueRowsForHex(ops: ControlDbOps, h3Index: string): Bu
     id: number;
     h3Index: string;
     queueIndex: number;
-    unitType: BuildUnitType;
+    unitType: BuildQueueItemType;
     remainingCount: number;
   }>(
     `SELECT id, h3_index AS h3Index, queue_index AS queueIndex, unit_type AS unitType, remaining_count AS remainingCount
@@ -500,7 +476,7 @@ export function getBuildProgressPointsForHex(ops: ControlDbOps, h3Index: string)
 export function getKeepBuildingForHex(
   ops: ControlDbOps,
   h3Index: string
-): { keepBuilding: boolean; keepBuildingUnitType: BuildUnitType | null } {
+): { keepBuilding: boolean; keepBuildingUnitType: BuildQueueItemType | null } {
   logTrace('gameDb getKeepBuildingForHex', { h3Index });
   const row = ops.getOne<{ keepBuilding: number; keepBuildingUnitType: string | null }>(
     `SELECT keep_building AS keepBuilding, keep_building_unit_type AS keepBuildingUnitType
@@ -511,7 +487,7 @@ export function getKeepBuildingForHex(
     return { keepBuilding: false, keepBuildingUnitType: null };
   }
   const unitType = row.keepBuildingUnitType;
-  if (!isBuildUnitType(unitType)) {
+  if (!isBuildQueueItemType(unitType)) {
     return { keepBuilding: false, keepBuildingUnitType: null };
   }
   return { keepBuilding: true, keepBuildingUnitType: unitType };
@@ -530,7 +506,7 @@ export function setKeepBuildingForHex(
   ops: ControlDbOps,
   h3Index: string,
   keepBuilding: boolean,
-  keepBuildingUnitType: BuildUnitType | null
+  keepBuildingUnitType: BuildQueueItemType | null
 ): void {
   if (keepBuilding && !keepBuildingUnitType) {
     throw new Error('Keep building requires a unit type when enabled.');
@@ -582,7 +558,7 @@ export function clearBuildQueueAndProgressForHex(ops: ControlDbOps, h3Index: str
 }
 
 /**
- * Defines the `replaceBuildQueueForHex` function shape (export function replaceBuildQueueForHex( ops: ControlDbOps, h3Index: string, entries: Array<{ unitType: BuildUnitType; remainingCount: number }> ): vo).
+ * Defines the `replaceBuildQueueForHex` function shape (export function replaceBuildQueueForHex( ops: ControlDbOps, h3Index: string, entries: Array<{ unitType: BuildQueueItemType; remainingCount: number }> ): vo).
 
  * Purpose: Supports maintainability by documenting why `replaceBuildQueueForHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -592,7 +568,7 @@ export function clearBuildQueueAndProgressForHex(ops: ControlDbOps, h3Index: str
 export function replaceBuildQueueForHex(
   ops: ControlDbOps,
   h3Index: string,
-  entries: Array<{ unitType: BuildUnitType; remainingCount: number }>
+  entries: Array<{ unitType: BuildQueueItemType; remainingCount: number }>
 ): void {
   logDebug('gameDb replaceBuildQueueForHex', { h3Index, entryCount: entries.length });
   ops.run('DELETE FROM res_s_build_queue WHERE h3_index = ?', [h3Index]);
@@ -620,7 +596,7 @@ export function getStrategicInfrastructureForHex(ops: ControlDbOps, h3Index: str
     whereClause: 'WHERE h3_index = ?',
     params: [h3Index],
   })[0];
-  return row ?? { h3Index, urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
+  return row ?? { h3Index, urbanHexCount: 0, airportCount: 0, seaportCount: 0, fortifiedCount: 0, fortifiableCount: 0 };
 }
 
 /**
@@ -684,6 +660,7 @@ export function listTacticalFeatureOverridesForGame(ops: ControlDbOps): Tactical
     isAirport: number;
     isSeaport: number;
     isRubble: number;
+    isFortified: number;
   }>(
     `SELECT h3_index AS h3Index,
             parent_h3_index AS parentH3Index,
@@ -691,7 +668,8 @@ export function listTacticalFeatureOverridesForGame(ops: ControlDbOps): Tactical
             is_urban AS isUrban,
             is_airport AS isAirport,
             is_seaport AS isSeaport,
-            is_rubble AS isRubble
+            is_rubble AS isRubble,
+            is_fortified AS isFortified
      FROM res_t_feature_overrides
      ORDER BY h3_index ASC`
   ).map((row) => ({
@@ -702,6 +680,7 @@ export function listTacticalFeatureOverridesForGame(ops: ControlDbOps): Tactical
     isAirport: row.isAirport === 1,
     isSeaport: row.isSeaport === 1,
     isRubble: row.isRubble === 1,
+    isFortified: row.isFortified === 1,
   }));
 }
 
@@ -742,7 +721,7 @@ export function insertTacticalFeatureOverrideRubbleRow(
 export function updateTacticalFeatureOverrideRow(
   ops: ControlDbOps,
   h3Index: string,
-  patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
+  patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble' | 'isFortified'>>
 ): void {
   logDebug('gameDb updateRes4FeatureOverrideRow', { h3Index, patch });
   const row = ops.getOne<{
@@ -750,11 +729,13 @@ export function updateTacticalFeatureOverrideRow(
     isAirport: number;
     isSeaport: number;
     isRubble: number;
+    isFortified: number;
   }>(
     `SELECT is_urban AS isUrban,
             is_airport AS isAirport,
             is_seaport AS isSeaport,
-            is_rubble AS isRubble
+            is_rubble AS isRubble,
+            is_fortified AS isFortified
      FROM res_t_feature_overrides
      WHERE h3_index = ?`,
     [h3Index]
@@ -762,93 +743,28 @@ export function updateTacticalFeatureOverrideRow(
   if (!row) return;
   ops.run(
     `UPDATE res_t_feature_overrides
-     SET is_urban = ?, is_airport = ?, is_seaport = ?, is_rubble = ?
+     SET is_urban = ?, is_airport = ?, is_seaport = ?, is_rubble = ?, is_fortified = ?
      WHERE h3_index = ?`,
     [
       patch.isUrban === undefined ? row.isUrban : patch.isUrban ? 1 : 0,
       patch.isAirport === undefined ? row.isAirport : patch.isAirport ? 1 : 0,
       patch.isSeaport === undefined ? row.isSeaport : patch.isSeaport ? 1 : 0,
       patch.isRubble === undefined ? row.isRubble : patch.isRubble ? 1 : 0,
+      patch.isFortified === undefined ? row.isFortified : patch.isFortified ? 1 : 0,
       h3Index,
     ]
   );
 }
 
-/**
- * Defines the `ensureStrategicInfrastructureSyncTriggers` function shape (export function ensureStrategicInfrastructureSyncTriggers(ops: ControlDbOps): void).
-
- * Purpose: Supports maintainability by documenting why `ensureStrategicInfrastructureSyncTriggers` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function ensureStrategicInfrastructureSyncTriggers(ops: ControlDbOps): void {
-  logDebug('gameDb ensureRes1InfrastructureSyncTriggers');
-  ops.run(
-    `CREATE TRIGGER IF NOT EXISTS ${TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES.afterInsert}
-     AFTER INSERT ON res_t_feature_overrides
-     BEGIN
-       ${buildStrategicRollupUpdateSql('NEW.parent_h3_index')}
-     END;`
-  );
-  ops.run(
-    `CREATE TRIGGER IF NOT EXISTS ${TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES.afterDelete}
-     AFTER DELETE ON res_t_feature_overrides
-     BEGIN
-       ${buildStrategicRollupUpdateSql('OLD.parent_h3_index')}
-     END;`
-  );
-  ops.run(
-    `CREATE TRIGGER IF NOT EXISTS ${TACTICAL_TO_STRATEGIC_SYNC_TRIGGER_NAMES.afterUpdate}
-     AFTER UPDATE ON res_t_feature_overrides
-     BEGIN
-       ${buildStrategicRollupUpdateSql('OLD.parent_h3_index')}
-       ${buildStrategicRollupUpdateSql('NEW.parent_h3_index')}
-     END;`
-  );
-}
+export { ensureStrategicInfrastructureSyncTriggers, reconcileStrategicInfrastructureCountsFromTacticalOverrides } from './strategicInfrastructureRollup';
 
 /**
- * Defines the `reconcileStrategicInfrastructureCountsFromTacticalOverrides` function shape (export function reconcileStrategicInfrastructureCountsFromTacticalOverrides(ops: ControlDbOps): { changedHexCount: number } { logDebug('gameDb reconcileStrategicInfrastruc).
-
- * Purpose: Supports maintainability by documenting why `reconcileStrategicInfrastructureCountsFromTacticalOverrides` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function reconcileStrategicInfrastructureCountsFromTacticalOverrides(ops: ControlDbOps): { changedHexCount: number } {
-  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides');
-  const mismatch = ops.getOne<{ mismatchCount: number }>(
-    `SELECT COUNT(*) AS mismatchCount
-     FROM res_s_infrastructure ri
-     LEFT JOIN (${TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL}) counts ON counts.h3Index = ri.h3_index
-     WHERE ${buildStrategicCountsMismatchPredicateSql('ri', 'counts')}`
-  )?.mismatchCount ?? 0;
-  if (mismatch <= 0) {
-    logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides: no-op');
-    return { changedHexCount: 0 };
-  }
-  ops.run(
-    `WITH counts AS (${TACTICAL_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL})
-     UPDATE res_s_infrastructure
-     SET urban_hex_count = COALESCE((SELECT urbanHexCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0),
-         airport_count = COALESCE((SELECT airportCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0),
-         seaport_count = COALESCE((SELECT seaportCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0)
-     WHERE urban_hex_count != COALESCE((SELECT urbanHexCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0)
-        OR airport_count != COALESCE((SELECT airportCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0)
-        OR seaport_count != COALESCE((SELECT seaportCount FROM counts WHERE counts.h3Index = res_s_infrastructure.h3_index), 0)`
-  );
-  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides: applied', { changedHexCount: mismatch });
-  return { changedHexCount: mismatch };
-}
-
-/**
- * Defines the `getTacticalTerrainOverridesForRendererFromGame` function shape (export function getTacticalTerrainOverridesForRendererFromGame(ops: ControlDbOps): Array<).
-
- * Purpose: Supports maintainability by documenting why `getTacticalTerrainOverridesForRendererFromGame` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Returns merged tactical terrain rows for the renderer, using the override cache.
+ *
+ * Purpose: The renderer reads one row per tactical cell without rebuilding the merge on every call.
+ * When to use: IPC and tests that need the current tactical feature picture.
+ * Expected outcome: Cached rows when the feature signature is unchanged.
+ * Exceptions: Propagates errors from the cache rebuild.
  */
 export function getTacticalTerrainOverridesForRendererFromGame(ops: ControlDbOps): Array<{
   h3Index: string;
@@ -857,6 +773,7 @@ export function getTacticalTerrainOverridesForRendererFromGame(ops: ControlDbOps
   isAirport?: boolean;
   isSeaport?: boolean;
   isRubble?: boolean;
+  isFortified?: boolean;
 }> {
   logTrace('gameDb getRes4TerrainOverridesForRendererFromGame');
   return getTacticalRendererOverrideRowsCached(ops, () => buildTacticalTerrainOverridesForRendererFromGameUncached(ops));
@@ -877,6 +794,7 @@ function buildTacticalTerrainOverridesForRendererFromGameUncached(ops: ControlDb
   isAirport?: boolean;
   isSeaport?: boolean;
   isRubble?: boolean;
+  isFortified?: boolean;
 }> {
   logDebug('gameDb buildRes4TerrainOverridesForRendererFromGameUncached');
   if (!isTerrainClassificationCacheLoaded()) {
@@ -894,6 +812,7 @@ function buildTacticalTerrainOverridesForRendererFromGameUncached(ops: ControlDb
         isAirport: false,
         isSeaport: false,
         isRubble: !!row.isRubble,
+        isFortified: false,
       },
     ])
   );
@@ -906,6 +825,7 @@ function buildTacticalTerrainOverridesForRendererFromGameUncached(ops: ControlDb
       isAirport: feature.isAirport,
       isSeaport: feature.isSeaport,
       isRubble: feature.isRubble,
+      isFortified: feature.isFortified,
     });
   }
   const rows = [...mergedByH3.values()].sort((a, b) => a.h3Index.localeCompare(b.h3Index));

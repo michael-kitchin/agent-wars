@@ -315,7 +315,7 @@ export function collectAggregatedPossibleActionRows(args: {
           return rememberComputedHexList(
             ferryDestByKey,
             `${unit.h3Index}|tactical-ferry`,
-            () => collectTacticalLegalFerryDestinationHexes(tacticalBattle, unit.h3Index)
+            () => collectTacticalLegalFerryDestinationHexes(tacticalBattle, unit.h3Index, unit.player)
           );
         }
         return rememberComputedHexList(

@@ -12,6 +12,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { projectHexBoundaryToContainerPoints, shouldDrawTacticalChildHexInViewport } from '../map/terrainView';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
+import { drawFortifiedCellTicks, fortificationTickColor } from './fortificationTickDrawing';
 import { fillHexTerrain } from './terrainVisualStyles';
 
 /**
@@ -75,6 +76,10 @@ export function paintBattleFootprintTerrain(
     ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
     drawClosedPath();
     ctx.stroke();
+    const fortOwner = tactical.tacticalFortificationOwnerByH3?.[child];
+    if (fortOwner && !deps.isMapInspectionModeHeld()) {
+      drawFortifiedCellTicks(ctx, pts, child, fortificationTickColor(fortOwner, true));
+    }
   }
 }
 

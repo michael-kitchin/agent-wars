@@ -1,5 +1,6 @@
-import type { BuildUnitType } from './ipcTypes';
+import type { BuildQueueItemType, BuildUnitType } from './ipcTypes';
 import { activeGameMap } from './activeGameMap';
+import { FORTIFICATION_COST_INFANTRY_MULTIPLIER, FORTIFICATION_QUEUE_ITEM } from './fortificationRules';
 
 /**
  * Returns the purchase cost of one unit on the active map.
@@ -91,4 +92,29 @@ export function missileRangeHexes(): number {
  */
 export function strategicUrbanCellsDestroyedPerHit(): number {
   return activeGameMap().rules.strategicStrikeUrbanCells;
+}
+
+/**
+ * Returns the production cost of fortifying one intact city cell.
+ *
+ * Purpose: A fortification costs the same as one infantry unit on the loaded map.
+ * When to use: Queue spend, the build popup, and the production prompt.
+ * Expected outcome: `infantryCost` times `FORTIFICATION_COST_INFANTRY_MULTIPLIER`.
+ * Exceptions: None.
+ */
+export function fortificationCostPerCell(): number {
+  return activeGameMap().rules.infantryCost * FORTIFICATION_COST_INFANTRY_MULTIPLIER;
+}
+
+/**
+ * Returns the production cost of one queued item on the active map.
+ *
+ * Purpose: Queue spend and estimates charge a fortification without treating it as a unit.
+ * When to use: Keep-building refill, turn estimates, and the production spend loop.
+ * Expected outcome: `fortificationCostPerCell` for a fortification. `unitCostFor` for a unit.
+ * Exceptions: Throws when `itemType` is not a build-queue item. `unitCostFor` throws for an unknown unit.
+ */
+export function buildQueueItemCostFor(itemType: BuildQueueItemType): number {
+  if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
+  return unitCostFor(itemType);
 }

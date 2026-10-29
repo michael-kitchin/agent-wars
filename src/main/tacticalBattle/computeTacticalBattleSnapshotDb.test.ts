@@ -7,10 +7,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CombatUnit } from '../combatUnitTypes';
 import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../gameActions/meleeInterceptCandidates';
-import { dbGetOne, dbRun, isDbReady, listUnitsForSnapshot } from '../gameDb';
+import { dbGetOne, dbRun, isDbReady, listFortifiableCellsForHex, listUnitsForSnapshot, setHexController, setTacticalCellFortified } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
@@ -100,6 +101,24 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
       const parsed = parseTacticalSubUnitId(sub.id);
       assert.ok(parsed, `expected compact sub-unit id, got ${sub.id}`);
       assert.equal(parsed.parentUnitId, sub.parentUnitId);
+    }
+  });
+});
+
+test('defenders occupy fortified core cells and attackers do not', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-fort-place-', ({ targetStrategicH3 }) => {
+    setHexController(targetStrategicH3, HUMAN_SEAT_ID);
+    const core = new Set(tacticalBattleFootprint(targetStrategicH3).coreChildH3Indexes);
+    const fortified = listFortifiableCellsForHex(targetStrategicH3).filter((cell) => core.has(cell)).slice(0, 2);
+    assert.ok(fortified.length >= 2, 'contested hex needs two fortifiable core cells');
+    for (const cell of fortified) setTacticalCellFortified(cell, true);
+    const result = computeTacticalBattleSnapshot(targetStrategicH3, 'fortified-placement');
+    assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
+    const placed = result.snapshot!.subUnits;
+    for (const cell of fortified) {
+      const occupants = placed.filter((sub) => sub.h3Index === cell);
+      assert.ok(occupants.some((sub) => sub.player === HUMAN_SEAT_ID), cell);
+      assert.equal(occupants.every((sub) => sub.player === HUMAN_SEAT_ID), true, cell);
     }
   });
 });

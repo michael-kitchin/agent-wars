@@ -31,7 +31,7 @@ Let a hex's controller fortify its intact city cells through the build queue. A 
 
 ## Background
 
-These facts were read from engine 2.10.0, which includes the missile work. Re-check each one where a phase uses it.
+These facts were read from the current branch: engine 2.10.0 with the missile work, plus the follow-up commit that moved missile strike sentences into loss sections. Re-check each one where a phase uses it.
 
 - **Per-cell infrastructure** lives in `res_t_feature_overrides(h3_index, parent_h3_index, terrain_kind, is_urban, is_airport, is_seaport, is_rubble)` ([`src/main/gameDb/schema.ts`](../src/main/gameDb/schema.ts)). Seeding inserts a row for every urban, airport, or seaport cell.
   - Airport and seaport strikes and missiles can leave a cell with `is_urban = 1` and `is_rubble = 1`.
@@ -85,14 +85,19 @@ These facts were read from engine 2.10.0, which includes the missile work. Re-ch
   - The strategic draw sequence in `gameScene.ts` is `drawTerrainHexes(ctx); drawTacticalTerrainHexes(ctx); drawScenarioHomeRegionOutlines(ctx);`.
   - Zoomed-in cells are drawn by the child loop of `drawTacticalTerrainHexes`. Battle cells are drawn by `paintBattleFootprintTerrain` ([`src/renderer/rendering/tacticalBattleTerrainPaint.ts`](../src/renderer/rendering/tacticalBattleTerrainPaint.ts)).
   - Hex boundaries come from H3. At odd resolutions a boundary often has 7–10 vertices, because H3 adds near-collinear "distortion" vertices. Pentagons have 5 corners. The latitude clamp near the poles can produce duplicate points.
-- **Turn report.** The Updates toast is built by `announceResolutionTurnUpdate` ([`src/renderer/gameplay/readyResolutionAnnouncements.ts`](../src/renderer/gameplay/readyResolutionAnnouncements.ts)) from `buildConsolidatedTurnUpdateToastMessage` ([`src/shared/consolidatedTurnUpdateToast.ts`](../src/shared/consolidatedTurnUpdateToast.ts)).
-  - `readyHandler.ts` calls it only when the turn has playback (`needsAnimation`). The existing deployed-units line has the same limit. Leave that gate alone.
-  - There is no air-strike Updates line today.
+- **Turn report.** The turn-update toast is built by `announceResolutionTurnUpdate` ([`src/renderer/gameplay/readyResolutionAnnouncements.ts`](../src/renderer/gameplay/readyResolutionAnnouncements.ts)) from `buildConsolidatedTurnUpdateToastMessage` ([`src/shared/consolidatedTurnUpdateToast.ts`](../src/shared/consolidatedTurnUpdateToast.ts)).
+  - **Loss sections.** Each side that lost a visible unit, lost hexes, or controlled a hex hit by a visible missile launch gets a loss section (`buildTurnLossSections` in `src/shared/turnLossSections.ts`). A section holds cause lines, then that side's missile strike sentences, then its hex sentences.
+  - **Missile lines.** `missileStrikeLines` entries are `MissileStrikeToastLine` (`{ controllerId, line }`). `splitMissileStrikeLines` sends a seat-controlled strike to that seat's section, and a neutral or uncontrolled one to Updates.
+  - **Updates.** Updates holds deployments, caps, the combat-activity fallback, the neutral or uncontrolled missile sentences, and finally the unknown-battle line.
+  - **Gate.** `readyHandler.ts` calls `announceResolutionTurnUpdate` only when the turn has playback (`needsAnimation`). The existing deployed-units line has the same limit. Leave that gate alone.
+  - There is no air-strike line in the turn report today.
 - **Import cycles.** `npm run check:circular` already fails. It reports the same four existing cycles noted in the missile plan, against an empty baseline. This work must not change that output.
 
 ## Locked decisions
 
 These came from the human. Do not reopen them.
+
+Two decisions were revised so the code could follow them. The display formula no longer lights an edge when the fortified count is 0, and it no longer asks for more edges than the hex has. Battle placement keeps today's missile-first loop: missiles land first, then the controller's other sub-units take the remaining fortified core cells. The snapshot helper is `isExploredEnemyFortifiedHex`. It does not check occupancy. The validator pairs it with `!hasEnemy`. The siege test that landed is `src/main/gameActions/fortificationSiege.test.ts` (one infantry, two forts, two melee phases). The twenty-turn ready loop below was not used. `readyTypes.ts` was 841 lines when this work finished.
 
 - **What is fortified.** One intact city cell at a time. A hex can hold as many fortifications as it has intact city cells. Airport-only and seaport-only cells cannot be fortified. There are no other limits for now.
 - **Ownership.** A fortification belongs to whoever controls its strategic hex. It is never stored with an owner. After a knockout the hex goes to Neutral; its fortifications stay and belong to Neutral.
@@ -121,20 +126,20 @@ These came from the human. Do not reopen them.
 
   Unfortified cells roll per flag as today.
 - **Tactical battles.**
-  - **Placement.** Defenders (the controller's sub-units) are placed first, one sub-unit on each fortified core cell. The rest of their sub-units are placed by the existing rules. Missiles keep their birth-cell rule. No side is ever placed on a cell fortified by another owner.
+  - **Placement.** Missiles still land first, including on a friendly fortified cell. Then the controller's other sub-units take the remaining fortified core cells, one each, before any other side. No side is placed on a cell fortified by another owner. `orderParentsForFortifiedPlacement` is missiles, then that defender's other parents, then the rest.
   - **Hits.** A fortified core cell absorbs one hit aimed at its controller's sub-units on that cell.
   - **Fire at infrastructure.** Fire at a fortified cell's infrastructure strips the fortification first. The cell is rubbled only after that.
   - **Movement.** A unit cannot march or ferry into any footprint cell fortified by another owner, core or margin, until that fortification is gone. A fortification removed during a beat unblocks movement from the next beat.
   - **Margin cells.** Fortifications on margin cells block movement but are never struck or soaked, because a battle never changes a margin hex.
 - **Display.**
   - **Pattern A:** four short ticks per edge, evenly spaced, perpendicular to the edge, pointing inward, in the controller's map color.
-  - **Strategic hexes** light `max(1, round(E × fortified ÷ intact city cells))` of their `E` edges (6, or 5 on a pentagon), clockwise from the topmost corner. A tactical cell shows the full pattern.
+  - **Strategic hexes** light 0 edges when the fortified count is 0. Otherwise they light `round(E × fortified ÷ max(intact, fortified))` edges, clamped to 1..E. `E` is 6, or 5 on a pentagon, clockwise from the topmost corner. A tactical cell shows the full pattern. The helper is `litFortificationEdgeCount`.
   - **Visibility.** Ticks are drawn wherever city and rubble state is drawn today (explored hexes), and hidden while terrain inspection is held.
   - **Unknown controller.** When the viewer cannot see who controls the hex, the ticks are gray.
   - **Tooltips and legend.** The hex tooltip shows `Fortified: N of M city cells`. A fortified cell's tooltip says `Fortified urban`. The terrain legend gains a Fortified row.
 - **Fog.** Enemies see fortifications wherever they see a hex's city and rubble state: on explored hexes.
 - **Reporting.**
-  - **Per-hex line.** Each fortified hex that lost fortifications on the strategic map this turn, from any source, adds one Updates line: `Fortifications at Vienna absorbed 4 hits; 16 remain.` That line also reports air-strike losses, because air strikes have no Updates line of their own.
+  - **Per-hex line.** Each fortified hex that lost fortifications on the strategic map this turn, from any source, adds one line: `Fortifications at Vienna absorbed 4 hits; 16 remain.` It goes in the loss section of the side that owned those fortifications (the hex's controller while they were lost), after that side's missile strike sentences and before its hex sentences. Unlike a missile sentence, a Neutral-owned hex's line goes under Neutral Losses, not Updates. That line also reports air-strike losses, because air strikes have no turn-report line of their own.
   - **Missiles.** The missile strike line counts fortifications.
   - **Production.** The human sees how many cells were fortified this turn, and which queues paused because every city cell is fortified.
   - **Battles.** Fortifications lost inside a tactical battle are shown only by the battle map's ticks.
@@ -178,7 +183,7 @@ These came from the human. Do not reopen them.
   | `src/renderer/rendering/terrainVisualStyles.ts` | 879 | at most 3 lines |
   | `src/main/gameDb.test.ts` | 871 | at most 25 lines |
   | `src/main/gameDb.ts` | 825 | at most 10 lines |
-  | `src/shared/ipc/readyTypes.ts` | 812 | at most 45 lines |
+  | `src/shared/ipc/readyTypes.ts` | 841 | at most 45 lines above the earlier 813 |
   | `src/renderer/rendering/gameScene.ts` | 810 | at most 6 lines |
   | `src/main/tacticalBattle/tacticalStrategicOrderPhases.ts` | 805 | at most 15 lines |
   | `src/main/combatResolution.ts` | 766 | at most 60 lines |
@@ -229,7 +234,7 @@ Spell these exactly. Later phases refer to them.
 | `FORTIFICATION_COST_INFANTRY_MULTIPLIER` | `1` | same |
 | `fortificationCostPerCell(): number` | `activeGameMap().rules.infantryCost * FORTIFICATION_COST_INFANTRY_MULTIPLIER` | `src/shared/gameRules.ts` |
 | `BuildQueueItemType` | `BuildUnitType \| typeof FORTIFICATION_QUEUE_ITEM` | `src/shared/ipc/productionTypes.ts` |
-| `ALL_BUILD_QUEUE_ITEM_TYPES` | `[...ALL_BUILD_UNIT_TYPES, FORTIFICATION_QUEUE_ITEM]` (fortification last) | same |
+| `ALL_BUILD_QUEUE_ITEM_TYPES` | `[...ALL_BUILD_UNIT_TYPES, FORTIFICATION_QUEUE_ITEM] as const` (fortification last) | same |
 | `isBuildQueueItemType(value: unknown)` | type guard over `ALL_BUILD_QUEUE_ITEM_TYPES` | same |
 | `buildQueueItemCostFor(item: BuildQueueItemType): number` | `fortificationCostPerCell()` for a fortification, otherwise `unitCostFor(item)` | `src/shared/gameRules.ts` |
 | `getAvailableBuildQueueItemTypes(urban, seaports, airports, intactCityCells)` | `getAvailableBuildUnitTypes(urban, seaports, airports)`, plus `'fortification'` when `intactCityCells > 0` | `src/main/productionRules.ts` |
@@ -275,8 +280,8 @@ Spell these exactly. Later phases refer to them.
 
 | Name | Value | Lives in |
 | --- | --- | --- |
-| briefing column | `Fortified`, valued `N/M` (fortified / intact city cells) | production table; missile targets table |
-| tactical map glyph | `F` / `f` (uppercase when the AI's side controls the cell's hex) | `src/main/briefing/map/hexMapRenderer.ts` |
+| briefing column | `FORTIFIED_COLUMN_HEADER` (`Fortified`), valued `N/M` (fortified / intact city cells) | production table; missile targets table |
+| tactical map glyph | `F` / `f` (uppercase when the fortification is the AI's) | `src/main/briefing/map/hexMapRenderer.ts` |
 
 ## Player-facing and model-facing text
 
@@ -293,26 +298,30 @@ All of these live in new [`src/shared/fortificationRules.ts`](../src/shared/fort
 | `FORTIFIED_CELL_BLOCKED_HOVER` | `Blocked: Fortified` |
 | `formatFortificationReportLine({ placeName, lost, remaining })` | ``Fortifications at ${placeName} absorbed ${lost} ${hitWord}; ${remainingPhrase}.``<br>`hitWord`: `hit` when `lost` is 1, otherwise `hits`.<br>`remainingPhrase`: `none remain` for 0, `1 remains` for 1, otherwise ``${n} remain``.<br>Example: `Fortifications at Vienna absorbed 4 hits; 16 remain.` |
 | `formatFortificationsBuiltLine(count)` | `1 city cell fortified.` or ``${count} city cells fortified.`` |
-| `formatFortificationQueuePausedLine(placeNames)` | One name: ``Every city cell at ${name} is fortified, so its build queue is paused.``<br>Several: ``Every city cell is fortified at ${list}, so their build queues are paused.``<br>`list` joins the names with `, ` and puts ` and ` before the last. |
+| `formatFortificationQueuePausedLine(placeNames)` | One name: ``Every city cell at ${name} is fortified, so its build queue is paused.``<br>Several: ``Every city cell is fortified at ${list}, so their build queues are paused.``<br>`list` uses the serial comma, as other Updates lists do: `A and B`, `A, B, and C`. Write the join in this file; do not import `joinWithSerialComma` from `consolidatedTurnUpdateToast.ts`, which would create an import cycle. |
 | `FORTIFICATION_UNNAMED_PLACE` | `an unnamed hex` |
 | `KEEP_BUILDING_FORTIFICATION_NOTE` (in `src/renderer/chrome/controlTooltipText.ts`) | `A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.` |
+| `FORTIFICATION_NOT_AVAILABLE_REASON` | `This hex has no intact city cell to fortify.` |
+| `FORTIFIED_COLUMN_HEADER` | `Fortified` (AI briefing table header) |
+| `formatFortifiedFeaturePart(n)` | ``${n} fortified`` (AI Hex Features part) |
+| `FORTIFIED_MAP_LEGEND_FRAGMENT` | `, F/f fortified city cell (F = yours)` (AI tactical map legend) |
 | `buildFortificationRule(gates)` (in new `src/main/openRouter/promptSpec/gameRuleFortificationText.ts`) | see Phase 8 |
 | `buildFortificationProductionRulePart()` (same file) | see Phase 8 |
 
 ## Shared types
 
-[`src/shared/ipc/fortificationTypes.ts`](../src/shared/ipc/fortificationTypes.ts) is created in Phase 5 and exported from [`src/shared/ipc/index.ts`](../src/shared/ipc/index.ts):
+[`src/shared/ipc/fortificationTypes.ts`](../src/shared/ipc/fortificationTypes.ts) is created in Phase 5 and exported from [`src/shared/ipc/index.ts`](../src/shared/ipc/index.ts). `ownerId` is read before control resolution because a hex whose last fortification fell this turn may change hands in that step, and the line belongs to the side that lost them. Only a controlled hex holds fortifications, so `ownerId` is null only in a broken state; such a line goes to Updates.
 
 ```ts
 export interface FortificationReport {
   readonly h3Index: string;
-  readonly controllerId: string | null; // controller after this turn's control resolution
+  readonly ownerId: string | null;      // the hex's controller while the fortifications were lost, read before this turn's control resolution
   readonly lost: number;                // fortifications removed this turn on the strategic map, from every source
-  readonly remaining: number;           // fortifications left after control resolution, before this turn's production
+  readonly remaining: number;           // fortifications left after this turn's fighting, before this turn's production
 }
 ```
 
-[`src/main/fortificationCombat.ts`](../src/main/fortificationCombat.ts) is created in Phase 2 with the tally. Phase 5 adds the rest.
+[`src/main/fortificationCombat.ts`](../src/main/fortificationCombat.ts) is created in Phase 2 with the tally. Phase 5 adds the hooks, the context, and `takeHitsInCasualtyOrder`. Phase 6 adds `runSiegeRolls` and `rollRangedAgainstFortifiedHex`.
 
 ```ts
 export type FortificationLossTally = Map<string, number>;
@@ -390,7 +399,7 @@ Then add the two counts everywhere the three existing counts appear in the moved
 
 - **Strategic rows.** `StrategicInfrastructureRow`, `StrategicInfrastructureDbRow`, `mapStrategicInfrastructureDbRow`, `listStrategicInfrastructureRowsInternal`, and `getStrategicInfrastructureForHex` gain `fortifiedCount` and `fortifiableCount`. Missing rows read as 0. Leave `setStrategicInfrastructureForHex` unchanged.
 - **Cell rows.** `TacticalFeatureOverrideRow` and `listTacticalFeatureOverridesForGame` gain `isFortified`.
-- **Cell updates.** `updateTacticalFeatureOverrideRow`'s patch type gains `isFortified`. It reads the current value like the other four flags and writes all five. A patch that omits `isFortified` keeps the stored value.
+- **Cell updates.** `updateTacticalFeatureOverrideRow`'s patch type gains `isFortified`. It reads the current value like the other four flags and writes all five. A patch that omits `isFortified` keeps the stored value. The wrapper of the same name in `controlInfrastructureAccess.ts`, which every caller imports through `../gameDb`, has its own patch type: add `'isFortified'` to its `Pick` too.
 - **Renderer rows.** `buildTacticalTerrainOverridesForRendererFromGameUncached` copies `isFortified` onto the renderer rows. Add `isFortified?: boolean` to every inline copy of the renderer row type:
   - `controlInfrastructure.ts` (two places);
   - `controlInfrastructureAccess.ts`;
@@ -417,7 +426,7 @@ Add thin wrappers that pass `gameDbOps` in a new [`src/main/gameDb/fortification
 
 - `GameStateSnapshot.strategicInfrastructure` rows gain `fortifiedCount?: number` and `fortifiableCount?: number`. They are optional so existing fixtures still compile. `getGameStateSnapshot` always fills both, still unfiltered.
 - `TacticalTerrainOverrideRow` and `TacticalRendererOverrideRow` gain `isFortified?: boolean`.
-- The renderer's `S.tacticalTerrainOverridesByH3` entry type (`src/renderer/core/state.ts`) gains `isFortified: boolean`. `deriveInfrastructureOverlayState` (`src/renderer/rendering/infrastructureOverlayState.ts`) fills it as `row.isFortified === true`.
+- The renderer's `S.tacticalTerrainOverridesByH3` entry type (`src/renderer/core/state.ts`) gains `isFortified: boolean`. `deriveInfrastructureOverlayState` (`src/renderer/rendering/infrastructureOverlayState.ts`) fills it as `row.isFortified === true`. `TacticalOverlayEntry`, the value type of the map it builds (same file), gains `isFortified: boolean` too, so the assignment in `entryCallbacks.ts` still type-checks.
 - `computeTacticalFeatureOverrideSignature` adds `SUM(is_fortified)` and `SUM(is_fortified * rowid)`. The second term changes when one cell is fortified and another stripped in the same turn, which the plain sum would miss.
 
 **Tests.**
@@ -429,8 +438,8 @@ Add thin wrappers that pass `gameDbOps` in a new [`src/main/gameDb/fortification
   - `setTacticalCellFortified` on an h3 index with no row throws.
   - The `res_s_build_queue` table accepts a row with `unit_type 'fortification'`.
 - `src/main/gameDb.test.ts`:
-  - In the existing drift-reconcile test, also corrupt `fortified_count` and `fortifiable_count`, and check that both are reconciled.
-  - `assertStrategicMatchesTacticalRollupForHex` also compares both counts.
+  - In the existing drift-reconcile test, also set `fortified_count = 7, fortifiable_count = 7` in its corrupting UPDATE, and check that both are reconciled.
+  - `getStrategicCountsDerivedFromTactical` gains the two `SUM(CASE …)` columns and returns them, and `assertStrategicMatchesTacticalRollupForHex` compares both counts.
   - Extend `testRendererTacticalOverridesCacheReflectsDbChanges`: fortifying cell A and stripping cell B between two reads changes the rows returned.
 - **Literals.** The compiler lists every test literal of `StrategicInfrastructureRow`; add `fortifiedCount: 0, fortifiableCount: 0` to each. Add `isFortified: false` to every `TacticalFeatureOverrideRow` literal.
 
@@ -453,6 +462,7 @@ No `doc/` edits.
 
 - **`replaceRandomTacticalFeaturesWithRubble`** returns `{ readonly rubbled: number; readonly fortificationsStripped: number }` instead of a number.
   - The candidate filter, the pick, and the one `next()` draw per picked cell are unchanged.
+  - The loop still stops after `count` picks, strips and rubbles together. Keep a separate counter for each result.
   - For each picked row with `isFortified`, call `updateTacticalFeatureOverrideRow(row.h3Index, { isFortified: false })` and count a strip.
   - Otherwise, apply today's rubble update and count a rubble.
 - **Options.** `ApplyInfrastructureDestructionOptions` gains `readonly fortificationTally?: FortificationLossTally`.
@@ -483,7 +493,7 @@ No `doc/` edits.
   ```
   A fortified row never reaches `updateClearedFlags`, which would write rubble. Rows without a fortification roll per flag as today.
 - **Tally.** `resolveMissileLaunchPhase` gains a third parameter, `fortificationTally?: FortificationLossTally`. Record each launch's destroyed count for its target hex.
-- **Strike line.** `formatMissileStrikeLine` (`src/shared/missileStrikeReport.ts`) adds `flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, 'fortification', 'fortifications')` as the last part. Example: `Missile strike on Vienna: 9 city cells and 10 fortifications destroyed.` A seat-controlled sentence is already in that side's loss section. A neutral or uncontrolled sentence stays in Updates.
+- **Strike line.** `formatMissileStrikeLine` (`src/shared/missileStrikeReport.ts`) adds `flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, 'fortification', 'fortifications')` as the last part. Example: `Missile strike on Vienna: 9 city cells and 10 fortifications destroyed.`
 - **Literals.** The compiler lists every `MissileLaunchRecord` literal. Add `fortificationsBefore: 0, fortificationsDestroyed: 0` to each, including the `record()` helper in `src/shared/missileStrikeReport.test.ts`.
 
 **Tactical ranged rubble** (`applyTacticalRangedRubbleToCell`). Right after `rowForCell` is found, when it is fortified:
@@ -496,7 +506,7 @@ The city cell and its terrain are unchanged, so callers that refresh terrain on 
 
 **Tests.** Create [`src/main/gameActions/fortificationStrikes.test.ts`](../src/main/gameActions/fortificationStrikes.test.ts) on a temp match. Fortify cells with `setTacticalCellFortified`.
 
-- **Urban strike on a fully fortified hex.** `applyInfrastructureDestructionEffects(hex, 'urban', next, { fortificationTally })`, on a hex whose intact city cells are all fortified:
+- **Urban strike on a fully fortified hex.** Use a hex with more intact city cells than `strategicUrbanCellsDestroyedPerHit()`, and fortify all of them. Then `applyInfrastructureDestructionEffects(hex, 'urban', next, { fortificationTally })`:
   - rubbles nothing;
   - strips `min(strategicUrbanCellsDestroyedPerHit(), fortified)`;
   - records that number in the tally.
@@ -505,7 +515,7 @@ The city cell and its terrain are unchanged, so callers that refresh terrain on 
 - **Missiles** (`src/main/gameActions/missileLaunchResolution.test.ts`):
   - With every die face 1, a fortified cell keeps its urban flag and loses its fortification, and the record shows `fortificationsDestroyed: 1`.
   - With every face 20, it keeps both.
-- **Strike line** (`src/shared/missileStrikeReport.test.ts`). A record with `fortificationsBefore: 12, fortificationsDestroyed: 10` produces the example line above.
+- **Strike line** (`src/shared/missileStrikeReport.test.ts`). With `placeName: 'Vienna'` and a record with `urbanBefore: 21, urbanDestroyed: 9, fortificationsBefore: 12, fortificationsDestroyed: 10` and no airports or seaports, `formatMissileStrikeLine` produces the example line above.
 
 **Verify:**
 
@@ -575,14 +585,15 @@ The compiler may report more sites where a queue entry's type flows. Widen those
   - `pruneBuildQueueForInfrastructureState`. A fortification row then survives pruning while the hex has an intact city cell.
 - **Keep building.** `getKeepBuildingForHex` accepts a stored type when `isBuildQueueItemType` is true.
 - **Payload guards.** `parseBuildQueueUpdatePayload` and `parseBuildQueueTemplatePayload` (`src/main/ipcPayloadGuards.ts`) use `isBuildQueueItemType`. In `src/main/ipc/buildQueueSealiftIpcHandler.ts`, widen the payload's `unitType` annotation.
+- **Rejection text.** `buildQueue.ts` rejects an unavailable item with ``Unit type "${unitType}" is not available for this hex.`` in two places (the update path and the template skip). When the item is `'fortification'`, use `FORTIFICATION_NOT_AVAILABLE_REASON` instead. Unit messages are unchanged.
 
 **Keep the AI unaware for now.** If the AI's tools saw `fortification` in `availableUnitTypes`, they would offer an item they cannot accept yet. They would also change the AI's cap rules, because `fortification` is never capped. Pass `availableUnitTypes.filter(isBuildUnitType)` instead of `availableUnitTypes` in three places:
 
 - `summarizeQueue` (`src/main/tools/productionTools.ts`);
 - `setBuildQueue`'s cap check and its "not available" message (same file);
-- `normalizeControlledHexQueueRow` (`src/main/openRouter/briefingSections.ts`).
+- `normalizeControlledHexQueueRow` (`src/main/openRouter/briefingSections.ts`). There the list is the local `availableList`, built from `unknown`; filter it with `isBuildUnitType`, imported from `../productionRules`.
 
-One existing test reads the raw snapshot, not an AI view. In `productionTools.test.ts`, change `assert.deepEqual(queue.availableUnitTypes, ['infantry']);` to `assert.deepEqual(queue.availableUnitTypes.filter(isBuildUnitType), ['infantry']);`. Whether that hex has an intact city cell depends on the seeded map, so the raw list may or may not end with `fortification`.
+One existing test reads the raw snapshot, not an AI view. In `productionTools.test.ts`, change `assert.deepEqual(queue.availableUnitTypes, ['infantry']);` to `assert.deepEqual(queue.availableUnitTypes.filter(isBuildUnitType), ['infantry']);`, importing `isBuildUnitType` from `../productionRules`. Whether that hex has an intact city cell depends on the seeded map, so the raw list may or may not end with `fortification`.
 
 **Fortification placement.** Create [`src/main/gameActions/fortificationProduction.ts`](../src/main/gameActions/fortificationProduction.ts):
 
@@ -650,8 +661,8 @@ The module comment says why the selection uses its own seeded generator: product
   - `humanFortificationQueuePausedHexes`, omitted when empty.
 
   Add both to `readyTypes.ts`, and to `pickReadyResolutionIpcMirrorFields` with its field union.
-- **Built line.** `buildOtherTurnUpdatePrimaryLines` (`src/shared/consolidatedTurnUpdateToast.ts`) adds `formatFortificationsBuiltLine(n)` after the deployed line when `humanFortificationsBuilt` is above 0.
-- **Toast argument.** `buildConsolidatedTurnUpdateToastMessage` gains `fortificationLines?: readonly string[]`. Its lines are trimmed and appended in Updates after the missile sentences that remain there (a neutral or uncontrolled hex), before the unknown-battle line. A seat-controlled missile sentence is already in that side's loss section and is not copied into Updates.
+- **Built line.** `buildOtherTurnUpdatePrimaryLines` (`src/shared/consolidatedTurnUpdateToast.ts`) adds `formatFortificationsBuiltLine(n)` after the deployed line and before the cap line, when `humanFortificationsBuilt` is above 0.
+- **Toast argument.** `buildConsolidatedTurnUpdateToastMessage` gains `fortificationLines?: readonly string[]`, for Updates. Its lines are trimmed, blank ones dropped, and appended right after the missile sentences that stay in Updates, before the unknown-battle line.
 - **Paused line.** It needs place names, so it is built in the renderer. Create [`src/renderer/gameplay/fortificationUpdateLines.ts`](../src/renderer/gameplay/fortificationUpdateLines.ts):
   ```ts
   export async function fortificationUpdateLinesFor(readySlice: ReadyResult): Promise<string[]>
@@ -663,13 +674,13 @@ The module comment says why the selection uses its own seeded generator: product
 
 **Build UI.**
 
-- **`buildQueuePopup.ts`.** The type select already lists `snapshot.availableUnitTypes`. `formatBuildUnitTypeOptionLabel` returns `FORTIFICATION_QUEUE_ITEM_LABEL` for a fortification and keeps today's labels for units. Cast to `BuildQueueItemType` wherever it casts to `BuildUnitType` today.
-- **`buildQueueMultiPopup.ts` and `buildQueueMultiSelect.ts`.** Every list ordered by `ALL_BUILD_UNIT_TYPES` uses `ALL_BUILD_QUEUE_ITEM_TYPES` instead, for example `unionAvailableBuildUnitTypes` and the option filter. `filterTemplateForBuildHex` only needs its types widened.
+- **`buildQueuePopup.ts`.** The type select already lists `snapshot.availableUnitTypes`, and capitalizes each type inline for its label. Label a fortification option with `FORTIFICATION_QUEUE_ITEM_LABEL` instead; unit labels are unchanged. Cast to `BuildQueueItemType` wherever it casts to `BuildUnitType` today.
+- **`buildQueueMultiPopup.ts` and `buildQueueMultiSelect.ts`.** Every list ordered by `ALL_BUILD_UNIT_TYPES` uses `ALL_BUILD_QUEUE_ITEM_TYPES` instead, for example `unionAvailableBuildUnitTypes` and the option filter. `filterTemplateForBuildHex` only needs its types widened. `formatBuildUnitTypeOptionLabel` (`buildQueueMultiSelect.ts`) uses `FORTIFICATION_QUEUE_ITEM_LABEL` as the type label for a fortification and keeps its eligibility suffix, such as `(all hexes)`.
 - **`productionOverlayHelpers.ts`** (`formatProductionQueueAwareLabel`):
   - When `nextUnitType` is `'fortification'` and the hex's `fortifiableCount ?? 0` in `strategicInfrastructure` is 0, show `∞t`.
   - Otherwise estimate with `buildQueueItemCostFor`.
   - Index the cap tables only for unit types (`isBuildUnitType`).
-- **`controlTooltipText.ts`.** `keepBuildingTooltipText` is a string constant. Append `KEEP_BUILDING_FORTIFICATION_NOTE` to its text as a final sentence, by interpolation.
+- **`controlTooltipText.ts`.** `keepBuildingTooltipText` and `multiKeepBuildingTooltipText` are string constants for the single-hex and multi-hex popups. Append `KEEP_BUILDING_FORTIFICATION_NOTE` to each as a final sentence, by interpolation.
 
 **Tests.**
 
@@ -689,8 +700,8 @@ The module comment says why the selection uses its own seeded generator: product
   - **Keep building.** Arm Keep building with `fortification` on an empty queue, with one fortifiable cell and points for three. It fortifies one cell, stays armed, and lists the hex as paused.
 - `src/shared/consolidatedTurnUpdateToast.test.ts`:
   - `humanFortificationsBuilt: 1` gives `1 city cell fortified.`
-  - `fortificationLines` appear after the missile lines and before the unknown-battle line.
-- [`src/shared/fortificationRules.test.ts`](../src/shared/fortificationRules.test.ts): `formatFortificationQueuePausedLine` for one name and for three names.
+  - `fortificationLines` appear in Updates after a neutral missile sentence and before the unknown-battle line.
+- [`src/shared/fortificationRules.test.ts`](../src/shared/fortificationRules.test.ts): `formatFortificationQueuePausedLine` for one name and for three names (`Vienna, Prague, and Berlin`).
 - `src/main/productionRules.test.ts`:
   - `getAvailableBuildQueueItemTypes(1, 0, 0, 1)` ends with `'fortification'`;
   - `(1, 0, 0, 0)` does not include it;
@@ -704,7 +715,7 @@ The module comment says why the selection uses its own seeded generator: product
 4. `npm start`, in a global match:
    1. The build popup's type list ends with Fortification, and its cost uses the infantry price.
    2. On a home city hex with at least 3 intact city cells and enough banked points for three fortifications, queue three fortifications and end the turn. When that turn shows the Updates toast, it says `3 city cells fortified.` The toast appears only on turns with movement or combat, as the deployed-units line does today. If the points cover fewer than three, the cells are fortified over several turns, and the lines add up to 3.
-   3. Queue more fortifications than the hex has city cells, and end turns until the queue pauses. Updates names the hex in the paused line, and the map label shows `∞t`.
+   3. Queue more fortifications than the hex has city cells, and end turns until the queue pauses. On that turn, move a unit so the Updates toast appears. Updates names the hex in the paused line, and the map label shows `∞t`.
 
 No `doc/` edits.
 
@@ -762,6 +773,7 @@ export function drawFortificationTicks(ctx: CanvasRenderingContext2D, args: {
   readonly lineWidthPx: number;
 }): void
 export function fortificationTickColor(controllerId: string | null, ownershipVisible: boolean): string
+export function fortificationCellTickColor(cellH3Index: string): string
 export function fortificationCornerCount(h3Index: string): number
 export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, deps: StrategicFortificationTickDeps): void
 ```
@@ -770,8 +782,14 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
 - **`fortificationTickColor`.** Export `resolveControllerBorderColor` from `homeRegionBorderDrawing.ts`, unchanged otherwise.
   - When ownership is visible, return `resolveControllerBorderColor(controllerId)`.
   - Otherwise, return `resolveControllerBorderColor(null)`, the gray used for an unknown controller.
+- **`fortificationCellTickColor`** gives a cell's ticks the color of its parent hex. The cell draw loops do not have the controller map or the viewer's perspective, so it reads them itself:
+  1. `parent = strategicParentOf(cellH3Index)` (`src/shared/h3Resolutions.ts`).
+  2. The controller is the `controllerPlayerId` of the parent's row in `S.gameState.strategicControl`, or null.
+  3. `ownershipVisible` is `isHexOwnershipVisibleToPerspective({ h3Index: parent, playerPerspective: ownershipPerspective(S.gameState.playerPerspective), visibleHexes, homeRegionHexesBySeat, intersectingHomeRegionHexes })`, with `visibleHexes` and the two home-region fields built from `S.gameState` exactly as `drawTerrainHexes` builds them.
+  4. Return `fortificationTickColor(controller, ownershipVisible)`. With no game state, return the gray.
+  5. Memoize the color per parent hex, and clear the memo when `S.gameState` is a different object from the last call. Without it, every fortified cell rebuilds the same sets on every frame.
 - **`fortificationCornerCount`** returns `isPentagon(h3Index) ? 5 : 6`, with `isPentagon` from `h3-js`.
-- **Radius** is the mean distance from the corners' mean point to the corners. The map passes below skip any polygon whose radius is under `FORTIFICATION_TICK_MIN_RADIUS_PX`.
+- **Radius** is the mean distance from the corners' mean point to the corners. The three map passes below (strategic, zoomed-in cells, battle cells) skip any polygon whose radius is under `FORTIFICATION_TICK_MIN_RADIUS_PX`. `drawFortificationTicks` itself never checks the radius, so the smaller legend swatch still draws.
 - **`StrategicFortificationTickDeps`** is `{ getExploredHexSet, isMapInspectionModeHeld }`, typed as in `TerrainRenderingDeps`.
 - **`drawStrategicFortificationTicks`:**
   - **When to skip.** It returns early when a battle snapshot exists, at tactical zoom (`shouldRenderTacticalHexes()`), or while `deps.isMapInspectionModeHeld()`.
@@ -785,8 +803,10 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
 - **Strategic map** (`gameScene.ts`): right after `drawScenarioHomeRegionOutlines(ctx);` in the strategic branch, call `drawStrategicFortificationTicks(ctx, { getExploredHexSet, isMapInspectionModeHeld })`. The ticks then sit above every hex border.
 - **Zoomed-in cells** (the child loop of `drawTacticalTerrainHexes` in `terrainRendering.ts`). After each cell's stroke, when the cell's override row has `isFortified` and inspection is not held:
   - draw the full pattern (`litEdgeCount = cornerCount`) with the `CELL_FORTIFICATION_TICK_*` sizes;
-  - take the color from the cell's parent hex controller, with ownership visibility checked on the parent.
-- **Battle cells** (`paintBattleFootprintTerrain`): the same, reading the override row and the parent controller. Phase 7 switches the owner source to the battle snapshot.
+  - color it with `fortificationCellTickColor(cell)`.
+
+  Inspection is `deps.isMapInspectionModeHeld()`, which the loop already receives.
+- **Battle cells** (`paintBattleFootprintTerrain`): the same, reading the override row from `S.tacticalTerrainOverridesByH3` and coloring with `fortificationCellTickColor(cell)`. It already receives `deps.isMapInspectionModeHeld`. Phase 7 switches the owner source to the battle snapshot.
 
 **Tooltip and legend.**
 
@@ -800,7 +820,7 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
   - all edges lit;
   - tick length 2 px;
   - line width 1 px;
-  - the human seat's map color.
+  - the human seat's map color, `paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? SEAT_PALETTES[0]!.map`. The fallback covers observe mode, where the roster has no human seat.
 
 **Tests.** [`src/shared/fortificationTickGeometry.test.ts`](../src/shared/fortificationTickGeometry.test.ts):
 
@@ -882,7 +902,7 @@ export function buildFortificationReports(tally: FortificationLossTally): Fortif
   It draws a random number only when it absorbs.
 - **`isEnemyFortifiedHex(h3, attacker)`** is true when the controller is not null, is not `attacker`, and the hex's `fortifiedCount > 0`.
 - **`stripOne(h3)`** works like `absorbHit` without the owner check. It returns false when no fortified cell remains.
-- **`buildFortificationReports`** goes through each hex in the tally with a loss above 0, sorted by `h3Index`. It returns `{ h3Index, controllerId: getHexController(h3Index), lost, remaining: fortifiedCount }` for each.
+- **`buildFortificationReports`** goes through each hex in the tally with a loss above 0, sorted by `h3Index`. It returns `{ h3Index, ownerId: getHexController(h3Index), lost, remaining: fortifiedCount }` for each. Call it before control resolution (see Reports), so `ownerId` is the side that owned the fortifications.
 
 **Soak in the combat functions** (`src/main/combatResolution.ts`, `src/main/multiSideMelee.ts`). They stay free of database code and only call the hooks. With no hooks, every function behaves exactly as today.
 
@@ -938,18 +958,32 @@ export function buildFortificationReports(tally: FortificationLossTally): Fortif
 
 **Reports.**
 
-- **Ready result.** In `finalizeReadyTurnAfterMelee`, after control resolution and before production, set `ReadyResult.fortificationReports = buildFortificationReports(tally)`, omitted when empty. Add the field to `readyTypes.ts` and to `pickReadyResolutionIpcMirrorFields`.
+- **Report type.** Create `src/shared/ipc/fortificationTypes.ts` with `FortificationReport` (see Shared types), and export it from `src/shared/ipc/index.ts`.
+- **Ready result.** In `finalizeReadyTurnAfterMelee`, right before `resolveStrategicControlAfterCombatAndMovement` is called, compute `const fortificationReports = buildFortificationReports(args.fortificationTally)`. Set `ReadyResult.fortificationReports` from it, omitted when empty. Add the field to `readyTypes.ts` and to `pickReadyResolutionIpcMirrorFields`.
 - **Visibility.** Create [`src/shared/fortificationReport.ts`](../src/shared/fortificationReport.ts) with:
   ```ts
   export function fortificationReportVisibleToViewer(report: FortificationReport, viewerSeatId: string | null, exploredHexes: ReadonlySet<string>): boolean
   ```
-  A report is visible when the viewer is null (observing), when the viewer is its `controllerId`, or when the hex is in `exploredHexes`.
-- **Update lines.** `fortificationUpdateLinesFor` (renderer) builds one `formatFortificationReportLine` per visible report, before the paused line.
-  - The viewer is `reportViewerSeatId()`.
-  - The explored set is `getExploredHexSet(S.gameState)`, imported from `../core/selection`.
-  - Place names come from the same guarded lookup.
+  A report is visible when the viewer is null (observing), when the viewer is its `ownerId`, or when the hex is in `exploredHexes`.
+- **Toast routing** (`src/shared/consolidatedTurnUpdateToast.ts`):
+  - Add `FortificationToastLine`, `{ readonly ownerId: string | null; readonly line: string }`, beside `MissileStrikeToastLine`.
+  - `buildConsolidatedTurnUpdateToastMessage` gains `fortificationReportLines?: readonly FortificationToastLine[]`.
+  - Trim each line and drop blank ones. An `ownerId` that is a seat id (`isSeatId`) or `NEUTRAL_OWNER_ID` files the line under that owner. A null `ownerId` sends it to Updates, right before `fortificationLines`.
+  - Merge the owner lines with `splitMissileStrikeLines`' `byOwner` map, so each owner's missile sentences come first, then its fortification lines. Pass the merged map as the fifth argument of `buildTurnLossSections`.
+  - In `src/shared/turnLossSections.ts`, rename `missileLinesByOwner` to `strikeLinesByOwner` in `buildTurnLossSections` and `orderedOwners`, `sectionLines`' `missileLines` to `strikeLines`, and `NO_MISSILE_LINES` to `NO_STRIKE_LINES`. Callers pass the map by position, so nothing else changes. A Neutral key there already yields a Neutral Losses section.
+  - Update that file's comments in two ways. First, a section holds cause lines, then missile and fortification sentences, then hex sentences. Second, the opening rule: a side also gets a section when it owned a hex whose fortifications fell this turn and the viewer may see that report.
+- **Report lines** (renderer). Add to `fortificationUpdateLines.ts`:
+  ```ts
+  export async function fortificationReportLinesFor(
+    readySlice: ReadyResult,
+    viewer: { readonly viewerSeatId: string | null; readonly exploredHexes: ReadonlySet<string> }
+  ): Promise<FortificationToastLine[]>
+  ```
+  - It returns `{ ownerId: report.ownerId, line: formatFortificationReportLine(...) }` for each visible report, in report order. Place names come from the same guarded lookup.
+  - `announceResolutionTurnUpdate` awaits it, passing `{ viewerSeatId, exploredHexes: getExploredHexSet(S.gameState) }`. It uses the `viewerSeatId` local it already computes, and imports `getExploredHexSet` from `../core/selection`. It passes the result as `fortificationReportLines`.
+  - `fortificationUpdateLines.ts` must not import from `./readyResolutionAnnouncements`, which imports it; that would be an import cycle.
 
-  These reports always come with ranged, melee, air-strike, or missile playback, so the existing `needsAnimation` gate shows them.
+  Siege, ranged fire, and air strikes always set `needsAnimation`. A missile strike the viewer cannot see does not, so its fortification line shows only when something else animates that turn. Leave the gate alone.
 
 **Tests.**
 
@@ -961,7 +995,7 @@ export function buildFortificationReports(tally: FortificationLossTally): Fortif
 - [`src/main/gameActions/fortificationCombatLedger.test.ts`](../src/main/gameActions/fortificationCombatLedger.test.ts), on a temp match with fog off:
   - In a hex the human controls with 2 fortified cells, a human victim is absorbed twice, then not. The tally shows 2, and the hex's `fortifiedCount` is 0.
   - A victim that is not the controller's is never absorbed.
-  - `buildFortificationReports` returns `{ lost: 2, remaining: 0 }` for that hex.
+  - `buildFortificationReports` returns `{ ownerId: HUMAN_SEAT_ID, lost: 2, remaining: 0 }` for that hex.
 - [`src/main/gameActions/fortificationControl.test.ts`](../src/main/gameActions/fortificationControl.test.ts), in the pattern of `src/main/gameActionsProduction.test.ts`:
   1. Pick an AI-controlled hex with at least one intact city cell and no units, and fortify one cell.
   2. Move one human infantry there with SQL.
@@ -970,6 +1004,10 @@ export function buildFortificationReports(tally: FortificationLossTally): Fortif
 - [`src/shared/fortificationReport.test.ts`](../src/shared/fortificationReport.test.ts):
   - the line wording for 1 and 4 hits, and for 0, 1, and 16 remaining;
   - the three visibility cases.
+- `src/shared/consolidatedTurnUpdateToast.test.ts`:
+  - a fortification line owned by a seat lands in that side's section, after its missile sentence and before its hex sentence;
+  - one owned by `neutral` lands under Neutral Losses;
+  - one with a null owner lands in Updates.
 - **Existing tests.** All existing combat and Ready tests pass unchanged, apart from the `runRangedPhase` call shape.
 
 **Verify:**
@@ -980,7 +1018,7 @@ export function buildFortificationReports(tally: FortificationLossTally): Fortif
 4. `npm start`, in a global match. Fortify a frontline hex fully and leave infantry in it. When the AI attacks:
    - the units survive while fortifications fall;
    - the ticks shrink;
-   - Updates shows `Fortifications at … absorbed …`;
+   - the turn report shows `Fortifications at … absorbed …` under Your Losses;
    - the hex is not captured while any fortification remains.
 
 No `doc/` edits.
@@ -1004,7 +1042,7 @@ export function runSiegeRolls(args: {
 
 For each hex of `hexList`, in order:
 
-1. Skip the hex when it is in `excludedHexes`, or when its units do not all belong to one player.
+1. Skip the hex when it is in `excludedHexes`, when it has no units, or when its units do not all belong to one player.
 2. Let `player` be that one player. Skip the hex unless `hooks.isEnemyFortifiedHex?.(hex, player)` is true and `hooks.stripOne` exists.
 3. Take its units that pass `unitTypeRollsInCombat`, sorted by `id`. For each one:
    1. Stop when `isEnemyFortifiedHex(hex, player)` is no longer true.
@@ -1031,7 +1069,7 @@ if (options?.fortification?.isEnemyFortifiedHex && options.fortification.stripOn
 
 - A hex that had melee this turn is excluded. This keeps the "two or more players, no siege" rule.
 - Siege produces no kills and no removed units.
-- The tactical caller passes hooks without `isEnemyFortifiedHex`, so battles never siege.
+- The tactical melee caller passes no fortification hooks (see Phase 7), so battles never siege.
 
 **Ranged fire at a fortified hex.**
 
@@ -1071,19 +1109,20 @@ if (options?.fortification?.isEnemyFortifiedHex && options.fortification.stripOn
   - It does nothing when the hex holds two players, or when the hex is in `excludedHexes`.
   - `rollRangedAgainstFortifiedHex` strips once per hit and stops at 0.
   - `runMeleePhase` on a hex where two non-controller players met, with hooks that report an enemy fortified hex, calls `stripOne` zero times, even when melee leaves only one side.
-- [`src/main/gameActions/fortifiedRangedTargetValidation.test.ts`](../src/main/gameActions/fortifiedRangedTargetValidation.test.ts):
-  - A ranged order at an empty enemy hex with a fortification is valid.
+  - `runRangedPhase` with fake hooks, one sure-hit attacker, and an empty target hex for which `isEnemyFortifiedHex` returns true calls `stripOne` once and lists the target in `combatHexes`.
+- [`src/main/gameActions/fortifiedRangedTargetValidation.test.ts`](../src/main/gameActions/fortifiedRangedTargetValidation.test.ts). Strategic infantry has range 0, so use a human armor unit (range 1). With SQL, move it to a land hex next to an AI-controlled hex that has an intact city cell and no units, and fortify one cell there.
+  - A ranged order at that empty enemy hex is valid.
   - At an empty enemy hex without one, it is rejected as today.
-- [`src/main/gameActions/fortificationSiegeReady.test.ts`](../src/main/gameActions/fortificationSiegeReady.test.ts). Start the match and call `ready` as `readySeats.test.ts` does. Then:
+- The test that landed is [`src/main/gameActions/fortificationSiege.test.ts`](../src/main/gameActions/fortificationSiege.test.ts): one infantry, two forts, two melee phases. Do not use the twenty-turn ready loop that follows. That older sketch was [`src/main/gameActions/fortificationSiegeReady.test.ts`](../src/main/gameActions/fortificationSiegeReady.test.ts). Start the match as `readySeats.test.ts` does, with the same map and seats, and pin the dice with `gameSeed: 4242` in the `withSeatedTempGameDb` options. When no three-group map is listed, skip the test with `t.skip` exactly as that file does. The seed is meant for `western_asia_north`. Call `ready` as that file does. Then:
   1. Pick an AI-controlled hex with at least 2 intact city cells and no units. Fortify 2 cells.
   2. Clear that hex's build queue and Keep building with SQL, so no AI unit spawns there.
-  3. Move up to 6 non-embarked human infantry there with SQL.
+  3. Move 6 non-embarked human infantry there with SQL. Assert that at least 4 were moved before calling `ready`.
   4. Call `ready` up to 20 times, until the hex's `fortifiedCount` is 0.
 
   Then assert:
   - the AI keeps control after every turn that ends with a fortification left;
   - the human controls the hex after the turn the count reaches 0;
-  - that turn's `fortificationReports` lists the hex.
+  - that turn's `fortificationReports` lists the hex, with the AI as `ownerId`.
 
 **Verify:**
 
@@ -1093,7 +1132,7 @@ if (options?.fortification?.isEnemyFortifiedHex && options.fortification.stripOn
 4. `npm start`:
    1. Move infantry into an undefended enemy fortified hex and end turns. Dice show at the hex, the fortifications fall, and the hex is captured once none remain.
    2. Order ranged fire at an enemy fortified hex with no units. The order is accepted and strips fortifications.
-   3. Strike a fortified city hex from the air. The ticks shrink before any city cell turns to rubble.
+   3. Strike a fully fortified city hex from the air. The ticks shrink, and no city cell turns to rubble.
 
 No `doc/` edits.
 
@@ -1225,7 +1264,8 @@ With no record, the march set is the whole footprint, as today. Use these helper
 - **`humanTacticalDraftCommit.ts`:**
   - Add `tacticalChildH3Indexes: preBattle.tacticalChildH3Indexes` to `terrainBattle`, so the planner cache builds its adjacency from the full footprint.
   - Both `tacticalMarchFirstStopAlongPath` calls, human and opponent, use `tacticalMarchSetForMover({ battle: preBattle, moverPlayer: <the sub-unit's player>, originH3: from })`.
-- **`src/shared/collectTacticalLegalMoveDestinationHexes.ts`.** Both functions plan over the mover's set, so their parity test holds.
+  - Delete the `const tacticalSet` local in `commitHumanTacticalDraftOrders` (about line 289) that this leaves unused; the lint step rejects unused variables. Keep the other `tacticalSet` near the top of the file (about line 70), which is still passed to `tacticalComputeMovementOrderOutcome`.
+- **`src/shared/collectTacticalLegalMoveDestinationHexes.ts`.** Both functions plan over the mover's set, so their parity test holds. Add `'tacticalFortificationOwnerByH3'` to the battle `Pick` they take.
 - **`src/shared/tacticalMarchHoverPreview.ts`:**
   - In `buildPreviewForSubUnit`, before the footprint membership check, return an invalid preview with `invalidReason: FORTIFIED_CELL_BLOCKED_REASON` when the hovered cell is blocked for `HUMAN_SEAT_ID`.
   - Both preview builders plan over `tacticalMarchSetForMover({ battle, moverPlayer: HUMAN_SEAT_ID })`.
@@ -1233,16 +1273,18 @@ With no record, the march set is the whole footprint, as today. Use these helper
 - **`src/main/tools/tacticalPathfinding.ts`** (AI route tools):
   - `buildTacticalRouteSet`, its unfiltered fallback, and the best-effort set use the mover's set.
   - `executeTacticalPlanRoute` returns `FORTIFIED_CELL_BLOCKED_REASON` as its error when the destination is blocked, before planning.
-  - `check_distance` uses the mover `briefingSeatForBattle(battle)`.
+  - In `executeTacticalCheckDistance` (`check_distance`), add `player: briefingSeatForBattle(battle)` to the `mover` literal and drop the fourth argument to `estimateTacticalMarch`, so the mover's set is used. Keep `footprint` only for the membership check and the naval redirect.
 - **`src/main/tools/tacticalMarchEstimate.ts`.** The default set is the mover's set. Add `player` to its mover Pick.
 - **Ferry** (`src/main/tacticalBattle/tacticalFerryAirportGuards.ts`):
   - `tacticalFerryAirportRejectionReason`, `collectTacticalLegalFerryDestinationHexes`, and `tacticalFerryApplyOutcome` gain a `moverPlayer: string` parameter.
   - A destination blocked for that player is rejected with `FORTIFIED_CELL_BLOCKED_REASON`, or left out of the list.
+  - Add `'tacticalFortificationOwnerByH3'` to `TacticalFerryAirportBattle` and to the inline `Pick` on `tacticalFerryApplyOutcome`.
   - Update the callers in `tacticalFerryAirportGuards.ts` itself, `tacticalOpponentOrderValidation.ts`, `possibleUnitActions.ts`, and `tacticalStrategicOrderPhases.ts`.
+  - In `src/main/tacticalBattle/tacticalFerryAirportGuards.test.ts`, add `HUMAN_SEAT_ID` as the new argument to every call of the three functions.
 
 **Rendering.**
 
-- `paintBattleFootprintTerrain` reads owners from `S.tacticalBattleSnapshot.tacticalFortificationOwnerByH3`, in place of the override row and the parent controller.
+- `paintBattleFootprintTerrain` reads owners from `S.tacticalBattleSnapshot.tacticalFortificationOwnerByH3`, in place of the override row and the parent controller, and colors each fortified cell with `fortificationTickColor(owner, true)`. Both sides in a battle can see who holds each cell.
 - `battleTerrainTooltipState` (`terrainTooltipStrategicState.ts`) sets `isFortifiedCell` when the cell is in that record.
 
 **Tests.**
@@ -1254,8 +1296,12 @@ With no record, the march set is the whole footprint, as today. Use these helper
   - no record means the full footprint.
 - [`src/main/tacticalBattle/tacticalFortificationPlacement.test.ts`](../src/main/tacticalBattle/tacticalFortificationPlacement.test.ts): the four helpers.
 - [`src/main/tacticalBattle/tacticalFortificationOwners.test.ts`](../src/main/tacticalBattle/tacticalFortificationOwners.test.ts): `buildTacticalFortificationOwnerRecord` maps margin and core cells to their parents' controllers and skips unfortified rows.
-- `src/main/tacticalBattle/computeTacticalBattleSnapshotDb.test.ts`:
-  - With two fortified core cells owned by the defender, the defender's first two non-missile sub-units sit on them, one each, and no attacker sub-unit sits on either.
+- `src/main/tacticalBattle/computeTacticalBattleSnapshotDb.test.ts`. The fixture's target hex is not guaranteed to suit this test, so set it up:
+  1. `setHexController(target, HUMAN_SEAT_ID)`.
+  2. Fortify two cells from `listFortifiableCellsForHex(target)` that are in `tacticalBattleFootprint(target).coreChildH3Indexes`. Assert, with a message, that at least two exist, as the missile placement test does.
+
+  Then:
+  - each of the two fortified cells holds at least one defender sub-unit, and no attacker sub-unit sits on either.
   - Without fortifications, the existing placement assertions pass unchanged.
 - `src/main/tacticalBattle/tacticalMovementApply.test.ts`: an attacker march onto a defender-fortified cell returns `fortified_cell`.
 - [`src/main/tacticalBattle/tacticalFortificationSoak.test.ts`](../src/main/tacticalBattle/tacticalFortificationSoak.test.ts):
@@ -1270,7 +1316,7 @@ With no record, the march set is the whole footprint, as today. Use these helper
 3. `npm run build:renderer`.
 4. `npm start`:
    1. Fortify a frontline hex, keep units in it, and accept a battle there. Your sub-units start on the fortified cells, and the AI's sub-units never step onto them. The first hit on a fortified cell removes its ticks at the end of that beat, and your unit survives.
-   2. Attack an enemy fortified hex and accept the battle. Hovering a fortified cell with one of your units selected shows `Blocked: Fortified`.
+   2. Attack an enemy fortified hex that still has unfortified land cells, and accept the battle. Hovering a fortified cell with one of your units selected shows `Blocked: Fortified`.
 
 No `doc/` edits.
 
@@ -1287,11 +1333,13 @@ export function buildFortificationProductionRulePart(): string
 
 - **Strategic mode** returns:
 
-  ``Fortifications: a hex's controller fortifies its intact city cells by queueing unitType "fortification" (one cell per item, cost ${fortificationCostPerCell()} each). Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains. Units alone in an enemy fortified hex roll their attack against the fortifications each turn, and ranged fire may target an enemy fortified hex even when it holds no units. Air strikes and missiles remove a cell's fortification before they can destroy the cell.``
+  `Fortifications: a hex's controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains. Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row. Air strikes and missiles remove a cell's fortification before they can destroy the cell.`
+
+  The item name and its cost appear only in the production cost line, so models consulted without production tools are not told to queue anything.
 - **Tactical mode** returns this text when `gates.hasFortifiedCells === true`, and null otherwise:
 
-  `Fortified cells (F) belong to the controller of their hex, and enemy units cannot enter them. Inside the battle hex, each fortified cell absorbs one hit aimed at its owner's units on that cell, and fire at it removes the fortification first.`
-- **Production part:** ``fortification cost ${fortificationCostPerCell()} per city cell``.
+  `Fortified cells (F for yours, f for the enemy's) belong to the controller of their hex, and enemy units cannot enter them. Inside the battle hex, each fortified cell absorbs one hit aimed at its owner's units on that cell, and fire at it removes the fortification first.`
+- **Production part:** ``fortification cost ${fortificationCostPerCell()} per city cell (queue unitType "fortification", one cell per item)``.
 
 Wire it in:
 
@@ -1312,21 +1360,33 @@ Wire it in:
   - The type check and its error text use `isBuildQueueItemType` and `ALL_BUILD_QUEUE_ITEM_TYPES.join('|')`.
   - The availability check uses the full `availableUnitTypes`.
   - The cap check keeps the unit-only list. A fortification is never capped.
+  - For every cap rule and cap message, `fortification` is not "another type": the cap check and the all-at-cap note look at unit types only. Do not edit `PRODUCTION_REQUIREMENT_BASE` or `PRODUCTION_CAP_QUEUE_GUIDANCE` in `promptText.ts`; a contract test pins their text, and the unit-only rule is already met by the table cell and the cap check.
 - **`summarizeQueue`** (same file):
   - `availableUnitTypes` becomes the unit-only filtered list, plus `'fortification'` when the full list contains it.
-  - It adds `fortifiedCount` and `fortifiableCount` from `getStrategicInfrastructureForHex(queue.h3Index)`.
+  - When `queue.controlledByRequester` is true, it adds `fortifiedCount` and `fortifiableCount` from `getStrategicInfrastructureForHex(queue.h3Index)`. `query_production` can summarize any hex, and another seat's counts are not the AI's to see this way.
 - **Submit clause.** In `promptText.ts`, `buildProductionSubmitClause` lists `ALL_BUILD_QUEUE_ITEM_TYPES.join('|')`.
 - **Production table** (`briefingSections.ts`, `buildProductionBriefingBlock`):
-  - The hex table gains a `Fortified` column after `Urban Hexes`, valued `${fortifiedCount}/${fortifiedCount + fortifiableCount}`.
+  - The hex table gains a `FORTIFIED_COLUMN_HEADER` column after `Urban Hexes`, valued `${fortifiedCount}/${fortifiedCount + fortifiableCount}`.
   - Add both counts to `ControlledHexQueueSnapshot` and `NormalizedControlledHexQueueRow`, and fill them where the rows are built.
   - The available-types cell, and the caps and counts lines, stay unit-only.
+  - The empty-row placeholder array gains a seventh `'—'` for the new column.
 
-**Seeing fortifications.** Every reader below shows counts only for hexes in `state.exploredHexes`, the way `briefingSectionsMissiles.ts` does.
+**Seeing fortifications.** Every reader below shows counts only for explored hexes, the way `briefingSectionsMissiles.ts` does: a hex counts as explored when `state.exploredHexes` is absent or includes it.
 
-- **Hex Features cell.** The Best Options `Hex Features` cell adds `Fortified ${n}` for a hex with `fortifiedCount > 0`. It is built by `featuresCellForHex`, `featuresCellForStrike`, and `describeInfrastructure` in `possibleUnitActionsIndexedState.ts`.
-- **Missile targets table.** `briefingSectionsMissiles.ts` gains a `Fortified` column after `Seaports`.
-- **`assess_hex`.** `src/main/tools/assessment.ts` reports `fortifiedCount` when it is above 0.
-- **AI ranged validation.** `validateAiRangedOrder` (`src/main/openRouter/openRouter.ts`) accepts an empty enemy hex with a fortification, as the human validation does. It reads `state.strategicControl` and `state.strategicInfrastructure`.
+- **Snapshot rules.** Create [`src/shared/fortificationSnapshotRules.ts`](../src/shared/fortificationSnapshotRules.ts), pure over `GameStateSnapshot`:
+  ```ts
+  export function isHexExploredInSnapshot(state: GameStateSnapshot, h3Index: string): boolean
+  export function isExploredEnemyFortifiedHex(state: GameStateSnapshot, h3Index: string, player: string): boolean
+  ```
+  - `isHexExploredInSnapshot` is true when `state.exploredHexes` is absent or includes the hex. Use it for every explored check in this phase.
+  - `isExploredEnemyFortifiedHex` does not check occupancy. It is true when three things hold: the hex's controller in `state.strategicControl` is not null and not `player`; its `fortifiedCount ?? 0` in `state.strategicInfrastructure` is above 0; and it is explored. The validator adds `!hasEnemy`.
+- **Hex Features cell** (`possibleUnitActionsIndexedState.ts`). `describeInfrastructure(inf)` has no hex or state, so the fog rule is applied when the counts are indexed:
+  - `InfraCounts` gains `readonly fortified: number`.
+  - `buildPossibleActionsIndexedState` sets it to `row.fortifiedCount ?? 0` when `isHexExploredInSnapshot(state, row.h3Index)`, and to 0 otherwise. The `getInfra` fallback gains `fortified: 0`.
+  - `describeInfrastructure` appends `formatFortifiedFeaturePart(n)` after the urban part when `fortified > 0`. `featuresCellForHex` and `featuresCellForStrike` then show it.
+- **Missile targets table.** `briefingSectionsMissiles.ts` gains a `FORTIFIED_COLUMN_HEADER` column after `Seaports`, valued `${fortifiedCount}/${fortifiedCount + fortifiableCount}` from the target's infrastructure row. The table already lists only explored hexes.
+- **`assess_hex`.** `src/main/tools/assessment.ts` reports `fortifiedCount` when it is above 0 and the hex is explored.
+- **AI ranged validation.** `validateAiRangedOrder` (`src/main/openRouter/openRouter.ts`) is private, and that file is near its size limit. Its strategic branch rejects with `if (!hasEnemy) return { valid: false, reason: 'Target hex has no enemy' };`. Change the condition to `!hasEnemy && !isExploredEnemyFortifiedHex(state, order.targetH3Index, unit.player)`. That mirrors the human validation in one line.
 
 **Estimates.**
 
@@ -1344,14 +1404,14 @@ Wire it in:
   }): number
   ```
   - **In a battle:** 1 when the defending cell is a core cell (`coreChildH3Indexes ?? tacticalChildH3Indexes`) and is in the record with `defendingPlayer` as owner. Otherwise 0, because margin cells never soak.
-  - **On the strategic map:** the hex's `fortifiedCount` when `defendingPlayer` controls it and the hex is in `state.exploredHexes`, and 0 otherwise.
+  - **On the strategic map:** the hex's `fortifiedCount` when `defendingPlayer` controls it and `isHexExploredInSnapshot(state, defendingH3Index)` is true, and 0 otherwise.
 - **Callers.** Pass the result as `defenderSoak` in all three `computeEngagementPrediction` calls in `executeEstimateCombat` (`combatEstimation.ts`): the ranged call and both melee calls. The defending player is `defenders.combat[0]?.player`; with no defenders, the soak is 0. That file is at 578 lines and must stay at or under 600.
 
 **Tactical map.**
 
-- **Cell state.** `HexMapCellState.features` (`hexMapRenderer.ts`) gains `readonly fortified?: boolean`. Set it where the tactical cell states are built, from the battle's `tacticalFortificationOwnerByH3`.
-- **Glyph.** In `structuralOverlay`, a fortified cell without an airport or seaport shows `F` / `f` in place of `U` / `u`. `B`, `A`, and `S` keep precedence. A displaced `F` is listed like any other displaced feature.
-- **Legend.** The tactical legend line in `briefingMapSection.ts` appends `, F/f fortified city cell` after `U/u urban only`, only when at least one cell on the map is fortified.
+- **Cell state.** `HexMapCellState.features` (`hexMapRenderer.ts`) gains `readonly fortifiedByAi?: boolean`. In `buildTacticalHexGameStateMap` (`briefingMapSection.ts`), set it for each cell in the battle's `tacticalFortificationOwnerByH3`: true when the owner is `briefingOwnSeatId(state)`, false otherwise. Leave it undefined for unfortified cells. Its case must come from the fortification's owner, not from `controlledByAI`, which holds the enclosing hex's control for every footprint cell, margin cells included.
+- **Glyph.** In `structuralOverlay`, a cell with `fortifiedByAi` defined, and without an airport or seaport, shows `F` when it is true and `f` when it is false, in place of `U` / `u`. `B`, `A`, and `S` keep precedence. A displaced `F` or `f` is listed like any other displaced feature.
+- **Legend.** The tactical legend line in `briefingMapSection.ts` appends `FORTIFIED_MAP_LEGEND_FRAGMENT` after `U/u urban only`, only when at least one cell on the map is fortified.
 
 **Tests.**
 
@@ -1363,6 +1423,7 @@ Wire it in:
   - a soak of 2 against 1 defender with 2 sure hits predicts 0 defender losses;
   - `defenderFortificationSoak` returns 0 for an unexplored hex.
 - `src/main/productionOrders.test.ts`: a `fortification` order is accepted.
+- [`src/shared/fortificationSnapshotRules.test.ts`](../src/shared/fortificationSnapshotRules.test.ts), with snapshot literals: `isExploredEnemyFortifiedHex` is true for an explored enemy hex with a fortification, and false for one without a fortification, for the player's own hex, and for an unexplored hex.
 - `src/main/openRouter/promptSpec/envelopeJsonSchema.test.ts`: the `productionOrders` enum contains `fortification`.
 
 **Verify:**
@@ -1390,40 +1451,45 @@ No `doc/` edits.
 
 - **[`doc/combat-rules-v3.md`](../doc/combat-rules-v3.md):**
   - §2: production: the fortification item, its cost, and the pause rule.
+  - §3.6 (missile): the sentence that each flagged city cell is destroyed unless it rolls a 20 gains the fortified-cell exception.
   - §4.2: empty enemy fortified hexes as ranged targets.
-  - §4.6: siege.
+  - §4.6: siege, and the sentence "One side left holds the hex" gains the fortified-hex exception.
   - §4.9: the soak, before casualty order.
   - §4.10: elimination with fortifications.
   - §5: the flow. Siege comes after melee, and production fortifies cells.
   - §6, edge cases: two non-controller players, knockout to Neutral, and a contested fortified hex.
   - §6, control bullets ("territorial control changes immediately"): the fortified-hex exception.
+  - §6, the sentence that any enemy-occupied hex in range is a valid ranged target: add empty enemy fortified hexes.
   - §8.1: air strikes on units are soaked.
   - §8.3–8.5: air strikes strip fortifications first.
   - §8.6 (missiles): the fortified-cell roll.
   - §11: summary.
   - §12 introduction: margin-cell fortifications block movement but are never struck or soaked.
-  - §12.3: placement on fortified cells, next to the missile placement paragraph in §12.2.
+  - §12.3 (entry-side injection, which describes opening placement): defenders start on fortified core cells, one sub-unit per cell, before the entry-side rule places the rest; no side is placed on a cell fortified by another owner.
   - §12.4 (movement): the block, and that it lifts from the next beat.
   - §12.5 (ranged combat): the soak, and fire at a fortified cell.
-  - §13: display.
-  - §14: control.
+  - §13.1 item 7 (melee lightning): a siege hex shows melee lightning and dice although only one side is there.
+  - §14 item 1: home control waits until a fortified hex's fortifications are gone.
+  - §14.1 (knockout and Neutral): fortifications stay when a hex turns Neutral, and the sentence that Neutral units take every empty hex they enter gains the fortified-hex exception.
 - **[`doc/how-to-play.md`](../doc/how-to-play.md):**
   - "Building units"
   - "How a turn resolves"
   - "Aiming ranged attacks and air strikes"
   - "Air power"
   - "Battles"
-  - "Things that may surprise you"
+  - "Things that may surprise you", including its "Reading the turn report" bullet: a side also gets a section when it owned a hex whose fortifications fell; the fortification line sits in the owner's section after missile strike sentences; and a Neutral-owned one sits under Neutral Losses.
   - "Where messages appear"
 - **[`doc/README.md`](../doc/README.md):** an engine constants row for `fortificationCostPerCell` and `FORTIFICATION_COST_INFANTRY_MULTIPLIER`.
 - **[`doc/save-files.md`](../doc/save-files.md):** `EXPECTED_USER_VERSION` is 25.
-- **[`README.md`](../README.md):** "How the Economy Works" and the opponent's tools, only where they are now wrong.
+- **[`README.md`](../README.md):** "How the Economy Works" and the opponent's tools, only where they are now wrong, and the test count in "Guardrails" if it is stated (run `npm test` and use its count).
 - **`doc/ux/`:**
   - `build-popup.md` and `multi-hex-build-popup.md`: the Fortification item and the pause.
   - `hex-tooltips.md`: the Fortified line, `Fortified urban`, and `Blocked: Fortified`.
-  - `map-surface.md`: the tick pattern, lit edges, and gray when control is unknown.
+  - `map-surface.md`: the tick pattern, lit edges, and gray when control is unknown; and `∞t` on a production label also means every city cell is fortified.
+  - `minimap.md`: `∞t` on a production label also means every city cell is fortified.
+  - `input-map.md`: holding T also hides fortification ticks.
   - `terrain-legend.md`: the Fortified row.
-  - `notifications-and-feedback.md` and `reports-tab.md`: the new Updates lines.
+  - `notifications-and-feedback.md` and `reports-tab.md`: the fortification line in the owner's loss section (Neutral Losses for a Neutral-owned hex); the opening rule, so a side also gets a section when it owned a hex whose fortifications fell; and the built and paused lines in Updates.
   - `control-tooltips.md`: the Keep-building note, and Source Anchors.
   - `order-lifecycle.md`.
   - `resolution-playback.md`: siege dice on an uncontested hex.
@@ -1444,7 +1510,7 @@ No `doc/` edits.
   Update them wherever they mirror a builder this plan changed: the rules, the production table and submit clause, the cost line, the missile targets table, the tactical map legend, and the tool enums.
 - **`doc/region-summary-1.md`:** the cost-scale line, if it lists build costs.
 
-**Search** `doc/` and `README.md` for `rubble`, `city cells`, `build queue`, `Keep building`, `unitType`, `capture`, `control changes`, and `EXPECTED_USER_VERSION`. Fix every maintained document that is now wrong. Also check [`doc/project-instructions.md`](../doc/project-instructions.md) and [`doc/coding-prompts-1.md`](../doc/coding-prompts-1.md) for any fact this work made wrong, and change only that fact.
+**Search** `doc/` and `README.md` for `rubble`, `city cells`, `build queue`, `Keep building`, `unitType`, `capture`, `control changes`, `casualt`, `absorb`, `legend`, `tooltip`, `availableUnitTypes`, `user_version`, `EXPECTED_USER_VERSION`, `∞t`, and `T is held`. Fix every maintained document that is now wrong. Also check [`doc/project-instructions.md`](../doc/project-instructions.md) and [`doc/coding-prompts-1.md`](../doc/coding-prompts-1.md) for any fact this work made wrong, and change only that fact.
 
 **Leave alone:**
 
@@ -1483,5 +1549,8 @@ No `doc/` edits.
   One missed site either lets units walk into fortified cells or makes a whole beat fail `march_validation`.
 - **Owner record timing.** `tacticalFortificationOwnerByH3` is set when the battle starts and when a beat ends, and nowhere else. Refreshing it mid-beat would unblock movement in the same beat and split validation from playback.
 - **Placement parity.** Battles without fortified cells must place exactly as before. The existing placement tests guard this.
+- **Battles that cannot start.** If every core cell where the attacker can stand is fortified by the defender, the attacker cannot be placed. The hex is then not offered as a Fight, and the strategic soak applies instead. This is intended.
+- **Siege counts as melee.** Siege hexes join the melee combat hexes, so besiegers count as melee participants (which can prompt an AI consult), and a siege the viewer cannot see produces the unknown-battle Updates line. This is intended. A match without fortifications is unaffected.
+- **Failed beats keep their strips.** A tactical beat can fail validation after its fire has already written to the database. A fortification stripped by that fire stays stripped, as rubble and unit deletes already do today.
 - **AI caps.** Until Phase 8, every AI view strips `fortification` from `availableUnitTypes`. Otherwise the AI's cap rules would treat an uncapped fortification as a buildable alternative.
 - **Old saves.** The version bump makes every earlier save unloadable. That is accepted. Do not add a migration.

@@ -184,6 +184,7 @@ export async function requestOrdersFlow(
         battleId: tacticalBattle.battleId,
         tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
         seatId,
+        hasFortifiedCells: Object.keys(tacticalBattle.tacticalFortificationOwnerByH3 ?? {}).length > 0,
       }
     : { mode: 'strategic', seatId };
   ensureStrategicCoordinateRegistryInitialized();

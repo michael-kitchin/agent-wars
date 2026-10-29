@@ -15,6 +15,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import { canDefenderReturnFireAtAnyAttackerHex } from '../../shared/returnFireEligibility';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { defenderSoakForEstimate } from './combatEstimationFortification';
 import { h3ToLatLng, type LatLngMap } from './h3LatLng';
 import {
   buildStrategicCombatEstimationTheater,
@@ -178,19 +179,23 @@ export function computeEngagementPrediction(
   attackerHitProbs: readonly number[],
   defenderHitProbs: readonly number[],
   attackerCount: number,
-  defenderCount: number
+  defenderCount: number,
+  defenderSoak = 0
 ): EngagementPrediction {
   logTrace('combatEstimation computeEngagementPrediction', {
     attackerHitProbCount: attackerHitProbs.length,
     defenderHitProbCount: defenderHitProbs.length,
     attackerCount,
     defenderCount,
+    defenderSoak,
   });
+  let attackerHitsExpected = 0;
   let defenderLossesExpected = 0;
   let probabilityDefenderEliminated = 0;
   poissonBinomialPMF([...attackerHitProbs]).forEach((p, k) => {
-    defenderLossesExpected += Math.min(k, defenderCount) * p;
-    if (k >= defenderCount) probabilityDefenderEliminated += p;
+    attackerHitsExpected += Math.min(k, defenderCount) * p;
+    defenderLossesExpected += Math.min(Math.max(k - defenderSoak, 0), defenderCount) * p;
+    if (k >= defenderCount + defenderSoak) probabilityDefenderEliminated += p;
   });
   let attackerLossesExpected = 0;
   let probabilityAttackerLosesUnit = 0;
@@ -199,7 +204,7 @@ export function computeEngagementPrediction(
     if (k >= 1) probabilityAttackerLosesUnit += p;
   });
   return {
-    attackerHitsExpected: defenderLossesExpected,
+    attackerHitsExpected,
     defenderHitsExpected: attackerLossesExpected,
     attackerLossesExpected,
     defenderLossesExpected,
@@ -465,6 +470,13 @@ export function executeEstimateCombat(
   const defenders = buildDefenders(parsed.defenders, ctx);
   if (defenders.error !== undefined) return { status: 'error', error: defenders.error };
 
+  const defenderSoak = defenderSoakForEstimate({
+    state,
+    defendingH3Index: targetHexH3,
+    defenderPlayer: defenders.combat[0]?.player,
+    ownSeatId,
+    battle: tacticalBattle,
+  });
   const base = {
     status: 'ok',
     error: null,
@@ -472,7 +484,7 @@ export function executeEstimateCombat(
     targetHex: h3ToLatLng(targetHexH3, latLngByH3, 'cellCenter'),
     attackerSummary: { units: attackers.summary, totalUnits: attackers.combat.length },
   };
-  if (defenders.combat.length === 0 && defenders.automatic) {
+  if (defenders.combat.length === 0 && defenders.automatic && defenderSoak === 0) {
     return {
       ...base,
       defenderSummary: { units: [], totalUnits: 0, canReturnFire: false, returnFireDetails: null },
@@ -498,7 +510,7 @@ export function executeEstimateCombat(
     } else {
       warnings.push('Using assumed attackers - return fire not evaluated (attacker position unknown)');
     }
-    prediction = computeEngagementPrediction(attackProbs(attackers.combat), returnFire.hitProbs, attackerCount, defenderCount);
+    prediction = computeEngagementPrediction(attackProbs(attackers.combat), returnFire.hitProbs, attackerCount, defenderCount, defenderSoak);
     const leadType = attackers.combat[0]?.unitType ?? 'attacker';
     const leadAttack = attackerCount > 0 ? attackHitThreshold(attackers.combat[0]!) : 0;
     const hitPct = Math.round(hitChanceForThreshold(leadAttack) * 100);
@@ -509,13 +521,15 @@ export function executeEstimateCombat(
       attackProbs(attackers.combat),
       defenseProbs(defenders.combat),
       attackerCount,
-      defenderCount
+      defenderCount,
+      defenderSoak
     );
     const attackersRollDefense = computeEngagementPrediction(
       defenseProbs(attackers.combat),
       attackProbs(defenders.combat),
       attackerCount,
-      defenderCount
+      defenderCount,
+      defenderSoak
     );
     prediction = averagePredictions(attackersRollAttack, attackersRollDefense);
     meleeRoleOutcomes = {

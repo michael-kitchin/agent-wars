@@ -34,6 +34,8 @@ import {
   syncEmbarkedLandUnitPositionsWithNaval,
 } from './sealift';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
+import { createStrategicFortificationHooks } from './fortificationCombatLedger';
+import type { FortificationLossTally } from '../fortificationCombat';
 import { finalizeReadyTurnAfterMelee } from './meleeInterceptReadyFinalize';
 import {
   buildMeleeInterceptCandidateRows,
@@ -230,8 +232,10 @@ export function executeReadyStrategicTurn(
     rngInvocationsBeforeMelee += 1;
     return rawCombatRng();
   };
+  const fortificationTally: FortificationLossTally = new Map();
+  const fortificationHooks = createStrategicFortificationHooks({ next, tally: fortificationTally });
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
-  const missileLaunchResult = resolveMissileLaunchPhase(allMissileLaunches, next);
+  const missileLaunchResult = resolveMissileLaunchPhase(allMissileLaunches, next, fortificationTally);
 
   const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
@@ -248,7 +252,14 @@ export function executeReadyStrategicTurn(
   const listedForWeather = listUnitsForSnapshot();
   const techHitBonusAt = buildTechHitBonusLookupFromDb(listedForWeather);
   const targetCoverAt = createStrategicTerrainCoverLookup(preMoveState.hexes);
-  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt, targetCoverAt, techHitBonusAt);
+  const airStrikeResult = resolveAirStrikePhase(
+    allAirStrikes,
+    next,
+    originHitBonusAt,
+    targetCoverAt,
+    techHitBonusAt,
+    { hooks: fortificationHooks, tally: fortificationTally }
+  );
   const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
@@ -285,8 +296,11 @@ export function executeReadyStrategicTurn(
     hexList,
     allRanged,
     next,
-    { theater: 'strategic', hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase },
-    targetCoverAt
+    {
+      returnFireContext: { theater: 'strategic', hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase },
+      targetCoverAt,
+      fortification: fortificationHooks,
+    }
   );
   for (const id of rangedResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
@@ -469,6 +483,7 @@ export function executeReadyStrategicTurn(
       candidateHexes: [...candidateHexes],
       meleeInterceptCandidates,
       lossFlagFactsByUnitId,
+      fortificationTally,
     };
     setMeleeInterceptPendingSnapshot(snapshot);
     logDebug('ready: awaiting melee intercept decision', {
@@ -484,7 +499,7 @@ export function executeReadyStrategicTurn(
     };
   }
 
-  const meleeResult = runMeleePhase(combatUnitsAfter, hexList, next);
+  const meleeResult = runMeleePhase(combatUnitsAfter, hexList, next, { fortification: fortificationHooks });
   return finalizeReadyTurnAfterMelee({
     meleeResult,
     rangedResult,
@@ -505,5 +520,6 @@ export function executeReadyStrategicTurn(
     aiRangedOrders,
     knockoutCoordinates: { latLngByH3, resolveToH3 },
     lossFlagFactsByUnitId,
+    fortificationTally,
   });
 }

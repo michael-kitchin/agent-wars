@@ -131,7 +131,7 @@ export function validateTacticalOpponentFerryOrder(
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can ferry');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.destinationH3Index)) return tacticalInvalidResult('Destination not on tactical map');
-  const airportReason = tacticalFerryAirportRejectionReason(battle, unit.h3Index, order.destinationH3Index);
+  const airportReason = tacticalFerryAirportRejectionReason(battle, unit.h3Index, order.destinationH3Index, unit.player);
   if (airportReason) return tacticalInvalidResult(airportReason);
   tacticalLogQuery('validateTacticalOpponentFerryOrder ok', { unitId: order.unitId });
   return tacticalValidResult();

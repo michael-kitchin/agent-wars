@@ -9,6 +9,7 @@ import {
   dbGetAll,
   dbGetOne,
   getTacticalTerrainOverridesForRendererFromGame,
+  getHexController,
   listTacticalFeatureOverridesForGame,
   listUnitsForSnapshot,
 } from '../gameDb';
@@ -39,6 +40,13 @@ import { loadedStrategicTerrainKindByH3 } from '../gameDb/mapHexRead';
 import { isStrategicCell } from '../../shared/h3Resolutions';
 import { HUMAN_SEAT_ID, isOwnerId } from '../../shared/seatIds';
 import { tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
+import { buildTacticalFortificationOwnerRecord } from './tacticalFortificationOwners';
+import {
+  fortifiedCellsForOwner,
+  orderParentsForFortifiedPlacement,
+  placementPassableForSide,
+  takeFortifiedCellForDefender,
+} from './tacticalFortificationPlacement';
 
 /**
  * Maps one strategic parent type to the number of tactical sub-units placed for it.
@@ -436,11 +444,19 @@ export function computeTacticalBattleSnapshot(
     const childSet = new Set(children);
     // Seaport/airport for tactical march and spawn come only from `res_t_feature_overrides`, not merged
     // renderer hints, so a strategic-level port count cannot imply facility tiles on unrelated tactical children.
-    for (const row of listTacticalFeatureOverridesForGame()) {
+    const featureRows = listTacticalFeatureOverridesForGame();
+    for (const row of featureRows) {
       if (!coreSet.has(row.h3Index)) continue;
       if (row.isSeaport) tacticalIsSeaportByH3[row.h3Index] = true;
       if (row.isAirport) tacticalIsAirportByH3[row.h3Index] = true;
     }
+    const ownerByH3 = buildTacticalFortificationOwnerRecord({
+      rows: featureRows,
+      footprint: children,
+      controllerOf: getHexController,
+    });
+    const hexController = getHexController(enclosingStrategicH3Index);
+    const defenderSide = hexController === HUMAN_SEAT_ID || hexController === opposingPartyId ? hexController : null;
     const urbanRubbleForPlacement = tacticalUrbanRubbleFlagRecordsForFootprint(coreChildren, tacticalRows);
     const urbanRubble = tacticalUrbanRubbleFlagRecordsForFootprint(children, tacticalRows);
     const transportForPlacement = tacticalFootprintTransportOverlayRecords({
@@ -486,10 +502,16 @@ export function computeTacticalBattleSnapshot(
     const subUnits: TacticalSubUnitSnapshot[] = [];
     const skippedParentDisplayNames: string[] = [];
     const occupiedByHex = new Map<string, InitialPlacementSide>();
-    const parentsInPlacementOrder = [
-      ...inHex.filter((parent) => isMissileUnitType(parent.unitType)),
-      ...inHex.filter((parent) => !isMissileUnitType(parent.unitType)),
-    ];
+    const defenderFortifiedCells = defenderSide
+      ? fortifiedCellsForOwner({ orderedCells, ownerByH3, ownerId: defenderSide })
+      : [];
+    const parentsInPlacementOrder = defenderSide !== null && defenderFortifiedCells.length > 0
+      ? orderParentsForFortifiedPlacement(inHex, defenderSide)
+      : [
+          ...inHex.filter((parent) => isMissileUnitType(parent.unitType)),
+          ...inHex.filter((parent) => !isMissileUnitType(parent.unitType)),
+        ];
+    const defenderHeldCells = new Set<string>();
     for (const parent of parentsInPlacementOrder) {
       const n = tacticalSubUnitCountForStrategicUnitType(parent.unitType);
       if (n <= 0) continue;
@@ -518,33 +540,71 @@ export function computeTacticalBattleSnapshot(
       let placed = 0;
       let cellCursor = 0;
       const placingSide: InitialPlacementSide = parent.player === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : opposingPartyId;
-      const genericPassable = (cell: string): boolean => {
-        const effKind = tacticalKindByH3.get(cell) ?? hexRow.terrain_kind;
-        return isTacticalCellPassableForUnitType({
+      const genericPassable = (cell: string): boolean => placementPassableForSide({
+        cell,
+        placingOwnerId: placingSide,
+        ownerByH3,
+        basePassable: (candidate) => {
+          const effKind = tacticalKindByH3.get(candidate) ?? hexRow.terrain_kind;
+          return isTacticalCellPassableForUnitType({
+            unitType: parent.unitType,
+            effectiveKind: effKind,
+            parentTerrain: hexRow.terrain,
+            parentTerrainKind: hexRow.terrain_kind,
+            isSeaportCell: !!tacticalIsSeaportByH3[candidate],
+            isAirportCell: !!tacticalIsAirportByH3[candidate],
+            cellH3: candidate,
+            childFootprint: coreSet,
+            placementTerrain,
+            roadRailByH3,
+            rubbleByH3: urbanRubbleForPlacement.tacticalIsRubbleByH3,
+          });
+        },
+      });
+      const placeSubUnit = (cell: string): void => {
+        placed += 1;
+        if (placingSide === defenderSide) defenderHeldCells.add(cell);
+        subUnits.push({
+          id: formatTacticalSubUnitId(parent.id, placed),
+          parentUnitId: parent.id,
+          player: placingSide,
           unitType: parent.unitType,
-          effectiveKind: effKind,
-          parentTerrain: hexRow.terrain,
-          parentTerrainKind: hexRow.terrain_kind,
-          isSeaportCell: !!tacticalIsSeaportByH3[cell],
-          isAirportCell: !!tacticalIsAirportByH3[cell],
-          cellH3: cell,
-          childFootprint: coreSet,
-          placementTerrain,
-          roadRailByH3,
-          rubbleByH3: urbanRubbleForPlacement.tacticalIsRubbleByH3,
+          h3Index: cell,
+          displayName: formatTacticalSubUnitDisplayName(parentName, placed),
+          ...(parent.origin ? { origin: parent.origin } : {}),
+          ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(parent.origin?.birthH3Index) } : {}),
+          ...(techOn ? { techLevel: techLevelForBirthHex(parent.origin?.birthH3Index) } : {}),
         });
       };
       while (placed < n) {
+        if (!missileParent && placingSide === defenderSide) {
+          const fortifiedCell = takeFortifiedCellForDefender({
+            cells: defenderFortifiedCells,
+            held: defenderHeldCells,
+            passable: genericPassable,
+            occupiedByHex,
+            placingSide,
+          });
+          if (fortifiedCell) {
+            placeSubUnit(fortifiedCell);
+            continue;
+          }
+        }
         let next = takeNextOpeningCell({
           orderedCells: openingCells,
           cellCursor,
           maxCursor: openingCells.length * 3,
           passable: missileParent
-            ? (cell) => missilePlacementPassable({
+            ? (cell) => placementPassableForSide({
                 cell,
-                isUrbanOrRubble: (candidate) =>
-                  (placementTerrain.isUrbanTactical?.(candidate) ?? false)
-                  || (placementTerrain.isRubbleTactical?.(candidate) ?? false),
+                placingOwnerId: placingSide,
+                ownerByH3,
+                basePassable: (candidate) => missilePlacementPassable({
+                  cell: candidate,
+                  isUrbanOrRubble: (urbanCell) =>
+                    (placementTerrain.isUrbanTactical?.(urbanCell) ?? false)
+                    || (placementTerrain.isRubbleTactical?.(urbanCell) ?? false),
+                }),
               })
             : genericPassable,
           occupiedByHex,
@@ -562,18 +622,7 @@ export function computeTacticalBattleSnapshot(
         }
         if (!next) break;
         cellCursor = next.nextCursor;
-        placed += 1;
-        subUnits.push({
-          id: formatTacticalSubUnitId(parent.id, placed),
-          parentUnitId: parent.id,
-          player: placingSide,
-          unitType: parent.unitType,
-          h3Index: next.cell,
-          displayName: formatTacticalSubUnitDisplayName(parentName, placed),
-          ...(parent.origin ? { origin: parent.origin } : {}),
-          ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(parent.origin?.birthH3Index) } : {}),
-          ...(techOn ? { techLevel: techLevelForBirthHex(parent.origin?.birthH3Index) } : {}),
-        });
+        placeSubUnit(next.cell);
       }
       if (placed < n) {
         skippedParentDisplayNames.push(parentName);
@@ -602,6 +651,7 @@ export function computeTacticalBattleSnapshot(
       enclosingStrategicH3Index,
       tacticalChildH3Indexes: [...children],
       coreChildH3Indexes: coreChildren,
+      ...(Object.keys(ownerByH3).length > 0 ? { tacticalFortificationOwnerByH3: ownerByH3 } : {}),
       strategicTurnNumber: turnRow.turn_number,
       tacticalTurnNumber: 1,
       ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weatherBonusLevel: weatherSettings.weatherBonusLevel ?? 'low', weather: battleWeather } : {}),

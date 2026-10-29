@@ -15,7 +15,7 @@ import { paletteForCurrentOwner } from './ownerColors';
  * Expected outcome: A seat's map color, Neutral's held-hex outline, or gray when nobody controls the hex.
  * Exceptions: None.
  */
-function resolveControllerBorderColor(controllerPlayerId: string | null | undefined): string {
+export function resolveControllerBorderColor(controllerPlayerId: string | null | undefined): string {
   if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
   return paletteForCurrentOwner(controllerPlayerId)?.map ?? MULTI_PLAYER_FILL;
 }

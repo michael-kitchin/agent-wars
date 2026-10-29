@@ -478,11 +478,13 @@ function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), sqliteD
 function getStrategicCountsDerivedFromTactical(
   gameDb: typeof import('./gameDb'),
   h3Index: string
-): { urbanHexCount: number; airportCount: number; seaportCount: number } {
-  const row = gameDb.dbGetOne<{ urbanHexCount: number; airportCount: number; seaportCount: number }>(
+): { urbanHexCount: number; airportCount: number; seaportCount: number; fortifiedCount: number; fortifiableCount: number } {
+  const row = gameDb.dbGetOne<{ urbanHexCount: number; airportCount: number; seaportCount: number; fortifiedCount: number; fortifiableCount: number }>(
     `SELECT COALESCE(SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END), 0) AS urbanHexCount,
             COALESCE(SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END), 0) AS airportCount,
-            COALESCE(SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END), 0) AS seaportCount
+            COALESCE(SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END), 0) AS seaportCount,
+            COALESCE(SUM(CASE WHEN is_fortified = 1 THEN 1 ELSE 0 END), 0) AS fortifiedCount,
+            COALESCE(SUM(CASE WHEN is_urban = 1 AND is_rubble = 0 AND is_fortified = 0 THEN 1 ELSE 0 END), 0) AS fortifiableCount
      FROM res_t_feature_overrides
      WHERE parent_h3_index = ?`,
     [h3Index]
@@ -491,6 +493,8 @@ function getStrategicCountsDerivedFromTactical(
     urbanHexCount: row?.urbanHexCount ?? 0,
     airportCount: row?.airportCount ?? 0,
     seaportCount: row?.seaportCount ?? 0,
+    fortifiedCount: row?.fortifiedCount ?? 0,
+    fortifiableCount: row?.fortifiableCount ?? 0,
   };
 }
 
@@ -508,6 +512,8 @@ function assertStrategicMatchesTacticalRollupForHex(gameDb: typeof import('./gam
   assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
   assert.strictEqual(actual.airportCount, expected.airportCount);
   assert.strictEqual(actual.seaportCount, expected.seaportCount);
+  assert.strictEqual(actual.fortifiedCount, expected.fortifiedCount);
+  assert.strictEqual(actual.fortifiableCount, expected.fortifiableCount);
 }
 
 /**
@@ -533,7 +539,7 @@ function testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift(gameDb: 
     );
     assert.ok(target?.h3Index, 'expected at least one infrastructure-bearing hex');
     gameDb.dbRun(
-      'UPDATE res_s_infrastructure SET urban_hex_count = 0, airport_count = 0, seaport_count = 0 WHERE h3_index = ?',
+      'UPDATE res_s_infrastructure SET urban_hex_count = 0, airport_count = 0, seaport_count = 0, fortified_count = 7, fortifiable_count = 7 WHERE h3_index = ?',
       [target!.h3Index]
     );
     gameDb.closeGameDatabaseForTests();
@@ -819,6 +825,18 @@ function testRendererTacticalOverridesCacheReflectsDbChanges(gameDb: typeof impo
     const after = gameDb.getTacticalTerrainOverridesForRendererFromGame();
     const updated = after.find((row) => row.h3Index === target!.h3Index);
     assert.strictEqual(updated?.isRubble, true, 'DB mutation must appear in subsequent fetch');
+    const intact = after.filter((row) => row.isUrban && !row.isRubble);
+    const cellA = intact[0];
+    const cellB = intact[1];
+    assert.ok(cellA && cellB, 'expected two intact city cells');
+    gameDb.setTacticalCellFortified(cellA.h3Index, true);
+    gameDb.setTacticalCellFortified(cellB.h3Index, true);
+    const both = gameDb.getTacticalTerrainOverridesForRendererFromGame();
+    gameDb.setTacticalCellFortified(cellB.h3Index, false);
+    const swapped = gameDb.getTacticalTerrainOverridesForRendererFromGame();
+    assert.notDeepStrictEqual(both, swapped, 'fortify and strip must change the cached rows');
+    assert.equal(swapped.find((row) => row.h3Index === cellA.h3Index)?.isFortified, true);
+    assert.equal(swapped.find((row) => row.h3Index === cellB.h3Index)?.isFortified, false);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });

@@ -4,6 +4,7 @@
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
+import { isHexExploredInSnapshot } from '../../shared/fortificationSnapshotRules';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { isAiSeatId } from '../../shared/seatIds';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
@@ -643,6 +644,9 @@ function executeAssessHex(
     strategicNotes.push(`Chokepoint - only ${passableNeighbors} passable adjacent ${adjacentHexWord}`);
   }
   strategicNotes.splice(3);
+  const fortifiedCount = isHexExploredInSnapshot(state, hexH3)
+    ? (state.strategicInfrastructure?.find((row) => row.h3Index === hexH3)?.fortifiedCount ?? 0)
+    : 0;
 
   return {
     status: 'ok',
@@ -654,6 +658,7 @@ function executeAssessHex(
       ? { weather: state.hexes.find((hex) => hex.h3Index === hexH3)?.weather ?? null }
       : {}),
     passableBy,
+    ...(fortifiedCount > 0 ? { fortifiedCount } : {}),
     unitsAtHex,
     unitsInRange: { rangedRange1, rangedRange2, meleeRange },
     adjacentTerrain,

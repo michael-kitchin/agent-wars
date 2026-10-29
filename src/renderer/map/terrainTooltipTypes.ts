@@ -124,6 +124,33 @@ export interface TerrainTooltipState {
    * Exceptions: None.
    */
   hasRail: boolean;
+  /**
+   * Fortified city cells on this strategic hex.
+   *
+   * Contract: The hex tooltip names how much of the city is fortified.
+   * When to use: When infrastructure glyphs are allowed and the count is above 0.
+   * Expected outcome: Omitted when the hex is unexplored. Zero draws no line.
+   * Exceptions: None.
+   */
+  fortifiedCount?: number;
+  /**
+   * Intact city cells on this strategic hex, fortified or not.
+   *
+   * Contract: The tooltip states the fortified count against the city that remains.
+   * When to use: Together with `fortifiedCount`.
+   * Expected outcome: Fortified plus still-fortifiable cells.
+   * Exceptions: None.
+   */
+  intactCityCells?: number;
+  /**
+   * Whether the sampled cell itself is fortified.
+   *
+   * Contract: A cell tooltip says so in place of the plain Urban suffix.
+   * When to use: Zoomed-in and battle cell tooltips.
+   * Expected outcome: True only for a fortified intact city cell.
+   * Exceptions: None.
+   */
+  isFortifiedCell?: boolean;
 }
 
 /**

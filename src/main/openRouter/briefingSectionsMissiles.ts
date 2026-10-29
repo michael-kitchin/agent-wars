@@ -12,6 +12,8 @@ import { missileReachSet } from '../gameActions/missileReach';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
+import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
+import { isHexExploredInSnapshot } from '../../shared/fortificationSnapshotRules';
 import { missileRangeHexes } from '../../shared/gameRules';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { isSeatId } from '../../shared/seatIds';
@@ -129,7 +131,7 @@ export function buildMissileForcesBriefingBlock(
   const targetRows = missileTargetRows(state, ownSeat, reaches, format);
   const targetBlock = targetRows.length > 0
     ? `${MISSILE_TARGETS_TABLE_INTRO}\n\n${buildPromptTableLines(
-        ['Target', 'Owner', 'City Cells', 'Airports', 'Seaports', 'Enemy Air Based', 'In Range Of'],
+        ['Target', 'Owner', 'City Cells', 'Airports', 'Seaports', FORTIFIED_COLUMN_HEADER, 'Enemy Air Based', 'In Range Of'],
         targetRows
       ).join('\n')}`
     : NO_MISSILE_TARGETS_LINE;
@@ -158,8 +160,6 @@ function missileTargetRows(
   reaches: readonly MissileReachRow[],
   format: (h3Index: string) => string
 ): string[][] {
-  const explored = state.exploredHexes;
-  const exploredKnown = Array.isArray(explored);
   const controllerByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   const candidates = (state.strategicInfrastructure ?? [])
     .filter((row) => row.urbanHexCount > 0 || row.airportCount > 0 || row.seaportCount > 0)
@@ -167,7 +167,7 @@ function missileTargetRows(
       const controller = controllerByHex.get(row.h3Index);
       return controller != null && isSeatId(controller) && controller !== ownSeat;
     })
-    .filter((row) => !exploredKnown || explored.includes(row.h3Index))
+    .filter((row) => isHexExploredInSnapshot(state, row.h3Index))
     .map((row) => ({ row, inRange: reaches.filter((missile) => missile.reach.has(row.h3Index)) }))
     .filter((item) => item.inRange.length > 0)
     .sort((a, b) => {
@@ -192,6 +192,7 @@ function missileTargetRows(
       String(item.row.urbanHexCount),
       String(item.row.airportCount),
       String(item.row.seaportCount),
+      `${item.row.fortifiedCount ?? 0}/${(item.row.fortifiedCount ?? 0) + (item.row.fortifiableCount ?? 0)}`,
       String(enemyAir),
       item.inRange.map((missile) => missile.id).join(', '),
     ];

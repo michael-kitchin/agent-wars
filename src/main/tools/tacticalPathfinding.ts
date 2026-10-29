@@ -7,6 +7,8 @@ import { MISSILE_CANNOT_MOVE_REASON, isMissileUnitType } from '../../shared/miss
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
+import { FORTIFIED_CELL_BLOCKED_REASON } from '../../shared/fortificationRules';
+import { isCellBlockedByFortification, tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
 import { briefingSeatForBattle } from '../briefing/briefingPerspective';
 import { checkDistanceTagSourceUnit } from './pathfindingDistanceHelpers';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
@@ -75,7 +77,7 @@ function buildTacticalRouteSet(
   avoidEnemies: boolean,
   moverPlayer: string
 ): Set<string> {
-  const base = new Set(battle.tacticalChildH3Indexes);
+  const base = tacticalMarchSetForMover({ battle, moverPlayer, originH3 });
   if (!avoidEnemies) return base;
   const enemyOccupied = new Set<string>();
   for (const u of battle.subUnits) {
@@ -217,6 +219,7 @@ export function executeTacticalPlanRoute(
     if (!footprint.has(originH3) || !footprint.has(destH3)) {
       return { status: 'error', error: 'Origin or destination is outside the tactical battle footprint.' };
     }
+    const marchSet = tacticalMarchSetForMover({ battle, moverPlayer: unit.player, originH3 });
     const warnings: string[] = [];
     const terrainBonusCategory = sub ? terrainBonusMarchCategoryForMover(battle, sub, unit.unitType) : null;
     if (unit.unitType === 'naval') {
@@ -225,6 +228,9 @@ export function executeTacticalPlanRoute(
         destH3 = resolved.destH3;
         warnings.push('Naval destination redirected to nearest water/coastal/seaport hex in the tactical footprint.');
       }
+    }
+    if (isCellBlockedByFortification(battle, destH3, unit.player)) {
+      return { status: 'error', error: FORTIFIED_CELL_BLOCKED_REASON };
     }
     if (originH3 === destH3) {
       const ll = h3ToLatLng(originH3, latLngByH3, 'origin');
@@ -270,7 +276,7 @@ export function executeTacticalPlanRoute(
 
     let plan = tryPlan(buildTacticalRouteSet(battle, originH3, destH3, avoidEnemies, unit.player));
     if (!plan.reachable && avoidEnemies) {
-      plan = tryPlan(footprint);
+      plan = tryPlan(marchSet);
       if (plan.reachable) {
         warnings.push('Route passes through enemy-occupied hexes - avoidance was not possible.');
       }
@@ -281,7 +287,7 @@ export function executeTacticalPlanRoute(
         battle,
         fromH3: originH3,
         orderedToH3: destH3,
-        tacticalSet: footprint,
+        tacticalSet: marchSet,
         moveType: unit.unitType,
         movementPointBudget: budget,
         weatherTags: sub?.weatherTags,
@@ -400,7 +406,13 @@ export function executeTacticalCheckDistance(
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
   const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType, briefingSeatForBattle(battle));
-  const mover = { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags, origin: occupant?.origin };
+  const mover = {
+    unitType,
+    h3Index: fromH3,
+    player: briefingSeatForBattle(battle),
+    weatherTags: occupant?.weatherTags,
+    origin: occupant?.origin,
+  };
   const toH3Resolved =
     unitType === 'naval'
       ? resolveNavalTacticalDestination({
@@ -413,7 +425,7 @@ export function executeTacticalCheckDistance(
   if (fromH3 === toH3Resolved) {
     return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: true };
   }
-  const estimate = estimateTacticalMarch(battle, mover, toH3Resolved, footprint);
+  const estimate = estimateTacticalMarch(battle, mover, toH3Resolved);
   return {
     status: 'ok',
     from: fromLl,

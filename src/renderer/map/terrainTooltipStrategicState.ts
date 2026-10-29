@@ -249,6 +249,7 @@ function battleTerrainTooltipState(detailH3: string, battle: TacticalBattleSnaps
     terrainKind,
     isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
     isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+    isFortifiedCell: battle.tacticalFortificationOwnerByH3?.[detailH3] != null,
     features,
     urbanHexCount: null,
     strategicTerrainSummary: null,
@@ -487,6 +488,11 @@ function getStrategicFeaturesSummary(h3: string): string | null {
  */
 export function terrainTooltipStateForStrategicHex(h3: string): TerrainTooltipState {
   const state = terrainStateForStrategicHex(h3);
+  const infra = infraGlyphsAllowedForStrategicHex(h3)
+    ? S.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3)
+    : undefined;
+  const fortifiedCount = infra ? (infra.fortifiedCount ?? 0) : undefined;
+  const intactCityCells = infra ? fortifiedCount! + (infra.fortifiableCount ?? 0) : undefined;
   return {
     ...state,
     ...EMPTY_TERRAIN_EFFECT_FIELDS,
@@ -494,6 +500,7 @@ export function terrainTooltipStateForStrategicHex(h3: string): TerrainTooltipSt
     urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
     strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
     strategicFeaturesSummary: getStrategicFeaturesSummary(h3),
+    ...(fortifiedCount === undefined ? {} : { fortifiedCount, intactCityCells }),
   };
 }
 
@@ -588,6 +595,7 @@ export function terrainStateForPointer(
       terrainKind: detail?.terrainKind ?? parentKind,
       isUrban: detail?.isUrban ?? false,
       isRubble: detail?.isRubble ?? false,
+      isFortifiedCell: detail?.isFortified === true,
       features: featureLabelsForTacticalChild(parentH3, detailH3),
       urbanHexCount: null,
       strategicTerrainSummary: null,

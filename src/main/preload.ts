@@ -26,7 +26,7 @@ import type {
   TacticalTransportVectorOverlayRow,
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
-  BuildUnitType,
+  BuildQueueItemType,
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
   SetHexesKeepBuildingResult,
@@ -597,14 +597,14 @@ getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot 
 addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> =>
     ipcRenderer.invoke(IPC_GAME.addHexBuildQueueEntry, payload),
     /**
-   * Documents the object literal property `updateHexBuildQueueEntry` (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }): Promise<{ success: boolean; reason?).
+   * Documents the object literal property `updateHexBuildQueueEntry` (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildQueueItemType; count: number }): Promise<{ success: boolean; reason?).
 
    * Purpose: Supports maintainability by documenting why `updateHexBuildQueueEntry` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }): Promise<{
+updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildQueueItemType; count: number }): Promise<{
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;

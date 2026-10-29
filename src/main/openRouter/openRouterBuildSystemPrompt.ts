@@ -347,6 +347,7 @@ ${contextCoaching}
     hasNavalUnits: hasNaval,
     ordersEnabled: standingOrdersIssuable,
     originBonusSettings: originBonusSettingsFromSnapshot(state),
+    hasFortifiedCells: coordinateContext.hasFortifiedCells === true,
   });
   const combatRulesWithToolHints = combatTargetHint
     ? combatRulesParagraph.replace(

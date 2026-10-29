@@ -1,5 +1,5 @@
 import { formatSelectedHexTechLineHtml } from '../../shared/featureIconHtml';
-import { ALL_BUILD_UNIT_TYPES, type BuildUnitType, type HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES, type BuildQueueItemType, type HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { UNIT_SELECT_GLYPH } from '../core/constants';
@@ -338,7 +338,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     row.className = 'build-queue-row';
     const typeSelect = document.createElement('select');
     typeSelect.setAttribute('data-control-tooltip', multiBuildTypeTooltipText);
-    const rowTypes = ALL_BUILD_UNIT_TYPES.filter(
+    const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
       (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
     );
     for (const unitType of rowTypes) {
@@ -380,7 +380,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       const updated = [...S.buildQueueTemplate];
       updated[entryIndex] = {
         rowKey,
-        unitType: typeSelect.value as BuildUnitType,
+        unitType: typeSelect.value as BuildQueueItemType,
         count: readCurrentCount(),
       };
       await commitEditedTemplate(deps, updated);
@@ -395,7 +395,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       const updated = [...S.buildQueueTemplate];
       updated[entryIndex] = {
         rowKey,
-        unitType: typeSelect.value as BuildUnitType,
+        unitType: typeSelect.value as BuildQueueItemType,
         count: readCurrentCount(),
       };
       await commitEditedTemplate(deps, updated);

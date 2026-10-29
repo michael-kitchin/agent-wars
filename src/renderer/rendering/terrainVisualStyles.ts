@@ -7,6 +7,7 @@ import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
 import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
 import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
 import { appendUrbanLegendRow, urbanSwatchColor } from './terrainLegendUrban';
+import { appendFortifiedLegendRow } from './terrainLegendFortified';
 import { appendRubbleLegendRow, applyRubbleSwatchPaint } from './terrainLegendRubble';
 import { terrainStyleTooltipText } from '../chrome/controlTooltipText';
 
@@ -876,4 +877,5 @@ export function renderTerrainLegend(
   }
   appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
   appendRubbleLegendRow(container, getActiveTerrainStyleId());
+  appendFortifiedLegendRow(container);
 }

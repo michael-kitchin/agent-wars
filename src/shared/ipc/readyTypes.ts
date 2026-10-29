@@ -1,4 +1,5 @@
 import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
+import type { FortificationReport } from './fortificationTypes';
 import type { MissileLaunchRecord } from './missileTypes';
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
@@ -611,6 +612,33 @@ deployedUnitsByType?: {
    * Exceptions: None.
    */
 humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
+  /**
+   * City cells the human seat fortified this turn.
+   *
+   * Contract: The Updates line reports new fortifications.
+   * When to use: After production, when the count is above 0.
+   * Expected outcome: Omitted when none were built.
+   * Exceptions: None.
+   */
+  humanFortificationsBuilt?: number;
+  /**
+   * Hexes whose fortification queue paused because no city cell remains.
+   *
+   * Contract: The Updates paused line names these hexes.
+   * When to use: After production, when at least one hex paused.
+   * Expected outcome: Omitted when the list is empty.
+   * Exceptions: None.
+   */
+  humanFortificationQueuePausedHexes?: readonly string[];
+  /**
+   * Strategic fortifications lost this turn, one row per hex.
+   *
+   * Contract: The turn report names the hits and what remains.
+   * When to use: After fighting and before control resolution. Omitted when nothing was lost.
+   * Expected outcome: Sorted by hex. `ownerId` is the controller at that moment.
+   * Exceptions: None.
+   */
+  fortificationReports?: readonly FortificationReport[];
     /**
    * Specifies the contract for the `deploymentCapReachedUnitTypesBySeat` member (deploymentCapReachedUnitTypesBySeat?: BuildUnitType[];).
 

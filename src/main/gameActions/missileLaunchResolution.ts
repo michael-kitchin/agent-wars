@@ -11,6 +11,7 @@
 import type { MissileLaunchOrder, MissileLaunchRecord } from '../../shared/ipc/missileTypes';
 import type { InfrastructureDestroyedEvent } from '../../shared/ipc/readyTypes';
 import { MISSILE_INFRASTRUCTURE_SURVIVAL_FACE } from '../../shared/missileRules';
+import { recordFortificationLoss, type FortificationLossTally } from '../fortificationCombat';
 import { createCombatDieRoller } from '../combatDice';
 import type { CombatUnit } from '../combatUnitTypes';
 import { dbGetOne, dbRun, getHexController, listTacticalFeatureOverridesForGame, updateTacticalFeatureOverrideRow } from '../gameDb';
@@ -166,6 +167,24 @@ interface FlagCounts {
    * Exceptions: None.
    */
   seaportsDestroyed: number;
+  /**
+   * Fortified cells in the target when the launch started.
+   *
+   * Contract: A fortified cell is not also counted in the urban, airport, or seaport before-counts.
+   * When to use: The launch record.
+   * Expected outcome: Zero when the hex has no fortifications.
+   * Exceptions: None.
+   */
+  fortificationsBefore: number;
+  /**
+   * Fortifications this launch removed.
+   *
+   * Contract: The city, airport, and seaport flags on that cell stay.
+   * When to use: The launch record and the turn tally.
+   * Expected outcome: Zero when every fortified cell rolls a 20.
+   * Exceptions: None.
+   */
+  fortificationsDestroyed: number;
 }
 
 /**
@@ -204,9 +223,19 @@ function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCoun
     airportsDestroyed: 0,
     seaportsBefore: 0,
     seaportsDestroyed: 0,
+    fortificationsBefore: 0,
+    fortificationsDestroyed: 0,
   };
   const rows = listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === targetH3Index);
   for (const row of rows) {
+    if (row.isFortified) {
+      counts.fortificationsBefore += 1;
+      if (rollDie() < MISSILE_INFRASTRUCTURE_SURVIVAL_FACE) {
+        updateTacticalFeatureOverrideRow(row.h3Index, { isFortified: false });
+        counts.fortificationsDestroyed += 1;
+      }
+      continue;
+    }
     let isUrban = row.isUrban;
     let isAirport = row.isAirport;
     let isSeaport = row.isSeaport;
@@ -278,7 +307,8 @@ function spendMissile(unitId: string): void {
  */
 export function resolveMissileLaunchPhase(
   orders: readonly MissileLaunchOrder[],
-  next: () => number
+  next: () => number,
+  fortificationTally?: FortificationLossTally
 ): MissileLaunchPhaseResult {
   logDebug('missileLaunchResolution resolveMissileLaunchPhase', { orderCount: orders.length });
   const loaded = orders
@@ -306,6 +336,7 @@ export function resolveMissileLaunchPhase(
     const target = launch.order.targetH3Index;
     const controller = getHexController(target);
     const counts = rollTargetFlags(target, rollDie);
+    recordFortificationLoss(fortificationTally, target, counts.fortificationsDestroyed);
     const destroyedAir = counts.airportsDestroyed > 0 ? destroyBasedAirUnitsAtHex(target) : [];
     const destroyedAirUnitIds = destroyedAir.map((row) => row.id);
     for (const row of destroyedAir) {
@@ -334,6 +365,8 @@ export function resolveMissileLaunchPhase(
       airportsDestroyed: counts.airportsDestroyed,
       seaportsBefore: counts.seaportsBefore,
       seaportsDestroyed: counts.seaportsDestroyed,
+      fortificationsBefore: counts.fortificationsBefore,
+      fortificationsDestroyed: counts.fortificationsDestroyed,
       destroyedAirUnitIds,
     });
   }

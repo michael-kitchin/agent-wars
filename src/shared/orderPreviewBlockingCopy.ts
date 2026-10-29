@@ -6,6 +6,7 @@ import {
   STRATEGIC_DESTINATION_UNREACHABLE_REASON,
   TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON,
 } from './marchInvalidReasons';
+import { FORTIFIED_CELL_BLOCKED_HOVER, FORTIFIED_CELL_BLOCKED_REASON } from './fortificationRules';
 import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from './strategicTerrainFlags';
 
 /**
@@ -130,10 +131,10 @@ export function blockingHoverMessageFromAirStrikeReason(reason: string): string 
 /**
  * Derives the march-preview hover string from `previewHumanMarchOrders` / tactical planner `invalidReason` text.
  *
- * Purpose: March preview strings mix movement rules, terrain vocabulary, and generic unreachable messages.
- * An entry block names the hovered terrain. Every other illegal march says `Blocked: Unreachable`.
+ * Purpose: March preview strings mix movement rules, terrain vocabulary, a fortified cell, and generic unreachable messages.
+ * An entry block names the hovered terrain. A fortified cell says `Blocked: Fortified`. Every other illegal march says `Blocked: Unreachable`.
  * When to use: Renderer hover while movement planning shows `showInvalidMarker` on the grouped envelope or per-unit preview.
- * Expected outcome: An entry block names the hovered terrain. Every other illegal march, including a missing route and a cell outside the battle, says `Blocked: Unreachable`.
+ * Expected outcome: An entry block names the hovered terrain. `FORTIFIED_CELL_BLOCKED_REASON` returns `Blocked: Fortified`. Every other illegal march, including a missing route and a cell outside the battle, says `Blocked: Unreachable`.
  * Exceptions: Returns `null` when `invalidReason` is empty or clearly non-terrain (e.g. database errors).
  */
 export function blockingHoverMessageFromMarchInvalidReason(
@@ -141,6 +142,7 @@ export function blockingHoverMessageFromMarchInvalidReason(
   hoveredTerrainKind: string | null
 ): string | null {
   if (!invalidReason) return null;
+  if (invalidReason === FORTIFIED_CELL_BLOCKED_REASON) return FORTIFIED_CELL_BLOCKED_HOVER;
   if (
     invalidReason === TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON ||
     invalidReason === NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON ||

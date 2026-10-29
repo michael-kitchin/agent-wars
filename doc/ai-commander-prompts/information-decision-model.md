@@ -145,10 +145,10 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `PRODUCTION_QUEUES` | Controlled cells that can build, what they may build, and what is queued | `query_production` summary, `strategicBuildQueueTotals` | own-control only | 9 | strategic | conditional — `flags.productionEnabled` |
-| `PRODUCTION_RULES_COSTS` | Cost and infrastructure minimum per unit type | `UNIT_COST_BY_TYPE`, build availability rules | n/a | 9 | strategic | conditional — `flags.productionEnabled` |
+| `PRODUCTION_QUEUES` | Controlled cells that can build, what they may build, and what is queued. Fortification is listed while an intact city cell remains, including after every one is fortified. The Fortified column is fortified over intact city cells. | `query_production` summary, `strategicBuildQueueTotals` | own-control only | 9 | strategic | conditional — `flags.productionEnabled` |
+| `PRODUCTION_RULES_COSTS` | Cost and infrastructure minimum per unit type, then the fortification cost from `buildFortificationProductionRulePart` | `UNIT_COST_BY_TYPE`, `fortificationCostPerCell`, build availability rules | n/a | 9 | strategic | conditional — `flags.productionEnabled` |
 | `PRODUCTION_CAPS` | Per-side deployment cap per type at this game size, and current counts against it | `getMaxUnitsPerType`, `parseGameSize`, `getMaxedUnitTypesForPlayer` | own-side | 9, 27 | strategic | conditional — `flags.productionEnabled` |
-| `PRODUCTION_CAP_QUEUE_RULE` | Replace a queue blocked by a cap unless every available type is capped, in which case leave it | `shouldRejectCappedQueueType`, `filterQueueableUnitTypes`, `ALL_AVAILABLE_TYPES_AT_CAP_NOTE` | n/a | 9, 27 | strategic | conditional — `flags.productionEnabled` |
+| `PRODUCTION_CAP_QUEUE_RULE` | Replace a queue blocked by a cap unless every available unit type is capped, in which case leave it. Fortification is not a unit and is not that alternative. | `shouldRejectCappedQueueType`, `filterQueueableUnitTypes`, `ALL_AVAILABLE_TYPES_AT_CAP_NOTE` | n/a | 9, 27 | strategic | conditional — `flags.productionEnabled` |
 | `PRODUCTION_INCOME` | A cell earns points equal to its urban count each turn and spends them in queue order | `applyProduction` | own-side | 9 | strategic | conditional — `flags.productionEnabled` |
 | `PRODUCTION_TIMING` | Spawns resolve after combat and control resolution | ready pipeline ordering | n/a | 9 | strategic | conditional — `flags.productionEnabled` |
 

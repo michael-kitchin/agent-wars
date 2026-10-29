@@ -12,6 +12,7 @@ import { isHumanSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { readoutViewerSeatId } from '../../shared/observeModeControls';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 import { buildUnitOriginByLossDisplayName, rememberUnitOrigins } from '../core/unitOriginFlags';
+import { getExploredHexSet } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import {
   dropQueuedResolutionPlaybackCompleteNotifies,
@@ -19,6 +20,7 @@ import {
   notifyResolutionPlaybackFinished,
 } from '../openRouter/resolutionPlaybackDeferral';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
+import { fortificationReportLinesFor, fortificationUpdateLinesFor } from './fortificationUpdateLines';
 import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
 
 /**
@@ -354,6 +356,11 @@ export async function announceResolutionTurnUpdate(
     }
   }
   const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
+  const fortificationLines = await fortificationUpdateLinesFor(readySlice);
+  const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
+    viewerSeatId,
+    exploredHexes: getExploredHexSet(S.gameState),
+  });
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
     turnLossSummary,
@@ -365,6 +372,8 @@ export async function announceResolutionTurnUpdate(
     },
     unknownBattleLine,
     missileStrikeLines,
+    fortificationLines,
+    fortificationReportLines,
   });
   if (updateText) {
     // Casualties carry birth records for units that never appeared in a fog-filtered snapshot.

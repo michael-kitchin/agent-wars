@@ -8,10 +8,12 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
-  ALL_BUILD_UNIT_TYPES,
   isBuildUnitType,
   isValidBuildCount,
 } from '../productionRules';
+import { ALL_BUILD_QUEUE_ITEM_TYPES, isBuildQueueItemType } from '../../shared/ipc/productionTypes';
+import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
+import { getStrategicInfrastructureForHex } from '../gameDb';
 import {
   addHexBuildQueueEntry,
   getHexBuildQueue,
@@ -111,6 +113,11 @@ function summarizeQueue(
   maxedTypes: ReadonlySet<string>
 ): Record<string, unknown> {
   const ll = latLngByH3.get(queue.h3Index);
+  const unitTypes = filterQueueableUnitTypes(queue.availableUnitTypes.filter(isBuildUnitType), maxedTypes);
+  const availableUnitTypes = queue.availableUnitTypes.includes(FORTIFICATION_QUEUE_ITEM)
+    ? [...unitTypes, FORTIFICATION_QUEUE_ITEM]
+    : unitTypes;
+  const counts = queue.controlledByRequester ? getStrategicInfrastructureForHex(queue.h3Index) : null;
   return {
     hex: ll ? toDisplayLatLng(ll) : null,
     controllerPlayerId: queue.controllerPlayerId,
@@ -118,7 +125,8 @@ function summarizeQueue(
     urbanHexCount: queue.urbanHexCount,
     airportCount: queue.airportCount,
     seaportCount: queue.seaportCount,
-    availableUnitTypes: filterQueueableUnitTypes(queue.availableUnitTypes, maxedTypes),
+    ...(counts ? { fortifiedCount: counts.fortifiedCount, fortifiableCount: counts.fortifiableCount } : {}),
+    availableUnitTypes,
     buildSectionVisible: queue.buildSectionVisible,
     noBuildReason: queue.noBuildReason,
     entries: queue.entries.map((entry) => ({
@@ -198,8 +206,8 @@ function setBuildQueue(
   };
   const resolved = resolveHexArgument(args, resolveToH3);
   if (!resolved.ok) return reject(resolved.error);
-  if (!isBuildUnitType(args.unitType)) {
-    return reject(`set_build_queue requires unitType (${ALL_BUILD_UNIT_TYPES.join('|')}).`, resolved.h3Index);
+  if (!isBuildQueueItemType(args.unitType)) {
+    return reject(`set_build_queue requires unitType (${ALL_BUILD_QUEUE_ITEM_TYPES.join('|')}).`, resolved.h3Index);
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {
@@ -215,10 +223,11 @@ function setBuildQueue(
   if (!currentQueue.buildSectionVisible) {
     return reject(currentQueue.noBuildReason ?? 'Build section is not available for this hex.', resolved.h3Index);
   }
-  if (!currentQueue.availableUnitTypes.includes(args.unitType)) {
+  const queueableTypes = currentQueue.availableUnitTypes;
+  if (!queueableTypes.includes(args.unitType)) {
     return reject(
       `set_build_queue unitType ${args.unitType} is not available for this hex; available: ${
-        currentQueue.availableUnitTypes.join(', ') || 'none'
+        queueableTypes.join(', ') || 'none'
       }.`,
       resolved.h3Index
     );
@@ -226,7 +235,8 @@ function setBuildQueue(
   const maxedTypes = new Set(
     getMaxedUnitTypesForPlayer(state.units, seatId, parseGameSize(state.gameSize))
   );
-  if (shouldRejectCappedQueueType(args.unitType, currentQueue.availableUnitTypes, maxedTypes)) {
+  const unitTypes = queueableTypes.filter(isBuildUnitType);
+  if (isBuildUnitType(args.unitType) && shouldRejectCappedQueueType(args.unitType, unitTypes, maxedTypes)) {
     return reject(
       `set_build_queue unitType ${args.unitType} is at deployment cap; queue a still-available type instead.`,
       resolved.h3Index

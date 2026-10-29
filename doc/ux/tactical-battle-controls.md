@@ -15,6 +15,7 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 - A button with an exit icon and the label "Exit Battle", in the battle header, while a battle is active and annihilation is not showing. It uses the shared button colors, and the dimmed teal while it is disabled.
 - The annihilation dialog: "You win!", "You lose.", or "All units destroyed.", plus an Exit Battle button.
 - Control tips for both Exit Battle buttons are in [control-tooltips.md](control-tooltips.md).
+- A cell fortified by the other side cannot be entered. Hovering it says "Blocked: Fortified". The controller's units start on fortified core cells, one each, after missiles. The first hit on those units removes the ticks at the end of the beat and the unit stays. A fortified cell in the outer rings blocks movement and is never hit.
 
 ## Inputs and Responses
 
@@ -75,4 +76,8 @@ None.
 - `src/renderer/tactical/tacticalExitFlow.ts`
 - `src/renderer/tactical/tacticalAnnihilationDialog.ts`
 - `src/renderer/tactical/tacticalUiOrchestration.ts`
+- `src/main/tacticalBattle/tacticalFortificationPlacement.ts` (`orderParentsForFortifiedPlacement`, `takeFortifiedCellForDefender`)
+- `src/main/tacticalBattle/tacticalFortificationSoak.ts` (`createTacticalFortificationHooks`)
+- `src/shared/tacticalFortificationMovement.ts` (`tacticalMarchSetForMover`)
+- `src/renderer/rendering/tacticalBattleTerrainPaint.ts`
 - `src/renderer/tactical/applyTacticalPostBeatConsultSideEffects.ts`

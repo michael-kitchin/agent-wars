@@ -9,7 +9,7 @@
  */
 
 import { logDebug } from '../../logger';
-import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../../shared/ipc/productionTypes';
 import { STANDING_ORDER_TYPES } from '../../tools/standingOrdersShared';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
 import { envelopeFieldsForGates, legalOrderActionsForMode, type EnvelopeGates } from './envelopeContract';
@@ -426,7 +426,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
           {
             action: enumSchema(PRODUCTION_ORDER_ACTIONS),
             hex: STRING_SCHEMA,
-            unitType: enumSchema(ALL_BUILD_UNIT_TYPES),
+            unitType: enumSchema(ALL_BUILD_QUEUE_ITEM_TYPES),
             count: { type: 'integer' },
           },
           ['action', 'hex', 'unitType', 'count']

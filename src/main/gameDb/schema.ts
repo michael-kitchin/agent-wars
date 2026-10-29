@@ -160,7 +160,7 @@ export function getFullDdl(): string {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       h3_index TEXT NOT NULL,
       queue_index INTEGER NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')),
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile', 'fortification')),
       remaining_count INTEGER NOT NULL CHECK (remaining_count > 0),
       UNIQUE (h3_index, queue_index)
     );
@@ -171,7 +171,7 @@ export function getFullDdl(): string {
       keep_building INTEGER NOT NULL DEFAULT 0 CHECK (keep_building IN (0, 1)),
       keep_building_unit_type TEXT CHECK (
         keep_building_unit_type IS NULL
-        OR keep_building_unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')
+        OR keep_building_unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile', 'fortification')
       )
     );
 
@@ -179,7 +179,9 @@ export function getFullDdl(): string {
       h3_index TEXT PRIMARY KEY,
       urban_hex_count INTEGER NOT NULL DEFAULT 0,
       airport_count INTEGER NOT NULL DEFAULT 0,
-      seaport_count INTEGER NOT NULL DEFAULT 0
+      seaport_count INTEGER NOT NULL DEFAULT 0,
+      fortified_count INTEGER NOT NULL DEFAULT 0,
+      fortifiable_count INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS res_t_feature_overrides (
@@ -189,7 +191,9 @@ export function getFullDdl(): string {
       is_urban INTEGER NOT NULL DEFAULT 0,
       is_airport INTEGER NOT NULL DEFAULT 0,
       is_seaport INTEGER NOT NULL DEFAULT 0,
-      is_rubble INTEGER NOT NULL DEFAULT 0
+      is_rubble INTEGER NOT NULL DEFAULT 0,
+      is_fortified INTEGER NOT NULL DEFAULT 0,
+      CHECK (is_fortified IN (0, 1) AND (is_fortified = 0 OR (is_urban = 1 AND is_rubble = 0)))
     );
 
     CREATE TABLE IF NOT EXISTS seats (

@@ -18,7 +18,9 @@ import {
   PRODUCTION_CAP_QUEUE_GUIDANCE,
 } from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
+import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
+import { isBuildUnitType } from '../productionRules';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -191,6 +193,24 @@ airportCount?: unknown;
    * Exceptions: None.
    */
 seaportCount?: unknown;
+  /**
+   * Fortified city cells on a hex the commander controls.
+   *
+   * Contract: From `query_production`. Absent on another seat's hex.
+   * When to use: The Fortified column.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  fortifiedCount?: unknown;
+  /**
+   * Intact city cells that are not yet fortified.
+   *
+   * Contract: From `query_production`, paired with `fortifiedCount`.
+   * When to use: The Fortified column's denominator.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  fortifiableCount?: unknown;
     /**
    * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes?: unknown;).
 
@@ -256,6 +276,15 @@ airports: number;
    * Exceptions: None.
    */
 seaports: number;
+  /**
+   * Fortified cells over intact city cells, as text.
+   *
+   * Contract: `fortified/intact`.
+   * When to use: The Fortified column.
+   * Expected outcome: A fraction. Both zeros read `0/0`.
+   * Exceptions: None.
+   */
+  fortified: string;
     /**
    * Specifies the contract for the `available` member (available: string;).
 
@@ -303,8 +332,10 @@ function normalizeControlledHexQueueRow(
   const urban = Number(row.urbanHexCount ?? 0);
   const airports = Number(row.airportCount ?? 0);
   const seaports = Number(row.seaportCount ?? 0);
+  const fortifiedCount = Number(row.fortifiedCount ?? 0);
+  const fortifiableCount = Number(row.fortifiableCount ?? 0);
   const availableList = Array.isArray(row.availableUnitTypes)
-    ? (row.availableUnitTypes as unknown[]).map((x) => String(x))
+    ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).filter(isBuildUnitType)
     : [];
   const available = formatBriefingAvailableUnitTypes(availableList, maxedTypes);
   const entriesList = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
@@ -331,6 +362,7 @@ function normalizeControlledHexQueueRow(
     urban,
     airports,
     seaports,
+    fortified: `${fortifiedCount}/${fortifiedCount + fortifiableCount}`,
     available,
     entries,
     hasQueuedEntries: entriesList.length > 0,
@@ -417,9 +449,9 @@ export function buildProductionBriefingBlock(args: {
   }
   lines.push(
     ...buildPromptTableLines(
-      ['Hex', 'Urban Hexes', 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue'],
-      selectedRows.map((row) => [row.hexText, row.urban, row.airports, row.seaports, row.available, row.entries]),
-      ['—', '—', '—', '—', '—', '—']
+      ['Hex', 'Urban Hexes', FORTIFIED_COLUMN_HEADER, 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue'],
+      selectedRows.map((row) => [row.hexText, row.urban, row.fortified, row.airports, row.seaports, row.available, row.entries]),
+      ['—', '—', '—', '—', '—', '—', '—']
     )
   );
   return lines.join('\n');

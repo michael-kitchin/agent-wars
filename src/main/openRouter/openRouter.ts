@@ -8,6 +8,7 @@ import * as path from 'path';
 import { app, safeStorage } from 'electron';
 import { getRange } from '../combatConstants';
 import { isMissileUnitType, MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
+import { isExploredEnemyFortifiedHex } from '../../shared/fortificationSnapshotRules';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
@@ -507,7 +508,9 @@ function validateAiRangedOrder(
     return { valid: false, reason: 'Invalid distance' };
   }
   const hasEnemy = state.units.some((u) => u.h3Index === order.targetH3Index && u.player !== unit.player);
-  if (!hasEnemy) return { valid: false, reason: 'Target hex has no enemy' };
+  if (!hasEnemy && !isExploredEnemyFortifiedHex(state, order.targetH3Index, unit.player)) {
+    return { valid: false, reason: 'Target hex has no enemy' };
+  }
   return { valid: true };
 }
 

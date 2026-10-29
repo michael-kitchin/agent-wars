@@ -12,6 +12,7 @@ import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { executeProductionTools } from './productionTools';
+import { isBuildUnitType } from '../productionRules';
 
 /**
  * Locates or provisions an opponent-controlled hex with the requested urban count.
@@ -139,7 +140,7 @@ function testSetBuildQueueAllowsCappedTypeWhenNoAlternative(): void {
   withTempGameDb('aw-tool6-cap-only-', () => {
     const h3Index = findOrProvisionOpponentBuildableHex(1);
     const queue = getHexBuildQueue(h3Index, 'opponent');
-    assert.deepEqual(queue.availableUnitTypes, ['infantry']);
+    assert.deepEqual(queue.availableUnitTypes.filter(isBuildUnitType), ['infantry']);
     const state = withOpponentTypeAtCap(getGameState(), 'infantry');
     const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
     const hex = latLngByH3.get(h3Index);

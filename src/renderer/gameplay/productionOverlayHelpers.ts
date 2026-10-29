@@ -3,7 +3,8 @@
  */
 
 import { isSeatId, type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
-import type { BuildUnitType, GameStateSnapshot } from '../../shared/ipcTypes';
+import { isBuildUnitType, type BuildUnitType, type GameStateSnapshot } from '../../shared/ipcTypes';
+import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import { estimateTurnsToNextSpawn } from '../../shared/productionConfig';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getPlayerUnitCountsByType } from '../../shared/unitCountsByType';
@@ -207,10 +208,15 @@ export function formatProductionQueueAwareLabel(
   if (queuedUnits <= 0) return capacityText;
   const nextUnitType = queue?.nextUnitType;
   const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
+  if (nextUnitType === FORTIFICATION_QUEUE_ITEM) {
+    const fortifiable =
+      state.strategicInfrastructure?.find((row) => row.h3Index === h3Index)?.fortifiableCount ?? 0;
+    if (fortifiable <= 0) return `${capacityText} / ∞t`;
+  }
   if (!nextUnitType || capacityPerTurn <= 0) {
     return `${capacityText} / ?t`;
   }
-  if (controller && isSeatId(controller)) {
+  if (controller && isSeatId(controller) && isBuildUnitType(nextUnitType)) {
     const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
     if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
       return `${capacityText} / ∞t`;

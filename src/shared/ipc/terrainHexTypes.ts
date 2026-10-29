@@ -110,6 +110,15 @@ isSeaport?: boolean;
    * Exceptions: None.
    */
 isRubble?: boolean;
+  /**
+   * True when this tactical cell is fortified.
+   *
+   * Contract: Optional so callers that have not loaded the flag still compile. Absent means not fortified.
+   * When to use: Renderer ticks and the fortified-cell tooltip.
+   * Expected outcome: True only for an intact fortified city cell.
+   * Exceptions: None.
+   */
+  isFortified?: boolean;
 }
 
 /**

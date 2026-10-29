@@ -17,6 +17,7 @@ The player sees the following stages, skipping any stage the resolution does not
 - Missile launches fly to the target on a continuous line in the launching side's map color and do not return. The missile is already gone. Infrastructure and based air lost to the launch are part of that strike.
 - Air units move out, air combat, air casualties, then air units return.
 - Ranged combat, then ranged casualties.
+- Melee lightning and dice include a siege hex that holds only one side. The siege rolls are melee dice.
 - Movement.
 - Melee combat, then melee casualties.
 
@@ -106,6 +107,8 @@ None.
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/shared/combatDiceChips.ts`
 - `src/main/combatDiceRecording.ts`
+- `src/main/fortificationCombat.ts` (`runSiegeRolls`)
+- `src/main/combatResolution.ts` (`runMeleePhase`)
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/gameplay/observeChrome.ts` (`maybeObserveAutoAdvance`)
 - `src/renderer/gameplay/readyHandler.ts`

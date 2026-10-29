@@ -65,6 +65,15 @@ export interface CoordinateContext {
    * Exceptions: None.
    */
   seatId?: AiSeatId;
+  /**
+   * Whether the tactical battle has at least one fortified cell.
+   *
+   * Contract: Omitted means false. Strategic consultations leave it unset.
+   * When to use: Set from the battle owner record when the consultation is tactical.
+   * Expected outcome: The combat paragraph includes the tactical fortification sentence only when this is true.
+   * Exceptions: None.
+   */
+  hasFortifiedCells?: boolean;
 }
 
 /**

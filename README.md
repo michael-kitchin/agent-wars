@@ -146,7 +146,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1171 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1231 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -199,6 +199,7 @@ Production is based on real-world urban land cover: the Natural Earth urban area
 | Armor    | 40   | 2 urban cells                |
 | Air      | 60   | 5 urban cells and an airport |
 | Naval    | 100  | 10 urban cells and a seaport |
+| Fortification | 20 | One intact city cell. Not a unit, and not capped. |
 
 
 Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3:10 for infantry, armor, naval, air, and missiles, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)).
@@ -215,7 +216,7 @@ The opponent plans and manages its forces through six groups of MCP-style tools:
 | Estimation | Analytic hit odds for a proposed attack | `estimate_combat`                     |
 | Memory     | Notes it saved on earlier turns         | `memory_read`                         |
 | Orders     | The standing orders it has assigned     | `query_orders`                        |
-| Production | Income, build options, and queues       | `query_production`, `set_build_queue` |
+| Production | Income, build options, and queues, including fortification | `query_production`, `set_build_queue` |
 
 
 Memory writes and standing-order changes travel in the model's JSON reply. The full catalog is in [doc/ai-tools.md](doc/ai-tools.md).

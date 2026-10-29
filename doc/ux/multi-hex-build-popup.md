@@ -17,7 +17,7 @@ Opens in Strategic planning when two or more build hexes are selected. Selection
 - Production per turn for the selected hexes added together, under Tech when that line is shown and under the hex codes when it is not.
 - A combined queue summary: cost and turns for the template as applied to those hexes.
 - The title "Build Queue".
-- One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes. The types are infantry, armor, naval, air, and missile. A hex that does not meet the missile urban gate (`buildMinimumUrbanCells`) skips a missile row.
+- One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes. The types are infantry, armor, naval, air, and missile, and Fortification while a selected hex still has an intact city cell. A hex that does not meet the missile urban gate (`buildMinimumUrbanCells`) skips a missile row. A hex with no intact city cell skips a fortification row. A hex whose city cells are all already fortified still takes the row, and that queue pauses when it is spent.
 - A Keep building checkbox. It shows as checked only when every selected hex has Keep building on. It can be changed only when every selected hex can arm it.
 - If the queues fail to load, "Failed to load build queues for the selected hexes." That failure shows no Tech line.
 - Control tips for the queue controls and Keep building are in [control-tooltips.md](control-tooltips.md).
@@ -81,3 +81,5 @@ None.
 - `src/renderer/gameplay/buildQueueMultiSelect.ts`
 - `src/renderer/gameplay/buildQueuePopup.ts`
 - `src/renderer/gameplay/buildQueueKeepBuilding.ts`
+- `src/main/productionRules.ts` (`getAvailableBuildQueueItemTypes`)
+- `src/shared/fortificationRules.ts` (`FORTIFICATION_QUEUE_ITEM`)

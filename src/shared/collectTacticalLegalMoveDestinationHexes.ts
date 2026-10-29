@@ -5,6 +5,7 @@
  * legal destinations (land: MP Dijkstra; naval: enter-cost Dijkstra), not one plan per candidate hex.
  */
 
+import { tacticalMarchSetForMover } from './tacticalFortificationMovement';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import { isMissileUnitType } from './missileRules';
 import { collectInfantryArmorReachableWithinBudget } from './tacticalLandReachabilityWithinBudget';
@@ -31,6 +32,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   battle: Pick<
     TacticalBattleSnapshot,
     | 'tacticalChildH3Indexes'
+    | 'tacticalFortificationOwnerByH3'
     | 'subUnits'
     | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrain'
@@ -58,6 +60,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   if (budget < 1) return [];
   const footprint = new Set(battle.tacticalChildH3Indexes);
   if (!footprint.has(u.h3Index)) return [];
+  const marchSet = tacticalMarchSetForMover({ battle, moverPlayer: u.player, originH3: u.h3Index });
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
   const footprintNeighbors = tacticalFootprintNeighborLookupFromMap(
     buildTacticalFootprintAdjacencyMap(footprint)
@@ -66,7 +69,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   if (u.unitType === 'infantry' || u.unitType === 'armor') {
     return collectInfantryArmorReachableWithinBudget({
       fromH3: u.h3Index,
-      tacticalSet: footprint,
+      tacticalSet: marchSet,
       unitTypeForMovement: u.unitType,
       movementPointBudget: budget,
       terrain,
@@ -79,7 +82,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   }
   return collectSimpleEnterCostReachableWithinBudget({
     fromH3: u.h3Index,
-    tacticalSet: footprint,
+    tacticalSet: marchSet,
     unitTypeForMovement: u.unitType,
     movementPointBudget: budget,
     terrain,
@@ -112,13 +115,14 @@ export function collectTacticalLegalMoveDestinationHexesBruteForceForTests(
   if (budget < 1) return [];
   const footprint = new Set(battle.tacticalChildH3Indexes);
   if (!footprint.has(u.h3Index)) return [];
+  const marchSet = tacticalMarchSetForMover({ battle, moverPlayer: u.player, originH3: u.h3Index });
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
   const footprintNeighbors = tacticalFootprintNeighborLookupFromMap(
     buildTacticalFootprintAdjacencyMap(footprint)
   );
   let candidates: string[];
   try {
-    candidates = [...gridDisk(u.h3Index, budget)].filter((h) => h !== u.h3Index && footprint.has(h));
+    candidates = [...gridDisk(u.h3Index, budget)].filter((h) => h !== u.h3Index && marchSet.has(h));
   } catch {
     candidates = battle.tacticalChildH3Indexes.filter((h) => h !== u.h3Index);
   }
@@ -127,7 +131,7 @@ export function collectTacticalLegalMoveDestinationHexesBruteForceForTests(
     const plan = planTacticalMarch({
       fromH3: u.h3Index,
       toH3,
-      tacticalSet: footprint,
+      tacticalSet: marchSet,
       unitTypeForMovement: u.unitType,
       movementPointBudget: budget,
       terrain,

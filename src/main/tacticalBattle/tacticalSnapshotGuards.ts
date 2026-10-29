@@ -20,6 +20,7 @@ import {
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { isMissileUnitType } from '../../shared/missileRules';
+import { isCellBlockedByFortification, tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
 import { HUMAN_SEAT_ID, isNeutralOwnerId, type OwnerId } from '../../shared/seatIds';
 import { opposingPartyIdOf } from './opposingParty';
 import { tacticalLogError, tacticalLogMutate } from './tacticalLogging';
@@ -274,7 +275,8 @@ export type TacticalMovementBlockReason =
   | 'out_of_range'
   | 'air_no_march'
   | 'missile_no_march'
-  | 'embarked_cargo';
+  | 'embarked_cargo'
+  | 'fortified_cell';
 
 /**
  * Snapshot fields and lookup tables needed to project one tactical march order.
@@ -308,6 +310,7 @@ type TacticalMovementOrderOutcomeArgs = {
     | 'weatherBonusLevel'
     | 'terrainBonusEnabled'
     | 'opposingPartyId'
+    | 'tacticalFortificationOwnerByH3'
   >;
 };
 
@@ -354,6 +357,14 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }
+  if (isCellBlockedByFortification(args.battle, args.order.toH3Index, player)) {
+    return {
+      ok: false,
+      reason: 'fortified_cell',
+      context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
+    };
+  }
+  const marchSet = tacticalMarchSetForMover({ battle: args.battle, moverPlayer: player, originH3: u.h3Index });
   let pathfindUnit = u;
   if (player === HUMAN_SEAT_ID) {
     if (
@@ -386,7 +397,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
   let plan = planTacticalMarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,
-    tacticalSet: args.tacticalSet,
+    tacticalSet: marchSet,
     unitTypeForMovement: moveType,
     movementPointBudget: Math.max(0, budget),
     weatherEnabled: args.battle.weatherBonusEnabled === true,
@@ -401,7 +412,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
             battle: args.battle,
             fromH3: u.h3Index,
             orderedToH3: args.order.toH3Index,
-            tacticalSet: args.tacticalSet,
+            tacticalSet: marchSet,
             moveType,
             movementPointBudget: Math.max(0, budget),
             weatherTags: pathfindUnit.weatherTags,
@@ -483,7 +494,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     toH3: args.order.toH3Index,
     budget,
     plan,
-    tacticalSet: args.tacticalSet,
+    tacticalSet: marchSet,
   });
   return { ok: true, idx, appliedToH3Index };
 }

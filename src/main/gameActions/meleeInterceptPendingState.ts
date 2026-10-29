@@ -7,6 +7,7 @@ import type { CombatUnit } from '../combatUnitTypes';
 import type { CombatResolutionResult } from '../combatResolution';
 import type { FerryAnimationMove, GameStateSnapshot, MeleeCandidateRow, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { LossFlagFacts } from '../../shared/lossFlagFacts';
+import type { FortificationLossTally } from '../fortificationCombat';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
 import type { MissileLaunchPhaseResult } from './missileLaunchResolution';
 import { logDebug, logError, logTrace } from '../logger';
@@ -228,6 +229,15 @@ meleeInterceptCandidates: MeleeCandidateRow[];
    * Exceptions: None.
    */
   lossFlagFactsByUnitId: ReadonlyMap<string, LossFlagFacts>;
+  /**
+   * Fortifications already removed before melee.
+   *
+   * Contract: The same map the air and ranged phases wrote. Resume melee appends to it.
+   * When to use: Creating soak hooks on the resume path.
+   * Expected outcome: Reports built at finalize include losses from before the pause.
+   * Exceptions: None.
+   */
+  fortificationTally: FortificationLossTally;
 }
 
 let pendingMeleeIntercept: MeleeInterceptReadyPauseSnapshot | null = null;

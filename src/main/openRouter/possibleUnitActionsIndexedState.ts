@@ -2,6 +2,8 @@
  * Indexed snapshot maps for possible-action collection, and the read-only lookups and cell text built from them.
  */
 
+import { formatFortifiedFeaturePart } from '../../shared/fortificationRules';
+import { isHexExploredInSnapshot } from '../../shared/fortificationSnapshotRules';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import type { GameStateSnapshot } from '../gameDb';
@@ -44,6 +46,15 @@ export interface InfraCounts {
    * Exceptions: None.
    */
   readonly airport: number;
+  /**
+   * Fortified city cells the viewer may be told about.
+   *
+   * Contract: 0 when the hex is unexplored or the row has no fortified count.
+   * When to use: The features cell, after the urban count.
+   * Expected outcome: Non-negative integer.
+   * Exceptions: None.
+   */
+  readonly fortified: number;
 }
 
 /**
@@ -130,6 +141,7 @@ export function buildPossibleActionsIndexedState(state: GameStateSnapshot): Poss
       urban: Number(row.urbanHexCount ?? 0),
       seaport: Number(row.seaportCount ?? 0),
       airport: Number(row.airportCount ?? 0),
+      fortified: isHexExploredInSnapshot(state, row.h3Index) ? Number(row.fortifiedCount ?? 0) : 0,
     });
   }
   const controlByHex = new Map<string, string | null>();
@@ -171,7 +183,7 @@ export function buildPossibleActionsIndexedState(state: GameStateSnapshot): Poss
  */
 export function getInfra(indexed: PossibleActionsIndexedState, h3: string): InfraCounts {
   logTrace('possibleUnitActions getInfra', h3);
-  return indexed.infraByHex.get(h3) ?? { urban: 0, seaport: 0, airport: 0 };
+  return indexed.infraByHex.get(h3) ?? { urban: 0, seaport: 0, airport: 0, fortified: 0 };
 }
 
 /**
@@ -209,6 +221,7 @@ export function describeInfrastructure(inf: InfraCounts): string | null {
   logTrace('possibleUnitActions describeInfrastructure', inf);
   const parts: string[] = [];
   if (inf.urban > 0) parts.push(`${inf.urban} urban hex${inf.urban === 1 ? '' : 'es'}`);
+  if (inf.fortified > 0) parts.push(formatFortifiedFeaturePart(inf.fortified));
   if (inf.seaport > 0) parts.push(`${inf.seaport} seaport${inf.seaport === 1 ? '' : 's'}`);
   if (inf.airport > 0) parts.push(`${inf.airport} airport${inf.airport === 1 ? '' : 's'}`);
   if (parts.length === 0) return null;

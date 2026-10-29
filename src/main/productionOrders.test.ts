@@ -93,13 +93,24 @@ function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
 }
 
 /**
- * Defines the `testNormalizeProductionOrdersRequiresArrayWhenPresent` function shape (function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void).
-
- * Purpose: Supports maintainability by documenting why `testNormalizeProductionOrdersRequiresArrayWhenPresent` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Accepts a fortification queue item.
+ *
+ * Purpose: The production envelope may name a fortification, which is not a unit type.
+ * When to use: After `normalizeProductionOrders` widens `unitType`.
+ * Expected outcome: One valid order and no drop.
  * Exceptions: None.
  */
+function testNormalizeProductionOrdersAcceptsFortification(): void {
+  const [hx0] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [{ action: 'set_build_queue', hex: hx0, unitType: 'fortification', count: 1 }],
+    strategicCtx
+  );
+  assert.strictEqual(parsed.validOrders.length, 1);
+  assert.strictEqual(parsed.validOrders[0]?.unitType, 'fortification');
+  assert.strictEqual(parsed.droppedReasons.length, 0);
+}
+
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
   const parsed = normalizeProductionOrders({ action: 'set_build_queue' }, strategicCtx);
   assert.strictEqual(parsed.validOrders.length, 0);
@@ -120,6 +131,7 @@ function run(): void {
     { name: 'mixed validity partial keep', fn: testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid },
     { name: 'count bounds', fn: testNormalizeProductionOrdersRejectsOutOfBoundsCount },
     { name: 'array contract', fn: testNormalizeProductionOrdersRequiresArrayWhenPresent },
+    { name: 'fortification order', fn: testNormalizeProductionOrdersAcceptsFortification },
   ];
   for (const test of tests) {
     try {

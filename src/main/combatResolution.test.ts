@@ -205,7 +205,7 @@ function testStrategicInfantryDoesNotReturnFire(): void {
     [defenderHex, attackerHex!],
     [{ unitId: 'atk', targetH3Index: defenderHex }],
     () => 0,
-    { theater: 'strategic' }
+    { returnFireContext: { theater: 'strategic' } }
   );
   assert.ok(
     !out.rangedResolutionShotLines?.some(
@@ -243,7 +243,7 @@ function testStrategicNavalOutOfRangeDoesNotReturnFire(): void {
     [defenderHex, far!],
     [{ unitId: 'atk', targetH3Index: defenderHex }],
     () => 0,
-    { theater: 'strategic' }
+    { returnFireContext: { theater: 'strategic' } }
   );
   assert.ok(
     !out.rangedResolutionShotLines?.some(
@@ -275,7 +275,7 @@ function testStrategicAirWithoutAirportDoesNotReturnFire(): void {
     [defenderHex, attackerHex!],
     [{ unitId: 'atk', targetH3Index: defenderHex }],
     () => 0,
-    { theater: 'strategic', hasIntactAirportAtAirBase: () => false }
+    { returnFireContext: { theater: 'strategic', hasIntactAirportAtAirBase: () => false } }
   );
   assert.equal(out.killsByReturnFire?.length ?? 0, 0);
   assert.ok(
@@ -421,8 +421,7 @@ function testRangedTargetCoverAppliesToAttackersOnly(): void {
     [defenderHex, attackerHex!],
     [{ unitId: 'atk', targetH3Index: defenderHex }],
     rollExactly(9),
-    undefined,
-    () => 2
+    { targetCoverAt: () => 2 }
   );
   assert.deepStrictEqual(out.removedUnitIds, ['atk']);
 }

@@ -3,12 +3,13 @@
  *
  * Purpose: Keeps air-vs-units dice and casualty rules out of the larger tactical order-phase module.
  * When to use: From `applyTacticalAirStrikeThenRangedPhaseOnBattle`.
- * Expected outcome: Mutates the caller's removal set and kill ledgers; never touches the database.
+ * Expected outcome: Mutates the caller's removal set and kill ledgers. `absorbHit` may clear a fortification in the database. Anti-air does not.
  * Exceptions: None.
  */
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
+import type { FortificationVictim } from '../fortificationCombat';
 import { compareCasualtyOrder } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { rollCombatDieAgainst, type CombatDiceRollSink } from '../combatDiceRecording';
@@ -136,6 +137,15 @@ export interface TacticalAirStrikeOnUnitsInput {
    * Exceptions: None.
    */
   readonly onRoll?: CombatDiceRollSink;
+  /**
+   * Spends the hit on a fortified cell instead of the victim.
+   *
+   * Contract: True means the victim stays. Omitted means the victim is removed.
+   * When to use: The tactical air-strike phase, with the battle's fortification hooks.
+   * Expected outcome: A true result does not mark a casualty.
+   * Exceptions: None.
+   */
+  readonly absorbHit?: (victim: FortificationVictim) => boolean;
 }
 
 /**
@@ -232,13 +242,20 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       (a, b) =>
         compareCasualtyOrder(a.unitType, b.unitType)
     )[0]!;
-    markTacticalSubUnitCasualty(sub, toRemove, victim.id, [attacker.id], killsByAirStrike);
-    tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits ground target destroyed', {
-      targetH3Index,
-      victimSubUnitId: victim.id,
-      victimParentUnitId: victim.parentUnitId,
-      attackerSubUnitId: attacker.id,
-    });
+    if (input.absorbHit?.({ player: victim.player, h3Index: victim.h3Index })) {
+      tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits fortification absorbed the hit', {
+        targetH3Index,
+        victimSubUnitId: victim.id,
+      });
+    } else {
+      markTacticalSubUnitCasualty(sub, toRemove, victim.id, [attacker.id], killsByAirStrike);
+      tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits ground target destroyed', {
+        targetH3Index,
+        victimSubUnitId: victim.id,
+        victimParentUnitId: victim.parentUnitId,
+        attackerSubUnitId: attacker.id,
+      });
+    }
   }
   for (const defender of eligibleForAa) {
     if (toRemove.has(attacker.id)) break;

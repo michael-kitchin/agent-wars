@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { FORTIFIED_CELL_VARIANT_LABEL, FORTIFIED_TOOLTIP_LABEL, formatFortifiedTooltipValue } from '../../shared/fortificationRules';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
@@ -60,9 +61,10 @@ function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null
  * Expected outcome: Empty, an Urban swatch, or a Rubble swatch. A rubble cell names Rubble. An intact urban cell names Urban. The caller inserts this HTML as-is.
  * Exceptions: None.
  */
-function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
+function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble' | 'isFortifiedCell'>): string {
   const variants: string[] = [];
   if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+  else if (state.isFortifiedCell) variants.push(`${formatUrbanSwatchHtml()}${FORTIFIED_CELL_VARIANT_LABEL}`);
   else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
@@ -241,10 +243,15 @@ function formatTerrainTooltipHtml(
       : state.urbanHexCount > 0 && !neutralBorder
         ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
         : `<strong>Production:</strong> (none)`;
+  const fortifiedCount = state.fortifiedCount ?? 0;
+  const fortifiedLine =
+    fortifiedCount > 0
+      ? `<strong>${FORTIFIED_TOOLTIP_LABEL}:</strong> ${formatFortifiedTooltipValue(fortifiedCount, state.intactCityCells ?? fortifiedCount)}`
+      : null;
   const resolution = namingTarget?.resolution;
   const orderedLines =
     resolution === 1
-      ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine]
+      ? [controlLine, productionLine, fortifiedLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine]
       : resolution === 4
         ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine, productionLine]
         : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine, productionLine];
@@ -288,7 +295,10 @@ function terrainTooltipContentKey(
   const techBonusKey = S.gameState?.techBonusEnabled === true ? '1' : '0';
   const baselineUrbanKey =
     namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : 'x';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
+  const fortifiedKey = state.fortifiedCount == null ? 'x' : String(state.fortifiedCount);
+  const intactKey = state.intactCityCells == null ? 'x' : String(state.intactCityCells);
+  const fortifiedCellKey = state.isFortifiedCell ? '1' : '0';
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}::${fortifiedKey}::${intactKey}::${fortifiedCellKey}`;
 }
 
 /**

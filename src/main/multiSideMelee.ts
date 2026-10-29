@@ -10,6 +10,7 @@
 import { compareCasualtyOrder, unitTypeRollsInCombat } from './combatConstants';
 import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import { rollCombatDieAgainst, type CombatDiceRollSink } from './combatDiceRecording';
+import type { FortificationVictim } from './fortificationCombat';
 import type { CombatUnit } from './combatUnitTypes';
 import { logDebug } from './logger';
 
@@ -87,6 +88,15 @@ export interface MultiSideMeleeEngagement {
    * Exceptions: None.
    */
   readonly onRoll?: CombatDiceRollSink;
+  /**
+   * Spends a hit on a fortification instead of the chosen unit.
+   *
+   * Contract: A fortified hex keeps the unit when a cell absorbs the hit.
+   * When to use: Strategic melee. Omit it in a battle.
+   * Expected outcome: True leaves the unit in place and spends the hit. Omitted removes the unit.
+   * Exceptions: None.
+   */
+  readonly absorbHit?: (victim: FortificationVictim) => boolean;
 }
 
 /**
@@ -159,10 +169,12 @@ export function resolveMultiSideMeleeEngagement(args: MultiSideMeleeEngagement):
         }
         draw -= count;
       }
-      const victim = remaining.get(chosen)?.shift();
+      const victim = remaining.get(chosen)?.[0];
       if (!victim) break;
-      removals.push({ victim, killerIds });
       hitsLeft -= 1;
+      if (args.absorbHit?.(victim)) continue;
+      remaining.get(chosen)!.shift();
+      removals.push({ victim, killerIds });
     }
   }
   logDebug('resolveMultiSideMeleeEngagement complete', { removalCount: removals.length });

@@ -114,6 +114,7 @@ Element documents share a fixed heading set:
 - Theater: strategic play on the world map, or tactical play inside a battle.
 - Contested hex: a strategic hex with units from both sides, eligible for a tactical battle.
 - Fog of war: hidden information the player has not yet earned. The rules are in the combat rules.
+- Fortification: a flag on one intact city cell. The hex's controller builds it, one cell per queue item, at the infantry cost (`fortificationCostPerCell`). It soaks one hit on that controller's units and blocks a change of control until none remain. The map draws it as ticks. The rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
 ## Element and Mode Matrix
 

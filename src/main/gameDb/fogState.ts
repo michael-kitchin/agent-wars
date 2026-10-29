@@ -1,7 +1,7 @@
 import { cellToLatLng } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES, getOrderedHexList } from '../mapData';
 import { computeVisibleHexesForSide } from '../visibility';
-import type { BuildUnitType } from '../productionRules';
+import type { BuildQueueItemType } from '../productionRules';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   computeContestedHomeRegionHexes,
@@ -260,7 +260,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const queueTotalRows = ops.getAll<{
     h3Index: string;
     queuedUnits: number;
-    nextUnitType: BuildUnitType | null;
+    nextUnitType: BuildQueueItemType | null;
     nextRemainingCount: number | null;
     storedPoints: number;
   }>(

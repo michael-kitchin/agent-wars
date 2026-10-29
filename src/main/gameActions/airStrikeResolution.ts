@@ -1,5 +1,6 @@
 import { strategicUrbanCellsDestroyedPerHit } from '../../shared/gameRules';
 import { strategicParentOf } from '../../shared/h3Resolutions';
+import { recordFortificationLoss, type FortificationLossTally, type StrategicFortificationContext } from '../fortificationCombat';
 import {
   dbGetAll,
   dbGetOne,
@@ -14,7 +15,7 @@ import {
   updateTacticalFeatureOverrideRow,
 } from '../gameDb';
 import { logDebug } from '../logger';
-import { getAvailableBuildUnitTypes } from '../productionRules';
+import { getAvailableBuildQueueItemTypes } from '../productionRules';
 import { compareCasualtyOrder, getRange } from '../combatConstants';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
@@ -56,7 +57,10 @@ export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
     return;
   }
 
-  const allowed = new Set(getAvailableBuildUnitTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount));
+  const intactCityCells = infra.urbanHexCount <= 0 ? 0 : infra.fortifiedCount + infra.fortifiableCount;
+  const allowed = new Set(
+    getAvailableBuildQueueItemTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount, intactCityCells)
+  );
   const rows = listBuildQueueRowsForHex(h3Index);
   const standing = getKeepBuildingForHex(h3Index);
 
@@ -110,8 +114,8 @@ function replaceRandomTacticalFeaturesWithRubble(
   feature: 'urban' | 'airport' | 'seaport',
   count: number,
   next: () => number
-): number {
-  if (count <= 0) return 0;
+): { readonly rubbled: number; readonly fortificationsStripped: number } {
+  if (count <= 0) return { rubbled: 0, fortificationsStripped: 0 };
   const candidates = listTacticalFeatureOverridesForGame().filter((row) => {
     if (row.parentH3Index !== h3Index) return false;
     if (row.isRubble) return false;
@@ -119,20 +123,28 @@ function replaceRandomTacticalFeaturesWithRubble(
     if (feature === 'airport') return row.isAirport;
     return row.isSeaport;
   });
-  let changed = 0;
+  let rubbled = 0;
+  let fortificationsStripped = 0;
+  let picks = 0;
   const pool = [...candidates];
-  while (pool.length > 0 && changed < count) {
+  while (pool.length > 0 && picks < count) {
     const idx = Math.floor(next() * pool.length);
     const row = pool.splice(idx, 1)[0]!;
-    updateTacticalFeatureOverrideRow(row.h3Index, {
-      isRubble: true,
-      isUrban: feature === 'urban' ? false : row.isUrban,
-      isAirport: feature === 'airport' ? false : row.isAirport,
-      isSeaport: feature === 'seaport' ? false : row.isSeaport,
-    });
-    changed++;
+    picks += 1;
+    if (row.isFortified) {
+      updateTacticalFeatureOverrideRow(row.h3Index, { isFortified: false });
+      fortificationsStripped += 1;
+    } else {
+      updateTacticalFeatureOverrideRow(row.h3Index, {
+        isRubble: true,
+        isUrban: feature === 'urban' ? false : row.isUrban,
+        isAirport: feature === 'airport' ? false : row.isAirport,
+        isSeaport: feature === 'seaport' ? false : row.isSeaport,
+      });
+      rubbled += 1;
+    }
   }
-  return changed;
+  return { rubbled, fortificationsStripped };
 }
 
 /**
@@ -173,6 +185,15 @@ export type ApplyInfrastructureDestructionOptions = {
    * Exceptions: None.
    */
   tacticalUrbanStrikeTargetH3?: string;
+  /**
+   * Turn tally for fortifications this strike strips.
+   *
+   * Contract: Omitted when the caller is not collecting a turn report.
+   * When to use: Strategic resolution, once the turn tally exists.
+   * Expected outcome: Stripped cells are added under the strategic hex.
+   * Exceptions: None.
+   */
+  readonly fortificationTally?: FortificationLossTally;
 };
 
 /**
@@ -191,6 +212,7 @@ export function applyInfrastructureDestructionEffects(
 ): {
   destroyedAirUnits: Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>;
   changedRubbleCount: number;
+  fortificationsStrippedCount: number;
 } {
   logDebug('applyInfrastructureDestructionEffects', {
     h3Index,
@@ -201,20 +223,31 @@ export function applyInfrastructureDestructionEffects(
   const result = {
     destroyedAirUnits: [] as Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>,
     changedRubbleCount: 0,
+    fortificationsStrippedCount: 0,
+  };
+  const finish = (): typeof result => {
+    recordFortificationLoss(options?.fortificationTally, h3Index, result.fortificationsStrippedCount);
+    return result;
   };
   if (targetType === 'urban') {
     const tacticalStrikeTarget = options?.tacticalUrbanStrikeTargetH3?.trim();
     if (tacticalStrikeTarget) {
       if (strategicParentOf(tacticalStrikeTarget) !== h3Index) {
         logDebug('applyInfrastructureDestructionEffects tactical urban parent mismatch', { tacticalStrikeTarget, h3Index });
-        return result;
+        return finish();
       }
       const match = listTacticalFeatureOverridesForGame().find(
         (row) => row.h3Index === tacticalStrikeTarget && row.parentH3Index === h3Index && row.isUrban && !row.isRubble
       );
       if (!match) {
         logDebug('applyInfrastructureDestructionEffects tactical urban no eligible res4 row', { tacticalStrikeTarget, h3Index });
-        return result;
+        return finish();
+      }
+      if (match.isFortified) {
+        updateTacticalFeatureOverrideRow(match.h3Index, { isFortified: false });
+        result.fortificationsStrippedCount = 1;
+        logDebug('applyInfrastructureDestructionEffects tactical urban stripped a fortification', { tacticalStrikeTarget, h3Index });
+        return finish();
       }
       logDebug('applyInfrastructureDestructionEffects tactical urban converting targeted res4 to rubble', {
         tacticalStrikeTarget,
@@ -228,33 +261,39 @@ export function applyInfrastructureDestructionEffects(
       });
       result.changedRubbleCount = 1;
       pruneBuildQueueForInfrastructureState(h3Index);
-      return result;
+      return finish();
     }
     const destroyCount = Math.min(strategicUrbanCellsDestroyedPerHit(), current.urbanHexCount);
-    if (destroyCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'urban', destroyCount, next);
+    if (destroyCount <= 0) return finish();
+    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'urban', destroyCount, next);
+    result.changedRubbleCount = picked.rubbled;
+    result.fortificationsStrippedCount = picked.fortificationsStripped;
     if (result.changedRubbleCount > 0) {
       pruneBuildQueueForInfrastructureState(h3Index);
     }
-    return result;
+    return finish();
   }
   if (targetType === 'airport') {
-    if (current.airportCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'airport', 1, next);
+    if (current.airportCount <= 0) return finish();
+    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'airport', 1, next);
+    result.changedRubbleCount = picked.rubbled;
+    result.fortificationsStrippedCount = picked.fortificationsStripped;
     if (result.changedRubbleCount > 0) {
       result.destroyedAirUnits = destroyBasedAirUnitsAtHex(h3Index);
       pruneBuildQueueForInfrastructureState(h3Index);
     }
-    return result;
+    return finish();
   }
   if (targetType === 'seaport') {
-    if (current.seaportCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'seaport', 1, next);
+    if (current.seaportCount <= 0) return finish();
+    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'seaport', 1, next);
+    result.changedRubbleCount = picked.rubbled;
+    result.fortificationsStrippedCount = picked.fortificationsStripped;
     if (result.changedRubbleCount > 0) {
       pruneBuildQueueForInfrastructureState(h3Index);
     }
   }
-  return result;
+  return finish();
 }
 
 /**
@@ -311,6 +350,15 @@ casualtyHexes: Set<string>;
    * Exceptions: None.
    */
   readonly diceLog: CombatDiceLog;
+  /**
+   * Soak for a hit on the hex controller's units.
+   *
+   * Contract: A fortification can spend the strike instead of deleting the victim.
+   * When to use: Strategic resolution, when the turn has hooks. Omit it in tests that have no fortifications.
+   * Expected outcome: Absent means the victim is deleted, as before. Anti-air never reads it.
+   * Exceptions: None.
+   */
+  readonly fortification?: StrategicFortificationContext;
 }
 
 /**
@@ -401,8 +449,10 @@ function resolveAirStrikeAgainstUnits(
   let attackerLost = false;
   if (attackHit && defenders.length > 0) {
     const victim = [...defenders].sort((a, b) => compareCasualtyOrder(a.unit_type, b.unit_type))[0]!;
-    dbRun('DELETE FROM units WHERE id = ?', [victim.id]);
-    recordRemovedUnit(acc, victim);
+    if (acc.fortification?.hooks.absorbHit({ player: victim.player, h3Index: targetH3Index }) !== true) {
+      dbRun('DELETE FROM units WHERE id = ?', [victim.id]);
+      recordRemovedUnit(acc, victim);
+    }
     success = true;
   }
 
@@ -456,7 +506,14 @@ function resolveAirStrikeAgainstInfrastructure(
   let success = false;
   let attackerLost = false;
   if (attackHit) {
-    const destruction = applyInfrastructureDestructionEffects(order.targetH3Index, order.targetType, next);
+    const destruction = applyInfrastructureDestructionEffects(order.targetH3Index, order.targetType, next, { fortificationTally: acc.fortification?.tally });
+    if (
+      destruction.changedRubbleCount > 0 ||
+      destruction.fortificationsStrippedCount > 0 ||
+      destruction.destroyedAirUnits.length > 0
+    ) {
+      success = true;
+    }
     if (destruction.changedRubbleCount > 0 || destruction.destroyedAirUnits.length > 0) {
       infrastructureDestroyedEvents.push({
         h3Index: order.targetH3Index,
@@ -464,7 +521,6 @@ function resolveAirStrikeAgainstInfrastructure(
         changedRubbleCount: destruction.changedRubbleCount,
         destroyedAirUnitsCount: destruction.destroyedAirUnits.length,
       });
-      success = true;
     }
     for (const removed of destruction.destroyedAirUnits) {
       recordRemovedUnit(acc, removed);
@@ -500,7 +556,8 @@ export function resolveAirStrikePhase(
   next: () => number,
   originHitBonusAt: OriginHitBonusLookup,
   targetCoverAt: TerrainCoverLookup,
-  techHitBonusAt: TechHitBonusLookup = noTechHitBonus
+  techHitBonusAt: TechHitBonusLookup = noTechHitBonus,
+  fortification?: StrategicFortificationContext
 ): {
   removedUnitIds: string[];
   removedUnits: CombatUnit[];
@@ -521,6 +578,7 @@ export function resolveAirStrikePhase(
     removedUnits: [],
     casualtyHexes: new Set<string>(),
     diceLog: createCombatDiceLog(),
+    fortification,
   };
   const strikeHexes = new Set<string>();
   const strikeMoves: AirStrikeAnimationMove[] = [];

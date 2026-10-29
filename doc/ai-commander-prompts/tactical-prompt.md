@@ -81,7 +81,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 #### `# Operational Map`
 
 - **Example:** one rendered grid from a single consultation is in [`example-tactical-prompt.md`](example-tactical-prompt.md).
-- **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; uppercase means the enclosing cell is AI-controlled; odd rows are indented one space; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
+- **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; when a cell is fortified the legend adds `, F/f fortified city cell (F = yours)` and that cell shows `F` or `f` in place of `U` or `u` (`FORTIFIED_MAP_LEGEND_FRAGMENT`); uppercase means the enclosing cell is AI-controlled; odd rows are indented one space; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
 - **Displaced-features footnote:** included when a unit overlay hides a feature marker; omitted when empty.
 - **Empty footprint:** the map body states that there are no tactical cells to render.
 - **Must not contain:** a unit-roster subsection.
@@ -252,3 +252,4 @@ Claims the builders **omit** from tactical coaching:
 | Distance caveat line | present when distances are hop counts | never |
 | Tools | up to nine | routing, distance, `assess_unit`, and `estimate_combat` (no air strikes), per tool-group toggles |
 | Envelope tails | air, ferry, missile launches when the roster has a missile, callbacks, memory, production | air, ferry, callbacks. No `missileLaunches` |
+| Fortification rule | Always, from `buildFortificationRule` | The tactical sentence from `buildFortificationRule` only when `hasFortifiedCells` is true: `F` is yours, `f` is the enemy's, enemy units cannot enter, a fortified cell absorbs one hit on its owner's units, and fire removes the fortification first |

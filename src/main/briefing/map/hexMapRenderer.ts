@@ -49,6 +49,15 @@ export interface HexMapCellState {
     hasAirport: boolean;
     hasSeaport: boolean;
     urbanCount: number;
+    /**
+     * Whether this cell's fortification belongs to the commander.
+     *
+     * Contract: Undefined when the cell is not fortified. True when the owner is the briefing seat.
+     * When to use: The structural overlay, in place of the urban glyph.
+     * Expected outcome: `F` or `f`. An airport or seaport glyph still wins.
+     * Exceptions: None.
+     */
+    fortifiedByAi?: boolean;
   };
   /**
    * True when the cell is controlled by the AI side for upper/lower-case structural markers.
@@ -137,6 +146,7 @@ export function renderHexAsciiMap(grid: HexGrid, gameState: Map<string, HexMapCe
     if (a && s) return upper ? 'B' : 'b';
     if (a) return upper ? 'A' : 'a';
     if (s) return upper ? 'S' : 's';
+    if (st.features.fortifiedByAi !== undefined) return st.features.fortifiedByAi ? 'F' : 'f';
     if (u) return upper ? 'U' : 'u';
     return '.';
   };

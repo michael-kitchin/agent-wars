@@ -18,6 +18,7 @@ export type TacticalRendererOverrideRow = {
   isAirport?: boolean;
   isSeaport?: boolean;
   isRubble?: boolean;
+  isFortified?: boolean;
 };
 
 /**
@@ -46,15 +47,19 @@ function computeTacticalFeatureOverrideSignature(ops: BasicDbOps): string {
     a: number;
     s: number;
     r: number;
+    f: number;
+    fr: number;
   }>(
     `SELECT COUNT(*) AS c,
             COALESCE(SUM(is_urban), 0) AS u,
             COALESCE(SUM(is_airport), 0) AS a,
             COALESCE(SUM(is_seaport), 0) AS s,
-            COALESCE(SUM(is_rubble), 0) AS r
+            COALESCE(SUM(is_rubble), 0) AS r,
+            COALESCE(SUM(is_fortified), 0) AS f,
+            COALESCE(SUM(is_fortified * rowid), 0) AS fr
      FROM res_t_feature_overrides`
   );
-  return `${row?.c ?? 0}|${row?.u ?? 0}|${row?.a ?? 0}|${row?.s ?? 0}|${row?.r ?? 0}`;
+  return `${row?.c ?? 0}|${row?.u ?? 0}|${row?.a ?? 0}|${row?.s ?? 0}|${row?.r ?? 0}|${row?.f ?? 0}|${row?.fr ?? 0}`;
 }
 
 /**

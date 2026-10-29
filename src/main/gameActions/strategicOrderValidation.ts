@@ -11,8 +11,8 @@ import type { OwnerId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { getRange } from '../combatConstants';
-import { dbGetOne, getGameStateForPlayer, getMapHexSet, isDbReady } from '../gameDb';
-import { logDebug, logError } from '../logger';
+import { dbGetOne, getGameStateForPlayer, getHexController, getMapHexSet, getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
+import { logDebug, logError, logTrace } from '../logger';
 import { isLandSeaportSpawnHex, normalizeMovementTerrain } from '../movementTerrain';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
@@ -232,11 +232,28 @@ export function validateOrder(
 }
 
 /**
+ * Whether an enemy holds a fortification on the hex.
+ *
+ * Purpose: Ranged fire may target an empty fortified hex.
+ * When to use: After the target has no enemy units.
+ * Expected outcome: True when the controller is someone else and at least one cell is fortified.
+ * Exceptions: None.
+ */
+function isEnemyFortifiedHex(h3Index: string, attackerPlayer: string): boolean {
+  const controller = getHexController(h3Index);
+  const fortified = controller !== null
+    && controller !== attackerPlayer
+    && getStrategicInfrastructureForHex(h3Index).fortifiedCount > 0;
+  logTrace('strategicOrderValidation isEnemyFortifiedHex', { h3Index, attackerPlayer, controller, fortified });
+  return fortified;
+}
+
+/**
  * Checks whether one unit may make a strategic ranged attack against a hex.
  *
  * Purpose: Single-unit ranged gate shared by group targeting and submit-orders.
  * When to use: After the caller has a unit id and target hex; pass `allowedPlayer` for opponent checks.
- * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering ownership, range, embark, map, and enemy presence.
+ * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering ownership, range, embark, map, and an enemy unit or an enemy fortification.
  * Exceptions: None. A closed database returns `{ valid: false, reason: 'Database not initialized' }`.
  */
 export function validateRangedAttack(
@@ -263,7 +280,7 @@ export function validateRangedAttack(
   const withinRange = isWithinGridRangeSafe(unit.h3_index, targetH3Index, range, 'validateRangedAttack');
   if (!withinRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, range) };
 
-  if (!hasEnemyUnitsAtHex(targetH3Index, unit.player)) {
+  if (!hasEnemyUnitsAtHex(targetH3Index, unit.player) && !isEnemyFortifiedHex(targetH3Index, unit.player)) {
     return { valid: false, reason: 'Target hex has no enemy units' };
   }
 

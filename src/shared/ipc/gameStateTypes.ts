@@ -1,4 +1,4 @@
-import type { BuildUnitType } from './productionTypes';
+import type { BuildQueueItemType } from './productionTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { ActiveBonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
@@ -442,7 +442,7 @@ strategicControl?: { h3Index: string; controllerPlayerId: string | null }[];
 strategicBuildQueueTotals?: {
     h3Index: string;
     queuedUnits: number;
-    nextUnitType: BuildUnitType | null;
+    nextUnitType: BuildQueueItemType | null;
     nextRemainingCount: number | null;
     storedPoints: number;
   }[];
@@ -459,6 +459,8 @@ strategicInfrastructure?: {
     urbanHexCount: number;
     airportCount: number;
     seaportCount: number;
+    fortifiedCount?: number;
+    fortifiableCount?: number;
   }[];
     /**
    * Specifies the contract for the `gameOver` member (gameOver?: boolean;).

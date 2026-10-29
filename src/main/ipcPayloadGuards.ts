@@ -4,7 +4,7 @@ import type {
   EmbarkOrder,
   FerryOrder,
 } from '../shared/ipcTypes';
-import { isBuildUnitType, type BuildUnitType } from '../shared/ipc/productionTypes';
+import { isBuildQueueItemType, type BuildQueueItemType } from '../shared/ipc/productionTypes';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPushTypes';
 
 /**
@@ -122,11 +122,11 @@ export function parseBuildQueueUpdatePayload(payload: {
   entryId?: unknown;
   unitType?: unknown;
   count?: unknown;
-}): { h3Index: string; entryId: number; unitType: BuildUnitType; count: number } | null {
+}): { h3Index: string; entryId: number; unitType: BuildQueueItemType; count: number } | null {
   if (typeof payload?.h3Index !== 'string' || typeof payload?.entryId !== 'number' || typeof payload?.count !== 'number') {
     return null;
   }
-  if (!isBuildUnitType(payload?.unitType)) return null;
+  if (!isBuildQueueItemType(payload?.unitType)) return null;
   return { h3Index: payload.h3Index, entryId: payload.entryId, unitType: payload.unitType, count: payload.count };
 }
 
@@ -150,7 +150,7 @@ export function parseBuildQueueTemplatePayload(payload: unknown): {
   for (const entry of value.entries) {
     if (entry === null || typeof entry !== 'object') return null;
     const row = entry as { unitType?: unknown; count?: unknown };
-    if (!isBuildUnitType(row.unitType)) return null;
+    if (!isBuildQueueItemType(row.unitType)) return null;
     if (typeof row.count !== 'number' || !Number.isFinite(row.count)) return null;
     entries.push({ unitType: row.unitType, count: row.count });
   }

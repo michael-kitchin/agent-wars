@@ -12,6 +12,7 @@ import type { GameStateSnapshot } from '../../gameDb';
 import { logDebug } from '../../logger';
 import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openRouter/possibleUnitActions';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
+import { FORTIFIED_MAP_LEGEND_FRAGMENT } from '../../../shared/fortificationRules';
 import type { CoordinateContext } from './coordinateContext';
 import {
   ensureStrategicCoordinateRegistryInitialized,
@@ -211,12 +212,15 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
   const displacedLine = renderDisplacedFeaturesLine(displacedFeatures);
+  const fortifiedLegend = [...gameByH3.values()].some((cell) => cell.features.fortifiedByAi !== undefined)
+    ? FORTIFIED_MAP_LEGEND_FRAGMENT
+    : '';
 
   const legend =
     'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
     'Terrain: x = land, . = water.\n' +
     'Overlay: * = your units, ! = enemy units, including neutral garrisons, # = contested.\n' +
-    'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
+    `Features: A/a airport, S/s seaport, B/b both, U/u urban only${fortifiedLegend}; uppercase = your control.\n` +
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
   return (
@@ -265,10 +269,16 @@ function buildTacticalHexGameStateMap(
     const urban = !rubble && !!battle.tacticalIsUrbanByH3?.[h3];
     const seaport = !rubble && !!battle.tacticalIsSeaportByH3?.[h3];
     const airport = !rubble && !!battle.tacticalIsAirportByH3?.[h3];
+    const fortOwner = battle.tacticalFortificationOwnerByH3?.[h3];
     out.set(h3, {
       terrain,
       isDiscovered,
-      features: { hasAirport: airport, hasSeaport: seaport, urbanCount: urban ? 1 : 0 },
+      features: {
+        hasAirport: airport,
+        hasSeaport: seaport,
+        urbanCount: urban ? 1 : 0,
+        ...(fortOwner !== undefined ? { fortifiedByAi: fortOwner === ownSeat } : {}),
+      },
       controlledByAI,
       aiUnitCount: aiUnitsByH3.get(h3) ?? 0,
       enemyUnitCount: visible ? humanUnitsByH3.get(h3) ?? 0 : 0,

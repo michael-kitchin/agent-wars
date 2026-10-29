@@ -106,11 +106,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Single-hex add: Add a queue row. It starts as the first unit type this hex can build.
 - Single-hex type: Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.
 - Single-hex count: Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.
-- Single-hex Keep building: After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.
+- Single-hex Keep building: After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.
 - Multi-hex add: Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.
 - Multi-hex type: Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.
 - Multi-hex count: Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.
-- Multi-hex Keep building: After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.
+- Multi-hex Keep building: After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.
 - Sealift slot: Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.
 - Sealift debark: Land the unit in this slot now. In a battle, that unit's march is cancelled too.
 - Fight: Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.
@@ -178,7 +178,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
 - `src/renderer/chrome/frameTooltipText.ts`

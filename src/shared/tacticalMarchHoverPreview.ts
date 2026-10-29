@@ -4,6 +4,8 @@
  */
 
 import { cellToLatLng, gridDistance } from 'h3-js';
+import { FORTIFIED_CELL_BLOCKED_REASON } from './fortificationRules';
+import { isCellBlockedByFortification, tacticalMarchSetForMover } from './tacticalFortificationMovement';
 import { MISSILE_CANNOT_MOVE_REASON, isMissileUnitType } from './missileRules';
 import {
   buildHumanOrderGroupPreviewEnvelope,
@@ -154,6 +156,9 @@ function buildPreviewForSubUnit(args: {
   }
   if (!resOk) {
     return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Invalid tactical cell', segments: [] });
+  }
+  if (isCellBlockedByFortification(args.battle, args.hoveredH3Index, HUMAN_SEAT_ID)) {
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: FORTIFIED_CELL_BLOCKED_REASON, segments: [] });
   }
   if (!args.tacticalSet.has(args.hoveredH3Index)) {
     return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Outside tactical footprint', segments: [] });
@@ -310,7 +315,7 @@ export function buildTacticalMarchHoverPreview(
   unitIds: readonly string[],
   hoveredH3Index: string | null
 ): HumanOrderGroupPreviewResult {
-  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
+  const tacticalSet = tacticalMarchSetForMover({ battle, moverPlayer: HUMAN_SEAT_ID });
   const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
   const selectedHuman = uniqueIds
     .map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID))
@@ -415,7 +420,7 @@ export function buildTacticalMarchDraftDestinationPreview(
   destinationH3Index: string,
   options?: { overridePathH3Indexes?: readonly string[] }
 ): TacticalDraftPreviewResult {
-  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
+  const tacticalSet = tacticalMarchSetForMover({ battle, moverPlayer: HUMAN_SEAT_ID });
   return buildPreviewForSubUnit({
     battle,
     unitId: subUnitId,

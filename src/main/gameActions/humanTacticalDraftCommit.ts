@@ -13,6 +13,7 @@ import type {
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { combatDicePlaybackFields } from '../combatDiceRecording';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
+import { tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import { isDbReady, reconcileStrategicInfrastructureCountsFromTacticalOverrides } from '../gameDb';
 import { logDebug, logError } from '../logger';
@@ -286,11 +287,11 @@ export function commitHumanTacticalDraftOrders(args: {
       explicitRangedCount: explicitRanged.length,
       explicitAirCount: explicitAir.length,
     });
-    const tacticalSet = new Set(preBattle.tacticalChildH3Indexes);
     const terrainBattle = {
       battleId: preBattle.battleId,
       tacticalTurnNumber: preBattle.tacticalTurnNumber,
       subUnits: preBattle.subUnits,
+      tacticalChildH3Indexes: preBattle.tacticalChildH3Indexes,
       tacticalTerrainKindByH3: preBattle.tacticalTerrainKindByH3,
       strategicHexTerrain: preBattle.strategicHexTerrain,
       strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
@@ -323,7 +324,7 @@ export function commitHumanTacticalDraftOrders(args: {
         from,
         o.toH3Index,
         maxEdges,
-        tacticalSet,
+        tacticalMarchSetForMover({ battle: preBattle, moverPlayer: sub.player, originH3: from }),
         terrainBattle,
         moveType,
         sub
@@ -414,7 +415,7 @@ export function commitHumanTacticalDraftOrders(args: {
             from,
             o.toH3Index,
             oppMaxEdges,
-            tacticalSet,
+            tacticalMarchSetForMover({ battle: preBattle, moverPlayer: su.player, originH3: from }),
             terrainBattle,
             oppMoveType,
             su

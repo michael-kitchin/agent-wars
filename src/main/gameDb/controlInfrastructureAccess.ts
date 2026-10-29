@@ -1,4 +1,4 @@
-import type { BuildUnitType } from '../productionRules';
+import type { BuildQueueItemType } from '../productionRules';
 import { logDebug, logTrace } from '../logger';
 import { gameDbOps } from './dbConnection';
 import {
@@ -110,7 +110,7 @@ export function getBuildProgressPointsForHex(h3Index: string): number {
  */
 export function getKeepBuildingForHex(h3Index: string): {
   keepBuilding: boolean;
-  keepBuildingUnitType: BuildUnitType | null;
+  keepBuildingUnitType: BuildQueueItemType | null;
 } {
   return getKeepBuildingForHexFromModule(gameDbOps, h3Index);
 }
@@ -126,7 +126,7 @@ export function getKeepBuildingForHex(h3Index: string): {
 export function setKeepBuildingForHex(
   h3Index: string,
   keepBuilding: boolean,
-  keepBuildingUnitType: BuildUnitType | null
+  keepBuildingUnitType: BuildQueueItemType | null
 ): void {
   setKeepBuildingForHexFromModule(gameDbOps, h3Index, keepBuilding, keepBuildingUnitType);
 }
@@ -163,7 +163,7 @@ export function clearBuildQueueAndProgressForHex(h3Index: string): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitType: BuildUnitType; remainingCount: number }>): void {
+export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitType: BuildQueueItemType; remainingCount: number }>): void {
   replaceBuildQueueForHexFromModule(gameDbOps, h3Index, entries);
 }
 
@@ -300,7 +300,7 @@ export function insertTacticalFeatureOverrideRubbleRow(args: {
  */
 export function updateTacticalFeatureOverrideRow(
   h3Index: string,
-  patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
+  patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble' | 'isFortified'>>
 ): void {
   updateTacticalFeatureOverrideRowFromModule(gameDbOps, h3Index, patch);
 }
@@ -320,6 +320,7 @@ export function getTacticalTerrainOverridesForRendererFromGame(): Array<{
   isAirport?: boolean;
   isSeaport?: boolean;
   isRubble?: boolean;
+  isFortified?: boolean;
 }> {
   return getTacticalTerrainOverridesForRendererFromGameFromModule(gameDbOps);
 }

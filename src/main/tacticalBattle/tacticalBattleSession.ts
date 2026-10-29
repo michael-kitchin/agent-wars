@@ -9,6 +9,7 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
+import { FORTIFIED_CELL_BLOCKED_REASON } from '../../shared/fortificationRules';
 import { MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { opposingPartyIdOf } from './opposingParty';
@@ -21,6 +22,7 @@ import {
   writeTacticalBattleSnapshotToGameConfig,
 } from './tacticalBattlePersistence';
 import { computeTacticalBattleSnapshot, tacticalSubUnitCountForStrategicUnitType } from './computeTacticalBattleSnapshot';
+import { withFortificationOwnersFromGameDb } from './tacticalFortificationOwners';
 import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
@@ -336,6 +338,8 @@ function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): st
       return MISSILE_CANNOT_MOVE_REASON;
     case 'embarked_cargo':
       return 'Embarked land units cannot receive independent movement orders. Debark first.';
+    case 'fortified_cell':
+      return FORTIFIED_CELL_BLOCKED_REASON;
     default:
       return `Movement order rejected (${reason}).`;
   }
@@ -525,10 +529,10 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
     );
     const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry.battle);
     const meleePack = applyTacticalMeleeAfterSupportOrders(bSynced, rawNext);
-    const battleAdvancedTurn: TacticalBattleSnapshot = {
+    const battleAdvancedTurn: TacticalBattleSnapshot = withFortificationOwnersFromGameDb({
       ...meleePack.battle,
       tacticalTurnNumber: cur.tacticalTurnNumber + 1,
-    };
+    });
     commitActiveTacticalBattle(battleAdvancedTurn);
     tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder applied', {
       battleId: battleAdvancedTurn.battleId,

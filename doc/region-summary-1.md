@@ -43,7 +43,7 @@ Footprint counts are strategic hexes. Side-group entries are each group's share 
 
 ## Table 2: Unit economy
 
-Costs are in production points. A hex earns one point per turn for each intact urban cell it contains. Minimums and the Advanced threshold count urban cells in a single strategic hex. These rows are the manifest economy. The global row's older columns are unchanged. Missile is ten times that row's infantry cost. Range is hex steps.
+Costs are in production points. A hex earns one point per turn for each intact urban cell it contains. Minimums and the Advanced threshold count urban cells in a single strategic hex. These rows are the manifest economy. The global row's older columns are unchanged. Missile is ten times that row's infantry cost. A fortification costs that same infantry cost (`fortificationCostPerCell`, times `FORTIFICATION_COST_INFANTRY_MULTIPLIER`). Range is hex steps.
 
 `compute_missile_range_hexes` in `scripts/regional_pipeline/missile_reach.py` picks each regional range so an Advanced hex covers about `GLOBAL_MISSILE_COVERAGE_SHARE` (0.553) of that map's land, the share a global range of 12 covers. By kilometre reach those ranges fall in the SRBM, MRBM, IRBM, or ICBM band: up to 1,000 km, up to 3,000 km, up to 5,500 km, and beyond.
 

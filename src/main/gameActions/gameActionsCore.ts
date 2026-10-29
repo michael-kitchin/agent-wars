@@ -30,7 +30,7 @@ import type {
   BuildQueueTemplateEntry,
   SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
-import type { BuildUnitType } from '../productionRules';
+import type { BuildQueueItemType } from '../productionRules';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import {
   executeAddHexBuildQueueEntry,
@@ -490,7 +490,7 @@ export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId: strin
 export function updateHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
-  unitType: BuildUnitType,
+  unitType: BuildQueueItemType,
   count: number,
   requestingPlayerId: string = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {

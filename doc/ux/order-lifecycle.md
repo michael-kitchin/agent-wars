@@ -18,7 +18,7 @@ When the player double-clicks with an all-air selection, and Strike targeting is
 
 ### Ranged attack
 
-When Ranged targeting is on, a double-click on a hex validates the target for every selected unit. A single click does not queue the attack and does not change the selection, including a click that misses every hex. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Clicking the pressed reticle turns targeting off. A double-click outside the active tactical battle does not queue an attack; the clicks that led to it already show the outside-battle toast.
+When Ranged targeting is on, a double-click on a hex validates the target for every selected unit. An explored enemy hex with no units is valid when it still has a fortification. Standing orders and the tempo sweep do not aim at that empty hex on their own. A single click does not queue the attack and does not change the selection, including a click that misses every hex. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Clicking the pressed reticle turns targeting off. A double-click outside the active tactical battle does not queue an attack; the clicks that led to it already show the outside-battle toast.
 
 ### Air strike
 
@@ -79,6 +79,8 @@ None.
 ## Code Entry Points
 
 - `src/renderer/gameplay/tacticalOrders.ts`
+- `src/main/gameActions/strategicOrderValidation.ts` (`validateRangedAttack`)
+- `src/shared/fortificationSnapshotRules.ts` (`isExploredEnemyFortifiedHex`)
 - `src/renderer/gameplay/gameApiHumanOrderPreview.ts`
 - `src/renderer/gameplay/hoverRoutePreviewRefresh.ts`
 - `src/renderer/gameplay/hoverRoutePreviewStale.ts`

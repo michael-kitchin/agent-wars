@@ -4,6 +4,7 @@
 
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
 import { buildMinimumUrbanCells } from '../shared/gameRules';
+import { FORTIFICATION_QUEUE_ITEM } from '../shared/fortificationRules';
 import { logTrace } from './logger';
 import {
   applyProduction as applyProductionShared,
@@ -12,11 +13,19 @@ import {
 } from '../shared/productionConfig';
 import {
   ALL_BUILD_UNIT_TYPES,
+  isBuildQueueItemType,
   isBuildUnitType,
+  type BuildQueueItemType,
   type BuildUnitType,
 } from '../shared/ipc/productionTypes';
 
-export { ALL_BUILD_UNIT_TYPES, isBuildUnitType, type BuildUnitType };
+export {
+  ALL_BUILD_UNIT_TYPES,
+  isBuildQueueItemType,
+  isBuildUnitType,
+  type BuildQueueItemType,
+  type BuildUnitType,
+};
 
 /**
  * Documents the `BuildQueueEntryLike` interface as a named contract surface (export interface BuildQueueEntryLike).
@@ -46,14 +55,14 @@ id: number;
    */
 queueIndex: number;
     /**
-   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
 
-   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: A unit type or a fortification.
+   * When to use: One ordered queue row passed to production math.
+   * Expected outcome: Spend charges `buildQueueItemCostFor` and spawns a unit only for a unit type.
    * Exceptions: None.
    */
-unitType: BuildUnitType;
+unitType: BuildQueueItemType;
     /**
    * Specifies the contract for the `remainingCount` member (remainingCount: number;).
 
@@ -233,10 +242,37 @@ export function isValidBuildCount(value: number): boolean {
 }
 
 /**
+ * Lists queue items a hex may build, with a fortification last when a city cell remains.
+ *
+ * Purpose: Menus and pruning share one list. A fortification needs an intact city cell, not merely urban rubble.
+ * When to use: Eligibility, Keep building, and queue pruning. Pass 0 intact cells wherever urban count is 0.
+ * Expected outcome: The unit list from `getAvailableBuildUnitTypes`, then `fortification` when `intactCityCells` is above 0.
+ * Exceptions: None.
+ */
+export function getAvailableBuildQueueItemTypes(
+  urbanHexCount: number,
+  seaportCount: number,
+  airportCount: number,
+  intactCityCells: number
+): BuildQueueItemType[] {
+  const available = getAvailableBuildUnitTypes(urbanHexCount, seaportCount, airportCount);
+  const items: BuildQueueItemType[] =
+    intactCityCells > 0 ? [...available, FORTIFICATION_QUEUE_ITEM] : [...available];
+  logTrace('getAvailableBuildQueueItemTypes', {
+    urbanHexCount,
+    seaportCount,
+    airportCount,
+    intactCityCells,
+    items,
+  });
+  return items;
+}
+
+/**
  * Lists unit types a hex may queue from its urban cells, seaports, and airports.
  *
  * Purpose: The urban gate follows the active map. Seaport minimums stay on the static prerequisite table.
- * When to use: Build menus and prompt sentences that need the types a hex can start.
+ * When to use: `getAvailableBuildQueueItemTypes` and prompt sentences that need the unit types a hex can start.
  * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. A missile needs the Advanced urban-cell count. Naval also needs its seaport minimum. Air needs an airport.
  * Exceptions: None.
  */
@@ -279,6 +315,6 @@ export function applyProduction(
  * Expected outcome: Same result as `computeKeepBuildingRefillCount` in shared productionConfig (points-based).
  * Exceptions: None.
  */
-export function computeKeepBuildingRefillCount(unitType: BuildUnitType, availablePoints: number): number {
+export function computeKeepBuildingRefillCount(unitType: BuildQueueItemType, availablePoints: number): number {
   return computeKeepBuildingRefillCountShared(unitType, availablePoints);
 }

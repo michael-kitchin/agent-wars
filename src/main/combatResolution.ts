@@ -5,6 +5,13 @@
  * priority lowest defense first, then infantry → armor → naval. Uses seeded RNG for determinism.
  */
 
+import {
+  rollRangedAgainstFortifiedHex,
+  runSiegeRolls,
+  takeHitsInCasualtyOrder,
+  type FortificationCombatHooks,
+  type FortificationVictim,
+} from './fortificationCombat';
 import { compareCasualtyOrder, unitTypeRollsInCombat } from './combatConstants';
 import { createCombatDieRoller } from './combatDice';
 import { createCombatDiceLog, rollCombatDieAgainst, type CombatDiceRollSink } from './combatDiceRecording';
@@ -68,6 +75,15 @@ export type ResolveOneRangedEngagementOptions = {
    * Exceptions: None.
    */
   onRoll?: CombatDiceRollSink;
+  /**
+   * Spends a hit on a fortification instead of removing the unit.
+   *
+   * Purpose: Strategic soak for the defender and for return fire.
+   * When to use: The strategic ranged phase. Omit it when no fortification can absorb.
+   * Expected outcome: True keeps the unit and spends the hit.
+   * Exceptions: None.
+   */
+  absorbHit?: (victim: FortificationVictim) => boolean;
 };
 
 /**
@@ -157,9 +173,7 @@ export function resolveOneRangedEngagement(
     (a, b) =>
       compareCasualtyOrder(a.unitType, b.unitType)
   );
-  for (let h = 0; h < attackerHits && h < defSorted.length; h++) {
-    defenderRemovedIds.push(defSorted[h]!.id);
-  }
+  defenderRemovedIds.push(...takeHitsInCasualtyOrder(defSorted, attackerHits, options?.absorbHit));
 
   for (let h = 0; h < defenderHits; h++) {
     const atkAlive = attackerUnits.filter((u) => !removedAtk.has(u.id));
@@ -184,6 +198,7 @@ export function resolveOneRangedEngagement(
     );
     const u = unitsAtHex.find((x) => !removedAtk.has(x.id));
     if (u) {
+      if (options?.absorbHit?.(u)) continue;
       removedAtk.add(u.id);
       attackerRemovedIds.push(u.id);
     }
@@ -207,7 +222,8 @@ export function resolveOneMeleeEngagement(
   attackerUnits: CombatUnit[],
   defenderUnits: CombatUnit[],
   rollDie: () => number,
-  onRoll?: CombatDiceRollSink
+  onRoll?: CombatDiceRollSink,
+  absorbHit?: (victim: FortificationVictim) => boolean
 ): OneEngagementResult {
   const attackerRemovedIds: string[] = [];
   const defenderRemovedIds: string[] = [];
@@ -235,16 +251,12 @@ export function resolveOneMeleeEngagement(
     (a, b) =>
       compareCasualtyOrder(a.unitType, b.unitType)
   );
-  for (let i = 0; i < atkHits && i < defSorted.length; i++) {
-    defenderRemovedIds.push(defSorted[i]!.id);
-  }
+  defenderRemovedIds.push(...takeHitsInCasualtyOrder(defSorted, atkHits, absorbHit));
   const atkSorted = [...attackerUnits].sort(
     (a, b) =>
       compareCasualtyOrder(a.unitType, b.unitType)
   );
-  for (let i = 0; i < defHits && i < atkSorted.length; i++) {
-    attackerRemovedIds.push(atkSorted[i]!.id);
-  }
+  attackerRemovedIds.push(...takeHitsInCasualtyOrder(atkSorted, defHits, absorbHit));
 
   return { attackerRemovedIds, defenderRemovedIds };
 }
@@ -475,12 +487,49 @@ function buildRangedEngagementGroups(
 }
 
 /**
- * Resolves declared ranged attacks (direct fire + return fire) and attaches lightning playback shot lines.
+ * Optional bags for one ranged phase.
  *
- * Purpose: Single strategic/tactical combat entry for the ranged phase; shot lines mirror orders + return-fire eligibility.
- * When to use: Strategic Ready and tactical combat-order batches that call into shared combat resolution.
- * Expected outcome: Casualties applied; `rangedResolutionShotLines` present only when combat hexes are non-empty;
- *   `diceRolls` always set, in roll order.
+ * Purpose: Return fire, cover, and fortification soak stay off the positional argument list.
+ * When to use: Strategic Ready, a battle, and tests that need one of the three.
+ * Expected outcome: Omitting a member keeps today's behavior for that part.
+ * Exceptions: None.
+ */
+export interface RunRangedPhaseOptions {
+  /**
+   * Planning-parity return-fire context (theater, airport, tactical terrain).
+   *
+   * Contract: Threads the same eligibility into dice and shot lines.
+   * When to use: Production Ready and tactical callers pass a complete bag. Omit it for the strategic theater.
+   * Expected outcome: Defaults to `{ theater: 'strategic' }`.
+   * Exceptions: None.
+   */
+  readonly returnFireContext?: ReturnFireEligibilityContext;
+  /**
+   * Cover each target position gives against the shots fired at it.
+   *
+   * Contract: Lowers attacker hit numbers by the defender hex or cell's cover. Return fire never reads it.
+   * When to use: Production strategic and battle callers always pass a lookup. Tests that ignore cover may omit it.
+   * Expected outcome: Defaults to `noTerrainCover`.
+   * Exceptions: None.
+   */
+  readonly targetCoverAt?: TerrainCoverLookup;
+  /**
+   * Fortifications that can spend a hit before a unit is removed.
+   *
+   * Contract: Strategic soak. A battle does not pass this.
+   * When to use: The strategic ranged phase, when the turn has a fortification tally.
+   * Expected outcome: Omitted means every hit removes a unit, as before.
+   * Exceptions: None.
+   */
+  readonly fortification?: FortificationCombatHooks;
+}
+
+/**
+ * Resolves declared ranged attacks and attaches lightning playback shot lines.
+ *
+ * Purpose: Single strategic and tactical entry for the ranged phase.
+ * When to use: Strategic Ready and tactical combat-order batches.
+ * Expected outcome: Casualties applied. Shot lines are present only when combat hexes are non-empty. Dice stay in roll order. Omitting fortification hooks removes units exactly as before.
  * Exceptions: None.
  */
 export function runRangedPhase(
@@ -488,26 +537,10 @@ export function runRangedPhase(
   hexList: string[],
   rangedOrders: RangedAttackOrder[],
   next: () => number,
-  /**
-   * Planning-parity return-fire context (theater, airport, tactical terrain).
-   *
-   * Purpose: Threads the same eligibility into dice and shot lines.
-   * When to use: Production Ready / tactical callers pass a complete bag; omit defaults to strategic theater.
-   * Expected outcome: Defaults to `{ theater: 'strategic' }`.
-   * Exceptions: None.
-   */
-  returnFireContext?: ReturnFireEligibilityContext,
-  /**
-   * Cover each target position gives against the shots fired at it.
-   *
-   * Purpose: Lowers attacker hit numbers by the defender hex or cell's cover; return fire never reads it.
-   * When to use: Production strategic and battle callers always pass a lookup; tests that ignore cover may omit it.
-   * Expected outcome: Defaults to `noTerrainCover`.
-   * Exceptions: None.
-   */
-  targetCoverAt: TerrainCoverLookup = noTerrainCover
+  options?: RunRangedPhaseOptions
 ): CombatResolutionResult {
-  const rfContext: ReturnFireEligibilityContext = returnFireContext ?? { theater: 'strategic' };
+  const rfContext: ReturnFireEligibilityContext = options?.returnFireContext ?? { theater: 'strategic' };
+  const targetCoverAt = options?.targetCoverAt ?? noTerrainCover;
   logDebug('runRangedPhase', {
     unitCount: units.length,
     rangedOrderCount: rangedOrders.length,
@@ -537,7 +570,25 @@ export function runRangedPhase(
       .filter((u): u is CombatUnit => u != null && !removed.has(u.id));
     // Ranged engagements are side-vs-side: only enemy units in the target hex can be hit or return fire.
     const defenderUnits = getUnitsAtHex(group.defenderHex).filter((u) => u.player !== group.attackerPlayer);
-    if (attackerUnits.length === 0 || defenderUnits.length === 0) continue;
+    if (attackerUnits.length === 0) continue;
+    if (defenderUnits.length === 0) {
+      const hooks = options?.fortification;
+      if (hooks?.stripOne && hooks.isEnemyFortifiedHex?.(group.defenderHex, group.attackerPlayer)) {
+        const attackerHexes = [...new Set(attackerUnits.map((unit) => unit.h3Index))];
+        combatHexes.push(group.defenderHex, ...attackerHexes);
+        const coveredAttackers = attackerUnits.map((unit) =>
+          withTargetCover(unit, targetCoverAt(group.defenderHex, terrainCoverShooterForUnitType(unit.unitType)))
+        );
+        rollRangedAgainstFortifiedHex({
+          attackers: coveredAttackers,
+          hex: group.defenderHex,
+          hooks,
+          rollDie,
+          onRoll: diceLog.sink,
+        });
+      }
+      continue;
+    }
 
     const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
     combatHexes.push(group.defenderHex);
@@ -560,7 +611,7 @@ export function runRangedPhase(
       defenderUnits,
       group.defenderHex,
       rollDie,
-      { returnFireContext: rfContext, onRoll: diceLog.sink }
+      { returnFireContext: rfContext, onRoll: diceLog.sink, absorbHit: options?.fortification?.absorbHit }
     );
     const attackerUnitIds = attackerUnits.map((u) => u.id);
     const defenderUnitIds = defenderUnits.map((u) => u.id);
@@ -636,7 +687,7 @@ export function runMeleePhase(
   units: CombatUnit[],
   hexList: string[],
   next: () => number,
-  options?: { skipMeleeHexes?: ReadonlySet<string> }
+  options?: { skipMeleeHexes?: ReadonlySet<string>; fortification?: FortificationCombatHooks }
 ): CombatResolutionResult {
   logDebug('runMeleePhase', { unitCount: units.length, skipCount: options?.skipMeleeHexes?.size ?? 0 });
   const removed = new Set<string>();
@@ -685,7 +736,8 @@ export function runMeleePhase(
         atkUnits,
         defUnits,
         rollDie,
-        diceLog.sink
+        diceLog.sink,
+        options?.fortification?.absorbHit
       );
       const atkUnitIds = atkUnits.map((u) => u.id);
       const defUnitIds = defUnits.map((u) => u.id);
@@ -720,6 +772,7 @@ export function runMeleePhase(
         rollDie,
         next,
         onRoll: diceLog.sink,
+        absorbHit: options?.fortification?.absorbHit,
       });
       for (const removal of multi.removals) {
         recordRemovedUnit({
@@ -733,6 +786,17 @@ export function runMeleePhase(
         });
       }
     }
+  }
+
+  if (options?.fortification?.isEnemyFortifiedHex && options.fortification.stripOne) {
+    combatHexes.push(...runSiegeRolls({
+      hexList,
+      units: unitList.filter((unit) => !removed.has(unit.id)),
+      excludedHexes: new Set([...(options.skipMeleeHexes ?? []), ...combatHexes]),
+      hooks: options.fortification,
+      rollDie,
+      onRoll: diceLog.sink,
+    }));
   }
 
   const combatHexSet = new Set(combatHexes);

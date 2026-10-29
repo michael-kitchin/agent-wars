@@ -10,7 +10,7 @@ import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
-import { tacticalComputeHumanMovementOrderOutcome } from './tacticalSnapshotGuards';
+import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPlanningCache';
 import {
@@ -392,6 +392,40 @@ test('projectTacticalSnapshotAfterOpponentMovementOrders lets two units stack on
   ]);
   assert.equal(next.subUnits.find((u) => u.id === 'opp-a')?.h3Index, dest);
   assert.equal(next.subUnits.find((u) => u.id === 'opp-b')?.h3Index, dest);
+});
+
+test('an attacker march onto a defender fortified cell is blocked', () => {
+  const strategic = tacticalParentCell(15, 23);
+  const center = tacticalUnderCorner(15, 23);
+  const ring = gridDisk(center, 1);
+  const dest = firstRingCellDistinctFrom(center);
+  const attacker: TacticalSubUnitSnapshot = {
+    id: 'opp-fort-su',
+    parentUnitId: 'p-fort',
+    player: 'opponent',
+    unitType: 'infantry',
+    h3Index: center,
+    displayName: 'I Infantry (01)',
+  };
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-fort-block',
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [attacker],
+    tacticalFortificationOwnerByH3: { [dest]: HUMAN_SEAT_ID },
+  };
+  const outcome = tacticalComputeMovementOrderOutcome({
+    byId: new Map([[attacker.id, 0]]),
+    sub: snap.subUnits,
+    order: { unitId: attacker.id, toH3Index: dest },
+    tacticalSet: new Set(snap.tacticalChildH3Indexes),
+    battle: snap,
+  });
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) assert.equal(outcome.reason, 'fortified_cell');
 });
 
 test('a missile sub-unit cannot march', () => {

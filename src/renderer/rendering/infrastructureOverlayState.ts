@@ -63,6 +63,15 @@ isSeaport?: boolean;
    * Exceptions: None.
    */
 isRubble?: boolean;
+  /**
+   * Present when the tactical cell is fortified.
+   *
+   * Contract: Optional so older payloads still type-check. Absent means not fortified.
+   * When to use: Overlay derivation.
+   * Expected outcome: True only for a fortified intact city cell.
+   * Exceptions: None.
+   */
+  isFortified?: boolean;
 }
 
 /**
@@ -119,6 +128,15 @@ isSeaport: boolean;
    * Exceptions: None.
    */
 isRubble: boolean;
+  /**
+   * True when this cell is a fortified intact city cell.
+   *
+   * Contract: Copied from the override row. Missing means false.
+   * When to use: Tick drawing and the fortified-cell tooltip.
+   * Expected outcome: False unless the database row is fortified.
+   * Exceptions: None.
+   */
+  isFortified: boolean;
 }
 
 /**
@@ -197,6 +215,7 @@ export function deriveInfrastructureOverlayState(
         isAirport: !!r.isAirport,
         isSeaport: !!r.isSeaport,
         isRubble: !!r.isRubble,
+        isFortified: r.isFortified === true,
       },
     ])
   );

@@ -17,7 +17,7 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 - Production per turn, or none when the hex has no production.
 - Queue cost and turns to complete, or none when the queue is empty. Turns show as unknown when they cannot be estimated. Costs and prerequisites are in the [combat rules](../combat-rules-v3.md). Per-side caps are in [game size and unit caps](../game-size-unit-caps.md).
 - The title "Build Queue" when the hex can build.
-- One row per queued entry: unit type, count, and a remove control. The type list is infantry, armor, naval, air, and missile (`ALL_BUILD_UNIT_TYPES`). A missile row is offered only when the hex meets that type's urban gate (`buildMinimumUrbanCells`). On the global map that gate is the Advanced count, 21.
+- One row per queued entry: unit type, count, and a remove control. The type list is infantry, armor, naval, air, and missile (`ALL_BUILD_UNIT_TYPES`), and Fortification (`FORTIFICATION_QUEUE_ITEM`) while the hex still has an intact city cell (`getAvailableBuildQueueItemTypes`, intact count above 0). That includes a hex whose city cells are all already fortified. A missile row is offered only when the hex meets that type's urban gate (`buildMinimumUrbanCells`). On the global map that gate is the Advanced count, 21. One fortification item fortifies one cell that is not yet fortified, at `fortificationCostPerCell()`. When none of those remain, the queue pauses and Keep building stays on. Fortification has no cap.
 - A Keep building checkbox when the queue can arm it.
 - When the hex cannot build, the reason, or "This hex cannot build units."
 - A hex the player does not control shows the production summary and no queue editor.
@@ -81,6 +81,9 @@ None.
 
 - `static/index.html` (`#build-entry-layer`, `#build-popup`, `#build-popup-body`)
 - `src/renderer/gameplay/buildQueuePopup.ts`
+- `src/shared/fortificationRules.ts` (`FORTIFICATION_QUEUE_ITEM`, `FORTIFICATION_QUEUE_ITEM_LABEL`)
+- `src/main/productionRules.ts` (`getAvailableBuildQueueItemTypes`)
+- `src/renderer/chrome/controlTooltipText.ts` (`KEEP_BUILDING_FORTIFICATION_NOTE`)
 - `src/renderer/gameplay/buildQueuePopupFormatting.ts`
 - `src/renderer/gameplay/buildQueueKeepBuilding.ts`
 - `src/renderer/gameplay/productionOverlayHelpers.ts`

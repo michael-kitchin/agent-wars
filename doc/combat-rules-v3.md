@@ -19,8 +19,8 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 
 - **Simultaneous resolution:** The engine resolves all combat and movement in a defined phase sequence. No mid-combat input, except the melee-intercept choice to enter a tactical battle or continue strategic melee.
 - **Dice-based hits:** Each unit rolls one d20; a hit is scored when the result is **less than or equal to** that unit's hit number (A&A style). The attack hit number is `min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`; the defense hit number is `min(17, defense + origin bonus + tech defense bonus)` (§4.9). Penalties and cover never take an attack below 2 before either bonus, and a roll of 18 to 20 always misses.
-- **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`). A missile is always last (`compareCasualtyOrder`). A missile never rolls.
-- **Resolution order (strategic):** embark → missile launches → air strikes → ranged → ground/naval movement → cargo sync → ferry → melee. Production, control, and fog refresh run after melee.
+- **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`). A missile is always last (`compareCasualtyOrder`). A missile never rolls. A hit that would remove the hex controller's unit strips one fortification instead, until none remain (§4.9).
+- **Resolution order (strategic):** embark → missile launches → air strikes → ranged → ground/naval movement → cargo sync → ferry → melee. A siege of an enemy fortified hex is the last part of that melee step (§4.6). Production, control, and fog refresh run after melee. Control does not change a hex while `fortifiedCount` is above 0.
 - **Resolution order (tactical beat):** embark → air strikes → ranged → movement → ferry → cargo sync → melee. No production step.
 - **Participant IDs:** At the start of combat resolution, each side with at least one unit in any combat is assigned a unique random integer ID from the game RNG. Melee ordering uses these IDs.
 - **RNG:** A single game seed plus turn number produces deterministic replay for a given order set.
@@ -60,6 +60,8 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
   Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
 
   The costs and urban minimums in the roster are the global map. `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts` read the active map. Infantry's urban minimum stays 1. On a regional map the costs, minimums, and strike size come from that map's manifest.
+
+  A fortification is a queue item, not a unit (`FORTIFICATION_QUEUE_ITEM`, `'fortification'`, in `src/shared/fortificationRules.ts`). It is not in `ALL_BUILD_UNIT_TYPES` and has no deployment cap. One item fortifies one intact city cell (`is_urban = 1` and `is_rubble = 0` and not already fortified). An airport-only or seaport-only cell cannot be fortified. The cost is `fortificationCostPerCell()`: the map's infantry cost times `FORTIFICATION_COST_INFANTRY_MULTIPLIER` (1), so 20 on the global map. The cell is chosen from that hex's remaining intact unfortified city cells by a seed of its own (`fortificationPlacementSeed`), not by the combat die. When none remain, the queue pauses the way a capped unit pauses, and keep-building may still be on. A neutral-border hex cannot fortify. Ownership of a fortification is the strategic hex's controller. It is not stored on the cell.
 
   Air strikes that destroy urban cells permanently reduce the production rate. On the global map one strategic hit destroys 9 tactical urban cells (`strategicUrbanCellsDestroyedPerHit` in `src/shared/gameRules.ts`). On a regional map the same hit destroys the strike size stored in that map's manifest.
 
@@ -108,7 +110,7 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 
 ### 3.6 Missile
 
-- **Strengths:** A missile does not roll to hit. Each flagged city, airport, and seaport cell in the target hex rolls its own d20 and is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). Based air at that hex is destroyed when any airport cell is destroyed. Other units in the hex are unharmed. Launch range is `missileRangeHexes()`: 12 hexes on the global map.
+- **Strengths:** A missile does not roll to hit. Each flagged city, airport, and seaport cell in the target hex rolls its own d20 and is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). A fortified cell is the exception: it rolls once, a 20 leaves it, and any other face removes only the fortification. The cell stays a city, airport, or seaport, and it is not counted among the cells destroyed. Based air at that hex is destroyed when any airport cell is destroyed. Other units in the hex are unharmed. Launch range is `missileRangeHexes()`: 12 hexes on the global map.
 - **Weaknesses:** Move 0 and vision 0. It never rolls, and `compareCasualtyOrder` removes it last. It launches once and is then deleted. That deletion is not a combat loss. It cannot launch during a battle, and its only standing order is `hold_fire`.
 - **Role:** One long-range strike against infrastructure.
 
@@ -142,6 +144,7 @@ Using the **current** (pre-movement) positions:
 Using the **current** positions, after air strike casualties:
 - Build ranged attacks: for each unit with range ≥ 1 (armor, naval — **not** air). Each (attacker hex, defender hex) is a ranged attack.
 - Resolve all ranged engagements. Apply casualties. No melee yet.
+- An explored enemy fortified hex that holds no units is also a legal ranged target (`validateRangedAttack`). There is no return fire. DEFEND standing orders and the tempo sweep still look only at enemy units, so they do not fire at that empty hex on their own.
 
 **DEFEND standing orders (strategic):** Each turn, a unit holding a DEFEND order automatically issues one ranged attack (armor/naval) or one air strike against enemy units (air only, `targetType: units`) at the closest enemy within weapon range, measured from the unit's **current** hex — including while still marching toward its defend post. Infantry has no strategic ranged attack and does not auto-fire. Explicit human pending orders override standing-generated attack rows for the same unit id.
 
@@ -172,7 +175,8 @@ Using the **post-movement** positions:
 - Build melee combats: each hex that has ground/naval units from two or more sides is one melee engagement. Air units do **not** participate in melee.
 - If a contested hex is eligible, the engine may **pause** here for a melee-intercept dialog (Fight tactical battle / Ignore and resolve strategically). See §12.1.
 - Resolve remaining same-hex combats in a deterministic order.
-- Two sides in one hex: the side with the lower participant id rolls attack values and the other rolls defense values. Three or more sides: every unit rolls once, the first side in the shuffled order rolling attack values and the others rolling defense values. Each side then assigns its hits one at a time. A hit picks an enemy side at random, weighted by how many of that side's units are not yet casualties, and removes that side's next casualty. Hits left after every enemy unit is gone are lost. One side left holds the hex. Otherwise the hex stays contested.
+- Two sides in one hex: the side with the lower participant id rolls attack values and the other rolls defense values. Three or more sides: every unit rolls once, the first side in the shuffled order rolling attack values and the others rolling defense values. Each side then assigns its hits one at a time. A hit picks an enemy side at random, weighted by how many of that side's units are not yet casualties, and removes that side's next casualty. Hits left after every enemy unit is gone are lost. One side left holds the hex, unless any fortification remains: `resolveStrategicControlAfterCombatAndMovement` does not change the controller while `fortifiedCount` is above 0, including when movement enters an empty fortified hex. Knockout still sets the hex to Neutral (`NEUTRAL_OWNER_ID`). Otherwise the hex stays contested.
+- **Siege.** After that melee, a hex that had no melee this turn, still has a fortification, and holds units of exactly one player who is not the controller is a siege (`runSiegeRolls`). Each unit that rolls in combat rolls its attack once. Each hit strips one fortification, and the rolls stop when none remain. Two or more non-controller players do not siege, even when the melee that just ended leaves only one of them. A siege hex is listed with the melee hexes, so its dice play back with melee.
 
 ### 4.7 Resolution ordering and determinism
 
@@ -194,7 +198,8 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`. For **defense** (melee only), hit if `roll ≤ min(17, defense + origin bonus + tech defense bonus)`. The weather penalty, cover, origin bonus, and tech bonus are each 0 unless the rules below apply (`attackHitThreshold` and `defenseHitThreshold` in `src/main/combatHitThresholds.ts`).
 - **Floor and cap:** The floor of 2 applies after penalties and cover and before the origin and tech bonuses, so a shot keeps at least a 10% chance and a qualifying unit gets its full bonuses. The cap of 17 means a roll of 18, 19, or 20 always misses.
 - **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules. **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check.
-- **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**. In a hex with three or more sides, those hits are spread across the other sides by the weighted draw in §4.6, and the same order chooses the unit inside the side that was drawn.
+- **Fortification soak:** Before a casualty is chosen, a hit that would destroy one of the hex controller's units strips one fortified cell instead (`absorbHit` in `src/main/gameActions/fortificationCombatLedger.ts`). That applies to ranged fire, return fire, melee, and an air strike against units. Units that do not belong to the controller are never soaked, and neither is anti-air or infrastructure counter-fire. The combat RNG draws an extra value only when a fortification is actually stripped. When none remain, the hit removes a unit as below.
+- **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**. In a hex with three or more sides, those hits are spread across the other sides by the weighted draw in §4.6, and the same order chooses the unit inside the side that was drawn. A soaked hit does not advance that casualty.
 
 #### Origin bonus and terrain bonus (optional)
 
@@ -307,7 +312,7 @@ Single-roll hit chances, useful for checking tests and play.
 
 ### 4.10 Elimination
 
-When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step. If a naval unit carrying cargo is destroyed, embarked units are destroyed with it (see §9.4).
+When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step. If a naval unit carrying cargo is destroyed, embarked units are destroyed with it (see §9.4). The controller's units are not chosen while a fortification remains to soak the hit (§4.9). Control of the hex waits for the same condition (§4.6).
 
 ---
 
@@ -359,11 +364,16 @@ Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Ne
    sides. Air units do not participate. Process hexes in H3 index order.
    For each melee hex: order sides by participant ID; resolve one round
    (attacker rolls attack, defender rolls defense); assign hits by casualty
-   priority.
+   priority. A hit on the controller is soaked by a fortification first (§4.9).
+10a. Siege: hexes that had no melee, still have a fortification, and hold
+   exactly one non-controller player. Each rolling unit rolls attack once;
+   each hit strips one fortification (§4.6).
 11. Post-melee air unit check: if an airport hex is no longer owned by the
     air unit's player, the based air unit is destroyed.
 12. Production, control, fog refresh, game-over check, clear pending orders,
-    advance turn, set phase back to planning (strategic only).
+    advance turn, set phase back to planning (strategic only). Production
+    spends a queued fortification on one intact city cell (§2). Control skips
+    a hex whose `fortifiedCount` is still above 0.
 ```
 
 No player input during steps 2–12 except the melee-intercept dialog at step 10.
@@ -377,7 +387,7 @@ No player input during steps 2–12 except the melee-intercept dialog at step 10
 - **Coastal bombardment:** Naval at range 2 can target land units in hexes within 2. Armor in a land hex may attack naval units in an adjacent water hex (range 1). Infantry (range 0) cannot attack naval on the strategic map.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement. Assign defender return-fire hits to attacker hexes one at a time: most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
 - **Arbitrary number of players:** Participant IDs are assigned once per side. Melee with three or more sides follows §4.6. A match has two to four sides.
-- **Line of sight / blocking (strategic):** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range is a valid target.
+- **Line of sight / blocking (strategic):** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range is a valid target, and so is an explored enemy fortified hex that holds no units (§4.2).
 - **Cover never blocks:** terrain cover (§4.9) lowers hit numbers but never makes a shot illegal.
 - **Line of sight (tactical):** A mountain cell strictly between the shooter and the target blocks armor and naval shots. The shooter's cell and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. The target cell still applies its cover. See §12.5.
 - **Reproducibility:** A single RNG seed for the entire game so that replay is deterministic.
@@ -387,9 +397,12 @@ No player input during steps 2–12 except the melee-intercept dialog at step 10
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has air units. No stacking limit for air units at airports.
 - **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure. Self-striking an airport with your own air units based there destroys those air units. Counter-fire rules apply normally.
 - **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently. Two urban strikes on the global map destroy up to 18 tactical urban cells (9 per hit, capped at remaining). On a regional map each hit destroys that map's manifest count. Two strikes on the same airport hex each turn one airport cell to rubble on a hit. A strike that finds no airport cell left has no effect.
-- **Air unit survival and territorial control:** The post-melee air check uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement, territorial control changes immediately — even if that enemy unit is subsequently destroyed in melee. Recapturing an airport hex requires a separate ground action on a subsequent turn.
+- **Air unit survival and territorial control:** The post-melee air check uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement, territorial control changes immediately — even if that enemy unit is subsequently destroyed in melee — unless a fortification remains. While `fortifiedCount` is above 0, `setHexController` is not called for that hex, so the air unit's owner is unchanged. Recapturing an airport hex requires a separate ground action on a subsequent turn, after the fortifications are gone.
+- **Two non-controller players in a fortified hex:** They fight as a normal melee. There is no siege that turn, even if the melee leaves only one of them (§4.6).
+- **Knockout of a fortified hex:** The hex becomes Neutral and its fortifications stay. Neutral does not strip them by the knockout itself (§14.1).
+- **A contested fortified hex:** Units fight, and the controller's losses are soaked (§4.9). The controller does not change while any fortification remains.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked during transit. The ferry is an instantaneous relocation.
-- **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport), missile **0**. A missile does not reveal hexes. Unexplored hexes are never seen. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
+- **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport), missile **0**. A missile does not reveal hexes. Unexplored hexes are never seen, and they do not show fortification ticks or the fortified count. An explored hex shows those the same way it shows city and rubble. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
 - **hold_fire:** A standing order that suppresses both DEFEND auto-engagement and the tempo sweep for that unit until replaced. Omitting an attack is not the same as `hold_fire`. A missile is built with `hold_fire`, and that order cannot be cancelled.
 - **A missile alone against another side:** A hex that holds units of two sides is a melee hex, including when one side's only unit there is a missile. The missile does not roll (`unitTypeRollsInCombat`). The other side's units that do roll can still hit it. It is removed last on its side (`compareCasualtyOrder`).
 - **Several missiles on one hex:** Each missile with a pending launch fires its own launch. They do not combine into one roll. In melee they still do not roll, and they are removed after every non-missile on that side.
@@ -417,7 +430,7 @@ Tactical ranged baselines are larger; see §12.5.
 An air unit with a strike order targeting an enemy-occupied hex resolves as follows:
 
 1. The air unit rolls d20. Hit if roll ≤ 10 (attack value), less the target's air cover (§4.9): 9 against forest, urban, or rubble.
-2. If hit, assign one casualty to the target hex using the standard casualty priority.
+2. If hit, assign one casualty to the target hex using the standard casualty priority. A fortification of the controller soaks that hit first (§4.9). The air unit's roll still happens. Anti-air does not soak.
 3. **Counter-fire:** Every defending unit in the target hex with **strategic** range ≥ 1 rolls d20; hit if roll ≤ that unit's attack value. Cover never lowers counter-fire. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check.
    - Armor (range 1, attack 10): returns fire, hitting on 1–10 (50%).
    - Naval (range 2, attack 7): returns fire, hitting on 1–7 (35%).
@@ -441,13 +454,13 @@ An air unit may target infrastructure at a hex within its 3-hex strike radius in
 
 Cover never applies to strikes on infrastructure or to infrastructure counter-fire. The fixed counter-fire numbers are `INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD` in `src/main/combatDice.ts`.
 
-**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, tactical urban cells at the target strategic hex are permanently destroyed: **9** on the global map (`strategicUrbanCellsDestroyedPerHit()`), or that map's manifest value on a regional map, or all remaining if fewer remain. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
+**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, the strike picks that many tactical urban cells at random (`strategicUrbanCellsDestroyedPerHit()`, **9** on the global map, or that map's manifest value, or fewer when fewer remain). A pick that is fortified loses only `is_fortified`, stays a city cell, and still uses one of those picks. It is not counted in `changedRubbleCount`. An unfortified pick becomes rubble as before. Fortified cells are not preferred over the others (`replaceRandomTacticalFeaturesWithRubble`). Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk). Infrastructure counter-fire is not soaked.
 
-**Target: Airport.** The air unit rolls d20, hit if roll ≤ 10. On hit, one of the hex's airport cells permanently becomes rubble, and every air unit based at the hex is destroyed immediately. A hex with more than one airport cell keeps an airport, and can still base and build air units, until every airport cell is gone (`applyInfrastructureDestructionEffects` in `src/main/gameActions/airStrikeResolution.ts`). Counter-fire: roll d20; the air unit is destroyed if roll ≤ 7 (35% risk).
+**Target: Airport.** The air unit rolls d20, hit if roll ≤ 10. On hit, one of the hex's airport cells is picked at random. An unfortified pick permanently becomes rubble, and every air unit based at the hex is destroyed immediately. A fortified pick loses only the fortification and stays an airport, so based air is not destroyed by that strip. A hex with more than one airport cell keeps an airport, and can still base and build air units, until every airport cell is gone (`applyInfrastructureDestructionEffects` in `src/main/gameActions/airStrikeResolution.ts`). Counter-fire: roll d20; the air unit is destroyed if roll ≤ 7 (35% risk).
 
-**Target: Seaport.** The air unit rolls d20, hit if roll ≤ 10. On hit, one of the hex's seaport cells permanently becomes rubble. Once no seaport cell remains, the hex cannot produce naval units, and queued naval builds there are dropped (`pruneBuildQueueForInfrastructureState`). Naval units already at sea are unaffected. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
+**Target: Seaport.** The air unit rolls d20, hit if roll ≤ 10. On hit, one of the hex's seaport cells is picked at random. An unfortified pick permanently becomes rubble. A fortified pick loses only the fortification and stays a seaport. Once no seaport cell remains, the hex cannot produce naval units, and queued naval builds there are dropped (`pruneBuildQueueForInfrastructureState`). Naval units already at sea are unaffected. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
 
-In a **tactical** battle, air may also strike strikeable infrastructure inside the footprint (urban, airport, seaport, or an active road/rail corridor that is not rubble), without the strategic 3-hex radius.
+In a **tactical** battle, air may also strike strikeable infrastructure inside the footprint (urban, airport, seaport, or an active road/rail corridor that is not rubble), without the strategic 3-hex radius. A fortified cell in that footprint loses only its fortification. A margin cell is never struck.
 
 ### 8.4 Infrastructure destruction is permanent
 
@@ -466,7 +479,7 @@ The values in §8 are the printed values. With an origin bonus on (§4.9), a qua
 
 ### 8.6 Missile strikes
 
-A missile does not roll to hit. Every flagged city, airport, and seaport cell in the target hex rolls its own d20. The cell is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). Other units in the hex are unharmed. If any airport cell is destroyed, every air unit based at that hex is destroyed. Destroyed cells become rubble, and build queues are pruned the same way an air strike prunes them (`pruneBuildQueueForInfrastructureState`).
+A missile does not roll to hit. Every flagged city, airport, and seaport cell in the target hex rolls its own d20. The cell is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). A fortified cell rolls once: 20 leaves it, and any other face clears `is_fortified` only. That cell is not added to the city, airport, or seaport counts in the strike sentence. Other units in the hex are unharmed. If any airport cell is destroyed, every air unit based at that hex is destroyed. Destroyed cells become rubble, and build queues are pruned the same way an air strike prunes them (`pruneBuildQueueForInfrastructureState`). Stripping a fortification does not prune the queue by itself.
 
 The range is the loaded map's `missileRangeHexes()`: 12 on the global map, and `missile_range_hexes` from the regional manifest otherwise. Cost is ten times that map's infantry cost (`missile_cost`).
 
@@ -512,19 +525,20 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **A&A-style:** One d20 per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee). Attack is floored at 2 before any bonus; every hit number is capped at 17.
 - **Terrain cover:** The target's forest, mountain, or wetlands (plus urban and rubble in battles) lowers ranged and air-strike attack (§4.9).
 - **Origin bonus and terrain bonus (optional):** +2 (Low) or +4 (High) to that value for a unit rolling in its birth country; in battles, also on its birth terrain kind. The two never stack; the larger amount applies. In battles the terrain bonus also lets armor, and naval units born on wetlands, enter one cell of birth terrain they otherwise cannot enter, ending that beat there (§4.9).
-- **Caps:** Small 12/8/8/6 infantry/armor/naval/air, scaled by game size. Global costs are 20 / 40 / 100 / 60. A regional map uses the costs in its manifest.
+- **Caps:** Small 12/8/8/6 infantry/armor/naval/air, scaled by game size. Global costs are 20 / 40 / 100 / 60. A fortification costs the same as one infantry unit (`fortificationCostPerCell`) and is not capped. A regional map uses the costs in its manifest.
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. One action per turn: strike or ferry (range 4).
-- **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes and by missile launches. No rebuilding.
+- **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes and by missile launches. A pick that lands on a fortified cell clears the fortification and keeps the facility. No rebuilding.
+- **Fortifications:** The controller's units are soaked one hit per fortification. Control does not change while any remain. One player alone in an enemy fortified hex sieges it. An empty explored enemy fortified hex is a legal ranged target.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only on the strategic map. Return fire uses planning-parity reverse reach.
 - **Fog:** Infantry vision 1, armor 2, naval 2, air 3. Stale intel lasts 2 turns.
 - **Sealift:** Explicit cargo assignment. Fatal transport loss when the carrier is destroyed. LLM opponent movement orders auto-debark.
-- **WEGO:** embark → missile launches → air strike → ranged → movement → cargo sync → ferry → melee; automatic casualty assignment; tempo sweep fires unordered legal shots unless `hold_fire`. A missile never rolls and is removed last.
+- **WEGO:** embark → missile launches → air strike → ranged → movement → cargo sync → ferry → melee → siege; automatic casualty assignment; tempo sweep fires unordered legal shots unless `hold_fire`. A missile never rolls and is removed last. Production then fortifies queued cells.
 
 ---
 
 ## 12. Tactical game (optional battles at res4)
 
-The tactical game is a separate combat layer. The battlefield is the enclosing strategic hex's own tactical cells plus three rings of neighboring tactical cells. Margin cells whose strategic hex is not on a regional map are not part of a new battle. A battle already underway keeps the cell list it was created with. Units deploy on the original entry edge of the enclosing hex. They may move into the margin and end there. After the battle, strategic units still occupy the enclosing hex. Infrastructure damage applies only to the enclosing hex's own tactical cells. A shot in the margin does not change any strategic hex's urban, airport, or seaport counts. Origin bonus uses each cell's country, or its regional origin area, including a margin cell. Weather is the enclosing hex's weather for the whole battle. While a tactical battle is in progress, the rest of the strategic map does not resolve. Tactical beats use the same WEGO model as the strategic game.
+The tactical game is a separate combat layer. The battlefield is the enclosing strategic hex's own tactical cells plus three rings of neighboring tactical cells. Margin cells whose strategic hex is not on a regional map are not part of a new battle. A battle already underway keeps the cell list it was created with. Units deploy on the original entry edge of the enclosing hex. They may move into the margin and end there. After the battle, strategic units still occupy the enclosing hex. Infrastructure damage applies only to the enclosing hex's own tactical cells. A shot in the margin does not change any strategic hex's urban, airport, or seaport counts. A fortified margin cell blocks movement for every side but its owner (`tacticalFortificationOwnerByH3`) and is never struck or soaked. Origin bonus uses each cell's country, or its regional origin area, including a margin cell. Weather is the enclosing hex's weather for the whole battle. While a tactical battle is in progress, the rest of the strategic map does not resolve. Tactical beats use the same WEGO model as the strategic game.
 
 ### 12.1 Triggering a tactical battle
 
@@ -557,6 +571,8 @@ Sub-units inherit their parent's unit type for combat resolution. Each sub-unit 
 
 Sub-units are placed on the enclosing hex's own tactical cells, at the edge corresponding to the direction from which the parent strategic unit entered that hex (`getPreviousStrategicH3IndexForUnit`). The three neighboring rings are extra ground, including behind that line, and units are not deployed there. A ring cell whose strategic hex is off a regional map's edge is left out. If a unit was already in the hex, placement uses a default edge. Road/rail corridors can allow infantry/armor to spawn on otherwise blocked cells. Urban and rubble cells are occupiable. Armor is blocked by mountains, wetlands, arctic, and water unless a transport override applies.
 
+When the controller is the human or the opposing party and a core cell is fortified, missiles are still placed first, including on a friendly fortification. The controller's other sub-units then take the remaining fortified core cells, one each (`takeFortifiedCellForDefender`), before anyone else. No side, missiles included, is placed on a cell fortified by another owner (`placementPassableForSide`). A battle with no fortified core cell keeps the usual order. If every core cell the attacker can stand on is fortified by the defender, the attacker cannot be placed and the battle does not start.
+
 ### 12.4 Movement
 
 Tactical movement uses a per-beat **movement-point budget** consumed as sub-units enter res4 hexes. Air sub-units do not march.
@@ -586,6 +602,8 @@ Tactical movement uses a per-beat **movement-point budget** consumed as sub-unit
 
 A destination beyond this beat's budget is **clamped** to the first reachable leg rather than rejected. When the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step. Friendly stacking on that cell is legal.
 
+A cell in `tacticalFortificationOwnerByH3` whose owner is not the mover is blocked (`fortified_cell`, hover text `FORTIFIED_CELL_BLOCKED_HOVER`). The mover may leave its own fortified cell. The record is written when the battle starts and when a beat ends (`withFortificationOwnersFromGameDb`), so a fortification stripped during the beat stays blocked until the next beat. Ferry uses the same block.
+
 ### 12.5 Ranged combat
 
 At the tactical level, all unit types have a positive ranged baseline (`RANGED_RANGE_BY_UNIT_TYPE`):
@@ -601,7 +619,8 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - A mountain cell strictly between the shooter and the target blocks **armor and naval** shots (`tacticalMountainLosBlockedState`). The shooter's cell and the target cell do not. **Infantry is exempt.** Air strikes and ferry are not blocked by mountains. The target cell still applies its cover. If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
 - Return fire uses the same range + LOS rules (planning parity).
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
-- Legal targets include enemy-occupied cells anywhere in the footprint, including a margin cell, **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail) on the enclosing hex's own tactical cells. A margin city or road still slows movement and still gives cover. It is not a legal infrastructure target, and a shot there does not change a strategic hex.
+- Legal targets include enemy-occupied cells anywhere in the footprint, including a margin cell, **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail) on the enclosing hex's own tactical cells. A margin city or road still slows movement and still gives cover. It is not a legal infrastructure target, and a shot there does not change a strategic hex. A fortified margin cell is never a target and never soaks.
+- A fortified core cell absorbs one hit aimed at the controller's sub-units on that cell, for ranged fire and for an air strike against units (`createTacticalFortificationHooks`). The sub-unit stays and `is_fortified` is cleared. The next hit is not absorbed. An attacker's sub-unit is never absorbed. Melee does not soak: two players cannot stand on the cell, so `runMeleePhase` is not given those hooks. Fire at the cell as infrastructure removes the fortification and leaves the city, airport, or seaport.
 
 Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonus or the terrain bonus on, a unit on a cell in the area where it was built, or on a cell whose terrain kind matches its birth terrain, adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonus and terrain bonus"). That area is its birth country on the global map and its origin area on a regional map. An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
 
@@ -663,7 +682,7 @@ During the resolution phase, the client animates so that combat and death overla
 4. **Ranged lightning** — Yellow lightning at ranged combat hexes; units at **pre-move** positions. Shot lines may be drawn from attacker to target.
 5. **Ranged casualties** — Red X at ranged removal hexes.
 6. **Movement** — Ground and naval units that are still alive interpolate from source to destination. A unit removed before movement does not move. Air ferries appear at the new airport (or show destruction, without gliding, if the ferry failed and the origin was lost). Embarked follow-moves travel with the carrier.
-7. **Melee lightning** — Yellow lightning at melee hexes. A unit that reached its destination is drawn there. A unit removed on its origin is still on that hex.
+7. **Melee lightning** — Yellow lightning at melee hexes, including a siege hex that holds only one side (§4.6). A unit that reached its destination is drawn there. A unit removed on its origin is still on that hex.
 8. **Melee casualties** — Red X at melee removal hexes. Air units destroyed by base capture show destruction at their airport hex.
 
 Air strike overlays complete before ranged overlays begin. Ranged overlays never "chase" moved units; melee overlays appear only after movement is complete.
@@ -684,7 +703,7 @@ The tactical battle UI displays the battlefield from the opening of §12, with e
 
 The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](region-vs-region.md). After combat, production, and control updates, `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts` knocks out every active seat that meets any of these, and stores every reason that holds:
 
-1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells (`controlWinMinUrbanShare` on the loaded map). Bombing does not lower the target. A home with no generated urban cells falls back to every hex.
+1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells (`controlWinMinUrbanShare` on the loaded map). Bombing does not lower the target. A home with no generated urban cells falls back to every hex. A fortified hex still counts for its current controller until `fortifiedCount` is 0 (§4.6).
 2. **No city hexes.** The seat controls no strategic hex whose current `urbanHexCount` is greater than zero.
 3. **Home cities destroyed.** The current urban sum of the seat's own home is zero.
 
@@ -698,4 +717,4 @@ A side with no remaining strategic units has not lost by that fact alone. The ma
 
 `applyKnockout` in `src/main/gameActions/knockoutConsequences.ts` runs for each seat knocked out on the turn, after the outcome is recorded. That seat's land becomes Neutral and its build queues and progress are cleared. Its units become Neutral and keep their ids. A missile receives `hold_fire` through `insertMissileHoldOrder` and does not launch. Every other unit receives a `defend` standing order on its current hex, so a garrison holds and fires. A ship that is still loaded keeps that `defend` only until the next turn's landing check. The seat's standing orders, memory, callbacks, pending orders, consultation combat and loss rows, and fog intel are deleted. Neutral does not build, and a Neutral-controlled hex accrues no production.
 
-On later turns, Neutral garrisons hold and fire from those `defend` orders. A loaded ship that is already on a landing hex unloads there: the cargo assignment is removed, and the ship and the cargo each receive `defend` on that hex. A landing hex is one where `canManualDebarkAtHex` is true for Neutral (native coastal, wetlands, a land seaport, or a water seaport Neutral controls). Otherwise the ship marches toward the nearest reachable empty landing hex, or toward an occupied one when no empty landing has a route, with `engageEnRoute`. A ship with no route is deleted with its cargo. Neutral infantry and armor take every empty hex they enter, including a hex they only pass through. A Neutral ship does not take a hex by sailing.
+On later turns, Neutral garrisons hold and fire from those `defend` orders. A loaded ship that is already on a landing hex unloads there: the cargo assignment is removed, and the ship and the cargo each receive `defend` on that hex. A landing hex is one where `canManualDebarkAtHex` is true for Neutral (native coastal, wetlands, a land seaport, or a water seaport Neutral controls). Otherwise the ship marches toward the nearest reachable empty landing hex, or toward an occupied one when no empty landing has a route, with `engageEnRoute`. A ship with no route is deleted with its cargo. Neutral infantry and armor take every empty hex they enter, including a hex they only pass through, except a hex that still has a fortification. A Neutral ship does not take a hex by sailing. Fortifications that were on a knocked-out seat's hex stay, and Neutral is then their owner.

@@ -584,7 +584,7 @@ unitDisplayNameById: new Map<string, string>(),
    */
 tacticalTerrainOverridesByH3: new Map<
     string,
-    { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }
+    { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean; isFortified: boolean }
   >(),
     /**
    * Documents the object literal property `tacticalCityOverlayLabelByH3` (tacticalCityOverlayLabelByH3: new Map<string, string>()).

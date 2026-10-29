@@ -2,9 +2,10 @@
  * Shared consolidated map-toast message builder (turn-report sentences and an Updates section).
  */
 
-import { type SeatId, HUMAN_SEAT_ID, isSeatId } from './seatIds';
+import { type SeatId, HUMAN_SEAT_ID, isSeatId, NEUTRAL_OWNER_ID } from './seatIds';
 import { ALL_BUILD_UNIT_TYPES } from './ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from './ipcTypes';
+import { formatFortificationsBuiltLine } from './fortificationRules';
 import { type TurnLossSummary } from './lossSummary';
 import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
 import { hexChangeLinesByOwner, type TurnReportInput } from './turnReportLines';
@@ -95,6 +96,8 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   const lines: string[] = [];
   const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
   if (deployedLine) lines.push(deployedLine);
+  const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
+  if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
   const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
   if (deploymentCapLine) lines.push(deploymentCapLine);
   return lines;
@@ -158,6 +161,53 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None. Omitted, or a blank line, adds nothing. A seat line is not copied into Updates.
    */
   missileStrikeLines?: readonly MissileStrikeToastLine[];
+  /**
+   * Paused-fortification sentences for the Updates section.
+   *
+   * Contract: The renderer names the hexes, because this builder does not look up places.
+   * When to use: Strategic Ready, after the paused-hex names are known.
+   * Expected outcome: Trimmed lines are appended after missile sentences that stay in Updates, and before the unknown-battle line.
+   * Exceptions: None. Blank lines are dropped.
+   */
+  fortificationLines?: readonly string[];
+  /**
+   * Fortification sentences, each with the owner who held the hex.
+   *
+   * Contract: The toast files a seat or Neutral line in that side's section, after its missile sentences.
+   * When to use: Strategic Ready, after visibility filtering.
+   * Expected outcome: A null owner goes to Updates, after missile sentences that stay there and before the paused-queue lines.
+   * Exceptions: None. A blank line is dropped.
+   */
+  fortificationReportLines?: readonly FortificationToastLine[];
+}
+
+/**
+ * One fortification sentence and the side that owned the hex.
+ *
+ * Purpose: The toast can file the sentence under that side, or under Updates when the hex had no owner.
+ * When to use: `buildConsolidatedTurnUpdateToastMessage`.
+ * Expected outcome: A seat id or `neutral` means that side's loss section. Null means Updates.
+ * Exceptions: None.
+ */
+export interface FortificationToastLine {
+  /**
+   * Who controlled the hex while the fortifications were lost.
+   *
+   * Contract: A seat id, `neutral`, or null.
+   * When to use: Choosing the section.
+   * Expected outcome: `isSeatId` or `neutral` selects a loss section. Null selects Updates.
+   * Exceptions: None.
+   */
+  readonly ownerId: string | null;
+  /**
+   * The formatted fortification sentence.
+   *
+   * Contract: Output of `formatFortificationReportLine`, possibly with surrounding whitespace.
+   * When to use: The body line. A blank value is dropped.
+   * Expected outcome: The trimmed sentence.
+   * Exceptions: None.
+   */
+  readonly line: string;
 }
 
 /**
@@ -231,6 +281,57 @@ function splitMissileStrikeLines(lines: readonly MissileStrikeToastLine[] | unde
 }
 
 /**
+ * Splits fortification sentences by who owned the hex.
+ *
+ * Purpose: A seat's or Neutral's losses belong in that side's section. A hex with no owner stays in Updates.
+ * When to use: After missile sentences are split, so the two maps can be merged.
+ * Expected outcome: `byOwner` keeps report order for each seat and for Neutral. `updates` keeps report order for a null owner. A blank line is dropped.
+ * Exceptions: None.
+ */
+function splitFortificationReportLines(lines: readonly FortificationToastLine[] | undefined): {
+  readonly byOwner: ReadonlyMap<string, readonly string[]>;
+  readonly updates: readonly string[];
+} {
+  const byOwner = new Map<string, string[]>();
+  const updates: string[] = [];
+  for (const entry of lines ?? []) {
+    const line = entry.line.trim();
+    if (line.length === 0) continue;
+    const ownerId = entry.ownerId;
+    if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
+      const existing = byOwner.get(ownerId);
+      if (existing) existing.push(line);
+      else byOwner.set(ownerId, [line]);
+    } else {
+      updates.push(line);
+    }
+  }
+  return { byOwner, updates };
+}
+
+/**
+ * Puts missile sentences before fortification sentences for each owner.
+ *
+ * Purpose: One loss section lists missiles first, then fortifications.
+ * When to use: After both splits.
+ * Expected outcome: A new map. An owner present in only one source keeps that source's lines.
+ * Exceptions: None.
+ */
+function mergeStrikeLines(
+  missileLines: ReadonlyMap<string, readonly string[]>,
+  fortificationLines: ReadonlyMap<string, readonly string[]>
+): ReadonlyMap<string, readonly string[]> {
+  const merged = new Map<string, string[]>();
+  for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
+  for (const [ownerId, lines] of fortificationLines) {
+    const existing = merged.get(ownerId);
+    if (existing) existing.push(...lines);
+    else merged.set(ownerId, [...lines]);
+  }
+  return merged;
+}
+
+/**
  * Builds the consolidated map toast message with turn-report sentences and an Updates section.
  *
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
@@ -244,13 +345,14 @@ function splitMissileStrikeLines(lines: readonly MissileStrikeToastLine[] | unde
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
   const { readyResult, combatFallbackBullets, turnReport } = args;
   const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
+  const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
   const sections: string[] = [];
   const lossSections = buildTurnLossSections(
     args.turnLossSummary,
     turnReport?.viewerSeatId ?? null,
     turnReport?.seats ?? [],
     turnReport ? hexChangeLinesByOwner(turnReport) : undefined,
-    missileLines.byOwner
+    mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
   );
   sections.push(...lossSections);
   let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
@@ -258,7 +360,10 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
   const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';
+  const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
   if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
+  if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
+  if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
   if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);

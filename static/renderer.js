@@ -982,6 +982,7 @@
   function isBuildUnitType(value) {
     return typeof value === "string" && ALL_BUILD_UNIT_TYPES.includes(value);
   }
+  var ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, "fortification"];
 
   // src/shared/lossSummary.ts
   var LOSS_TYPE_NAME_LIST_MAX = 3;
@@ -1108,11 +1109,11 @@
 
   // src/shared/turnLossSections.ts
   var NO_HEX_LINES = /* @__PURE__ */ new Map();
-  var NO_MISSILE_LINES = /* @__PURE__ */ new Map();
+  var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
   var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, missileLinesByOwner = NO_MISSILE_LINES) {
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES) {
     const lines = [];
-    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, missileLinesByOwner)) {
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner)) {
       const header = headerFor(ownerId, viewerSeatId2, seats);
       lines.push(
         ...sectionLines(
@@ -1120,17 +1121,17 @@
           ownerId,
           header,
           hexLinesByOwner.get(ownerId) ?? [],
-          missileLinesByOwner.get(ownerId) ?? []
+          strikeLinesByOwner.get(ownerId) ?? []
         )
       );
     }
     return lines;
   }
-  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, missileLinesByOwner) {
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner) {
     const ids = /* @__PURE__ */ new Set([
       ...Object.keys(summary.byOwner),
       ...hexLinesByOwner.keys(),
-      ...missileLinesByOwner.keys()
+      ...strikeLinesByOwner.keys()
     ]);
     const ordered = [];
     if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
@@ -1160,14 +1161,14 @@
     const name = seat?.homeRegion.trim() ?? "";
     return `${name.length > 0 ? name : ownerId} Losses`;
   }
-  function sectionLines(summary, ownerId, header, hexLines, missileLines) {
+  function sectionLines(summary, ownerId, header, hexLines, strikeLines) {
     const buckets = summary.byOwner[ownerId];
     const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-    if (causes.length === 0 && hexLines.length === 0 && missileLines.length === 0) return [];
+    if (causes.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
     return [
       `${SECTION_HEADER_PREFIX}${header}`,
       ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
-      ...missileLines,
+      ...strikeLines,
       ...hexLines
     ];
   }
@@ -15597,6 +15598,12 @@
     var upper = ref[1];
     return Boolean(H3.isValidCell(lower, upper));
   }
+  function isPentagon(h3Index) {
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    return Boolean(H3.isPentagon(lower, upper));
+  }
   function getResolution(h3Index) {
     var ref = h3IndexToSplitLong(h3Index);
     var lower = ref[0];
@@ -19555,6 +19562,40 @@
     return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
   }
 
+  // src/shared/fortificationRules.ts
+  var FORTIFICATION_QUEUE_ITEM = "fortification";
+  var FORTIFICATION_COST_INFANTRY_MULTIPLIER = 1;
+  var FORTIFICATION_QUEUE_ITEM_LABEL = "Fortification";
+  var FORTIFIED_TOOLTIP_LABEL = "Fortified";
+  var FORTIFIED_LEGEND_LABEL = "Fortified";
+  var FORTIFIED_CELL_VARIANT_LABEL = "Fortified urban";
+  var FORTIFIED_CELL_BLOCKED_REASON = "Enemy fortifications block that cell. Destroy them with fire first.";
+  var FORTIFIED_CELL_BLOCKED_HOVER = "Blocked: Fortified";
+  var FORTIFICATION_UNNAMED_PLACE = "an unnamed hex";
+  function formatFortifiedTooltipValue(fortified, intactCityCells) {
+    const noun = intactCityCells === 1 ? "city cell" : "city cells";
+    return `${fortified} of ${intactCityCells} ${noun}`;
+  }
+  function formatFortificationReportLine(args) {
+    const hitWord = args.lost === 1 ? "hit" : "hits";
+    const remainingPhrase = args.remaining === 0 ? "none remain" : args.remaining === 1 ? "1 remains" : `${args.remaining} remain`;
+    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}; ${remainingPhrase}.`;
+  }
+  function formatFortificationsBuiltLine(count) {
+    return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
+  }
+  function joinPlaceNames(placeNames) {
+    if (placeNames.length <= 1) return placeNames[0] ?? "";
+    if (placeNames.length === 2) return `${placeNames[0]} and ${placeNames[1]}`;
+    return `${placeNames.slice(0, -1).join(", ")}, and ${placeNames[placeNames.length - 1]}`;
+  }
+  function formatFortificationQueuePausedLine(placeNames) {
+    if (placeNames.length === 1) {
+      return `Every city cell at ${placeNames[0]} is fortified, so its build queue is paused.`;
+    }
+    return `Every city cell is fortified at ${joinPlaceNames(placeNames)}, so their build queues are paused.`;
+  }
+
   // src/shared/gameRules.ts
   function unitCostFor(unitType) {
     const rules = activeGameMap().rules;
@@ -19577,6 +19618,13 @@
   }
   function advancedTechMinUrbanCells() {
     return activeGameMap().rules.advancedMinUrbanCells;
+  }
+  function fortificationCostPerCell() {
+    return activeGameMap().rules.infantryCost * FORTIFICATION_COST_INFANTRY_MULTIPLIER;
+  }
+  function buildQueueItemCostFor(itemType) {
+    if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
+    return unitCostFor(itemType);
   }
 
   // src/shared/missileRules.ts
@@ -21072,6 +21120,7 @@ ${bonuses}`;
   function formatTerrainVariantSuffix(state) {
     const variants = [];
     if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+    else if (state.isFortifiedCell) variants.push(`${formatUrbanSwatchHtml()}${FORTIFIED_CELL_VARIANT_LABEL}`);
     else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
@@ -21165,8 +21214,10 @@ ${bonuses}`;
     const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
     const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
     const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const fortifiedCount = state.fortifiedCount ?? 0;
+    const fortifiedLine = fortifiedCount > 0 ? `<strong>${FORTIFIED_TOOLTIP_LABEL}:</strong> ${formatFortifiedTooltipValue(fortifiedCount, state.intactCityCells ?? fortifiedCount)}` : null;
     const resolution = namingTarget?.resolution;
-    const orderedLines = resolution === 1 ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
+    const orderedLines = resolution === 1 ? [controlLine, productionLine, fortifiedLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
     const bodyParts = orderedLines.filter((line) => line != null);
     const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
     if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
@@ -21192,7 +21243,10 @@ ${bonuses}`;
     const railKey = state.hasRail ? "1" : "0";
     const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
     const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : "x";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
+    const fortifiedKey = state.fortifiedCount == null ? "x" : String(state.fortifiedCount);
+    const intactKey = state.intactCityCells == null ? "x" : String(state.intactCityCells);
+    const fortifiedCellKey = state.isFortifiedCell ? "1" : "0";
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}::${fortifiedKey}::${intactKey}::${fortifiedCellKey}`;
   }
   function producedUnitTechLineHtml(namingTarget) {
     if (namingTarget?.resolution !== 1) return null;
@@ -21322,6 +21376,7 @@ ${bonuses}`;
       terrainKind,
       isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
       isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+      isFortifiedCell: battle.tacticalFortificationOwnerByH3?.[detailH3] != null,
       features,
       urbanHexCount: null,
       strategicTerrainSummary: null,
@@ -21477,13 +21532,17 @@ ${bonuses}`;
   }
   function terrainTooltipStateForStrategicHex(h3) {
     const state = terrainStateForStrategicHex(h3);
+    const infra = infraGlyphsAllowedForStrategicHex(h3) ? rendererSharedState.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3) : void 0;
+    const fortifiedCount = infra ? infra.fortifiedCount ?? 0 : void 0;
+    const intactCityCells = infra ? fortifiedCount + (infra.fortifiableCount ?? 0) : void 0;
     return {
       ...state,
       ...EMPTY_TERRAIN_EFFECT_FIELDS,
       features: featureLabelsForStrategicHex(h3),
       urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
       strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
-      strategicFeaturesSummary: getStrategicFeaturesSummary(h3)
+      strategicFeaturesSummary: getStrategicFeaturesSummary(h3),
+      ...fortifiedCount === void 0 ? {} : { fortifiedCount, intactCityCells }
     };
   }
   function terrainStateForPointer(clientX, clientY, fallbackStrategicH3) {
@@ -21560,6 +21619,7 @@ ${bonuses}`;
         terrainKind: detail?.terrainKind ?? parentKind,
         isUrban: detail?.isUrban ?? false,
         isRubble: detail?.isRubble ?? false,
+        isFortifiedCell: detail?.isFortified === true,
         features: featureLabelsForTacticalChild(parentH3, detailH3),
         urbanHexCount: null,
         strategicTerrainSummary: null,
@@ -22867,11 +22927,12 @@ ${bonuses}`;
   var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
   var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
   var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var keepBuildingTooltipText = "After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.";
+  var KEEP_BUILDING_FORTIFICATION_NOTE = "A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.";
+  var keepBuildingTooltipText = `After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
   var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
   var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
   var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
-  var multiKeepBuildingTooltipText = "After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.";
+  var multiKeepBuildingTooltipText = `After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
   var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
   var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
   var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
@@ -24175,6 +24236,393 @@ ${bonuses}`;
     container.appendChild(row);
   }
 
+  // src/shared/fortificationTickGeometry.ts
+  var FORTIFICATION_TICKS_PER_EDGE = 4;
+  var FORTIFICATION_DUPLICATE_POINT_PX = 0.5;
+  function dropDuplicatePoints(points) {
+    const kept = [];
+    for (const point of points) {
+      const previous = kept[kept.length - 1];
+      if (previous && distance(previous, point) < FORTIFICATION_DUPLICATE_POINT_PX) continue;
+      kept.push(point);
+    }
+    const first = kept[0];
+    const last = kept[kept.length - 1];
+    if (first && last && kept.length > 1 && distance(first, last) < FORTIFICATION_DUPLICATE_POINT_PX) kept.pop();
+    return kept;
+  }
+  function signedScreenArea(points) {
+    let sum = 0;
+    for (let index = 0; index < points.length; index += 1) {
+      const current = points[index];
+      const next = points[(index + 1) % points.length];
+      sum += current.x * next.y - next.x * current.y;
+    }
+    return sum;
+  }
+  function turnAngle(previous, current, next) {
+    const ax = current.x - previous.x;
+    const ay = current.y - previous.y;
+    const bx = next.x - current.x;
+    const by = next.y - current.y;
+    return Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+  }
+  function distance(from, to) {
+    return Math.hypot(to.x - from.x, to.y - from.y);
+  }
+  function fortificationEdges(points, cornerCount) {
+    const ring = dropDuplicatePoints(points);
+    if (ring.length < 3) return [];
+    if (signedScreenArea(ring) < 0) ring.reverse();
+    const ranked = ring.map((point, index) => ({
+      index,
+      angle: turnAngle(ring[(index - 1 + ring.length) % ring.length], point, ring[(index + 1) % ring.length])
+    }));
+    ranked.sort((left, right) => right.angle - left.angle || left.index - right.index);
+    const chosenCount = Math.min(Math.max(0, cornerCount), ring.length);
+    const chosen = ranked.slice(0, chosenCount).map((entry) => entry.index).sort((left, right) => left - right);
+    if (chosen.length === 0) return [];
+    let startSlot = 0;
+    for (let slot = 1; slot < chosen.length; slot += 1) {
+      const point = ring[chosen[slot]];
+      const best = ring[chosen[startSlot]];
+      if (point.y < best.y || point.y === best.y && point.x < best.x) startSlot = slot;
+    }
+    const ordered = [...chosen.slice(startSlot), ...chosen.slice(0, startSlot)];
+    return ordered.map((from, slot) => {
+      const to = ordered[(slot + 1) % ordered.length];
+      const edge = [];
+      let index = from;
+      while (true) {
+        edge.push(ring[index]);
+        if (index === to) break;
+        index = (index + 1) % ring.length;
+        if (edge.length > ring.length) break;
+      }
+      return edge;
+    });
+  }
+  function litFortificationEdgeCount(args) {
+    if (args.fortified <= 0 || args.edgeCount <= 0) return 0;
+    const share = Math.round(args.edgeCount * args.fortified / Math.max(args.intactCityCells, args.fortified));
+    return Math.min(args.edgeCount, Math.max(1, share));
+  }
+  function fortificationTickSegments(args) {
+    const edges = fortificationEdges(args.points, args.cornerCount);
+    const corners = edges.map((edge) => edge[0]).filter((point) => point != null);
+    const lit = edges.slice(0, Math.max(0, args.litEdgeCount));
+    if (corners.length === 0) return [];
+    const center = meanPoint(corners);
+    const segments = [];
+    for (const edge of lit) {
+      const length = polylineLength(edge);
+      if (length <= 0) continue;
+      for (let tick = 1; tick <= FORTIFICATION_TICKS_PER_EDGE; tick += 1) {
+        const at = pointAlong(edge, length * tick / (FORTIFICATION_TICKS_PER_EDGE + 1));
+        if (!at) continue;
+        const inward = inwardNormal(at.dx, at.dy, at.point, center);
+        segments.push({
+          x1: at.point.x,
+          y1: at.point.y,
+          x2: at.point.x + inward.x * args.tickLengthPx,
+          y2: at.point.y + inward.y * args.tickLengthPx
+        });
+      }
+    }
+    return segments;
+  }
+  function meanPoint(points) {
+    let x = 0;
+    let y = 0;
+    for (const point of points) {
+      x += point.x;
+      y += point.y;
+    }
+    return { x: x / points.length, y: y / points.length };
+  }
+  function polylineLength(points) {
+    let length = 0;
+    for (let index = 1; index < points.length; index += 1) length += distance(points[index - 1], points[index]);
+    return length;
+  }
+  function pointAlong(points, distanceAlong) {
+    let remaining = distanceAlong;
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const span = distance(from, to);
+      if (span <= 0) continue;
+      if (remaining <= span || index === points.length - 1) {
+        const t = Math.min(1, remaining / span);
+        return {
+          point: { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t },
+          dx: to.x - from.x,
+          dy: to.y - from.y
+        };
+      }
+      remaining -= span;
+    }
+    return null;
+  }
+  function inwardNormal(dx, dy, origin, center) {
+    const span = Math.hypot(dx, dy) || 1;
+    let x = -dy / span;
+    let y = dx / span;
+    if (x * (center.x - origin.x) + y * (center.y - origin.y) < 0) {
+      x = -x;
+      y = -y;
+    }
+    return { x, y };
+  }
+
+  // src/renderer/rendering/homeRegionBorderDrawing.ts
+  function resolveControllerBorderColor(controllerPlayerId) {
+    if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
+    return paletteForCurrentOwner(controllerPlayerId)?.map ?? MULTI_PLAYER_FILL;
+  }
+  function resolveHomeRegionOwnerBorderColor(identity) {
+    if (identity == null) return null;
+    if (identity.kind === "shared") return MULTI_PLAYER_STROKE;
+    return paletteForCurrentOwner(identity.seatId)?.map ?? MULTI_PLAYER_FILL;
+  }
+  function buildInsetPolygonPoints(pts, insetPx) {
+    if (pts.length === 0 || insetPx <= 0) return [...pts];
+    let sumX = 0;
+    let sumY = 0;
+    for (const p of pts) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    const cx = sumX / pts.length;
+    const cy = sumY / pts.length;
+    return pts.map((p) => {
+      const dx = cx - p.x;
+      const dy = cy - p.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 1e-4) return { x: p.x, y: p.y };
+      const appliedInset = Math.min(insetPx, dist * 0.35);
+      const t = appliedInset / dist;
+      return { x: p.x + dx * t, y: p.y + dy * t };
+    });
+  }
+  function drawOutlinedHomeRegionOwnershipBorders(ctx, pts, args) {
+    ctx.save();
+    ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
+    const outerColor = args.outerColor ?? resolveControllerBorderColor(args.controllerPlayerId);
+    const innerColor = args.innerColor ?? resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
+    const drawClosedPath = (points) => {
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+    };
+    drawClosedPath(pts);
+    ctx.strokeStyle = outerColor;
+    ctx.lineWidth = args.ownershipLineWidth;
+    ctx.setLineDash([]);
+    ctx.stroke();
+    const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
+    const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
+    drawClosedPath(innerPts);
+    ctx.strokeStyle = innerColor;
+    ctx.lineWidth = innerLineWidth;
+    ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  function resolveOwnershipBorderColor(style) {
+    if (style.kind === "normal") return paletteForCurrentOwner(style.ownerId)?.map ?? MULTI_PLAYER_FILL;
+    if (style.kind === "outlinedNeutral") return MULTI_PLAYER_FILL;
+    return null;
+  }
+  function ownershipStyleIsOutlined(style) {
+    return style.kind === "outlined" || style.kind === "outlinedNeutral";
+  }
+
+  // src/renderer/rendering/fortificationTickDrawing.ts
+  var STRATEGIC_FORTIFICATION_TICK_LENGTH_RATIO = 0.16;
+  var STRATEGIC_FORTIFICATION_TICK_WIDTH_RATIO = 0.04;
+  var STRATEGIC_FORTIFICATION_TICK_MIN_WIDTH_PX = 1.5;
+  var CELL_FORTIFICATION_TICK_LENGTH_RATIO = 0.18;
+  var CELL_FORTIFICATION_TICK_WIDTH_RATIO = 0.05;
+  var CELL_FORTIFICATION_TICK_MIN_WIDTH_PX = 1;
+  var FORTIFICATION_TICK_MIN_RADIUS_PX = 6;
+  var colorMemoState = null;
+  var colorByParent = /* @__PURE__ */ new Map();
+  function drawFortificationTicks(ctx, args) {
+    const segments = fortificationTickSegments(args);
+    if (segments.length === 0) return;
+    ctx.save();
+    ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
+    ctx.strokeStyle = args.color;
+    ctx.lineWidth = args.lineWidthPx;
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    for (const segment of segments) {
+      ctx.moveTo(segment.x1, segment.y1);
+      ctx.lineTo(segment.x2, segment.y2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  function fortificationTickColor(controllerId, ownershipVisible) {
+    return resolveControllerBorderColor(ownershipVisible ? controllerId : null);
+  }
+  function fortificationCellTickColor(cellH3Index) {
+    const state = rendererSharedState.gameState;
+    if (!state) return fortificationTickColor(null, false);
+    if (state !== colorMemoState) {
+      colorMemoState = state;
+      colorByParent = /* @__PURE__ */ new Map();
+    }
+    let parent = cellH3Index;
+    try {
+      parent = strategicParentOf(cellH3Index);
+    } catch {
+      return fortificationTickColor(null, false);
+    }
+    const cached = colorByParent.get(parent);
+    if (cached) return cached;
+    const controller = state.strategicControl?.find((row) => row.h3Index === parent)?.controllerPlayerId ?? null;
+    const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((hex) => hex.h3Index));
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: parent,
+      playerPerspective: ownershipPerspective(state.playerPerspective),
+      visibleHexes,
+      homeRegionHexesBySeat: state.homeRegionHexesBySeat,
+      intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
+    });
+    const color = fortificationTickColor(controller, ownershipVisible);
+    colorByParent.set(parent, color);
+    return color;
+  }
+  function fortificationCornerCount(h3Index) {
+    return isPentagon(h3Index) ? 5 : 6;
+  }
+  function drawStrategicFortificationTicks(ctx, deps) {
+    const state = rendererSharedState.gameState;
+    if (!state || rendererSharedState.tacticalBattleSnapshot) return;
+    if (shouldRenderTacticalHexes() || deps.isMapInspectionModeHeld()) return;
+    const map = getMainLeafletMap();
+    const leaflet = getLeafletGlobal();
+    if (!map || !leaflet) return;
+    const explored = deps.getExploredHexSet(state);
+    const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((hex) => hex.h3Index));
+    const perspective = ownershipPerspective(state.playerPerspective);
+    const control = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+    const infra = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
+    for (const hex of state.hexes) {
+      if (!explored.has(hex.h3Index)) continue;
+      const row = infra.get(hex.h3Index);
+      const fortified = row?.fortifiedCount ?? 0;
+      if (fortified <= 0) continue;
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(hex.h3Index);
+      const points = boundary.map(([lat, lng]) => {
+        const projected = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
+        return { x: projected.x, y: projected.y };
+      });
+      const cornerCount = fortificationCornerCount(hex.h3Index);
+      const ownershipVisible = isHexOwnershipVisibleToPerspective({
+        h3Index: hex.h3Index,
+        playerPerspective: perspective,
+        visibleHexes,
+        homeRegionHexesBySeat: state.homeRegionHexesBySeat,
+        intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
+      });
+      drawScaledFortificationTicks(ctx, {
+        points,
+        cornerCount,
+        litEdgeCount: litFortificationEdgeCount({
+          fortified,
+          intactCityCells: fortified + (row?.fortifiableCount ?? 0),
+          edgeCount: cornerCount
+        }),
+        color: fortificationTickColor(control.get(hex.h3Index) ?? null, ownershipVisible),
+        lengthRatio: STRATEGIC_FORTIFICATION_TICK_LENGTH_RATIO,
+        widthRatio: STRATEGIC_FORTIFICATION_TICK_WIDTH_RATIO,
+        minWidthPx: STRATEGIC_FORTIFICATION_TICK_MIN_WIDTH_PX
+      });
+    }
+  }
+  function drawFortifiedCellTicks(ctx, points, cellH3Index, color = fortificationCellTickColor(cellH3Index)) {
+    const cornerCount = fortificationCornerCount(cellH3Index);
+    drawScaledFortificationTicks(ctx, {
+      points,
+      cornerCount,
+      litEdgeCount: cornerCount,
+      color,
+      lengthRatio: CELL_FORTIFICATION_TICK_LENGTH_RATIO,
+      widthRatio: CELL_FORTIFICATION_TICK_WIDTH_RATIO,
+      minWidthPx: CELL_FORTIFICATION_TICK_MIN_WIDTH_PX
+    });
+  }
+  function drawScaledFortificationTicks(ctx, args) {
+    const corners = fortificationEdges(args.points, args.cornerCount).map((edge) => edge[0]).filter((point) => point != null);
+    if (corners.length < 3) return;
+    let x = 0;
+    let y = 0;
+    for (const corner of corners) {
+      x += corner.x;
+      y += corner.y;
+    }
+    x /= corners.length;
+    y /= corners.length;
+    let radius = 0;
+    for (const corner of corners) radius += Math.hypot(corner.x - x, corner.y - y);
+    radius /= corners.length;
+    if (radius < FORTIFICATION_TICK_MIN_RADIUS_PX) return;
+    drawFortificationTicks(ctx, {
+      points: args.points,
+      cornerCount: args.cornerCount,
+      litEdgeCount: args.litEdgeCount,
+      color: args.color,
+      tickLengthPx: radius * args.lengthRatio,
+      lineWidthPx: Math.max(args.minWidthPx, radius * args.widthRatio)
+    });
+  }
+
+  // src/renderer/rendering/terrainLegendFortified.ts
+  function appendFortifiedLegendRow(container) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.marginBottom = "2px";
+    const swatch = document.createElement("canvas");
+    swatch.width = 18;
+    swatch.height = 12;
+    swatch.style.display = "inline-block";
+    swatch.style.width = "18px";
+    swatch.style.height = "12px";
+    swatch.style.border = "1px solid #d5deea";
+    swatch.style.borderRadius = "2px";
+    const ctx = swatch.getContext("2d");
+    if (ctx) {
+      const points = [];
+      for (let index = 0; index < 6; index += 1) {
+        const angle = index * Math.PI / 3;
+        points.push({ x: 9 + Math.sin(angle) * 5.5, y: 6 - Math.cos(angle) * 5.5 });
+      }
+      drawFortificationTicks(ctx, {
+        points,
+        cornerCount: 6,
+        litEdgeCount: 6,
+        color: paletteForCurrentOwner(HUMAN_SEAT_ID)?.map ?? SEAT_PALETTES[0].map,
+        tickLengthPx: 2,
+        lineWidthPx: 1
+      });
+    }
+    row.appendChild(swatch);
+    const label = document.createElement("span");
+    label.textContent = FORTIFIED_LEGEND_LABEL;
+    row.appendChild(label);
+    container.appendChild(row);
+  }
+
   // src/renderer/rendering/terrainLegendRubble.ts
   function applyRubbleSwatchPaint(element, styleId) {
     element.style.background = "";
@@ -24612,6 +25060,7 @@ ${bonuses}`;
     }
     appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
     appendRubbleLegendRow(container, getActiveTerrainStyleId());
+    appendFortifiedLegendRow(container);
   }
 
   // src/shared/numericPriorityMinHeap.ts
@@ -25282,6 +25731,7 @@ ${bonuses}`;
   }
   function blockingHoverMessageFromMarchInvalidReason(invalidReason, hoveredTerrainKind) {
     if (!invalidReason) return null;
+    if (invalidReason === FORTIFIED_CELL_BLOCKED_REASON) return FORTIFIED_CELL_BLOCKED_HOVER;
     if (invalidReason === TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON || invalidReason === NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON || invalidReason === LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON) {
       return blockedTerrainOrUnreachable(hoveredTerrainKind);
     }
@@ -26583,7 +27033,7 @@ ${bonuses}`;
   };
   function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
     if (!nextUnitType) return null;
-    const unitCost = unitCostFor(nextUnitType);
+    const unitCost = buildQueueItemCostFor(nextUnitType);
     const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
     if (safeCapacity <= 0) return null;
     const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
@@ -26598,12 +27048,14 @@ ${bonuses}`;
     let idx = 0;
     while (idx < updated.length) {
       const entry = updated[idx];
-      const unitCost = unitCostFor(entry.unitType);
-      if (points < unitCost) break;
+      const unitCost = buildQueueItemCostFor(entry.unitType);
+      if (!Number.isInteger(unitCost) || unitCost <= 0 || points < unitCost) break;
       const maxBuildable = Math.floor(points / unitCost);
       const built = Math.min(maxBuildable, entry.remainingCount);
       if (built <= 0) break;
-      for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+      if (isBuildUnitType(entry.unitType)) {
+        for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+      }
       points -= built * unitCost;
       entry.remainingCount -= built;
       if (entry.remainingCount <= 0) {
@@ -26620,7 +27072,7 @@ ${bonuses}`;
   function sumQueuedProductionCost(entries) {
     let sum = 0;
     for (const row of entries) {
-      const cost = unitCostFor(row.unitType);
+      const cost = buildQueueItemCostFor(row.unitType);
       sum += cost * Math.max(0, Math.trunc(row.count));
     }
     return sum;
@@ -26787,10 +27239,14 @@ ${bonuses}`;
     if (queuedUnits <= 0) return capacityText;
     const nextUnitType = queue?.nextUnitType;
     const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
+    if (nextUnitType === FORTIFICATION_QUEUE_ITEM) {
+      const fortifiable = state.strategicInfrastructure?.find((row) => row.h3Index === h3Index)?.fortifiableCount ?? 0;
+      if (fortifiable <= 0) return `${capacityText} / \u221Et`;
+    }
     if (!nextUnitType || capacityPerTurn <= 0) {
       return `${capacityText} / ?t`;
     }
-    if (controller && isSeatId(controller)) {
+    if (controller && isSeatId(controller) && isBuildUnitType(nextUnitType)) {
       const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
       if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
         return `${capacityText} / \u221Et`;
@@ -27178,6 +27634,10 @@ ${bonuses}`;
       ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
       drawClosedPath();
       ctx.stroke();
+      const fortOwner = tactical.tacticalFortificationOwnerByH3?.[child];
+      if (fortOwner && !deps.isMapInspectionModeHeld()) {
+        drawFortifiedCellTicks(ctx, pts, child, fortificationTickColor(fortOwner, true));
+      }
     }
   }
   function drawBattleFootprintInfrastructureGlyphs(ctx, tactical, map, leaflet, viewportWidth, viewportHeight, outlineScreenPx) {
@@ -27194,74 +27654,6 @@ ${bonuses}`;
         glyphAreaScale: TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE
       });
     }
-  }
-
-  // src/renderer/rendering/homeRegionBorderDrawing.ts
-  function resolveControllerBorderColor(controllerPlayerId) {
-    if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
-    return paletteForCurrentOwner(controllerPlayerId)?.map ?? MULTI_PLAYER_FILL;
-  }
-  function resolveHomeRegionOwnerBorderColor(identity) {
-    if (identity == null) return null;
-    if (identity.kind === "shared") return MULTI_PLAYER_STROKE;
-    return paletteForCurrentOwner(identity.seatId)?.map ?? MULTI_PLAYER_FILL;
-  }
-  function buildInsetPolygonPoints(pts, insetPx) {
-    if (pts.length === 0 || insetPx <= 0) return [...pts];
-    let sumX = 0;
-    let sumY = 0;
-    for (const p of pts) {
-      sumX += p.x;
-      sumY += p.y;
-    }
-    const cx = sumX / pts.length;
-    const cy = sumY / pts.length;
-    return pts.map((p) => {
-      const dx = cx - p.x;
-      const dy = cy - p.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= 1e-4) return { x: p.x, y: p.y };
-      const appliedInset = Math.min(insetPx, dist * 0.35);
-      const t = appliedInset / dist;
-      return { x: p.x + dx * t, y: p.y + dy * t };
-    });
-  }
-  function drawOutlinedHomeRegionOwnershipBorders(ctx, pts, args) {
-    ctx.save();
-    ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
-    const outerColor = args.outerColor ?? resolveControllerBorderColor(args.controllerPlayerId);
-    const innerColor = args.innerColor ?? resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
-    const drawClosedPath = (points) => {
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i++) {
-        const p = points[i];
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-    };
-    drawClosedPath(pts);
-    ctx.strokeStyle = outerColor;
-    ctx.lineWidth = args.ownershipLineWidth;
-    ctx.setLineDash([]);
-    ctx.stroke();
-    const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
-    const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
-    drawClosedPath(innerPts);
-    ctx.strokeStyle = innerColor;
-    ctx.lineWidth = innerLineWidth;
-    ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-  function resolveOwnershipBorderColor(style) {
-    if (style.kind === "normal") return paletteForCurrentOwner(style.ownerId)?.map ?? MULTI_PLAYER_FILL;
-    if (style.kind === "outlinedNeutral") return MULTI_PLAYER_FILL;
-    return null;
-  }
-  function ownershipStyleIsOutlined(style) {
-    return style.kind === "outlined" || style.kind === "outlinedNeutral";
   }
 
   // src/renderer/rendering/terrainRendering.ts
@@ -27423,6 +27815,9 @@ ${bonuses}`;
         ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
         drawClosedPath();
         ctx.stroke();
+        if (override?.isFortified && !deps.isMapInspectionModeHeld()) {
+          drawFortifiedCellTicks(ctx, pts, child);
+        }
       }
     }
   }
@@ -29377,9 +29772,9 @@ ${bonuses}`;
   });
   function formatOrderRowDetail(parts) {
     const code = parts.targetCode && parts.targetCode.length > 0 ? parts.targetCode : "?";
-    const distance = parts.distanceHexes == null ? "?" : String(parts.distanceHexes);
+    const distance2 = parts.distanceHexes == null ? "?" : String(parts.distanceHexes);
     const note = parts.note ? ` \xB7 ${parts.note}` : "";
-    return `\u2192 ${code} \xB7 ${distance}h${note}`;
+    return `\u2192 ${code} \xB7 ${distance2}h${note}`;
   }
   function formatQueuedOrdersSubtitle(queuedCount, turnNumber, battleBeat) {
     const when = battleBeat == null ? `turn ${turnNumber}` : `beat ${battleBeat}`;
@@ -31065,6 +31460,21 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/tacticalFortificationMovement.ts
+  function isCellBlockedByFortification(battle, cell, moverPlayer) {
+    const owner = battle.tacticalFortificationOwnerByH3?.[cell];
+    return owner !== void 0 && owner !== moverPlayer;
+  }
+  function tacticalMarchSetForMover(args) {
+    const cells = new Set(
+      args.battle.tacticalChildH3Indexes.filter(
+        (cell) => !isCellBlockedByFortification(args.battle, cell, args.moverPlayer)
+      )
+    );
+    if (args.originH3) cells.add(args.originH3);
+    return cells;
+  }
+
   // src/shared/tacticalMarchBeatSearch.ts
   function advanceBeatPosition(from, step, budget) {
     if (step.kind === "blocked") return null;
@@ -31495,6 +31905,9 @@ ${bonuses}`;
     if (!resOk) {
       return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Invalid tactical cell", segments: [] });
     }
+    if (isCellBlockedByFortification(args.battle, args.hoveredH3Index, HUMAN_SEAT_ID)) {
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: FORTIFIED_CELL_BLOCKED_REASON, segments: [] });
+    }
     if (!args.tacticalSet.has(args.hoveredH3Index)) {
       return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Outside tactical footprint", segments: [] });
     }
@@ -31627,7 +32040,7 @@ ${bonuses}`;
     };
   }
   function buildTacticalMarchHoverPreview(battle, unitIds, hoveredH3Index) {
-    const tacticalSet = new Set(battle.tacticalChildH3Indexes);
+    const tacticalSet = tacticalMarchSetForMover({ battle, moverPlayer: HUMAN_SEAT_ID });
     const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
     const selectedHuman = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === HUMAN_SEAT_ID)).filter((u) => !!u);
     if (!hoveredH3Index || selectedHuman.length === 0) {
@@ -31682,7 +32095,7 @@ ${bonuses}`;
     return capByOrigin;
   }
   function buildTacticalMarchDraftDestinationPreview(battle, subUnitId, destinationH3Index, options) {
-    const tacticalSet = new Set(battle.tacticalChildH3Indexes);
+    const tacticalSet = tacticalMarchSetForMover({ battle, moverPlayer: HUMAN_SEAT_ID });
     return buildPreviewForSubUnit({
       battle,
       unitId: subUnitId,
@@ -33828,6 +34241,7 @@ ${bonuses}`;
     drawTerrainHexes2(ctx);
     drawTacticalTerrainHexes2(ctx);
     drawScenarioHomeRegionOutlines(ctx);
+    drawStrategicFortificationTicks(ctx, { getExploredHexSet, isMapInspectionModeHeld });
     const hexList = state.hexes.map((h) => h.h3Index);
     let moveProgress = 1;
     let airStrikeOutboundProgress = 1;
@@ -34032,7 +34446,8 @@ ${bonuses}`;
           isUrban: !!r.isUrban,
           isAirport: !!r.isAirport,
           isSeaport: !!r.isSeaport,
-          isRubble: !!r.isRubble
+          isRubble: !!r.isRubble,
+          isFortified: r.isFortified === true
         }
       ])
     );
@@ -34507,13 +34922,13 @@ ${bonuses}`;
   }
   function unionAvailableBuildUnitTypes(snapshots) {
     const available = new Set(snapshots.flatMap((snapshot2) => snapshot2.availableUnitTypes));
-    return ALL_BUILD_UNIT_TYPES.filter((unitType) => available.has(unitType));
+    return ALL_BUILD_QUEUE_ITEM_TYPES.filter((unitType) => available.has(unitType));
   }
   function countEligibleBuildHexes(snapshots, unitType) {
     return snapshots.filter((snapshot2) => snapshot2.availableUnitTypes.includes(unitType)).length;
   }
   function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
-    const typeLabel = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+    const typeLabel = unitType === FORTIFICATION_QUEUE_ITEM ? FORTIFICATION_QUEUE_ITEM_LABEL : unitType.charAt(0).toUpperCase() + unitType.slice(1);
     if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
       return `${typeLabel} (all hexes)`;
     }
@@ -34735,7 +35150,7 @@ ${bonuses}`;
       row.className = "build-queue-row";
       const typeSelect = document.createElement("select");
       typeSelect.setAttribute("data-control-tooltip", multiBuildTypeTooltipText);
-      const rowTypes = ALL_BUILD_UNIT_TYPES.filter(
+      const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
         (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
       );
       for (const unitType of rowTypes) {
@@ -35045,7 +35460,7 @@ ${bonuses}`;
         for (const unitType of options) {
           const opt = document.createElement("option");
           opt.value = unitType;
-          opt.textContent = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+          opt.textContent = unitType === FORTIFICATION_QUEUE_ITEM ? FORTIFICATION_QUEUE_ITEM_LABEL : unitType.charAt(0).toUpperCase() + unitType.slice(1);
           typeSelect.appendChild(opt);
         }
         typeSelect.value = entry.unitType;
@@ -35309,6 +35724,8 @@ ${bonuses}`;
     const lines = [];
     const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
     if (deployedLine) lines.push(deployedLine);
+    const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
+    if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
     const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
     if (deploymentCapLine) lines.push(deploymentCapLine);
     return lines;
@@ -35333,16 +35750,44 @@ ${bonuses}`;
     }
     return { byOwner, updates };
   }
+  function splitFortificationReportLines(lines) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const updates = [];
+    for (const entry of lines ?? []) {
+      const line = entry.line.trim();
+      if (line.length === 0) continue;
+      const ownerId = entry.ownerId;
+      if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
+        const existing = byOwner.get(ownerId);
+        if (existing) existing.push(line);
+        else byOwner.set(ownerId, [line]);
+      } else {
+        updates.push(line);
+      }
+    }
+    return { byOwner, updates };
+  }
+  function mergeStrikeLines(missileLines, fortificationLines) {
+    const merged = /* @__PURE__ */ new Map();
+    for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
+    for (const [ownerId, lines] of fortificationLines) {
+      const existing = merged.get(ownerId);
+      if (existing) existing.push(...lines);
+      else merged.set(ownerId, [...lines]);
+    }
+    return merged;
+  }
   function buildConsolidatedTurnUpdateToastMessage(args) {
     const { readyResult, combatFallbackBullets, turnReport } = args;
     const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
+    const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
     const sections = [];
     const lossSections = buildTurnLossSections(
       args.turnLossSummary,
       turnReport?.viewerSeatId ?? null,
       turnReport?.seats ?? [],
       turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
-      missileLines.byOwner
+      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
     );
     sections.push(...lossSections);
     let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
@@ -35350,7 +35795,10 @@ ${bonuses}`;
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }
     const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
+    const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
     if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
+    if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
+    if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
     if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
     if (otherLines.length > 0) {
       sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
@@ -35377,7 +35825,8 @@ ${bonuses}`;
     const parts = [
       flagPhrase(record.urbanDestroyed, record.urbanBefore, "city cell", "city cells"),
       flagPhrase(record.airportsDestroyed, record.airportsBefore, "airport", "airports"),
-      flagPhrase(record.seaportsDestroyed, record.seaportsBefore, "seaport", "seaports")
+      flagPhrase(record.seaportsDestroyed, record.seaportsBefore, "seaport", "seaports"),
+      flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, "fortification", "fortifications")
     ].filter((part) => part !== null);
     if (parts.length === 0) return `Missile strike on ${args.placeName}: nothing there to destroy.`;
     const air = record.destroyedAirUnitIds.length;
@@ -35689,6 +36138,49 @@ ${bonuses}`;
     return unknownContinentNames;
   }
 
+  // src/shared/fortificationReport.ts
+  function fortificationReportVisibleToViewer(report, viewerSeatId2, exploredHexes) {
+    if (viewerSeatId2 === null) return true;
+    if (viewerSeatId2 === report.ownerId) return true;
+    return exploredHexes.has(report.h3Index);
+  }
+
+  // src/renderer/gameplay/fortificationUpdateLines.ts
+  async function fortificationUpdateLinesFor(readySlice) {
+    const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
+    if (hexes.length === 0) return [];
+    const names = [];
+    for (const h3Index of hexes) {
+      let placeName = FORTIFICATION_UNNAMED_PLACE;
+      try {
+        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
+        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
+      } catch (err) {
+        console.error("fortification place name failed", err);
+      }
+      names.push(placeName);
+    }
+    return [formatFortificationQueuePausedLine(names)];
+  }
+  async function fortificationReportLinesFor(readySlice, viewer) {
+    const lines = [];
+    for (const report of readySlice.fortificationReports ?? []) {
+      if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
+      let placeName = FORTIFICATION_UNNAMED_PLACE;
+      try {
+        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: report.h3Index, resolution: 1 });
+        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
+      } catch (err) {
+        console.error("fortification place name failed", err);
+      }
+      lines.push({
+        ownerId: report.ownerId,
+        line: formatFortificationReportLine({ placeName, lost: report.lost, remaining: report.remaining })
+      });
+    }
+    return lines;
+  }
+
   // src/renderer/gameplay/readyResolutionAnnouncements.ts
   function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
     const allKills = readyResult.kills ?? [];
@@ -35861,6 +36353,11 @@ ${bonuses}`;
       }
     }
     const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
+    const fortificationLines = await fortificationUpdateLinesFor(readySlice);
+    const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
+      viewerSeatId: viewerSeatId2,
+      exploredHexes: getExploredHexSet(rendererSharedState.gameState)
+    });
     const updateText = buildConsolidatedTurnUpdateToastMessage({
       readyResult: readySlice,
       turnLossSummary,
@@ -35871,7 +36368,9 @@ ${bonuses}`;
         transitions: readySlice.controlTransitions ?? []
       },
       unknownBattleLine,
-      missileStrikeLines
+      missileStrikeLines,
+      fortificationLines,
+      fortificationReportLines
     });
     if (updateText) {
       rememberUnitOrigins([

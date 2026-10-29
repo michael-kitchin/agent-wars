@@ -35,7 +35,7 @@ export type TacticalRangedRubbleApplyOptions = {
  *
  * Purpose: Single DB write path for tactical ranged (and related) infrastructure collapse on one footprint cell, including INSERT for road/rail-only targets.
  * When to use: After ranged kills defenders on an infra hex, or after a successful infra-only ranged strike roll.
- * Expected outcome: `changed` true when a facility row was updated, a non-rubble non-facility row was rubbled, or a transport INSERT succeeded; airport-bearing cells may delete strategic air units at the parent strategic.
+ * Expected outcome: A fortified cell loses only its fortification and returns `changed: false`, because the city cell and its terrain are unchanged. Otherwise `changed` is true when a facility row was updated, a non-rubble non-facility row was rubbled, or a transport INSERT succeeded; airport-bearing cells may delete strategic air units at the parent strategic.
  * Exceptions: Logs at error level and returns `changed: false` if listing or insert/update throws.
  */
 export function applyTacticalRangedRubbleToCell(
@@ -58,6 +58,13 @@ export function applyTacticalRangedRubbleToCell(
     }
     const rows = listTacticalFeatureOverridesForGame();
     const rowForCell = rows.find((r) => r.h3Index === tacticalH3Index && r.parentH3Index === strategicParentH3Index);
+    if (rowForCell?.isFortified) {
+      updateTacticalFeatureOverrideRow(tacticalH3Index, { isFortified: false });
+      logDebug('tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: stripped fortification', {
+        tacticalH3Index,
+      });
+      return { changed: false, destroyedAirUnitsCount: 0 };
+    }
     if (
       rowForCell &&
       !rowForCell.isRubble &&

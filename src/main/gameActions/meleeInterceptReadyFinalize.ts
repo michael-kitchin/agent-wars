@@ -29,6 +29,8 @@ import { HUMAN_SEAT_ID, isAiSeatId, isSeatId, type OwnerId, type SeatId } from '
 import { activeAiSeats } from '../../shared/seatRoster';
 import { buildKillLabelUnitRoster } from '../../shared/unitDisplayNames';
 import { withLossFlagFacts, type LossFlagFacts } from '../../shared/lossFlagFacts';
+import type { FortificationLossTally } from '../fortificationCombat';
+import { buildFortificationReports } from './fortificationCombatLedger';
 
 /**
  * AI seats that reached a deployment cap this turn.
@@ -220,6 +222,15 @@ knockoutCoordinates: KnockoutCoordinates;
    * Exceptions: None.
    */
   lossFlagFactsByUnitId: ReadonlyMap<string, LossFlagFacts>;
+  /**
+   * Fortifications removed during this turn's fighting.
+   *
+   * Contract: Shared by missiles, air strikes, ranged fire, and melee. Resume passes the snapshot's map.
+   * When to use: Before control resolution, so each report still names the owner who held the hex.
+   * Expected outcome: One report per hex whose count is above 0. An empty map adds no field.
+   * Exceptions: None.
+   */
+  fortificationTally: FortificationLossTally;
 }
 
 /**
@@ -272,6 +283,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     meleeResult.removedUnits
   );
 
+  const fortificationReports = buildFortificationReports(args.fortificationTally);
   const controlTransitions = resolveStrategicControlAfterCombatAndMovement(traversedHexesByPlayer);
   const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
   const airStrikeDestroyedFeatures = { urban: 0, airport: 0, seaport: 0 };
@@ -504,6 +516,14 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     humanDeploymentCapReachedUnitTypes: (productionSummary.capReachedByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
       ? productionSummary.capReachedByPlayer.get(HUMAN_SEAT_ID)
       : undefined,
+    humanFortificationsBuilt: (productionSummary.fortificationsBuiltByPlayer.get(HUMAN_SEAT_ID) ?? 0) > 0
+      ? productionSummary.fortificationsBuiltByPlayer.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanFortificationQueuePausedHexes:
+      (productionSummary.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
+        ? productionSummary.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)
+        : undefined,
+    fortificationReports: fortificationReports.length > 0 ? fortificationReports : undefined,
     deploymentCapReachedUnitTypesBySeat: deploymentCapsBySeat(productionSummary.capReachedByPlayer),
     combatParticipantUnitIdsBySeat,
     removedUnitIdsBySeat,

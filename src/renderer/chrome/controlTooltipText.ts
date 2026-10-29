@@ -453,13 +453,24 @@ export const buildCountTooltipText =
   'Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.';
 
 /**
+ * Sentence appended to both Keep building tips.
+ *
+ * Purpose: The checkbox also covers a fortification row, which pauses when the city is fully fortified.
+ * When to use: `keepBuildingTooltipText` and `multiKeepBuildingTooltipText` only.
+ * Expected outcome: One sentence.
+ * Exceptions: None.
+ */
+export const KEEP_BUILDING_FORTIFICATION_NOTE =
+  'A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.';
+
+/**
  * Purpose: Says what stays in production and when the box can be turned on.
  * When to use: The Keep building label in the single-hex build popup.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows this sentence, including the fortification note.
  * Exceptions: None.
  */
 export const keepBuildingTooltipText =
-  'After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.';
+  `After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
 
 /**
  * Purpose: Says the row is copied to every selected hex and that some hexes skip it.
@@ -495,7 +506,7 @@ export const multiBuildCountTooltipText =
  * Exceptions: None.
  */
 export const multiKeepBuildingTooltipText =
-  "After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.";
+  `After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. ${KEEP_BUILDING_FORTIFICATION_NOTE}`;
 
 /**
  * Purpose: Says the load applies immediately and that a battle also cancels marches.

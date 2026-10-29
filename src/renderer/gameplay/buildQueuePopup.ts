@@ -1,5 +1,6 @@
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
-import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import type { BuildQueueItemType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import { FORTIFICATION_QUEUE_ITEM, FORTIFICATION_QUEUE_ITEM_LABEL } from '../../shared/fortificationRules';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
@@ -242,7 +243,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   function restoreRejectedBuildQueueControls(
     typeSelect: HTMLSelectElement,
     countInput: HTMLInputElement,
-    entry: { unitType: BuildUnitType; count: number }
+    entry: { unitType: BuildQueueItemType; count: number }
   ): void {
     typeSelect.value = entry.unitType;
     countInput.value = String(entry.count);
@@ -259,7 +260,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   function rejectedBuildQueueEditStillShown(
     typeSelect: HTMLSelectElement,
     countInput: HTMLInputElement,
-    submittedUnitType: BuildUnitType,
+    submittedUnitType: BuildQueueItemType,
     submittedCountText: string
   ): boolean {
     return typeSelect.value === submittedUnitType && countInput.value === submittedCountText;
@@ -436,7 +437,10 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       for (const unitType of options) {
         const opt = document.createElement('option');
         opt.value = unitType;
-        opt.textContent = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+        opt.textContent =
+          unitType === FORTIFICATION_QUEUE_ITEM
+            ? FORTIFICATION_QUEUE_ITEM_LABEL
+            : unitType.charAt(0).toUpperCase() + unitType.slice(1);
         typeSelect.appendChild(opt);
       }
       typeSelect.value = entry.unitType;
@@ -463,7 +467,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       async function submitBuildQueueEntryEdit(failureMessage: string): Promise<void> {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        const submittedUnitType = typeSelect.value as BuildUnitType;
+        const submittedUnitType = typeSelect.value as BuildQueueItemType;
         const submittedCount = readCurrentCount();
         const submittedCountText = countInput.value;
         const success = await runBuildQueueMutation({

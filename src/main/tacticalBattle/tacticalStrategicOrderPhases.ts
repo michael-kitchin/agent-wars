@@ -16,6 +16,7 @@ import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
+import { createTacticalFortificationHooks } from './tacticalFortificationSoak';
 import {
   tacticalMovementTerrainAnchorH3,
   tacticalRangedDirectFirePassesTerrainAndRange,
@@ -330,6 +331,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     rangedPlayer,
     resolutionScope,
   });
+  const fortificationHooks = createTacticalFortificationHooks(battle);
   const originHitBonusAt = buildTacticalOriginHitBonusLookupFromDb(battle);
   const techHitBonusAt = buildTechHitBonusLookupFromDb(battle.subUnits);
   let sub = battle.subUnits.map((u) => ({ ...u }));
@@ -385,6 +387,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         killsByAirStrike,
         killsByReturnFire,
         onRoll: airDiceLog.sink,
+        absorbHit: fortificationHooks.absorbHit,
       });
       flushAirCasualties();
       strikeMoves.push({
@@ -559,8 +562,11 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       workBattle.tacticalChildH3Indexes,
       rangedOrdersCombat,
       next,
-      buildTacticalReturnFireContext(workBattle),
-      createTacticalTerrainCoverLookup(workBattle)
+      {
+        returnFireContext: buildTacticalReturnFireContext(workBattle),
+        targetCoverAt: createTacticalTerrainCoverLookup(workBattle),
+        fortification: fortificationHooks,
+      }
     );
     rangedDiceLog.rolls.push(...(rangedResult.diceRolls ?? []));
     rangedResolutionShotLines = dedupeRangedResolutionShotLines([
@@ -750,7 +756,7 @@ export function applyTacticalFerryPhaseOnBattle(
     const air = sub[fi]!;
     if (air.player !== player || air.unitType !== 'air') continue;
     if (player !== HUMAN_SEAT_ID && !tacticalGuardOpponentAirSubUnitForFerry(sub, fi, player)) continue;
-    const outcome = tacticalFerryApplyOutcome(battle, air.h3Index, f.destinationH3Index);
+    const outcome = tacticalFerryApplyOutcome(battle, air.h3Index, f.destinationH3Index, air.player);
     if (outcome === 'move') {
       sub[fi] = { ...air, h3Index: f.destinationH3Index };
       continue;

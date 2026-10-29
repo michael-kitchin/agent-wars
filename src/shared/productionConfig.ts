@@ -1,6 +1,6 @@
-import type { BuildUnitType } from './ipcTypes';
+import { isBuildUnitType, type BuildQueueItemType, type BuildUnitType } from './ipcTypes';
 import { GLOBAL_GAME_MAP } from './activeGameMap';
-import { unitCostFor } from './gameRules';
+import { buildQueueItemCostFor } from './gameRules';
 
 /**
  * Documents the module-scope binding `UNIT_COST_BY_TYPE` (UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>>).
@@ -107,12 +107,12 @@ air: 6,
  * Exceptions: None.
  */
 export function estimateTurnsToNextSpawn(
-  nextUnitType: BuildUnitType | null | undefined,
+  nextUnitType: BuildQueueItemType | null | undefined,
   storedPoints: number,
   capacityPerTurn: number
 ): number | null {
   if (!nextUnitType) return null;
-  const unitCost = unitCostFor(nextUnitType);
+  const unitCost = buildQueueItemCostFor(nextUnitType);
   const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
   if (safeCapacity <= 0) return null;
   const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
@@ -152,10 +152,10 @@ export interface BuildQueueProductionEntry {
 
    * Contract: The unit type being built for this queue row.
    * When to use: Must be a key present in `UNIT_COST_BY_TYPE`.
-   * Expected outcome: Spend uses `unitCostFor` for this type. `UNIT_COST_BY_TYPE` is the global column only.
+   * Expected outcome: Spend uses `buildQueueItemCostFor` for this item. A fortification charges its cost and spawns nothing.
    * Exceptions: None.
    */
-  unitType: BuildUnitType;
+  unitType: BuildQueueItemType;
   /**
    * Specifies the contract for the `remainingCount` member (remainingCount: number;).
 
@@ -191,12 +191,14 @@ export function applyProduction(
   let idx = 0;
   while (idx < updated.length) {
     const entry = updated[idx]!;
-    const unitCost = unitCostFor(entry.unitType);
-    if (points < unitCost) break;
+    const unitCost = buildQueueItemCostFor(entry.unitType);
+    if (!Number.isInteger(unitCost) || unitCost <= 0 || points < unitCost) break;
     const maxBuildable = Math.floor(points / unitCost);
     const built = Math.min(maxBuildable, entry.remainingCount);
     if (built <= 0) break;
-    for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+    if (isBuildUnitType(entry.unitType)) {
+      for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+    }
     points -= built * unitCost;
     entry.remainingCount -= built;
     if (entry.remainingCount <= 0) {
@@ -220,11 +222,11 @@ export function applyProduction(
  * Exceptions: None.
  */
 export function sumQueuedProductionCost(
-  entries: ReadonlyArray<{ unitType: BuildUnitType; count: number }>
+  entries: ReadonlyArray<{ unitType: BuildQueueItemType; count: number }>
 ): number {
   let sum = 0;
   for (const row of entries) {
-    const cost = unitCostFor(row.unitType);
+    const cost = buildQueueItemCostFor(row.unitType);
     sum += cost * Math.max(0, Math.trunc(row.count));
   }
   return sum;
@@ -239,7 +241,7 @@ export function sumQueuedProductionCost(
  * Exceptions: None.
  */
 export function estimateTurnsToCompleteQueuedProduction(
-  entries: ReadonlyArray<{ id: number; queueIndex: number; unitType: BuildUnitType; count: number }>,
+  entries: ReadonlyArray<{ id: number; queueIndex: number; unitType: BuildQueueItemType; count: number }>,
   storedPoints: number,
   capacityPerTurn: number
 ): number | null {
@@ -283,9 +285,10 @@ export function estimateTurnsToCompleteQueuedProduction(
  * `urbanHexCount <= 0`.
  * Exceptions: None; negative points are treated as 0 after truncation.
  */
-export function computeKeepBuildingRefillCount(unitType: BuildUnitType, availablePoints: number): number {
+export function computeKeepBuildingRefillCount(unitType: BuildQueueItemType, availablePoints: number): number {
   const points = Math.max(0, Math.trunc(availablePoints));
-  const cost = unitCostFor(unitType);
+  const cost = buildQueueItemCostFor(unitType);
+  if (!Number.isInteger(cost) || cost <= 0) return 1;
   const raw = Math.max(1, Math.floor(points / cost));
   return Math.min(99, Math.max(1, raw));
 }

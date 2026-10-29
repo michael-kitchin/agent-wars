@@ -9,6 +9,8 @@
  * Exceptions: Does not apply dest-hex ownership (tactical battles are often contested at the enclosing strategic).
  */
 
+import { FORTIFIED_CELL_BLOCKED_REASON } from '../../shared/fortificationRules';
+import { isCellBlockedByFortification } from '../../shared/tacticalFortificationMovement';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { tacticalLogQuery } from './tacticalLogging';
@@ -21,7 +23,10 @@ import { tacticalLogQuery } from './tacticalLogging';
  * Expected outcome: Omitted keys mean the cell is not an airport.
  * Exceptions: None.
  */
-export type TacticalFerryAirportBattle = Pick<TacticalBattleSnapshot, 'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3'>;
+export type TacticalFerryAirportBattle = Pick<
+  TacticalBattleSnapshot,
+  'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3' | 'tacticalFortificationOwnerByH3'
+>;
 
 /**
  * True when the cell is an intact (non-rubble) airport tile on the tactical snapshot.
@@ -48,9 +53,11 @@ export function tacticalCellHasIntactAirport(battle: TacticalFerryAirportBattle,
 export function tacticalFerryAirportRejectionReason(
   battle: TacticalFerryAirportBattle,
   originH3: string,
-  destH3: string
+  destH3: string,
+  moverPlayer: string
 ): string | null {
-  tacticalLogQuery('tacticalFerryAirportRejectionReason', { originH3, destH3 });
+  tacticalLogQuery('tacticalFerryAirportRejectionReason', { originH3, destH3, moverPlayer });
+  if (isCellBlockedByFortification(battle, destH3, moverPlayer)) return FORTIFIED_CELL_BLOCKED_REASON;
   if (!tacticalCellHasIntactAirport(battle, originH3)) {
     return 'Origin airport is not intact';
   }
@@ -71,13 +78,19 @@ export function tacticalFerryAirportRejectionReason(
  * Exceptions: None.
  */
 export function tacticalFerryApplyOutcome(
-  battle: Pick<TacticalBattleSnapshot, 'tacticalChildH3Indexes' | 'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3'>,
+  battle: Pick<
+    TacticalBattleSnapshot,
+    'tacticalChildH3Indexes' | 'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3' | 'tacticalFortificationOwnerByH3'
+  >,
   originH3: string,
-  destH3: string
+  destH3: string,
+  moverPlayer: string
 ): 'move' | 'stay' | 'destroy' {
-  tacticalLogQuery('tacticalFerryApplyOutcome', { originH3, destH3 });
+  tacticalLogQuery('tacticalFerryApplyOutcome', { originH3, destH3, moverPlayer });
   const destLegal =
-    battle.tacticalChildH3Indexes.includes(destH3) && tacticalCellHasIntactAirport(battle, destH3);
+    battle.tacticalChildH3Indexes.includes(destH3)
+    && tacticalCellHasIntactAirport(battle, destH3)
+    && !isCellBlockedByFortification(battle, destH3, moverPlayer);
   if (destLegal) return 'move';
   if (!tacticalCellHasIntactAirport(battle, originH3)) return 'destroy';
   return 'stay';
@@ -93,12 +106,15 @@ export function tacticalFerryApplyOutcome(
  */
 export function collectTacticalLegalFerryDestinationHexes(
   battle: TacticalBattleSnapshot,
-  originH3: string
+  originH3: string,
+  moverPlayer: string
 ): string[] {
-  tacticalLogQuery('collectTacticalLegalFerryDestinationHexes', { originH3 });
+  tacticalLogQuery('collectTacticalLegalFerryDestinationHexes', { originH3, moverPlayer });
   if (!tacticalCellHasIntactAirport(battle, originH3)) return [];
   return battle.tacticalChildH3Indexes.filter(
-    (h3) => h3 !== originH3 && tacticalCellHasIntactAirport(battle, h3)
+    (h3) => h3 !== originH3
+      && tacticalCellHasIntactAirport(battle, h3)
+      && !isCellBlockedByFortification(battle, h3, moverPlayer)
   );
 }
 
@@ -135,7 +151,7 @@ export function validateTacticalGroupFerryTarget(
     if (unit.unitType !== 'air') {
       return { success: false, reason: `${label}: Only air units can ferry.` };
     }
-    const airportReason = tacticalFerryAirportRejectionReason(battle, unit.h3Index, destinationH3Index);
+    const airportReason = tacticalFerryAirportRejectionReason(battle, unit.h3Index, destinationH3Index, attackerPlayer);
     if (airportReason) {
       return { success: false, reason: `${label}: ${airportReason}` };
     }

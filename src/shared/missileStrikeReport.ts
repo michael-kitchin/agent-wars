@@ -67,6 +67,7 @@ export function formatMissileStrikeLine(args: { readonly placeName: string; read
     flagPhrase(record.urbanDestroyed, record.urbanBefore, 'city cell', 'city cells'),
     flagPhrase(record.airportsDestroyed, record.airportsBefore, 'airport', 'airports'),
     flagPhrase(record.seaportsDestroyed, record.seaportsBefore, 'seaport', 'seaports'),
+    flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, 'fortification', 'fortifications'),
   ].filter((part): part is string => part !== null);
   if (parts.length === 0) return `Missile strike on ${args.placeName}: nothing there to destroy.`;
   const air = record.destroyedAirUnitIds.length;

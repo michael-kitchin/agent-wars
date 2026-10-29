@@ -3,7 +3,7 @@
  * Keeps parsing logic pure so OpenRouter can share one contract across prompt/tool paths.
  */
 
-import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, isBuildUnitType, type BuildUnitType } from './productionRules';
+import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, isBuildQueueItemType, type BuildQueueItemType } from './productionRules';
 import { logTrace } from './logger';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from './briefing/map/coordinateContext';
@@ -47,14 +47,14 @@ action: ProductionOrderAction;
    */
 hex: string;
     /**
-   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
 
    * Contract: Describes stable behavior for callers of `unitType` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-unitType: BuildUnitType;
+unitType: BuildQueueItemType;
     /**
    * Specifies the contract for the `count` member (count: number;).
 
@@ -168,7 +168,7 @@ export function normalizeProductionOrders(raw: unknown, context: CoordinateConte
       continue;
     }
     const hex = hexRaw;
-    if (!isBuildUnitType(row.unitType)) {
+    if (!isBuildQueueItemType(row.unitType)) {
       droppedReasons.push(`${prefix}: set_build_queue requires unitType.`);
       continue;
     }

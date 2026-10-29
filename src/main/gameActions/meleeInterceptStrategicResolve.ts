@@ -6,6 +6,7 @@ import { dbGetOne } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { createCombatRng, runMeleePhase } from '../combatResolution';
+import { createStrategicFortificationHooks } from './fortificationCombatLedger';
 import { logDebug, logError } from '../logger';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
 import { finalizeReadyTurnAfterMelee } from './meleeInterceptReadyFinalize';
@@ -63,7 +64,14 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
   for (let i = 0; i < pending.rngInvocationsBeforeMelee; i += 1) {
     resumeNext();
   }
-  const meleeResult = runMeleePhase(pending.combatUnitsAfter, pending.hexList, resumeNext, { skipMeleeHexes });
+  const fortificationHooks = createStrategicFortificationHooks({
+    next: resumeNext,
+    tally: pending.fortificationTally,
+  });
+  const meleeResult = runMeleePhase(pending.combatUnitsAfter, pending.hexList, resumeNext, {
+    skipMeleeHexes,
+    fortification: fortificationHooks,
+  });
   const baseResult = finalizeReadyTurnAfterMelee({
     meleeResult,
     rangedResult: pending.rangedResult,
@@ -84,6 +92,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     aiRangedOrders: pending.aiRangedOrders,
     knockoutCoordinates: buildLatLngCoordinateMap(pending.hexList),
     lossFlagFactsByUnitId: pending.lossFlagFactsByUnitId,
+    fortificationTally: pending.fortificationTally,
   });
   if (!baseResult.success) {
     return baseResult;

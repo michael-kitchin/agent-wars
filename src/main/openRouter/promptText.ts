@@ -3,7 +3,7 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
-import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../shared/ipc/productionTypes';
 import { logDebug, logTrace } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
@@ -468,7 +468,7 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
     ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
-    ` {"action":"set_build_queue","hex":"<two-char code>","unitType":"${ALL_BUILD_UNIT_TYPES.join('|')}","count":1..99}.` +
+    ` {"action":"set_build_queue","hex":"<two-char code>","unitType":"${ALL_BUILD_QUEUE_ITEM_TYPES.join('|')}","count":1..99}.` +
     ' Any productionOrders item missing "action" or required fields is dropped.' +
     ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
     ` ${PRODUCTION_CAP_GUIDANCE}` +

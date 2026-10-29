@@ -29,10 +29,13 @@ import { insertUnitRow } from '../gameDb/unitInsert';
 import { resolveUnitBirthOrigin } from '../unitOrigin/unitBirthOrigin';
 import {
   computeKeepBuildingRefillCount,
-  getAvailableBuildUnitTypes,
+  getAvailableBuildQueueItemTypes,
+  type BuildQueueItemType,
   type BuildUnitType,
 } from '../productionRules';
-import { unitCostFor } from '../../shared/gameRules';
+import { buildQueueItemCostFor } from '../../shared/gameRules';
+import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
+import { fortificationSpendStep, fortifyCellsForHex } from './fortificationProduction';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
 
@@ -263,6 +266,16 @@ export function resolveStrategicControlAfterCombatAndMovement(
     }
     if (!nextController) continue;
     if (currentController === nextController) continue;
+    const fortifiedCount = getStrategicInfrastructureForHex(h3Index).fortifiedCount;
+    if (fortifiedCount > 0) {
+      logDebug('gameActions resolveRes1ControlAfterCombatAndMovement: fortifications block control change', {
+        h3Index,
+        fortifiedCount,
+        currentController,
+        nextController,
+      });
+      continue;
+    }
     setHexController(h3Index, nextController);
     transitions.push({
       h3Index,
@@ -291,11 +304,15 @@ export function resolveStrategicControlAfterCombatAndMovement(
 export function processProductionAfterControlResolution(): {
   deployedByPlayer: ReadonlyMap<SeatId, DeployedUnitsByType>;
   capReachedByPlayer: ReadonlyMap<SeatId, BuildUnitType[]>;
+  fortificationsBuiltByPlayer: ReadonlyMap<SeatId, number>;
+  fortificationPausedHexesByPlayer: ReadonlyMap<SeatId, readonly string[]>;
 } {
   logDebug('gameActions processProductionAfterControlResolution');
   const maxUnitsPerType = readPersistedMaxUnitsPerType({ run: dbRun, getOne: dbGetOne });
   const deployedByPlayer = new Map<SeatId, DeployedUnitsByType>();
   const capReachedByPlayer = new Map<SeatId, BuildUnitType[]>();
+  const fortificationsBuiltByPlayer = new Map<SeatId, number>();
+  const fortificationPausedHexesByPlayer = new Map<SeatId, string[]>();
   for (const seat of getSeatRoster()) {
     deployedByPlayer.set(seat.seatId, {});
     capReachedByPlayer.set(seat.seatId, []);
@@ -313,7 +330,8 @@ export function processProductionAfterControlResolution(): {
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
     if (!controllerPlayerId || !isSeatId(controllerPlayerId)) continue;
-    const { urbanHexCount, seaportCount, airportCount } = getStrategicInfrastructureForHex(control.h3Index);
+    const { urbanHexCount, seaportCount, airportCount, fortifiedCount, fortifiableCount } =
+      getStrategicInfrastructureForHex(control.h3Index);
     if (urbanHexCount <= 0) continue;
 
     const queueRows = listBuildQueueRowsForHex(control.h3Index);
@@ -336,17 +354,21 @@ export function processProductionAfterControlResolution(): {
       }))
       .sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
     let points = Math.max(0, Math.trunc(storedPoints)) + (neutralBorder ? 0 : Math.max(0, Math.trunc(urbanHexCount)));
+    let fortifiableLeft = neutralBorder ? 0 : fortifiableCount;
+    let fortificationsToBuild = 0;
+    let fortificationPaused = false;
     const simulatedCountsByType = new Map<BuildUnitType, number>();
     for (const unitType of DEPLOYMENT_CAP_TYPE_ORDER) {
       simulatedCountsByType.set(unitType, unitCountsByPlayerType.get(`${controllerPlayerId}:${unitType}`) ?? 0);
     }
     const spawnedUnitTypes: BuildUnitType[] = [];
     let blockedByCapType: BuildUnitType | null = null;
-    let lastDepletedUnitType: BuildUnitType | null = null;
-    const availableTypes = getAvailableBuildUnitTypes(
+    let lastDepletedUnitType: BuildQueueItemType | null = null;
+    const availableTypes = getAvailableBuildQueueItemTypes(
       neutralBorder ? 0 : urbanHexCount,
       seaportCount,
-      airportCount
+      airportCount,
+      neutralBorder ? 0 : fortifiedCount + fortifiableCount
     );
     const maxLoopIterations = 10_000;
     let loopIterations = 0;
@@ -382,12 +404,37 @@ export function processProductionAfterControlResolution(): {
       }
 
       const entry = queueWorking[0]!;
-      const cost = unitCostFor(entry.unitType);
-      const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
-      const maxCount = maxUnitsPerType[entry.unitType];
+      const unitType = entry.unitType;
+      if (unitType === FORTIFICATION_QUEUE_ITEM) {
+        const cost = buildQueueItemCostFor(unitType);
+        if (!Number.isInteger(cost) || cost <= 0) break;
+        const step = fortificationSpendStep({
+          remainingCount: entry.remainingCount,
+          points,
+          fortifiableLeft,
+          cost,
+        });
+        if (step.paused) {
+          fortificationPaused = true;
+          break;
+        }
+        if (step.built <= 0) break;
+        entry.remainingCount -= step.built;
+        points -= step.built * cost;
+        fortifiableLeft -= step.built;
+        fortificationsToBuild += step.built;
+        if (entry.remainingCount <= 0) {
+          lastDepletedUnitType = unitType;
+          queueWorking.shift();
+        }
+        continue;
+      }
+      const cost = buildQueueItemCostFor(unitType);
+      const currentCount = simulatedCountsByType.get(unitType) ?? 0;
+      const maxCount = maxUnitsPerType[unitType];
       if (currentCount >= maxCount) {
-        blockedByCapType = entry.unitType;
-        capSet.add(entry.unitType);
+        blockedByCapType = unitType;
+        capSet.add(unitType);
         break;
       }
       if (points < cost) break;
@@ -397,10 +444,10 @@ export function processProductionAfterControlResolution(): {
       if (built <= 0) break;
       entry.remainingCount -= built;
       points -= built * cost;
-      simulatedCountsByType.set(entry.unitType, currentCount + built);
-      for (let n = 0; n < built; n++) spawnedUnitTypes.push(entry.unitType);
+      simulatedCountsByType.set(unitType, currentCount + built);
+      for (let n = 0; n < built; n++) spawnedUnitTypes.push(unitType);
       if (entry.remainingCount <= 0) {
-        lastDepletedUnitType = entry.unitType;
+        lastDepletedUnitType = unitType;
         queueWorking.shift();
       }
     }
@@ -419,6 +466,22 @@ export function processProductionAfterControlResolution(): {
       queueWorking.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
     );
     setBuildProgressPointsForHex(control.h3Index, points);
+    if (fortificationsToBuild > 0) {
+      const fortified = fortifyCellsForHex({
+        h3Index: control.h3Index,
+        count: fortificationsToBuild,
+        turnNumber: currentPlanningTurnNumber(),
+      });
+      fortificationsBuiltByPlayer.set(
+        controllerPlayerId,
+        (fortificationsBuiltByPlayer.get(controllerPlayerId) ?? 0) + fortified
+      );
+    }
+    if (fortificationPaused) {
+      const paused = fortificationPausedHexesByPlayer.get(controllerPlayerId) ?? [];
+      paused.push(control.h3Index);
+      fortificationPausedHexesByPlayer.set(controllerPlayerId, paused);
+    }
     const standingAfter = getKeepBuildingForHex(control.h3Index);
     if (standingAfter.keepBuilding) {
       const confirmedType =
@@ -457,7 +520,7 @@ export function processProductionAfterControlResolution(): {
     });
     capArray.splice(0, capArray.length, ...DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)));
   }
-  return { deployedByPlayer, capReachedByPlayer };
+  return { deployedByPlayer, capReachedByPlayer, fortificationsBuiltByPlayer, fortificationPausedHexesByPlayer };
 }
 
 /**

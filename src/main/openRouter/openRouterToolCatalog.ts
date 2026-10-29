@@ -1,9 +1,12 @@
-import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES, ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { NAVAL_PLAN_ROUTE_PROMPT_SUFFIX } from '../navalMovementMessages';
 import { logTrace } from '../logger';
 
 /** JSON Schema `enum` values for tool params that accept a `BuildUnitType`; mirrors `ALL_BUILD_UNIT_TYPES`. */
 const BUILD_UNIT_TYPE_SCHEMA_ENUM = [...ALL_BUILD_UNIT_TYPES];
+
+/** JSON Schema `enum` values for a build queue item, including fortification. */
+const BUILD_QUEUE_ITEM_SCHEMA_ENUM = [...ALL_BUILD_QUEUE_ITEM_TYPES];
 
 /**
  * Static OpenRouter tool metadata and JSON-schema definitions for chat completions.
@@ -235,7 +238,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       type: 'object',
       properties: {
         hex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Controlled cell as briefing hex code' },
-        unitType: { type: 'string', enum: BUILD_UNIT_TYPE_SCHEMA_ENUM, description: 'Unit type to keep in queue' },
+        unitType: { type: 'string', enum: BUILD_QUEUE_ITEM_SCHEMA_ENUM, description: 'Unit type to keep in queue' },
         count: { type: 'number', description: 'Build count (1..99) for the selected unit type' },
       },
       required: ['hex', 'unitType', 'count'],

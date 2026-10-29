@@ -32,6 +32,8 @@ function record(partial: Partial<MissileLaunchRecord> & Pick<MissileLaunchRecord
     airportsDestroyed: 0,
     seaportsBefore: 0,
     seaportsDestroyed: 0,
+    fortificationsBefore: 0,
+    fortificationsDestroyed: 0,
     destroyedAirUnitIds: [],
     ...partial,
   };
@@ -51,6 +53,21 @@ test('formatMissileStrikeLine names the destroyed flags and a lost squadron', ()
     }),
   });
   assert.equal(line, 'Missile strike on Osaka: 276 city cells and 2 airports destroyed; 1 squadron lost.');
+});
+
+test('formatMissileStrikeLine counts fortifications after city cells', () => {
+  const line = formatMissileStrikeLine({
+    placeName: 'Vienna',
+    record: record({
+      player: HUMAN_SEAT_ID,
+      targetControllerId: AI_SEAT_IDS[0],
+      urbanBefore: 21,
+      urbanDestroyed: 9,
+      fortificationsBefore: 12,
+      fortificationsDestroyed: 10,
+    }),
+  });
+  assert.equal(line, 'Missile strike on Vienna: 9 city cells and 10 fortifications destroyed.');
 });
 
 test('formatMissileStrikeLine says when the hex had nothing to destroy', () => {

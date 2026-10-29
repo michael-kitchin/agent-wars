@@ -175,6 +175,15 @@ export interface TacticalBattleSnapshot {
    */
   coreChildH3Indexes?: readonly string[];
   /**
+   * Fortified footprint cells and the side that owns each one.
+   *
+   * Contract: Keys are a subset of `tacticalChildH3Indexes`. The owner is the controller of the cell's parent hex. Omitted when no fortified cell has an owner.
+   * When to use: Placement, movement, drawing, and the AI map. Set when the battle starts and when a beat ends.
+   * Expected outcome: A cell absent from the record is not fortified for this beat.
+   * Exceptions: None.
+   */
+  tacticalFortificationOwnerByH3?: Record<string, OwnerId>;
+  /**
    * Strategic turn number captured when tactical mode began.
    *
    * Contract: Matches `GameStateSnapshot.turnNumber` from planning at start time.

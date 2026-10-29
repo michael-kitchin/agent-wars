@@ -15,10 +15,11 @@ import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
   NO_PRODUCTION_INFRASTRUCTURE_REASON,
-  getAvailableBuildUnitTypes,
+  getAvailableBuildQueueItemTypes,
   isValidBuildCount,
-  type BuildUnitType,
+  type BuildQueueItemType,
 } from '../productionRules';
+import { FORTIFICATION_NOT_AVAILABLE_REASON, FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
@@ -56,14 +57,14 @@ id: number;
    */
 queueIndex: number;
     /**
-   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
 
    * Contract: Describes stable behavior for callers of `unitType` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-unitType: BuildUnitType;
+unitType: BuildQueueItemType;
     /**
    * Specifies the contract for the `count` member (count: number;).
 
@@ -148,14 +149,14 @@ seaportCount: number;
    */
 airportCount: number;
     /**
-   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildQueueItemType[];).
 
    * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-availableUnitTypes: BuildUnitType[];
+availableUnitTypes: BuildQueueItemType[];
     /**
    * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
 
@@ -200,7 +201,7 @@ entries: HexBuildQueueEntryView[];
    * Expected outcome: Last synced valid type while armed; otherwise null.
    * Exceptions: None.
    */
-  keepBuildingUnitType: BuildUnitType | null;
+  keepBuildingUnitType: BuildQueueItemType | null;
 }
 
 /**
@@ -213,14 +214,14 @@ entries: HexBuildQueueEntryView[];
  */
 interface ProductionEligibilityView extends StrategicProductionContextSnapshot {
     /**
-   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildQueueItemType[];).
 
    * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-availableUnitTypes: BuildUnitType[];
+availableUnitTypes: BuildQueueItemType[];
     /**
    * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
 
@@ -242,6 +243,20 @@ noBuildReason: string | null;
 }
 
 /**
+ * Explains why a queue item cannot be written on this hex.
+ *
+ * Purpose: A fortification has its own sentence. Unit messages stay the same.
+ * When to use: The update path and a template skip.
+ * Expected outcome: The fortification sentence, or `Unit type "…" is not available for this hex.`
+ * Exceptions: None.
+ */
+function unavailableQueueItemReason(unitType: BuildQueueItemType): string {
+  return unitType === FORTIFICATION_QUEUE_ITEM
+    ? FORTIFICATION_NOT_AVAILABLE_REASON
+    : `Unit type "${unitType}" is not available for this hex.`;
+}
+
+/**
  * Defines the `buildProductionEligibilityView` function shape (function buildProductionEligibilityView().
 
  * Purpose: Supports maintainability by documenting why `buildProductionEligibilityView` exists.
@@ -253,13 +268,18 @@ function buildProductionEligibilityView(
   h3Index: string,
   productionContext: StrategicProductionContextSnapshot
 ): ProductionEligibilityView {
-  const availableUnitTypes = isNeutralBorderHex(h3Index)
-    ? []
-    : getAvailableBuildUnitTypes(
+  const eligibilityInfra =
+    isNeutralBorderHex(h3Index) || productionContext.urbanHexCount <= 0
+      ? null
+      : getStrategicInfrastructureForHex(h3Index);
+  const availableUnitTypes = eligibilityInfra
+    ? getAvailableBuildQueueItemTypes(
         productionContext.urbanHexCount,
         productionContext.seaportCount,
-        productionContext.airportCount
-      );
+        productionContext.airportCount,
+        eligibilityInfra.fortifiedCount + eligibilityInfra.fortifiableCount
+      )
+    : [];
   const buildSectionVisible = availableUnitTypes.length > 0;
   return {
     ...productionContext,
@@ -409,7 +429,7 @@ export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId
 }
 
 /**
- * Defines the `executeUpdateHexBuildQueueEntry` function shape (export function executeUpdateHexBuildQueueEntry( h3Index: string, entryId: number, unitType: BuildUnitType, count: number, requestingPlayerId = 'hum).
+ * Defines the `executeUpdateHexBuildQueueEntry` function shape (export function executeUpdateHexBuildQueueEntry( h3Index: string, entryId: number, unitType: BuildQueueItemType, count: number, requestingPlayerId = 'hum).
 
  * Purpose: Supports maintainability by documenting why `executeUpdateHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -419,7 +439,7 @@ export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId
 export function executeUpdateHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
-  unitType: BuildUnitType,
+  unitType: BuildQueueItemType,
   count: number,
   requestingPlayerId: string = HUMAN_SEAT_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
@@ -433,7 +453,7 @@ export function executeUpdateHexBuildQueueEntry(
     if (!context.valid) return { success: false, reason: context.reason };
     const queueView = context.queueView;
     if (!queueView.availableUnitTypes.includes(unitType)) {
-      return { success: false, reason: `Unit type "${unitType}" is not available for this hex.` };
+      return { success: false, reason: unavailableQueueItemReason(unitType) };
     }
     if (!isValidBuildCount(count)) {
       return {
@@ -549,7 +569,7 @@ export function executeApplyBuildQueueTemplateToHexes(
         result.skipped.push({
           h3Index,
           unitType: entry.unitType,
-          reason: `Unit type "${entry.unitType}" is not available for this hex.`,
+          reason: unavailableQueueItemReason(entry.unitType),
         });
         return [];
       });

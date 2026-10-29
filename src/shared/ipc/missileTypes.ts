@@ -145,6 +145,24 @@ export interface MissileLaunchRecord {
    */
   readonly seaportsDestroyed: number;
   /**
+   * Fortified cells in the target when the launch started.
+   *
+   * Contract: Those cells are not included in the urban, airport, or seaport before-counts.
+   * When to use: The strike line.
+   * Expected outcome: Zero when the hex had no fortifications.
+   * Exceptions: None.
+   */
+  readonly fortificationsBefore: number;
+  /**
+   * Fortifications this launch removed.
+   *
+   * Contract: The cell keeps its city, airport, and seaport flags.
+   * When to use: The strike line.
+   * Expected outcome: Zero when every fortified cell rolls a 20.
+   * Exceptions: None.
+   */
+  readonly fortificationsDestroyed: number;
+  /**
    * Air units removed because an airport flag in the target was destroyed.
    *
    * Contract: Empty when no airport was destroyed. These ids are also removed units.

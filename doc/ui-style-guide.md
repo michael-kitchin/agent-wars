@@ -109,6 +109,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 - **Canvas:** The hex map is the main interactive surface. Support pan (e.g., drag or edge-scroll) and zoom (e.g., wheel or pinch) with smooth, predictable behavior. Keep map rendering performant (culling, LOD if applicable).
 - **Hex affordance:** Selected hex and hovered hex should be visually distinct (e.g., highlight or outline) without obscuring terrain. Movement range and valid targets (e.g., for an order) should use clear, consistent highlighting (e.g., fill or border).
+- **Fortification ticks (live):** A fortified hex draws four inward ticks on each edge, in the controller's color, gray when ownership is unknown, and hidden while terrain inspection is held. Lit edges are `round(E * fortified / max(intact, fortified))`, clamped to 1..E when any cell is fortified, and 0 when none are (`litFortificationEdgeCount` in `src/shared/fortificationTickGeometry.ts`). A battle cell uses the owner in `tacticalFortificationOwnerByH3` and is fully lit.
 - **Fog of war:** Unexplored (never seen) vs. last-known (previously seen, currently out of sight) must be visually distinct—e.g., darker vs. dimmed, or different treatment (pattern/opacity). Explored and currently visible should look “normal” so the map reads quickly.
 - **Minimap:** Implemented. A 280 × 200 px Leaflet overview with a viewport rectangle in an opaque `--chrome-border` line, and a 2 px `--chrome-bg` line on its inside edge, the same opaque color as the expand control, in a navy panel at the map's top-left, over a row of five map-mode tabs (Weather, Tech, Control, Production, Legend). The row is hidden when the app opens; a 32 px square toggle on the overview's lower-left corner, in the selection panel's expand-control style, shows and hides it, and its chevron points down while the row is hidden. The tabs are the console rail's tabs: 56 × 58 px, an 18 px icon above a 9 px label, in the rail's colors (`--chrome-tab-height`, `--chrome-tab-label-size`). A chosen mode gets the console's selected-tab mark: a lighter tab with a teal edge, here on the edge next to the overview. The terrain legend opens as a panel beside it, or under it when the map is too narrow. The + and − buttons are 30 px squares in `--chrome-bg`, the same dark slate as the expand control, at the map's bottom-right, and the scale and attribution sit to their left.
 
@@ -158,6 +159,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 - **Trigger:** Production is initiated from a production-capable hex (or from a dedicated build menu reachable from the map or top/sidebar). Prefer an inline panel or sidebar section over a full modal so the map stays visible.
 - **Contents:** List of buildable units with cost and build time; current resources; optional build queue and ETA. Selection of placement hex when applicable (e.g. production hex). Keep the model simple (e.g. one resource, fixed menu) per Axis & Allies–style design.
+- **Live app:** The queue also offers Fortification, one intact city cell per item, at `fortificationCostPerCell()`. The row pauses when every such cell is fortified. It is not a unit and has no cap.
 - **Style:** Same typography and color system as the rest of the UI. Use the same accent for affordability vs. unaffordable. Clear primary action (e.g. “Build” or “Queue”) and cancel/close.
 
 ### 2.10 Replay Controls
@@ -188,6 +190,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 - **Consistency:** The same fog rules apply to human and AI. The UI should never imply that the player sees “true” state in fogged areas—only “last known” or “unknown.”
 - **Last-known state:** When showing last-known positions (e.g., enemy unit that moved), use a distinct treatment (e.g., faded, dashed, or “last seen” label) so players don’t confuse it with current intel.
+- **Fortification ticks:** On an explored hex they follow the same fog rule as city and rubble. An unexplored hex does not draw them. In a battle both sides see the owner color.
 
 ### 3.4 AI and LLM Transparency
 

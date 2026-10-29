@@ -11,6 +11,7 @@ import {
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
+import { drawFortifiedCellTicks } from './fortificationTickDrawing';
 import { drawBattleFootprintInfrastructureGlyphs, paintBattleFootprintTerrain } from './tacticalBattleTerrainPaint';
 import { OWNERSHIP_BORDER_ALPHA } from '../core/constants';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -305,6 +306,9 @@ export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: Te
       ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
       drawClosedPath();
       ctx.stroke();
+      if (override?.isFortified && !deps.isMapInspectionModeHeld()) {
+        drawFortifiedCellTicks(ctx, pts, child);
+      }
     }
   }
 }

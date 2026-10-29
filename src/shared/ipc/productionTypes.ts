@@ -31,6 +31,38 @@ export function isBuildUnitType(value: unknown): value is BuildUnitType {
 }
 
 /**
+ * Queue order: the five unit types, then a fortification.
+ *
+ * Purpose: Menus, templates, and eligibility lists share one order.
+ * When to use: Anywhere a build queue offers items, including a fortification.
+ * Expected outcome: Unit types stay in cap order. `fortification` is last.
+ * Exceptions: None.
+ */
+export const ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, 'fortification'] as const;
+
+/**
+ * A build-queue row: a unit type, or a fortification.
+ *
+ * Purpose: Queue rows are not limited to units. A fortification is not a `BuildUnitType`.
+ * When to use: Queue snapshots, templates, Keep building, and production spend.
+ * Expected outcome: Exhaustive switches cover the five unit types and `fortification`.
+ * Exceptions: None.
+ */
+export type BuildQueueItemType = (typeof ALL_BUILD_QUEUE_ITEM_TYPES)[number];
+
+/**
+ * Narrows unknown input to a build-queue item.
+ *
+ * Purpose: IPC and stored Keep-building values can name a fortification.
+ * When to use: Before accepting a queue type from JSON or the database.
+ * Expected outcome: TypeScript narrows `value` to `BuildQueueItemType` when `true`.
+ * Exceptions: None. Returns false for any other value.
+ */
+export function isBuildQueueItemType(value: unknown): value is BuildQueueItemType {
+  return typeof value === 'string' && (ALL_BUILD_QUEUE_ITEM_TYPES as readonly string[]).includes(value);
+}
+
+/**
  * Documents the `StrategicProductionContextSnapshot` interface as a named contract surface (export interface StrategicProductionContextSnapshot).
 
  * Purpose: Supports maintainability by documenting why `StrategicProductionContextSnapshot` exists.
@@ -96,14 +128,14 @@ id: number;
    */
 queueIndex: number;
     /**
-   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
 
-   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: A unit type or a fortification.
+   * When to use: Reading one queue row.
+   * Expected outcome: One `BuildQueueItemType`.
    * Exceptions: None.
    */
-unitType: BuildUnitType;
+unitType: BuildQueueItemType;
     /**
    * Specifies the contract for the `count` member (count: number;).
 
@@ -188,14 +220,14 @@ airportCount: StrategicProductionContextSnapshot['airportCount'];
    */
 seaportCount: StrategicProductionContextSnapshot['seaportCount'];
     /**
-   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildQueueItemType[];).
 
-   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: Every item this hex can queue.
+   * When to use: Build menus and eligibility checks.
+   * Expected outcome: Unit types first, then `fortification` when an intact city cell remains.
    * Exceptions: None.
    */
-availableUnitTypes: BuildUnitType[];
+availableUnitTypes: BuildQueueItemType[];
     /**
    * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
 
@@ -240,7 +272,7 @@ entries: HexBuildQueueEntrySnapshot[];
    * Expected outcome: Matches `res_s_build_progress.keep_building_unit_type`, or null when disarmed.
    * Exceptions: None.
    */
-  keepBuildingUnitType: BuildUnitType | null;
+  keepBuildingUnitType: BuildQueueItemType | null;
 }
 
 /**
@@ -302,12 +334,12 @@ export interface BuildQueueTemplateEntry {
   /**
    * Buildable unit kind requested for this template row.
    *
-   * Contract: Must be one canonical production unit type.
+   * Contract: A unit type or a fortification.
    * When to use: Identifying the row to filter and persist per selected hex.
-   * Expected outcome: Eligible hexes receive this unit type in template order.
+   * Expected outcome: Eligible hexes receive this item in template order.
    * Exceptions: None.
    */
-  unitType: BuildUnitType;
+  unitType: BuildQueueItemType;
   /**
    * Remaining unit count requested for each eligible selected hex.
    *
@@ -342,10 +374,10 @@ export interface BuildQueueTemplateSkip {
    *
    * Contract: Identifies the template row filtered from this hex.
    * When to use: Explaining partial eligibility.
-   * Expected outcome: One canonical production unit type.
+   * Expected outcome: One build-queue item.
    * Exceptions: None.
    */
-  unitType: BuildUnitType;
+  unitType: BuildQueueItemType;
   /**
    * Human-readable eligibility explanation.
    *

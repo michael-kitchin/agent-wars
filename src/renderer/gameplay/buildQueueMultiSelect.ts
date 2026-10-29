@@ -1,10 +1,11 @@
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import {
-  ALL_BUILD_UNIT_TYPES,
+  ALL_BUILD_QUEUE_ITEM_TYPES,
+  type BuildQueueItemType,
   type BuildQueueTemplateEntry,
-  type BuildUnitType,
   type HexBuildQueueSnapshot,
 } from '../../shared/ipcTypes';
+import { FORTIFICATION_QUEUE_ITEM, FORTIFICATION_QUEUE_ITEM_LABEL } from '../../shared/fortificationRules';
 import { escapeBuildPopupHtml } from './buildQueuePopupFormatting';
 
 /**
@@ -46,7 +47,7 @@ let nextBuildQueueTemplateRowKey = 1;
  * Exceptions: None.
  */
 export function createBuildQueueTemplateRow(
-  unitType: BuildUnitType,
+  unitType: BuildQueueItemType,
   count: number
 ): BuildQueueTemplateRow {
   return { rowKey: nextBuildQueueTemplateRowKey++, unitType, count };
@@ -105,9 +106,9 @@ export function buildQueueTemplateFromSnapshot(snapshot: HexBuildQueueSnapshot):
  * Expected outcome: A deterministic subset of infantry, armor, naval, air.
  * Exceptions: Empty input returns an empty array.
  */
-export function unionAvailableBuildUnitTypes(snapshots: HexBuildQueueSnapshot[]): BuildUnitType[] {
+export function unionAvailableBuildUnitTypes(snapshots: HexBuildQueueSnapshot[]): BuildQueueItemType[] {
   const available = new Set(snapshots.flatMap((snapshot) => snapshot.availableUnitTypes));
-  return ALL_BUILD_UNIT_TYPES.filter((unitType) => available.has(unitType));
+  return ALL_BUILD_QUEUE_ITEM_TYPES.filter((unitType) => available.has(unitType));
 }
 
 /**
@@ -120,7 +121,7 @@ export function unionAvailableBuildUnitTypes(snapshots: HexBuildQueueSnapshot[])
  */
 export function countEligibleBuildHexes(
   snapshots: HexBuildQueueSnapshot[],
-  unitType: BuildUnitType
+  unitType: BuildQueueItemType
 ): number {
   return snapshots.filter((snapshot) => snapshot.availableUnitTypes.includes(unitType)).length;
 }
@@ -134,11 +135,14 @@ export function countEligibleBuildHexes(
  * Exceptions: Counts at or below zero use the plural `hexes` form.
  */
 export function formatBuildUnitTypeOptionLabel(
-  unitType: BuildUnitType,
+  unitType: BuildQueueItemType,
   eligibleCount: number,
   selectedHexCount: number
 ): string {
-  const typeLabel = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+  const typeLabel =
+    unitType === FORTIFICATION_QUEUE_ITEM
+      ? FORTIFICATION_QUEUE_ITEM_LABEL
+      : unitType.charAt(0).toUpperCase() + unitType.slice(1);
   if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
     return `${typeLabel} (all hexes)`;
   }
@@ -172,7 +176,7 @@ export function filterTemplateForBuildHex(
  */
 export function templateEntriesForTurnEstimate(
   template: BuildQueueTemplateEntry[]
-): Array<{ id: number; queueIndex: number; unitType: BuildUnitType; count: number }> {
+): Array<{ id: number; queueIndex: number; unitType: BuildQueueItemType; count: number }> {
   return template.map((entry, queueIndex) => ({
     id: queueIndex + 1,
     queueIndex,

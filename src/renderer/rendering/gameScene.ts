@@ -49,6 +49,7 @@ import {
   resolutionAnimationElapsedMs,
   type ResolutionPlaybackPhase,
 } from './resolutionPlayback';
+import { drawStrategicFortificationTicks } from './fortificationTickDrawing';
 import {
   drawScenarioHomeRegionOutlines,
   drawTerrainHexes as drawTerrainHexesFromModule,
@@ -544,6 +545,7 @@ function drawGameScene(
   drawTerrainHexes(ctx);
   drawTacticalTerrainHexes(ctx);
   drawScenarioHomeRegionOutlines(ctx);
+  drawStrategicFortificationTicks(ctx, { getExploredHexSet, isMapInspectionModeHeld });
   const hexList = state.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let airStrikeOutboundProgress = 1;
