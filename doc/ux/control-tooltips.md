@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Save game and Load game show the sentences in [save-and-load.md](save-and-load.md). Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -55,7 +55,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
-- Settings, Help, Load game, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Settings, Help, How to play, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
@@ -75,7 +75,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Cities readout: City hexes you hold, your place, and how many sides are still playing. The tip lists every active side. Shown only in a match that ends on a turn limit. While observing, the tip has no "(you)".
 - Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
 - Quit: Close Agent Wars.
-- Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
+- Save game, while it can be clicked: Save this match to a file.
+- Save game, while it cannot: "There is no match to save.", "The match is over, so there is nothing to save.", "Close the new-game screen to save the match under it.", or "Save game is available again once this turn or beat finishes resolving."
+- Load game, while a match is still being played: Open a saved game from a file. The match in progress is replaced.
+- Load game, while it can be clicked and no match is still being played: Open a saved game from a file.
+- Load game, while a turn or beat is resolving: Load game is available again once this turn or beat finishes resolving.
 - API key: Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log. The button sits to the right of the model selector in the commander popover.
 - Start, while it cannot be clicked: Turn planning on or off for every commander. Give at least one commander an API key and a model first.
@@ -174,3 +178,5 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/renderer/chrome/controlTooltip.ts`
 - `src/renderer/chrome/controlTooltipText.ts`
 - `src/renderer/chrome/frameTooltipText.ts`
+- `src/shared/saveLoadAvailability.ts`
+- `src/renderer/gameplay/saveLoadMenu.ts`

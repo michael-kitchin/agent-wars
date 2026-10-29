@@ -220,13 +220,21 @@ const FRAME_CHECKS = Object.freeze([
       '#topbar-help-btn',
       '#console-tab-build',
       '#console-tab-forces',
-      '#game-menu-save-btn',
-      '#game-menu-load-btn',
       '#game-menu-how-to-play-btn',
     ],
     run: (p, el) => {
       const enabled = Object.entries(p.elements).filter(([, e]) => e && !e.disabled).map(([selector]) => selector);
       return enabled.length === 0 ? null : `placeholders that are not disabled: ${enabled.join(', ')}`;
+    },
+  },
+  {
+    name: 'save-load-enabled',
+    scenes: [SCENES.gameMenuOpen],
+    needs: ['#game-menu-save-btn', '#game-menu-load-btn'],
+    run: (p, el) => {
+      if (el('#game-menu-save-btn').disabled) return 'Save game… is disabled';
+      if (el('#game-menu-load-btn').disabled) return 'Load game… is disabled';
+      return null;
     },
   },
   {

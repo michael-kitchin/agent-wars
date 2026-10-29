@@ -84,6 +84,19 @@ export function getTacticalRendererOverrideRowsCached(
 }
 
 /**
+ * Clears the in-memory tactical terrain override rows.
+ *
+ * Purpose: A loaded match must not keep the previous match's renderer rows.
+ * When to use: From `releaseTacticalBattleMemory`. Tests call `clearTacticalRendererOverrideCacheForTests`.
+ * Expected outcome: The next fetch rebuilds rows from the database.
+ * Exceptions: None.
+ */
+export function clearTacticalRendererOverrideCache(): void {
+  logDebug('tacticalRendererOverrideCache clearTacticalRendererOverrideCache');
+  rendererOverrideCache = null;
+}
+
+/**
  * Clears the renderer override cache for unit tests that mutate `res_t_feature_overrides` between assertions.
  *
  * Purpose: Test hook only; production invalidation relies on the signature query.
@@ -93,5 +106,5 @@ export function getTacticalRendererOverrideRowsCached(
  */
 export function clearTacticalRendererOverrideCacheForTests(): void {
   logTrace('res4RendererOverrideCache clearRes4RendererOverrideCacheForTests');
-  rendererOverrideCache = null;
+  clearTacticalRendererOverrideCache();
 }

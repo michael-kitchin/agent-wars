@@ -120,6 +120,7 @@ import { wireConsoleFrame } from './chrome/consoleFrame';
 import { fetchMatchSnapshot } from './core/matchSnapshotClient';
 import { wireObserveMode } from './gameplay/observeChrome';
 import { wireGameMenu } from './chrome/gameMenu';
+import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
   type TacticalExitSessionAccessor,
@@ -642,6 +643,7 @@ function init(): void {
   });
   wireSelectionPanel({ formatUnitDisplayName });
   wireGameMenu();
+  wireSaveLoadMenu();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');
   // applyModifierDrivenPopoverCloseRules('shift_released');
@@ -758,6 +760,7 @@ function init(): void {
       await handleReadyButtonClickFromModule(createReadyHandlerDeps());
     });
   }
+  showLoadedSaveToastAfterReload();
 }
 
 if (document.readyState === 'loading') {

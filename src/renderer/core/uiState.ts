@@ -15,6 +15,7 @@ import { placeNewGameDialogAtInset } from '../gameplay/newGameDialogMove';
 import { forgetMatchUnderNewGame, isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 import { renderTopBarStatus } from '../chrome/topBar';
 import { closeGameMenu, syncGameMenuNewGameItem } from '../chrome/gameMenu';
+import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
 import { refreshConsoleHeader } from '../chrome/consoleFrame';
 import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
 import { renderSelectionPanel } from '../gameplay/selectionPanel';
@@ -91,7 +92,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog' || id === 'start-confirm-dialog') continue;
+      if (id === 'tactical-annihilation-overlay' || id === 'knockout-dialog' || id === 'start-confirm-dialog' || id === 'load-confirm-dialog') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
@@ -108,6 +109,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   }
   if (!topBarEnabled) closeGameMenu();
   syncGameMenuNewGameItem();
+  syncSaveLoadItems();
   syncNewGameDialogMapPointer();
 }
 

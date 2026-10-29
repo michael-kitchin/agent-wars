@@ -96,15 +96,6 @@ export const gameMenuButtonTooltipText =
 export const quitTooltipText = 'Close Agent Wars.';
 
 /**
- * Purpose: Says saving to a file is not available, and that the match in progress is still kept.
- * When to use: The tip host around `#game-menu-save-btn`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const saveGameUnavailableTooltipText =
-  'Saving to a file is not available in this version. The match in progress is kept on disk between sessions.';
-
-/**
  * The selection panel close button's tip.
  *
  * Purpose: Says the selection panel's × clears the selection and keeps the orders.

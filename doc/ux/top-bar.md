@@ -40,7 +40,7 @@ While the new-game overlay is open, in New game and Game over, the bar is the ne
 
 - The game menu button. The menu works there, with New game… disabled. See [game-menu.md](game-menu.md).
 - The title "New game", also on the game-over screen.
-- Load game…, with a folder icon, disabled in this version.
+- Load game…, with a folder icon. It opens a saved game. See [save-and-load.md](save-and-load.md).
 - Settings and Help.
 
 ## Inputs and Responses
@@ -85,6 +85,7 @@ While the new-game overlay is open, in New game and Game over, the bar is the ne
 
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [game-menu.md](game-menu.md)
+- [save-and-load.md](save-and-load.md)
 - [console.md](console.md)
 - [control-tooltips.md](control-tooltips.md)
 - [tactical-battle-controls.md](tactical-battle-controls.md)

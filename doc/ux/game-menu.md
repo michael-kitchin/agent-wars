@@ -15,8 +15,8 @@ The menu button is on the [top bar](top-bar.md), so the menu can open wherever t
 A popup under the menu button, in this order:
 
 - New game…, disabled while the new-game overlay is open.
-- Save game…, disabled in this version.
-- Load game…, disabled in this version.
+- Save game…. When it is enabled or disabled is in [save-and-load.md](save-and-load.md).
+- Load game…. When it is enabled or disabled is in [save-and-load.md](save-and-load.md).
 - A separator.
 - Offer tactical battles, a checkbox, checked by default.
 - How to play, disabled in this version.
@@ -31,6 +31,7 @@ Control tips for these items are in [control-tooltips.md](control-tooltips.md).
 
 - When the player clicks the menu button, the menu opens. A second click closes it.
 - When the player clicks New game…, the menu closes and the new-game overlay opens over the match, which keeps running. New game works during strategic planning, tactical planning, and resolution playback. See [new-game-dialog.md](new-game-dialog.md). While that overlay is open, in New game and Game over, New game… is disabled, and its tip says the new-game screen is already open. While a Ready is resolving, New game… is also disabled, and its tip host says "New game is available again once this turn or beat finishes resolving." (`syncGameMenuNewGameItem`).
+- When the player clicks Save game… or Load game…, an enabled item closes the menu and runs that action. A disabled item does nothing. The tips, the dialogs, and the toasts are in [save-and-load.md](save-and-load.md).
 - When the player changes Offer tactical battles, the menu stays open. Later Ready resolutions either show the tactical battles list or skip it and resolve melee as Ignore. The choice survives a restart. See [tactical-battles-list.md](tactical-battles-list.md).
 - When the player clicks Quit, the menu closes and the window closes. On Windows and Linux the app quits. On macOS the app stays in the dock.
 - A press anywhere outside the menu and its button closes the menu.
@@ -69,6 +70,7 @@ None. The menu works the same in both theaters.
 - [tactical-battles-list.md](tactical-battles-list.md)
 - [opponent-tab-commander.md](opponent-tab-commander.md)
 - [input-map.md](input-map.md)
+- [save-and-load.md](save-and-load.md)
 
 ## Known Deviations
 
@@ -83,6 +85,7 @@ None.
 - `static/index.html` (`#game-menu-btn`, `#game-menu`, `#openrouter-new-btn`, `#game-menu-save-btn`, `#game-menu-load-btn`, `#openrouter-tactical-battles`, `#game-menu-how-to-play-btn`, `#game-menu-quit-btn`)
 - `static/frameChrome.css`
 - `src/renderer/chrome/gameMenu.ts` (`syncGameMenuNewGameItem`)
+- `src/renderer/gameplay/saveLoadMenu.ts` (`syncSaveLoadItems`)
 - `src/renderer/openRouter/openRouterControls.ts` (New game and Offer tactical battles handlers)
 - `src/renderer/gameplay/newGame.ts` (`openNewGameOverlayFromModelTab`)
 - `src/renderer/gameplay/tacticalBattlePromptPreference.ts`

@@ -7,6 +7,7 @@
  */
 import { rendererSharedState as S } from '../core/state';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
+import { syncSaveLoadItems } from '../gameplay/saveLoadMenu';
 import { dismissStaleControlTooltip } from './controlTooltip';
 import { newGameItemBusyTooltipText, newGameItemOpenTooltipText } from './controlTooltipText';
 
@@ -87,6 +88,7 @@ export function openGameMenu(): void {
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
   syncGameMenuNewGameItem();
+  syncSaveLoadItems();
   menu.hidden = false;
   button.setAttribute('aria-expanded', 'true');
 }

@@ -24,6 +24,11 @@ import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { readSeatHasApiKey } from '../gameDb/seatApiKeyFlags';
+import {
+  OPENROUTER_API_KEY_CONFIG_KEY,
+  OPENROUTER_SELECTED_MODEL_CONFIG_KEY,
+  OPENROUTER_SELECTED_REASONING_EFFORT_CONFIG_KEY,
+} from '../gameDb/machineLocalConfigKeys';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
 import { isEmbarkedLandUnit } from '../gameActions/sealift';
@@ -75,7 +80,7 @@ const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const OPENROUTER_KEY_DB_CONFIG_KEY = 'openrouter_api_key';
+const OPENROUTER_KEY_DB_CONFIG_KEY = OPENROUTER_API_KEY_CONFIG_KEY;
 /**
  * Documents the module-scope binding `OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY` (OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY).
 
@@ -84,7 +89,7 @@ const OPENROUTER_KEY_DB_CONFIG_KEY = 'openrouter_api_key';
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
+const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = OPENROUTER_SELECTED_MODEL_CONFIG_KEY;
 /**
  * `game_config` key holding the player's reasoning-effort override for the selected model.
  *
@@ -93,7 +98,7 @@ const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
  * Expected outcome: Missing row means "use the model default".
  * Exceptions: None.
  */
-const OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY = 'openrouter_selected_reasoning_effort';
+const OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY = OPENROUTER_SELECTED_REASONING_EFFORT_CONFIG_KEY;
 
 /**
  * Defines the `getConfigPath` function shape (function getConfigPath(): string).

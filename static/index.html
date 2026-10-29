@@ -70,14 +70,14 @@
     <div class="battle-header-exit battle-header-only">
       <span id="tactical-exit-host" class="control-tooltip-host" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back."><button type="button" id="tactical-exit-btn" class="battle-exit-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"></path></svg>Exit Battle</button></span>
     </div>
-    <span class="control-tooltip-host new-game-only" data-control-tooltip="Load game is not available in this version."><button type="button" id="topbar-load-btn" class="topbar-text-btn" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
+    <span class="control-tooltip-host new-game-only" data-control-tooltip="Open a saved game from a file."><button type="button" id="topbar-load-btn" class="topbar-text-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
     <span class="control-tooltip-host" data-control-tooltip="Settings is not available in this version."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
     <span class="control-tooltip-host" data-control-tooltip="Help is not available in this version."><button type="button" id="topbar-help-btn" class="topbar-icon-btn" aria-label="Help" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"></circle><path d="M6.3 6.2a1.8 1.8 0 1 1 2.5 1.7c-.5.2-.8.6-.8 1.1v.5M8 11.4v.1"></path></svg></button></span>
   </header>
   <div id="game-menu" class="game-menu" role="group" aria-label="Game menu" hidden>
     <span class="control-tooltip-host game-menu-host" data-control-tooltip="The new-game screen is already open."><button type="button" id="openrouter-new-btn" class="game-menu-item" data-control-tooltip="Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>New game…</button></span>
-    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Saving to a file is not available in this version. The match in progress is kept on disk between sessions."><button type="button" id="game-menu-save-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h8l3 3v8h-11zM5 2.5v3.5h5V2.5M5 13.5V9.5h6v4"></path></svg>Save game…</button></span>
-    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Load game is not available in this version."><button type="button" id="game-menu-load-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Save this match to a file."><button type="button" id="game-menu-save-btn" class="game-menu-item"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h8l3 3v8h-11zM5 2.5v3.5h5V2.5M5 13.5V9.5h6v4"></path></svg>Save game…</button></span>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Open a saved game from a file."><button type="button" id="game-menu-load-btn" class="game-menu-item"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
     <div class="game-menu-separator" aria-hidden="true"></div>
     <label class="game-menu-item game-menu-check" data-control-tooltip="Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore."><input type="checkbox" id="openrouter-tactical-battles" checked />Offer tactical battles</label>
     <span class="control-tooltip-host game-menu-host" data-control-tooltip="How to play is not available in this version."><button type="button" id="game-menu-how-to-play-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3h4.5a1.5 1.5 0 0 1 1.5 1.5V14a1.5 1.5 0 0 0-1.5-1.5H2.5zM13.5 3H9a1.5 1.5 0 0 0-1.5 1.5M13.5 3v9.5H9a1.5 1.5 0 0 0-1.5 1.5"></path></svg>How to play</button></span>
@@ -277,6 +277,22 @@
         <div class="knockout-dialog-actions">
           <button type="button" id="start-confirm-yes">Yes</button>
           <button type="button" id="start-confirm-no">No</button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="load-confirm-dialog"
+      class="start-confirm-dialog game-over-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="load-confirm-title"
+    >
+      <div class="game-over-box">
+        <p id="load-confirm-title">Load a saved game?</p>
+        <p>The match in progress will be replaced. Save it first if you want to keep it.</p>
+        <div class="knockout-dialog-actions">
+          <button type="button" id="load-confirm-yes">Load…</button>
+          <button type="button" id="load-confirm-no">Cancel</button>
         </div>
       </div>
     </div>

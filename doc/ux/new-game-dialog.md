@@ -100,6 +100,7 @@ None.
 - `src/renderer/gameplay/newGameSidesUi.ts`
 - `src/renderer/gameplay/newGameVictoryUi.ts` (`bindNewGameVictory`, `readNewGameVictory`)
 - `src/renderer/gameplay/startConfirmDialog.ts` (`confirmStartWithNoModels`)
+- `src/renderer/chrome/confirmDialog.ts` (`createConfirmDialog`)
 - `static/index.html` (`#start-confirm-dialog`, `#start-confirm-yes`, `#start-confirm-no`)
 - `static/feedbackChrome.css` (the no-models question)
 - `src/shared/commanderSetupCopy.ts` (`prefillFirstAiApiKey`, `copyButtonState`)

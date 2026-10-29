@@ -38,7 +38,7 @@ export function getActiveTacticalBattleSnapshotRef(): TacticalBattleSnapshot | n
  * Replaces the active tactical snapshot reference (or clears it).
  *
  * Purpose: Single mutation entry for tactical session lifecycle so persistence can mirror memory reliably.
- * When to use: From `tacticalBattleSession` start/apply/advance/end and from DB restore after app launch.
+ * When to use: From `tacticalBattleSession` start/apply/advance/end, from DB restore after app launch, and from `releaseTacticalBattleMemory`.
  * Expected outcome: Subsequent reads return `next` (or null after clear).
  * Exceptions: None.
  */

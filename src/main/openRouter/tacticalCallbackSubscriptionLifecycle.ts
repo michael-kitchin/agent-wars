@@ -257,6 +257,19 @@ export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void 
 }
 
 /**
+ * Drops the in-memory opponent-subscription stash.
+ *
+ * Purpose: A loaded match must not keep the previous match's stash. Restore refills it only when the loaded save has a battle.
+ * When to use: From `releaseTacticalBattleMemory`. Tests use `resetTacticalCallbackSubscriptionStashForTests`.
+ * Expected outcome: The stash is null. The database is unchanged.
+ * Exceptions: None.
+ */
+export function clearTacticalCallbackSubscriptionStash(): void {
+  logDebug('tacticalCallbackSubscriptionLifecycle clearTacticalCallbackSubscriptionStash');
+  stashedOpponentSubscriptions = null;
+}
+
+/**
  * Test helper: clears the in-memory stash without touching the database.
  *
  * Purpose: Isolates lifecycle unit tests.
@@ -265,5 +278,5 @@ export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void 
  * Exceptions: None.
  */
 export function resetTacticalCallbackSubscriptionStashForTests(): void {
-  stashedOpponentSubscriptions = null;
+  clearTacticalCallbackSubscriptionStash();
 }

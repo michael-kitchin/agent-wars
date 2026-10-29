@@ -241,6 +241,8 @@ async function runMultiCommanderScenes(ctx) {
     await page.waitForFunction(() => document.getElementById('new-game-observe-only')?.checked === true, null, { timeout: 10000 });
     await addSidesUntil(page, 4);
     await startObservedMatch(page, 120000);
+    await page.click('#console-tab-reports');
+    await page.waitForTimeout(SETTLE_MS.click);
     await openViewAs(page);
     await ctx.recordScene(page, ctx.report, ctx.outDir, SCENES.matchObserve);
   } finally {

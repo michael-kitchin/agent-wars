@@ -6,6 +6,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
+import type { LoadGameResult, SaveGameResult } from '../shared/ipc/saveLoadTypes';
 import type { AiSeatId } from '../shared/seatIds';
 import type { CommanderKeyMemoryView } from '../shared/commanderSetupCopy';
 import type { DoctrineChoice, SeatSnapshot } from '../shared/seatRoster';
@@ -74,6 +75,8 @@ const IPC_GAME = {
   newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',
+  saveGame: 'game:saveGame',
+  loadGame: 'game:loadGame',
   setSeatCommander: 'game:setSeatCommander',
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',
@@ -317,6 +320,24 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    * Exceptions: Rejects when the database write fails.
    */
   endMatch: (): Promise<GameStateSnapshot> => ipcRenderer.invoke(IPC_GAME.endMatch),
+  /**
+   * Saves the match in progress to a file the player chooses.
+   *
+   * Purpose: Save on the game menu opens the system Save dialog in the main process.
+   * When to use: When the player chooses Save.
+   * Expected outcome: `saved` with the file's base name, `canceled`, or `failed` with one sentence.
+   * Exceptions: None. A write failure is `failed`.
+   */
+  saveGame: (): Promise<SaveGameResult> => ipcRenderer.invoke(IPC_GAME.saveGame),
+  /**
+   * Loads a saved match in place of the one in progress.
+   *
+   * Purpose: Load on the game menu and the new-game screen opens the system Open dialog in the main process.
+   * When to use: When the player chooses Load, after confirming when a match is in progress.
+   * Expected outcome: `loaded` with the file's base name, `canceled`, or `failed` with one sentence.
+   * Exceptions: None. A failure that cannot reopen the previous match returns that sentence.
+   */
+  loadGame: (): Promise<LoadGameResult> => ipcRenderer.invoke(IPC_GAME.loadGame),
   /**
    * Starts commander planning for every eligible AI seat, or for the active battle.
    *

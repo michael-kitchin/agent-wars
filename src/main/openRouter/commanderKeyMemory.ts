@@ -13,27 +13,8 @@ import { AI_SEAT_IDS, aiSeatIdForIndex } from '../../shared/seatIds';
 import { AI_SEAT_KIND, DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
 import { logDebug, logError, logTrace } from '../logger';
 import { readSeatApiKeyFlagMap, SEAT_API_KEY_FLAGS_CONFIG_KEY, writeSeatApiKeyFlags } from '../gameDb/seatApiKeyFlags';
+import { COMMANDER_MEMORY_CONFIG_KEY, SEAT_API_KEYS_CONFIG_KEY } from '../gameDb/machineLocalConfigKeys';
 import { readSecretString, readStoredSecret, writeSecretString } from './secretConfig';
-
-/**
- * `game_config` key for the remembered commander array.
- *
- * Purpose: The snapshot has one encrypted row.
- * When to use: Reading and writing the remembered match.
- * Expected outcome: The string `openrouter_commander_memory`.
- * Exceptions: None.
- */
-const COMMANDER_MEMORY_CONFIG_KEY = 'openrouter_commander_memory';
-
-/**
- * `game_config` key for the encrypted seat-key map.
- *
- * Purpose: The seat secrets have one encrypted row, separate from the boolean flags.
- * When to use: Reading and writing seat keys.
- * Expected outcome: The string `openrouter_seat_api_keys`.
- * Exceptions: None.
- */
-const SEAT_API_KEYS_CONFIG_KEY = 'openrouter_seat_api_keys';
 
 /**
  * A remembered commander with no model and no key.

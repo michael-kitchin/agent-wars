@@ -18,6 +18,7 @@ import type {
 import type { GameStateSnapshot } from './gameStateTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
+import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
 import type { AiSeatId } from '../seatIds';
 import type { DoctrineChoice, SeatSnapshot } from '../seatRoster';
 import type { GameMapListEntry } from '../gameMapList';
@@ -247,6 +248,24 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    * Exceptions: Rejects when the database write fails.
    */
   endMatch: () => Promise<GameStateSnapshot>;
+  /**
+   * Saves the match in progress to a file the player chooses.
+   *
+   * Contract: The main process shows the Save dialog. A cancel returns `canceled`. A match that cannot be saved returns `failed` without a dialog.
+   * When to use: The game menu's Save item.
+   * Expected outcome: `saved` with the file's base name, `canceled`, or `failed` with one sentence.
+   * Exceptions: None. A write failure is `failed`.
+   */
+  saveGame: () => Promise<SaveGameResult>;
+  /**
+   * Loads a saved match in place of the one in progress.
+   *
+   * Contract: The main process shows the Open dialog. The caller confirms first when a match is in progress. A cancel returns `canceled`.
+   * When to use: The game menu's Load item and the new-game screen's Load button.
+   * Expected outcome: `loaded` with the file's base name, `canceled`, or `failed` with one sentence. The previous match stays open when the load fails and can be restored.
+   * Exceptions: None. A failure that cannot reopen the previous match returns that sentence.
+   */
+  loadGame: () => Promise<LoadGameResult>;
   /**
    * Starts commander planning for every eligible AI seat, or for the active battle.
    *

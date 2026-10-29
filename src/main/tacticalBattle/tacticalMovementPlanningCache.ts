@@ -146,15 +146,15 @@ function resolveTerrainIdentity(
 }
 
 /**
- * Clears module-level tactical march memo state so tests and dev reloads do not leak across scenarios.
+ * Clears the in-memory tactical march memo.
  *
- * Purpose: `planTacticalMarchWithSessionCache` keeps process-global terrain + memo; tests need a clean slate.
- * When to use: Start of tactical cache unit tests and any harness that swaps synthetic battles under duplicate ids.
- * Expected outcome: Next planning call rebuilds terrain from the passed snapshot.
+ * Purpose: Battle ids can repeat between saves of the same match, so a loaded battle must not reuse the previous battle's memo.
+ * When to use: From `releaseTacticalBattleMemory`. Tests call `resetTacticalMovementPlanningCacheForTests`.
+ * Expected outcome: The next planning call rebuilds terrain from the snapshot it is given.
  * Exceptions: None.
  */
-export function resetTacticalMovementPlanningCacheForTests(): void {
-  tacticalLogMutate('resetTacticalMovementPlanningCacheForTests');
+export function clearTacticalMovementPlanningCache(): void {
+  logDebug('tacticalMovementPlanningCache clearTacticalMovementPlanningCache');
   cachedTerrainKey = '';
   cachedTerrainContext = '';
   cachedTerrainSignature = '';
@@ -164,6 +164,19 @@ export function resetTacticalMovementPlanningCacheForTests(): void {
   cachedFootprintNeighbors = null;
   cachedFullFootprintSize = 0;
   planMemo.clear();
+}
+
+/**
+ * Clears module-level tactical march memo state so tests and dev reloads do not leak across scenarios.
+ *
+ * Purpose: `planTacticalMarchWithSessionCache` keeps process-global terrain + memo; tests need a clean slate.
+ * When to use: Start of tactical cache unit tests and any harness that swaps synthetic battles under duplicate ids.
+ * Expected outcome: Next planning call rebuilds terrain from the passed snapshot.
+ * Exceptions: None.
+ */
+export function resetTacticalMovementPlanningCacheForTests(): void {
+  tacticalLogMutate('resetTacticalMovementPlanningCacheForTests');
+  clearTacticalMovementPlanningCache();
 }
 
 /**

@@ -9,16 +9,17 @@
 
 import { logDebug, logError, logTrace } from '../logger';
 import { getOne, run } from './dbConnection';
+import { SEAT_API_KEY_FLAGS_CONFIG_KEY } from './machineLocalConfigKeys';
 
 /**
  * `game_config` key for the seat-key flags.
  *
- * Purpose: The flag row has one name, shared with the writer that stores the encrypted keys.
- * When to use: Reading and writing this row.
- * Expected outcome: The string `openrouter_seat_api_key_flags`.
+ * Purpose: Existing callers import the name from this module. The value lives with the other machine-local keys.
+ * When to use: Reading and writing this row, and any import that already uses this module.
+ * Expected outcome: The same string `machineLocalConfigKeys` exports.
  * Exceptions: None.
  */
-export const SEAT_API_KEY_FLAGS_CONFIG_KEY = 'openrouter_seat_api_key_flags';
+export { SEAT_API_KEY_FLAGS_CONFIG_KEY };
 
 /**
  * Reads the stored flag object.

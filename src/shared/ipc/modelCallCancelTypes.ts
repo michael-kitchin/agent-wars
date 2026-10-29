@@ -11,6 +11,7 @@ export const MODEL_CALL_CANCEL_REASONS = [
   'run_off',
   'model_changed',
   'new_game',
+  'load_game',
   'battle_exit',
   'teardown',
 ] as const;
@@ -58,6 +59,8 @@ export function modelCallCancelLogLine(reason: ModelCallCancelReason): string {
       return 'Opponent planning stopped: the model changed.';
     case 'new_game':
       return 'Opponent planning stopped for a new game.';
+    case 'load_game':
+      return 'Opponent planning stopped to load a saved game.';
     case 'battle_exit':
       return 'Opponent planning stopped: you left the battle.';
     case 'teardown':

@@ -21,6 +21,8 @@ export const IPC_GAME = {
   newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',
+  saveGame: 'game:saveGame',
+  loadGame: 'game:loadGame',
   setSeatCommander: 'game:setSeatCommander',
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',

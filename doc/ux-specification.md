@@ -35,6 +35,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
 | The top bar, its readouts, its date block, or the battle header | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
 | The game menu, New game, or Offer tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md) | [game-menu.md](ux/game-menu.md) |
+| Save game or Load game | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md), [control-tooltips.md](ux/control-tooltips.md) | [save-and-load.md](ux/save-and-load.md) |
 | The console as a whole, its tabs, its footer status line, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [console.md](ux/console.md) |
 | Ready or the reticle | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [console-command-bar.md](ux/console-command-bar.md) |
 | Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [orders-tab.md](ux/orders-tab.md) |
@@ -85,7 +86,8 @@ Element documents share a fixed heading set:
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block, and the battle header it becomes in a battle.
-- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Offer tactical battles, Quit, and the disabled placeholders.
+- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Offer tactical battles, How to play, and Quit.
+- [save-and-load.md](ux/save-and-load.md): Save game and Load game, the confirm before a load replaces a live match, and the automatic saves.
 - [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
 - [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle and the air-strike target list in the selection panel.
 - [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.

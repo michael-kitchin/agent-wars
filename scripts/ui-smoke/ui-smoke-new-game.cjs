@@ -25,6 +25,8 @@ const SCENARIO = Object.freeze({
   aiRegion: 'Northern Africa',
   startMonth: '9',
   gameSize: 'small',
+  victoryRule: 'most_city_hexes_at_turn_limit',
+  turnLimit: '30',
 });
 
 /**
@@ -61,6 +63,25 @@ async function waitForNewGameOverlay(page) {
 }
 
 /**
+ * Answers Yes when Start asks because no opponent has a model.
+ *
+ * Purpose: The smoke profile has no saved model, and Start waits for that answer before the match begins.
+ * When to use: Immediately after clicking Start.
+ * Expected outcome: Yes is clicked when the dialog is open. A start that does not ask is left alone.
+ * Exceptions: None. A dialog that never opens is not an error.
+ */
+async function acceptStartWithoutModels(page) {
+  const opened = await page
+    .waitForFunction(() => {
+      const dialog = document.getElementById('start-confirm-dialog');
+      return dialog !== null && !dialog.classList.contains('hidden');
+    }, null, { timeout: 2000 })
+    .then(() => true)
+    .catch(() => false);
+  if (opened) await page.click('#start-confirm-yes');
+}
+
+/**
  * Clicks Start and waits until the overlay has closed.
  *
  * Purpose: One click for both matches. The button is the same element in the footer and in the collapsed header.
@@ -72,6 +93,7 @@ async function waitForNewGameOverlay(page) {
  */
 async function clickStartGame(page, timeoutMs) {
   await page.click('#new-game-btn');
+  await acceptStartWithoutModels(page);
   await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: timeoutMs });
   await page.waitForTimeout(SETTLE_MS.start);
   await page.click('#console-tab-orders');
@@ -83,7 +105,7 @@ async function clickStartGame(page, timeoutMs) {
  *
  * Purpose: Every run must show the same match so checks can compare known values.
  * When to use: Once, while the startup overlay is open.
- * Expected outcome: The overlay closes with Southern Europe against Northern Africa, a small game, starting in September.
+ * Expected outcome: The overlay closes with Southern Europe against Northern Africa, a small game, starting in September, most city hexes at turn 30.
  * Exceptions: Throws when a choice does not hold or the match does not start within 60 seconds.
  */
 async function startScenarioMatch(page) {
@@ -98,14 +120,19 @@ async function startScenarioMatch(page) {
   await setSideHome(page, 'Opponent 1', SCENARIO.aiRegion);
   await page.selectOption('#new-game-start-month', SCENARIO.startMonth);
   await page.selectOption('#new-game-size-select', SCENARIO.gameSize);
+  await page.selectOption('#new-game-victory-select', SCENARIO.victoryRule);
+  await page.selectOption('#new-game-turn-limit-select', SCENARIO.turnLimit);
   await page.waitForTimeout(SETTLE_MS.click);
   const chosen = await page.evaluate(() => ({
     human: document.querySelector('select[aria-label="You home"]').value,
     ai: document.querySelector('select[aria-label="Opponent 1 home"]').value,
     month: document.getElementById('new-game-start-month').value,
     size: document.getElementById('new-game-size-select').value,
+    victory: document.getElementById('new-game-victory-select').value,
+    turnLimit: document.getElementById('new-game-turn-limit-select').value,
   }));
   if (chosen.month !== SCENARIO.startMonth || chosen.size !== SCENARIO.gameSize
+    || chosen.victory !== SCENARIO.victoryRule || chosen.turnLimit !== SCENARIO.turnLimit
     || !chosen.human.includes(SCENARIO.humanRegion) || !chosen.ai.includes(SCENARIO.aiRegion)) {
     throw new Error(`scenario choices did not hold: ${JSON.stringify(chosen)}`);
   }
@@ -208,6 +235,7 @@ async function setSideHome(page, label, value) {
  */
 async function startObservedMatch(page, timeoutMs) {
   await page.click('#new-game-btn');
+  await acceptStartWithoutModels(page);
   await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: timeoutMs });
   await page.waitForFunction(() => {
     const sides = document.getElementById('topbar-sides');

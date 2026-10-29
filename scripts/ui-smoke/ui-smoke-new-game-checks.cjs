@@ -112,7 +112,7 @@ const TWO_SIDE_PANEL_SCENES = Object.freeze(PANEL_SCENES.filter((scene) => scene
 /**
  * The top bar's parts that the new-game screen shows, and the parts it hides.
  *
- * Purpose: The new-game bar is the menu button, the title, Load game…, Settings, and Help; the match status and the
+ * Purpose: The new-game bar is the menu button, the title, Load game… (enabled), Settings, and Help; the match status and the
  *   battle header stay hidden, even when the overlay was opened from a battle.
  * When to use: The new-game top bar check.
  * Expected outcome: Selectors only.
@@ -490,7 +490,7 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (extra.length > 0) return `shown on the new-game bar: ${extra.join(', ')}`;
       const title = el('#topbar-new-game-title').text;
       if (title !== 'New game') return `the title reads "${title}", expected "New game"`;
-      return el('#topbar-load-btn').disabled ? null : 'Load game… is enabled';
+      return el('#topbar-load-btn').disabled ? 'Load game… is disabled' : null;
     },
   },
   {

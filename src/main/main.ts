@@ -62,6 +62,7 @@ import { registerBuildQueueSealiftIpcHandler } from './ipc/buildQueueSealiftIpcH
 import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
+import { forgetAutoSaveTurnKey, rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
 import { resetCommanderPool } from './openRouter/commanderPool';
 import { readSeatApiKey, storeNewMatchCommanderKeys, updateRememberedCommander, writeSeatApiKey } from './openRouter/commanderKeyMemory';
 import {
@@ -267,6 +268,9 @@ function buildSharedHumanReadyConsultationDeps(
  * Exceptions: A handler may throw when its action throws. Registration itself does not throw.
  */
 function registerIpcHandlers(): void {
+  const sendActivityLog = (line: string): void => {
+    mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
+  };
   ipcMain.handle(IPC_GAME.getState, (_event, viewAs: unknown) => readMatchSnapshot(viewAs));
   ipcMain.handle(IPC_GAME.getTacticalTerrainOverrides, () => getTacticalTerrainOverridesForRendererFromGame());
   registerLoggedIpcHandler(
@@ -317,10 +321,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.newGameMapPreview, (_event, request: NewGameMapPreviewRequest) =>
     buildNewGameMapPreview(request)
   );
-  ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
-    stopModelWork('new_game', (line) => {
-      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
-    });
+  ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => withAutoSaveAfter(() => {
+    stopModelWork('new_game', sendActivityLog);
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
     const originBonusLevel = parseBonusLevel(payload?.originBonusLevel, 'off');
@@ -354,6 +356,7 @@ function registerIpcHandlers(): void {
       turnLimit: payload?.turnLimit,
       victoryRule: payload?.victoryRule,
     });
+    forgetAutoSaveTurnKey();
     storeNewMatchCommanderKeys(payload?.seats, loadKey());
     if (!payload?.seats) applyAppWideCommanderToLegacySeat();
     resetCommanderPool(getSeatRoster());
@@ -361,7 +364,7 @@ function registerIpcHandlers(): void {
     clearStrategicPreviousHexMemory();
     endTacticalBattleSession();
     return readMatchSnapshot(undefined);
-  });
+  }));
   ipcMain.handle(IPC_GAME.setSeatCommander, (_event, seatId: unknown, commander: unknown) => {
     if (typeof seatId !== 'string' || !isSeatId(seatId) || !isAiSeatId(seatId)) {
       throw new Error(`Cannot update a commander for ${String(seatId)}`);
@@ -447,7 +450,7 @@ function registerIpcHandlers(): void {
       return assignHumanMarchOrders(parsed.unitIds, parsed.destinationH3Index);
     }
   );
-  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, async (_event, payload: unknown) => {
+  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, async (_event, payload: unknown) => withAutoSaveAfter(async () => {
     if (hasDeferredPlaybackConsultPending()) {
       return { success: false, reason: 'Resolution playback consultation is still in progress.' };
     }
@@ -491,7 +494,7 @@ function registerIpcHandlers(): void {
       battleId,
     });
     return { ...result, tacticalPostBeatConsultDeferred: true };
-  });
+  }));
   ipcMain.handle(
     IPC_GAME.validateGroupRangedTarget,
     (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
@@ -527,28 +530,26 @@ function registerIpcHandlers(): void {
     return cancelHumanOrder(payload.unitId);
   });
   registerBuildQueueSealiftIpcHandler(ipcMain);
-  ipcMain.handle(IPC_GAME.startTacticalBattle, (_event, payload: { enclosingStrategicH3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.startTacticalBattle, (_event, payload: { enclosingStrategicH3Index?: string }) => withAutoSaveAfter(() => {
     if (typeof payload?.enclosingStrategicH3Index !== 'string') {
       return { success: false, reason: 'Invalid tactical start payload.' };
     }
     return startTacticalBattleForEnclosingHex(payload.enclosingStrategicH3Index);
-  });
-  ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
-    stopModelWork('battle_exit', (line) => {
-      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
-    });
+  }));
+  ipcMain.handle(IPC_GAME.endTacticalBattle, () => withAutoSaveAfter(() => {
+    stopModelWork('battle_exit', sendActivityLog);
     clearDeferredPlaybackConsultPending();
     endTacticalBattleSessionForHumanVoluntaryExitBailout();
     return { success: true as const };
-  });
+  }));
   const sharedReadyConsultationDeps = buildSharedHumanReadyConsultationDeps(requestOrdersWithLog);
   ipcMain.handle(IPC_GAME.ready, async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {
-    return handleGameReady(payload, { ...sharedReadyConsultationDeps, ready });
+    return withAutoSaveAfter(() => runWithReadyInFlight(() => handleGameReady(payload, { ...sharedReadyConsultationDeps, ready })));
   });
   ipcMain.handle(
     IPC_GAME.resolveMeleeIntercept,
     async (_event, payload?: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> => {
-      return handleResolveMeleeIntercept(payload, { ...sharedReadyConsultationDeps, resolveMeleeIntercept });
+      return withAutoSaveAfter(() => runWithReadyInFlight(() => handleResolveMeleeIntercept(payload, { ...sharedReadyConsultationDeps, resolveMeleeIntercept })));
     }
   );
   ipcMain.handle(IPC_GAME.notifyResolutionPlaybackComplete, async (event, payload: unknown) => {
@@ -559,14 +560,13 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.cancelRequestAiOrders, (_event, payload?: { reason?: string }) => {
     const reason = parseModelCallCancelReason(payload?.reason);
     logDebug('main game:cancelRequestAiOrders', { reason });
-    stopModelWork(reason, (line) => {
-      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
-    });
+    stopModelWork(reason, sendActivityLog);
   });
 
   registerOpenRouterIpcHandler(ipcMain);
   registerCommanderPoolIpcHandler(ipcMain);
   registerEndMatchIpcHandler(ipcMain);
+  registerSaveLoadIpcHandler(ipcMain, () => mainWindow, sendActivityLog);
 }
 
 applyVersionedAppName();
@@ -582,6 +582,7 @@ process.on('unhandledRejection', (reason) => {
 app.whenReady().then(async () => {
   await initDatabase();
   restorePersistedTacticalBattleSession();
+  rememberCurrentAutoSaveTurnKey();
   registerIpcHandlers();
   createWindow();
   app.on('child-process-gone', (_event, details) => {

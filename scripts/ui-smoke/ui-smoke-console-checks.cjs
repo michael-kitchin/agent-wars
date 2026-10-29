@@ -128,13 +128,12 @@ const MAP_OVERLAY_INSET = 12;
 /**
  * Distance from the map's bottom edge to the map toast's bottom edge, in CSS pixels.
  *
- * Purpose: The update toast sits above the zoom buttons.
+ * Purpose: The update toast covers the zoom buttons at the map's lower-right corner.
  * When to use: The message-band and update-toast check, for the update toast's lower-right anchor.
- * Expected outcome: Matches `bottom` on `#map-toast` in `static/feedbackChrome.css`: 12 px inset, plus the 63 px zoom
- *   stack, plus an 8 px gap.
+ * Expected outcome: Matches `bottom` on `#map-toast` in `static/feedbackChrome.css`.
  * Exceptions: None.
  */
-const MAP_TOAST_BOTTOM = 83;
+const MAP_TOAST_BOTTOM = 12;
 
 /**
  * Checks that the selection panel is anchored at the map's bottom-left at the given size.

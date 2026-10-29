@@ -29034,6 +29034,170 @@ ${bonuses}`;
     renderTopBarSides(rendererSharedState.gameState);
   });
 
+  // src/shared/saveLoadAvailability.ts
+  var SAVE_NOTHING_TO_SAVE_MESSAGE = "There is no match to save.";
+  var SAVE_GAME_OVER_MESSAGE = "The match is over, so there is nothing to save.";
+  var SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE = "Close the new-game screen to save the match under it.";
+  var SAVE_RESOLVING_MESSAGE = "Save game is available again once this turn or beat finishes resolving.";
+  var SAVE_MATCH_TOOLTIP = "Save this match to a file.";
+  var LOAD_RESOLVING_MESSAGE = "Load game is available again once this turn or beat finishes resolving.";
+  var LOAD_REPLACES_MATCH_TOOLTIP = "Open a saved game from a file. The match in progress is replaced.";
+  var LOAD_FILE_TOOLTIP = "Open a saved game from a file.";
+  function saveGameItemState(state) {
+    if (state.gameOver) return { disabled: true, tooltip: SAVE_GAME_OVER_MESSAGE };
+    if (!state.matchLoaded) return { disabled: true, tooltip: SAVE_NOTHING_TO_SAVE_MESSAGE };
+    if (state.newGameScreenOpen) return { disabled: true, tooltip: SAVE_CLOSE_NEW_GAME_SCREEN_MESSAGE };
+    if (state.readyInFlight) return { disabled: true, tooltip: SAVE_RESOLVING_MESSAGE };
+    return { disabled: false, tooltip: SAVE_MATCH_TOOLTIP };
+  }
+  function loadGameItemState(state) {
+    if (state.readyInFlight) return { disabled: true, tooltip: LOAD_RESOLVING_MESSAGE };
+    if (state.matchLoaded && !state.gameOver) return { disabled: false, tooltip: LOAD_REPLACES_MATCH_TOOLTIP };
+    return { disabled: false, tooltip: LOAD_FILE_TOOLTIP };
+  }
+  function loadNeedsConfirm(state) {
+    return state.matchLoaded && !state.gameOver;
+  }
+
+  // src/renderer/chrome/confirmDialog.ts
+  function createConfirmDialog(ids) {
+    let pendingAnswer = null;
+    let buttonsBound = false;
+    function finish(answer) {
+      document.getElementById(ids.dialogId)?.classList.add("hidden");
+      const resolve = pendingAnswer;
+      pendingAnswer = null;
+      resolve?.(answer);
+    }
+    function bind2(dialog) {
+      if (buttonsBound) return;
+      buttonsBound = true;
+      document.getElementById(ids.confirmId)?.addEventListener("click", () => {
+        finish(true);
+      });
+      document.getElementById(ids.cancelId)?.addEventListener("click", () => {
+        finish(false);
+      });
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) finish(false);
+      });
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key !== "Escape") return;
+          if (dialog.classList.contains("hidden")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          finish(false);
+        },
+        true
+      );
+    }
+    return function ask() {
+      const dialog = document.getElementById(ids.dialogId);
+      if (!(dialog instanceof HTMLElement)) {
+        console.error(`${ids.dialogId} is missing`);
+        return Promise.resolve(false);
+      }
+      if (pendingAnswer) {
+        const previous = pendingAnswer;
+        pendingAnswer = null;
+        previous(false);
+      }
+      bind2(dialog);
+      dialog.classList.remove("hidden");
+      const focusId = ids.initialFocus === "confirm" ? ids.confirmId : ids.cancelId;
+      const focusTarget = document.getElementById(focusId);
+      if (focusTarget instanceof HTMLElement) focusTarget.focus();
+      return new Promise((resolve) => {
+        pendingAnswer = resolve;
+      });
+    };
+  }
+
+  // src/renderer/gameplay/loadConfirmDialog.ts
+  var confirmLoadOverMatch = createConfirmDialog({
+    dialogId: "load-confirm-dialog",
+    confirmId: "load-confirm-yes",
+    cancelId: "load-confirm-no",
+    initialFocus: "cancel"
+  });
+
+  // src/renderer/gameplay/saveLoadMenu.ts
+  var LOADED_SAVE_FILE_NAME_KEY = "agentWarsLoadedSaveFileName";
+  var SAVE_BUTTON_ID = "game-menu-save-btn";
+  var LOAD_BUTTON_IDS = ["game-menu-load-btn", "topbar-load-btn"];
+  function readSaveLoadUiState() {
+    const hexes = rendererSharedState.gameState?.hexes.length ?? 0;
+    return {
+      matchLoaded: hexes > 0,
+      gameOver: rendererSharedState.gameState?.gameOver === true,
+      readyInFlight: rendererSharedState.readyRequestInFlight,
+      newGameScreenOpen: newGameOverlayIsOpen()
+    };
+  }
+  function syncSaveLoadItems() {
+    const state = readSaveLoadUiState();
+    applyItem(SAVE_BUTTON_ID, saveGameItemState(state));
+    const load = loadGameItemState(state);
+    for (const id of LOAD_BUTTON_IDS) applyItem(id, load);
+  }
+  function wireSaveLoadMenu() {
+    syncSaveLoadItems();
+    document.getElementById(SAVE_BUTTON_ID)?.addEventListener("click", () => {
+      void onSaveClick();
+    });
+    for (const id of LOAD_BUTTON_IDS) {
+      document.getElementById(id)?.addEventListener("click", () => {
+        void onLoadClick();
+      });
+    }
+  }
+  function showLoadedSaveToastAfterReload() {
+    let fileName = null;
+    try {
+      fileName = sessionStorage.getItem(LOADED_SAVE_FILE_NAME_KEY);
+      if (fileName) sessionStorage.removeItem(LOADED_SAVE_FILE_NAME_KEY);
+    } catch (err) {
+      console.error("could not read the loaded save name", err);
+      return;
+    }
+    if (fileName) showMapToast(`Loaded ${fileName}.`);
+  }
+  function applyItem(id, item) {
+    const button = document.getElementById(id);
+    if (!(button instanceof HTMLButtonElement)) return;
+    button.disabled = item.disabled;
+    button.parentElement?.setAttribute("data-control-tooltip", item.tooltip);
+  }
+  async function onSaveClick() {
+    if (saveGameItemState(readSaveLoadUiState()).disabled) return;
+    const result = await window.gameApi?.saveGame();
+    if (!result || result.status === "canceled") return;
+    if (result.status === "saved") showMapToast(`Saved ${result.fileName}.`);
+    else showMapToast(result.message);
+  }
+  async function onLoadClick() {
+    const state = readSaveLoadUiState();
+    if (loadGameItemState(state).disabled) return;
+    if (loadNeedsConfirm(state)) {
+      const confirmed = await confirmLoadOverMatch();
+      if (!confirmed) return;
+    }
+    const result = await window.gameApi?.loadGame();
+    if (!result || result.status === "canceled") return;
+    if (result.status === "failed") {
+      showMapToast(result.message);
+      return;
+    }
+    try {
+      sessionStorage.setItem(LOADED_SAVE_FILE_NAME_KEY, result.fileName);
+    } catch (err) {
+      console.error("could not store the loaded save name", err);
+    }
+    window.location.reload();
+  }
+
   // src/renderer/chrome/gameMenu.ts
   var GAME_MENU_ID = "game-menu";
   var GAME_MENU_BUTTON_ID = "game-menu-btn";
@@ -29054,6 +29218,7 @@ ${bonuses}`;
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
     syncGameMenuNewGameItem();
+    syncSaveLoadItems();
     menu.hidden = false;
     button.setAttribute("aria-expanded", "true");
   }
@@ -29767,7 +29932,7 @@ ${bonuses}`;
     if (container) {
       for (const child of container.children) {
         const id = child.id;
-        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog" || id === "start-confirm-dialog") continue;
+        if (id === "tactical-annihilation-overlay" || id === "knockout-dialog" || id === "start-confirm-dialog" || id === "load-confirm-dialog") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
@@ -29784,6 +29949,7 @@ ${bonuses}`;
     }
     if (!topBarEnabled) closeGameMenu();
     syncGameMenuNewGameItem();
+    syncSaveLoadItems();
     syncNewGameDialogMapPointer();
   }
   function updateGameOverUI(state, updateReadyButtonState2) {
@@ -33727,57 +33893,12 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/startConfirmDialog.ts
-  var pendingAnswer = null;
-  var buttonsBound = false;
-  function confirmStartWithNoModels() {
-    const dialog = document.getElementById("start-confirm-dialog");
-    if (!(dialog instanceof HTMLElement)) {
-      console.error("start confirm dialog is missing");
-      return Promise.resolve(false);
-    }
-    if (pendingAnswer) {
-      const previous = pendingAnswer;
-      pendingAnswer = null;
-      previous(false);
-    }
-    bindStartConfirmDialog(dialog);
-    dialog.classList.remove("hidden");
-    const yes = document.getElementById("start-confirm-yes");
-    if (yes instanceof HTMLElement) yes.focus();
-    return new Promise((resolve) => {
-      pendingAnswer = resolve;
-    });
-  }
-  function bindStartConfirmDialog(dialog) {
-    if (buttonsBound) return;
-    buttonsBound = true;
-    document.getElementById("start-confirm-yes")?.addEventListener("click", () => {
-      finishStartConfirm(true);
-    });
-    document.getElementById("start-confirm-no")?.addEventListener("click", () => {
-      finishStartConfirm(false);
-    });
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) finishStartConfirm(false);
-    });
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key !== "Escape") return;
-        if (dialog.classList.contains("hidden")) return;
-        event.preventDefault();
-        event.stopPropagation();
-        finishStartConfirm(false);
-      },
-      true
-    );
-  }
-  function finishStartConfirm(answer) {
-    document.getElementById("start-confirm-dialog")?.classList.add("hidden");
-    const resolve = pendingAnswer;
-    pendingAnswer = null;
-    resolve?.(answer);
-  }
+  var confirmStartWithNoModels = createConfirmDialog({
+    dialogId: "start-confirm-dialog",
+    confirmId: "start-confirm-yes",
+    cancelId: "start-confirm-no",
+    initialFocus: "confirm"
+  });
 
   // src/renderer/gameplay/observeIntent.ts
   var watchTheRest = false;
@@ -39820,6 +39941,7 @@ ${bonuses}`;
     });
     wireSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName2 });
     wireGameMenu();
+    wireSaveLoadMenu();
     wireInitCore({
       requestRedraw: requestRedraw2,
       resizeAndRedraw,
@@ -39910,6 +40032,7 @@ ${bonuses}`;
         await handleReadyButtonClick(createReadyHandlerDeps());
       });
     }
+    showLoadedSaveToastAfterReload();
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

@@ -88,6 +88,24 @@ export default class Database {
      */
 constructor(filename: string, options?: { readonly?: boolean; fileMustExist?: boolean });
         /**
+     * The path passed to the constructor.
+     *
+     * Purpose: Tests copy the open match file without a second path argument.
+     * When to use: After the database is open.
+     * Expected outcome: The file path, or `:memory:` for an in-memory database.
+     * Exceptions: None.
+     */
+readonly name: string;
+        /**
+     * True while this connection has an open transaction.
+     *
+     * Purpose: A save cannot checkpoint the database from inside a transaction.
+     * When to use: Before `VACUUM INTO`.
+     * Expected outcome: True between `BEGIN` and `COMMIT` or `ROLLBACK`.
+     * Exceptions: None.
+     */
+readonly inTransaction: boolean;
+        /**
      * Implements behavior for `pragma` (pragma(source: string, options?:).
 
      * Purpose: Supports maintainability by documenting why `pragma` exists.

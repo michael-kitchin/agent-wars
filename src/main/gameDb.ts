@@ -123,9 +123,9 @@ export {
 /**
  * SQLite `user_version` that the current schema DDL produces.
  *
- * Purpose: Detects match databases created by an older schema.
- * When to use: Bump whenever `getFullDdl` changes; fresh databases are stamped with it.
- * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created.
+ * Purpose: Detects match databases created by an older schema. Bumping it also makes every saved game from an earlier version unloadable. Changing the shape of any JSON a save carries in `game_config`, without bumping this number, does the same, because an older or newer app would misread it.
+ * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape. See `doc/save-files.md`.
+ * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
 export const EXPECTED_USER_VERSION = 23;
@@ -168,12 +168,14 @@ export function validateGameDatabaseOrThrow(database: InstanceType<typeof Databa
  * Defines the `getCanonicalDbPath` function shape (function getCanonicalDbPath(): string).
 
  * Purpose: Delegates canonical DB location to `resolveGameDbFileUnderUserData` for reuse across modules.
- * When to use: Internal `gameDb` helpers that open, seed, or recover the primary SQLite file.
- * Expected outcome: Same path as previously returned for `GAME_DB_FILE_NAME`.
+ * When to use: Opening, saving, loading, or recovering the primary SQLite file.
+ * Expected outcome: The path of `GAME_DB_FILE_NAME` under the versioned app data directory.
  * Exceptions: None.
  */
-function getCanonicalDbPath(): string {
-  return resolveGameDbFileUnderUserData(GAME_DB_FILE_NAME);
+export function getCanonicalDbPath(): string {
+  const canonicalPath = resolveGameDbFileUnderUserData(GAME_DB_FILE_NAME);
+  logTrace('gameDb getCanonicalDbPath', { canonicalPath });
+  return canonicalPath;
 }
 
 /**
@@ -396,40 +398,12 @@ export async function initDatabase(): Promise<void> {
     return;
   }
 
-  let d: InstanceType<typeof Database> | null = null;
   let openedExisting = false;
   try {
-    d = new Database(canonicalPath);
-    applyGameDbPragmas(d);
-    validateGameDatabaseOrThrow(d);
-    setDbHandle(d);
-    d = null;
-    runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
-    ensureTurnStateRow();
-    repairStrandedStrategicResolutionPhaseOnDbBootstrap();
-    seedGameSeedIfMissing();
-    let mapLoaded = false;
-    try {
-      mapLoaded = loadStoredGameMap();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setGameMapLoadError(message);
-      logError('gameDb initDatabase: map load failed', err);
-    }
-    if (mapLoaded) {
-      backfillInfrastructureStateFromMetadataIfMissing();
-      reconcileStrategicInfrastructureCountsFromTacticalOverrides();
-    }
+    openExistingGameDatabaseAt(canonicalPath);
     openedExisting = true;
     logDebug('gameDb initDatabase: opened existing', { canonicalPath });
   } catch (err) {
-    if (d) {
-      try {
-        d.close();
-      } catch (closeErr) {
-        logError('gameDb initDatabase: failed to close temp handle after validation error', closeErr);
-      }
-    }
     logError('gameDb initDatabase: validation/open failed', err);
     if (notifyBetterSqliteNativeLoadFailureAndExitIfApplicable(err)) return;
     recoverCorruptDatabaseUiWithFs(canonicalPath, err, {
@@ -446,8 +420,79 @@ export async function initDatabase(): Promise<void> {
       setGameMapLoadError(message);
       logError('gameDb initDatabase: map load failed', err);
     }
+    refreshFogOfWarIntelFromCurrentState();
   }
-  refreshFogOfWarIntelFromCurrentState();
+}
+
+/**
+ * The map outcome of opening an existing match database.
+ *
+ * Purpose: A map failure leaves the database open and tells the caller why.
+ * When to use: The return value of `openExistingGameDatabaseAt`.
+ * Expected outcome: `mapLoadError` is null when the map loaded or there was no match to load.
+ * Exceptions: None.
+ */
+export interface OpenExistingGameDatabaseResult {
+  /**
+   * The map-load failure, when the file opened but its map did not.
+   *
+   * Contract: Null when the map loaded or the file has no match to load.
+   * When to use: After `openExistingGameDatabaseAt` returns.
+   * Expected outcome: A player-facing sentence, or null.
+   * Exceptions: None.
+   */
+  readonly mapLoadError: string | null;
+}
+
+/**
+ * Opens a match database that is already on disk.
+ *
+ * Purpose: Launch and loading a save share the steps that attach an existing file.
+ * When to use: When `canonicalPath` exists. A missing file is created by `initDatabase` instead.
+ * Expected outcome: The process handle is that file. The stored map is loaded when the file has a match. Fog is refreshed. A fog failure is logged and does not fail the open. `mapLoadError` is the map failure message, or null.
+ * Exceptions: Throws when the file cannot be opened or fails validation, after closing the temporary handle. Does not replace a corrupt file. A fog failure does not throw.
+ */
+export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingGameDatabaseResult {
+  logDebug('gameDb openExistingGameDatabaseAt', { canonicalPath });
+  let pending: InstanceType<typeof Database> | null = new Database(canonicalPath);
+  try {
+    applyGameDbPragmas(pending);
+    validateGameDatabaseOrThrow(pending);
+    setDbHandle(pending);
+    pending = null;
+    runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
+    ensureTurnStateRow();
+    repairStrandedStrategicResolutionPhaseOnDbBootstrap();
+    seedGameSeedIfMissing();
+    let mapLoaded = false;
+    let mapLoadError: string | null = null;
+    try {
+      mapLoaded = loadStoredGameMap();
+    } catch (err) {
+      mapLoadError = err instanceof Error ? err.message : String(err);
+      setGameMapLoadError(mapLoadError);
+      logError('gameDb openExistingGameDatabaseAt: map load failed', err);
+    }
+    if (mapLoaded) {
+      backfillInfrastructureStateFromMetadataIfMissing();
+      reconcileStrategicInfrastructureCountsFromTacticalOverrides();
+    }
+    try {
+      refreshFogOfWarIntelFromCurrentState();
+    } catch (err) {
+      logError('gameDb openExistingGameDatabaseAt: fog refresh failed', err);
+    }
+    return { mapLoadError };
+  } catch (err) {
+    if (pending) {
+      try {
+        pending.close();
+      } catch (closeErr) {
+        logError('gameDb openExistingGameDatabaseAt: failed to close temp handle after validation error', closeErr);
+      }
+    }
+    throw err;
+  }
 }
 
 /**

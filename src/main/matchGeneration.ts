@@ -3,7 +3,7 @@
  *
  * Purpose: An in-flight Ready must not call `ready()` after New has already started another match.
  * Run off and a model change do not move it, so that turn still resolves.
- * When to use: `stopModelWork` when the reason is `new_game`, and `handleGameReady` around `deps.ready()`.
+ * When to use: `stopModelWork` when the reason is `new_game` or `load_game`, and `handleGameReady` around `deps.ready()`.
  * Expected outcome: `getMatchGeneration` changes only through `advanceMatchGeneration`.
  * Exceptions: None.
  */
@@ -28,8 +28,8 @@ export function getMatchGeneration(): number {
 /**
  * Moves the match generation forward.
  *
- * Purpose: Opening New and starting the new match each call this once, through `stopModelWork`.
- * When to use: Only from `stopModelWork` when the reason is `new_game`.
+ * Purpose: Opening New, starting the new match, and loading a save each call this once, through `stopModelWork`.
+ * When to use: Only from `stopModelWork` when the reason is `new_game` or `load_game`.
  * Expected outcome: The generation increases by one. Two increases are fine; Ready only checks inequality.
  * Exceptions: None.
  */
