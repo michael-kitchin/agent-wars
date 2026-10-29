@@ -50,8 +50,10 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Reticle, while a ranged attack is aimed: Stop aiming a ranged attack. Attacks already in the list stay there.
 - Reticle, for an all-air selection: Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.
 - Reticle, while an air strike is aimed: Stop aiming an air strike. Strikes already in the list stay there.
+- Reticle, before a missile launch is aimed: Aim a missile launch. Turn this on, then double-click any explored hex in range. Each missile launches once.
+- Reticle, while a missile launch is aimed: Stop aiming a missile launch. Launches already in the list stay there.
 - Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you stop aiming.
-- The reticle while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
+- The reticle while it is greyed out: its reason, "Missiles cannot fire or launch during a battle.", "A launch needs a selection of missiles only.", "Infantry can't fire on the world map.", or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
 - Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
 - Commanders tab: Show each commander's status, cost, and settings, the tool groups, and the AI activity log. Click the selected tab to hide the console and widen the map.
@@ -176,7 +178,9 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts`
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`)
+- `src/shared/selectionSupportButtonMode.ts`
+- `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
 - `src/renderer/chrome/frameTooltipText.ts`
 - `src/shared/saveLoadAvailability.ts`
 - `src/renderer/gameplay/saveLoadMenu.ts`

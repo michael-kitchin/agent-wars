@@ -1,5 +1,5 @@
 import { cellToLatLng } from 'h3-js';
-import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, MissileLaunchOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import {
   filterShotLinesByVisibleEndpoints,
@@ -8,6 +8,7 @@ import {
 import {
   RANGE_PERIMETER_AIR_STRIKE_COLOR,
   RANGE_PERIMETER_ALPHA,
+  RANGE_PERIMETER_MISSILE_COLOR,
   RANGE_PERIMETER_RANGED_COLOR,
   UNIT_RADIUS,
 } from '../core/constants';
@@ -41,7 +42,7 @@ export type PendingOrderLineUnit = { id: string; h3Index: string };
  * Exceptions: None.
  */
 export function rangePerimeterStaticLineStyle(
-  mode: 'ranged' | 'airStrike',
+  mode: 'ranged' | 'airStrike' | 'missile',
   kind: RangeOverlayStrokeKind = 'connector'
 ): {
   lineWidth: number;
@@ -50,7 +51,12 @@ export function rangePerimeterStaticLineStyle(
   lineCap: 'butt' | 'round';
 } {
   const lineWidth = getCurrentRangeOverlayLineWidth(kind);
-  const strokeColor = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+  const strokeColor =
+    mode === 'airStrike'
+      ? RANGE_PERIMETER_AIR_STRIKE_COLOR
+      : mode === 'missile'
+        ? RANGE_PERIMETER_MISSILE_COLOR
+        : RANGE_PERIMETER_RANGED_COLOR;
   return {
     lineWidth,
     strokeColor,
@@ -83,7 +89,7 @@ type SupportOrderLineSegment = { fromH3Index: string; toH3Index: string };
  */
 export function strokeSupportOrderLines(
   ctx: CanvasRenderingContext2D,
-  mode: 'ranged' | 'airStrike',
+  mode: 'ranged' | 'airStrike' | 'missile',
   segments: readonly SupportOrderLineSegment[]
 ): void {
   if (segments.length === 0) return;
@@ -95,7 +101,11 @@ export function strokeSupportOrderLines(
     if (segment.fromH3Index === segment.toH3Index) continue;
     const from = hexCenterPx(segment.fromH3Index);
     const to = hexCenterPxRelativeTo(segment.fromH3Index, segment.toH3Index);
-    drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS, style.dash), lineStyle);
+    drawOrderLine(
+      ctx,
+      straightOrderLineShape(from, to, UNIT_RADIUS, style.dash, mode === 'missile' ? { continuous: true } : undefined),
+      lineStyle
+    );
   }
   ctx.restore();
 }
@@ -182,6 +192,30 @@ export function drawAirStrikeLines(
     segments.push({ fromH3Index: unit.h3Index, toH3Index: strike.targetH3Index });
   }
   strokeSupportOrderLines(ctx, 'airStrike', segments);
+}
+
+/**
+ * Draws pending missile launches as crimson one-way arrows.
+ *
+ * Purpose: A queued launch stays on the map until Ready, including when the arrow is wider than the window.
+ * When to use: From `drawPendingSupportOrderOverlays` when `S.pendingMissileLaunches` is not empty.
+ * Expected outcome: One continuous arrow per launch, from the missile's hex to its target.
+ * Exceptions: Skips a row whose missile is not in `units`.
+ */
+export function drawMissileLaunchLines(
+  ctx: CanvasRenderingContext2D,
+  launches: MissileLaunchOrder[],
+  units: readonly PendingOrderLineUnit[],
+  hexList: string[] | undefined
+): void {
+  if (launches.length === 0 || !hexList) return;
+  const segments: SupportOrderLineSegment[] = [];
+  for (const launch of launches) {
+    const unit = units.find((row) => row.id === launch.unitId);
+    if (!unit) continue;
+    segments.push({ fromH3Index: unit.h3Index, toH3Index: launch.targetH3Index });
+  }
+  strokeSupportOrderLines(ctx, 'missile', segments);
 }
 
 /**

@@ -17,6 +17,30 @@ export const MAP_TOAST_SECTION_HEADER_PREFIX = '## ';
 export const MAP_TOAST_UPDATES_SECTION_TITLE = 'Updates';
 
 /**
+ * Today's deployed-line order, with missiles last.
+ *
+ * Purpose: The sentence stays byte-identical for the original four types.
+ * When to use: `formatDeployedUnitsLine` only.
+ * Expected outcome: Armor, infantry, naval, air, then missile.
+ * Exceptions: None.
+ */
+const DEPLOYED_LINE_TYPE_ORDER = ['armor', 'infantry', 'naval', 'air', 'missile'] as const;
+
+/**
+ * Joins phrases with a serial comma.
+ *
+ * Purpose: Deployment and cap sentences share one list style for any count.
+ * When to use: When a sentence names one or more unit types.
+ * Expected outcome: One phrase unchanged, two joined with "and", and three or more with a comma before "and".
+ * Exceptions: None. An empty list returns an empty string.
+ */
+export function joinWithSerialComma(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+/**
  * Builds the deployment summary line for the Updates section when new units entered play.
  *
  * Purpose: Surfaces production/deployment outcomes separate from combat losses.
@@ -26,21 +50,18 @@ export const MAP_TOAST_UPDATES_SECTION_TITLE = 'Updates';
  * Exceptions: None.
  */
 function formatDeployedUnitsLine(
-  deployed: { armor?: number; infantry?: number; naval?: number; air?: number } | undefined
+  deployed: { armor?: number; infantry?: number; naval?: number; air?: number; missile?: number } | undefined
 ): string | null {
   if (!deployed) return null;
   const parts: string[] = [];
-  if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor!.toLocaleString()} armor`);
-  if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry!.toLocaleString()} infantry`);
-  if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval!.toLocaleString()} naval`);
-  if ((deployed.air ?? 0) > 0) parts.push(`${deployed.air!.toLocaleString()} air`);
+  for (const unitType of DEPLOYED_LINE_TYPE_ORDER) {
+    const count = deployed[unitType] ?? 0;
+    if (count > 0) parts.push(`${count.toLocaleString()} ${unitType}`);
+  }
   if (parts.length === 0) return null;
-  const total = (deployed.armor ?? 0) + (deployed.infantry ?? 0) + (deployed.naval ?? 0) + (deployed.air ?? 0);
+  const total = DEPLOYED_LINE_TYPE_ORDER.reduce((sum, unitType) => sum + (deployed[unitType] ?? 0), 0);
   const noun = total === 1 ? 'unit' : 'units';
-  if (parts.length === 1) return `${parts[0]} ${noun} deployed`;
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]} ${noun} deployed`;
-  if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} ${noun} deployed`;
-  return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} ${noun} deployed`;
+  return `${joinWithSerialComma(parts)} ${noun} deployed`;
 }
 
 /**
@@ -59,10 +80,7 @@ function formatDeploymentCapReachedLine(
   if (!cappedTypes || cappedTypes.length === 0) return null;
   const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
   if (ordered.length === 0) return null;
-  if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
-  if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
-  if (ordered.length === 3) return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
-  return `Maximum human ${ordered[0]}, ${ordered[1]}, ${ordered[2]}, and ${ordered[3]} units deployed.`;
+  return `Maximum human ${joinWithSerialComma([...ordered])} units deployed.`;
 }
 
 /**
@@ -131,6 +149,15 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None. It does not replace loss sections or deployment lines.
    */
   unknownBattleLine?: string | null;
+  /**
+   * Missile strike sentences for the Updates section.
+   *
+   * Contract: One line per launch the viewer may see, already formatted.
+   * When to use: Strategic Ready after visibility filtering.
+   * Expected outcome: Appended after the other Updates lines and before the unknown-battle line.
+   * Exceptions: None. Omitted or empty adds nothing.
+   */
+  missileStrikeLines?: readonly string[];
 }
 
 /**
@@ -170,6 +197,8 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
   const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';
+  const missileStrikeLines = (args.missileStrikeLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+  if (missileStrikeLines.length > 0) otherLines = [...otherLines, ...missileStrikeLines];
   if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);

@@ -38,7 +38,19 @@ export const ORDER_LINE_SOLID: readonly number[] = [];
  * Expected outcome: Two or more points draw a line; fewer draw nothing.
  * Exceptions: None.
  */
-export type OrderLineRun = { readonly points: readonly CanvasPoint[]; readonly dash: readonly number[] };
+export type OrderLineRun = {
+  readonly points: readonly CanvasPoint[];
+  readonly dash: readonly number[];
+  /**
+   * Draws the run as one line even when it is wider than half the canvas.
+   *
+   * Purpose: A missile arrow is often wider than half the canvas, and the wrap test would otherwise drop it. The target point is already placed the short way round.
+   * When to use: Missile launches and missile playback.
+   * Expected outcome: `traceRun` uses `lineTo` for every point.
+   * Exceptions: None. Omitted means the date-line wrap test still applies.
+   */
+  readonly continuous?: boolean;
+};
 
 /**
  * Everything one order line draws: its runs and, optionally, an arrowhead from `orderArrowGeometry`.
@@ -61,13 +73,13 @@ export type OrderLineShape = {
  * Expected outcome: The current path holds the run; nothing is stroked here.
  * Exceptions: None.
  */
-function traceRun(ctx: CanvasRenderingContext2D, points: readonly CanvasPoint[]): void {
+function traceRun(ctx: CanvasRenderingContext2D, points: readonly CanvasPoint[], continuous = false): void {
   const wrapJumpPx = ctx.canvas.width * 0.5;
   ctx.beginPath();
   ctx.moveTo(points[0]!.x, points[0]!.y);
   for (let i = 1; i < points.length; i++) {
     const current = points[i]!;
-    if (Math.abs(current.x - points[i - 1]!.x) > wrapJumpPx) ctx.moveTo(current.x, current.y);
+    if (!continuous && Math.abs(current.x - points[i - 1]!.x) > wrapJumpPx) ctx.moveTo(current.x, current.y);
     else ctx.lineTo(current.x, current.y);
   }
 }
@@ -116,7 +128,7 @@ export function drawOrderLine(
   ctx.fillStyle = ORDER_LINE_CASING_COLOR;
   ctx.lineWidth = style.width + ORDER_LINE_CASING_PAD * 2;
   for (const run of runs) {
-    traceRun(ctx, run.points);
+    traceRun(ctx, run.points, run.continuous === true);
     ctx.stroke();
   }
   if (shape.arrow) {
@@ -132,7 +144,7 @@ export function drawOrderLine(
   ctx.lineWidth = style.width;
   for (const run of runs) {
     ctx.setLineDash([...run.dash]);
-    traceRun(ctx, run.points);
+    traceRun(ctx, run.points, run.continuous === true);
     ctx.stroke();
   }
   if (shape.arrow) {
@@ -159,11 +171,12 @@ export function straightOrderLineShape(
   from: CanvasPoint,
   to: CanvasPoint,
   tipInset: number,
-  dash: readonly number[] = ORDER_LINE_SOLID
+  dash: readonly number[] = ORDER_LINE_SOLID,
+  options?: { readonly continuous?: boolean }
 ): OrderLineShape {
   if (orderEndsCoincide(from, to)) return { runs: [], arrow: null };
   const arrow = orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset });
-  return { runs: [{ points: [from, arrow.lineEnd], dash }], arrow };
+  return { runs: [{ points: [from, arrow.lineEnd], dash, ...(options?.continuous ? { continuous: true } : {}) }], arrow };
 }
 
 /**

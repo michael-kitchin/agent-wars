@@ -14,6 +14,8 @@ describe('mapSelectionComposition', () => {
     assert.equal(mapSelectionComposition(['air', 'air']), 'airOnly');
     assert.equal(mapSelectionComposition(['infantry', 'naval']), 'nonAirOnly');
     assert.equal(mapSelectionComposition(['air', 'armor']), 'mixed');
+    assert.equal(mapSelectionComposition(['missile']), 'missileOnly');
+    assert.equal(mapSelectionComposition(['missile', 'infantry']), 'mixedMissile');
   });
 });
 
@@ -73,6 +75,25 @@ describe('resolveMapDoubleClickAction', () => {
     assert.deepEqual(
       resolveMapDoubleClickAction({ ...airAway, composition: 'mixed', iconHit: true }),
       { kind: 'rejectMixed' }
+    );
+  });
+
+  it('clears a missile selection on an empty click, ignores an icon click, and rejects a mix', () => {
+    assert.deepEqual(resolveMapDoubleClickAction({ ...airAway, composition: 'missileOnly' }), { kind: 'deselect' });
+    assert.deepEqual(
+      resolveMapDoubleClickAction({ ...airAway, composition: 'missileOnly', iconHit: true }),
+      { kind: 'ignore' }
+    );
+    assert.deepEqual(
+      resolveMapDoubleClickAction({ ...airAway, composition: 'mixedMissile' }),
+      { kind: 'rejectMissileMixed' }
+    );
+  });
+
+  it('still plans a support target while aiming, including a missile selection', () => {
+    assert.deepEqual(
+      resolveMapDoubleClickAction({ ...airAway, composition: 'missileOnly', targetingModeActive: true }),
+      { kind: 'planSupportTarget' }
     );
   });
 

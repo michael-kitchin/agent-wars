@@ -24,7 +24,7 @@ import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH } from '../../tools/memory';
  *
  * Purpose: The subsequence and tactical-drop rules must hold for the whole matrix, not one happy path.
  * When to use: The gating cases in this file.
- * Expected outcome: Sixteen objects covering both modes and the three boolean flags.
+ * Expected outcome: Thirty-two objects covering both modes and the four boolean flags.
  * Exceptions: None.
  */
 function allGateCombinations(): EnvelopeGates[] {
@@ -35,7 +35,15 @@ function allGateCombinations(): EnvelopeGates[] {
     for (const includeAirActions of flags) {
       for (const includeMemoryUpdates of flags) {
         for (const includeProductionOrders of flags) {
-          out.push({ coordinateMode, includeAirActions, includeMemoryUpdates, includeProductionOrders });
+          for (const includeMissileActions of flags) {
+            out.push({
+              coordinateMode,
+              includeAirActions,
+              includeMemoryUpdates,
+              includeProductionOrders,
+              includeMissileActions,
+            });
+          }
         }
       }
     }
@@ -61,13 +69,14 @@ function isSubsequence(actual: readonly string[], expected: readonly string[]): 
   return true;
 }
 
-test('ENVELOPE_FIELD_ORDER is the canonical eight-field sequence', () => {
+test('ENVELOPE_FIELD_ORDER is the canonical nine-field sequence', () => {
   assert.deepEqual(ENVELOPE_FIELD_ORDER, [
     'message',
     'strategy',
     'orders',
     'airStrikes',
     'ferryOrders',
+    'missileLaunches',
     'callbacks',
     'memoryUpdates',
     'productionOrders',
@@ -78,6 +87,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
   const strategicAll = envelopeFieldsForGates({
     coordinateMode: 'strategic',
     includeAirActions: true,
+    includeMissileActions: true,
     includeMemoryUpdates: true,
     includeProductionOrders: true,
   });
@@ -290,4 +300,40 @@ test('invalid-output air-action rule is omitted when air tails are off', () => {
     includeProductionOrders: false,
   });
   assert.match(withAir, /or air action/);
+});
+
+test('missileLaunches is strategic and only present when the flag is on', () => {
+  const on = envelopeFieldsForGates({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMissileActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+  });
+  assert.ok(on.includes('missileLaunches'));
+  assert.equal(on.indexOf('missileLaunches'), on.indexOf('ferryOrders') + 1);
+  const off = envelopeFieldsForGates({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMissileActions: false,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+  });
+  assert.ok(!off.includes('missileLaunches'));
+  const tactical = envelopeFieldsForGates({
+    coordinateMode: 'tactical',
+    includeAirActions: true,
+    includeMissileActions: true,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+  });
+  assert.ok(!tactical.includes('missileLaunches'));
+  const rules = buildInvalidOutputRulesClause({
+    coordinateMode: 'strategic',
+    includeAirActions: false,
+    includeMissileActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+  });
+  assert.match(rules, /use missileLaunches/);
 });

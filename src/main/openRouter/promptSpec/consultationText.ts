@@ -100,6 +100,15 @@ export interface OpeningMessageGates {
    */
   readonly hasAirUnits: boolean;
   /**
+   * Whether the commander has a missile and this is a strategic turn.
+   *
+   * Contract: Omitted means false. The opening message names `missileLaunches` only when this is true and the mode is strategic.
+   * When to use: The same roster check as the system prompt.
+   * Expected outcome: False omits `missileLaunches` from the field list.
+   * Exceptions: None.
+   */
+  readonly hasMissileUnits?: boolean;
+  /**
    * Whether the briefing includes a Best Options table with rows.
    *
    * Contract: Copy-row wording is forbidden when the table is absent.
@@ -123,6 +132,7 @@ function envelopeGatesFromOpening(gates: OpeningMessageGates): EnvelopeGates {
   return {
     coordinateMode: gates.coordinateMode,
     includeAirActions: gates.hasAirUnits,
+    includeMissileActions: gates.hasMissileUnits === true && !tactical,
     includeMemoryUpdates: gates.memoryEnabled && !tactical,
     includeProductionOrders: gates.productionEnabled && !tactical,
     includeStandingOrderActions: gates.ordersEnabled && !tactical,

@@ -4,6 +4,7 @@
  */
 
 import { cellToLatLng, gridDistance } from 'h3-js';
+import { MISSILE_CANNOT_MOVE_REASON, isMissileUnitType } from './missileRules';
 import {
   buildHumanOrderGroupPreviewEnvelope,
   groupedTacticalMarchPreviewUnitIds,
@@ -176,6 +177,9 @@ function buildPreviewForSubUnit(args: {
       invalidReason: 'Embarked land units cannot receive independent movement orders. Debark first.',
       segments: [],
     });
+  }
+  if (isMissileUnitType(sub.unitType)) {
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: MISSILE_CANNOT_MOVE_REASON, segments: [] });
   }
   const moveType = tacticalMovementUnitTypeForPathfinding(sub, args.hoveredH3Index);
   if (moveType === 'air') {

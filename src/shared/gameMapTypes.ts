@@ -78,6 +78,24 @@ export interface GameRules {
    */
   readonly airCost: number;
   /**
+   * Purchase cost of one missile.
+   *
+   * Contract: Ten times the infantry cost. The global cost is 200. A regional map uses its manifest.
+   * When to use: Production spending and prompt cost sentences.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  readonly missileCost: number;
+  /**
+   * Missile launch range in hex steps, measured by `gridDisk` membership.
+   *
+   * Contract: The global range is 12. A regional map uses the range in its manifest. The disk includes the launch hex.
+   * When to use: Launch validation and the missile briefing. Do not measure this range with `gridDistance`.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  readonly missileRangeHexes: number;
+  /**
    * Urban cells required before armor can be built.
    *
    * Contract: The global gate is 2. A regional map uses the minimum in its manifest economy.

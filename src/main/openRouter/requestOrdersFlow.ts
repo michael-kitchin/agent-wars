@@ -1,6 +1,7 @@
 import { cellToLatLng } from 'h3-js';
 import { isLikelyAbortError } from '../../shared/abortError';
 import { emptyRosterAbsenceReason } from '../../shared/commanderStatus';
+import { ONLY_MISSILES_REMAIN_IN_BATTLE_MESSAGE, isMissileUnitType } from '../../shared/missileRules';
 import { AI_SEAT_IDS, aiIndexForSeatId } from '../../shared/seatIds';
 import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
@@ -152,10 +153,14 @@ export async function requestOrdersFlow(
   }
 
   const opponentUnits = planState.units.filter((u) => u.player === seatId);
-  const rosterAbsence = emptyRosterAbsenceReason(Boolean(tacticalBattle), opponentUnits.length);
+  const actionableCount = tacticalBattle
+    ? opponentUnits.filter((unit) => !isMissileUnitType(unit.unitType)).length
+    : opponentUnits.length;
+  const rosterAbsence = emptyRosterAbsenceReason(Boolean(tacticalBattle), actionableCount);
   if (rosterAbsence) {
-    logDebug('openRouter requestOrders: no units remain in this battle', { seatId, absenceReason: rosterAbsence });
-    if (onLog) onLog('No units remain in this battle.');
+    const onlyMissiles = Boolean(tacticalBattle) && opponentUnits.length > 0;
+    logDebug('openRouter requestOrders: no units remain in this battle', { seatId, absenceReason: rosterAbsence, onlyMissiles });
+    if (onLog) onLog(onlyMissiles ? ONLY_MISSILES_REMAIN_IN_BATTLE_MESSAGE : 'No units remain in this battle.');
     return { success: true, orders: [], absenceReason: rosterAbsence };
   }
 
@@ -313,6 +318,7 @@ export async function requestOrdersFlow(
     tacticalBattle ? 'tactical' : 'strategic',
     {
       hasAirUnits: opponentUnits.some((u) => u.unitType === 'air'),
+      hasMissileUnits: !tacticalBattle && opponentUnits.some((u) => isMissileUnitType(u.unitType)),
       hasBestOptionsTable: hasBriefing && briefingOverride.includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN),
     }
   );
@@ -379,6 +385,7 @@ export async function requestOrdersFlow(
   const envelopeGates: EnvelopeGates = {
     coordinateMode: coordinateContext.mode,
     includeAirActions: planState.units.some((u) => u.player === seatId && u.unitType === 'air'),
+    includeMissileActions: !tacticalBattle && planState.units.some((u) => u.player === seatId && isMissileUnitType(u.unitType)),
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,

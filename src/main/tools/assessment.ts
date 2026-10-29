@@ -4,6 +4,7 @@
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
+import { isMissileUnitType } from '../../shared/missileRules';
 import { isAiSeatId } from '../../shared/seatIds';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { gridDisk } from 'h3-js';
@@ -530,7 +531,7 @@ function executeAssessUnit(
     nearbyEnemies,
     nearbyFriendlies,
     threats,
-    canAttackThisTurn,
+    canAttackThisTurn: isMissileUnitType(unit.unitType) ? [] : canAttackThisTurn,
   };
 }
 

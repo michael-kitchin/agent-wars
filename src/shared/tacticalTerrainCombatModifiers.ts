@@ -21,6 +21,7 @@
  * Baseline ranges and budgets live in `tacticalRanges.ts`; this module **reduces** them when rules apply.
  */
 
+import { isMissileUnitType } from './missileRules';
 import { computeGridPathCellsPure, isWithinGridRangePure } from './h3GridRangePure';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { tacticalWeatherMovementBudget, weatherBonusLevelOf } from './weatherBonusRules';
@@ -333,9 +334,9 @@ export function tacticalRangedDirectFirePassesTerrainAndRange(
 /**
  * Returns the **movement point budget** for one tactical march leg after terrain modifiers.
  *
- * Contract: Urban/rubble + armor or infantry ⇒ **1**; else armor in forest ⇒ **infantry** baseline; else `MOVEMENT_RANGE_BY_UNIT_TYPE[moveType]` with unit fallback like snapshot guards. When the computed budget is **0** but the leg is not an **air** march (air does not use tactical marching), the result is **1** so first-leg truncation and `planTacticalMarch` stay aligned with finite-cost reachability.
+ * Contract: Urban/rubble + armor or infantry ⇒ **1**; else armor in forest ⇒ **infantry** baseline; else `MOVEMENT_RANGE_BY_UNIT_TYPE[moveType]` with unit fallback like snapshot guards. When the computed budget is **0** but the leg is not an **air** or **missile** march, the result is **1** so first-leg truncation and `planTacticalMarch` stay aligned with finite-cost reachability.
  * When to use: `tacticalComputeMovementOrderOutcome`, human twin, and `tacticalMarchFirstStopAlongPath` callers.
- * Expected outcome: Positive integer suitable for `planTacticalMarchWithSessionCache` for infantry/armor/naval; **0** only for air (no tactical march).
+ * Expected outcome: Positive integer suitable for `planTacticalMarchWithSessionCache` for infantry/armor/naval; **0** for air and missiles.
  * Exceptions: None.
  */
 export function effectiveTacticalMovementPointBudgetForMarchLeg(
@@ -359,7 +360,13 @@ export function effectiveTacticalMovementPointBudgetForMarchLeg(
   } else {
     budget = Math.max(0, base);
   }
-  if (budget === 0 && moveType !== 'air' && subUnit.unitType !== 'air') {
+  if (
+    budget === 0
+    && moveType !== 'air'
+    && subUnit.unitType !== 'air'
+    && !isMissileUnitType(moveType)
+    && !isMissileUnitType(subUnit.unitType)
+  ) {
     return 1;
   }
   return tacticalWeatherMovementBudget({

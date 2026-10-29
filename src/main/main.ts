@@ -62,6 +62,7 @@ import { registerBuildQueueSealiftIpcHandler } from './ipc/buildQueueSealiftIpcH
 import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
+import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
 import { forgetAutoSaveTurnKey, rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
 import { resetCommanderPool } from './openRouter/commanderPool';
 import { readSeatApiKey, storeNewMatchCommanderKeys, updateRememberedCommander, writeSeatApiKey } from './openRouter/commanderKeyMemory';
@@ -566,6 +567,7 @@ function registerIpcHandlers(): void {
   registerOpenRouterIpcHandler(ipcMain);
   registerCommanderPoolIpcHandler(ipcMain);
   registerEndMatchIpcHandler(ipcMain);
+  registerMissileLaunchIpcHandler(ipcMain);
   registerSaveLoadIpcHandler(ipcMain, () => mainWindow, sendActivityLog);
 }
 

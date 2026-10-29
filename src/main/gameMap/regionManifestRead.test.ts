@@ -59,11 +59,13 @@ function manifestText(schema: string, armorCost: number): string {
       armor_cost: armorCost,
       naval_cost: 50,
       air_cost: 30,
+      missile_cost: 100,
       armor_min_urban_cells: 2,
       air_min_urban_cells: 4,
       naval_min_urban_cells: 5,
       advanced_min_urban_cells: 10,
       strategic_strike_urban_cells: 4,
+      missile_range_hexes: 5,
     },
   });
 }
@@ -86,6 +88,20 @@ test('armor that is not twice infantry is rejected', () => {
   assert.throws(
     () => readRegionManifestText(manifestText('1.2.0', 19), 'sample'),
     /economy\.armor_cost must be 2 × infantry_cost/
+  );
+});
+
+test('missile cost and range are read from the economy block', () => {
+  const manifest = readRegionManifestText(manifestText('1.2.0', 20), 'sample');
+  assert.equal(manifest.rules.missileCost, 100);
+  assert.equal(manifest.rules.missileRangeHexes, 5);
+});
+
+test('a missile cost that is not ten times infantry is rejected', () => {
+  const text = manifestText('1.2.0', 20).replace('"missile_cost":100', '"missile_cost":90');
+  assert.throws(
+    () => readRegionManifestText(text, 'sample'),
+    /economy\.missile_cost must be 10 × infantry_cost/
   );
 });
 

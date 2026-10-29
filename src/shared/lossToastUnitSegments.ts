@@ -52,6 +52,7 @@ const GROUP_TYPE_BY_LABEL: Readonly<Record<string, LostUnitType>> = {
   Air: 'air',
   Armored: 'armor',
   Infantry: 'infantry',
+  Missile: 'missile',
 };
 
 /**
@@ -62,7 +63,7 @@ const GROUP_TYPE_BY_LABEL: Readonly<Record<string, LostUnitType>> = {
  * Expected outcome: The count and one of the four labels.
  * Exceptions: None.
  */
-const GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry)$/;
+const GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
 
 /**
  * Separator between victim names on a loss cause line.

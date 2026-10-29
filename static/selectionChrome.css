@@ -32,6 +32,9 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 .selection-panel[data-aim="strike"] {
   border-color: var(--order-strike);
 }
+.selection-panel[data-aim="launch"] {
+  border-color: var(--order-missile);
+}
 
 /* The details show while the panel is expanded and while it slides; the grip only once it is fully expanded. */
 .selection-panel[data-state="compact"] .selection-panel-details,
@@ -263,6 +266,10 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 .selection-panel[data-aim="strike"] .selection-panel-reticle[aria-pressed="true"] {
   background: var(--order-strike);
   border-color: var(--order-strike);
+}
+.selection-panel[data-aim="launch"] .selection-panel-reticle[aria-pressed="true"] {
+  background: var(--order-missile);
+  border-color: var(--order-missile);
 }
 .selection-panel[data-aim] .selection-panel-reticle[aria-pressed="true"]:hover {
   filter: brightness(1.2);

@@ -125,6 +125,7 @@ function testMultilineCauseOrderAndSuppression(): void {
     melee: [],
     returnFire: [{ unitType: 'armor', displayName: 'Y' }],
     airStrike: [],
+    missileStrike: [],
     other: [{ unitType: 'naval', displayName: 'Z' }],
   };
   const lines = formatPlayerLossLinesMultiline(summary);
@@ -148,6 +149,7 @@ function testInlineJoinsWithSemicolons(): void {
     melee: [{ unitType: 'armor', displayName: 'B', unitId: 'human-armor-1' }],
     returnFire: [],
     airStrike: [],
+    missileStrike: [],
     other: [],
   };
   assert.strictEqual(
@@ -173,6 +175,7 @@ function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
     ],
     returnFire: [],
     airStrike: [],
+    missileStrike: [],
     other: [],
   };
   const text = formatPlayerLossInline(summary);
@@ -195,12 +198,26 @@ function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
  * Expected outcome: Throws on first assertion failure; logs pass message when all succeed.
  * Exceptions: Propagates assertion errors from individual cases.
  */
+/**
+ * Groups infantry and missiles once each type has more than three losses.
+ *
+ * Purpose: A missile is a loss type and sorts after infantry in the grouped order.
+ * When to use: After changing `GROUP_ORDER` or `isKnownLossType`.
+ * Expected outcome: `4x Infantry, 4x Missile`.
+ * Exceptions: None.
+ */
+function testMissileGroupFollowsInfantry(): void {
+  const text = formatLossEntries([...sampleUnits(4, 'infantry'), ...sampleUnits(4, 'missile')]);
+  assert.strictEqual(text, '4x Infantry, 4x Missile');
+}
+
 function run(): void {
   testListWhenFiveOrFewer();
   testGroupedWhenMoreThanThreeOfOneType();
   testGroupedOrderAndZeroOmission();
   testMixedCollapseAndNameCap();
   testUnknownTypeStaysNamed();
+  testMissileGroupFollowsInfantry();
   testMultilineCauseOrderAndSuppression();
   testInlineJoinsWithSemicolons();
   testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames();

@@ -3,11 +3,11 @@
  *
  * Purpose: One simultaneous round replaces the old pair-by-pair fight, without changing two-sided melee.
  * When to use: `runMeleePhase` when a hex has three or more owners.
- * Expected outcome: Every unit rolls once. Hits are then assigned across the other sides.
+ * Expected outcome: Every unit rolls once, except a missile, which is skipped and can still be removed. Hits are then assigned across the other sides.
  * Exceptions: None.
  */
 
-import { casualtyPriorityIndex, getDefense } from './combatConstants';
+import { compareCasualtyOrder, unitTypeRollsInCombat } from './combatConstants';
 import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import { rollCombatDieAgainst, type CombatDiceRollSink } from './combatDiceRecording';
 import type { CombatUnit } from './combatUnitTypes';
@@ -94,14 +94,12 @@ export interface MultiSideMeleeEngagement {
  *
  * Purpose: Hits remove the softest unit first, then the usual type order.
  * When to use: Once per side, before any hit is assigned.
- * Expected outcome: Lowest printed defense first, then casualty priority. Equal units keep their incoming order.
+ * Expected outcome: Lowest printed defense first, then casualty priority, with every missile after every other unit. Equal units keep their incoming order.
  * Exceptions: None.
  */
 function unitsInCasualtyOrder(units: readonly CombatUnit[]): CombatUnit[] {
   return [...units].sort(
-    (left, right) =>
-      getDefense(left.unitType) - getDefense(right.unitType) ||
-      casualtyPriorityIndex(left.unitType) - casualtyPriorityIndex(right.unitType)
+    (left, right) => compareCasualtyOrder(left.unitType, right.unitType)
   );
 }
 
@@ -129,6 +127,7 @@ export function resolveMultiSideMeleeEngagement(args: MultiSideMeleeEngagement):
     const attacking = side === attackerSide;
     let hits = 0;
     for (const unit of unitsBySide.get(side) ?? []) {
+      if (!unitTypeRollsInCombat(unit.unitType)) continue;
       const threshold = attacking ? attackHitThreshold(unit) : defenseHitThreshold(unit);
       const hit = rollCombatDieAgainst(
         args.rollDie,

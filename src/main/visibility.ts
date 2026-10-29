@@ -53,6 +53,7 @@ naval: 2,
    * Exceptions: None.
    */
 air: 3,
+  missile: 0,
 };
 
 /**

@@ -126,6 +126,7 @@ function testSmallUnitCapsMatchBaseline(): void {
     armor: 8,
     naval: 8,
     air: 6,
+    missile: 2,
   });
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
   assert.deepStrictEqual(getMaxUnitsPerType('medium'), {
@@ -133,12 +134,14 @@ function testSmallUnitCapsMatchBaseline(): void {
     armor: 16,
     naval: 16,
     air: 12,
+    missile: 4,
   });
   assert.deepStrictEqual(getMaxUnitsPerType('large'), {
     infantry: 36,
     armor: 24,
     naval: 24,
     air: 18,
+    missile: 6,
   });
 }
 

@@ -46,6 +46,15 @@ export interface EnvelopeGates {
    */
   readonly includeAirActions: boolean;
   /**
+   * Whether this consultation may advertise missile launches.
+   *
+   * Contract: Omitted means false. Tactical mode never keeps the field even when this is true.
+   * When to use: True only for a strategic consult whose roster includes a missile.
+   * Expected outcome: `missileLaunches` appears after `ferryOrders` when this is true and the mode is strategic.
+   * Exceptions: None.
+   */
+  readonly includeMissileActions?: boolean;
+  /**
    * Whether the memory tool group is enabled for this consultation.
    *
    * Contract: Memory writes are JSON-only and only exist when the memory tools are on.
@@ -79,7 +88,7 @@ export interface EnvelopeGates {
  *
  * Purpose: The include/omit matrix in assembly-contract.md section 5.1.
  * When to use: Iterate this when assembling a header, an example object, or a repair schema.
- * Expected outcome: `callbacks` always follows the air tails and precedes memory and production.
+ * Expected outcome: `callbacks` follows `missileLaunches` and precedes memory and production.
  * Exceptions: None.
  */
 export const ENVELOPE_FIELD_ORDER: readonly string[] = [
@@ -88,6 +97,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'orders',
   'airStrikes',
   'ferryOrders',
+  'missileLaunches',
   'callbacks',
   'memoryUpdates',
   'productionOrders',
@@ -168,6 +178,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
   return ENVELOPE_FIELD_ORDER.filter((field) => {
     if (ALWAYS_PRESENT_FIELDS.has(field)) return true;
     if (field === 'airStrikes' || field === 'ferryOrders') return gates.includeAirActions;
+    if (field === 'missileLaunches') return gates.coordinateMode !== 'tactical' && gates.includeMissileActions === true;
     if (field === 'memoryUpdates') return includeMemory;
     if (field === 'productionOrders') return includeProduction;
     return false;
@@ -232,6 +243,9 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
     ...shared,
     "A march to the unit's current cell is dropped as already arrived.",
     ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
+    ...(gates.includeMissileActions === true
+      ? ['Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use missileLaunches.']
+      : []),
     'Infantry cannot be given a strategic ranged_attack.',
   ].join(' ');
 }
@@ -353,6 +367,8 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
       example.airStrikes = [{ unitId: 'a1-a1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {
       example.ferryOrders = [{ unitId: 'a1-a2', destination: 'CJ' }];
+    } else if (field === 'missileLaunches') {
+      example.missileLaunches = [{ unitId: 'a1-m1', targetHexCode: 'CK' }];
     } else if (field === 'callbacks') {
       example.callbacks = [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }];
     } else if (field === 'memoryUpdates') {

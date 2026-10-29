@@ -240,6 +240,7 @@ function applyVisibleCosts(): void {
   setCost('new-game-cost-armor', entry.costs.armor);
   setCost('new-game-cost-naval', entry.costs.naval);
   setCost('new-game-cost-air', entry.costs.air);
+  setCost('new-game-cost-missile', entry.costs.missile);
   setAdvancedTechLine(formatAdvancedTechLine(entry.advancedMinUrbanCells));
 }
 

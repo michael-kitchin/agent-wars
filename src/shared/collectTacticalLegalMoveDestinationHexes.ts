@@ -6,6 +6,7 @@
  */
 
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
+import { isMissileUnitType } from './missileRules';
 import { collectInfantryArmorReachableWithinBudget } from './tacticalLandReachabilityWithinBudget';
 import { collectSimpleEnterCostReachableWithinBudget, planTacticalMarch } from './tacticalMovementPlanner';
 import {
@@ -47,7 +48,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   moverSubUnitId: string
 ): string[] {
   const u = battle.subUnits.find((s) => s.id === moverSubUnitId);
-  if (!u || u.unitType === 'air' || u.embarkedOnSubUnitId) return [];
+  if (!u || u.unitType === 'air' || isMissileUnitType(u.unitType) || u.embarkedOnSubUnitId) return [];
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(
     battle,
     u,
@@ -101,7 +102,7 @@ export function collectTacticalLegalMoveDestinationHexesBruteForceForTests(
   moverSubUnitId: string
 ): string[] {
   const u = battle.subUnits.find((s) => s.id === moverSubUnitId);
-  if (!u || u.unitType === 'air' || u.embarkedOnSubUnitId) return [];
+  if (!u || u.unitType === 'air' || isMissileUnitType(u.unitType) || u.embarkedOnSubUnitId) return [];
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(
     battle,
     u,

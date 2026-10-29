@@ -39,12 +39,14 @@ describe('getMaxUnitsPerType', () => {
       armor: 16,
       naval: 16,
       air: 12,
+      missile: 4,
     });
     assert.deepEqual(getMaxUnitsPerType('large'), {
       infantry: 36,
       armor: 24,
       naval: 24,
       air: 18,
+      missile: 6,
     });
     assert.deepEqual(getMaxUnitsPerType('world' as GameSize), MAX_UNITS_PER_TYPE);
   });
@@ -57,6 +59,7 @@ describe('gameSizeCapPreviewRows', () => {
       { unitType: 'armor', displayName: 'Armor', cap: 8 },
       { unitType: 'naval', displayName: 'Naval', cap: 8 },
       { unitType: 'air', displayName: 'Air', cap: 6 },
+      { unitType: 'missile', displayName: 'Missile', cap: 2 },
     ]);
     assert.equal(gameSizeCapPreviewRows('large')[0]?.cap, 36);
   });

@@ -4,12 +4,14 @@ import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import { validateMissileLaunchOrder } from './missileValidation';
 import {
   ORDER_PLAN_SANITIZE_CONTEXT,
   logOrderPlanSanitizeDrop,
   logOrderPlanSanitizeSummary,
   strategicAirStrikeDuplicateReason,
   strategicFerryDuplicateReason,
+  strategicMissileLaunchDuplicateReason,
   strategicMovementDuplicateReason,
   strategicRangedDuplicateReason,
 } from './orderPlanSanitize';
@@ -229,12 +231,30 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
       keptFerry.push(f);
     }
 
+    const missileLaunches = payload.missileLaunches ?? [];
+    const missileDupReason = strategicMissileLaunchDuplicateReason(missileLaunches, deps.displayLabelForUnit);
+    if (missileDupReason) return { success: false, reason: missileDupReason };
+    const keptMissileLaunches: typeof missileLaunches = [];
+    for (const row of missileLaunches) {
+      const result = validateMissileLaunchOrder(row.unitId, row.targetH3Index, {
+        allowedPlayer: deps.humanPlayerId,
+        displayLabelForUnit: deps.displayLabelForUnit,
+      });
+      if (!result.valid) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'missileLaunch', { unitId: row.unitId, reason: result.reason });
+        continue;
+      }
+      keptMissileLaunches.push(row);
+    }
+
     if (droppedInvalidRows > 0) {
       logOrderPlanSanitizeSummary(sanitizeCtx, droppedInvalidRows, {
         movements: keptMovements.length,
         ranged: keptRanged.length,
         airStrikes: keptAirStrikes.length,
         ferry: keptFerry.length,
+        missileLaunches: keptMissileLaunches.length,
       });
     }
 
@@ -257,6 +277,10 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
     dbRun('DELETE FROM pending_ferry_orders');
     for (const f of keptFerry) {
       dbRun('INSERT INTO pending_ferry_orders (unit_id, destination_h3_index) VALUES (?, ?)', [f.unitId, f.destinationH3Index]);
+    }
+    dbRun('DELETE FROM pending_missile_launches');
+    for (const row of keptMissileLaunches) {
+      dbRun('INSERT INTO pending_missile_launches (unit_id, target_h3_index) VALUES (?, ?)', [row.unitId, row.targetH3Index]);
     }
     return { success: true };
   } catch (err) {

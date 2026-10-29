@@ -6,6 +6,7 @@ import {
   selectionSupportButtonMode,
   STRIKE_NEEDS_AIR_ONLY_REASON,
 } from './selectionSupportButtonMode';
+import { LAUNCH_NEEDS_MISSILES_ONLY_REASON, MISSILES_CANNOT_FIRE_IN_BATTLE_REASON } from './missileRules';
 
 describe('selectionSupportButtonMode strategic', () => {
   it('hides the button when nothing is selected', () => {
@@ -25,6 +26,12 @@ describe('selectionSupportButtonMode strategic', () => {
   it('offers Strike for one air unit and for several air units', () => {
     assert.equal(selectionSupportButtonMode(['air'], false), 'strike');
     assert.equal(selectionSupportButtonMode(['air', 'air'], false), 'strike');
+  });
+
+  it('offers Launch for missiles on the world map and hides it in a battle', () => {
+    assert.equal(selectionSupportButtonMode(['missile'], false), 'launch');
+    assert.equal(selectionSupportButtonMode(['missile', 'missile'], false), 'launch');
+    assert.equal(selectionSupportButtonMode(['missile'], true), 'hidden');
   });
 });
 
@@ -69,5 +76,22 @@ describe('selectionSupportAction', () => {
 
   it('greys out Ranged without a reason for an empty selection', () => {
     assert.deepEqual(selectionSupportAction([], false), { kind: 'ranged', enabled: false, reason: null });
+  });
+
+  it('enables Launch for missiles on the world map', () => {
+    assert.deepEqual(selectionSupportAction(['missile', 'missile'], false), { kind: 'launch', enabled: true, reason: null });
+  });
+
+  it('greys out Launch in a battle and when missiles are mixed with other types', () => {
+    assert.deepEqual(selectionSupportAction(['missile'], true), {
+      kind: 'launch',
+      enabled: false,
+      reason: MISSILES_CANNOT_FIRE_IN_BATTLE_REASON,
+    });
+    assert.deepEqual(selectionSupportAction(['missile', 'infantry'], false), {
+      kind: 'launch',
+      enabled: false,
+      reason: LAUNCH_NEEDS_MISSILES_ONLY_REASON,
+    });
   });
 });

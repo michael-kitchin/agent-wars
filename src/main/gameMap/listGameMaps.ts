@@ -61,15 +61,16 @@ export function listGameMaps(): GameMapListEntry[] {
  *
  * Purpose: The dialog does not import the whole profile.
  * When to use: For the global row and each catalog row.
- * Expected outcome: The four purchase prices.
+ * Expected outcome: The five purchase prices.
  * Exceptions: None.
  */
-function costsFromRules(rules: { infantryCost: number; armorCost: number; navalCost: number; airCost: number }): GameMapListEntry['costs'] {
+function costsFromRules(rules: { infantryCost: number; armorCost: number; navalCost: number; airCost: number; missileCost: number }): GameMapListEntry['costs'] {
   return {
     infantry: rules.infantryCost,
     armor: rules.armorCost,
     naval: rules.navalCost,
     air: rules.airCost,
+    missile: rules.missileCost,
   };
 }
 

@@ -5,6 +5,7 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
+import { isMissileUnitType, MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
 import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import {
   getNavalStrategicDistanceAndTurns,
@@ -843,6 +844,9 @@ export function executePathfinding(
       const matchedUnit = state.units.find((u) => u.id === a.unitId);
       if (matchedUnit?.unitType === 'air') {
         return { status: 'error', error: 'Air units use air strikes, not hex movement. Use the air_strike order instead of plan_route.' };
+      }
+      if (isMissileUnitType(matchedUnit?.unitType ?? '')) {
+        return { status: 'error', error: MISSILE_CANNOT_MOVE_REASON };
       }
       const dest = Array.isArray(a.destination) && a.destination.length >= 2 && a.destination.every((n) => typeof n === 'number')
         ? [Number(a.destination[0]), Number(a.destination[1])] as LatLng

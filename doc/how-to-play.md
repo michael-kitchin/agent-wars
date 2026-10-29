@@ -58,7 +58,7 @@ The dialog shows the selected map's price beside each unit type, and its tech cu
 2. **Zoom:** Mouse wheel (zooms toward the cursor), or the + and − buttons at the map's bottom-right (half a level each). The update toast covers those buttons while it is open. The wheel still zooms, and it scrolls the toast when the message is taller than the box. Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
 3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. A gold ring replaces the white border of each token in a hex that holds a selected unit, including both tokens of a stack. The selection panel at the map's bottom-left opens as a bar that names the hex and the selection, with a hint for what a double-click does next; its **×** clears the selection. Click the chevron at the bar's left edge to show the hex's terrain and each selected unit's orders, and click it again to hide them. While they show, drag the panel's corner grip to resize it. The panel's state and size last until you close the app.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. When the selection cannot fire, the reticle is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. With a selection of only missiles, outside a battle, it aims a launch: turn it on, then double-click any explored hex in range. Each missile launches once. When the selection cannot fire, the reticle is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. That resolution can end the match (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
@@ -68,12 +68,12 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 - Both sides give orders for the same turn, and the engine resolves them together.
 - You can plan your turn while the commanders plan theirs. Moving, aiming, and building all work while they think. Only Ready waits for their plans.
-- The order is fixed: air strikes, then ranged fire, then movement, then melee.
+- The order is fixed: missile launches, then air strikes, then ranged fire, then movement, then melee.
 - Strikes and ranged fire use positions from before anyone moves, so they land where you aimed.
 - Melee happens wherever enemy units share a hex after movement.
 - Each unit rolls one d20 and hits on a roll at or under its hit number. A roll of 18 to 20 always misses.
 - A hit removes one unit. Units don't take partial damage.
-- A side that's hit loses its lowest-defense units first, then infantry, armor, naval, and air, in that order.
+- A side that's hit loses its lowest-defense units first, then infantry, armor, naval, and air, in that order. A missile is hit last, and a missile never rolls.
 - In melee, which side rolls attack and which rolls defense is random each turn. Moving in doesn't make you the attacker.
 - Enemies still sharing a hex after melee fight again next turn.
 
@@ -101,6 +101,12 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 - **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain cell between the shooter and the target can still block armor and naval. The cell either unit stands on does not.
 - **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond, ending in an arrowhead. A queued move keeps that route through the movement animation, then drops it once the animation has finished and the unit is on the destination. Move routes and the attack lines above are drawn over a pale edge so they stay readable.
+
+### Aiming a missile launch
+
+On the world map, select only missiles, then click the reticle. It aims a launch, and there is no target-type list and no reach outline. Double-click any explored hex in range, including the missile's own hex. Each missile launches once and is then gone. That removal is not a combat loss. The reticle and the selection panel's border are crimson (`--order-missile`). A queued or hover launch line is the same crimson, drawn as one continuous arrow (`straightOrderLineShape` with `continuous`). During playback the flight uses that side's map color, still as one continuous arrow, and it does not return.
+
+The reticle is greyed out in a battle, with "Missiles cannot fire or launch during a battle." (`MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`). A selection that mixes missiles with other types is greyed out, with "A launch needs a selection of missiles only." (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`).
 
 ## Air power
 
@@ -166,6 +172,7 @@ A hex needs the urban cells in this table, and anything named under **Also needs
 | Armor     | 40             | 2                   | Nothing else | 8                      |
 | Air       | 60             | 5                   | An airport | 6                        |
 | Naval     | 100            | 10                  | A seaport  | 8                        |
+| Missile   | 200            | 21                  | The Advanced urban count | 2               |
 
 - **Regional maps:** prices and minimums follow the map, as the new-game dialog shows.
 - **Only legal choices:** the type list offers only what that hex can build.
@@ -225,6 +232,8 @@ Each unit splits into sub-units that keep its attack and defense. Unit types als
 | Movement, strategic map    | 1 hex        | 2 hexes | 2 hexes  | Doesn't march               |
 | Movement points per beat   | 2            | 4       | 3        | Doesn't march               |
 | Shoots back at air strikes | Battles only | Yes     | Yes      | Yes                         |
+
+A missile becomes one sub-unit. It does not move or fire. On the strategic map its launch range is 12 hexes on the global map, and that map's own range on a regional map. It launches once and is gone. It is hit last, and it never rolls.
 
 Armor that enters a rugged, arctic, or city hex stops there for the turn.
 

@@ -167,7 +167,7 @@ const TURN_LIMIT_WIN_SENTENCE = ' If the turn limit arrives first, the most city
  * Exceptions: None.
  */
 const RESOLUTION_ORDER_BULLET =
-  '- This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
+  '- This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
 
 /**
  * A listed shot costs no movement, so copy it from Best Options.

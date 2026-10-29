@@ -12,7 +12,10 @@ import type { LatLng } from '../tools/pathfinding';
 import { executeProductionTools } from '../tools/productionTools';
 import { normalizeProductionOrders } from '../productionOrders';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
+import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
+import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -417,100 +420,6 @@ function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
 }
 
 /**
- * Collects actor ids from a single envelope entry.
- *
- * Purpose: Best Options rows list several units; the compact JSON form uses `unitIds` so a large roster fits the completion budget.
- * When to use: `expandGroupedActorEntries` before per-unit order application.
- * Expected outcome: A non-empty `unitIds` array is the actor set; otherwise a trimmed `unitId`. Duplicates are dropped, order preserved.
- * Exceptions: None.
- */
-function actorIdsFromOrderRaw(raw: Record<string, unknown>): string[] {
-  const fromList: string[] = [];
-  if (Array.isArray(raw.unitIds)) {
-    for (const id of raw.unitIds) {
-      if (typeof id === 'string' && id.trim().length > 0) fromList.push(id.trim());
-    }
-  }
-  const uniqueFromList: string[] = [];
-  for (const id of fromList) {
-    if (!uniqueFromList.includes(id)) uniqueFromList.push(id);
-  }
-  if (uniqueFromList.length > 0) return uniqueFromList;
-  const single = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
-  return single ? [single] : [];
-}
-
-/**
- * Expands grouped `unitIds` entries into one object per actor with a scalar `unitId`.
- *
- * Purpose: Downstream order applicators still consume one actor per object.
- * When to use: Immediately before `processV3OrdersArray`, air-strike, and ferry normalizers.
- * Expected outcome: Each grouped entry becomes N copies sharing destination/target fields; ungrouped entries are unchanged.
- * Exceptions: Non-array input becomes an empty list.
- */
-function expandGroupedActorEntries(entries: unknown): unknown[] {
-  if (!Array.isArray(entries)) return [];
-  const out: unknown[] = [];
-  let groupedCount = 0;
-  for (const raw of entries) {
-    if (!raw || typeof raw !== 'object') {
-      out.push(raw);
-      continue;
-    }
-    const rec = raw as Record<string, unknown>;
-    const ids = actorIdsFromOrderRaw(rec);
-    if (ids.length === 0) {
-      out.push(raw);
-      continue;
-    }
-    if (ids.length > 1) groupedCount += 1;
-    for (const unitId of ids) {
-      const expanded: Record<string, unknown> = { ...rec, unitId };
-      delete expanded.unitIds;
-      out.push(expanded);
-    }
-  }
-  if (groupedCount > 0) {
-    logDebug('openRouter expandGroupedActorEntries', { groupedCount, expandedCount: out.length, sourceCount: entries.length });
-  }
-  return out;
-}
-
-/**
- * Defines the `normalizeOrderEntries` function shape (function normalizeOrderEntries<T>( entries: unknown, options: { expectedObjectDropReason: string; missingFieldsDropReason: string; normaliz).
-
- * Purpose: Supports maintainability by documenting why `normalizeOrderEntries` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function normalizeOrderEntries<T>(
-  entries: unknown,
-  options: {
-    expectedObjectDropReason: string;
-    missingFieldsDropReason: string;
-    normalizeOne: (raw: Record<string, unknown>) => T | null;
-  }
-): { items: T[]; dropReasons: string[] } {
-  const items: T[] = [];
-  const dropReasons: string[] = [];
-  if (!Array.isArray(entries)) return { items, dropReasons };
-  for (const raw of entries) {
-    if (!raw || typeof raw !== 'object') {
-      dropReasons.push(options.expectedObjectDropReason);
-      continue;
-    }
-    const normalized = options.normalizeOne(raw as Record<string, unknown>);
-    if (!normalized) {
-      dropReasons.push(options.missingFieldsDropReason);
-      continue;
-    }
-    items.push(normalized);
-  }
-  return { items, dropReasons };
-}
-
-/**
  * Defines the `normalizeAirStrikeOrders` function shape (function normalizeAirStrikeOrders( entries: unknown, resolveToH3: (lat: number, lng: number) => string | undefined ): { airStrikes: AirStrikeOrder[]; dro).
 
  * Purpose: Supports maintainability by documenting why `normalizeAirStrikeOrders` exists.
@@ -654,6 +563,15 @@ export function parseOrdersResponse(
   embarkOrders: EmbarkOrder[];
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
+  /**
+   * Missile launches normalized to H3 targets.
+   *
+   * Contract: One row per expanded actor. Empty when the model omitted the field or every row was dropped.
+   * When to use: `applyParsedRequestOrders` validates this list.
+   * Expected outcome: `unitId` and `targetH3Index` only. A tactical envelope yields an empty list and a battle drop reason.
+   * Exceptions: None.
+   */
+  missileLaunches: MissileLaunchOrder[];
   strategy?: string;
   /**
    * One-line in-character taunt or threat from the orders envelope `"message"` field.
@@ -680,9 +598,9 @@ export function parseOrdersResponse(
   /**
    * How many actor rows the envelope submitted after grouped ids were expanded.
    *
-   * Contract: Sum of the expanded `orders`, `airStrikes`, and `ferryOrders` lengths, including entries that are not objects.
+   * Contract: Sum of the expanded `orders`, `airStrikes`, `ferryOrders`, and `missileLaunches` lengths, including entries that are not objects.
    * When to use: The debug log when `everyActorRowDropped` triggers a repair.
-   * Expected outcome: Zero when those three arrays are empty.
+   * Expected outcome: Zero when those four arrays are empty.
    * Exceptions: None.
    */
   expandedActorRowCount: number;
@@ -761,9 +679,12 @@ export function parseOrdersResponse(
         } = processV3OrdersArray(ordersArray, state, latLngByH3, resolveToH3, context);
         const expandedAirStrikes = expandGroupedActorEntries(obj.airStrikes);
         const expandedFerryOrders = expandGroupedActorEntries(obj.ferryOrders);
+        const expandedMissileLaunches = expandGroupedActorEntries(obj.missileLaunches);
         const normalizedAirStrikes = normalizeAirStrikeOrders(expandedAirStrikes, state, context);
         const normalizedFerryOrders = normalizeFerryOrders(expandedFerryOrders, context);
-        const expandedActorRowCount = ordersArray.length + expandedAirStrikes.length + expandedFerryOrders.length;
+        const normalizedMissileLaunches = normalizeMissileLaunchOrders(expandedMissileLaunches, context);
+        const expandedActorRowCount =
+          ordersArray.length + expandedAirStrikes.length + expandedFerryOrders.length + expandedMissileLaunches.length;
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {
@@ -780,6 +701,7 @@ export function parseOrdersResponse(
           ...productionDropReasons,
           ...normalizedAirStrikes.dropReasons,
           ...normalizedFerryOrders.dropReasons,
+          ...normalizedMissileLaunches.dropReasons,
         ];
         return {
           movementOrders,
@@ -787,6 +709,7 @@ export function parseOrdersResponse(
           embarkOrders,
           airStrikes: normalizedAirStrikes.airStrikes,
           ferryOrders: normalizedFerryOrders.ferryOrders,
+          missileLaunches: normalizedMissileLaunches.missileLaunches,
           strategy,
           message,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
@@ -800,6 +723,7 @@ export function parseOrdersResponse(
             embarkOrders.length === 0 &&
             normalizedAirStrikes.airStrikes.length === 0 &&
             normalizedFerryOrders.ferryOrders.length === 0 &&
+            normalizedMissileLaunches.missileLaunches.length === 0 &&
             appliedStandingOrderCount === 0,
           expandedActorRowCount,
         };

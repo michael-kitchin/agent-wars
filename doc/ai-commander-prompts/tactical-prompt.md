@@ -46,7 +46,8 @@ Same clause order as strategic section 1.5, with these substitutions:
 | Per-type reach | Tactical reaches from `RANGED_RANGE_BY_UNIT_TYPE`; air is stated as striking anywhere in the battle rather than as a numeric reach |
 | Infantry clause | Infantry and armor fire at res4 baselines; forest, urban, or rubble on the attacker caps them to range 1; a mountain cell between the shooter and the target blocks armor and naval, and the cells they stand on do not; infantry is exempt; air strikes and ferry are not blocked by mountains; close to melee when out of reach |
 | Movement budgets | The point budget from section 1.6: clear-of-weather type baselines, origin urban/rubble collapsing infantry and armor to one point, forest penalty for armor, intact line enter costs for infantry and armor, the roadless urban enter cost, and rubble enter costs; not the strategic per-turn cell counts. Weather changes to those budgets are the weather-bonus row |
-| Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`) |
+| Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`). Missile launches are not in this list |
+| Missile employment | When the roster has a missile sub-unit, `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` |
 | Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. Friendly stacking on that cell is legal. |
 | Origin bonus | Included when either bonus flag is on. Country: a unit on a cell in the area where it was built adds 2 (Low) or 4 (High) to every value it rolls there. That area is its birth country in a global game and its origin area in a regional game. Terrain: the same for a cell whose terrain kind matches its birth terrain kind, with urban and rubble ignored. The terrain clause ends with the terrain-bonus movement sentence (`TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE` in `src/shared/terrainBonusMarch.ts`): armor may enter one cell of a birth terrain kind it otherwise cannot enter, other than water, and a wetlands-born naval unit one wetlands cell; the entry ends the beat there; routes and beat estimates use it only when it arrives in fewer beats; roads, rails, urban, rubble, and seaport rules are unchanged. Both on: the bonuses do not stack, and the sentence names the larger amount as the most. Air qualifies by its base cell when the opponent has air. Casualty order keeps the printed defense values (`buildOriginBonusRule`) |
 | Tech bonus | Included only when the tech bonus is on (`buildTechBonusRule`). An Advanced unit, born in a hex with at least the loaded map's Advanced threshold (21 urban cells on the global map), adds 2 to its attack at Low and High, and also 2 to its defense at High. A Basic unit adds nothing. At Low, the tech bonus does not change defense. Casualty order keeps the printed defense values. The Unit Status Bonus column names the clause |
@@ -174,7 +175,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 ### 3.1 Fields
 
-`message`, `strategy`, `orders`, `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, and `callbacks`. **No `memoryUpdates` and no `productionOrders`**, in the contract, in the example, and in the repair schema.
+`message`, `strategy`, `orders`, `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema.
 
 ### 3.2 Legal actions this beat
 
@@ -188,7 +189,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 | `disembark` | `unitId`, `destination` | Clears cargo and marches in one action. |
 | `ferryOrders` entry | `unitId`, `destination` | Intact airport cells in the footprint. A sub-unit that strikes this beat must not also ferry; a ferry order for a striking sub-unit is discarded. |
 
-**Forbidden:** the standing-order assignment and cancellation actions for sub-unit ids, memory updates, and production orders. The prompt states the standing-order prohibition explicitly, because the strategic habit of assigning missions is exactly what a model carries into a beat.
+**Forbidden:** the standing-order assignment and cancellation actions for sub-unit ids, missile launches, memory updates, and production orders. The prompt states the standing-order prohibition explicitly, because the strategic habit of assigning missions is exactly what a model carries into a beat.
 
 ### 3.3 Option row to envelope field mapping
 
@@ -250,4 +251,4 @@ Claims the builders **omit** from tactical coaching:
 | Visibility | fog-dependent | complete inside the footprint |
 | Distance caveat line | present when distances are hop counts | never |
 | Tools | up to nine | routing, distance, `assess_unit`, and `estimate_combat` (no air strikes), per tool-group toggles |
-| Envelope tails | air, ferry, callbacks, memory, production | air, ferry, callbacks |
+| Envelope tails | air, ferry, missile launches when the roster has a missile, callbacks, memory, production | air, ferry, callbacks. No `missileLaunches` |

@@ -36,6 +36,9 @@ import { resetActiveGameMap } from '../../shared/activeGameMap';
 import { setLoadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { missileReachSet } from '../gameActions/missileReach';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
  * Installs a stand-in Electron so the key store can load under Node.
@@ -292,6 +295,198 @@ test('each seat sends its own key, and an empty key does not call the model', as
       assert.equal(empty.success, false);
       assert.equal(empty.error, 'No API key set');
       assert.deepEqual(seen, []);
+    });
+  } finally {
+    openRouter.setChatTransportOverrideForTests(null);
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A tactical consult whose own sub-units are only missiles does not call the model.
+ *
+ * Purpose: Missiles cannot act in a battle, so a side that has only missiles left is absent.
+ * When to use: After the battle roster ignores missiles.
+ * Expected outcome: `absenceReason` is `no_units_in_battle` and the transport is not called.
+ * Exceptions: Skips when the regional pack is not extracted.
+ */
+test('a tactical consult of only missiles does not call the model', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orders-missile-only-'));
+  const restoreElectron = installElectronMock(userData);
+  delete require.cache[require.resolve('./openRouter')];
+  const openRouter = require('./openRouter') as {
+    setSelectedModel: (modelId: string) => void;
+    setChatTransportOverrideForTests: (override: ((payload: { key: string }) => Promise<{
+      ok: true;
+      status: number;
+      headers: Record<string, string>;
+      bodyText: string;
+    }>) | null) => void;
+    requestOrders: (
+      state: ReturnType<typeof getGameState>,
+      modelId: string,
+      options: {
+        seatId: (typeof AI_SEAT_IDS)[number];
+        enabledToolNames: string[];
+        usePrecomputation: boolean;
+        tacticalAiBattle: TacticalBattleSnapshot;
+      }
+    ) => Promise<{ success: boolean; absenceReason?: string; error?: string }>;
+  };
+  const memory = require('./commanderKeyMemory') as {
+    writeSeatApiKeys: (entries: readonly { seatId: string; apiKey: string }[]) => void;
+  };
+  let transportCalls = 0;
+  try {
+    openRouter.setSelectedModel('test-model');
+    openRouter.setChatTransportOverrideForTests(async () => {
+      transportCalls += 1;
+      return {
+        ok: true as const,
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({ choices: [{ message: { content: '{}' } }] }),
+      };
+    });
+    await withThreeSeatMatch(async () => {
+      memory.writeSeatApiKeys([{ seatId: AI_SEAT_IDS[0], apiKey: 'test-openrouter-key' }]);
+      const parent = dbGetOne<{ id: string; h3Index: string }>(
+        'SELECT id, h3_index AS h3Index FROM units WHERE player = ? LIMIT 1',
+        [AI_SEAT_IDS[0]]
+      );
+      assert.ok(parent, 'the seat should have a unit');
+      const child = tacticalChildrenOf(parent.h3Index)[0];
+      assert.ok(child, 'the parent should have a tactical child');
+      const battle: TacticalBattleSnapshot = {
+        battleId: 'tb-missiles-only',
+        opposingPartyId: AI_SEAT_IDS[0],
+        enclosingStrategicH3Index: parent.h3Index,
+        tacticalChildH3Indexes: [child],
+        strategicTurnNumber: 1,
+        tacticalTurnNumber: 1,
+        subUnits: [
+          {
+            id: `${parent.id}-s1`,
+            parentUnitId: parent.id,
+            player: AI_SEAT_IDS[0],
+            unitType: 'missile',
+            h3Index: child,
+            displayName: 'M Missile (01)',
+          },
+        ],
+      };
+      const result = await openRouter.requestOrders(getGameState(), 'test-model', {
+        seatId: AI_SEAT_IDS[0],
+        enabledToolNames: [],
+        usePrecomputation: false,
+        tacticalAiBattle: battle,
+      });
+      assert.equal(result.success, true, result.error);
+      assert.equal(result.absenceReason, 'no_units_in_battle');
+      assert.equal(transportCalls, 0);
+    });
+  } finally {
+    openRouter.setChatTransportOverrideForTests(null);
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A strategic consult keeps a launch at the missile's own hex and drops one past its range.
+ *
+ * Purpose: Range is checked before a launch is stored. The last valid row for a different missile still returns.
+ * When to use: After launch rows are parsed from the envelope.
+ * Expected outcome: The in-range missile is returned. The out-of-range missile is a drop reason.
+ * Exceptions: Skips when the regional pack is not extracted.
+ */
+test('a strategic consult drops an out-of-range missile launch and returns one in range', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orders-missile-launch-'));
+  const restoreElectron = installElectronMock(userData);
+  delete require.cache[require.resolve('./openRouter')];
+  const openRouter = require('./openRouter') as {
+    setSelectedModel: (modelId: string) => void;
+    setChatTransportOverrideForTests: (override: ((payload: { key: string }) => Promise<{
+      ok: true;
+      status: number;
+      headers: Record<string, string>;
+      bodyText: string;
+    }>) | null) => void;
+    requestOrders: (
+      state: ReturnType<typeof getGameState>,
+      modelId: string,
+      options: { seatId: (typeof AI_SEAT_IDS)[number]; enabledToolNames: string[]; usePrecomputation: boolean }
+    ) => Promise<{
+      success: boolean;
+      error?: string;
+      dropReasons?: string[];
+      missileLaunches?: { unitId: string; targetH3Index: string }[];
+    }>;
+  };
+  const memory = require('./commanderKeyMemory') as {
+    writeSeatApiKeys: (entries: readonly { seatId: string; apiKey: string }[]) => void;
+  };
+  try {
+    openRouter.setSelectedModel('test-model');
+    await withThreeSeatMatch(async () => {
+      memory.writeSeatApiKeys([{ seatId: AI_SEAT_IDS[0], apiKey: 'test-openrouter-key' }]);
+      const origin = dbGetOne<{ h3Index: string }>(
+        'SELECT h3_index AS h3Index FROM units WHERE player = ? LIMIT 1',
+        [AI_SEAT_IDS[0]]
+      );
+      assert.ok(origin, 'the seat should have a unit');
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES ('near-m1', ?, 'missile', ?, 1)`,
+        [AI_SEAT_IDS[0], origin.h3Index]
+      );
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES ('far-m1', ?, 'missile', ?, 2)`,
+        [AI_SEAT_IDS[0], origin.h3Index]
+      );
+      ensureStrategicCoordinateRegistryInitialized();
+      const reach = missileReachSet(origin.h3Index);
+      const farther = getGameState().hexes.find((hex) => !reach.has(hex.h3Index));
+      assert.ok(farther, 'the map should contain a hex outside missile range');
+      const content = JSON.stringify({
+        message: 'hold',
+        strategy: 'hold',
+        orders: [],
+        airStrikes: [],
+        ferryOrders: [],
+        missileLaunches: [
+          { unitId: 'far-m1', targetHexCode: h3ToCode(farther.h3Index, { mode: 'strategic' }) },
+          { unitId: 'near-m1', targetHexCode: h3ToCode(origin.h3Index, { mode: 'strategic' }) },
+        ],
+        callbacks: [],
+      });
+      openRouter.setChatTransportOverrideForTests(async () => ({
+        ok: true as const,
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({ choices: [{ message: { content } }] }),
+      }));
+      const result = await openRouter.requestOrders(getGameState(), 'test-model', {
+        seatId: AI_SEAT_IDS[0],
+        enabledToolNames: [],
+        usePrecomputation: false,
+      });
+      assert.equal(result.success, true, result.error);
+      assert.deepEqual(result.missileLaunches?.map((launch) => launch.unitId), ['near-m1']);
+      assert.ok(
+        (result.dropReasons ?? []).some((reason) => reason.includes('more than')),
+        `expected an out-of-range drop: ${(result.dropReasons ?? []).join(' | ')}`
+      );
     });
   } finally {
     openRouter.setChatTransportOverrideForTests(null);

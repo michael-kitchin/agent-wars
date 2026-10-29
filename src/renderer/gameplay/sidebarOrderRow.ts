@@ -134,6 +134,7 @@ const ORDER_GROUP_ELEMENT_IDS: Readonly<Record<QueuedOrderGroup, { readonly list
     movement: { listId: 'pending-orders-list', countId: 'pending-orders-count' },
     ranged: { listId: 'ranged-attacks-list', countId: 'ranged-attacks-count' },
     strike: { listId: 'air-strikes-list', countId: 'air-strikes-count' },
+    launch: { listId: 'missile-launches-list', countId: 'missile-launches-count' },
   });
 
 /**

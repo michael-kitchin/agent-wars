@@ -14,12 +14,13 @@ import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
  *
  * Purpose: Widest strategic schema.
  * When to use: Field-order, closure, and example-fit checks.
- * Expected outcome: All eight envelope fields present.
+ * Expected outcome: Every strategic envelope field present, including missile launches.
  * Exceptions: None.
  */
 const STRATEGIC_ALL_ON: EnvelopeGates = {
   coordinateMode: 'strategic',
   includeAirActions: true,
+  includeMissileActions: true,
   includeMemoryUpdates: true,
   includeProductionOrders: true,
   includeStandingOrderActions: true,
@@ -260,6 +261,7 @@ function testTaughtExamplesFitSchema(): void {
         includeMemoryUpdates: true,
         includeProductionOrders: true,
         includeAirActions: true,
+        includeMissileActions: true,
         includeStandingOrderActions: true,
         coordinateMode: 'strategic',
       }),
@@ -477,7 +479,31 @@ function run(): void {
   testMemoryUpdateRowsRequireContentAndTier();
   testTaughtExamplesFitSchema();
   testTaughtCallbackParametersFitSchema();
+  testMissileLaunchesSchemaFollowsTheFlag();
   console.log('envelopeJsonSchema.test.ts passed');
+}
+
+/**
+ * Verifies `missileLaunches` is on the strategic schema only when the gate is on, and never on a tactical schema.
+ *
+ * Purpose: Structured output must not invite a launch the prompt omitted.
+ * When to use: After the envelope field list changes.
+ * Expected outcome: The property exists for the widest strategic gates and is absent when the flag is false or the mode is tactical.
+ * Exceptions: None.
+ */
+function testMissileLaunchesSchemaFollowsTheFlag(): void {
+  const on = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  assert.ok('missileLaunches' in on);
+  const off = asRecord(
+    envelopeSchema({ ...STRATEGIC_ALL_ON, includeMissileActions: false }).properties,
+    'properties'
+  );
+  assert.ok(!('missileLaunches' in off));
+  const tactical = asRecord(
+    envelopeSchema({ ...TACTICAL, includeMissileActions: true }).properties,
+    'properties'
+  );
+  assert.ok(!('missileLaunches' in tactical));
 }
 
 run();

@@ -36,6 +36,7 @@ export function strategicRangedRangeHexesForUnitType(unitType: string): number {
     armor: 1,
     naval: 2,
     air: 3,
+    missile: 0,
   };
   return table[unitType] ?? 0;
 }

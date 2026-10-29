@@ -1,6 +1,7 @@
 import { cellToLatLng } from 'h3-js';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { isMissileUnitType } from '../../shared/missileRules';
 import {
   COUNT_BADGE_OFFSET,
   ORDER_LINE_WIDTH,
@@ -204,6 +205,7 @@ export function drawResolutionMoveLines(
     const isHumanMove = move.player === HUMAN_SEAT_ID;
     const withArrow = !isHumanMove || includeArrowForHuman;
     const style = { color: orderColorForOwner(move.player), width: ORDER_LINE_WIDTH };
+    const continuous = isMissileUnitType(move.unitType) ? ({ continuous: true } as const) : undefined;
     const path = move.pathH3Indexes;
     if (path && path.length >= 2 && map) {
       const points = path.map((h) => {
@@ -213,14 +215,14 @@ export function drawResolutionMoveLines(
       });
       const hPen = path[path.length - 2]!;
       const arrow = withArrow ? routeEndArrow(hexCenterPx(hPen), hexCenterPxRelativeTo(hPen, path[path.length - 1]!)) : null;
-      drawOrderLine(ctx, { runs: [{ points, dash: ORDER_LINE_SOLID }], arrow }, style);
+      drawOrderLine(ctx, { runs: [{ points, dash: ORDER_LINE_SOLID, ...continuous }], arrow }, style);
       continue;
     }
     const from = hexCenterPx(move.fromH3Index);
     const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
     const shape = withArrow
-      ? straightOrderLineShape(from, to, UNIT_RADIUS)
-      : { runs: [{ points: [from, to], dash: ORDER_LINE_SOLID }], arrow: null };
+      ? straightOrderLineShape(from, to, UNIT_RADIUS, ORDER_LINE_SOLID, continuous)
+      : { runs: [{ points: [from, to], dash: ORDER_LINE_SOLID, ...continuous }], arrow: null };
     drawOrderLine(ctx, shape, style);
   }
   ctx.restore();

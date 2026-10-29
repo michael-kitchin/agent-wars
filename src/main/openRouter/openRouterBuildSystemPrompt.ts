@@ -12,6 +12,8 @@ import {
 } from '../../shared/homeRegionRules';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
 import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
+import { buildMissileForcesBriefingBlock } from './briefingSectionsMissiles';
+import { isMissileUnitType } from '../../shared/missileRules';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import {
@@ -106,6 +108,7 @@ export function buildSystemPromptForTools(
   const filtered = getFilteredToolMetadata(enabledToolNames, coordinateContext.mode);
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasAir = opponentUnits.some((u) => u.unitType === 'air');
+  const hasMissile = opponentUnits.some((u) => isMissileUnitType(u.unitType));
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const hasBestOptionsTable =
     hasPrecomputedBriefing && (briefingOverride ?? '').includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN);
@@ -182,8 +185,10 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const standingOrderBlock = flags.ordersEnabled ? injection.standingOrderText + '\n\n' : '';
   const productionBlock = flags.productionEnabled ? injection.productionText + '\n\n' : '';
   const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
+  const missileRaw = buildMissileForcesBriefingBlock(state, format, coordinateContext.mode);
   const sealiftRaw = buildSealiftBriefingBlock(state, format, coordinateContext.mode);
   const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
+  const missileBlock = missileRaw ? `${missileRaw}\n\n` : '';
   const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
 
   const hasRanged = opponentUnits.some((u) => unitHasDirectRangedPlanning(u.unitType, tacticalBattleActive));
@@ -292,14 +297,15 @@ ${contextCoaching}
   const sidesPrefix = sidesBlock.length > 0 ? `${sidesBlock}\n\n` : '';
   const scenarioPrefix = scenarioObjectiveBlock.length > 0 ? `${scenarioObjectiveBlock}\n\n` : '';
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeAirActions: hasAir,
+    includeMissileActions: hasMissile && coordinateContext.mode !== 'tactical',
     includeNavalActions: hasNaval,
     includeStandingOrderActions: standingOrdersIssuable,
     movementOrderInstruction,
@@ -311,6 +317,7 @@ ${contextCoaching}
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeAirActions: hasAir,
+    includeMissileActions: hasMissile && coordinateContext.mode !== 'tactical',
     includeStandingOrderActions: standingOrdersIssuable,
     coordinateMode: coordinateContext.mode,
   });
@@ -336,6 +343,7 @@ ${contextCoaching}
   const combatRulesParagraph = buildCombatRulesParagraph({
     coordinateMode: coordinateContext.mode,
     hasAirUnits: hasAir,
+    hasMissileUnits: hasMissile,
     hasNavalUnits: hasNaval,
     ordersEnabled: standingOrdersIssuable,
     originBonusSettings: originBonusSettingsFromSnapshot(state),

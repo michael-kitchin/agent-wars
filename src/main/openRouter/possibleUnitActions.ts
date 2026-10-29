@@ -22,6 +22,7 @@ import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { collectTacticalLegalRangedTargetHexes } from '../../shared/tacticalTerrainCombatModifiers';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
+import { isMissileUnitType } from '../../shared/missileRules';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { logDebug, logTrace } from '../logger';
 import {
@@ -307,6 +308,7 @@ export function collectAggregatedPossibleActionRows(args: {
   const strategicLandNavalOrigins = new Set<string>();
 
   for (const unit of opponentUnits) {
+    if (isMissileUnitType(unit.unitType)) continue;
     const legalDests = (() => {
       if (unit.unitType === 'air') {
         if (tacticalBattle) {

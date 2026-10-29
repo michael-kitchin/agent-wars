@@ -24,7 +24,9 @@ import { getActiveTacticalBattleSnapshot, isTacticalBattleActive } from '../tact
 import { validateTacticalGroupFerryTarget } from '../tacticalBattle/tacticalFerryAirportGuards';
 import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { strategicRangeOnState } from '../weather/weatherMatch';
+import { MISSILES_CANNOT_FIRE_IN_BATTLE_REASON, NO_SELECTED_MISSILES_REASON } from '../../shared/missileRules';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import { validateMissileLaunchOrder } from './missileValidation';
 import type { SubmitOrdersResult } from './gameActionsTypes';
 import { isWithinGridRangeSafe } from './gridRange';
 import { getLandMovementBlockReason, isLandUnitType } from './landMovementConstraints';
@@ -414,6 +416,29 @@ export function validateGroupFerryTarget(
       validateTacticalGroupFerryTarget(snap, uniqueUnitIds, destinationH3Index, tacticalAttackerPlayer),
     validateStrategicUnit: (unitId, strategicLabel) =>
       validateFerryOrder(unitId, destinationH3Index, {
+        allowedPlayer: HUMAN_PLAYER_ID,
+        displayLabelForUnit: strategicLabel,
+      }),
+  });
+}
+
+/**
+ * Validates one launch target for every selected missile.
+ *
+ * Purpose: The reticle uses the same reasons as a single-missile check.
+ * When to use: The missile launch IPC handler.
+ * Expected outcome: `{ success: true }` when every selected missile can launch at the hex. A battle refuses every launch.
+ * Exceptions: Logged as `validateGroupMissileLaunchTarget: exception`.
+ */
+export function validateGroupMissileLaunchTarget(unitIds: string[], targetH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions validateGroupMissileLaunchTarget', { unitCount: unitIds.length, targetH3Index });
+  return validateGroupTarget({
+    logName: 'validateGroupMissileLaunchTarget',
+    unitIds,
+    emptySelectionReason: NO_SELECTED_MISSILES_REASON,
+    validateTactical: () => ({ success: false, reason: MISSILES_CANNOT_FIRE_IN_BATTLE_REASON }),
+    validateStrategicUnit: (unitId, strategicLabel) =>
+      validateMissileLaunchOrder(unitId, targetH3Index, {
         allowedPlayer: HUMAN_PLAYER_ID,
         displayLabelForUnit: strategicLabel,
       }),

@@ -263,7 +263,7 @@ function dropUnitsWithoutTerrainCandidates(
  * Exceptions: None.
  */
 function summarizePlanCounts(entries: UnitPlanEntry[]): Record<BuildUnitType, number> {
-  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0, air: 0 };
+  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0, air: 0, missile: 0 };
   for (const entry of entries) counts[entry.unitType] += 1;
   return counts;
 }

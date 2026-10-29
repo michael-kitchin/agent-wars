@@ -34,7 +34,7 @@ export interface GameMapListSideGroup {
  *
  * Purpose: The start screen prints these under the unit names.
  * When to use: The tab and region that are currently selected.
- * Expected outcome: Positive integers. The global row is 20, 40, 100, and 60.
+ * Expected outcome: Positive integers. The global row is 20, 40, 100, 60, and 200.
  * Exceptions: None.
  */
 export interface GameMapListCosts {
@@ -74,6 +74,15 @@ export interface GameMapListCosts {
    * Exceptions: None.
    */
   readonly air: number;
+  /**
+   * Missile cost.
+   *
+   * Contract: Ten times the infantry cost.
+   * When to use: The missile cost label.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  readonly missile: number;
 }
 
 /**

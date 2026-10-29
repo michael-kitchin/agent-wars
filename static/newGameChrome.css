@@ -478,13 +478,14 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-size-row select {
   width: max-content;
 }
-/* One row of the four unit types: the map glyph on a gray disk, the cap for the game size, and the price. A wide font
-   wraps the row rather than widening the panel. */
+/* One row of the five unit types: the map glyph on a gray disk, the cap for the game size, and the price.
+   The row stays on one line inside the 432 px panel, including a three-digit price, rather than widening the panel. */
 .new-game-units {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: space-between;
-  gap: 6px 10px;
+  align-items: center;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -492,13 +493,14 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-unit {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   white-space: nowrap;
+  font-size: 11px;
 }
 .new-game-unit-token {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #b0b0b0;
   border: 1px solid #222;
@@ -507,8 +509,8 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   justify-content: center;
 }
 .new-game-unit-token img {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   pointer-events: none;
   filter: brightness(0.133);
 }

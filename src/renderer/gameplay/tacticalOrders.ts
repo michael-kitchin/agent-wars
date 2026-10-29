@@ -2,6 +2,7 @@ import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { selectionSupportAction, selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import {
   formatPendingAirStrikeSidebarLabel,
+  formatPendingMissileLaunchSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
 } from './orderLabelFormatting';
 import { rendererSharedState as S } from '../core/state';
@@ -24,7 +25,11 @@ export { refreshHoverRoutePreview };
  * Expected outcome: The name of the attack a click would aim, greyed out or not.
  * Exceptions: None.
  */
-const SUPPORT_BUTTON_NAMES = Object.freeze({ ranged: 'Ranged attack', strike: 'Air strike' });
+const SUPPORT_BUTTON_NAMES = Object.freeze({
+  ranged: 'Ranged attack',
+  strike: 'Air strike',
+  launch: 'Missile launch',
+});
 
 /**
  * Replaces pending support-order rows for the selected unit ids via a row builder.
@@ -90,6 +95,25 @@ export function replacePendingAirStrikesForSelected(
 }
 
 /**
+ * Replaces pending missile launches for the selected missiles.
+ *
+ * Purpose: A double-click on a legal target queues one launch per selected missile.
+ * When to use: After `validateGroupMissileLaunchTarget` succeeds.
+ * Expected outcome: Prior launches for those ids are replaced. Other missiles keep theirs.
+ * Exceptions: None.
+ */
+export function replacePendingMissileLaunchesForSelected(selectedIds: string[], targetH3Index: string): void {
+  replacePendingOrdersForSelected(
+    () => S.pendingMissileLaunches,
+    (next) => {
+      S.pendingMissileLaunches = next;
+    },
+    selectedIds,
+    (unitId) => ({ unitId, targetH3Index })
+  );
+}
+
+/**
  * Defines the `replacePendingFerryOrdersForSelected` function shape (export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void).
 
  * Purpose: Supports maintainability by documenting why `replacePendingFerryOrdersForSelected` exists.
@@ -109,11 +133,11 @@ export function replacePendingFerryOrdersForSelected(selectedIds: string[], dest
 }
 
 /**
- * Empties every draft order list (ranged, air strike, ferry, embark, tactical march) and turns Ranged and Strike targeting off.
+ * Empties every draft order list and turns Ranged, Strike, and Launch targeting off.
  *
  * Purpose: One reset for callers that discard all drafts, so no list is forgotten.
  * When to use: New game, tactical battle exit or session release, and preparing the strategic UI before a tactical battle auto-starts.
- * Expected outcome: All five lists are empty and both targeting modes are off. Standing orders and any in-flight AI planning are untouched.
+ * Expected outcome: The draft lists are empty and the targeting modes are off. Standing orders and any in-flight AI planning are untouched.
  * Exceptions: None.
  */
 export function clearPendingTacticalOrders(): void {
@@ -121,6 +145,8 @@ export function clearPendingTacticalOrders(): void {
   S.rangedModeActive = false;
   S.pendingAirStrikes = [];
   S.airStrikeModeActive = false;
+  S.pendingMissileLaunches = [];
+  S.missileLaunchModeActive = false;
   S.pendingFerryOrders = [];
   S.pendingEmbarkOrders = [];
   S.tacticalPendingMarches = [];
@@ -193,10 +219,24 @@ export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps):
 }
 
 /**
+ * Removes one missile's pending launch, turns Launch targeting off, and refreshes the panels and map.
+ *
+ * Purpose: Backs the cancel control on a pending launch row.
+ * When to use: From the missile launch list's row cancel callback.
+ * Expected outcome: Only that missile's launch is removed.
+ * Exceptions: None.
+ */
+export function cancelMissileLaunchForUnit(unitId: string, deps: TacticalOrderDeps): void {
+  S.pendingMissileLaunches = S.pendingMissileLaunches.filter((row) => row.unitId !== unitId);
+  S.missileLaunchModeActive = false;
+  finishTargetingDraftCancel(unitId, deps);
+}
+
+/**
  * Drops one unit's embark draft during a battle, then refreshes hover, sidebars, and the map.
  *
  * Purpose: Ranged and strike cancel share this refresh sequence after each has cleared its own draft and mode flag.
- * When to use: Only from `cancelRangedForUnit` and `cancelAirStrikeForUnit`, after those writes.
+ * When to use: Only from `cancelRangedForUnit`, `cancelAirStrikeForUnit`, and `cancelMissileLaunchForUnit`, after those writes.
  * Expected outcome: Embark rows for that unit are gone when a battle is active; panels and the map match the remaining drafts.
  * Exceptions: None.
  */
@@ -249,6 +289,7 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const listEl = document.getElementById('ranged-attacks-list');
   const strikeListEl = document.getElementById('air-strikes-list');
+  const launchListEl = document.getElementById('missile-launches-list');
   const btnEl = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
   const btnHostEl = document.getElementById('ranged-attack-tip-host');
   const strikeTypeEl = document.getElementById('air-strike-target-type') as HTMLSelectElement | null;
@@ -280,11 +321,25 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       )
     );
   }
+  if (launchListEl) {
+    renderSidebarOrderGroup(
+      'launch',
+      S.pendingMissileLaunches.map((launch) =>
+        sidebarOrderRowArgs(
+          launch.unitId,
+          formatPendingMissileLaunchSidebarLabel(S.gameState, launch, battle),
+          () => cancelMissileLaunchForUnit(launch.unitId, deps),
+          deps
+        )
+      )
+    );
+  }
 
   if (btnEl && btnHostEl) {
     const tb = S.tacticalBattleSnapshot;
     const rangedWasActive = S.rangedModeActive;
     const strikeWasActive = S.airStrikeModeActive;
+    const launchWasActive = S.missileLaunchModeActive;
     const unitTypes = selectedUnitTypes();
     const mode = selectionSupportButtonMode(unitTypes, !!tb);
     const action = selectionSupportAction(unitTypes, !!tb);
@@ -297,8 +352,15 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     btnHostEl.style.display = '';
     // The reticle has no visible label, so its name says which attack it aims, greyed out or not.
     btnEl.setAttribute('aria-label', SUPPORT_BUTTON_NAMES[action.kind]);
-    if (mode === 'strike') {
+    if (mode === 'launch') {
       S.rangedModeActive = false;
+      S.airStrikeModeActive = false;
+      btnEl.setAttribute('aria-pressed', String(S.missileLaunchModeActive));
+      btnEl.setAttribute('data-control-tooltip', supportButtonTooltipText('launch', S.missileLaunchModeActive));
+      if (strikeTypeEl) strikeTypeEl.style.display = 'none';
+    } else if (mode === 'strike') {
+      S.rangedModeActive = false;
+      S.missileLaunchModeActive = false;
       btnEl.setAttribute('aria-pressed', String(S.airStrikeModeActive));
       btnEl.setAttribute('data-control-tooltip', supportButtonTooltipText('strike', S.airStrikeModeActive));
       if (strikeTypeEl) {
@@ -307,6 +369,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       }
     } else if (mode === 'ranged') {
       S.airStrikeModeActive = false;
+      S.missileLaunchModeActive = false;
       btnEl.setAttribute('aria-pressed', String(S.rangedModeActive));
       btnEl.setAttribute('data-control-tooltip', supportButtonTooltipText('ranged', S.rangedModeActive));
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
@@ -316,10 +379,13 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       btnEl.removeAttribute('data-control-tooltip');
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
+      S.missileLaunchModeActive = false;
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
     }
     const targetingModeCleared =
-      (rangedWasActive && !S.rangedModeActive) || (strikeWasActive && !S.airStrikeModeActive);
+      (rangedWasActive && !S.rangedModeActive) ||
+      (strikeWasActive && !S.airStrikeModeActive) ||
+      (launchWasActive && !S.missileLaunchModeActive);
     if (targetingModeCleared) {
       S.hoverRoutePreview = null;
       showOrderBlockHexTooltip(null);

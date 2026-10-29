@@ -50,7 +50,15 @@ test('one seat cannot read another seat\'s commander stores', () => {
     const first = AI_SEAT_IDS[0];
     const second = AI_SEAT_IDS[1];
     const move: MovementOrder = { unitId: 'a2-inf', toH3Index: 'abc' };
-    setAiPendingOrders(second, [move], []);
+    const launch = { unitId: 'a2-m1', targetH3Index: 'def' };
+    setAiPendingOrders(second, {
+      movementOrders: [move],
+      rangedOrders: [],
+      airStrikeOrders: [],
+      ferryOrders: [],
+      embarkOrders: [],
+      missileLaunchOrders: [launch],
+    });
     addCombatSinceConsultation(second, ['a2-inf']);
     const kill: KillEdge = { victimId: 'a2-inf', killerIds: ['h-inf'] };
     addAiLossEventsSinceConsultation(second, 4, [{ id: 'a2-inf', player: second }], [kill]);
@@ -64,6 +72,7 @@ test('one seat cannot read another seat\'s commander stores', () => {
     assert.equal(getAndClearAiToolLimitExceededLastTurn(first), false);
 
     assert.equal(getAiPendingOrders(second)?.movementOrders[0]?.unitId, 'a2-inf');
+    assert.deepEqual(getAiPendingOrders(second)?.missileLaunchOrders, [launch]);
     assert.deepEqual(getCombatSinceConsultation(second), ['a2-inf']);
     assert.equal(getAiLossEventsSinceConsultation(second)[0]?.victimUnitId, 'a2-inf');
     assert.equal(getAiLastConsultationTurn(second), 4);

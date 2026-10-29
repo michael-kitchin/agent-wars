@@ -10,6 +10,7 @@
  */
 
 import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
+import { MISSILE_MIXED_MOVE_MESSAGE } from '../../shared/missileRules';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { observeModeControls } from '../../shared/observeModeControls';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
@@ -20,6 +21,7 @@ import {
 } from '../../shared/mapPlanningGesture';
 import { clearMapSelectionChrome } from '../core/selection';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
+import { planMissileLaunchFromDoubleClick } from './missileLaunchDoubleClick';
 import { rendererSharedState as S } from '../core/state';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import {
@@ -157,7 +159,7 @@ export async function handleMainMapDoubleClick(
     deps.pointerHitsDrawnUnitIcon(event.clientX, event.clientY, destinationH3);
 
   const decisionInput: MapDoubleClickDecisionInput = {
-    targetingModeActive: S.rangedModeActive || S.airStrikeModeActive,
+    targetingModeActive: S.rangedModeActive || S.airStrikeModeActive || S.missileLaunchModeActive,
     pointerHasHit: clickHit !== null,
     hasDestination: destinationH3 !== null,
     composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
@@ -215,6 +217,14 @@ export async function handleMainMapDoubleClick(
       deps.showMapToast('Cannot issue grouped movement for mixed air and non-air units.', { isError: true });
       return;
 
+    case 'rejectMissileMixed':
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
+        reason: 'mixed_missile_selection',
+        selectedCount: selectedAtMouseDown.length,
+      });
+      deps.showMapToast(MISSILE_MIXED_MOVE_MESSAGE, { isError: true });
+      return;
+
     case 'rejectFerry':
       emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
         reason: 'ferry_destination_rejected',
@@ -256,6 +266,10 @@ export async function handleMainMapDoubleClick(
       }
       S.selectedHexIndex = clickHit;
       const idsAtStart = [...selectedIds];
+      if (S.missileLaunchModeActive) {
+        await planMissileLaunchFromDoubleClick({ deps, clickHit, idsAtStart, acceptedDetails });
+        return;
+      }
       if (S.airStrikeModeActive) {
         if (!window.gameApi?.validateGroupAirStrikeTarget) {
           emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'support_target_api_missing' });

@@ -10,6 +10,7 @@
  */
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
@@ -31,6 +32,7 @@ import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalS
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
+import { applyParsedMissileLaunches } from './missileLaunchOrderParsing';
 import { dedupeByUnitKeepLast, unitIdsWhoseEarlierRowsWereDiscarded } from './requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
 
@@ -282,6 +284,14 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   const airSource = parsed.airStrikes ?? [];
   const ferrySource = parsed.ferryOrders ?? [];
   const embarkSource = parsed.embarkOrders ?? [];
+  const missileApplied = applyParsedMissileLaunches({
+    parsed: parsed.missileLaunches ?? [],
+    seatId,
+    tactical: tacticalBattle != null,
+    aiOrderUnitLabel,
+  });
+  dropReasons.push(...missileApplied.dropReasons);
+  const outMissile: MissileLaunchOrder[] = missileApplied.missileLaunches;
   for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(movementSource)) {
     dropReasons.push(`Duplicate order for ${aiOrderUnitLabel(unitId)}`);
   }
@@ -512,6 +522,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     airStrikes: outAir.length,
     ferry: outFerry.length,
     embark: outEmbark.length,
+    missileLaunches: outMissile.length,
     dropped: dropReasons.length,
     dropReasons,
   });
@@ -528,6 +539,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     } else {
       bits.push(`${outAir.length} air strike(s)`);
       bits.push(`${outFerry.length} ferry`);
+      bits.push(`${outMissile.length} missile launch(es)`);
     }
     const dropNote = dropReasons.length > 0 ? `; ${dropReasons.length} validation note(s)` : '';
     const tokNote =
@@ -543,6 +555,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     airStrikes: outAir.length > 0 ? outAir : undefined,
     ferryOrders: outFerry.length > 0 ? outFerry : undefined,
     embarkOrders: outEmbark.length > 0 ? outEmbark : undefined,
+    missileLaunches: outMissile.length > 0 ? outMissile : undefined,
     strategy: parsed.strategy,
     message: parsed.message,
     dropped: dropReasons.length,

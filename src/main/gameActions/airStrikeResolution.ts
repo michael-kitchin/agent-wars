@@ -15,7 +15,7 @@ import {
 } from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
-import { casualtyPriorityIndex, getDefense, getRange } from '../combatConstants';
+import { compareCasualtyOrder, getRange } from '../combatConstants';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { createCombatDiceLog, rollCombatDieAgainst, type CombatDiceLog } from '../combatDiceRecording';
@@ -400,9 +400,7 @@ function resolveAirStrikeAgainstUnits(
   let success = false;
   let attackerLost = false;
   if (attackHit && defenders.length > 0) {
-    const victim = defenders
-      .map((u) => ({ ...u, defense: getDefense(u.unit_type), order: casualtyPriorityIndex(u.unit_type) }))
-      .sort((a, b) => a.defense - b.defense || a.order - b.order)[0]!;
+    const victim = [...defenders].sort((a, b) => compareCasualtyOrder(a.unit_type, b.unit_type))[0]!;
     dbRun('DELETE FROM units WHERE id = ?', [victim.id]);
     recordRemovedUnit(acc, victim);
     success = true;

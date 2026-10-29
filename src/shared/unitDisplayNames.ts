@@ -94,6 +94,7 @@ naval: 'Fleet',
    * Exceptions: None.
    */
 air: 'Squadron',
+  missile: 'Missile',
 };
 
 /**

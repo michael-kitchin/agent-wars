@@ -1,3 +1,4 @@
+import { isMissileUnitType } from '../../shared/missileRules';
 import { representativeMarchPreviewUnitIdsByOriginH3 } from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
 import {
@@ -15,7 +16,7 @@ import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '..
 import { hideOrderSlowerHexTooltip, scheduleOrderEffectsTooltip } from '../map/orderSlowerHexTooltip';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipStrategicState';
 import { buildOrderPreviewEffectsTooltipInput } from './orderPreviewEffectsContext';
-import { getPreviewHumanMarchOrders, getValidateGroupAirStrikeTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
+import { getPreviewHumanMarchOrders, getValidateGroupAirStrikeTarget, getValidateGroupMissileLaunchTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
 import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGroupedTargeting';
 import { hoverRoutePreviewAsyncContextStillValid } from './hoverRoutePreviewStale';
 import type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
@@ -33,8 +34,7 @@ import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 function publishHoverRoutePreview(
   deps: TacticalOrderDeps,
   preview: HoverRoutePreviewState | null,
-  rangedValidationReason: string | null,
-  airStrikeValidationReason: string | null,
+  supportValidationReason: string | null,
   allowBlockingOrderTooltip: boolean
 ): void {
   S.hoverRoutePreview = preview;
@@ -57,10 +57,9 @@ function publishHoverRoutePreview(
   const msg = resolveOrderBlockHexTooltipMessage(
     preview.hoveredH3Index,
     preview.data,
-    preview.renderAsSupportTargeting === 'ranged',
-    preview.renderAsSupportTargeting === 'air',
-    preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
-    preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
+    preview.renderAsSupportTargeting
+      ? { kind: preview.renderAsSupportTargeting, reason: supportValidationReason }
+      : null
   );
   const effectsHtml = resolveOrderPreviewEffectsTooltipHtml(
     buildOrderPreviewEffectsTooltipInput({
@@ -116,7 +115,7 @@ function publishGroupedSupportTargetingPreview(args: {
   hoveredH3: string;
   unitIds: readonly string[];
   validation: { success: boolean; reason?: string | null };
-  supportKind: 'ranged' | 'air';
+  supportKind: 'ranged' | 'air' | 'missile';
   originH3ForGrouping: (unitId: string) => string | undefined;
   originH3ForPreview: (unitId: string) => string | undefined;
   allowBlockingOrderTooltip: boolean;
@@ -136,13 +135,7 @@ function publishGroupedSupportTargetingPreview(args: {
     args.validation.reason ?? null,
     args.originH3ForPreview
   );
-  publishHoverRoutePreview(
-    args.deps,
-    { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind },
-    args.supportKind === 'ranged' ? reason : null,
-    args.supportKind === 'air' ? reason : null,
-    args.allowBlockingOrderTooltip
-  );
+  publishHoverRoutePreview(args.deps, { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind }, reason, args.allowBlockingOrderTooltip);
 }
 
 /**
@@ -163,14 +156,14 @@ export async function refreshHoverRoutePreview(
   const seq = ++S.hoverPreviewRequestSeq;
   if (S.tacticalBattleSnapshot) {
     if (unitIds.length === 0 || !hoveredH3) {
-      publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+      publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
       return;
     }
     const tb = S.tacticalBattleSnapshot;
     if (S.rangedModeActive && !S.airStrikeModeActive) {
       const validateRanged = getValidateGroupRangedTarget();
       if (!validateRanged) {
-        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
         return;
       }
       const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
@@ -190,7 +183,7 @@ export async function refreshHoverRoutePreview(
     if (S.airStrikeModeActive) {
       const validateAir = getValidateGroupAirStrikeTarget();
       if (!validateAir) {
-        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
         return;
       }
       const validation = await validateAir({
@@ -219,7 +212,7 @@ export async function refreshHoverRoutePreview(
     if (tacticalHasAir && tacticalHasNonAir) {
       const data = buildTacticalMixedAirNonAirHoverEnvelope(unitIds);
       if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, allowBlockingOrderTooltip);
       return;
     }
     const allAirTactical =
@@ -227,29 +220,29 @@ export async function refreshHoverRoutePreview(
     if (allAirTactical) {
       const validateFerry = window.gameApi?.validateGroupFerryTarget;
       if (!validateFerry) {
-        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
         return;
       }
       const validation = await validateFerry({ unitIds, destinationH3Index: hoveredH3 });
       if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
       const data = buildTacticalFerryHoverPreview(tb, unitIds, hoveredH3, validation);
-      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, allowBlockingOrderTooltip);
       return;
     }
     const data = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
     if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-    publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+    publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, allowBlockingOrderTooltip);
     return;
   }
   if (unitIds.length === 0 || !hoveredH3 || !S.gameState) {
-    publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+    publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
     return;
   }
   const gs = S.gameState;
   if (S.rangedModeActive && !S.airStrikeModeActive) {
     const validateRanged = getValidateGroupRangedTarget();
     if (!validateRanged) {
-      publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+      publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
       return;
     }
     const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
@@ -269,7 +262,7 @@ export async function refreshHoverRoutePreview(
   if (S.airStrikeModeActive) {
     const validateAir = getValidateGroupAirStrikeTarget();
     if (!validateAir) {
-      publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+      publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
       return;
     }
     const validation = await validateAir({
@@ -290,12 +283,36 @@ export async function refreshHoverRoutePreview(
     });
     return;
   }
+  if (S.missileLaunchModeActive) {
+    const validateMissile = getValidateGroupMissileLaunchTarget();
+    if (!validateMissile) {
+      publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    const validation = await validateMissile({ unitIds, targetH3Index: hoveredH3 });
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+    publishGroupedSupportTargetingPreview({
+      deps,
+      hoveredH3,
+      unitIds,
+      validation,
+      supportKind: 'missile',
+      originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
+      allowBlockingOrderTooltip,
+    });
+    return;
+  }
+  if (unitIds.some((unitId) => isMissileUnitType(gs.units.find((unit) => unit.id === unitId)?.unitType ?? ''))) {
+    publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+    return;
+  }
   const previewMarch = getPreviewHumanMarchOrders();
   if (!previewMarch) {
-    publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+    publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
     return;
   }
   const data = await previewMarch({ unitIds, hoveredH3Index: hoveredH3 });
   if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-  publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+  publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, allowBlockingOrderTooltip);
 }

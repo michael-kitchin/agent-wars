@@ -19,6 +19,7 @@ import {
 } from '../../shared/tacticalTerrainMovement';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
+import { isMissileUnitType } from '../../shared/missileRules';
 import { HUMAN_SEAT_ID, isNeutralOwnerId, type OwnerId } from '../../shared/seatIds';
 import { opposingPartyIdOf } from './opposingParty';
 import { tacticalLogError, tacticalLogMutate } from './tacticalLogging';
@@ -272,6 +273,7 @@ export type TacticalMovementBlockReason =
   | 'outside_footprint'
   | 'out_of_range'
   | 'air_no_march'
+  | 'missile_no_march'
   | 'embarked_cargo';
 
 /**
@@ -371,6 +373,9 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
       !!u.embarkedOnSubUnitId &&
       args.order.toH3Index !== u.h3Index;
     pathfindUnit = opponentDebarkingIndependently ? { ...u, embarkedOnSubUnitId: undefined } : u;
+  }
+  if (isMissileUnitType(u.unitType)) {
+    return { ok: false, reason: 'missile_no_march', context: { unitId: args.order.unitId } };
   }
   const moveType = tacticalMovementUnitTypeForPathfinding(pathfindUnit, args.order.toH3Index);
   if (moveType === 'air') {

@@ -69,6 +69,9 @@ describe('formatTacticalSubUnitId and parseTacticalSubUnitId', () => {
     assert.equal(UNIT_TYPE_ID_CODES.armor, 't');
     assert.equal(UNIT_TYPE_ID_CODES.naval, 'n');
     assert.equal(UNIT_TYPE_ID_CODES.air, 'a');
+    assert.equal(UNIT_TYPE_ID_CODES.missile, 'm');
+    assert.equal(formatStrategicUnitId({ player: 'human', unitType: 'missile', ordinal: 3 }), 'h1-m3');
+    assert.equal(parseStrategicUnitId('h1-m3')?.unitType, 'missile');
     assert.ok(!Object.values(UNIT_TYPE_ID_CODES).includes('s'));
   });
 });
@@ -110,6 +113,7 @@ describe('unitTypeFromUnitId', () => {
       armor: 'h1-t1',
       naval: 'h1-n1',
       air: 'h1-a1',
+      missile: 'h1-m1',
     };
     for (const unitType of ALL_BUILD_UNIT_TYPES) {
       assert.equal(unitTypeFromUnitId(expected[unitType]), unitType);

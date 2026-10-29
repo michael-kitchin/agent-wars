@@ -128,7 +128,7 @@ export {
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 23;
+export const EXPECTED_USER_VERSION = 24;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).

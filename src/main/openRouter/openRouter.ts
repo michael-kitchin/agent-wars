@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
 import { getRange } from '../combatConstants';
+import { isMissileUnitType, MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
@@ -417,6 +418,7 @@ function validateAiOrder(
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
   if (unit.player !== seatId) return { valid: false, reason: "A commander can order only its own side's units" };
+  if (isMissileUnitType(unit.unitType)) return { valid: false, reason: MISSILE_CANNOT_MOVE_REASON };
 
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.toH3Index)) return { valid: false, reason: 'Destination not on map' };

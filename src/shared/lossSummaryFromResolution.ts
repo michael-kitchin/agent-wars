@@ -2,6 +2,7 @@
  * Normalizes combat resolution payloads into per-player, per-cause loss summaries.
  */
 
+import { isBuildUnitType } from './ipc/productionTypes';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
 import type { RemovedUnitSnapshot } from './ipc/readyTypes';
 import {
@@ -108,6 +109,15 @@ export interface BuildTurnLossSummaryArgs {
    */
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
   /**
+   * Air destroyed by a missile, which outranks an air-strike listing of the same unit.
+   *
+   * Contract: May overlap `airStrikeRemovedUnits` and `removedUnits`.
+   * When to use: Strategic Ready.
+   * Expected outcome: Unclaimed snapshots map to `missileStrike`.
+   * Exceptions: None.
+   */
+  missileStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
+  /**
    * Unit ids of air strikers lost to counter-fire or AA (from `airStrikeMoves` where `returnsToBase` is false).
    *
    * Contract: Striker ids only; excludes enemy units destroyed by the strike.
@@ -159,12 +169,11 @@ export interface BuildTurnLossSummaryArgs {
  *
  * Purpose: Rejects unknown unit types before they reach formatters.
  * When to use: When resolving victim metadata during `buildTurnLossSummary`.
- * Expected outcome: One of the four build unit types or null when unsupported.
+ * Expected outcome: A build unit type, or null when the string is not one.
  * Exceptions: None.
  */
 function normalizeUnitType(raw: string): LostUnitType | null {
-  if (raw === 'naval' || raw === 'air' || raw === 'armor' || raw === 'infantry') return raw;
-  return null;
+  return isBuildUnitType(raw) ? raw : null;
 }
 
 /**
@@ -192,6 +201,7 @@ function snapshotById(snapshots: readonly RemovedUnitSnapshot[]): Map<string, Re
 function allRemovedSnapshots(args: BuildTurnLossSummaryArgs): RemovedUnitSnapshot[] {
   const byId = new Map<string, RemovedUnitSnapshot>();
   for (const s of args.removedUnits ?? []) byId.set(s.id, s);
+  for (const s of args.missileStrikeRemovedUnits ?? []) byId.set(s.id, s);
   for (const s of args.airStrikeRemovedUnits ?? []) byId.set(s.id, s);
   return [...byId.values()];
 }
@@ -320,7 +330,7 @@ function causeForAirStrikeRemovedUnit(
  *
  * Purpose: Single normalizer for popup display and persisted turn-note loss JSON.
  * When to use: After strategic Ready finalize, tactical beat commit, and renderer toast assembly.
- * Expected outcome: Complete partition of removed units into five causes per player; fog may hide opponent victims in renderer.
+ * Expected outcome: Complete partition of removed units into six causes per player; fog may hide opponent victims in renderer.
  * Exceptions: None.
  */
 export function buildTurnLossSummary(args: BuildTurnLossSummaryArgs): TurnLossSummary {
@@ -345,6 +355,10 @@ export function buildTurnLossSummary(args: BuildTurnLossSummaryArgs): TurnLossSu
     assignFromEdges(args.killsByMelee, 'melee');
   } else {
     assignFromEdges(args.kills, 'melee');
+  }
+
+  for (const snap of args.missileStrikeRemovedUnits ?? []) {
+    if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, 'missileStrike');
   }
 
   for (const snap of args.airStrikeRemovedUnits ?? []) {
@@ -392,6 +406,7 @@ export function buildTurnLossSummaryFromReadyShape(args: {
   killsByMelee?: readonly KillEdge[];
   killsByAirStrike?: readonly KillEdge[];
   removedUnits?: readonly RemovedUnitSnapshot[];
+  missileStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
   airStrikeAttackerLossUnitIds?: readonly string[];
   resolveDisplayName: (unitId: string) => string;

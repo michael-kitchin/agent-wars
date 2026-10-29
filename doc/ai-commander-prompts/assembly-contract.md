@@ -31,11 +31,12 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 | 7 | `# Scenario Objective (Required)` | gated section |
 | 8 | `Strategic context:` coaching block | prose bullets |
 | 9 | `# Air Operations Status` | gated section |
-| 10 | `# Naval Transport Status` | gated section |
-| 11 | `# Available Tools` | section with numbered tool lines and guidance bullets |
-| 12 | Observed enemy roster line | prose, one line |
-| 13 | Response envelope contract | prose |
-| 14 | Response envelope example | compact JSON, no fence |
+| 10 | `# Missile Forces` | gated section, strategic only |
+| 11 | `# Naval Transport Status` | gated section |
+| 12 | `# Available Tools` | section with numbered tool lines and guidance bullets |
+| 13 | Observed enemy roster line | prose, one line |
+| 14 | Response envelope contract | prose |
+| 15 | Response envelope example | compact JSON, no fence |
 
 Ordering rules that must not be relaxed:
 
@@ -74,6 +75,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `# Scenario Objective (Required)` | when `scenarioId === 'region_vs_region'` | never | omit |
 | `Strategic context:` block | always | always (tactical variant) | n/a |
 | `# Air Operations Status` | when the opponent has at least one air unit | when the opponent has at least one air sub-unit in this battle | omit the section |
+| `# Missile Forces` | when the opponent has at least one missile | never | omit the section |
 | `# Naval Transport Status` | when the opponent has at least one naval unit | when the opponent has at least one naval sub-unit in this battle | omit the section |
 | `# Available Tools` | always | always | `No tools available.` |
 | Observed enemy roster line | always | always | the helper's empty-roster phrasing |
@@ -125,6 +127,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `orders` | array | required, third | Per-unit actions, processed in list order |
 | `airStrikes` | array | present when the opponent has air units | Strike actions |
 | `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, dests are intact airport cells in the footprint; strike-or-ferry exclusivity still applies. |
+| `missileLaunches` | array | present when the opponent has a missile and the consult is strategic | One launch per missile. Each entry uses `unitId` or `unitIds` and `targetHexCode`. A battle consult does not offer the field. |
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
 | `memoryUpdates` | array | present when memory tools are enabled | Write or delete. A write requires `content` and `tier`. A strategic consult applies the rows through `executeMemory` when memory tools are enabled; a rejected row is a drop reason. A battle consult does not apply them. A list sent while the group is off is not stored. |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
@@ -136,7 +139,7 @@ Envelope-wide rules the prompt must state:
 3. Optional arrays may be omitted or empty. An omitted or empty `callbacks` field clears all subscriptions.
 4. Legacy top-level `movementOrders` and `rangedAttacks` are invalid.
 5. Every `orders` entry carries an `action` and a `unitId` or a `unitIds` array. `unitIds` is the compact form for several actors sharing the same action and destination or target, copied from a Best Options `Unit IDs` cell. A non-empty `unitIds` list is the actor set; otherwise `unitId` is. The engine expands the list into per-unit orders. The prompt must tell the model to prefer `unitIds` whenever a row lists more than one id, because one JSON object per unit will not fit a large roster inside the completion budget.
-6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries. The engine logs a drop reason for incomplete `orders`, `airStrikes`, `ferryOrders`, `productionOrders`, and `memoryUpdates` entries, but nothing about a drop reaches the model. When one unit has more than one movement, ranged, air, ferry, or embark row, the last row is kept and each discarded earlier row logs a drop reason.
+6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries. The engine logs a drop reason for incomplete `orders`, `airStrikes`, `ferryOrders`, `missileLaunches`, `productionOrders`, and `memoryUpdates` entries, but nothing about a drop reaches the model. When one unit has more than one movement, ranged, air, ferry, embark, or missile-launch row, the last row is kept and each discarded earlier row logs a drop reason.
 7. Output is compact JSON only: no prose, no commentary, no markdown fence, and no extra whitespace around the submitted object.
 
 ### 5.2 Action legality by mode
@@ -150,6 +153,7 @@ Envelope-wide rules the prompt must state:
 | `embark`, `transport_move`, `disembark` | legal when the opponent has naval units | legal when the opponent has naval sub-units |
 | `airStrikes` entries | legal when the opponent has air units | legal when the opponent has air sub-units, targeting anywhere in the footprint |
 | `ferryOrders` entries | legal when the opponent has air units | legal when the opponent has air sub-units; dests are intact airport cells in the footprint |
+| `missileLaunches` entries | legal when the opponent has a missile | **forbidden** |
 | `memoryUpdates` entries | legal when memory tools are enabled | **forbidden** |
 | `productionOrders` entries | legal when production tools are enabled | **forbidden** |
 
@@ -160,9 +164,9 @@ The repair schema in [`consultation-flow.md`](consultation-flow.md) must offer e
 System-prompt content, both modes. Each item states the rule and why the model needs it; the mode files fix the wording and placement, and the strategic and tactical variants of each must not disagree.
 
 1. **Period-start resolution.** Attacks resolve from positions held at the start of the period, before movement is applied. A unit may therefore fire and move in the same period, and firing costs it nothing. Carries `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
-2. **Resolution order.** The strategic period resolves as embark, air strikes, ranged fire, movement, cargo sync, ferry, then melee. A tactical beat resolves the same list with cargo sync after ferry. The model needs this to understand that a unit it moves into contact will fight in melee this same period, that embarked cargo stays with the transport until sync, and that a ferried air unit arrives after ground movement. Carries `WEGO_PHASE_ORDER`.
+2. **Resolution order.** The strategic period resolves as embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, then melee. A tactical beat omits missile launches and puts cargo sync after ferry. The model needs this to understand that a unit it moves into contact will fight in melee this same period, that embarked cargo stays with the transport until sync, and that a ferried air unit arrives after ground movement. Carries `WEGO_PHASE_ORDER`.
 3. **One action per unit.** At most one ranged action per unit per period, and at most one air action when air is present; an air unit that strikes cannot also rebase. The air half of this sentence is omitted when the opponent has no air units. Carries `ATTACK_ONE_PER_UNIT`, `AIR_ORDER_RESTRICTIONS`.
-4. **Target selection.** Hits fall on the lowest-defense defender first, then in the fixed type order. Firing into a stack therefore removes its weakest unit, which is what makes stacked targets attractive. Carries `CASUALTY_PRIORITY`.
+4. **Target selection.** Hits fall on the lowest-defense defender first, then infantry, armor, naval, air. A missile is hit last and never rolls. Firing into a stack therefore removes its weakest unit, which is what makes stacked targets attractive. Carries `CASUALTY_PRIORITY`.
 5. **Friendly stacking is legal; enemy-occupied cells are move/melee contact.** Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee option — copy that Target Hex into the move field to make contact. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest. Carries `LEGAL_DEST_OCCUPANCY`.
 6. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy a ranged row into a ranged action, a move or approach row into the move field, and an air or ferry row into those tails when they are present. Copy them into one envelope entry using `unitIds` when the row lists more than one id; pick one row per unit per action; never copy a Target Hex from a row that does not list that unit; route only for something unlisted. Carries `BEST_OPTIONS_ROWS`.
 7. **Codes are copied exactly.** Two characters, taken from this prompt. Carries `HEX_IDENTITY`.

@@ -20,6 +20,7 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
   armor: 4,
   naval: 3,
   air: 0,
+  missile: 0,
 });
 
 /**
@@ -47,6 +48,7 @@ export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Objec
   armor: 5,
   naval: 10,
   air: 99,
+  missile: 0,
 });
 
 /**

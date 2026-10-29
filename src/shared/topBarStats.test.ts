@@ -48,8 +48,8 @@ test('computeTopBarStats skips neutral-border hexes for production', () => {
 test('computeTopBarStats counts human units against the game-size cap', () => {
   const stats = computeTopBarStats(input, notNeutral);
   assert.equal(stats.unitsFielded, 4);
-  assert.equal(stats.unitCap, 34);
-  assert.deepEqual(stats.fieldedByType, { infantry: 2, armor: 1, naval: 0, air: 1 });
+  assert.equal(stats.unitCap, 36);
+  assert.deepEqual(stats.fieldedByType, { infantry: 2, armor: 1, naval: 0, air: 1, missile: 0 });
 });
 
 test('computeTopBarStats counts human-held hexes of both home regions once each', () => {
@@ -62,7 +62,7 @@ test('computeTopBarStats treats missing lists as empty', () => {
   const stats = computeTopBarStats({ units: [] }, notNeutral);
   assert.equal(stats.productionPerTurn, 0);
   assert.deepEqual(stats.yourHome, { held: 0, total: 0 });
-  assert.equal(stats.unitCap, 34);
+  assert.equal(stats.unitCap, 36);
 });
 
 test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () => {
@@ -70,7 +70,7 @@ test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () =
   assert.deepEqual(formatTopBarStatParts(stats), {
     production: '+1,530',
     forces: '4',
-    forcesCap: '/34',
+    forcesCap: '/36',
     humanHome: '2',
     humanHomeTotal: '/3',
     enemyHome: '1',
@@ -78,7 +78,7 @@ test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () =
     cities: '',
     citiesTooltip: '',
   });
-  assert.equal(formatForcesBreakdown(stats), 'infantry 2 of 12, armor 1 of 8, naval 0 of 8, air 1 of 6');
+  assert.equal(formatForcesBreakdown(stats), 'infantry 2 of 12, armor 1 of 8, naval 0 of 8, air 1 of 6, missile 0 of 2');
 });
 
 const secondAi = aiSeatIdForIndex(2);

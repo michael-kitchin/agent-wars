@@ -23,6 +23,7 @@ import {
   closeGameDatabaseForTests,
 } from '../gameDb';
 import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './standingOrders';
+import { testMissileRefusesMarchAcceptsHoldAndKeepsIt } from './standingOrdersMissileCases';
 import type { GameStateSnapshot } from '../gameDb';
 
 /**
@@ -957,6 +958,7 @@ function run(): void {
   testAssignOrderPursueTargetNotFound();
   testAssignOrderPatrolTooFewWaypoints();
   testAssignOrderAirUnitRejectsMovementOrders();
+  testMissileRefusesMarchAcceptsHoldAndKeepsIt();
   testQueryOrdersRequiresUnitIdOrAll();
   testCancelOrderWhenNoOrder();
   testGetInjectionTextEmpty();

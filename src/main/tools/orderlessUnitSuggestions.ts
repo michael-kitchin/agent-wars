@@ -38,7 +38,7 @@ import {
   ACTION_APPROACH,
   ACTION_MOVES_MELEE,
 } from '../openRouter/possibleUnitActionsTableAssembly';
-import { canAssignStandingOrderType } from './standingOrdersShared';
+import { standingOrderTypeRejectionReason } from './standingOrdersShared';
 import { stayPutFriendlyOccupiedHexes, readStandingThisPeriodMoves } from './stayPutFriendlyOccupancy';
 
 /** Action labels that count as a one-step move the model can copy this turn. */
@@ -474,7 +474,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
     const unit = unitsById.get(unitId);
     if (!unit) continue;
     let suggestion: OrderlessMissionSuggestion | null = null;
-    if (!canAssignStandingOrderType(unit.unitType, 'march')) {
+    if (standingOrderTypeRejectionReason(unit.unitType, 'march') !== null) {
       if (airStrikeUnitIds?.has(unitId)) {
         suggestion = { orderType: 'defend', destinationH3: unit.h3Index };
       }

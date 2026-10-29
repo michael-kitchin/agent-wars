@@ -41,12 +41,12 @@ One paragraph, in this order. Every clause is required unless marked.
 
 1. Dice model: one d20 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17 (`buildCombatStatsLine`).
 2. Per-type stats and reach: attack, defense, and strategic ranged reach for each of infantry, armor, naval, and air. Reach values come from `strategicRangedRangeHexesForUnitType`; a reach of zero is stated as melee only.
-3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air (`buildCasualtySortRule`).
+3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last (`buildCasualtySortRule`).
 4. Origin bonus, included only when the origin bonus is on: a unit in a hex in the area where it was built adds 2 (Low) or 4 (High) to every value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. That area is its birth country in a global game and its origin area in a regional game. An air unit qualifies by its base when the opponent has air units. Casualty order still uses the printed defense values (`buildOriginBonusRule`).
 5. Tech bonus, included only when that flag is on (`buildTechBonusRule`). An Advanced unit, born in a hex with at least the loaded map's Advanced threshold (21 urban cells on the global map), adds 2 to its attack at Low and High, and also 2 to its defense at High. A Basic unit adds nothing. At Low, the tech bonus does not change defense. Casualty order still uses the printed defense values. The Unit Status Bonus column names the clause.
 6. Weather bonus, included only when that flag is on (`buildWeatherRule`). The turn line names the date. A global date reads `November, Year 3`. A regional date reads `November 22nd, Year 1`. Weather changes when that date enters a new month. The Unit Status Weather column names the weather of the hex where the unit stands, with birth tags in parentheses. Armor and naval move less in the weather they lack (High adds heat for armor and rain for naval), armor ranged attack is lower in snow or heat, air strikes are lower when the base or the target is weather the unit lacks (3 lower at Low, 5 at High), and a ferry into snow is 2 hexes. None of these penalties applies to a unit tagged for that weather. Weather does not change defense, melee, or casualty order.
 7. Terrain cover, always included (`buildTerrainCoverRule`): ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands; an air strike on units in a forest hex needs a roll 1 lower; melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. A city hex uses the higher of its terrain cover and city cover in each column. A rugged hex uses the higher of its terrain cover and rugged ground cover. Values come from `TERRAIN_COVER_BY_CATEGORY`.
-8. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
+8. Resolution order for the turn: embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
 9. Copy each ranged row that Best Options This Turn lists for that unit, and do not invent a target the table omits. Those attacks resolve from turn-start positions and do not prevent movement in the same turn (`buildAttackConstraintsClause`). When the opponent has air units, that sentence names air-strike rows as well.
 10. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
 11. Infantry has no strategic ranged action and closes to melee instead.
@@ -56,9 +56,10 @@ One paragraph, in this order. Every clause is required unless marked.
 15. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
 16. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
 17. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
+18. Missile sentence, included only when the opponent has a missile (`buildMissileEmploymentRule`): a missile never moves and is spent when it launches; the launch is a `missileLaunches` entry at an explored hex within `missileRangeHexes()` hexes; launches resolve before air strikes and always hit; each city, airport, and seaport cell survives only on its own d20 of 20; based air is destroyed when an airport cell is destroyed; other units in the hex are unharmed; the missile keeps `hold_fire` and takes no other standing order.
 
 - **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
-- **Include:** always; clauses 15 and 16 are roster-gated, clause 4 is gated by the origin bonus flag, clause 5 is gated by the tech bonus flag, and clause 6 is gated by the weather bonus flag. **Empty-state:** not possible.
+- **Include:** always; clauses 15, 16, and 18 are roster-gated, clause 4 is gated by the origin bonus flag, clause 5 is gated by the tech bonus flag, and clause 6 is gated by the weather bonus flag. **Empty-state:** not possible.
 - **Model use:** every firing and movement decision in the turn.
 
 Assessment-tool and combat-estimate hints must **not** appear when a precomputed briefing is attached, because those tools are not callable in that configuration.
@@ -201,6 +202,12 @@ Bullets in this order.
 - **Items:** `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 - **Model use:** for each air unit, decide strike or rebase; never both.
 
+### 1.9a `# Missile Forces`
+
+- **Include:** in a strategic consultation when the opponent has at least one missile. **Omit** in a battle, and omit when the roster has no missile (`buildMissileForcesBriefingBlock`).
+- **Content:** `missileForcesRulesLine`, a `| Unit ID | Hex |` table of own missiles sorted by id, then either `MISSILE_TARGETS_TABLE_INTRO` and a target table capped at `MISSILE_BRIEFING_TARGET_LIMIT` (8) or `NO_MISSILE_TARGETS_LINE`.
+- **Model use:** copy a launch into `missileLaunches`. Best Options does not list a missile.
+
 ### 1.10 `# Naval Transport Status`
 
 - **Include:** when the opponent has at least one naval unit. **Omit** the whole section otherwise, along with the sealift actions, the routing-tool land-target clause, and the naval combat clause.
@@ -283,6 +290,7 @@ Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md
 | `disembark` | `unitId`, `destination` | Clears the cargo assignment and marches in one action. |
 | `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target unit id, `targetType` of units, urban, airport, or seaport | Within the strike radius of an intact, controlled base. One air action per unit per turn. |
 | `ferryOrders` entry | `unitId` or `unitIds`, `destination` | Airport to airport within the ferry radius. A unit that strikes this turn must not also ferry; a ferry order for a striking unit is discarded. |
+| `missileLaunches` entry | `unitId` or `unitIds`, `targetHexCode` | Present only when the opponent has a missile and the consult is strategic. One launch per missile. The target is an explored hex within `missileRangeHexes()`. A missile cannot be given march, patrol, pursue, defend, or ranged orders. |
 | `memoryUpdates` entry | write or delete with a key, and content plus tier for a write | Keys are short and restricted to letters, digits, hyphen, and underscore; content is length-limited. There is no memory write tool. |
 | `productionOrders` entry | `action`, `hex`, `unitType`, `count` | Count is a whole number from one to ninety-nine. Each entry replaces that cell's whole queue with one type and count. An entry missing `action` or a required field is dropped. At least one `set_build_queue` is required this turn when any controlled hex has an empty queue, or a queue blocked at cap while another type can still be built. |
 
@@ -303,6 +311,7 @@ Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md
 3. An entry missing a required field is dropped without comment.
 4. A march to the unit's current cell is dropped as already arrived.
 5. Air units cannot be given march, patrol, or pursue orders. Omit when the opponent has no air units.
+5a. Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use `missileLaunches`. Omit when the opponent has no missile, and omit in a battle.
 6. Infantry cannot be given a strategic ranged attack.
 7. A ranged action's target must not be the acting unit's own move destination.
 8. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
@@ -314,7 +323,7 @@ Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md
 System-prompt content only. Each item is a rule the model must be told, with the reason it is needed. Wording is left to the implementer; the content is not.
 
 1. **Win paths.** Last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. On a turn-limit match, add that if the turn limit arrives first the most city hexes wins. When the match has three or more seats, also state that every other side is an enemy of the others, that a side fighting a third side is exposed, and that neutral garrisons hold and fire, with the loaded-ship exception. Carries `WIN_CONDITIONS`, `HOME_REGION_HEXES`.
-2. **Resolution order.** State the full turn order, including cargo sync between movement and ferry, so the model can reason about firing then closing, cargo riding the transport, and ferry arriving after ground movement.
+2. **Resolution order.** State the full turn order, embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee, so the model can reason about firing then closing, cargo riding the transport, and ferry arriving after ground movement.
 3. **Fire before moving costs nothing.** Every unit with a ranged row in Best Options This Turn, or an air-strike row when air is present, should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. The model must not invent a target the table does not list. The air-strike half of this sentence is omitted when the opponent has no air units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 4. **Withholding fire is an explicit order.** A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire. Include only when standing-order tools are enabled, since that is the only way to issue it. Carries `HOLD_FIRE_SEMANTICS`.
 5. **Target the weakest defender.** Hits land on the lowest-defense unit in a stack first, then in the fixed type order, so firing into a mixed stack removes its most fragile unit. Carries `CASUALTY_PRIORITY`.

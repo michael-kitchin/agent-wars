@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import { logDebug, logError, logTrace } from '../logger';
 import { pathCandidates } from '../terrainMetadataPaths';
+import { MISSILE_COST_MULTIPLIER } from '../../shared/missileRules';
 import type { GameMapScaleranks, GameRules } from '../../shared/gameMapTypes';
 
 /**
@@ -306,14 +307,20 @@ function parseEconomy(value: unknown, label: string): GameRules {
   const armorCost = positiveInteger(economy.armor_cost, label, 'armor_cost');
   const navalCost = positiveInteger(economy.naval_cost, label, 'naval_cost');
   const airCost = positiveInteger(economy.air_cost, label, 'air_cost');
+  const missileCost = positiveInteger(economy.missile_cost, label, 'missile_cost');
   if (armorCost !== infantryCost * 2) failEconomy(label, `${label}: economy.armor_cost must be 2 × infantry_cost`);
   if (navalCost !== infantryCost * 5) failEconomy(label, `${label}: economy.naval_cost must be 5 × infantry_cost`);
   if (airCost !== infantryCost * 3) failEconomy(label, `${label}: economy.air_cost must be 3 × infantry_cost`);
+  if (missileCost !== infantryCost * MISSILE_COST_MULTIPLIER) {
+    failEconomy(label, `${label}: economy.missile_cost must be 10 × infantry_cost`);
+  }
   return {
     infantryCost,
     armorCost,
     navalCost,
     airCost,
+    missileCost,
+    missileRangeHexes: positiveInteger(economy.missile_range_hexes, label, 'missile_range_hexes'),
     armorMinUrbanCells: positiveInteger(economy.armor_min_urban_cells, label, 'armor_min_urban_cells'),
     airMinUrbanCells: positiveInteger(economy.air_min_urban_cells, label, 'air_min_urban_cells'),
     navalMinUrbanCells: positiveInteger(economy.naval_min_urban_cells, label, 'naval_min_urban_cells'),

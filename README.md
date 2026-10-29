@@ -201,7 +201,7 @@ Production is based on real-world urban land cover: the Natural Earth urban area
 | Naval    | 100  | 10 urban cells and a seaport |
 
 
-Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3 for infantry, armor, naval, and air, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)).
+Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3:10 for infantry, armor, naval, air, and missiles, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)).
 
 ### The Opponent's Tools
 

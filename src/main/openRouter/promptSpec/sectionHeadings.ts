@@ -145,6 +145,16 @@ export const SECTION_TITLE_ACTIVE_CALLBACKS = 'Active Callbacks' as const;
 export const SECTION_TITLE_AIR_OPERATIONS_STATUS = 'Air Operations Status' as const;
 
 /**
+ * Title of the missile forces block, without ATX hashes.
+ *
+ * Purpose: Own missiles and the enemy infrastructure they can reach.
+ * When to use: Strategic prompts when the commander has a missile. Omitted in a battle and when the roster has none.
+ * Expected outcome: Missile coaching can point at this section.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_MISSILE_FORCES = 'Missile Forces' as const;
+
+/**
  * Title of the naval transport status block, without ATX hashes.
  *
  * Purpose: Capacity, cargo, and embark hexes. strategic-prompt.md section 1.10; tactical-prompt.md section 2.10.

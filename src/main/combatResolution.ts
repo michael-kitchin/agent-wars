@@ -5,7 +5,7 @@
  * priority lowest defense first, then infantry → armor → naval. Uses seeded RNG for determinism.
  */
 
-import { getDefense, casualtyPriorityIndex } from './combatConstants';
+import { compareCasualtyOrder, unitTypeRollsInCombat } from './combatConstants';
 import { createCombatDieRoller } from './combatDice';
 import { createCombatDiceLog, rollCombatDieAgainst, type CombatDiceRollSink } from './combatDiceRecording';
 import type { CombatDiceRoll } from '../shared/ipc/combatDiceTypes';
@@ -133,12 +133,14 @@ export function resolveOneRangedEngagement(
   let attackerHits = 0;
   const onRoll = options?.onRoll;
   for (const u of attackerUnits) {
+    if (!unitTypeRollsInCombat(u.unitType)) continue;
     const context = { kind: 'ranged', player: u.player, unitType: u.unitType, anchorH3Index: u.h3Index } as const;
     if (rollCombatDieAgainst(rollDie, attackHitThreshold(u), context, onRoll)) attackerHits++;
   }
   let defenderHits = 0;
   if (!options?.skipReturnFire) {
     for (const u of defenderUnits) {
+      if (!unitTypeRollsInCombat(u.unitType)) continue;
       const defender = { unitType: u.unitType, h3Index: u.h3Index || defenderHexH3 };
       const canReturnFire = canDefenderReturnFireAtAnyAttackerHex(defender, attackerHexes, returnFireContext);
       const context = {
@@ -153,8 +155,7 @@ export function resolveOneRangedEngagement(
 
   const defSorted = [...defenderUnits].sort(
     (a, b) =>
-      getDefense(a.unitType) - getDefense(b.unitType) ||
-      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+      compareCasualtyOrder(a.unitType, b.unitType)
   );
   for (let h = 0; h < attackerHits && h < defSorted.length; h++) {
     defenderRemovedIds.push(defSorted[h]!.id);
@@ -179,8 +180,7 @@ export function resolveOneRangedEngagement(
     if (!bestHex) break;
     const unitsAtHex = (byHex.get(bestHex) ?? []).sort(
       (a, b) =>
-        getDefense(a.unitType) - getDefense(b.unitType) ||
-        casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+        compareCasualtyOrder(a.unitType, b.unitType)
     );
     const u = unitsAtHex.find((x) => !removedAtk.has(x.id));
     if (u) {
@@ -214,11 +214,13 @@ export function resolveOneMeleeEngagement(
 
   let atkHits = 0;
   for (const u of attackerUnits) {
+    if (!unitTypeRollsInCombat(u.unitType)) continue;
     const context = { kind: 'meleeAttack', player: u.player, unitType: u.unitType, anchorH3Index: u.h3Index } as const;
     if (rollCombatDieAgainst(rollDie, attackHitThreshold(u), context, onRoll)) atkHits++;
   }
   let defHits = 0;
   for (const u of defenderUnits) {
+    if (!unitTypeRollsInCombat(u.unitType)) continue;
     const context = { kind: 'meleeDefense', player: u.player, unitType: u.unitType, anchorH3Index: u.h3Index } as const;
     if (rollCombatDieAgainst(rollDie, defenseHitThreshold(u), context, onRoll)) defHits++;
   }
@@ -231,16 +233,14 @@ export function resolveOneMeleeEngagement(
 
   const defSorted = [...defenderUnits].sort(
     (a, b) =>
-      getDefense(a.unitType) - getDefense(b.unitType) ||
-      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+      compareCasualtyOrder(a.unitType, b.unitType)
   );
   for (let i = 0; i < atkHits && i < defSorted.length; i++) {
     defenderRemovedIds.push(defSorted[i]!.id);
   }
   const atkSorted = [...attackerUnits].sort(
     (a, b) =>
-      getDefense(a.unitType) - getDefense(b.unitType) ||
-      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+      compareCasualtyOrder(a.unitType, b.unitType)
   );
   for (let i = 0; i < defHits && i < atkSorted.length; i++) {
     attackerRemovedIds.push(atkSorted[i]!.id);

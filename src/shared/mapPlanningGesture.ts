@@ -1,3 +1,5 @@
+import { isMissileUnitType } from './missileRules';
+
 /**
  * How the human selection is composed for map planning gestures.
  *
@@ -6,7 +8,7 @@
  * Expected outcome: `empty` for no types, `mixed` when air and non-air are both present, otherwise `airOnly` or `nonAirOnly`.
  * Exceptions: None.
  */
-export type MapSelectionComposition = 'empty' | 'airOnly' | 'nonAirOnly' | 'mixed';
+export type MapSelectionComposition = 'empty' | 'airOnly' | 'nonAirOnly' | 'mixed' | 'missileOnly' | 'mixedMissile';
 
 /**
  * What a main-map double-click should do once the selection snapshot and icon hit are known.
@@ -21,6 +23,7 @@ export type MapDoubleClickAction =
   | { kind: 'planSupportTarget' }
   | { kind: 'needFerryValidation' }
   | { kind: 'rejectMixed' }
+  | { kind: 'rejectMissileMixed' }
   | { kind: 'planFerry' }
   | { kind: 'rejectFerry' }
   | { kind: 'deselect' }
@@ -116,6 +119,8 @@ export const MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX = 6;
  */
 export function mapSelectionComposition(unitTypes: readonly string[]): MapSelectionComposition {
   if (unitTypes.length === 0) return 'empty';
+  if (unitTypes.every((unitType) => isMissileUnitType(unitType))) return 'missileOnly';
+  if (unitTypes.some((unitType) => isMissileUnitType(unitType))) return 'mixedMissile';
   let hasAir = false;
   let hasNonAir = false;
   for (const unitType of unitTypes) {
@@ -146,6 +151,8 @@ export function resolveMapDoubleClickAction(input: MapDoubleClickDecisionInput):
   if (input.allSelectedUnitsAlreadyAtDestination) {
     return input.iconHit ? { kind: 'ignore' } : { kind: 'deselect' };
   }
+  if (input.composition === 'mixedMissile') return { kind: 'rejectMissileMixed' };
+  if (input.composition === 'missileOnly') return input.iconHit ? { kind: 'ignore' } : { kind: 'deselect' };
   if (input.composition === 'mixed') {
     return { kind: 'rejectMixed' };
   }

@@ -8,7 +8,7 @@ import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
 import { logDebug, logTrace } from '../logger';
 import { computeTacticalBattleSnapshot } from '../tacticalBattle/computeTacticalBattleSnapshot';
 
-const UNIT_CATEGORY_ORDER = ['air', 'armor', 'infantry', 'naval'] as const;
+const UNIT_CATEGORY_ORDER = ['air', 'armor', 'infantry', 'naval', 'missile'] as const;
 
 /**
  * Lists strategic hexes where at least two players still have land-relevant combat units after movement and ranged.
@@ -73,6 +73,7 @@ export function formatMeleeUnitCategorySummary(units: CombatUnit[], playerId: st
     armor: 0,
     infantry: 0,
     naval: 0,
+    missile: 0,
   };
   for (const u of here) {
     if (u.unitType in counts) counts[u.unitType as keyof typeof counts] += 1;

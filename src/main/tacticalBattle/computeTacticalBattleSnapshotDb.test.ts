@@ -120,6 +120,26 @@ test('computeTacticalBattleSnapshot records placed baseline counts by parent id'
   });
 });
 
+test('a missile born on an urban cell is one sub-unit on that cell', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-missile-place-', ({ targetStrategicH3, humanId }) => {
+    const urban = dbGetOne<{ h3Index: string }>(
+      'SELECT h3_index AS h3Index FROM res_t_feature_overrides WHERE parent_h3_index = ? AND is_urban = 1 LIMIT 1',
+      [targetStrategicH3]
+    );
+    assert.ok(urban, 'contested hex has no urban tactical cell; do not invent one');
+    dbRun(
+      `UPDATE units SET unit_type = 'missile', birth_h3_index = ?, birth_res_t_h3_index = ? WHERE id = ?`,
+      [targetStrategicH3, urban.h3Index, humanId]
+    );
+    const result = computeTacticalBattleSnapshot(targetStrategicH3, 'missile-birth-place');
+    assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
+    const placed = result.snapshot.subUnits.filter((sub) => sub.parentUnitId === humanId);
+    assert.equal(placed.length, 1);
+    assert.equal(placed[0]?.unitType, 'missile');
+    assert.equal(placed[0]?.h3Index, urban.h3Index);
+  });
+});
+
 test('computeTacticalBattleSnapshot copies each parent origin onto its sub-units', () => {
   tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-origin-', ({ targetStrategicH3 }) => {
     const result = computeTacticalBattleSnapshot(targetStrategicH3, 'origin-copy-probe');

@@ -1,14 +1,14 @@
 /**
- * The three groups of the Orders tab, in display order. This module keeps the orders the next Ready will send, as the
+ * The groups of the Orders tab, in display order. This module keeps the orders the next Ready will send, as the
  * Orders tab last listed them: the Orders tab writes each group here when it redraws it, and other views, such as the
  * console header's count, read from here instead of rebuilding the lists, so every view shows the same rows.
  *
  * Purpose: Names the groups once for the lists, their counts, and readers.
  * When to use: Passing a group to `publishQueuedOrders`.
- * Expected outcome: Movement holds marches and ferries; the other two hold their drafts.
+ * Expected outcome: Movement holds marches and ferries; the other groups hold their drafts.
  * Exceptions: None.
  */
-export type QueuedOrderGroup = 'movement' | 'ranged' | 'strike';
+export type QueuedOrderGroup = 'movement' | 'ranged' | 'strike' | 'launch';
 
 /**
  * One queued order, as other views need it.
@@ -86,7 +86,7 @@ export function publishQueuedOrders(group: QueuedOrderGroup, orders: readonly Qu
  *
  * Purpose: The Orders badge and subtitle show this number.
  * When to use: From a listener or when the console header is drawn.
- * Expected outcome: The sum of the three groups' last published lengths.
+ * Expected outcome: The sum of the groups' last published lengths.
  * Exceptions: None.
  */
 export function queuedOrderCount(): number {
@@ -100,11 +100,11 @@ export function queuedOrderCount(): number {
  *
  * Purpose: Other views show a unit's order with the Orders tab's wording.
  * When to use: For each unit a view lists.
- * Expected outcome: The first match in Movement, then Ranged, then Strike order, or null.
+ * Expected outcome: The first match in Movement, then Ranged, then Strike, then Launch order, or null.
  * Exceptions: None.
  */
 export function queuedOrderForUnit(unitId: string): QueuedOrderSummary | null {
-  for (const group of ['movement', 'ranged', 'strike'] as const) {
+  for (const group of ['movement', 'ranged', 'strike', 'launch'] as const) {
     const match = ordersByGroup.get(group)?.find((order) => order.unitId === unitId);
     if (match) return match;
   }

@@ -5,6 +5,7 @@ import type {
   MovementOrder,
   RangedAttackOrder,
 } from './ordersTypes';
+import type { MissileLaunchOrder } from './missileTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { TacticalOpponentPlanPayload } from './consultationPushTypes';
 import type { CommanderAbsenceReason } from '../commanderStatus';
@@ -213,6 +214,15 @@ airStrikes?: AirStrikeOrder[];
        * Exceptions: None.
        */
 ferryOrders?: FerryOrder[];
+  /**
+   * Missile launches the consultation accepted.
+   *
+   * Contract: Omitted when none remain. Each row is one missile and one H3 target.
+   * When to use: Storing pending orders after a strategic consult.
+   * Expected outcome: Absent on a failure result and when the model launched nothing.
+   * Exceptions: None.
+   */
+  missileLaunches?: MissileLaunchOrder[];
             /**
        * Specifies the contract for the `embarkOrders` member (embarkOrders?: EmbarkOrder[];).
 

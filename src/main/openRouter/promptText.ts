@@ -3,6 +3,7 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
+import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { logDebug, logTrace } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
@@ -467,7 +468,7 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
     ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
-    ' {"action":"set_build_queue","hex":"<two-char code>","unitType":"infantry|armor|naval|air","count":1..99}.' +
+    ` {"action":"set_build_queue","hex":"<two-char code>","unitType":"${ALL_BUILD_UNIT_TYPES.join('|')}","count":1..99}.` +
     ' Any productionOrders item missing "action" or required fields is dropped.' +
     ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
     ` ${PRODUCTION_CAP_GUIDANCE}` +
@@ -533,12 +534,13 @@ export function getInitialUserMessage(
   flags: PromptToolFlags,
   hasPrecomputedBriefing = false,
   coordinateMode: 'strategic' | 'tactical' = 'strategic',
-  roster: { readonly hasAirUnits?: boolean; readonly hasBestOptionsTable?: boolean } = {}
+  roster: { readonly hasAirUnits?: boolean; readonly hasMissileUnits?: boolean; readonly hasBestOptionsTable?: boolean } = {}
 ): string {
   logDebug('promptText getInitialUserMessage', {
     coordinateMode,
     hasPrecomputedBriefing,
     hasAirUnits: roster.hasAirUnits !== false,
+    hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
   });
   return buildOpeningUserMessage({
@@ -550,6 +552,7 @@ export function getInitialUserMessage(
     fallbackMovementEnabled: flags.fallbackMovementEnabled,
     hasBriefing: hasPrecomputedBriefing,
     hasAirUnits: roster.hasAirUnits !== false,
+    hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
   });
 }

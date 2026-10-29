@@ -17,14 +17,14 @@ import type { CombatUnit } from '../combatUnitTypes';
  *
  * Purpose: Mirrors `resolveStrategicControlAfterCombatAndMovement`’s “distinctPlayers” notion for infantry/armor/naval/air.
  * When to use: Only from `destroyAirUnitsWithInvalidBase` before applying the airport+controller strand rule.
- * Expected outcome: True when `COUNT(DISTINCT player) >= 2` among combat unit rows sharing `h3_index`.
+ * Expected outcome: True when `COUNT(DISTINCT player) >= 2` among combat unit rows sharing `h3_index`, including missiles.
  * Exceptions: None; invalid `h3_index` yields false from empty counts.
  */
 function hexHasMultiPlayerCombatPresence(h3Index: string): boolean {
   const row = dbGetOne<{ c: number }>(
     `SELECT COUNT(DISTINCT player) AS c
      FROM units
-     WHERE h3_index = ? AND unit_type IN ('infantry', 'armor', 'naval', 'air')`,
+     WHERE h3_index = ? AND unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')`,
     [h3Index]
   );
   return (row?.c ?? 0) >= 2;

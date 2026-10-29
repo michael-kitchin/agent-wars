@@ -31,7 +31,7 @@ A new machine-local row has to be added to `MACHINE_LOCAL_CONFIG_KEYS` in the sa
 
 ## Version
 
-`EXPECTED_USER_VERSION` in `src/main/gameDb.ts` is **23**. A save is loaded only when its SQLite `user_version` equals that number. There is no migration. Bump it when `getFullDdl` changes. That bump makes every earlier save unloadable, and it also makes the on-disk match database from the previous schema fail validation on the next launch.
+`EXPECTED_USER_VERSION` in `src/main/gameDb.ts` is **24**. A save is loaded only when its SQLite `user_version` equals that number. There is no migration. Bump it when `getFullDdl` changes. That bump makes every earlier save unloadable, and it also makes the on-disk match database from the previous schema fail validation on the next launch.
 
 A change to the shape of any JSON a save carries in `game_config` needs a new versioned key, or the same bump. An older or newer app would misread the old shape. When `EXPECTED_USER_VERSION` or `MACHINE_LOCAL_CONFIG_KEYS` changes, update this document in the same change.
 

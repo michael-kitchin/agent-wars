@@ -156,6 +156,23 @@ export const strikeAimTooltipText =
 export const strikeStopTooltipText = 'Stop aiming an air strike. Strikes already in the list stay there.';
 
 /**
+ * Purpose: Says the next double-click chooses the hex a missile flies to.
+ * When to use: `#ranged-attack-btn` while missile aiming is off and the selection is missiles.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const launchAimTooltipText =
+  'Aim a missile launch. Turn this on, then double-click any explored hex in range. Each missile launches once.';
+
+/**
+ * Purpose: Says a second click stops aiming and queued launches stay in the list.
+ * When to use: `#ranged-attack-btn` while missile aiming is on.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const launchStopTooltipText = 'Stop aiming a missile launch. Launches already in the list stay there.';
+
+/**
  * Purpose: Names the four targets and says the next double-click uses the choice.
  * When to use: `#air-strike-target-type`.
  * Expected outcome: The control tip shows this sentence.
@@ -171,8 +188,9 @@ export const airStrikeTargetTooltipText =
  * Expected outcome: The sentence for that attack and that state.
  * Exceptions: None.
  */
-export function supportButtonTooltipText(kind: 'ranged' | 'strike', aiming: boolean): string {
+export function supportButtonTooltipText(kind: 'ranged' | 'strike' | 'launch', aiming: boolean): string {
   if (kind === 'strike') return aiming ? strikeStopTooltipText : strikeAimTooltipText;
+  if (kind === 'launch') return aiming ? launchStopTooltipText : launchAimTooltipText;
   return aiming ? rangedStopTooltipText : rangedAimTooltipText;
 }
 

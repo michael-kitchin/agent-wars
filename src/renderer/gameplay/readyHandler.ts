@@ -1,4 +1,5 @@
 import type { GameReadyIpcPayload, GameStateSnapshot } from '../../shared/ipcTypes';
+import { buildMissilePlaybackMoves, missileLaunchVisibleToViewer } from '../../shared/missileStrikeReport';
 import { currentConsoleReportTag } from '../chrome/consoleReports';
 import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
@@ -136,12 +137,14 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const hasPendingDraftOrders =
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
+      S.pendingMissileLaunches.length > 0 ||
       S.pendingFerryOrders.length > 0;
     if (hasPendingDraftOrders) {
       const submitResult = (await window.gameApi.submitOrders({
         movementOrders: [],
         rangedAttacks: S.pendingRangedAttacks,
         airStrikes: S.pendingAirStrikes,
+        missileLaunches: S.pendingMissileLaunches,
         ferryOrders: S.pendingFerryOrders,
       })) as { success: boolean; reason?: string };
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -240,8 +243,17 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
     const aiMoves = readyResult.aiMoves ?? [];
     const resolutionMoves = [...humanMoves, ...aiMoves];
-    const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
-    const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
+    const visibleHexes = deps.getVisibleHexSet(state);
+    const visibleMissileLaunches = (readyResult.missileLaunches ?? []).filter((record) =>
+      missileLaunchVisibleToViewer(
+        record,
+        reportViewerSeatId(),
+        new Set([...visibleHexesBeforeTurn, ...visibleHexes])
+      )
+    );
+    const strikeMoves = [...(readyResult.airStrikeMoves ?? []), ...buildMissilePlaybackMoves(visibleMissileLaunches)];
+    const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
+    const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
 
     applyToolInvocationCountsAfterReady({
       fromResult: readyResult.toolInvocationCounts,
@@ -268,13 +280,30 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
     const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
     const hasAirStrikeResolution =
+      visibleMissileLaunches.length > 0 ||
       (readyResult.airStrikeAttemptCount ?? 0) > 0 ||
       (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
       (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
       (readyResult.baseInvalidAirLossCount ?? 0) > 0;
-    const visibleHexes = deps.getVisibleHexSet(state);
     const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
     const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
+    const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
+    const visibleMissileVictims = (readyResult.missileStrikeRemovedUnits ?? []).filter((unit) =>
+      visibleMissileVictimIds.has(unit.id)
+    );
+    const airStrikeRemovedForPlayback = [...(readyResult.airStrikeRemovedUnits ?? []), ...visibleMissileVictims];
+    const airStrikeCasualtyHexesForPlayback = [
+      ...(readyResult.airStrikeCasualtyHexes ?? []),
+      ...visibleMissileVictims
+        .map((unit) => unit.h3Index)
+        .filter((hex) => !(readyResult.airStrikeCasualtyHexes ?? []).includes(hex)),
+    ];
+    const airStrikeCombatHexesForPlayback = [
+      ...(readyResult.airStrikeHexes ?? []),
+      ...visibleMissileLaunches
+        .map((record) => record.targetH3Index)
+        .filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex)),
+    ];
     const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
     if (readyResult.postResolutionConsultDeferred === true) {
       S.pendingDeferredStrategicPostResolutionConsult = true;
@@ -297,11 +326,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         moves: resolutionMoves,
         airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
         airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined,
-        airStrikeCombatHexes: readyResult.airStrikeHexes?.length ? readyResult.airStrikeHexes : undefined,
-        airStrikeCasualtyHexes: readyResult.airStrikeCasualtyHexes?.length ? readyResult.airStrikeCasualtyHexes : undefined,
-        ...(readyResult.airStrikeRemovedUnits?.length
-          ? { airStrikeRemovedUnits: readyResult.airStrikeRemovedUnits }
-          : {}),
+        airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : undefined,
+        airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : undefined,
+        ...(airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {}),
         startTime: Date.now(),
         combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : undefined,
         casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : undefined,
@@ -336,6 +363,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           visibility,
           killToastFormatter,
           reportTag: turnReportTag,
+          missileLaunches: visibleMissileLaunches,
         },
         deps
       );

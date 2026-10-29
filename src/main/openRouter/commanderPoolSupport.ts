@@ -7,6 +7,7 @@
  * Exceptions: A write that throws is logged and the queue continues.
  */
 
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipc/ordersTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -152,6 +153,15 @@ export type CommanderConsultOutcome = {
    */
   readonly embarkOrders: readonly EmbarkOrder[];
   /**
+   * Missile launches to store for a strategic consult.
+   *
+   * Contract: Empty when `finished` is false. Encoded into `strategy_text` with the other extra orders.
+   * When to use: `setAiPendingOrders`.
+   * Expected outcome: The validated launches. A battle consult stores none.
+   * Exceptions: None.
+   */
+  readonly missileLaunchOrders: readonly MissileLaunchOrder[];
+  /**
    * Player-facing message prose.
    *
    * Contract: Trimmed text, or null.
@@ -235,6 +245,7 @@ export function emptyConsultOutcome(
     airStrikeOrders: [],
     ferryOrders: [],
     embarkOrders: [],
+    missileLaunchOrders: [],
     message: null,
     strategy: null,
     costUsd: 0,

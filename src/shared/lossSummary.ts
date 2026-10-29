@@ -2,6 +2,8 @@
  * Shared types and formatters for consolidated per-player, per-cause loss reporting in popups and AI prompts.
  */
 
+import { isBuildUnitType, type BuildUnitType } from './ipc/productionTypes';
+
 /** Maximum victim count on a prompt loss line before that line uses grouped type totals. */
 export const LOSS_ENTRY_LIST_MAX = 5;
 
@@ -23,15 +25,16 @@ const GROUP_LABEL_BY_TYPE: Record<LostUnitType, string> = {
   air: 'Air',
   armor: 'Armored',
   infantry: 'Infantry',
+  missile: 'Missile',
 };
 
 /** Order used when emitting grouped type totals on crowded loss lines. */
-const GROUP_ORDER: LostUnitType[] = ['naval', 'air', 'armor', 'infantry'];
+const GROUP_ORDER: LostUnitType[] = ['naval', 'air', 'armor', 'infantry', 'missile'];
 
 /**
  * Supported unit types for loss grouping and display.
  */
-export type LostUnitType = 'naval' | 'air' | 'armor' | 'infantry';
+export type LostUnitType = BuildUnitType;
 
 /**
  * One destroyed unit entry on a loss cause line.
@@ -117,6 +120,15 @@ export interface PlayerLossSummary {
    */
   airStrike: LostUnit[];
   /**
+   * Air units destroyed on the ground by a missile.
+   *
+   * Contract: Populated from `missileStrikeRemovedUnits`. A unit also listed as an air-strike loss stays here.
+   * When to use: Serialized to JSON for turn notes and formatted for UI.
+   * Expected outcome: Rendered as the `Missile strike` cause line when non-empty.
+   * Exceptions: The spent missile is never in this bucket.
+   */
+  missileStrike: LostUnit[];
+  /**
    * Victims destroyed outside the four combat causes (transport loss, invalid base, etc.).
    *
    * Contract: Catch-all for removed units not mapped to ranged/melee/return/air strike.
@@ -139,7 +151,7 @@ export interface TurnLossSummary {
   /**
    * Cause buckets keyed by the victim's owner id.
    *
-   * Contract: Missing keys mean that owner lost nothing visible. Each value has all five cause arrays.
+   * Contract: Missing keys mean that owner lost nothing visible. Each value has all six cause arrays.
    * When to use: The turn report and a note that still stores one seat's losses apart from everyone else's.
    * Expected outcome: The victim's owner id, including a seat other than the human.
    * Exceptions: None.
@@ -152,11 +164,11 @@ export interface TurnLossSummary {
  *
  * Purpose: Shared initializer for normalizer and JSON parse fallbacks.
  * When to use: Start of `buildTurnLossSummary` and when hydrating partial DB rows.
- * Expected outcome: Mutable empty arrays for all five causes.
+ * Expected outcome: Mutable empty arrays for all six causes.
  * Exceptions: None.
  */
 export function emptyPlayerLossSummary(): PlayerLossSummary {
-  return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
+  return { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
 }
 
 /**
@@ -188,7 +200,7 @@ export function mergePlayerLossSummaries(parts: readonly PlayerLossSummary[]): P
 }
 
 /**
- * Returns whether a player lost any units across all five cause buckets.
+ * Returns whether a player lost any units across all six cause buckets.
  *
  * Purpose: Tells a caller whether this side's buckets are empty.
  * When to use: Before emitting a loss line for that side.
@@ -201,6 +213,7 @@ export function playerHasAnyLoss(summary: PlayerLossSummary): boolean {
     summary.melee.length > 0 ||
     summary.returnFire.length > 0 ||
     summary.airStrike.length > 0 ||
+    summary.missileStrike.length > 0 ||
     summary.other.length > 0
   );
 }
@@ -210,11 +223,11 @@ export function playerHasAnyLoss(summary: PlayerLossSummary): boolean {
  *
  * Purpose: An unexpected type stays a name so a loss is not dropped.
  * When to use: `formatLossEntries` only.
- * Expected outcome: True for naval, air, armor, and infantry.
+ * Expected outcome: True for every build unit type, including missiles.
  * Exceptions: None.
  */
 function isKnownLossType(unitType: string): unitType is LostUnitType {
-  return unitType === 'naval' || unitType === 'air' || unitType === 'armor' || unitType === 'infantry';
+  return isBuildUnitType(unitType);
 }
 
 /**
@@ -228,7 +241,7 @@ function isKnownLossType(unitType: string): unitType is LostUnitType {
  */
 export function formatLossEntries(units: readonly LostUnit[]): string {
   if (units.length === 0) return '';
-  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0 };
+  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
   for (const unit of units) {
     if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
   }
@@ -271,7 +284,7 @@ function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
  * Exceptions: None.
  */
 function formatGroupedTypeTotals(units: readonly LostUnit[]): string {
-  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0 };
+  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
   for (const u of units) {
     if (u.unitType in counts) counts[u.unitType] += 1;
   }
@@ -310,15 +323,16 @@ const CAUSE_SPECS: ReadonlyArray<{ key: keyof PlayerLossSummary; label: string }
   { key: 'melee', label: 'Melee attack' },
   { key: 'returnFire', label: 'Return fire' },
   { key: 'airStrike', label: 'Air strike' },
+  { key: 'missileStrike', label: 'Missile strike' },
   { key: 'other', label: 'Other losses' },
 ];
 
 /**
- * The five loss-cause labels, in display order.
+ * The six loss-cause labels, in display order.
  *
  * Purpose: Lets UI code recognize `<label>: ...` loss lines without restating the label literals.
  * When to use: When parsing formatted loss lines, for example to decorate victim names in the map toast.
- * Expected outcome: `Ranged attack`, `Melee attack`, `Return fire`, `Air strike`, `Other losses`.
+ * Expected outcome: `Ranged attack`, `Melee attack`, `Return fire`, `Air strike`, `Missile strike`, `Other losses`.
  * Exceptions: None.
  */
 export const LOSS_CAUSE_LABELS: ReadonlyArray<string> = CAUSE_SPECS.map((spec) => spec.label);
@@ -406,6 +420,7 @@ export function parsePlayerLossSummaryJson(raw: string | null | undefined): Play
       melee: readBucket('melee'),
       returnFire: readBucket('returnFire'),
       airStrike: readBucket('airStrike'),
+      missileStrike: readBucket('missileStrike'),
       other: readBucket('other'),
     };
   } catch {

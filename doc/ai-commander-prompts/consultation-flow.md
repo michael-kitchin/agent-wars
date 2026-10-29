@@ -81,7 +81,7 @@ The opening message does **not** carry game rules. Production doctrine, cap rule
 
 ## 5. Repair request after unparseable output
 
-1. **Trigger.** The final assistant text is present but cannot be parsed as the response envelope. A parsed envelope is a second trigger when every expanded `orders`, `airStrikes`, and `ferryOrders` row was dropped and production applied nothing. A parsed envelope that already applied production is not repaired, because a second parse would apply production again.
+1. **Trigger.** The final assistant text is present but cannot be parsed as the response envelope. A parsed envelope is a second trigger when every expanded `orders`, `airStrikes`, `ferryOrders`, and `missileLaunches` row was dropped and production applied nothing. A parsed envelope that already applied production is not repaired, because a second parse would apply production again.
 2. **Budget.** Exactly one repair call per consultation. When the text never parsed, a repair that also does not parse fails the consultation with the engine's parse-failure reason and produces no orders. When the trigger was an all-dropped actor envelope, a repair that parses replaces the original, even when that repair's actor rows were also all dropped. A repair that does not parse leaves the original envelope in place so the tempo sweep still runs. There is no fallback prompt.
 3. **Tools are disabled** for the repair call: no tool list is sent, and when the consultation offered tools and the model accepts `tool_choice`, tool use is explicitly refused with `tool_choice: none`. The model has one job, which is to re-emit the object.
 4. **Content contract.** Three clauses: the previous response was not parseable JSON; reply with compact JSON only, with no prose, no markdown, no code fences, and no extra whitespace; use exactly this top-level object schema, with the schema inlined. Plus two constraints that are shape, not rules: never a top-level array, and omit optional arrays when empty. It must not teach a game rule, must not re-explain any action's meaning, and must not introduce a field the mode forbids.
@@ -91,12 +91,13 @@ When the model supports structured outputs and the developer flag `AGENT_WARS_DI
 
 ### 5.1 Repair schema contract
 
-The inlined schema is a single JSON object with fields in envelope order: `message`, `strategy`, `orders`, then the air and ferry tails, then `callbacks`, then the memory tail, then the production tail.
+The inlined schema is a single JSON object with fields in envelope order: `message`, `strategy`, `orders`, then the air and ferry tails, then `missileLaunches` when that gate is on, then `callbacks`, then the memory tail, then the production tail.
 
 | Field | Strategic | Tactical |
 | --- | --- | --- |
 | `message`, `strategy`, `orders` | always, in that order | always, in that order |
 | `airStrikes`, `ferryOrders` | when the opponent has air units | when the opponent has air sub-units |
+| `missileLaunches` | when the opponent has a missile | **never** |
 | `callbacks` | always | always |
 | `memoryUpdates` | when memory tools are enabled | **never** |
 | `productionOrders` | when production tools are enabled | **never** |

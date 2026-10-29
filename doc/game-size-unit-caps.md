@@ -8,13 +8,13 @@ Live values come from `MAX_UNITS_PER_TYPE` (Small) and `GAME_SIZE_MULTIPLIER` in
 
 Caps are per side and per type. Small is the current baseline. Medium is twice Small. Large is three times Small.
 
-- Small: infantry 12, armor 8, naval 8, air 6
-- Medium: infantry 24, armor 16, naval 16, air 12
-- Large: infantry 36, armor 24, naval 24, air 18
+- Small: infantry 12, armor 8, naval 8, air 6, missile 2
+- Medium: infantry 24, armor 16, naval 16, air 12, missile 4
+- Large: infantry 36, armor 24, naval 24, air 18, missile 6
 
 ## Selection
 
-The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large), in the Forces section, between the Map section's home or side choices and the Rules section's bonuses. The dropdown sits on the same line as its label, to the right of that label, and is only as wide as its longest item. Under it, one row of the four unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
+The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large), in the Forces section, between the Map section's home or side choices and the Rules section's bonuses. The dropdown sits on the same line as its label, to the right of that label, and is only as wide as its longest item. Under it, one row of the five unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
 
 The dropdown keeps its last value for the session. A process restart returns to Small.
 

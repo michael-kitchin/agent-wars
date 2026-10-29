@@ -252,14 +252,14 @@ export async function afterResolution(
           });
           return { consulted: false, absenceReason: result.absenceReason };
         }
-        setAiPendingOrders(
-          seatId,
-          result.orders,
-          result.rangedAttacks ?? [],
-          result.airStrikes ?? [],
-          result.ferryOrders ?? [],
-          result.embarkOrders ?? []
-        );
+        setAiPendingOrders(seatId, {
+          movementOrders: result.orders,
+          rangedOrders: result.rangedAttacks ?? [],
+          airStrikeOrders: result.airStrikes ?? [],
+          ferryOrders: result.ferryOrders ?? [],
+          embarkOrders: result.embarkOrders ?? [],
+          missileLaunchOrders: result.missileLaunches ?? [],
+        });
         setAiLastConsultationTurn(seatId, state.turnNumber);
         clearCombatSinceConsultation(seatId);
         logDebug('afterResolution: consultation completed, pending orders stored', {

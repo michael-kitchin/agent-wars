@@ -27,7 +27,7 @@ let rangePerimeterAnimationTickInFlight = false;
  *
  * Purpose: Single gate for draw and animation scheduling.
  * When to use: Start of overlay draw and animation ensure paths.
- * Expected outcome: True when the user is picking a ranged or strike target.
+ * Expected outcome: True when the user is picking a ranged or strike target. Missiles get no perimeter.
  * Exceptions: None.
  */
 function isRangePerimeterModeActive(): boolean {

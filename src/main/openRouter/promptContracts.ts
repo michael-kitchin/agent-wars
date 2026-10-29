@@ -47,6 +47,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includeStandingOrderActions?: boolean;
+  /**
+   * When true, the contract names `missileLaunches`. Omitted means false.
+   *
+   * Contract: Strategic only. A tactical prompt never advertises the field.
+   * When to use: Pass from `buildSystemPromptForTools` when the roster has a missile and the mode is strategic.
+   * Expected outcome: The header, the clause, and the example include the field together.
+   * Exceptions: None.
+   */
+  includeMissileActions?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -66,6 +75,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeAirActions = true,
     includeNavalActions = true,
     includeStandingOrderActions = true,
+    includeMissileActions = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -77,6 +87,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeAirActions,
     includeNavalActions,
     includeStandingOrderActions,
+    includeMissileActions,
     coordinateMode,
   });
   const gates: EnvelopeGates = {
@@ -85,6 +96,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeMemoryUpdates,
     includeProductionOrders,
     includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
+    includeMissileActions: coordinateMode !== 'tactical' && includeMissileActions,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -93,6 +105,7 @@ export function buildFinalJsonContractInstruction(args: {
     orders: '"orders": [ ... ]',
     airStrikes: '"airStrikes": [ ... ]',
     ferryOrders: '"ferryOrders": [ ... ]',
+    missileLaunches: '"missileLaunches": [ ... ]',
     callbacks: '"callbacks": [...]',
     memoryUpdates: '"memoryUpdates": [...]',
     productionOrders: '"productionOrders": [...]',
@@ -133,13 +146,16 @@ export function buildFinalJsonContractInstruction(args: {
   const airClause = includeAirActions
     ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
     : '';
+  const missileClause = includeMissileActions && coordinateMode !== 'tactical'
+    ? 'Optional top-level missile launches: missileLaunches[] entries use { "unitId" or "unitIds", "targetHexCode" }; each missile launches once and is spent. '
+    : '';
   const callbacksClause = buildCallbackContractClause(coordinateMode);
   const invalidOutputClause = buildInvalidOutputRulesClause(gates);
   const memoryLimits =
     coordinateMode !== 'tactical' && includeMemoryUpdates ? buildMemoryWriteLimitsClause() : '';
   const memoryClause = coordinateMode === 'tactical' ? '' : submitMemoryClause;
   const productionClause = coordinateMode === 'tactical' ? '' : productionSubmitClause;
-  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${invalidOutputClause}${movementOrderInstruction} ${callbacksClause}${memoryClause}${memoryLimits} ${productionClause}`;
+  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${missileClause}${invalidOutputClause}${movementOrderInstruction} ${callbacksClause}${memoryClause}${memoryLimits} ${productionClause}`;
 }
 
 /**
@@ -188,6 +204,15 @@ includeProductionOrders: boolean;
    */
   includeStandingOrderActions?: boolean;
   /**
+   * When true, the example includes one missile launch. Omitted means false.
+   *
+   * Contract: Strategic only.
+   * When to use: The same flag as `buildFinalJsonContractInstruction`.
+   * Expected outcome: The example object contains `missileLaunches` only when the contract names that field.
+   * Exceptions: None.
+   */
+  includeMissileActions?: boolean;
+  /**
    * When `tactical`, the illustrative orders[] example leads with explicit_move / ranged_attack (assign_order stays blocked for sub-unit ids).
    *
    * Contract: Optional coordinate mode for example/contract text; omit or `strategic` for strategic prompts.
@@ -210,11 +235,13 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   const coordinateMode = flags.coordinateMode ?? 'strategic';
   const includeAirActions = flags.includeAirActions !== false;
   const includeStandingOrderActions = flags.includeStandingOrderActions !== false;
+  const includeMissileActions = flags.includeMissileActions === true && coordinateMode !== 'tactical';
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
     includeAirActions,
     includeStandingOrderActions,
+    includeMissileActions,
     coordinateMode,
   });
   const gates: EnvelopeGates = {
@@ -223,6 +250,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
     includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
+    includeMissileActions,
   };
   const tactical = coordinateMode === 'tactical';
   const standingOrdersIssuable = !tactical && includeStandingOrderActions;
@@ -252,6 +280,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
         ],
     airStrikes: [],
     ferryOrders: [],
+    missileLaunches: [{ unitId: 'a1-m1', targetHexCode: 'CK' }],
     callbacks: [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }],
     memoryUpdates: [
       {

@@ -410,6 +410,12 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
           'destination',
         ])
       );
+    case 'missileLaunches':
+      return arraySchema(
+        closedObjectSchema({ unitId: STRING_SCHEMA, unitIds: STRING_ARRAY_SCHEMA, targetHexCode: STRING_SCHEMA }, [
+          'targetHexCode',
+        ])
+      );
     case 'callbacks':
       return arraySchema(callbackRowSchema(gates));
     case 'memoryUpdates':

@@ -13,23 +13,23 @@ One selection drives the [selection panel](selection-panel.md), the gold ring on
 - Enemy units are not added to the selection. A plain click on a unit icon opens the stack callout, except when that hex has exactly one stationary unit and that unit is a selectable human. That click sole-selects the unit and starts movement planning. A Shift-click does not open it when the hex has exactly one selectable human unit. A Shift-click with two or more selectable human units, or with none, opens it when a plain click on that icon would. Hovering a single-unit icon shows that unit's Bonuses tooltip and does not select it. See [stack-callout.md](stack-callout.md).
 - A land unit that is embarked is not selectable.
 - While a hover order preview is in progress, a click that would replace the selection, or toggle a unit into it, is ignored. Toggling a unit out stays allowed.
-- While Ranged or Strike targeting is on, a click does not change the selection, open the stack callout, or record a new selected hex. The double-click places the attack. See [order-lifecycle.md](order-lifecycle.md).
+- While Ranged, Strike, or Launch targeting is on, a click does not change the selection, open the stack callout, or record a new selected hex. The double-click places the attack or the launch. See [order-lifecycle.md](order-lifecycle.md).
 - During Resolution playback, map clicks do not replace or toggle the selection. Right-click still clears it. See [resolution-playback.md](resolution-playback.md).
 - Build hexes use a separate selection owned by [build-popup.md](build-popup.md) and [multi-hex-build-popup.md](multi-hex-build-popup.md).
 
 ## Selecting
 
-- When Ranged and Strike targeting are off and the player clicks, without Shift, a hex with exactly one stationary selectable human unit, the selection becomes that unit after a short delay. A second click on that icon before the delay ends selects that unit immediately. The second press of a double-click does not. The stack callout stays closed, and movement planning starts once that selection applies. A plain click on any other unit icon still opens the stack callout.
-- When Ranged and Strike targeting are off and the player Shift-clicks a unit icon whose hex has one selectable human unit, that unit toggles in the selection and the delayed single-select is cancelled. The stack callout does not open. While a hover order preview is active, toggling the unit into the selection stays blocked, toggling it out stays allowed, and an already-open callout stays open. The second press of a double-click does not toggle the unit and does not cancel a callout the first press scheduled.
+- When Ranged, Strike, and Launch targeting are off and the player clicks, without Shift, a hex with exactly one stationary selectable human unit, the selection becomes that unit after a short delay. A second click on that icon before the delay ends selects that unit immediately. The second press of a double-click does not. The stack callout stays closed, and movement planning starts once that selection applies. A plain click on any other unit icon still opens the stack callout.
+- When Ranged, Strike, and Launch targeting are off and the player Shift-clicks a unit icon whose hex has one selectable human unit, that unit toggles in the selection and the delayed single-select is cancelled. The stack callout does not open. While a hover order preview is active, toggling the unit into the selection stays blocked, toggling it out stays allowed, and an already-open callout stays open. The second press of a double-click does not toggle the unit and does not cancel a callout the first press scheduled.
 - When that hex has two or more selectable human units, or none, Shift-click schedules the callout and does not toggle a unit from the icon. A plain click on a unit icon still schedules the callout, except a hex with exactly one stationary selectable human unit. Releasing Shift closes an open callout, including one that is scheduled but not open yet. Shift-click on an Orders tab row and a callout row's Shift toggle still toggle. See [input-map.md](input-map.md).
 - When the click is the second press of a double-click on the same spot, the click does not retarget the selection. The order is planned for the units selected at the start of the gesture.
-- When Ranged and Strike targeting are off and the player clicks a unit icon, and no hover order preview is already active, the stack callout opens after the same delay, except a Shift-click on one selectable human unit, and except a plain click on a hex with exactly one stationary selectable human unit. The preview that then appears because the pointer is still on the selected units' hex does not cancel or close that callout. A later click while that preview remains active does not open it again. Moving the pointer onto another hex while a preview is active does. The second press of a double-click on that spot does not schedule another callout. A double-click that plans an order cancels the one already scheduled.
+- When Ranged, Strike, and Launch targeting are off and the player clicks a unit icon, and no hover order preview is already active, the stack callout opens after the same delay, except a Shift-click on one selectable human unit, and except a plain click on a hex with exactly one stationary selectable human unit. The preview that then appears because the pointer is still on the selected units' hex does not cancel or close that callout. A later click while that preview remains active does not open it again. Moving the pointer onto another hex while a preview is active does. The second press of a double-click on that spot does not schedule another callout. A double-click that plans an order cancels the one already scheduled.
 - The [selection panel](selection-panel.md) names the first selected unit's hex and the selection on its bar, and lists the units when the panel is expanded. It is hidden when nothing is selected.
 - On the map, each marker of a hex that holds a selected unit gets a 3 px gold ring (`SELECTION_RING_COLOR`) in place of that marker's border, in both theaters. A stack has two markers, and both borders are covered. Each ring is drawn with its marker, so the upper marker covers the lower marker's ring where they overlap, the same way the upper marker's border covers the lower one. Every stack's count badge is drawn over the rings. A unit drawn moving during playback, or hidden at battle-detail zoom, shows no ring.
 
 ## Clearing and Keeping a Selection
 
-- When the player right-clicks the map, or clicks the selection panel's close control, while units are selected or a hover preview is showing, the selection, the gesture snapshot, the selected hex, the hover preview, and both targeting modes clear. Orders already queued stay queued.
+- When the player right-clicks the map, or clicks the selection panel's close control, while units are selected or a hover preview is showing, the selection, the gesture snapshot, the selected hex, the hover preview, and Ranged, Strike, and Launch targeting clear. Orders already queued stay queued.
 - When the player right-clicks with nothing selected and no hover preview, only the gesture snapshot clears.
 - When a ranged attack or air strike is accepted, the selection clears and that targeting mode turns off.
 - When a grouped march or ferry is committed, the selection clears. See [order-lifecycle.md](order-lifecycle.md).
@@ -38,12 +38,13 @@ One selection drives the [selection panel](selection-panel.md), the gold ring on
 
 ## Selection and Targeting Modes
 
-- The selection panel's reticle is greyed out, with its reason, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater. It is not on screen while the selection is empty, because the selection panel is hidden. See [console-command-bar.md](console-command-bar.md).
+- The selection panel's reticle is greyed out, with its reason, when the selection mixes air with other types, mixes missiles with other types, includes a missile during a battle, or when any selected unit cannot make a direct ranged attack in the current theater. It is not on screen while the selection is empty, because the selection panel is hidden. See [console-command-bar.md](console-command-bar.md).
 - When every selected unit is air, the reticle aims an air strike (Strike targeting).
-- When every selected unit can make a direct ranged attack and none is air, the reticle aims a ranged attack (Ranged targeting). While either targeting mode is on, the reticle reads as pressed.
-- Turning Ranged or Strike targeting on does not change which units are selected. A successful target double-click then clears the selection. A single click while targeting is on does not.
+- When every selected unit is a missile, and the match is not in a battle, the reticle aims a missile launch (Launch targeting).
+- When every selected unit can make a direct ranged attack and none is air or a missile, the reticle aims a ranged attack (Ranged targeting). While any of those targeting modes is on, the reticle reads as pressed.
+- Turning Ranged, Strike, or Launch targeting on does not change which units are selected. A successful target double-click then clears the selection. A single click while targeting is on does not.
 - Leaving the mode by clicking the pressed reticle turns the targeting mode off and keeps the selection. A failed target double-click keeps both the selection and the targeting mode. See [order-lifecycle.md](order-lifecycle.md).
-- An empty selection hides the reticle and turns both targeting modes off.
+- An empty selection hides the reticle and turns Ranged, Strike, and Launch targeting off.
 - Strategic and tactical theaters use the same reticle. Which unit types count as ranged-capable follows the [combat rules](../combat-rules-v3.md) for the active theater. A world-map selection that includes infantry and no air unit leaves the reticle greyed out, with its reason. Tactical infantry can fire.
 
 ## Strategic and Tactical Differences
@@ -57,7 +58,7 @@ The click, Shift-click, delay, and right-click rules are the same in both theate
 - Enemy units never become the selected units.
 - A left click on another hex never clears the unit selection. Right-click is the map gesture that clears it.
 - Shift is the only selection modifier. Control, Alt, and Meta never toggle a unit in or out of the selection.
-- Air mixed with any other type shows the reticle greyed out, with its reason, and never starts targeting.
+- Air mixed with any other type, or missiles mixed with any other type, shows the reticle greyed out, with its reason, and never starts targeting. A missile selection during a battle does the same.
 
 ## Open Questions
 

@@ -1,3 +1,5 @@
+import { formatMissileStrikeLine, MISSILE_STRIKE_UNNAMED_PLACE } from '../../shared/missileStrikeReport';
+import type { MissileLaunchRecord } from '../../shared/ipc/missileTypes';
 import type { ReadyResult, RemovedUnitSnapshot, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import {
   airStrikeAttackerLossUnitIdsFromMoves,
@@ -131,6 +133,10 @@ export function deriveCombatVisibilityClassification(
     if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
   }
   for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
+  for (const launch of readyResult.missileLaunches ?? []) {
+    if (launch.player !== viewerSeatId) continue;
+    for (const victimId of launch.destroyedAirUnitIds) knownVictimIds.add(victimId);
+  }
   const unknownVictimIds = allKills
     .map((k) => k.victimId)
     .filter((id, idx, arr) => arr.indexOf(id) === idx)
@@ -211,6 +217,7 @@ function buildPopupTurnLossSummary(args: {
   const metaMap = new Map<string, { player: string; unitType: string }>();
   for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
   for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+  for (const u of readySlice.missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
   const readyWithAir = readySlice as ReadyResult & { killsByAirStrike?: readonly { victimId: string }[] };
   return buildTurnLossSummaryFromReadyShape({
     kills: readySlice.kills,
@@ -220,10 +227,13 @@ function buildPopupTurnLossSummary(args: {
     killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
     removedUnits: removed,
     airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+    missileStrikeRemovedUnits: readySlice.missileStrikeRemovedUnits,
     airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
     resolveDisplayName: (id) => {
       const snap =
-        removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);
+        removed.find((u) => u.id === id) ??
+        readySlice.airStrikeRemovedUnits?.find((u) => u.id === id) ??
+        readySlice.missileStrikeRemovedUnits?.find((u) => u.id === id);
       if (snap?.displayName) return snap.displayName;
       return formatBaseUnitName(id);
     },
@@ -306,10 +316,11 @@ export async function announceResolutionTurnUpdate(
       killsByMelee?: readonly { victimId: string; killerIds?: readonly string[] }[];
       killsByAirStrike?: readonly { victimId: string; killerIds?: readonly string[] }[];
     };
+    missileLaunches?: readonly MissileLaunchRecord[];
   },
   deps: Pick<ReadyHandlerDeps, 'showMapToast' | 'appendOpenRouterLog' | 'formatUnknownBattleAnnouncement'>
 ): Promise<void> {
-  const { readySlice, visibility, killToastFormatter, extraKills, reportTag } = args;
+  const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
   const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
   const turnLossSummary = buildPopupTurnLossSummary({
     readySlice,
@@ -341,6 +352,7 @@ export async function announceResolutionTurnUpdate(
       unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
     }
   }
+  const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
     turnLossSummary,
@@ -351,12 +363,14 @@ export async function announceResolutionTurnUpdate(
       transitions: readySlice.controlTransitions ?? [],
     },
     unknownBattleLine,
+    missileStrikeLines,
   });
   if (updateText) {
     // Casualties carry birth records for units that never appeared in a fog-filtered snapshot.
     rememberUnitOrigins([
       ...(readySlice.removedUnits ?? []),
       ...(readySlice.airStrikeRemovedUnits ?? []),
+      ...(readySlice.missileStrikeRemovedUnits ?? []),
       ...(readySlice.rangedRemovedUnits ?? []),
       ...(readySlice.meleeRemovedUnits ?? []),
     ]);
@@ -370,6 +384,29 @@ export async function announceResolutionTurnUpdate(
     });
     deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
   }
+}
+
+/**
+ * Builds the Updates lines for launches the caller already decided the viewer may see.
+ *
+ * Purpose: Each line names the target hex the way the hex tooltip does.
+ * When to use: From `announceResolutionTurnUpdate` only.
+ * Expected outcome: One formatted line per record. A missing or failed caption uses the unnamed-hex words.
+ * Exceptions: A rejected caption lookup is logged and becomes the unnamed place. It is not rethrown.
+ */
+async function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | undefined): Promise<string[]> {
+  const lines: string[] = [];
+  for (const record of launches ?? []) {
+    let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
+    try {
+      const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: record.targetH3Index, resolution: 1 });
+      placeName = caption?.text.trim() || MISSILE_STRIKE_UNNAMED_PLACE;
+    } catch (err) {
+      console.error('missile strike place name failed', err);
+    }
+    lines.push(formatMissileStrikeLine({ placeName, record }));
+  }
+  return lines;
 }
 
 /**

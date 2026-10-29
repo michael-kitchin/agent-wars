@@ -16,7 +16,7 @@ The console's Commanders tab holds Start or Stop, one card per commander, the to
 
 ## Layers
 
-1. **Pre-computation** (`src/main/precomputation.ts`). Before a consult, the engine runs `assess_unit` on opponent units and `assess_hex` on relevant hexes, then `formatBriefing` / `formatTacticalBriefing` injects tables (unit status, Best Options, production, memory, standing orders, air, sealift). Combat-estimate injection was removed; Best Options carries legal this-period actions instead.
+1. **Pre-computation** (`src/main/precomputation.ts`). Before a consult, the engine runs `assess_unit` on opponent units and `assess_hex` on relevant hexes, then `formatBriefing` / `formatTacticalBriefing` injects tables (unit status, Best Options, production, memory, standing orders, air, Missile Forces when the seat has a missile and the consult is strategic, sealift). Combat-estimate injection was removed; Best Options carries legal this-period actions instead.
 2. **Ad-hoc tools** during the consult. Listed in [ai-tools.md](ai-tools.md). When a briefing is present, assessment and estimation tools are usually omitted from the model's tool list because those facts are already in the briefing.
 3. **Envelope writes.** Standing-order assign/cancel, memory write/delete, callbacks, and (strategically) production queues are applied from the parsed JSON, not from a second write-tool path — except production, which also exposes `set_build_queue` as a tool. See [ai-tools.md](ai-tools.md).
 4. **Standing-order execution** at Ready / tactical beat (`generateOrdersForStandingOrders`). DEFEND auto-fires; `hold_fire` suppresses auto-fire and the tempo sweep.
@@ -31,10 +31,10 @@ The console's Commanders tab holds Start or Stop, one card per commander, the to
   - The next Ready reads each seat's pending orders.
   - If a seat's evaluation does not call the model, or the call fails, that seat's pending orders are cleared and the next Ready uses standing orders. A timeout clears them too. There is no follow-up model call. A cancelled call does not clear orders that were already stored, and it does not store the cancelled reply.
   - If the deferred consult is abandoned because the playback notice does not match, the screen starts planning through the pool so the turn is not left without a plan.
-- **Event-driven mode, tactical:** after each beat, `runEventDrivenAfterTacticalBeatConsultation` runs the opposing AI seat's evaluation through the pool. A Neutral opponent has no consult. A beat with no trigger does not call the model. A consult whose seat has no sub-units left in that battle does not call the model (`emptyRosterAbsenceReason` in `src/shared/commanderStatus.ts`). Annihilation skips the same way. A plan that comes back stays in the pool until the next tactical commit, which reads it from there. An empty plan starts another battle consult.
+- **Event-driven mode, tactical:** after each beat, `runEventDrivenAfterTacticalBeatConsultation` runs the opposing AI seat's evaluation through the pool. A Neutral opponent has no consult. A beat with no trigger does not call the model. A consult whose seat has no sub-units left in that battle, or whose remaining sub-units are only missiles, does not call the model. Both cases use `emptyRosterAbsenceReason` in `src/shared/commanderStatus.ts` after missiles are left out of the count, and both store `no_units_in_battle`. Annihilation skips the same way. A plan that comes back stays in the pool until the next tactical commit, which reads it from there. An empty plan starts another battle consult.
 - **Draft edits:** the player's draft orders are not consult input, so editing them never cancels, restarts, or discards a consult. Only clicking Stop, a removed key or model, changing the selected model while a consult is running, an Events toggle, a new game, battle exit or reconciliation, annihilation, the wait timeout, or a rejected request cancel it. Leaving a battle stops the tactical consult and leaves a strategic one running.
 
-Mandatory overrides (`evaluateMandatoryOverrides` in `callbackEvaluation.ts`): `first_consultation`, `first_combat`, `new_contact`, `unit_destroyed`, `unordered_unit`, `standing_order_blocked`, `attack_mix_changed`, `deadman` (5 turns, `DEADMAN_TURNS`).
+Mandatory overrides (`evaluateMandatoryOverrides` in `callbackEvaluation.ts`): `first_consultation`, `first_combat`, `new_contact`, `unit_destroyed`, `unordered_unit`, `standing_order_blocked`, `attack_mix_changed`, `deadman` (5 turns, `DEADMAN_TURNS`). A missile is built with `hold_fire`, so it is not an `unordered_unit`. `canHitNow` is false for a missile, so it does not count as able to shoot. A seat that launched this turn is not idle (`seatHadStrategicResolutionUnitActions`). Another seat's launch counts as observable when the target hex's controller is this seat (`enemyHadStrategicResolutionObservableActions`). A spent missile is not in the removed-unit lists, so it does not raise `unit_destroyed`.
 
 Subscription events the evaluator implements: `turns`, `unit_engaged`, `unit_destroyed`, `unit_arrived`, `threat_escalation`, `infrastructure_destroyed`. **`territory_changed` is a no-op** (accepted, never fires).
 
@@ -59,9 +59,9 @@ Exhausting the tool-round cap records a successful-but-empty consult and warns o
 | Path | Used for |
 | --- | --- |
 | Tools | `plan_route`, `check_distance`, `assess_unit`, `assess_hex`, `estimate_combat`, `memory_read`, `query_orders`, `query_production`, `set_build_queue` |
-| JSON envelope | `orders` (including `assign_order` / `cancel_order` / `explicit_move` / `ranged_attack`), `airStrikes`, `ferryOrders`, `callbacks`, `memoryUpdates`, `productionOrders`, `strategy`, `message` |
+| JSON envelope | `orders` (including `assign_order` / `cancel_order` / `explicit_move` / `ranged_attack`), `airStrikes`, `ferryOrders`, `missileLaunches` when the commander has a missile and the consult is strategic, `callbacks`, `memoryUpdates`, `productionOrders`, `strategy`, `message` |
 
-Tactical envelopes omit `assign_order`, memory writes, and production. Sub-units are ordered with `explicit_move`, `ranged_attack`, embark/disembark, `transport_move`.
+Tactical envelopes omit `assign_order`, `missileLaunches`, memory writes, and production. Sub-units are ordered with `explicit_move`, `ranged_attack`, embark/disembark, `transport_move`.
 
 A strategic consult applies `memoryUpdates` through `executeMemory` in `applyParsedMemoryUpdates` after order validation when memory tools are enabled. A rejected row is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the memory group is off is one drop reason and is not stored.
 

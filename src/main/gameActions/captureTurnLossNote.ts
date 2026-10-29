@@ -113,6 +113,15 @@ export interface CaptureTurnLossNoteArgs {
    */
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
   /**
+   * Air destroyed by a missile launch.
+   *
+   * Contract: May overlap `airStrikeRemovedUnits`. A unit in both is a missile loss.
+   * When to use: Strategic finalize.
+   * Expected outcome: Filed under `missileStrike` before air-strike classification.
+   * Exceptions: None.
+   */
+  missileStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
+  /**
    * Air-strike animation rows used to identify striker ids lost to counter-fire.
    *
    * Contract: Same shape as Ready `airStrikeMoves`; `returnsToBase === false` marks attacker losses.
@@ -152,6 +161,7 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     killsByAirStrike,
     removedUnits,
     airStrikeRemovedUnits,
+    missileStrikeRemovedUnits,
     labelUnits,
     airStrikeMoves,
   } = args;
@@ -161,10 +171,12 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     turnNumber,
     removedCount: removedUnits.length,
     airStrikeRemovedCount: airStrikeRemovedUnits?.length ?? 0,
+    missileStrikeRemovedCount: missileStrikeRemovedUnits?.length ?? 0,
   });
   const metaMap = new Map<string, { player: string; unitType: string }>();
   for (const u of removedUnits) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
   for (const u of airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+  for (const u of missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
   const roster: readonly UnitDisplayIdentity[] =
     labelUnits ??
     removedUnits.map((u) => ({
@@ -181,10 +193,13 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     killsByMelee,
     killsByAirStrike,
     removedUnits,
+    missileStrikeRemovedUnits,
     airStrikeRemovedUnits,
     airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(airStrikeMoves),
     resolveDisplayName: (id: string) => {
-      const snap = removedUnits.find((u) => u.id === id) ?? airStrikeRemovedUnits?.find((u) => u.id === id);
+      const snap = removedUnits.find((u) => u.id === id)
+        ?? missileStrikeRemovedUnits?.find((u) => u.id === id)
+        ?? airStrikeRemovedUnits?.find((u) => u.id === id);
       if (snap?.displayName) return snap.displayName;
       return displayLookup.get(id) ?? fallbackDisplayNameFromUnitId(id);
     },

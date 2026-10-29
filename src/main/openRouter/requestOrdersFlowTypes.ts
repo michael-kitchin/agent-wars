@@ -9,6 +9,7 @@
 
 import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -66,6 +67,15 @@ export interface RequestOrdersResult {
    * Exceptions: None.
    */
   ferryOrders?: FerryOrder[];
+  /**
+   * Missile launches that passed validation.
+   *
+   * Contract: Omitted when none remain. Each missile appears once.
+   * When to use: Storing the consult and playing the turn.
+   * Expected outcome: `unitId` and `targetH3Index` for launches the seat may fire.
+   * Exceptions: None.
+   */
+  missileLaunches?: MissileLaunchOrder[];
   /**
    * Optional embark orders assigning land units to naval transports.
    *

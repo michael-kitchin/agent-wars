@@ -301,12 +301,13 @@ redraw: () => void;
  * Expected outcome: Mode flags set; both order-preview tooltips hidden; in-flight march preview invalidated; hover refresh starts for the current hex.
  * Exceptions: None.
  */
-function beginHoverSupportTargetingMode(deps: InitCoreDeps, mode: 'ranged' | 'air'): void {
+function beginHoverSupportTargetingMode(deps: InitCoreDeps, mode: 'ranged' | 'air' | 'missile'): void {
   hidePlanningChromeToasts();
   hideOrderBlockHexTooltip();
   hideOrderSlowerHexTooltip();
   S.rangedModeActive = mode === 'ranged';
   S.airStrikeModeActive = mode === 'air';
+  S.missileLaunchModeActive = mode === 'missile';
   S.hoverPreviewRequestSeq++;
   S.hoverRoutePreview = null;
   void deps.refreshHoverRoutePreview();
@@ -394,9 +395,10 @@ export function wireInitCore(deps: InitCoreDeps): void {
   // The reticle is a toggle: a click while a ranged attack or an air strike is aimed stops aiming, and otherwise starts
   // aiming the attack the selection can make.
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
-    if (S.airStrikeModeActive || S.rangedModeActive) {
+    if (S.airStrikeModeActive || S.rangedModeActive || S.missileLaunchModeActive) {
       S.airStrikeModeActive = false;
       S.rangedModeActive = false;
+      S.missileLaunchModeActive = false;
       hideOrderSlowerHexTooltip();
       void deps.refreshHoverRoutePreview();
     } else if (S.selectedUnitIds.length > 0 && S.gameState) {
@@ -417,6 +419,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
         beginHoverSupportTargetingMode(deps, 'air');
       } else if (mode === 'ranged') {
         beginHoverSupportTargetingMode(deps, 'ranged');
+      } else if (mode === 'launch') {
+        beginHoverSupportTargetingMode(deps, 'missile');
       }
     }
     deps.updateRangedSidebar();

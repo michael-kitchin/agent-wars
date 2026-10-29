@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { MISSILE_HOLD_CANNOT_BE_CANCELLED_REASON, isMissileUnitType } from '../../shared/missileRules';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { createPathfindingSession, executePlanRouteWithSession } from './pathfinding';
@@ -9,10 +10,10 @@ import { landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { logDebug, logError, logTrace } from '../logger';
 import {
-  canAssignStandingOrderType,
   parseComputedRoute,
   parseStandingOrderComputedRoute,
   parseOrderParams,
+  standingOrderTypeRejectionReason,
   toComputedRoutePayload,
   STANDING_ORDER_TYPES,
   type AssignOrderParams,
@@ -53,11 +54,9 @@ function assignOrder(
     return { status: 'error', error: 'assign_order requires order.type: defend | march | pursue | patrol | hold_fire' };
   }
 
-  if (!canAssignStandingOrderType(unit.unitType, orderType)) {
-    return {
-      status: 'error',
-      error: `Air units cannot take a ${orderType} standing order because they do not move hex by hex. Use an air strike to attack, a ferry order to reposition, or a defend order to keep striking targets in range.`,
-    };
+  const rejection = standingOrderTypeRejectionReason(unit.unitType, orderType);
+  if (rejection !== null) {
+    return { status: 'error', error: rejection };
   }
 
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
@@ -352,6 +351,10 @@ function cancelOrder(playerId: string, unitId: string): Record<string, unknown> 
   );
   if (!row) {
     return { status: 'error', error: `No standing order found for unit ${unitId}` };
+  }
+  const unitType = dbGetOne<{ unit_type: string }>('SELECT unit_type FROM units WHERE id = ?', [unitId]);
+  if (unitType && isMissileUnitType(unitType.unit_type)) {
+    return { status: 'error', error: MISSILE_HOLD_CANNOT_BE_CANCELLED_REASON };
   }
   const previousOrder: Record<string, unknown> = { type: row.order_type };
   const p = parseOrderParams(row);

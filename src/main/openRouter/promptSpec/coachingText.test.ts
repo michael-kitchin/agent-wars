@@ -68,7 +68,7 @@ function joined(gates: CoachingGates): string {
 test('strategic coaching includes every required item when its gate is on', () => {
   const text = joined(strategicGates());
   assert.match(text, /last side standing/i);
-  assert.match(text, /embark, then air strikes/i);
+  assert.match(text, /missile launches, then air strikes/i);
   assert.match(text, /cargo sync/i);
   assert.match(text, /does not consume the move/i);
   assert.match(text, /suppresses automatic engagement/i);

@@ -16,7 +16,7 @@ Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, range 2; armor: 10 attack / 7 defense, range 5; naval: 7 attack / 7 defense, range 10.
 
-Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
+Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
 
 Origin bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. That area is its birth country in a global game and its origin area in a regional game.
 
@@ -244,7 +244,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 
   Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain.
 - Infantry and armor fire at tactical baselines of 2 and 5; forest, urban, or rubble caps them to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.
-- Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
+- Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 - Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.

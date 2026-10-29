@@ -10,7 +10,7 @@ Separate queued orders from the selection and from resolution playback, so a cha
 
 ### March
 
-When the player double-clicks a destination with a non-air selection, and targeting is off, the selection plans a grouped march. If every selected unit is already on that hex and the click missed unit icons, the selection clears instead. A mixed air and non-air selection is rejected and shows an error toast. While Ranged or Strike targeting is on, a double-click does not plan a march.
+When the player double-clicks a destination with a non-air selection, and targeting is off, the selection plans a grouped march. If every selected unit is already on that hex and the click missed unit icons, the selection clears instead. A mixed air and non-air selection is rejected and shows an error toast. While Ranged, Strike, or Launch targeting is on, a double-click does not plan a march.
 
 ### Ferry
 
@@ -24,6 +24,10 @@ When Ranged targeting is on, a double-click on a hex validates the target for ev
 
 When Strike targeting is on, a double-click validates the target and the chosen target type: Enemy Units, Production, Airports, or Seaports. A single click does not queue the strike. Success queues the strikes, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves strike targeting on, the same as a failed ranged double-click.
 
+### Missile launch
+
+When Launch targeting is on, a double-click validates the target hex for every selected missile. There is no target-type list. A single click does not queue the launch. Success queues one launch per selected missile, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves launch targeting on. A launch is not accepted during a battle. Each missile launches once.
+
 ### Sealift
 
 Sealift embark and debark are not draft orders. They apply immediately from the stack callout in both theaters, never appear in an order group, and do not wait on Ready. See [stack-callout.md](stack-callout.md).
@@ -34,9 +38,9 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 
 ## Lifecycle
 
-- Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, and air strikes are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
+- Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, air strikes, and missile launches are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
 - Hover preview: while units are selected and the pointer is over a legal destination, the map draws a preview of the route or shot. The preview is dropped when the selection changes, when targeting turns off, when Ready finishes, and when a newer pointer position supersedes it. A preview that started before targeting turned off must not appear after the button has changed.
-- Commit: Ready submits pending ranged attacks, air strikes, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, and ferries for the current beat. A successful grouped march or ferry commit clears the draft selection immediately, before Ready.
+- Commit: Ready submits pending ranged attacks, air strikes, missile launches, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, and ferries for the current beat. Missile launches are not part of a beat. A successful grouped march or ferry commit clears the draft selection immediately, before Ready.
 - Rows: each row can select its unit and cancel that order. Cancel removes that order only.
 - Resolution: after a successful Ready, queued drafts that were submitted are cleared. Tactical march continuations can come back as pending movement for the next beat. Playback then animates the resolved turn. See [resolution-playback.md](resolution-playback.md) and [modes-and-transitions.md](modes-and-transitions.md).
 
@@ -63,9 +67,9 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
+- A rejected Ranged, Strike, or Launch target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
-- Every queued order that Ready will submit is visible in one of the three order groups.
+- Every queued order that Ready will submit is visible in one of the four order groups.
 - Sealift assignment is never a pending order.
 
 ## Open Questions

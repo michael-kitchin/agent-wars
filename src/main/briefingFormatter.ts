@@ -5,6 +5,7 @@
  */
 
 import { strategicCellAt, tacticalCellAt } from '../shared/h3Resolutions';
+import { isMissileUnitType } from '../shared/missileRules';
 
 import type { GameStateSnapshot } from './gameDb';
 import { briefingOwnSeatId } from './briefing/briefingPerspective';
@@ -438,6 +439,7 @@ function needsAction(
   standingOrdersActive: boolean,
   useGridHopBudget: boolean
 ): boolean {
+  if (isMissileUnitType(String(assessment.result.unit?.type ?? ''))) return false;
   // A shot the model could take is always worth surfacing. Auto-fire is a backstop for a turn the model skips,
   // never a reason to tell it a unit needs nothing, or it loses the chance to pick a better target than the
   // nearest one.

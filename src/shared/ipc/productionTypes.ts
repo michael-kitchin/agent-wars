@@ -1,18 +1,18 @@
 /**
- * Canonical deployment / build-queue iteration order: infantry, armor, naval, air.
+ * Canonical deployment / build-queue iteration order: infantry, armor, naval, air, missile.
  *
  * Purpose: Single source for cap ordering, availability filters, deployment UI, and OpenRouter tool enums.
  * When to use: Spread or copy when a mutable `BuildUnitType[]` is required; use `BuildUnitType` for typed elements.
  * Expected outcome: All game surfaces that list types in this order stay aligned.
  * Exceptions: None.
  */
-export const ALL_BUILD_UNIT_TYPES = ['infantry', 'armor', 'naval', 'air'] as const;
+export const ALL_BUILD_UNIT_TYPES = ['infantry', 'armor', 'naval', 'air', 'missile'] as const;
 
 /**
  * Union of deployable unit kinds used in production queues and deployment caps.
  *
  * Purpose: Typed alternative to raw strings for queue rows, IPC payloads, and DB columns.
- * When to use: Prefer over `string` wherever the value must be one of the four buildable types.
+ * When to use: Prefer over `string` wherever the value must be one of the buildable types.
  * Expected outcome: Compile-time exhaustiveness when switching on `BuildUnitType`.
  * Exceptions: None.
  */
@@ -27,7 +27,7 @@ export type BuildUnitType = (typeof ALL_BUILD_UNIT_TYPES)[number];
  * Exceptions: None; returns `false` for any non-matching value.
  */
 export function isBuildUnitType(value: unknown): value is BuildUnitType {
-  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
+  return typeof value === 'string' && (ALL_BUILD_UNIT_TYPES as readonly string[]).includes(value);
 }
 
 /**

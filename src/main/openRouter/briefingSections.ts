@@ -18,6 +18,7 @@ import {
   PRODUCTION_CAP_QUEUE_GUIDANCE,
 } from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
+import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -379,10 +380,10 @@ export function buildProductionBriefingBlock(args: {
   lines.push('');
   lines.push(buildProductionCostRulesLine());
   lines.push(
-    `Deployment caps (per side): infantry ${caps.infantry}, armor ${caps.armor}, naval ${caps.naval}, air ${caps.air}.`
+    `Deployment caps (per side): ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${caps[unitType]}`).join(', ')}.`
   );
   lines.push(
-    `Your current unit counts: infantry ${opponentCounts.infantry}/${caps.infantry}, armor ${opponentCounts.armor}/${caps.armor}, naval ${opponentCounts.naval}/${caps.naval}, air ${opponentCounts.air}/${caps.air}.`
+    `Your current unit counts: ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${opponentCounts[unitType]}/${caps[unitType]}`).join(', ')}.`
   );
   lines.push(buildProductionIncomeRule());
   if (maxedTypes.length > 0) {

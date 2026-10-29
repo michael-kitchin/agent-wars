@@ -1,5 +1,6 @@
 import { logDebug, logError, logTrace } from '../logger';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GuardedDbOps } from './dbOps';
@@ -120,6 +121,80 @@ ferryOrders: FerryOrder[];
    * Exceptions: None.
    */
 embarkOrders: EmbarkOrder[];
+  /**
+   * Missile launches stored with the other extra orders.
+   *
+   * Contract: Missing JSON becomes an empty list. Each row is one missile and one H3 target.
+   * When to use: Decode and encode of `strategy_text`.
+   * Expected outcome: Round-trips with the movement and ranged columns.
+   * Exceptions: None.
+   */
+  missileLaunchOrders: MissileLaunchOrder[];
+}
+
+/**
+ * Every order list stored for one commander's next turn.
+ *
+ * Purpose: `setAiPendingOrders` takes one object so a new list does not add another positional argument.
+ * When to use: Writing and reading `ai_pending_orders`.
+ * Expected outcome: Movement and ranged fire are their own columns. The other lists share `strategy_text`.
+ * Exceptions: None.
+ */
+export interface AiPendingOrderSet {
+  /**
+   * Movement orders for the seat.
+   *
+   * Contract: May be empty. Each row names a unit and a destination hex.
+   * When to use: The movement column.
+   * Expected outcome: Stored as JSON in `movement_orders`.
+   * Exceptions: None.
+   */
+  readonly movementOrders: readonly MovementOrder[];
+  /**
+   * Ranged attacks for the seat.
+   *
+   * Contract: May be empty.
+   * When to use: The ranged column.
+   * Expected outcome: Stored as JSON in `ranged_orders`.
+   * Exceptions: None.
+   */
+  readonly rangedOrders: readonly RangedAttackOrder[];
+  /**
+   * Air strikes for the seat.
+   *
+   * Contract: May be empty.
+   * When to use: The extra payload.
+   * Expected outcome: Stored inside `strategy_text`.
+   * Exceptions: None.
+   */
+  readonly airStrikeOrders: readonly AirStrikeOrder[];
+  /**
+   * Ferry orders for the seat.
+   *
+   * Contract: May be empty.
+   * When to use: The extra payload.
+   * Expected outcome: Stored inside `strategy_text`.
+   * Exceptions: None.
+   */
+  readonly ferryOrders: readonly FerryOrder[];
+  /**
+   * Embark orders for the seat.
+   *
+   * Contract: May be empty.
+   * When to use: The extra payload.
+   * Expected outcome: Stored inside `strategy_text`.
+   * Exceptions: None.
+   */
+  readonly embarkOrders: readonly EmbarkOrder[];
+  /**
+   * Missile launches for the seat.
+   *
+   * Contract: May be empty. A missing stored array decodes as empty.
+   * When to use: The extra payload.
+   * Expected outcome: Stored inside `strategy_text` and returned with the other lists.
+   * Exceptions: None.
+   */
+  readonly missileLaunchOrders: readonly MissileLaunchOrder[];
 }
 
 /**
@@ -141,11 +216,19 @@ type AiStateDbOps = GuardedDbOps;
  * Exceptions: None.
  */
 function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload {
-  const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown; embarkOrders?: unknown } | null;
+  const payload = value as {
+    airStrikeOrders?: unknown;
+    ferryOrders?: unknown;
+    embarkOrders?: unknown;
+    missileLaunchOrders?: unknown;
+  } | null;
   const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
   const ferryOrders = Array.isArray(payload?.ferryOrders) ? (payload.ferryOrders as FerryOrder[]) : [];
   const embarkOrders = Array.isArray(payload?.embarkOrders) ? (payload.embarkOrders as EmbarkOrder[]) : [];
-  return { airStrikeOrders, ferryOrders, embarkOrders };
+  const missileLaunchOrders = Array.isArray(payload?.missileLaunchOrders)
+    ? (payload.missileLaunchOrders as MissileLaunchOrder[])
+    : [];
+  return { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders };
 }
 
 /**
@@ -158,13 +241,13 @@ function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtra
  */
 function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrdersExtraPayload {
   if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
-    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [] };
   }
   try {
     return coerceAiPendingOrdersExtraPayload(JSON.parse(strategyText));
   } catch (err) {
     logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
-    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [] };
   }
 }
 
@@ -416,16 +499,7 @@ export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: 
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiPendingOrders(
-  ops: AiStateDbOps,
-  playerId: AiSeatId
-): {
-  movementOrders: MovementOrder[];
-  rangedOrders: RangedAttackOrder[];
-  airStrikeOrders: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  embarkOrders: EmbarkOrder[];
-} | null {
+export function getAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId): AiPendingOrderSet | null {
   logTrace('gameDb getAiPendingOrders', { playerId });
   if (!ops.hasDb()) return null;
   const row = ops.getOne<{ movement_orders: string; ranged_orders: string; strategy_text: string | null }>(
@@ -436,8 +510,8 @@ export function getAiPendingOrders(
   try {
     const movementOrders = JSON.parse(row.movement_orders) as MovementOrder[];
     const rangedOrders = JSON.parse(row.ranged_orders) as RangedAttackOrder[];
-    const { airStrikeOrders, ferryOrders, embarkOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
-    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders, embarkOrders };
+    const { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
+    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders };
   } catch (err) {
     logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
     return null;
@@ -452,28 +526,26 @@ export function getAiPendingOrders(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiPendingOrders(
-  ops: AiStateDbOps,
-  playerId: AiSeatId,
-  movementOrders: MovementOrder[],
-  rangedOrders: RangedAttackOrder[],
-  airStrikeOrders: AirStrikeOrder[] = [],
-  ferryOrders: FerryOrder[] = [],
-  embarkOrders: EmbarkOrder[] = []
-): void {
+export function setAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId, orders: AiPendingOrderSet): void {
   logDebug('gameDb setAiPendingOrders', {
     playerId,
-    movementCount: movementOrders.length,
-    rangedCount: rangedOrders.length,
-    airStrikeCount: airStrikeOrders.length,
-    ferryCount: ferryOrders.length,
-    embarkCount: embarkOrders.length,
+    movementCount: orders.movementOrders.length,
+    rangedCount: orders.rangedOrders.length,
+    airStrikeCount: orders.airStrikeOrders.length,
+    ferryCount: orders.ferryOrders.length,
+    embarkCount: orders.embarkOrders.length,
+    missileLaunchCount: orders.missileLaunchOrders.length,
   });
   if (!ops.hasDb()) return;
-  const strategyText = encodeAiPendingOrdersExtra({ airStrikeOrders, ferryOrders, embarkOrders });
+  const strategyText = encodeAiPendingOrdersExtra({
+    airStrikeOrders: [...orders.airStrikeOrders],
+    ferryOrders: [...orders.ferryOrders],
+    embarkOrders: [...orders.embarkOrders],
+    missileLaunchOrders: [...orders.missileLaunchOrders],
+  });
   ops.run(
     'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
-    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), strategyText]
+    [playerId, JSON.stringify(orders.movementOrders), JSON.stringify(orders.rangedOrders), strategyText]
   );
 }
 

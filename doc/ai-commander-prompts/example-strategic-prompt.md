@@ -16,7 +16,7 @@ Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy u
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, melee only; armor: 10 attack / 7 defense, range 1; naval: 7 attack / 7 defense, range 2; air: 10 attack / 3 defense, range 3.
 
-Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
+Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
 
 Origin bonus is on: a unit in a hex in the area where it was built adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. That area is its birth country in a global game and its origin area in a regional game. An air unit qualifies by the hex of its base, whatever it strikes. Casualty order still uses the printed defense values.
 
@@ -34,7 +34,7 @@ The Unit Status Weather column names the weather where that unit stands. Birth t
 
 Terrain cover: ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands. An air strike on units in a hex whose main terrain is forest needs a roll 1 lower. Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. A city hex uses the higher of its terrain cover and city cover in each column. A rugged hex uses the higher of its terrain cover and rugged ground cover.
 
-This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
+This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
 
 Movement budgets in clear weather: 1 cell for infantry, 2 for armor and naval, and air never marches. When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. A longer route continues on the next turn, and the turn count includes that halt. An explicit_move farther than this turn's budget is dropped, not shortened to the first step.
 
@@ -251,11 +251,11 @@ Turn 39:
 
 # Production Status
 
-Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport).
+Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21).
 
-Deployment caps (per side): infantry 12, armor 8, naval 8, air 6.
+Deployment caps (per side): infantry 12, armor 8, naval 8, air 6, missile 2.
 
-Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6.
+Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile 0/2.
 
 A controlled cell earns production points equal to its urban count each turn and spends them in queue order.
 
@@ -443,10 +443,10 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - memoryUpdates / tiers: "persistent" entries appear in every briefing (limit 5); "stored" are retrieved via memory_read (limit 15).
 - Production: use query_production to inspect controlled-hex queues and constraints; use set_build_queue to set one unit type/count for a queue (this replaces existing queue entries). If skipping tools, you may include productionOrders in final JSON.
 - Win by being the last side standing: knock out each enemy by controlling its home region, or by destroying or taking all of its cities. Those are the cells that matter. If the turn limit arrives first, the most city hexes wins.
-- This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.
+- This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.
 - Every unit with a ranged or air-strike row in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. Do not invent a target the table does not list.
 - A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire.
-- Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air.
+- Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
 - Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from a row listing that unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes.
 
   Each unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same unit.
@@ -520,7 +520,7 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
-"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
+"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air|missile","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 

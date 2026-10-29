@@ -9,6 +9,7 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
+import { MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { opposingPartyIdOf } from './opposingParty';
 import { createCombatRng } from '../combatResolution';
@@ -331,6 +332,8 @@ function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): st
       return 'No valid march path to that destination for one or more selected units (terrain, transport links, or blocked cells).';
     case 'air_no_march':
       return 'Air units cannot receive tactical march orders.';
+    case 'missile_no_march':
+      return MISSILE_CANNOT_MOVE_REASON;
     case 'embarked_cargo':
       return 'Embarked land units cannot receive independent movement orders. Debark first.';
     default:

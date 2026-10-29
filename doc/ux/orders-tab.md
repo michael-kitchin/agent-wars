@@ -1,6 +1,6 @@
 # Orders Tab
 
-The three order groups on the Orders tab. The selected units are shown in the [selection panel](selection-panel.md).
+The four order groups on the Orders tab. The selected units are shown in the [selection panel](selection-panel.md).
 
 ## Purpose
 
@@ -12,7 +12,7 @@ Shown on the console's Orders tab while the console is expanded. The player can 
 
 ## Information Displayed
 
-- Three groups, each with a heading and the number of orders in it: "Movement", "Ranged attacks", and "Air strikes". An empty group shows "None".
+- Four groups, each with a heading and the number of orders in it: "Movement", "Ranged attacks", "Air strikes", and "Missile launches". An empty group shows "None".
 - Each row shows the unit's name on its first line. Its second line shows an arrow, the target hex's code, a dot, and the distance in hexes, for example "→ E5 · 1h". A ferry adds "· Ferry". An air strike adds its target type as the target-type list names it, for example "→ GK · 2h · Airports". In a battle the code names the battle cell, for example "→ E8.K3 · 2h". A code or a distance that cannot be found shows "?". The codes are the ones the [hex tooltip](hex-tooltips.md) shows in parentheses (`orderTargetHexCode` in `src/shared/orderTargetHexCode.ts`). A strategic march's distance is the hexes its route has left.
 - A row whose unit is selected is highlighted and marked with a gold dot.
 - Each row ends with a cancel control (×).

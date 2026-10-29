@@ -260,6 +260,8 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'airStrikeHexes'
   | 'airStrikeCasualtyHexes'
   | 'airStrikeRemovedUnits'
+  | 'missileLaunches'
+  | 'missileStrikeRemovedUnits'
   | 'airStrikeMoves'
   | 'airStrikeAttemptCount'
   | 'airStrikeSuccessfulCount'
@@ -313,6 +315,8 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     airStrikeHexes: source.airStrikeHexes,
     airStrikeCasualtyHexes: source.airStrikeCasualtyHexes,
     airStrikeRemovedUnits: source.airStrikeRemovedUnits,
+    missileLaunches: source.missileLaunches,
+    missileStrikeRemovedUnits: source.missileStrikeRemovedUnits,
     airStrikeMoves: source.airStrikeMoves,
     airStrikeAttemptCount: source.airStrikeAttemptCount,
     airStrikeSuccessfulCount: source.airStrikeSuccessfulCount,

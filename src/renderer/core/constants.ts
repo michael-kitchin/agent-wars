@@ -83,6 +83,7 @@ naval: 'N',
    * Exceptions: None.
    */
 air: 'S',
+  missile: 'M',
 };
 
 /**
@@ -397,6 +398,16 @@ export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
+
+/**
+ * Stroke color for planned and played-back missile launches.
+ *
+ * Purpose: A launch reads as its own order, apart from ranged fire and air strikes.
+ * When to use: Missile branches of support-line drawing. Missiles have no range perimeter.
+ * Expected outcome: Crimson connector lines for missile planning and playback.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_MISSILE_COLOR = '#B91C1C';
 
 /**
  * Multiplier applied to home-region outer ownership line width for strategic range perimeter strokes.

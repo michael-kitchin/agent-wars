@@ -43,34 +43,36 @@ Footprint counts are strategic hexes. Side-group entries are each group's share 
 
 ## Table 2: Unit economy
 
-Costs are in production points. A hex earns one point per turn for each intact urban cell it contains. Minimums and the Advanced threshold count urban cells in a single strategic hex. These rows are the manifest economy. The global row is unchanged.
+Costs are in production points. A hex earns one point per turn for each intact urban cell it contains. Minimums and the Advanced threshold count urban cells in a single strategic hex. These rows are the manifest economy. The global row's older columns are unchanged. Missile is ten times that row's infantry cost. Range is hex steps.
 
-| Map | Infantry | Armor | Naval | Air | Minimums | Advanced | Strike | Scale |
-|---|---|---|---|---|---|---|---|---|
-| global | 20 | 40 | 100 | 60 | 2/5/10 | 21 | 9 | 1.000 |
-| western_europe | 60 | 120 | 300 | 180 | 7/17/31 | 59 | 26 | 2.907 |
-| southern_europe | 40 | 80 | 200 | 120 | 5/12/19 | 41 | 19 | 2.087 |
-| northern_europe | 25 | 50 | 125 | 75 | 3/7/12 | 26 | 12 | 1.286 |
-| eastern_europe | 17 | 34 | 85 | 51 | 3/6/10 | 15 | 7 | 0.833 |
-| northern_america | 20 | 40 | 100 | 60 | 2/6/11 | 20 | 9 | 1.000 |
-| central_america | 11 | 22 | 55 | 33 | 3/5/7 | 9 | 5 | 0.571 |
-| caribbean | 12 | 24 | 60 | 36 | 3/5/6 | 12 | 5 | 0.597 |
-| south_america | 10 | 20 | 50 | 30 | 2/4/6 | 9 | 4 | 0.488 |
-| maghreb | 19 | 38 | 95 | 57 | 4/7/10 | 21 | 9 | 0.960 |
-| libya_egypt_sudan | 14 | 28 | 70 | 42 | 2/5/6 | 15 | 6 | 0.690 |
-| west_africa_coast | 16 | 32 | 80 | 48 | 2/5/9 | 15 | 7 | 0.783 |
-| middle_africa_north | 9 | 18 | 45 | 27 | 3/4/5 | 8 | 4 | 0.427 |
-| middle_africa_south | 8 | 16 | 40 | 24 | 2/4/5 | 6 | 4 | 0.390 |
-| horn_and_great_lakes | 11 | 22 | 55 | 33 | 3/6/8 | 10 | 5 | 0.573 |
-| southern_east_africa | 10 | 20 | 50 | 30 | 3/4/6 | 9 | 4 | 0.497 |
-| southern_africa | 17 | 34 | 85 | 51 | 3/6/9 | 13 | 8 | 0.846 |
-| western_asia_north | 20 | 40 | 100 | 60 | 3/8/12 | 20 | 10 | 1.094 |
-| central_asia | 18 | 36 | 90 | 54 | 3/5/10 | 15 | 8 | 0.877 |
-| southern_asia_west | 35 | 70 | 175 | 105 | 6/10/19 | 34 | 16 | 1.727 |
-| southern_asia_east | 20 | 40 | 100 | 60 | 3/8/11 | 18 | 9 | 0.976 |
-| eastern_asia | 30 | 60 | 150 | 90 | 3/9/16 | 36 | 15 | 1.617 |
-| south_eastern_asia | 9 | 18 | 45 | 27 | 2/3/5 | 7 | 4 | 0.427 |
-| australia_new_zealand | 10 | 20 | 50 | 30 | 2/4/5 | 10 | 4 | 0.480 |
+`compute_missile_range_hexes` in `scripts/regional_pipeline/missile_reach.py` picks each regional range so an Advanced hex covers about `GLOBAL_MISSILE_COVERAGE_SHARE` (0.553) of that map's land, the share a global range of 12 covers. By kilometre reach those ranges fall in the SRBM, MRBM, IRBM, or ICBM band: up to 1,000 km, up to 3,000 km, up to 5,500 km, and beyond.
+
+| Map | Infantry | Armor | Naval | Air | Missile | Range | Minimums | Advanced | Strike | Scale |
+|---|---|---|---|---|---|---|---|---|---|---|
+| global | 20 | 40 | 100 | 60 | 200 | 12 | 2/5/10 | 21 | 9 | 1.000 |
+| western_europe | 60 | 120 | 300 | 180 | 600 | 5 | 7/17/31 | 59 | 26 | 2.907 |
+| southern_europe | 40 | 80 | 200 | 120 | 400 | 9 | 5/12/19 | 41 | 19 | 2.087 |
+| northern_europe | 25 | 50 | 125 | 75 | 250 | 12 | 3/7/12 | 26 | 12 | 1.286 |
+| eastern_europe | 17 | 34 | 85 | 51 | 170 | 14 | 3/6/10 | 15 | 7 | 0.833 |
+| northern_america | 20 | 40 | 100 | 60 | 200 | 8 | 2/6/11 | 20 | 9 | 1.000 |
+| central_america | 11 | 22 | 55 | 33 | 110 | 11 | 3/5/7 | 9 | 5 | 0.571 |
+| caribbean | 12 | 24 | 60 | 36 | 120 | 10 | 3/5/6 | 12 | 5 | 0.597 |
+| south_america | 10 | 20 | 50 | 30 | 100 | 10 | 2/4/6 | 9 | 4 | 0.488 |
+| maghreb | 19 | 38 | 95 | 57 | 190 | 10 | 4/7/10 | 21 | 9 | 0.960 |
+| libya_egypt_sudan | 14 | 28 | 70 | 42 | 140 | 12 | 2/5/6 | 15 | 6 | 0.690 |
+| west_africa_coast | 16 | 32 | 80 | 48 | 160 | 10 | 2/5/9 | 15 | 7 | 0.783 |
+| middle_africa_north | 9 | 18 | 45 | 27 | 90 | 9 | 3/4/5 | 8 | 4 | 0.427 |
+| middle_africa_south | 8 | 16 | 40 | 24 | 80 | 10 | 2/4/5 | 6 | 4 | 0.390 |
+| horn_and_great_lakes | 11 | 22 | 55 | 33 | 110 | 10 | 3/6/8 | 10 | 5 | 0.573 |
+| southern_east_africa | 10 | 20 | 50 | 30 | 100 | 8 | 3/4/6 | 9 | 4 | 0.497 |
+| southern_africa | 17 | 34 | 85 | 51 | 170 | 8 | 3/6/9 | 13 | 8 | 0.846 |
+| western_asia_north | 20 | 40 | 100 | 60 | 200 | 8 | 3/8/12 | 20 | 10 | 1.094 |
+| central_asia | 18 | 36 | 90 | 54 | 180 | 9 | 3/5/10 | 15 | 8 | 0.877 |
+| southern_asia_west | 35 | 70 | 175 | 105 | 350 | 11 | 6/10/19 | 34 | 16 | 1.727 |
+| southern_asia_east | 20 | 40 | 100 | 60 | 200 | 10 | 3/8/11 | 18 | 9 | 0.976 |
+| eastern_asia | 30 | 60 | 150 | 90 | 300 | 7 | 3/9/16 | 36 | 15 | 1.617 |
+| south_eastern_asia | 9 | 18 | 45 | 27 | 90 | 7 | 2/3/5 | 7 | 4 | 0.427 |
+| australia_new_zealand | 10 | 20 | 50 | 30 | 100 | 8 | 2/4/5 | 10 | 4 | 0.480 |
 
 ## Table 3: Strategic terrain and combat
 
@@ -106,7 +108,7 @@ Hits are air-strike hits on urban cells. The average side is the map's land hexe
 ## Rules these tables assume
 
 **Economy (Table 2)**
-- One cost scale per map applies to all four units, which keeps the global price ratio of 1:2:5:3 (infantry : armor : naval : air).
+- One cost scale per map applies to all five units, which keeps the global price ratio of 1:2:5:3:10 (infantry : armor : naval : air : missile).
 - Build minimums (armor, air, naval) and the Advanced tech threshold are set per map so that the same share of producing hexes qualifies as in the global game. Naval still needs a seaport and air an airport, as now.
 - Tech tier still comes from the generated urban count of a unit's birth hex.
 

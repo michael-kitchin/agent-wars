@@ -8,6 +8,7 @@ import type { CombatResolutionResult } from '../combatResolution';
 import type { FerryAnimationMove, GameStateSnapshot, MeleeCandidateRow, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { LossFlagFacts } from '../../shared/lossFlagFacts';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
+import type { MissileLaunchPhaseResult } from './missileLaunchResolution';
 import { logDebug, logError, logTrace } from '../logger';
 import { isOwnerId, type OwnerId } from '../../shared/seatIds';
 
@@ -101,6 +102,15 @@ rangedResult: CombatResolutionResult;
    * Exceptions: None.
    */
 airStrikeResult: AirStrikePhaseResult;
+  /**
+   * Launches already resolved before this pause.
+   *
+   * Contract: Produced once, before the invocation count is stored. Resume must not roll them again.
+   * When to use: Passed into finalize on resume.
+   * Expected outcome: The same records and removed air as the uninterrupted path.
+   * Exceptions: None.
+   */
+  missileLaunchResult: MissileLaunchPhaseResult;
     /**
    * Specifies the contract for the `airStrikeTransportLosses` member (airStrikeTransportLosses: CombatUnit[];).
 

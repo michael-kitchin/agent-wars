@@ -102,6 +102,7 @@ export function buildUnconsultedCommanderOrders(seatId: AiSeatId, aiState: GameS
     airStrikeOrders: [...generated.airStrikes, ...tempo.airStrikes],
     ferryOrders: [],
     embarkOrders: [],
+    missileLaunchOrders: [],
   };
 }
 
@@ -193,5 +194,6 @@ function takePending(seatId: AiSeatId): OwnerTurnOrders | null {
     airStrikeOrders: pending.airStrikeOrders,
     ferryOrders: pending.ferryOrders,
     embarkOrders: pending.embarkOrders,
+    missileLaunchOrders: pending.missileLaunchOrders,
   };
 }

@@ -17,6 +17,7 @@ import type { CombatResolutionResult } from '../combatResolution';
 import { combatDicePlaybackFields } from '../combatDiceRecording';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
+import type { MissileLaunchPhaseResult } from './missileLaunchResolution';
 import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../shared/ipcTypes';
 import { evaluateEndOfTurnOutcome, recordEndOfTurnOutcome } from './endOfTurnOutcome';
 import type { EndOfTurnOutcome } from './endOfTurnOutcomeRules';
@@ -75,6 +76,15 @@ rangedResult: CombatResolutionResult;
    * Exceptions: None.
    */
 airStrikeResult: AirStrikePhaseResult;
+  /**
+   * Launches resolved before melee.
+   *
+   * Contract: Already applied to the database. Finalize only reports them.
+   * When to use: Loss lists, infrastructure events, and `ReadyResult`.
+   * Expected outcome: Spent missiles are not in `removedUnits`.
+   * Exceptions: None.
+   */
+  missileLaunchResult: MissileLaunchPhaseResult;
     /**
    * Specifies the contract for the `airStrikeTransportLosses` member (airStrikeTransportLosses: CombatUnit[];).
 
@@ -239,6 +249,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     meleeResult,
     rangedResult,
     airStrikeResult,
+    missileLaunchResult,
     airStrikeTransportLosses,
     rangedTransportLosses,
     combatUnitsAfter,
@@ -315,6 +326,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
   dbRun('DELETE FROM pending_orders');
   dbRun('DELETE FROM pending_ranged_orders');
   dbRun('DELETE FROM pending_air_orders');
+  dbRun('DELETE FROM pending_missile_launches');
   dbRun('DELETE FROM pending_ferry_orders');
   dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', ['planning', turnNumber + 1]);
   const traversedForFog: Partial<Record<SeatId, readonly string[]>> = {};
@@ -326,6 +338,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
 
   saveDatabase();
   const allRemovedIds = [
+    ...missileLaunchResult.removedUnitIds,
     ...airStrikeResult.removedUnitIds,
     ...airStrikeTransportLosses.map((unit) => unit.id),
     ...rangedResult.removedUnitIds,
@@ -335,6 +348,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     ...baseLossRemovedAir.map((u) => u.id),
   ];
   const allRemovedUnits = [
+    ...missileLaunchResult.removedUnits,
     ...airStrikeResult.removedUnits,
     ...airStrikeTransportLosses,
     ...rangedResult.removedUnits,
@@ -354,6 +368,9 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
 
   const defenderHexes = new Set(allRanged.map((order) => order.targetH3Index));
   const meleeHexSet = new Set(meleeResult.combatHexes);
+  const stillPresent = new Set(finalUnits.map((unit) => unit.id));
+  const removedIds = new Set(allRemovedIds);
+  const countsAsCombatant = (unitId: string): boolean => stillPresent.has(unitId) || removedIds.has(unitId);
   const participantsFor = (seatId: string): string[] => {
     const attackers = allRanged
       .filter((order) => combatUnitsBefore.some((unit) => unit.id === order.unitId && unit.player === seatId))
@@ -364,7 +381,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     const meleeParticipants = combatUnitsAfter
       .filter((unit) => unit.player === seatId && meleeHexSet.has(unit.h3Index))
       .map((unit) => unit.id);
-    return [...new Set([...attackers, ...defenders, ...meleeParticipants])];
+    return [...new Set([...attackers, ...defenders, ...meleeParticipants])].filter(countsAsCombatant);
   };
   const removedFor = (seatId: string): string[] => allRemovedUnits.filter((unit) => unit.player === seatId).map((unit) => unit.id);
   const combatParticipantUnitIdsBySeat: Record<string, readonly string[]> = {};
@@ -409,6 +426,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     killsByDirectFire: rangedResult.killsByDirectFire,
     killsByReturnFire: rangedResult.killsByReturnFire,
     removedUnits: allRemovedUnits,
+    missileStrikeRemovedUnits: missileLaunchResult.removedUnits,
     airStrikeRemovedUnits: airStrikeResult.removedUnits,
     labelUnits: killLabelUnits,
     airStrikeMoves: airStrikeResult.strikeMoves,
@@ -454,6 +472,9 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
     airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
     airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? stampLossFlags(airStrikeResult.removedUnits) : undefined,
+    missileLaunches: missileLaunchResult.launches.length > 0 ? [...missileLaunchResult.launches] : undefined,
+    missileStrikeRemovedUnits:
+      missileLaunchResult.removedUnits.length > 0 ? stampLossFlags([...missileLaunchResult.removedUnits]) : undefined,
     airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,
     airStrikeAttemptCount: airStrikeResult.attemptCount > 0 ? airStrikeResult.attemptCount : undefined,
     airStrikeSuccessfulCount: airStrikeResult.successfulCount > 0 ? airStrikeResult.successfulCount : undefined,
@@ -461,7 +482,9 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     airStrikeAttackerLossCount: airStrikeResult.attackerLossCount > 0 ? airStrikeResult.attackerLossCount : undefined,
     baseInvalidAirLossCount: baseLossRemovedAir.length > 0 ? baseLossRemovedAir.length : undefined,
     infrastructureDestroyedEvents:
-      airStrikeResult.infrastructureDestroyedEvents.length > 0 ? airStrikeResult.infrastructureDestroyedEvents : undefined,
+      missileLaunchResult.infrastructureDestroyedEvents.length + airStrikeResult.infrastructureDestroyedEvents.length > 0
+        ? [...missileLaunchResult.infrastructureDestroyedEvents, ...airStrikeResult.infrastructureDestroyedEvents]
+        : undefined,
     resolvedFerryMoves: resolvedFerryMoves.length > 0 ? resolvedFerryMoves : undefined,
     meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
     meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,

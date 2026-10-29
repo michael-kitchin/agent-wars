@@ -35,6 +35,7 @@ import {
   buildWeatherRule,
   type GameRuleTextGates,
 } from './gameRuleText';
+import { MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 
 /**
  * Default gates for composing the combat paragraph in tests.
@@ -75,6 +76,7 @@ function namesStagesInOrder(text: string, stages: readonly string[]): boolean {
 
 const STRATEGIC_RESOLUTION_STAGES = [
   'embark',
+  'missile launches',
   'air strikes',
   'ranged',
   'movement',
@@ -116,6 +118,7 @@ test('buildCasualtySortRule uses lowest defence and the engine type order', () =
   assert.match(text, /lowest[- ]defen[cs]e/i);
   const typeOrder = CASUALTY_PRIORITY_ORDER.join(', ');
   assert.ok(text.includes(typeOrder), `casualty rule must list ${typeOrder}`);
+  assert.ok(text.endsWith(MISSILE_CASUALTY_ORDER_SENTENCE));
 });
 
 test('buildOriginBonusRule appears only when a flag applies in the mode', () => {
@@ -431,4 +434,16 @@ test('the system-prompt assembler delegates combat-rule prose to this module', (
   assert.ok(assembler.includes('buildCombatRulesParagraph'));
   assert.ok(!assembler.includes('d20 per shot'));
   assert.ok(!assembler.includes('Hits land on the lowest-defense'));
+});
+
+test('the missile rule appears only when the roster has a missile', () => {
+  const without = buildCombatRulesParagraph(gates());
+  assert.equal(without.includes('missileLaunches'), false);
+  const strategic = buildCombatRulesParagraph(gates({ hasMissileUnits: true }));
+  assert.match(strategic, /missile launches, then air strikes/);
+  assert.match(strategic, /within \d+ hexes/);
+  assert.match(strategic, /its own d20 roll is a 20/);
+  const tactical = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasMissileUnits: true }));
+  assert.match(tactical, /Missile sub-units never move or fire/);
+  assert.equal(tactical.includes('missileLaunches'), false);
 });

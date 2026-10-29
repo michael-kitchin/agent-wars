@@ -249,10 +249,12 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     : [];
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
+  S.pendingMissileLaunches = [];
   S.pendingFerryOrders = [];
   S.pendingEmbarkOrders = [];
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
+  S.missileLaunchModeActive = false;
   try {
     const refreshedStrategic = await fetchMatchSnapshot();
     if (!rendererMatchEpochCurrent(matchEpoch)) return true;

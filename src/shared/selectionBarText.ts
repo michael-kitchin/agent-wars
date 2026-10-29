@@ -1,3 +1,5 @@
+import { isMissileUnitType } from './missileRules';
+
 /**
  * The hint while a turn or a battle beat plays back. This module holds the text for the selection bar at the top of the
  * selection panel: the hint on its second line, which says what the next map gesture does, and the note on its first
@@ -52,6 +54,26 @@ export const SELECTION_HINT_MIXED = "Air units can't move with other units";
 export const SELECTION_HINT_MOVE = 'Double-click a hex to move · right-click to deselect';
 
 /**
+ * The hint when every selected unit is a missile.
+ *
+ * Purpose: A missile cannot march, so the bar must not offer a move.
+ * When to use: `selectionBarHint` for an all-missile selection.
+ * Expected outcome: Shown as written.
+ * Exceptions: None.
+ */
+export const SELECTION_HINT_MISSILE = "Missiles can't move · right-click to deselect";
+
+/**
+ * The hint when missiles are selected together with other types.
+ *
+ * Purpose: A mixed selection cannot march and cannot launch.
+ * When to use: `selectionBarHint` when any selected unit is a missile and another is not.
+ * Expected outcome: Shown as written.
+ * Exceptions: None.
+ */
+export const SELECTION_HINT_MISSILE_MIXED = "Missiles can't move with other units";
+
+/**
  * What decides the selection bar's hint.
  *
  * Purpose: The renderer reads these from its state; the rule stays testable.
@@ -101,6 +123,9 @@ export interface SelectionBarHintInput {
 export function selectionBarHint(input: SelectionBarHintInput): string {
   if (input.playbackRunning) return SELECTION_HINT_PLAYBACK;
   if (input.targetingOn) return SELECTION_HINT_TARGETING;
+  const missileCount = input.unitTypes.filter((unitType) => isMissileUnitType(unitType)).length;
+  if (missileCount > 0 && missileCount === input.unitTypes.length) return SELECTION_HINT_MISSILE;
+  if (missileCount > 0) return SELECTION_HINT_MISSILE_MIXED;
   const airCount = input.unitTypes.filter((unitType) => unitType === 'air').length;
   if (airCount > 0 && airCount === input.unitTypes.length) return SELECTION_HINT_FERRY;
   if (airCount > 0) return SELECTION_HINT_MIXED;

@@ -442,6 +442,18 @@ validateGroupAirStrikeTarget: (payload: {
    * Exceptions: None.
    */
 validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  /**
+   * Checks a group of missiles against one target hex.
+   *
+   * Contract: Resolves `{ success: false, reason }` when the payload or the first missile fails.
+   * When to use: The launch reticle.
+   * Expected outcome: The same result the main process returns.
+   * Exceptions: None.
+   */
+  validateGroupMissileLaunchTarget: (payload: {
+    unitIds: string[];
+    targetH3Index: string;
+  }) => Promise<{ success: boolean; reason?: string }>;
     /**
    * Specifies the contract for the `cancelHumanStandingOrder` member (cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;).
 

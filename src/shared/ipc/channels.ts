@@ -37,6 +37,7 @@ export const IPC_GAME = {
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',
+  validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
   cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
   getHexBuildQueue: 'game:getHexBuildQueue',
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',

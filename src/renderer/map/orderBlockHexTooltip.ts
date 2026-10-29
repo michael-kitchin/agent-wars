@@ -142,16 +142,12 @@ function firstMarchInvalidReasonFromPreview(data: HumanOrderGroupPreviewResult):
 export function resolveOrderBlockHexTooltipMessage(
   hoveredH3: string | null,
   data: HumanOrderGroupPreviewResult,
-  rangedMode: boolean,
-  airStrikeMode: boolean,
-  rangedValidationReason: string | null,
-  airStrikeValidationReason: string | null
+  support: { readonly kind: 'ranged' | 'air' | 'missile'; readonly reason: string | null } | null
 ): string | null {
-  if (rangedMode && !airStrikeMode && rangedValidationReason) {
-    return blockingHoverMessageFromRangedReason(rangedValidationReason);
-  }
-  if (airStrikeMode && airStrikeValidationReason) {
-    return blockingHoverMessageFromAirStrikeReason(airStrikeValidationReason);
+  if (support?.reason) {
+    if (support.kind === 'ranged') return blockingHoverMessageFromRangedReason(support.reason);
+    if (support.kind === 'air') return blockingHoverMessageFromAirStrikeReason(support.reason);
+    return support.reason;
   }
   if (!hoveredH3 || data.validForAll) return null;
   const marchReason = firstMarchInvalidReasonFromPreview(data);

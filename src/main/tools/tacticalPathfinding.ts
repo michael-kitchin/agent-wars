@@ -3,6 +3,7 @@
  */
 
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import { MISSILE_CANNOT_MOVE_REASON, isMissileUnitType } from '../../shared/missileRules';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
@@ -189,6 +190,9 @@ export function executeTacticalPlanRoute(
     const unit = planState.units.find((u) => u.id === unitId);
     if (!unit) {
       return { status: 'error', error: `Unit not found: ${unitId}` };
+    }
+    if (isMissileUnitType(unit.unitType)) {
+      return { status: 'error', error: MISSILE_CANNOT_MOVE_REASON };
     }
     if (unit.unitType === 'air') {
       return {
@@ -392,7 +396,7 @@ export function executeTacticalCheckDistance(
   }
   const fromLl = h3ToLatLng(fromH3, latLngByH3, 'origin');
   const toLl = h3ToLatLng(toH3, latLngByH3, 'origin');
-  if (unitType === 'air') {
+  if (isMissileUnitType(unitType) || unitType === 'air') {
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
   const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType, briefingSeatForBattle(battle));

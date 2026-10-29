@@ -13,10 +13,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
+from .missile_reach import MISSILE_COST_MULTIPLIER
+
 LOGGER = logging.getLogger(__name__)
 
-# Algorithm generation stored on each manifest. Bump it when the formulas change.
-METHOD_VERSION: Final = 1
+# Algorithm generation stored on each manifest. Version 2 added missile cost and range.
+METHOD_VERSION: Final = 2
 # A group's share may sit this far from an equal share, on either side.
 BALANCE_TOLERANCE: Final = 0.25
 # Fewer producing hexes than this cannot support the four gates.
@@ -99,6 +101,8 @@ class RegionalEconomy:
     naval_cost: int
     # Air purchase cost. Three times infantry.
     air_cost: int
+    # Missile purchase cost. Ten times infantry.
+    missile_cost: int
     # Urban cells required before armor can be built.
     armor_min_urban_cells: int
     # Urban cells required before air can be built.
@@ -109,6 +113,8 @@ class RegionalEconomy:
     advanced_min_urban_cells: int
     # Urban cells removed by one strategic strike.
     strategic_strike_urban_cells: int
+    # Hex range measured from geometry in ``measure_region_economy``. ``compute_regional_economy`` leaves it unset.
+    missile_range_hexes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -262,7 +268,8 @@ def compute_regional_economy(
     When to use:
         After counting urban cells on land hexes. Values below 1 are ignored.
     What to expect:
-        A ``RegionalEconomy`` whose armor, naval, and air costs are 2, 5, and 3 times infantry.
+        A ``RegionalEconomy`` whose armor, naval, air, and missile costs are 2, 5, 3, and 10 times infantry.
+        ``missile_range_hexes`` stays unset until geometry is measured.
     Exceptions:
         ``ValueError`` when fewer than ``MIN_PRODUCING_HEXES`` values remain.
     """
@@ -293,6 +300,7 @@ def compute_regional_economy(
         armor_cost=2 * infantry,
         naval_cost=5 * infantry,
         air_cost=3 * infantry,
+        missile_cost=MISSILE_COST_MULTIPLIER * infantry,
         armor_min_urban_cells=armor_min,
         air_min_urban_cells=air_min,
         naval_min_urban_cells=naval_min,
@@ -361,10 +369,12 @@ def economy_to_json(economy: RegionalEconomy, urban_overlay_max: int) -> dict[st
     What to expect:
         The manifest key set. ``scale`` is half-up to 3 decimals. Costs stay integers.
     Exceptions:
-        None.
+        ``ValueError`` when ``missile_range_hexes`` has not been measured.
     """
 
-    LOGGER.debug("economy_to_json infantry=%s.", economy.infantry_cost)
+    LOGGER.debug("economy_to_json infantry=%s range=%s.", economy.infantry_cost, economy.missile_range_hexes)
+    if economy.missile_range_hexes is None:
+        raise ValueError("economy.missile_range_hexes must be measured before it is written.")
     return {
         "method_version": METHOD_VERSION,
         "urban_overlay_max": urban_overlay_max,
@@ -376,11 +386,13 @@ def economy_to_json(economy: RegionalEconomy, urban_overlay_max: int) -> dict[st
         "armor_cost": economy.armor_cost,
         "naval_cost": economy.naval_cost,
         "air_cost": economy.air_cost,
+        "missile_cost": economy.missile_cost,
         "armor_min_urban_cells": economy.armor_min_urban_cells,
         "air_min_urban_cells": economy.air_min_urban_cells,
         "naval_min_urban_cells": economy.naval_min_urban_cells,
         "advanced_min_urban_cells": economy.advanced_min_urban_cells,
         "strategic_strike_urban_cells": economy.strategic_strike_urban_cells,
+        "missile_range_hexes": economy.missile_range_hexes,
     }
 
 

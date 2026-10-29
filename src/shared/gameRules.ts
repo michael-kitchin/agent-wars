@@ -20,6 +20,8 @@ export function unitCostFor(unitType: BuildUnitType): number {
       return rules.navalCost;
     case 'air':
       return rules.airCost;
+    case 'missile':
+      return rules.missileCost;
     default: {
       const unexpected: never = unitType;
       throw new Error(`Unknown unit type ${String(unexpected)}`);
@@ -46,6 +48,8 @@ export function buildMinimumUrbanCells(unitType: BuildUnitType): number {
       return rules.airMinUrbanCells;
     case 'naval':
       return rules.navalMinUrbanCells;
+    case 'missile':
+      return rules.advancedMinUrbanCells;
     default: {
       const unexpected: never = unitType;
       throw new Error(`Unknown unit type ${String(unexpected)}`);
@@ -63,6 +67,18 @@ export function buildMinimumUrbanCells(unitType: BuildUnitType): number {
  */
 export function advancedTechMinUrbanCells(): number {
   return activeGameMap().rules.advancedMinUrbanCells;
+}
+
+/**
+ * Returns the missile launch range of the loaded map, in hex steps.
+ *
+ * Purpose: Launch checks and the briefing share the manifest value. Membership in `gridDisk` is the only range test.
+ * When to use: Validation, reach sets, and prompt sentences. The disk includes the launch hex.
+ * Expected outcome: 12 on the global map. The catalog range on a regional map.
+ * Exceptions: None.
+ */
+export function missileRangeHexes(): number {
+  return activeGameMap().rules.missileRangeHexes;
 }
 
 /**

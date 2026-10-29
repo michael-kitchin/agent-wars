@@ -787,7 +787,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     // A click while targeting is on must not queue the attack or clear the selection.
     // The double-click that follows places the attack. Clearing here would turn targeting
     // off and let that double-click plan a march from the gesture snapshot.
-    if ((S.rangedModeActive || S.airStrikeModeActive) && S.selectedUnitIds.length > 0 && S.gameState) {
+    if ((S.rangedModeActive || S.airStrikeModeActive || S.missileLaunchModeActive) && S.selectedUnitIds.length > 0 && S.gameState) {
       return;
     }
 

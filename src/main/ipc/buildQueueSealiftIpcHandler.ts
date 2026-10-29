@@ -1,4 +1,5 @@
 import type { IpcMain } from 'electron';
+import type { BuildUnitType } from '../../shared/ipc/productionTypes';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { emptySealiftStackState } from '../../shared/sealiftStackState';
 import { logDebug } from '../logger';
@@ -86,7 +87,7 @@ export function registerBuildQueueSealiftIpcHandler(ipcMain: Pick<IpcMain, 'hand
   });
   ipcMain.handle(
     IPC_GAME.updateHexBuildQueueEntry,
-    (_event, payload: { h3Index?: string; entryId?: number; unitType?: 'infantry' | 'armor' | 'naval' | 'air'; count?: number }) => {
+    (_event, payload: { h3Index?: string; entryId?: number; unitType?: BuildUnitType; count?: number }) => {
       const parsed = parseBuildQueueUpdatePayload(payload);
       if (!parsed) {
         return { success: false, reason: 'Invalid build-queue payload' };

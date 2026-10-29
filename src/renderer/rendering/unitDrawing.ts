@@ -37,7 +37,7 @@ const TOKEN_ICON_FIT_RATIO = 0.9;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'mixed';
+type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'missile' | 'mixed';
 /**
  * Documents the module-scope binding `UNIT_ICON_FILE_BY_TYPE` (UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string>).
 
@@ -83,6 +83,7 @@ naval: 'naval.svg',
    * Exceptions: None.
    */
 air: 'air.svg',
+  missile: 'missile.svg',
     /**
    * Documents the object literal property `mixed` (mixed: 'mixed.svg').
 
@@ -212,9 +213,9 @@ export function drawUnitTypeGlyph(
   sizePx: number,
   player?: string
 ): boolean {
-  if (unitType !== 'infantry' && unitType !== 'armor' && unitType !== 'naval' && unitType !== 'air') return false;
+  if (!Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType) || unitType === 'mixed') return false;
   const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
-  return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
+  return drawUnitSvgIcon(ctx, centerX, centerY, unitType as UnitIconType, player, true, fitScaleMultiplier);
 }
 
 /**
@@ -280,6 +281,7 @@ export function drawOneUnitMarker(
     (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, 'infantry', unitPlayer)) ||
     (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, 'air', unitPlayer)) ||
     (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, 'naval', unitPlayer)) ||
+    (label === UNIT_TYPE_LABELS.missile && drawUnitSvgIcon(ctx, x, y, 'missile', unitPlayer)) ||
     (label === '*' && drawUnitSvgIcon(ctx, x, y, 'mixed', unitPlayer, false, 0.5));
   if (!drewIcon) ctx.fillText(label, x, y);
   ctx.restore();

@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { missileLaunchDuplicateReason } from '../../shared/missileRules';
 import { logDebug, logInfo } from '../logger';
 
 /**
@@ -140,6 +141,26 @@ export function strategicFerryDuplicateReason(
       return `Duplicate ferry order for ${displayLabelForUnit(f.unitId)}`;
     }
     seen.add(f.unitId);
+  }
+  return null;
+}
+
+/**
+ * Returns a reason when the same unit id appears twice in a missile-launch list.
+ *
+ * Purpose: Duplicate launch rows remain a hard error.
+ * When to use: `executeSubmitOrders` before launch row validation.
+ * Expected outcome: `null` when unique. Otherwise the missile duplicate sentence for the first repeated unit.
+ * Exceptions: None.
+ */
+export function strategicMissileLaunchDuplicateReason(
+  rows: readonly { unitId: string }[],
+  displayLabelForUnit: (unitId: string) => string
+): string | null {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (seen.has(row.unitId)) return missileLaunchDuplicateReason(displayLabelForUnit(row.unitId));
+    seen.add(row.unitId);
   }
   return null;
 }

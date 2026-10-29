@@ -13,6 +13,7 @@ import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from 
 import { logDebug, logError } from '../logger';
 import type { FerryAnimationMove, ReadyResult, AirStrikeTargetType } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
+import { resolveMissileLaunchPhase } from './missileLaunchResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
 import { buildTechHitBonusLookupFromDb } from '../techBonus/techHitBonusLookupDb';
@@ -157,6 +158,9 @@ export function executeReadyStrategicTurn(
   const humanAirStrikes = dbGetAll<{ unit_id: string; target_h3_index: string; target_type: AirStrikeTargetType }>(
     'SELECT unit_id, target_h3_index, target_type FROM pending_air_orders ORDER BY unit_id, target_h3_index'
   ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index, targetType: r.target_type }));
+  const humanMissileLaunches = dbGetAll<{ unit_id: string; target_h3_index: string }>(
+    'SELECT unit_id, target_h3_index FROM pending_missile_launches ORDER BY unit_id'
+  ).map((row) => ({ unitId: row.unit_id, targetH3Index: row.target_h3_index }));
   const humanFerryOrders = dbGetAll<{ unit_id: string; destination_h3_index: string }>(
     'SELECT unit_id, destination_h3_index FROM pending_ferry_orders ORDER BY unit_id, destination_h3_index'
   ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
@@ -194,6 +198,11 @@ export function executeReadyStrategicTurn(
     ordersForOwners.set(NEUTRAL_OWNER_ID, keepOrdersOfOwnedUnits(NEUTRAL_OWNER_ID, neutralOrders, unitOwnerById));
   }
   const allAirStrikes = listsInResolutionOrder(mergedHumanAirStrikes, ordersForOwners, (orders) => orders.airStrikeOrders);
+  const allMissileLaunches = listsInResolutionOrder(
+    humanMissileLaunches,
+    ordersForOwners,
+    (orders) => orders.missileLaunchOrders
+  );
   const strikeUnitIds = new Set(allAirStrikes.map((s) => s.unitId));
   const mergedFerryOrders = listsInResolutionOrder(humanFerryOrders, ordersForOwners, (orders) => orders.ferryOrders);
   const allFerryOrders = mergedFerryOrders.filter((f) => !strikeUnitIds.has(f.unitId));
@@ -222,6 +231,7 @@ export function executeReadyStrategicTurn(
     return rawCombatRng();
   };
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
+  const missileLaunchResult = resolveMissileLaunchPhase(allMissileLaunches, next);
 
   const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
@@ -445,6 +455,7 @@ export function executeReadyStrategicTurn(
       combatUnitsBefore: combatUnitsBefore.map((u) => ({ ...u })),
       rangedResult,
       airStrikeResult,
+      missileLaunchResult,
       airStrikeTransportLosses,
       rangedTransportLosses,
       humanMoves: [...humanMoves],
@@ -478,6 +489,7 @@ export function executeReadyStrategicTurn(
     meleeResult,
     rangedResult,
     airStrikeResult,
+    missileLaunchResult,
     airStrikeTransportLosses,
     rangedTransportLosses,
     combatUnitsAfter,

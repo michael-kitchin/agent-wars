@@ -3,6 +3,7 @@ import type {
   AirStrikeOrder,
   FerryOrder,
   GameStateSnapshot,
+  MissileLaunchOrder,
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
 import { AIR_STRIKE_TARGET_TYPE_LABELS, formatOrderRowDetail } from '../../shared/orderRowDetail';
@@ -129,6 +130,22 @@ export function formatPendingAirStrikeSidebarLabel(
     battle,
     AIR_STRIKE_TARGET_TYPE_LABELS[order.targetType] ?? null
   );
+}
+
+/**
+ * Formats the line for a queued missile launch.
+ *
+ * Purpose: The Missile launches group and the selection panel show the same line.
+ * When to use: For each row of `S.pendingMissileLaunches`.
+ * Expected outcome: For example `→ GK · 2h · Missile`.
+ * Exceptions: None.
+ */
+export function formatPendingMissileLaunchSidebarLabel(
+  state: GameStateSnapshot | null,
+  order: MissileLaunchOrder,
+  battle?: OrderLabelBattle | null
+): string {
+  return formatUnitToTargetDetail(state, order.unitId, order.targetH3Index, battle, 'Missile');
 }
 
 /**

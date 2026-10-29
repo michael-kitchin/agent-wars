@@ -6,6 +6,7 @@ import type {
   AirStrikeOrder,
   FerryOrder,
   HumanStandingOrderSnapshot,
+  MissileLaunchOrder,
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
 import { filterOrdersToLivingUnitIds } from '../../shared/filterOrdersToLivingUnitIds';
@@ -23,6 +24,7 @@ let strategicOrderDraftStash: {
   humanStandingOrders: HumanStandingOrderSnapshot[];
   pendingRangedAttacks: RangedAttackOrder[];
   pendingAirStrikes: AirStrikeOrder[];
+  pendingMissileLaunches: MissileLaunchOrder[];
   pendingFerryOrders: FerryOrder[];
 } | null = null;
 
@@ -40,16 +42,19 @@ export function stashStrategicOrderDraftsForTacticalSession(): void {
     humanStandingOrders: [...S.humanStandingOrders],
     pendingRangedAttacks: [...S.pendingRangedAttacks],
     pendingAirStrikes: [...S.pendingAirStrikes],
+    pendingMissileLaunches: [...S.pendingMissileLaunches],
     pendingFerryOrders: [...S.pendingFerryOrders],
   };
   S.humanStandingOrders = [];
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
+  S.pendingMissileLaunches = [];
   S.pendingFerryOrders = [];
   S.pendingEmbarkOrders = [];
   S.tacticalPendingMarches = [];
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
+  S.missileLaunchModeActive = false;
 }
 
 /**
@@ -89,6 +94,10 @@ export function restoreStrategicOrderDraftsAfterTacticalSession(): void {
   );
   S.pendingAirStrikes = restoreDraftRowsForLivingUnits(
     strategicOrderDraftStash.pendingAirStrikes,
+    livingUnitIds
+  );
+  S.pendingMissileLaunches = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.pendingMissileLaunches,
     livingUnitIds
   );
   S.pendingFerryOrders = restoreDraftRowsForLivingUnits(

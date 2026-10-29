@@ -1,12 +1,6 @@
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
-import type {
-  AirStrikeOrder,
-  EmbarkOrder,
-  FerryOrder,
-  MovementOrder,
-  RangedAttackOrder,
-} from '../../shared/ipcTypes';
 import type { AiSeatId } from '../../shared/seatIds';
+import type { AiPendingOrderSet } from './aiState';
 import { gameDbOps } from './dbConnection';
 import {
   addAiLossEventsSinceConsultation as addAiLossEventsSinceConsultationFromModule,
@@ -177,13 +171,7 @@ export function clearAiLossEventsSinceConsultation(playerId: AiSeatId): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getAiPendingOrders(playerId: AiSeatId): {
-  movementOrders: MovementOrder[];
-  rangedOrders: RangedAttackOrder[];
-  airStrikeOrders: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  embarkOrders: EmbarkOrder[];
-} | null {
+export function getAiPendingOrders(playerId: AiSeatId): AiPendingOrderSet | null {
   return getAiPendingOrdersFromModule(gameDbOps, playerId);
 }
 
@@ -195,23 +183,8 @@ export function getAiPendingOrders(playerId: AiSeatId): {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setAiPendingOrders(
-  playerId: AiSeatId,
-  movementOrders: MovementOrder[],
-  rangedOrders: RangedAttackOrder[],
-  airStrikeOrders: AirStrikeOrder[] = [],
-  ferryOrders: FerryOrder[] = [],
-  embarkOrders: EmbarkOrder[] = []
-): void {
-  setAiPendingOrdersFromModule(
-    gameDbOps,
-    playerId,
-    movementOrders,
-    rangedOrders,
-    airStrikeOrders,
-    ferryOrders,
-    embarkOrders
-  );
+export function setAiPendingOrders(playerId: AiSeatId, orders: AiPendingOrderSet): void {
+  setAiPendingOrdersFromModule(gameDbOps, playerId, orders);
 }
 
 /**

@@ -10,6 +10,8 @@ import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
+import { tacticalComputeHumanMovementOrderOutcome } from './tacticalSnapshotGuards';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPlanningCache';
 import {
   firstRingCellDistinctFrom,
@@ -390,4 +392,39 @@ test('projectTacticalSnapshotAfterOpponentMovementOrders lets two units stack on
   ]);
   assert.equal(next.subUnits.find((u) => u.id === 'opp-a')?.h3Index, dest);
   assert.equal(next.subUnits.find((u) => u.id === 'opp-b')?.h3Index, dest);
+});
+
+test('a missile sub-unit cannot march', () => {
+  const strategic = tacticalParentCell(14, 22);
+  const center = tacticalUnderCorner(14, 22);
+  const ring = gridDisk(center, 1);
+  const dest = firstRingCellDistinctFrom(center);
+  const missile = {
+    id: 'missile-su',
+    parentUnitId: 'parent-missile',
+    player: HUMAN_SEAT_ID,
+    unitType: 'missile' as const,
+    h3Index: center,
+    displayName: 'M Missile (01)',
+  };
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-missile-march',
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [missile],
+  };
+  const outcome = tacticalComputeHumanMovementOrderOutcome({
+    byId: new Map([[missile.id, 0]]),
+    sub: snap.subUnits,
+    order: { unitId: missile.id, toH3Index: dest },
+    tacticalSet: new Set(snap.tacticalChildH3Indexes),
+    battle: snap,
+  });
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) assert.equal(outcome.reason, 'missile_no_march');
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [{ unitId: missile.id, toH3Index: dest }]);
+  assert.equal(next.subUnits[0]!.h3Index, center);
 });

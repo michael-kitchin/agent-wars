@@ -106,17 +106,18 @@ export function getRangeOverlayLineCap(kind: RangeOverlayStrokeKind): 'butt' | '
 export function buildRangeOverlayDashArray(
   lineWidth: number,
   kind: RangeOverlayStrokeKind,
-  mode: 'ranged' | 'airStrike'
+  mode: 'ranged' | 'airStrike' | 'missile'
 ): [number, number] {
-  const minSolid = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
-  const minGap = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
+  const airDash = mode === 'airStrike' || mode === 'missile';
+  const minSolid = airDash ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
+  const minGap = airDash ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
   if (kind === 'perimeter') {
     const segment = Math.max(minSolid, minGap, lineWidth * RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH);
     return [segment, segment];
   }
   const solidFraction =
-    mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
+    mode === 'airStrike' || mode === 'missile' ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
   const gapFraction =
-    mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
+    mode === 'airStrike' || mode === 'missile' ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
   return [Math.max(minSolid, lineWidth * solidFraction), Math.max(minGap, lineWidth * gapFraction)];
 }

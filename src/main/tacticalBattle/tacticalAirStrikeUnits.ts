@@ -9,7 +9,7 @@
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
-import { casualtyPriorityIndex, getDefense } from '../combatConstants';
+import { compareCasualtyOrder } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { rollCombatDieAgainst, type CombatDiceRollSink } from '../combatDiceRecording';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
@@ -230,8 +230,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
   if (attackHit && defenders.length > 0) {
     const victim = [...defenders].sort(
       (a, b) =>
-        getDefense(a.unitType) - getDefense(b.unitType) ||
-        casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+        compareCasualtyOrder(a.unitType, b.unitType)
     )[0]!;
     markTacticalSubUnitCasualty(sub, toRemove, victim.id, [attacker.id], killsByAirStrike);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits ground target destroyed', {

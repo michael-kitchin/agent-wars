@@ -178,6 +178,8 @@ naval: { minUrbanHexes: GLOBAL_GAME_MAP.rules.navalMinUrbanCells, minSeaports: 1
    * Exceptions: None.
    */
 air: { minUrbanHexes: GLOBAL_GAME_MAP.rules.airMinUrbanCells, minSeaports: 0 },
+  // Not the live urban gate. `buildMinimumUrbanCells` reads the loaded map. This field only completes the record.
+  missile: { minUrbanHexes: GLOBAL_GAME_MAP.rules.advancedMinUrbanCells, minSeaports: 0 },
 };
 
 /**
@@ -235,7 +237,7 @@ export function isValidBuildCount(value: number): boolean {
  *
  * Purpose: The urban gate follows the active map. Seaport minimums stay on the static prerequisite table.
  * When to use: Build menus and prompt sentences that need the types a hex can start.
- * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. Naval also needs its seaport minimum. Air needs an airport.
+ * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. A missile needs the Advanced urban-cell count. Naval also needs its seaport minimum. Air needs an airport.
  * Exceptions: None.
  */
 export function getAvailableBuildUnitTypes(

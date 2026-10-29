@@ -6,6 +6,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
+import { isMissileUnitType } from '../../shared/missileRules';
 import { logTrace } from '../logger';
 
 /**
@@ -109,7 +110,7 @@ export function estimateTacticalMarch(
     estimatedBeats: 0,
     movementPointBudget,
   });
-  if (mover.unitType === 'air') return unreachable(0);
+  if (mover.unitType === 'air' || isMissileUnitType(mover.unitType)) return unreachable(0);
   const budget = Math.max(
     0,
     effectiveTacticalMovementPointBudgetForMarchLeg(battle, mover, battle.subUnits, mover.unitType)

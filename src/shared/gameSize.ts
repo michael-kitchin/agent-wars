@@ -48,6 +48,7 @@ const UNIT_TYPE_DISPLAY_NAME: Readonly<Record<BuildUnitType, string>> = {
   armor: 'Armor',
   naval: 'Naval',
   air: 'Air',
+  missile: 'Missile',
 };
 
 /**
@@ -80,6 +81,7 @@ export function getMaxUnitsPerType(size: GameSize): Readonly<Record<BuildUnitTyp
     armor: MAX_UNITS_PER_TYPE.armor * multiplier,
     naval: MAX_UNITS_PER_TYPE.naval * multiplier,
     air: MAX_UNITS_PER_TYPE.air * multiplier,
+    missile: MAX_UNITS_PER_TYPE.missile * multiplier,
   };
 }
 
@@ -88,7 +90,7 @@ export function getMaxUnitsPerType(size: GameSize): Readonly<Record<BuildUnitTyp
  *
  * Purpose: Lets the start screen's unit row show each cap without duplicating type order in HTML/JS.
  * When to use: Rendering or refreshing the four caps in the unit row under the Game size dropdown.
- * Expected outcome: Infantry → armor → naval → air with capitalized names and `getMaxUnitsPerType` caps.
+ * Expected outcome: Infantry → armor → naval → air → missile with capitalized names and `getMaxUnitsPerType` caps.
  * Exceptions: None.
  */
 export function gameSizeCapPreviewRows(size: GameSize): ReadonlyArray<{

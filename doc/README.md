@@ -36,7 +36,7 @@ When you change one of these, update [combat-rules-v3.md](combat-rules-v3.md) (a
 | Attack / defense / strategic move / strategic range | `src/main/combatConstants.ts`, `src/shared/rangePerimeterModel.ts` |
 | Die size, hit-number floor and cap, infrastructure counter-fire | `src/main/combatDice.ts` |
 | Terrain cover by target terrain | `TERRAIN_COVER_BY_CATEGORY` and `URBAN_OR_RUBBLE_TERRAIN_COVER` in `src/shared/terrainCoverRules.ts` |
-| Unit costs and build prerequisites | `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts`. The global column is copied into `src/shared/productionConfig.ts` and `src/main/productionRules.ts`. Regional costs, minimums, and strike size come from the loaded map's manifest. |
+| Unit costs and build prerequisites | `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts`. The global column is copied into `src/shared/productionConfig.ts` and `src/main/productionRules.ts`. Regional costs, minimums, strike size, `missile_cost`, and `missile_range_hexes` come from the loaded map's manifest. |
 | Armor stop and strategic city or rugged cover | `armorMoveEndsOnHex` and `strategicTerrainFlagsFor` in `src/shared/strategicTerrainFlags.ts`. Cover columns are in `terrainCoverPairFor` in `src/shared/terrainCoverRules.ts`. |
 | Loaded map extent | `mapExtentBoxForHexes`, `loadedMapExtentKey`, and `shouldApplyLoadedMapExtent` in `src/shared/mapExtent.ts`. Start frames the extent immediately. A later snapshot does not, while that footprint is unchanged. Player framing is in [ux/map-surface.md](ux/map-surface.md). The renderer applies it from `src/renderer/map/mapExtent.ts`. |
 | Per-side caps by game size | `src/shared/productionConfig.ts` (`MAX_UNITS_PER_TYPE`), `src/shared/gameSize.ts` |
@@ -53,6 +53,7 @@ When you change one of these, update [combat-rules-v3.md](combat-rules-v3.md) (a
 | Strategic and tactical H3 resolutions | `strategicH3Resolution` and `tacticalH3Resolution` in `src/shared/h3Resolutions.ts`. On the global map those are 1 and 4 (`GLOBAL_STRATEGIC_H3_RESOLUTION`, `GLOBAL_TACTICAL_H3_RESOLUTION`). A regional map uses strategic resolution 2 or 3 and tactical resolution 5 or 6. |
 | Sub-unit multiplication | `tacticalSubUnitCountForStrategicUnitType` in `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` |
 | Resolution phase order | `executeReadyStrategicTurn`, `buildResolutionOrderRule` |
+| Missile range, survival roll, and launch timing | `missileRangeHexes` in `src/shared/gameRules.ts`, `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` in `src/shared/missileRules.ts`, and `resolveMissileLaunchPhase` in `src/main/gameActions/missileLaunchResolution.ts`. Launches run after embark and before air strikes. |
 | Dice chip line and face limits (quoted in [ux/resolution-playback.md](ux/resolution-playback.md), not in the combat rules) | `COMBAT_DICE_CHIP_MAX_LINES` and `COMBAT_DICE_ROW_MAX_FACES` in `src/shared/combatDiceChips.ts` |
 | Seat limits and seat ids | `MIN_SEATS`, `MAX_SEATS`, `AI_SEAT_IDS`, `HUMAN_SEAT_ID`, `NEUTRAL_OWNER_ID` in `src/shared/seatIds.ts` |
 | Win rules, knockout, and places | `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`, `TURN_LIMIT_OPTIONS`, `DEFAULT_TURN_LIMIT`, `victorySettingsForRequest`, and `DEFAULT_VICTORY_RULE` in `src/shared/victoryRules.ts` |

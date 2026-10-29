@@ -8,6 +8,7 @@ import type {
   HumanStandingOrderSnapshot,
   RangedAttackOrder,
   AirStrikeOrder,
+  MissileLaunchOrder,
   EmbarkOrder,
   FerryOrder,
   AirStrikeTargetType,
@@ -412,6 +413,15 @@ pendingRangedAttacks: [] as RangedAttackOrder[],
    */
 pendingAirStrikes: [] as AirStrikeOrder[],
     /**
+   * Queued missile launches the next Ready will send.
+   *
+   * Purpose: Holds the human's aimed launches until Ready submits them or a new game clears them.
+   * When to use: Written when a launch is planned or cancelled. Read by the Orders tab and the map arrows.
+   * Expected outcome: Empty until the player double-clicks a target while missile aiming is on.
+   * Exceptions: None.
+   */
+pendingMissileLaunches: [] as MissileLaunchOrder[],
+    /**
    * Documents the object literal property `pendingFerryOrders` (pendingFerryOrders: [] as FerryOrder[]).
 
    * Purpose: Supports maintainability by documenting why `pendingFerryOrders` exists.
@@ -465,6 +475,15 @@ rangedModeActive: false,
    * Exceptions: None.
    */
 airStrikeModeActive: false,
+    /**
+   * Whether the reticle is aiming a missile launch.
+   *
+   * Purpose: The next double-click places a launch instead of a march.
+   * When to use: Set by the reticle. Cleared by a second click, an empty selection, or a successful launch.
+   * Expected outcome: True only while missiles are selected and the player is choosing a target.
+   * Exceptions: None. A battle never turns this on.
+   */
+missileLaunchModeActive: false,
     /**
    * Cached lat/lng vertex loops for the range perimeter overlay (recomputed when signature changes).
 

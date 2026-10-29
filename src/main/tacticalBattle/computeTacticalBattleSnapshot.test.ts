@@ -18,6 +18,7 @@ test('tacticalSubUnitCountForStrategicUnitType maps known strategic types to pos
   assert.equal(tacticalSubUnitCountForStrategicUnitType('armor'), 4);
   assert.equal(tacticalSubUnitCountForStrategicUnitType('air'), 3);
   assert.equal(tacticalSubUnitCountForStrategicUnitType('naval'), 4);
+  assert.equal(tacticalSubUnitCountForStrategicUnitType('missile'), 1);
 });
 
 test('tacticalSubUnitCountForStrategicUnitType returns zero for unknown types', () => {

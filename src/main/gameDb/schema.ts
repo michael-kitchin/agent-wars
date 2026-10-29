@@ -18,7 +18,7 @@ export function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS units (
       id TEXT PRIMARY KEY,
       player TEXT NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')),
       display_order INTEGER,
       h3_index TEXT NOT NULL,
       birth_h3_index TEXT,
@@ -54,6 +54,11 @@ export function getFullDdl(): string {
       unit_id TEXT PRIMARY KEY,
       target_h3_index TEXT NOT NULL,
       target_type TEXT NOT NULL CHECK (target_type IN ('units', 'urban', 'airport', 'seaport'))
+    );
+
+    CREATE TABLE IF NOT EXISTS pending_missile_launches (
+      unit_id TEXT PRIMARY KEY,
+      target_h3_index TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS pending_ferry_orders (
@@ -155,7 +160,7 @@ export function getFullDdl(): string {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       h3_index TEXT NOT NULL,
       queue_index INTEGER NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')),
       remaining_count INTEGER NOT NULL CHECK (remaining_count > 0),
       UNIQUE (h3_index, queue_index)
     );
@@ -166,7 +171,7 @@ export function getFullDdl(): string {
       keep_building INTEGER NOT NULL DEFAULT 0 CHECK (keep_building IN (0, 1)),
       keep_building_unit_type TEXT CHECK (
         keep_building_unit_type IS NULL
-        OR keep_building_unit_type IN ('infantry', 'armor', 'naval', 'air')
+        OR keep_building_unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')
       )
     );
 

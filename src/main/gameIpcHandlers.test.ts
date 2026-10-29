@@ -178,7 +178,14 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   const precomputedRanged: { unitId: string; targetH3Index: string }[] = [];
   let requestOrdersCalled = false;
   await withSeatedTempGameDbAsync('aw-ready-pending-', { fogOfWarEnabled: false }, async () => {
-  setAiPendingOrders(AI_SEAT_IDS[0], precomputedOrders, precomputedRanged, [], [], []);
+  setAiPendingOrders(AI_SEAT_IDS[0], {
+    movementOrders: precomputedOrders,
+    rangedOrders: precomputedRanged,
+    airStrikeOrders: [],
+    ferryOrders: [],
+    embarkOrders: [],
+    missileLaunchOrders: [],
+  });
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,
@@ -228,7 +235,14 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
   const ferryOrders = [{ unitId: 'opponent-air-2', destinationH3Index: '891f1d48b9fffff' }];
   const embarkOrders = [{ unitId: 'opponent-inf-1', navalUnitId: 'opponent-naval-1' }];
   await withSeatedTempGameDbAsync('aw-ready-extra-', { fogOfWarEnabled: false }, async () => {
-  setAiPendingOrders(AI_SEAT_IDS[0], [], [], airStrikes, ferryOrders, embarkOrders);
+  setAiPendingOrders(AI_SEAT_IDS[0], {
+    movementOrders: [],
+    rangedOrders: [],
+    airStrikeOrders: airStrikes,
+    ferryOrders,
+    embarkOrders,
+    missileLaunchOrders: [],
+  });
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,

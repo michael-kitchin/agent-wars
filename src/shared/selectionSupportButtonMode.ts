@@ -1,3 +1,8 @@
+import {
+  isMissileUnitType,
+  LAUNCH_NEEDS_MISSILES_ONLY_REASON,
+  MISSILES_CANNOT_FIRE_IN_BATTLE_REASON,
+} from './missileRules';
 import { unitHasDirectRangedPlanning } from './rangePerimeterModel';
 
 /**
@@ -9,7 +14,7 @@ import { unitHasDirectRangedPlanning } from './rangePerimeterModel';
  *   ranged attack, and `strike` aims an air strike.
  * Exceptions: None.
  */
-export type SelectionSupportButtonMode = 'hidden' | 'ranged' | 'strike';
+export type SelectionSupportButtonMode = 'hidden' | 'ranged' | 'strike' | 'launch';
 
 /**
  * Chooses whether the selection panel's reticle aims a ranged attack, an air strike, or nothing.
@@ -24,6 +29,7 @@ export function selectionSupportButtonMode(
   tacticalBattleActive: boolean
 ): SelectionSupportButtonMode {
   if (unitTypes.length === 0) return 'hidden';
+  if (!tacticalBattleActive && unitTypes.every((unitType) => isMissileUnitType(unitType))) return 'launch';
   if (unitTypes.every((unitType) => unitType === 'air')) return 'strike';
   const everyUnitCanRangedAttack = unitTypes.every(
     (unitType) => unitType !== 'air' && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
@@ -69,7 +75,7 @@ export interface SelectionSupportAction {
    * Expected outcome: Matches what a click would start.
    * Exceptions: None.
    */
-  readonly kind: 'ranged' | 'strike';
+  readonly kind: 'ranged' | 'strike' | 'launch';
   /**
    * Whether a click can start aiming.
    *
@@ -95,15 +101,24 @@ export interface SelectionSupportAction {
  *
  * Purpose: The selection panel shows the reticle for every selection and explains a greyed-out one.
  * When to use: Each time the selection or the theater changes, next to `selectionSupportButtonMode`.
- * Expected outcome: All air: strike, enabled. All able to fire: ranged, enabled. Air with other types: strike,
- *   disabled, `STRIKE_NEEDS_AIR_ONLY_REASON`. World-map infantry without air: ranged, disabled,
+ * Expected outcome: All missiles outside a battle: launch, enabled. All missiles in a battle: launch, disabled,
+ *   `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`. Missiles mixed with other types: launch, disabled,
+ *   `LAUNCH_NEEDS_MISSILES_ONLY_REASON`. All air: strike, enabled. All able to fire: ranged, enabled. Air with other
+ *   types: strike, disabled, `STRIKE_NEEDS_AIR_ONLY_REASON`. World-map infantry without air: ranged, disabled,
  *   `INFANTRY_CANNOT_FIRE_REASON`. Anything else: ranged, disabled, no reason.
  * Exceptions: None.
  */
 export function selectionSupportAction(unitTypes: readonly string[], tacticalBattleActive: boolean): SelectionSupportAction {
   const mode = selectionSupportButtonMode(unitTypes, tacticalBattleActive);
+  if (mode === 'launch') return { kind: 'launch', enabled: true, reason: null };
   if (mode === 'strike') return { kind: 'strike', enabled: true, reason: null };
   if (mode === 'ranged') return { kind: 'ranged', enabled: true, reason: null };
+  if (tacticalBattleActive && unitTypes.some((unitType) => isMissileUnitType(unitType))) {
+    return { kind: 'launch', enabled: false, reason: MISSILES_CANNOT_FIRE_IN_BATTLE_REASON };
+  }
+  if (unitTypes.some((unitType) => isMissileUnitType(unitType))) {
+    return { kind: 'launch', enabled: false, reason: LAUNCH_NEEDS_MISSILES_ONLY_REASON };
+  }
   if (unitTypes.includes('air')) return { kind: 'strike', enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
   if (!tacticalBattleActive && unitTypes.includes('infantry')) {
     return { kind: 'ranged', enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };

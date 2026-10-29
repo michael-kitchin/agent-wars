@@ -4,6 +4,7 @@ import type {
   EmbarkOrder,
   FerryOrder,
 } from '../shared/ipcTypes';
+import { isBuildUnitType, type BuildUnitType } from '../shared/ipc/productionTypes';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPushTypes';
 
 /**
@@ -15,15 +16,6 @@ import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPush
  * Exceptions: None.
  */
 type GroupTargetType = 'units' | 'urban' | 'airport' | 'seaport';
-/**
- * Documents the `BuildQueueUnitType` type alias (type BuildQueueUnitType).
-
- * Purpose: Supports maintainability by documenting why `BuildQueueUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type BuildQueueUnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 /**
  * Defines the `parseUnitIdList` function shape (export function parseUnitIdList(unitIds: unknown): string[] | null).
@@ -130,18 +122,11 @@ export function parseBuildQueueUpdatePayload(payload: {
   entryId?: unknown;
   unitType?: unknown;
   count?: unknown;
-}): { h3Index: string; entryId: number; unitType: BuildQueueUnitType; count: number } | null {
+}): { h3Index: string; entryId: number; unitType: BuildUnitType; count: number } | null {
   if (typeof payload?.h3Index !== 'string' || typeof payload?.entryId !== 'number' || typeof payload?.count !== 'number') {
     return null;
   }
-  if (
-    payload?.unitType !== 'infantry' &&
-    payload?.unitType !== 'armor' &&
-    payload?.unitType !== 'naval' &&
-    payload?.unitType !== 'air'
-  ) {
-    return null;
-  }
+  if (!isBuildUnitType(payload?.unitType)) return null;
   return { h3Index: payload.h3Index, entryId: payload.entryId, unitType: payload.unitType, count: payload.count };
 }
 
@@ -165,14 +150,7 @@ export function parseBuildQueueTemplatePayload(payload: unknown): {
   for (const entry of value.entries) {
     if (entry === null || typeof entry !== 'object') return null;
     const row = entry as { unitType?: unknown; count?: unknown };
-    if (
-      row.unitType !== 'infantry' &&
-      row.unitType !== 'armor' &&
-      row.unitType !== 'naval' &&
-      row.unitType !== 'air'
-    ) {
-      return null;
-    }
+    if (!isBuildUnitType(row.unitType)) return null;
     if (typeof row.count !== 'number' || !Number.isFinite(row.count)) return null;
     entries.push({ unitType: row.unitType, count: row.count });
   }

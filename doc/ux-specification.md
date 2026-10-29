@@ -90,8 +90,8 @@ Element documents share a fixed heading set:
 - [save-and-load.md](ux/save-and-load.md): Save game and Load game, the confirm before a load replaces a live match, and the automatic saves.
 - [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
 - [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle and the air-strike target list in the selection panel.
-- [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.
-- [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, and holds the reticle that aims a ranged attack or an air strike.
+- [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, Air strikes, and Missile launches groups on the Orders tab.
+- [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, and holds the reticle that aims a ranged attack, an air strike, or a missile launch.
 - [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Commanders tab's Tool groups section.
 - [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Start or Stop and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's API key, model, reasoning effort, and doctrine. The new-game popover uses the same model list.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
@@ -107,8 +107,8 @@ Element documents share a fixed heading set:
 - Hex: one cell of the world or battle grid.
 - Stack: two or more units in the same hex. The stack callout lists the units in one hex. A plain click on one stationary selectable human unit does not open it. A Shift-click on one selectable human unit does not open it. Hovering a one-unit token shows that unit's Bonuses tooltip.
 - Selection: the human units the player has chosen. The selected hex is tracked separately.
-- Targeting mode: Ranged or Strike, while the next map click chooses a target.
-- Order: a march, ferry, ranged attack, air strike, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.
+- Targeting mode: Ranged, Strike, or Launch, while the next double-click chooses a target.
+- Order: a march, ferry, ranged attack, air strike, missile launch, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.
 - Draft order: an order that is queued and not yet resolved.
 - Pending order: a draft order shown in a list on the console's Orders tab.
 - Theater: strategic play on the world map, or tactical play inside a battle.

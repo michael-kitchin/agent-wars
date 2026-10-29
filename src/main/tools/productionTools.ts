@@ -8,6 +8,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
+  ALL_BUILD_UNIT_TYPES,
   isBuildUnitType,
   isValidBuildCount,
 } from '../productionRules';
@@ -198,7 +199,7 @@ function setBuildQueue(
   const resolved = resolveHexArgument(args, resolveToH3);
   if (!resolved.ok) return reject(resolved.error);
   if (!isBuildUnitType(args.unitType)) {
-    return reject('set_build_queue requires unitType (infantry|armor|naval|air).', resolved.h3Index);
+    return reject(`set_build_queue requires unitType (${ALL_BUILD_UNIT_TYPES.join('|')}).`, resolved.h3Index);
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {

@@ -94,6 +94,7 @@ function targetCoverPlace(hoveredH3Index: string): TerrainCoverPlace | null {
 function effectsKind(preview: HoverRoutePreviewState): OrderPreviewEffectsKind {
   if (preview.renderAsSupportTargeting === 'ranged') return 'ranged';
   if (preview.renderAsSupportTargeting === 'air') return 'airStrike';
+  if (preview.renderAsSupportTargeting === 'missile') return 'missileLaunch';
   const battle = S.tacticalBattleSnapshot;
   if (battle) {
     const selected = battle.subUnits.filter(

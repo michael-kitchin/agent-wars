@@ -9,7 +9,7 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
-import { drawAirStrikeLines, drawPendingFerryLines, drawRangedAttackLines } from './orderDrawing';
+import { drawAirStrikeLines, drawMissileLaunchLines, drawPendingFerryLines, drawRangedAttackLines } from './orderDrawing';
 
 /**
  * Draws pending ranged, air strike, and ferry overlay lines for the current renderer draft state.
@@ -33,6 +33,9 @@ export function drawPendingSupportOrderOverlays(
   }
   if (S.pendingAirStrikes.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
     drawAirStrikeLines(ctx, S.pendingAirStrikes, unitsForOrderLines, hexList);
+  }
+  if (S.pendingMissileLaunches.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
+    drawMissileLaunchLines(ctx, S.pendingMissileLaunches, unitsForOrderLines, hexList);
   }
   if (S.pendingFerryOrders.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
     drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList);

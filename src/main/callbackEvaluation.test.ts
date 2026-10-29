@@ -4,6 +4,7 @@
  */
 
 import * as assert from 'assert';
+import { AI_SEAT_IDS } from '../shared/seatIds';
 import {
   evaluateMandatoryOverrides,
   evaluateSubscriptionEvents,
@@ -122,6 +123,29 @@ function testUnitDestroyedFires(): void {
     []
   );
   assert.ok(results.some((r) => r.type === 'unit_destroyed' && r.unitId === 'opponent-inf-1'));
+}
+
+/**
+ * A spent missile is not a destroyed unit.
+ *
+ * Purpose: Launch resolution omits the missile from the removed-id list, so the callback must not see it.
+ * When to use: After changing which ids `unit_destroyed` is raised for.
+ * Expected outcome: The removed air id is reported. The spent missile id is not.
+ * Exceptions: None.
+ */
+function testSpentMissileDoesNotRaiseUnitDestroyed(): void {
+  const seatId = AI_SEAT_IDS[0];
+  const results = evaluateMandatoryOverrides(
+    seatId,
+    baseState,
+    5,
+    [],
+    [],
+    ['a2-a1'],
+    []
+  );
+  assert.equal(results.some((result) => result.type === 'unit_destroyed' && result.unitId === 'h1-m1'), false);
+  assert.ok(results.some((result) => result.type === 'unit_destroyed' && result.unitId === 'a2-a1'));
 }
 
 /**
@@ -259,6 +283,7 @@ function run(): void {
   testFirstConsultationFires();
   testFirstCombatFires();
   testUnitDestroyedFires();
+  testSpentMissileDoesNotRaiseUnitDestroyed();
   testDeadmanFires();
   testNoFirstCombatWhenAlreadyInSet();
   testAttackMixChangedFires();

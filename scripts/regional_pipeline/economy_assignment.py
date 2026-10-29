@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from collections.abc import Iterable, Mapping, Sequence
@@ -15,6 +16,7 @@ from scripts.terrain_pipeline.metadata_io import write_json_document
 
 from .region_manifest import ECONOMY_MANIFEST_SCHEMA_VERSION
 from .region_paths import REGIONS_ROOT, RegionPaths
+from .missile_reach import compute_missile_range_hexes
 from .regional_economy import (
     RegionalEconomy,
     SideGroupBalance,
@@ -108,9 +110,11 @@ def measure_region_economy(
     known_groups = set(group_order)
     urban_by_group = {group_id: 0 for group_id in group_order}
     producing: list[int] = []
+    land_hexes: list[str] = []
     for entry in document.get("hexes", []):
         if entry.get("role") != "land":
             continue
+        land_hexes.append(str(entry["h3_index"]))
         group_id = entry.get("side_group_id")
         if group_id not in known_groups:
             raise ValueError(f"{paths.manifest}: land hex {entry.get('h3_index')} has no known side group.")
@@ -119,6 +123,8 @@ def measure_region_economy(
         if count >= 1:
             producing.append(count)
     economy = compute_regional_economy(producing)
+    range_hexes = compute_missile_range_hexes(land_hexes, urban_by_hex, economy.advanced_min_urban_cells)
+    economy = dataclasses.replace(economy, missile_range_hexes=range_hexes)
     balance = compute_side_group_balance(urban_by_group, group_order)
     return economy, balance, document
 
@@ -174,6 +180,7 @@ def format_economy_line(region_id: str, economy: RegionalEconomy, balance: SideG
         f"{region_id} urban={economy.urban_cell_count} producing={economy.producing_hex_count} "
         f"scale={scale} infantry={economy.infantry_cost} armor={economy.armor_cost} "
         f"naval={economy.naval_cost} air={economy.air_cost} "
+        f"missile={economy.missile_cost} range={economy.missile_range_hexes} "
         f"mins={economy.armor_min_urban_cells}/{economy.air_min_urban_cells}/{economy.naval_min_urban_cells} "
         f"advanced={economy.advanced_min_urban_cells} strike={economy.strategic_strike_urban_cells} "
         f"balance={status}"
@@ -217,8 +224,8 @@ def format_economy_markdown(rows: Sequence[tuple[str, RegionalEconomy]]) -> str:
 
     LOGGER.debug("format_economy_markdown rows=%s.", len(rows))
     lines = [
-        "| Map | Infantry | Armor | Naval | Air | Minimums | Advanced | Strike | Scale |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Map | Infantry | Armor | Naval | Air | Missile | Minimums | Advanced | Strike | Range | Scale |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for region_id, economy in rows:
         minimums = (
@@ -226,8 +233,8 @@ def format_economy_markdown(rows: Sequence[tuple[str, RegionalEconomy]]) -> str:
         )
         lines.append(
             f"| {region_id} | {economy.infantry_cost} | {economy.armor_cost} | {economy.naval_cost} | "
-            f"{economy.air_cost} | {minimums} | {economy.advanced_min_urban_cells} | "
-            f"{economy.strategic_strike_urban_cells} | {economy.scale:.3f} |"
+            f"{economy.air_cost} | {economy.missile_cost} | {minimums} | {economy.advanced_min_urban_cells} | "
+            f"{economy.strategic_strike_urban_cells} | {economy.missile_range_hexes} | {economy.scale:.3f} |"
         )
     return "\n".join(lines)
 

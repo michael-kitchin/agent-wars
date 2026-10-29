@@ -58,10 +58,10 @@ const SIDE_ROW = Object.freeze({
  *
  * Purpose: The row shows icons without words, so each icon names its type for assistive technology.
  * When to use: The unit row check.
- * Expected outcome: Infantry, Armor, Naval, Air.
+ * Expected outcome: Infantry, Armor, Naval, Air, Missile.
  * Exceptions: None.
  */
-const UNIT_ICONS = Object.freeze(['Infantry', 'Armor', 'Naval', 'Air'].map((name) => `.new-game-unit-token img[alt="${name}"]`));
+const UNIT_ICONS = Object.freeze(['Infantry', 'Armor', 'Naval', 'Air', 'Missile'].map((name) => `.new-game-unit-token img[alt="${name}"]`));
 
 /**
  * The four bonus dropdowns, in reading order: Origin and Tech on the first row, Terrain and Weather on the second.
@@ -442,8 +442,8 @@ const NEW_GAME_CHECKS = Object.freeze([
     run: (p, el) => {
       const texts = el('.new-game-unit').allTexts;
       const bad = texts.filter((text) => !/^\d+·\$\d+$/.test(text));
-      if (texts.length !== 4 || bad.length > 0) return `the unit row reads "${texts.join(' | ')}", expected four "cap·$price" entries`;
-      return near(el('.new-game-unit:first-child').y, el('.new-game-unit:last-child').y) ? null : 'the four unit types are not on one row';
+      if (texts.length !== 5 || bad.length > 0) return `the unit row reads "${texts.join(' | ')}", expected five "cap·$price" entries`;
+      return near(el('.new-game-unit:first-child').y, el('.new-game-unit:last-child').y) ? null : 'the five unit types are not on one row';
     },
   },
   {

@@ -155,6 +155,24 @@ function isFogOfWarEnabled(ops: FogDbOps): boolean {
 }
 
 /**
+ * Whether this side has a fog row for a hex, including a stale sighting.
+ *
+ * Purpose: A missile may target any hex its side has explored. Fog off allows every hex.
+ * When to use: Launch validation.
+ * Expected outcome: True when fog is off, or when `player_hex_intel` has any row for the pair.
+ * Exceptions: None.
+ */
+export function isHexExploredForPlayer(ops: FogDbOps, playerId: string, h3Index: string): boolean {
+  logTrace('fogState isHexExploredForPlayer', { playerId, h3Index });
+  if (!isFogOfWarEnabled(ops)) return true;
+  const row = ops.getOne<{ one: number }>(
+    'SELECT 1 AS one FROM player_hex_intel WHERE player_id = ? AND h3_index = ?',
+    [playerId, h3Index]
+  );
+  return row != null;
+}
+
+/**
  * Defines the `getCurrentTurnNumberFromDb` function shape (function getCurrentTurnNumberFromDb(ops: FogDbOps): number).
 
  * Purpose: Supports maintainability by documenting why `getCurrentTurnNumberFromDb` exists.

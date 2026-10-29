@@ -4,7 +4,7 @@ import {
 } from '../terrainClassificationCache';
 import { logDebug, logTrace } from '../logger';
 import { getTacticalRendererOverrideRowsCached } from './tacticalRendererOverrideCache';
-import type { BuildUnitType } from '../productionRules';
+import { isBuildUnitType, type BuildUnitType } from '../productionRules';
 import type { BasicDbOps } from './dbOps';
 
 /**
@@ -511,12 +511,7 @@ export function getKeepBuildingForHex(
     return { keepBuilding: false, keepBuildingUnitType: null };
   }
   const unitType = row.keepBuildingUnitType;
-  if (
-    unitType !== 'infantry' &&
-    unitType !== 'armor' &&
-    unitType !== 'naval' &&
-    unitType !== 'air'
-  ) {
+  if (!isBuildUnitType(unitType)) {
     return { keepBuilding: false, keepBuildingUnitType: null };
   }
   return { keepBuilding: true, keepBuildingUnitType: unitType };

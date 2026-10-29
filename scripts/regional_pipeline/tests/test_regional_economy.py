@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import unittest
 
 from scripts.regional_pipeline.regional_economy import (
@@ -37,6 +38,7 @@ class RegionalEconomyTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(strike, economy.strategic_strike_urban_cells)
+            self.assertEqual(economy.missile_cost, 10 * economy.infantry_cost)
 
     def test_threshold_ties_keep_the_smaller_gate(self) -> None:
         self.assertEqual(3, share_matched_threshold([1, 2, 3, 4], 0.5))
@@ -66,7 +68,10 @@ class RegionalEconomyTests(unittest.TestCase):
         self.assertEqual((1.25, 0.75), tuple(group.ratio_to_fair_share for group in edges.groups))
 
     def test_economy_json_uses_the_manifest_keys(self) -> None:
-        economy = compute_regional_economy([1, 1, 2, 3, 5, 8, 13, 21, 34, 55])
+        economy = dataclasses.replace(
+            compute_regional_economy([1, 1, 2, 3, 5, 8, 13, 21, 34, 55]),
+            missile_range_hexes=5,
+        )
         document = economy_to_json(economy, 7)
         self.assertEqual(
             {
@@ -80,17 +85,25 @@ class RegionalEconomyTests(unittest.TestCase):
                 "armor_cost",
                 "naval_cost",
                 "air_cost",
+                "missile_cost",
                 "armor_min_urban_cells",
                 "air_min_urban_cells",
                 "naval_min_urban_cells",
                 "advanced_min_urban_cells",
                 "strategic_strike_urban_cells",
+                "missile_range_hexes",
             },
             set(document),
         )
-        self.assertEqual(1, document["method_version"])
+        self.assertEqual(2, document["method_version"])
+        self.assertEqual(5, document["missile_range_hexes"])
         balance = balance_to_json(compute_side_group_balance({"a": 25, "b": 15}, ["a", "b"]), 0.25)
         self.assertEqual({"tolerance", "within_tolerance", "groups"}, set(balance))
+
+    def test_economy_json_requires_a_measured_range(self) -> None:
+        economy = compute_regional_economy([1, 1, 2, 3, 5, 8, 13, 21, 34, 55])
+        with self.assertRaises(ValueError):
+            economy_to_json(economy, 7)
 
 
 if __name__ == "__main__":

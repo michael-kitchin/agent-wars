@@ -91,6 +91,7 @@ const IPC_GAME = {
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',
+  validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
   cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
   getHexBuildQueue: 'game:getHexBuildQueue',
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
@@ -552,6 +553,19 @@ validateGroupFerryTarget: (payload: {
     unitIds: string[];
     destinationH3Index: string;
   }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupFerryTarget, payload),
+  /**
+   * Asks whether every selected missile can launch at one hex.
+   *
+   * Purpose: The aiming reticle checks the group before storing a launch.
+   * When to use: After the player double-clicks a target.
+   * Expected outcome: `{ success: true }` or the first failure reason.
+   * Exceptions: None.
+   */
+  validateGroupMissileLaunchTarget: (payload: {
+    unitIds: string[];
+    targetH3Index: string;
+  }): Promise<{ success: boolean; reason?: string }> =>
+    ipcRenderer.invoke(IPC_GAME.validateGroupMissileLaunchTarget, payload),
     /**
    * Documents the object literal property `cancelHumanStandingOrder` (cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:cancelHumanStandingOrde).
 

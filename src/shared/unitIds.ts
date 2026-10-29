@@ -47,7 +47,7 @@ export type TacticalSubUnitIdParts = {
  * Purpose: Central table so seeding, production, and parsers cannot drift.
  * When to use: Formatting and reverse lookup. `s` is reserved for the sub-unit segment
  * and must never appear here.
- * Expected outcome: infantry `i`, armor `t` (tank), naval `n`, air `a`.
+ * Expected outcome: infantry `i`, armor `t` (tank), naval `n`, air `a`, missile `m`.
  * Exceptions: None.
  */
 export const UNIT_TYPE_ID_CODES: Readonly<Record<BuildUnitType, string>> = {
@@ -55,6 +55,7 @@ export const UNIT_TYPE_ID_CODES: Readonly<Record<BuildUnitType, string>> = {
   armor: 't',
   naval: 'n',
   air: 'a',
+  missile: 'm',
 };
 
 /**
@@ -66,7 +67,7 @@ export const UNIT_TYPE_ID_CODES: Readonly<Record<BuildUnitType, string>> = {
  * Exceptions: Leading zeros are rejected after the match. Human indexes other than 1,
  * and AI indexes outside 1 to 4, are rejected by the parser.
  */
-const STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
+const STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itnam])(\d+)$/;
 
 /**
  * Matches compact tactical sub-unit ids such as `h1-t3-s2`.

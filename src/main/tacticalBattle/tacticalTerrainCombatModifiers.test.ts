@@ -122,6 +122,13 @@ test('tactical march budget is never zero for non-air; air stays at zero (no res
     effectiveTacticalMovementPointBudgetForMarchLeg(battle, air, [air], 'air'),
     MOVEMENT_RANGE_BY_UNIT_TYPE.air
   );
+  const missile = {
+    id: 't-missile',
+    unitType: 'missile' as const,
+    h3Index: cell,
+    embarkedOnSubUnitId: null as string | null,
+  };
+  assert.equal(effectiveTacticalMovementPointBudgetForMarchLeg(battle, missile, [missile], 'missile'), 0);
   const inf = {
     id: 't-inf',
     unitType: 'infantry' as const,

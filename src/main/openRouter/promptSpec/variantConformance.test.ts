@@ -43,6 +43,7 @@ import {
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
 } from '../../tools/assessUnitProximity';
 import { GAME_SIZES, getMaxUnitsPerType, parseGameSize } from '../../../shared/gameSize';
+import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
 
 /**
  * Fully enabled strategic coaching gates used as the baseline for presence and absence assertions.
@@ -81,6 +82,7 @@ function strategicEnvelope(overrides: Partial<EnvelopeGates> = {}): EnvelopeGate
   return {
     coordinateMode: 'strategic',
     includeAirActions: true,
+    includeMissileActions: true,
     includeMemoryUpdates: true,
     includeProductionOrders: true,
     includeStandingOrderActions: true,
@@ -106,6 +108,7 @@ function strategicOpening(overrides: Partial<OpeningMessageGates> = {}): Opening
     fallbackMovementEnabled: false,
     hasBriefing: true,
     hasAirUnits: true,
+    hasMissileUnits: true,
     hasBestOptionsTable: true,
     ...overrides,
   };
@@ -286,7 +289,7 @@ test('game size: printed caps come from getMaxUnitsPerType and unrecognised size
   assert.equal(large.air, small.air * 3);
   for (const size of GAME_SIZES) {
     const caps = getMaxUnitsPerType(size);
-    const line = `Deployment caps (per side): infantry ${caps.infantry}, armor ${caps.armor}, naval ${caps.naval}, air ${caps.air}.`;
+    const line = `Deployment caps (per side): ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${caps[unitType]}`).join(', ')}.`;
     assert.match(line, new RegExp(`air ${caps.air}`));
   }
   const emptyProduction = buildEmptyProductionQueuesSection();

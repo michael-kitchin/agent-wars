@@ -33,6 +33,8 @@ import {
   type BuildUnitType,
 } from '../productionRules';
 import { unitCostFor } from '../../shared/gameRules';
+import { isMissileUnitType } from '../../shared/missileRules';
+import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
 
 /**
  * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
@@ -74,7 +76,16 @@ naval?: number; /**
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-air?: number };
+air?: number;
+  /**
+   * Missiles already deployed for this side.
+   *
+   * Contract: Optional because older callers counted only the other four types.
+   * When to use: Cap checks that iterate every build type.
+   * Expected outcome: A count when the caller filled it. Omitted counts as absent.
+   * Exceptions: None.
+   */
+  missile?: number };
 /**
  * Documents the `ControlTransition` type alias (type ControlTransition).
 
@@ -196,6 +207,9 @@ function spawnProducedUnitsForHex(
       origin: resolveUnitBirthOrigin(GAME_DB_OPS, { unitId, birthH3Index: h3Index }),
       formedTurn: turnNumber + 1,
     });
+    if (isMissileUnitType(unitType)) {
+      insertMissileHoldOrder({ playerId: owner, unitId, h3Index, createdTurn: turnNumber });
+    }
     unitCountsByPlayerType.set(key, currentCount + 1);
     deployed.push(unitType);
   }
@@ -226,7 +240,7 @@ export function resolveStrategicControlAfterCombatAndMovement(
             COUNT(DISTINCT player) AS distinctPlayers,
             CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
      FROM units
-     WHERE unit_type IN ('infantry', 'armor', 'naval', 'air')
+     WHERE unit_type IN ('infantry', 'armor', 'naval', 'air', 'missile')
      GROUP BY h3_index`
   );
   const occupancyByHex = new Map(occupantRows.map((row) => [row.h3Index, row]));

@@ -446,6 +446,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM pending_orders');
   run('DELETE FROM pending_ranged_orders');
   run('DELETE FROM pending_air_orders');
+  run('DELETE FROM pending_missile_launches');
   run('DELETE FROM pending_ferry_orders');
   run('DELETE FROM unit_transport_assignments');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);

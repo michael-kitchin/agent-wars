@@ -25,6 +25,7 @@ export const GAME_DB_REQUIRED_TABLES = [
   'pending_orders',
   'pending_ranged_orders',
   'pending_air_orders',
+  'pending_missile_launches',
   'pending_ferry_orders',
   'unit_transport_assignments',
   'game_config',

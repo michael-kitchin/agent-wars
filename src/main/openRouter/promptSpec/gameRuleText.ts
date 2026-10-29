@@ -21,6 +21,7 @@ import {
 import { buildTechBonusRule } from './gameRuleTechText';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
+import { isMissileUnitType } from '../../../shared/missileRules';
 import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
 import { BUILD_PREREQUISITES_BY_TYPE } from '../../productionRules';
 import { buildMinimumUrbanCells, unitCostFor } from '../../../shared/gameRules';
@@ -52,6 +53,7 @@ import {
 } from '../../../shared/terrainCoverRules';
 import type { TacticalMovementCategory } from '../../../shared/tacticalTerrainMovement';
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
+import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -90,6 +92,15 @@ export interface GameRuleTextGates {
    * Exceptions: None.
    */
   readonly hasNavalUnits: boolean;
+  /**
+   * Whether the roster includes a missile.
+   *
+   * Contract: Omitted means false.
+   * When to use: Set from the opponent roster the assembler already inspected.
+   * Expected outcome: False omits the missile employment sentence.
+   * Exceptions: None.
+   */
+  readonly hasMissileUnits?: boolean;
   /**
    * Whether standing-order tools are enabled for this consultation.
    *
@@ -151,7 +162,8 @@ function formatReachClause(unitType: string, mode: PromptCoordinateMode): string
  */
 export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = true): string {
   logDebug('promptSpec buildCombatStatsLine', { mode, hasAirUnits });
-  const types = hasAirUnits ? ALL_BUILD_UNIT_TYPES : ALL_BUILD_UNIT_TYPES.filter((unitType) => unitType !== 'air');
+  const types = (hasAirUnits ? ALL_BUILD_UNIT_TYPES : ALL_BUILD_UNIT_TYPES.filter((unitType) => unitType !== 'air'))
+    .filter((unitType) => !isMissileUnitType(unitType));
   const summary = types.map(
     (unitType) =>
       `${unitType}: ${getAttack(unitType)} attack / ${getDefense(unitType)} defense${formatReachClause(unitType, mode)}`
@@ -168,7 +180,7 @@ export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = t
  * Purpose: The model cannot reason about firing then closing, ferry arriving after ground movement,
  * or cargo remaining on the transport until sync, from "ranged uses pre-move positions" alone.
  * When to use: Combat paragraph after the casualty rule.
- * Expected outcome: Embark, air strikes, ranged fire, movement, cargo sync, ferry, melee (tactical swaps cargo sync after ferry); tactical notes the beat and no production.
+ * Expected outcome: Strategic names embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, then melee. Tactical omits missile launches, puts cargo sync after ferry, and notes that the beat has no production.
  * Exceptions: None.
  */
 export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
@@ -176,7 +188,7 @@ export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
   if (mode === 'tactical') {
     return `This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step.`;
   }
-  return 'This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee.';
+  return 'This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee.';
 }
 
 /**
@@ -189,7 +201,7 @@ export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
  */
 export function buildCasualtySortRule(): string {
   logTrace('promptSpec buildCasualtySortRule', {});
-  return `Hits land on the lowest-defense unit in the target stack first, then in the fixed type order ${CASUALTY_PRIORITY_ORDER.join(', ')}.`;
+  return `Hits land on the lowest-defense unit in the target stack first, then in the fixed type order ${CASUALTY_PRIORITY_ORDER.join(', ')}. ${MISSILE_CASUALTY_ORDER_SENTENCE}`;
 }
 
 /**
@@ -601,6 +613,8 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   }
   const air = buildAirEmploymentRule(gates);
   if (air) parts.push(air);
+  const missile = buildMissileEmploymentRule(gates);
+  if (missile) parts.push(missile);
   if (gates.ordersEnabled) parts.push(buildHoldFireRule());
   return parts.join(' ');
 }

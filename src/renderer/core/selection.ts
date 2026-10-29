@@ -90,6 +90,7 @@ export function replaceSelection(unitIds: string[]): void {
     S.hoverPreviewRequestSeq++;
     S.rangedModeActive = false;
     S.airStrikeModeActive = false;
+    S.missileLaunchModeActive = false;
     return;
   }
   if (selectionUnitIdSetsDiffer(previousIds, S.selectedUnitIds)) {

@@ -9,7 +9,7 @@
 import type { OriginHitBonus } from '../shared/originBonusTypes';
 import type { TerrainCover } from '../shared/terrainCoverRules';
 import type { WeatherAttackPenalty } from '../shared/weatherBonusTypes';
-import { getAttack, getDefense } from './combatConstants';
+import { getAttack, getDefense, unitTypeRollsInCombat } from './combatConstants';
 import { MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from './combatDice';
 import { logTrace } from './logger';
 
@@ -87,6 +87,10 @@ export interface HitThresholdUnit {
  * Exceptions: None.
  */
 export function attackHitThreshold(unit: HitThresholdUnit): number {
+  if (!unitTypeRollsInCombat(unit.unitType)) {
+    logTrace('combatHitThresholds attackHitThreshold', { unitType: unit.unitType, threshold: 0 });
+    return 0;
+  }
   const printed = getAttack(unit.unitType);
   const penalty = unit.weatherAttackPenalty ?? 0;
   const cover = unit.targetCover ?? 0;
@@ -104,10 +108,14 @@ export function attackHitThreshold(unit: HitThresholdUnit): number {
  *
  * Purpose: Melee defense hit tests.
  * When to use: As `rollDie() <= defenseHitThreshold(unit)`; never for casualty order.
- * Expected outcome: `getDefense(unitType)` plus the origin bonus and the tech defense bonus, capped at `MAX_HIT_THRESHOLD`.
+ * Expected outcome: A missile is 0. Otherwise `getDefense(unitType)` plus the origin bonus and the tech defense bonus, capped at `MAX_HIT_THRESHOLD`.
  * Exceptions: None.
  */
 export function defenseHitThreshold(unit: HitThresholdUnit): number {
+  if (!unitTypeRollsInCombat(unit.unitType)) {
+    logTrace('combatHitThresholds defenseHitThreshold', { unitType: unit.unitType, threshold: 0 });
+    return 0;
+  }
   const tech = unit.techDefenseBonus ?? 0;
   const threshold = Math.min(MAX_HIT_THRESHOLD, getDefense(unit.unitType) + (unit.originHitBonus ?? 0) + tech);
   logTrace('combatHitThresholds defenseHitThreshold', { unitType: unit.unitType, tech, threshold });

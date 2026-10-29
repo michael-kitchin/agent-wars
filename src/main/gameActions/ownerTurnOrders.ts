@@ -8,6 +8,7 @@
  */
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID, type OwnerId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
 import { getSeatRoster } from '../gameDb';
@@ -67,6 +68,15 @@ export interface OwnerTurnOrders {
    * Exceptions: None.
    */
   readonly embarkOrders: readonly EmbarkOrder[];
+  /**
+   * Missile launches this owner declared.
+   *
+   * Contract: Each entry names a missile and a target hex.
+   * When to use: After the human pending launches have been read, in seat order.
+   * Expected outcome: Included in the launch phase when the missile belongs to this owner.
+   * Exceptions: None.
+   */
+  readonly missileLaunchOrders: readonly MissileLaunchOrder[];
 }
 
 /**
@@ -84,7 +94,7 @@ export type TurnOrdersByOwner = ReadonlyMap<OwnerId, OwnerTurnOrders>;
  *
  * Purpose: Callers can override one list without repeating the other four.
  * When to use: A test or a handler that has orders of only one kind.
- * Expected outcome: Five empty lists.
+ * Expected outcome: Six empty lists.
  * Exceptions: None.
  */
 export const EMPTY_OWNER_TURN_ORDERS: OwnerTurnOrders = {
@@ -93,6 +103,7 @@ export const EMPTY_OWNER_TURN_ORDERS: OwnerTurnOrders = {
   airStrikeOrders: [],
   ferryOrders: [],
   embarkOrders: [],
+  missileLaunchOrders: [],
 };
 
 /**
@@ -115,6 +126,7 @@ export function keepOrdersOfOwnedUnits(
     airStrikeCount: orders.airStrikeOrders.length,
     ferryCount: orders.ferryOrders.length,
     embarkCount: orders.embarkOrders.length,
+    missileLaunchCount: orders.missileLaunchOrders.length,
   });
   const keep = <T extends { readonly unitId: string }>(list: readonly T[], listName: string): T[] => {
     const kept: T[] = [];
@@ -139,6 +151,7 @@ export function keepOrdersOfOwnedUnits(
     airStrikeOrders: keep(orders.airStrikeOrders, 'air'),
     ferryOrders: keep(orders.ferryOrders, 'ferry'),
     embarkOrders: keep(orders.embarkOrders, 'embark'),
+    missileLaunchOrders: keep(orders.missileLaunchOrders, 'missile'),
   };
 }
 

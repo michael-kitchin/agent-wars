@@ -3,6 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { AI_SEAT_IDS } from '../shared/seatIds';
 import { buildTurnLossSummary } from '../shared/lossSummaryFromResolution';
 import type { RemovedUnitSnapshot } from '../shared/ipc/readyTypes';
 
@@ -157,6 +158,19 @@ function testAttackerLossFromStrikeMovesIsReturnFire(): void {
   assert.strictEqual(summary.byOwner.human?.airStrike.length, 0);
 }
 
+function testMissileStrikePrecedesAirStrike(): void {
+  const seatId = AI_SEAT_IDS[0];
+  const air = snap('a2-a1', seatId, 'air');
+  const summary = buildTurnLossSummary({
+    missileStrikeRemovedUnits: [air],
+    airStrikeRemovedUnits: [air],
+    resolveDisplayName: (id) => id,
+    resolveUnitMeta: () => ({ player: seatId, unitType: 'air' }),
+  });
+  assert.equal(summary.byOwner[seatId]?.missileStrike.length, 1);
+  assert.equal(summary.byOwner[seatId]?.airStrike.length, 0);
+}
+
 /**
  * Runs all loss summary normalization tests.
  *
@@ -169,6 +183,7 @@ function run(): void {
   testAirPrecedenceOverDirect();
   testAirStrikerCounterFireIsReturnFire();
   testAttackerLossFromStrikeMovesIsReturnFire();
+  testMissileStrikePrecedesAirStrike();
   testHumanAiSplit();
   testFogFiltersOpponentOnly();
   testOtherCatchAllWithoutKillEdge();

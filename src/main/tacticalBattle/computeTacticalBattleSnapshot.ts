@@ -1,4 +1,6 @@
 import { cellToLatLng } from 'h3-js';
+import { isMissileUnitType } from '../../shared/missileRules';
+import { missilePlacementCellOrder, missilePlacementPassable } from './tacticalMissilePlacement';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildUnitDisplayNameLookup, formatTacticalSubUnitDisplayName } from '../../shared/unitDisplayNames';
 import { formatTacticalSubUnitId } from '../../shared/unitIds';
@@ -43,7 +45,7 @@ import { tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../
  *
  * Purpose: Only multiplication table. Placement and the voluntary-exit fallback (when a snapshot stored no baseline) both use it.
  * When to use: Once per parent while building a battle snapshot, and from the exit fallback.
- * Expected outcome: Infantry 8, armor 4, air 3, naval 4. Any other type returns 0.
+ * Expected outcome: Infantry 8, armor 4, air 3, naval 4, missile 1. Any other type returns 0.
  * Exceptions: None.
  */
 export function tacticalSubUnitCountForStrategicUnitType(unitType: string): number {
@@ -60,6 +62,9 @@ export function tacticalSubUnitCountForStrategicUnitType(unitType: string): numb
       break;
     case 'naval':
       count = 4;
+      break;
+    case 'missile':
+      count = 1;
       break;
     default:
       count = 0;
@@ -481,7 +486,11 @@ export function computeTacticalBattleSnapshot(
     const subUnits: TacticalSubUnitSnapshot[] = [];
     const skippedParentDisplayNames: string[] = [];
     const occupiedByHex = new Map<string, InitialPlacementSide>();
-    for (const parent of inHex) {
+    const parentsInPlacementOrder = [
+      ...inHex.filter((parent) => isMissileUnitType(parent.unitType)),
+      ...inHex.filter((parent) => !isMissileUnitType(parent.unitType)),
+    ];
+    for (const parent of parentsInPlacementOrder) {
       const n = tacticalSubUnitCountForStrategicUnitType(parent.unitType);
       if (n <= 0) continue;
       const prev = getPreviousStrategicH3IndexForUnit(parent.id);
@@ -497,34 +506,60 @@ export function computeTacticalBattleSnapshot(
               battleId: `${battleId}|${parent.id}`,
             })
           : orderedCells;
+      const missileParent = isMissileUnitType(parent.unitType);
+      const openingCells = missileParent
+        ? missilePlacementCellOrder({
+            birthTacticalH3Index: parent.origin?.birthTacticalH3Index,
+            coreSet,
+            orderedCells: orderedForParent,
+          })
+        : orderedForParent;
       const parentName = parentLookup.get(parent.id) ?? parent.id;
       let placed = 0;
       let cellCursor = 0;
       const placingSide: InitialPlacementSide = parent.player === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : opposingPartyId;
+      const genericPassable = (cell: string): boolean => {
+        const effKind = tacticalKindByH3.get(cell) ?? hexRow.terrain_kind;
+        return isTacticalCellPassableForUnitType({
+          unitType: parent.unitType,
+          effectiveKind: effKind,
+          parentTerrain: hexRow.terrain,
+          parentTerrainKind: hexRow.terrain_kind,
+          isSeaportCell: !!tacticalIsSeaportByH3[cell],
+          isAirportCell: !!tacticalIsAirportByH3[cell],
+          cellH3: cell,
+          childFootprint: coreSet,
+          placementTerrain,
+          roadRailByH3,
+          rubbleByH3: urbanRubbleForPlacement.tacticalIsRubbleByH3,
+        });
+      };
       while (placed < n) {
-        const next = takeNextOpeningCell({
-          orderedCells: orderedForParent,
+        let next = takeNextOpeningCell({
+          orderedCells: openingCells,
           cellCursor,
-          maxCursor: orderedForParent.length * 3,
-          passable: (cell) => {
-            const effKind = tacticalKindByH3.get(cell) ?? hexRow.terrain_kind;
-            return isTacticalCellPassableForUnitType({
-              unitType: parent.unitType,
-              effectiveKind: effKind,
-              parentTerrain: hexRow.terrain,
-              parentTerrainKind: hexRow.terrain_kind,
-              isSeaportCell: !!tacticalIsSeaportByH3[cell],
-              isAirportCell: !!tacticalIsAirportByH3[cell],
-              cellH3: cell,
-              childFootprint: coreSet,
-              placementTerrain,
-              roadRailByH3,
-              rubbleByH3: urbanRubbleForPlacement.tacticalIsRubbleByH3,
-            });
-          },
+          maxCursor: openingCells.length * 3,
+          passable: missileParent
+            ? (cell) => missilePlacementPassable({
+                cell,
+                isUrbanOrRubble: (candidate) =>
+                  (placementTerrain.isUrbanTactical?.(candidate) ?? false)
+                  || (placementTerrain.isRubbleTactical?.(candidate) ?? false),
+              })
+            : genericPassable,
           occupiedByHex,
           placingSide,
         });
+        if (!next && missileParent) {
+          next = takeNextOpeningCell({
+            orderedCells: orderedForParent,
+            cellCursor,
+            maxCursor: orderedForParent.length * 3,
+            passable: genericPassable,
+            occupiedByHex,
+            placingSide,
+          });
+        }
         if (!next) break;
         cellCursor = next.nextCursor;
         placed += 1;

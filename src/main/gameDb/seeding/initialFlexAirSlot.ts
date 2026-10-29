@@ -167,7 +167,7 @@ export function resolveFlexUnitPlacement(args: {
     navalCandidates: args.navalCandidates.length,
   });
   const latLngByH3 = buildLatLngMap(args.regionHexSet);
-  const capRoom = (t: BuildUnitType): boolean =>
+  const capRoom = (t: Exclude<BuildUnitType, 'missile'>): boolean =>
     args.plannedCountsAfterSacrifice[t] + 1 <= args.maxUnitsPerType[t];
 
   const airportHexes = sortH3Deterministic(airportH3InRegion(args.deps, args.regionHexSet), latLngByH3);

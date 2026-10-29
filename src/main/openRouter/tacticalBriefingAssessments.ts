@@ -3,6 +3,7 @@
  */
 
 import { briefingSeatForBattle } from '../briefing/briefingPerspective';
+import { isMissileUnitType } from '../../shared/missileRules';
 import { cellToLatLng } from 'h3-js';
 import type { UnitAssessmentResult } from '../precomputation';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -143,6 +144,7 @@ function tacticalCanAttackRows(
   unit: TacticalSubUnitSnapshot,
   battle: TacticalBattleSnapshot
 ): Array<{ unitId: string; attackType: string; reason: string }> {
+  if (isMissileUnitType(unit.unitType)) return [];
   const targetH3 = pickClosestEnemyTacticalRangedTargetForSubUnit(battle, unit.id);
   if (!targetH3) return [];
   const enemy = battle.subUnits.find((s) => s.h3Index === targetH3 && s.player !== unit.player);

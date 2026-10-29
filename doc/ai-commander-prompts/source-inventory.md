@@ -32,7 +32,7 @@ Emitted before `mainBlock`, in this order.
 | Naval land-target routing hint | `NAVAL_PLAN_ROUTE_LAND_TARGET_HINT` | `hasNaval && planningEnabled` | omitted |
 | Assessment / estimate hints | `combatTargetHint`, `combatAssessHint` | assessment or estimation on **and** no precomputed briefing | omitted when a briefing is attached |
 
-`buildCombatRulesParagraph` joins, in order: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`); `buildCasualtySortRule`; `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (origin bonus on the strategic map, either flag in battle); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on; `buildTerrainCoverRule` always; `buildResolutionOrderRule` (embark, air strikes, ranged fire, movement, cargo sync, ferry, melee); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildHoldFireRule` when `ordersEnabled`.
+`buildCombatRulesParagraph` joins, in order: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`; missiles are left out of that stats line); `buildCasualtySortRule` (ends with `MISSILE_CASUALTY_ORDER_SENTENCE`); `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (origin bonus on the strategic map, either flag in battle); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on; `buildTerrainCoverRule` always; `buildResolutionOrderRule` (strategic: embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, melee; tactical omits missile launches and puts cargo sync after ferry); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildMissileEmploymentRule` when `hasMissileUnits`; `buildHoldFireRule` when `ordersEnabled`.
 
 Present dice sentence: `Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17.`
 
@@ -85,6 +85,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 | `# Scenario Objective (Required)` | `buildRegionVsRegionScenarioObjectiveBlock` | `state.scenarioId === 'region_vs_region'` and not tactical | omitted |
 | `Strategic context:` block | `buildContextCoaching` plus progress lines | always (strategic) | n/a |
 | `# Air Operations Status` | `buildAirOperationsBriefingBlock` | opponent has at least one air unit | **section omitted** (empty string, no dash row) |
+| `# Missile Forces` | `buildMissileForcesBriefingBlock` | strategic, and the opponent has at least one missile | **section omitted** in a battle and when the roster has no missile |
 | `# Naval Transport Status` | `buildSealiftBriefingBlock` | opponent has at least one naval unit | **section omitted** |
 | `# Available Tools` | `toolsSection` + `buildAvailableToolsIntro` + numbered `promptLine`s + `buildToolUsageGuidance` | always | heading plus `No tools available.` |
 | `Enemy units (currently observed): …` | `buildEnemyUnitsPromptLine` | always | groups by side in seat order, then Neutral. Empty-roster phrasing from the same helper |
@@ -95,7 +96,7 @@ When a strategic briefing is present, planning or assessment tools are on, and s
 
 `Strategic context:` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`, `Explored:` land-hex progress, `Controlled:` land-hex progress, then `regionHomeProgressAndHexBullets` when `homePartitions` is non-null. There is **no** unconditional enemy-intent opening sentence.
 
-Air Operations columns (strategic): `Unit ID` | `Base Hex` | `Base Intact` | `Base Controlled` | `Enemy Unit Targets` | `Strikeable Urban` | `Strikeable Airports` | `Strikeable Seaports` | `Ferry Destinations`. Naval Transport columns: `Unit ID` | `Hex` | `Your control` | `Seaport Here` | `Aboard` | `Capacity Used` | `Nearest Embark Hex`. Embark prose states coastal or land seaport without control, or a water seaport the opponent controls.
+Air Operations columns (strategic): `Unit ID` | `Base Hex` | `Base Intact` | `Base Controlled` | `Enemy Unit Targets` | `Strikeable Urban` | `Strikeable Airports` | `Strikeable Seaports` | `Ferry Destinations`. Missile Forces, when present, starts with `missileForcesRulesLine`, then `| Unit ID | Hex |`, then either the target intro and `| Target | Owner | City Cells | Airports | Seaports | Enemy Air Based | In Range Of |` (at most `MISSILE_BRIEFING_TARGET_LIMIT`, 8) or `NO_MISSILE_TARGETS_LINE`. Naval Transport columns: `Unit ID` | `Hex` | `Your control` | `Seaport Here` | `Aboard` | `Capacity Used` | `Nearest Embark Hex`. Embark prose states coastal or land seaport without control, or a water seaport the opponent controls.
 
 When a briefing override is present, `buildSystemPromptForTools` still computes memory, standing-order, and production injection but does not emit them in the shell; the same text is inside `formatBriefing`. Two call sites, one output. See `DUP_INJECTION`.
 
@@ -131,7 +132,7 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Turn header | `Strategic turn: {turnNumber}, date: {currentDateLabel}, tactical beat: {tacticalTurnNumber}, phase: {phase}.` The date clause is omitted when `currentDateLabel` is absent. |
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
-| Combat paragraph | same composer; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production**; no hold-fire (standing orders are not issuable) |
+| Combat paragraph | same composer; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; no hold-fire (standing orders are not issuable) |
 | Coaching | `buildTacticalCoachingBullets` plus `Strategic context:` with engage-priority, doctrine, message |
 | Scenario objective | omitted |
 | Scouting directive | omitted |
@@ -239,7 +240,7 @@ Every tool round and the repair call go through `postOrdersChatRequest`. `resolv
 
 ## 6. Variant-gate catalog
 
-Unchanged in spirit from the assembler flags: fog, `getToolFlags`, `hasAir` / `hasNaval`, empty observed roster, Best Options row count, orderless units, `scenarioId`, `gameSize`, `coordinateContext.mode`, briefing present, previous-consult tool-round exhaustion. Air and naval **sections** now omit entirely when that arm is absent (not a dash row). Envelope air tails omit when `hasAir` is false; sealift actions omit when `hasNaval` is false.
+Unchanged in spirit from the assembler flags: fog, `getToolFlags`, `hasAir` / `hasNaval` / `hasMissile`, empty observed roster, Best Options row count, orderless units, `scenarioId`, `gameSize`, `coordinateContext.mode`, briefing present, previous-consult tool-round exhaustion. Air, naval, and Missile Forces **sections** omit entirely when that arm is absent (not a dash row). Missile Forces is also omitted in a battle. Envelope air tails omit when `hasAir` is false; sealift actions omit when `hasNaval` is false; `missileLaunches` is present only when the commander has a missile and the consult is strategic.
 
 Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, and production tools (`filterToolNamesForTacticalBattle`). `assess_unit` and `estimate_combat` stay when their groups are enabled and run with battle rules.
 
@@ -249,7 +250,7 @@ Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, 
 | --- | --- | --- |
 | Dice, stats, ranges, one attack per unit, ranged uses pre-move positions | engine-true | combat constants, resolution pipeline |
 | Full WEGO order including cargo sync / ferry swap | engine-true | `executeReadyStrategicTurn`, tactical beat order |
-| Hits land on lowest defense then infantry, armor, naval, air | engine-true | casualty sort |
+| Hits land on lowest defense then infantry, armor, naval, air. Missiles are always hit last | engine-true | casualty sort |
 | Friendly stacks illegal; enemy cells are move/melee | engine-true | `getValidDestinations` / unoccupied approach |
 | `hold_fire` suppresses automatic engagement | engine-true | `holdFireUnitIdsForPlayer` |
 | Tempo: copy each listed Best Options ranged or air-strike row; do not invent a target | engine-true as instruction; sweep still fills omitted shots (`TEMPO_SWEEP_SILENCE`) | `collectTempoRuleAttacks` |

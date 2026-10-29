@@ -23,6 +23,18 @@ export function getValidateGroupAirStrikeTarget() {
 }
 
 /**
+ * Returns `validateGroupMissileLaunchTarget` when the preload bridge exposed it.
+ *
+ * Purpose: Same as `getValidateGroupAirStrikeTarget` for missile-launch hover validation.
+ * When to use: Before invoking launch validation from `refreshHoverRoutePreview`.
+ * Expected outcome: Callable IPC or undefined when the bridge is not ready.
+ * Exceptions: None.
+ */
+export function getValidateGroupMissileLaunchTarget() {
+  return window.gameApi?.validateGroupMissileLaunchTarget;
+}
+
+/**
  * Returns `previewHumanMarchOrders` when the preload bridge exposed it (otherwise undefined).
  *
  * Purpose: Centralizes strategic march hover preview IPC lookup.

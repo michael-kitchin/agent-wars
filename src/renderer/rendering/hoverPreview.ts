@@ -53,7 +53,11 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       if (!originH3 || !targetH3 || originH3 === targetH3) continue;
       segments.push({ fromH3Index: originH3, toH3Index: targetH3 });
     }
-    strokeSupportOrderLines(ctx, supportMode === 'ranged' ? 'ranged' : 'airStrike', segments);
+    strokeSupportOrderLines(
+      ctx,
+      supportMode === 'ranged' ? 'ranged' : supportMode === 'missile' ? 'missile' : 'airStrike',
+      segments
+    );
   } else {
   if (!state && !tb) return;
   const solidEdgeCapByOriginH3 = tb

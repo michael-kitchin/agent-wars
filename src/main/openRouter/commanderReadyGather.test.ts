@@ -72,7 +72,14 @@ test('ready gathers a stored plan, a late plan, and standing orders', async (t) 
     const storedSeat: AiSeatId = AI_SEAT_IDS[0];
     const lateSeat: AiSeatId = AI_SEAT_IDS[1];
     const standingSeat: AiSeatId = AI_SEAT_IDS[2];
-    setAiPendingOrders(storedSeat, [{ unitId: 'stored-unit', toH3Index: '8129fffffffffff' }], [], [], [], []);
+    setAiPendingOrders(storedSeat, {
+      movementOrders: [{ unitId: 'stored-unit', toH3Index: '8129fffffffffff' }],
+      rangedOrders: [],
+      airStrikeOrders: [],
+      ferryOrders: [],
+      embarkOrders: [],
+      missileLaunchOrders: [],
+    });
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;

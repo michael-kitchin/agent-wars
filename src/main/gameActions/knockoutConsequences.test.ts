@@ -181,6 +181,38 @@ test('a knocked-out seat becomes neutral garrisons and loses its private rows', 
   });
 });
 
+test('a knocked-out missile becomes Neutral and holds', (t) => {
+  const map = threeGroupMap();
+  if (!map) {
+    t.skip('no regional map with three side groups is listed');
+    return;
+  }
+  withSeatedTempGameDb('aw-knockout-missile-', { gameMapId: map.id, seats: threeSeats(map.sideGroupIds) }, () => {
+    const seatId = AI_SEAT_IDS[1];
+    const hex = dbGetOne<{ h3Index: string }>(
+      'SELECT h3_index AS h3Index FROM units WHERE player = ? LIMIT 1',
+      [seatId]
+    );
+    assert.ok(hex);
+    dbRun(
+      `INSERT INTO units (id, player, unit_type, h3_index) VALUES ('missile-ko', ?, 'missile', ?)`,
+      [seatId, hex!.h3Index]
+    );
+    const hexes = dbGetAll<{ h3_index: string }>('SELECT h3_index FROM hexes').map((row) => row.h3_index);
+    applyKnockout(seatId, buildLatLngCoordinateMap(hexes));
+    assert.equal(
+      dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', ['missile-ko'])?.player,
+      NEUTRAL_OWNER_ID
+    );
+    const order = dbGetOne<{ playerId: string; orderType: string }>(
+      'SELECT player_id AS playerId, order_type AS orderType FROM standing_orders WHERE unit_id = ?',
+      ['missile-ko']
+    );
+    assert.equal(order?.playerId, NEUTRAL_OWNER_ID);
+    assert.equal(order?.orderType, 'hold_fire');
+  });
+});
+
 test('ready knocks out the seat whose home another seat controls', (t) => {
   const map = threeGroupMap();
   if (!map) {

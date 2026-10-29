@@ -1,4 +1,5 @@
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
+import { isMissileUnitType, missileStandingOrderRejectionReason } from '../../shared/missileRules';
 import type { PlanRouteOk } from './pathfinding';
 
 /**
@@ -25,16 +26,33 @@ export const STANDING_ORDER_TYPES: readonly string[] = Object.freeze(['defend', 
 export const AIR_INELIGIBLE_ORDER_TYPES: ReadonlySet<string> = new Set(['march', 'pursue', 'patrol']);
 
 /**
- * Reports whether a unit type may be given a particular standing-order type.
+ * The sentence `assignOrder` returns when air is given a movement standing order.
  *
- * Purpose: The rejection in `assignOrder` and the briefing content that invites orders must agree, or the prompt will
- * keep suggesting a march to an air unit that `assignOrder` then refuses.
- * When to use: Before persisting an order, and before offering a movement destination for a unit in the briefing.
- * Expected outcome: False only for air units given a hex-by-hex movement order; true otherwise.
+ * Purpose: Air repositions by ferry and attacks by air strike, so a stored march would ask for a land route forever.
+ * When to use: `standingOrderTypeRejectionReason` for an air unit and a movement order type.
+ * Expected outcome: The sentence names the rejected type and the three orders air can use instead.
  * Exceptions: None.
  */
-export function canAssignStandingOrderType(unitType: string, orderType: string): boolean {
-  return !(unitType === 'air' && AIR_INELIGIBLE_ORDER_TYPES.has(orderType));
+export function airStandingOrderRejectionReason(orderType: string): string {
+  return `Air units cannot take a ${orderType} standing order because they do not move hex by hex. Use an air strike to attack, a ferry order to reposition, or a defend order to keep striking targets in range.`;
+}
+
+/**
+ * Reports why a standing-order type is refused, or null when it is allowed.
+ *
+ * Purpose: The rejection in `assignOrder` and the briefing that invites orders must agree.
+ * When to use: Before persisting an order, and before offering a march to a unit that cannot take one.
+ * Expected outcome: The air sentence for an air movement order, the missile sentence for any missile order except `hold_fire`, otherwise null.
+ * Exceptions: None.
+ */
+export function standingOrderTypeRejectionReason(unitType: string, orderType: string): string | null {
+  if (unitType === 'air' && AIR_INELIGIBLE_ORDER_TYPES.has(orderType)) {
+    return airStandingOrderRejectionReason(orderType);
+  }
+  if (isMissileUnitType(unitType) && orderType !== 'hold_fire') {
+    return missileStandingOrderRejectionReason(orderType);
+  }
+  return null;
 }
 
 /**

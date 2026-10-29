@@ -1,4 +1,5 @@
 import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
+import type { MissileLaunchRecord } from './missileTypes';
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
@@ -407,6 +408,24 @@ airStrikeCasualtyHexes?: string[];
    * Exceptions: None.
    */
 airStrikeRemovedUnits?: RemovedUnitSnapshot[];
+  /**
+   * Launches that spent a missile this turn.
+   *
+   * Contract: Absent when none spent. The missile itself is not a removed unit.
+   * When to use: Playback and consultation.
+   * Expected outcome: One record per spent missile.
+   * Exceptions: None.
+   */
+  missileLaunches?: MissileLaunchRecord[];
+  /**
+   * Air units destroyed on the ground by a missile.
+   *
+   * Contract: Absent when none. Filed as missile losses ahead of air-strike losses.
+   * When to use: The loss summary.
+   * Expected outcome: Based air whose airport was destroyed.
+   * Exceptions: None.
+   */
+  missileStrikeRemovedUnits?: RemovedUnitSnapshot[];
     /**
    * Specifies the contract for the `airStrikeMoves` member (airStrikeMoves?: AirStrikeAnimationMove[];).
 
@@ -561,14 +580,28 @@ killsByDirectFire?: KillEdge[];
    */
 killsByReturnFire?: KillEdge[];
     /**
-   * Specifies the contract for the `deployedUnitsByType` member (deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };).
+   * Specifies the contract for the `deployedUnitsByType` member (deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number; missile?: number };).
 
    * Contract: Describes stable behavior for callers of `deployedUnitsByType` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };
+deployedUnitsByType?: {
+    armor?: number;
+    infantry?: number;
+    naval?: number;
+    air?: number;
+    /**
+     * Missiles deployed this turn.
+     *
+     * Contract: Absent means none.
+     * When to use: The deployment sentence.
+     * Expected outcome: A count when missiles spawned.
+     * Exceptions: None.
+     */
+    missile?: number;
+  };
     /**
    * Specifies the contract for the `humanDeploymentCapReachedUnitTypes` member (humanDeploymentCapReachedUnitTypes?: BuildUnitType[];).
 

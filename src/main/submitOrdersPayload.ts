@@ -19,5 +19,6 @@ export function normalizeSubmitOrdersPayload(
     rangedAttacks: payload.rangedAttacks,
     airStrikes: payload.airStrikes,
     ferryOrders: payload.ferryOrders,
+    ...(payload.missileLaunches !== undefined ? { missileLaunches: payload.missileLaunches } : {}),
   };
 }

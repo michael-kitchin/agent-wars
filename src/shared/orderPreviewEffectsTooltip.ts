@@ -43,7 +43,8 @@ export type OrderPreviewEffectsKind =
   | 'strategicFerry'
   | 'tacticalFerry'
   | 'ranged'
-  | 'airStrike';
+  | 'airStrike'
+  | 'missileLaunch';
 
 /**
  * One selected unit's type, the weather where it stands, and its acclimation tags.
@@ -136,6 +137,8 @@ export function resolveOrderPreviewEffectsTooltipHtml(input: OrderPreviewEffects
       return rangedHtml(input);
     case 'airStrike':
       return airStrikeHtml(input);
+    case 'missileLaunch':
+      return null;
     default:
       return null;
   }

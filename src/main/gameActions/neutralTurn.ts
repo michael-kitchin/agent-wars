@@ -240,5 +240,6 @@ export function buildNeutralTurnOrders(coordinates: NeutralTurnCoordinates): Own
     airStrikeOrders: generated.airStrikes,
     ferryOrders: [],
     embarkOrders: [],
+    missileLaunchOrders: [],
   };
 }

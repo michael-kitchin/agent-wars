@@ -1,4 +1,5 @@
 import type { BonusLevel } from '../bonusLevel';
+import type { MissileLaunchOrder } from './missileTypes';
 import type { GameSize } from '../gameSize';
 import type { DoctrineChoice, SeatKind } from '../seatRoster';
 import type { VictoryRule } from '../victoryRules';
@@ -307,6 +308,15 @@ rangedAttacks?: RangedAttackOrder[];
    * Exceptions: None.
    */
 airStrikes?: AirStrikeOrder[];
+  /**
+   * Missile launches for this submit.
+   *
+   * Contract: Each row is one missile and one target hex. Absent means none.
+   * When to use: The human order plan. AI launches travel on `OwnerTurnOrders` instead.
+   * Expected outcome: Copied through normalization and stored in `pending_missile_launches`.
+   * Exceptions: None.
+   */
+  missileLaunches?: MissileLaunchOrder[];
     /**
    * Specifies the contract for the `ferryOrders` member (ferryOrders?: FerryOrder[];).
 

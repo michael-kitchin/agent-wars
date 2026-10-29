@@ -11,6 +11,7 @@ import { isSeatId, type AiSeatId } from '../shared/seatIds';
 import { registerAttackMixReset } from './attackMixReset';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { gridHopDistanceBetween } from './tools/assessUnitProximity';
+import { isMissileUnitType } from '../shared/missileRules';
 import { getRange } from './combatConstants';
 
 /**
@@ -376,7 +377,7 @@ registerAttackMixReset(clearAttackMixSnapshots);
  * Purpose: Threat-based callback events must fire while an enemy can actually shoot, so this compares grid distance
  * against the attacker's weapon range (melee-only types must share the hex).
  * When to use: Subscription evaluation for unit-threat events; not for validating a submitted attack order.
- * Expected outcome: Distance comes from `gridHopDistanceBetween`, so pairs that H3's fast distance APIs cannot measure
+ * Expected outcome: A missile never counts as able to hit. Otherwise distance comes from `gridHopDistanceBetween`, so pairs that H3's fast distance APIs cannot measure
  * across an icosahedron face crossing still resolve instead of silently reporting "cannot hit".
  * Exceptions: None; a pair that stays unmeasurable is treated as out of reach.
  */
@@ -384,6 +385,7 @@ function canHitNow(
   attacker: { unitType: string; h3Index: string },
   target: { h3Index: string }
 ): boolean {
+  if (isMissileUnitType(attacker.unitType)) return false;
   const dist = gridHopDistanceBetween(attacker.h3Index, target.h3Index);
   if (dist === null) return false;
   const range = getRange(attacker.unitType as 'infantry' | 'armor' | 'naval');

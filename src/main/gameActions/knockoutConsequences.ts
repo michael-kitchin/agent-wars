@@ -7,6 +7,7 @@
  * Exceptions: Propagates SQLite errors after rolling back the knockout transaction.
  */
 
+import { isMissileUnitType } from '../../shared/missileRules';
 import { NEUTRAL_OWNER_ID, type SeatId } from '../../shared/seatIds';
 import {
   clearBuildQueueAndProgressForHex,
@@ -17,6 +18,7 @@ import {
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { executeStandingOrderActionForPlayer } from '../tools/standingOrdersCore';
+import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
 import type { LatLng } from '../tools/pathfinding';
 
 /**
@@ -132,13 +134,22 @@ export function applyKnockout(seatId: SeatId, coordinates: KnockoutCoordinates):
       setHexController(hex.h3Index, NEUTRAL_OWNER_ID);
       clearBuildQueueAndProgressForHex(hex.h3Index);
     }
-    const units = dbGetAll<{ id: string; h3Index: string }>(
-      'SELECT id, h3_index AS h3Index FROM units WHERE player = ?',
+    const units = dbGetAll<{ id: string; h3Index: string; unitType: string }>(
+      'SELECT id, h3_index AS h3Index, unit_type AS unitType FROM units WHERE player = ?',
       [seatId]
     );
     dbRun('UPDATE units SET player = ? WHERE player = ?', [NEUTRAL_OWNER_ID, seatId]);
     const snapshot = getGameState();
     for (const unit of units) {
+      if (isMissileUnitType(unit.unitType)) {
+        insertMissileHoldOrder({
+          playerId: NEUTRAL_OWNER_ID,
+          unitId: unit.id,
+          h3Index: unit.h3Index,
+          createdTurn: snapshot.turnNumber,
+        });
+        continue;
+      }
       const result = executeStandingOrderActionForPlayer(
         NEUTRAL_OWNER_ID,
         'assign_order',

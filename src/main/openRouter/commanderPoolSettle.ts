@@ -168,14 +168,14 @@ export function applyConsultOutcome(
     if (entry.theater === 'tactical' && entry.battleId && outcome.tacticalPlan) {
       context.tacticalDrafts.set(tacticalDraftKey(seatId, entry.battleId), outcome.tacticalPlan);
     } else if (entry.theater === 'strategic') {
-      setAiPendingOrders(
-        seatId,
-        [...outcome.movementOrders],
-        [...outcome.rangedOrders],
-        [...outcome.airStrikeOrders],
-        [...outcome.ferryOrders],
-        [...outcome.embarkOrders]
-      );
+      setAiPendingOrders(seatId, {
+        movementOrders: [...outcome.movementOrders],
+        rangedOrders: [...outcome.rangedOrders],
+        airStrikeOrders: [...outcome.airStrikeOrders],
+        ferryOrders: [...outcome.ferryOrders],
+        embarkOrders: [...outcome.embarkOrders],
+        missileLaunchOrders: [...outcome.missileLaunchOrders],
+      });
     }
     recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
     context.dispatches.push({

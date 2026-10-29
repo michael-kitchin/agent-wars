@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { cellToParent, gridDisk, gridDistance } from 'h3-js';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -256,6 +256,43 @@ test('pickClosestEnemyTacticalRangedTargetForSubUnit keeps a legal shot gridDist
  * Expected outcome: A tactical index under `strategic`, preferring ring cells near `preferredChild`.
  * Exceptions: None.
  */
+test('a missile sub-unit has no legal ranged target', () => {
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalMissile = tacticalUnderCorner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
+  const sameParent = [...gridDisk(tacticalMissile, 8)].filter((h) => cellToParent(h, 1) === strategic);
+  const tacticalEnemy = sameParent.find((h) => h !== tacticalMissile && gridDistance(tacticalMissile, h) === 1);
+  assert.ok(tacticalEnemy, 'expected an adjacent enemy cell');
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-missile-ranged',
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: sameParent.slice(0, 40),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'coastal',
+    strategicHexTerrainKind: 'plains',
+    tacticalTerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, 'plains'])),
+    subUnits: [
+      {
+        id: 'missile:01',
+        parentUnitId: 'parent-missile',
+        player: AI_SEAT_IDS[0],
+        unitType: 'missile',
+        h3Index: tacticalMissile,
+        displayName: 'Missile',
+      },
+      {
+        id: 'hum:01',
+        parentUnitId: 'hum',
+        player: HUMAN_SEAT_ID,
+        unitType: 'infantry',
+        h3Index: tacticalEnemy,
+        displayName: 'Human',
+      },
+    ],
+  };
+  assert.equal(pickClosestEnemyTacticalRangedTargetForSubUnit(battle, 'missile:01'), undefined);
+});
+
 function battleFootprintOrigin(strategic: string, preferredChild: string): string {
   const ring = [...gridDisk(preferredChild, 6)].filter((h) => cellToParent(h, 1) === strategic);
   return ring.sort()[0] ?? preferredChild;

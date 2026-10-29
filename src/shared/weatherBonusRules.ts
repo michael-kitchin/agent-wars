@@ -67,7 +67,7 @@ export const WEATHER_MAX_TAGS = 2;
  *
  * Purpose: The documented campaign-map budgets. Tactical point budgets are a different table.
  * When to use: `strategicMovementHexes` and any prompt that states the printed move.
- * Expected outcome: Infantry 1, armor 2, naval 2, air 0.
+ * Expected outcome: Infantry 1, armor 2, naval 2, air 0, missile 0.
  * Exceptions: None.
  */
 const STRATEGIC_MOVEMENT_HEXES: Readonly<Record<string, number>> = Object.freeze({
@@ -75,6 +75,7 @@ const STRATEGIC_MOVEMENT_HEXES: Readonly<Record<string, number>> = Object.freeze
   armor: 2,
   naval: 2,
   air: 0,
+  missile: 0,
 });
 
 /**
@@ -252,7 +253,7 @@ export function weatherLevelFields(level: BonusLevel): {
  *
  * Purpose: Campaign-map movement before weather. This is not the tactical point budget.
  * When to use: Validation, destination search, and the printed movement sentence.
- * Expected outcome: Infantry 1, armor 2, naval 2, air 0. An unknown type returns 1.
+ * Expected outcome: Infantry 1, armor 2, naval 2, air 0, missile 0. An unknown type returns 1. A missile is listed, so it does not take that fallback.
  * Exceptions: None.
  */
 export function strategicMovementHexes(unitType: string): number {

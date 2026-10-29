@@ -38,12 +38,12 @@ export function selectedUnitTypes(): string[] {
  *
  * Purpose: Keeps the hint true to what the next map gesture does, and colors the bar's border with the order being aimed.
  * When to use: See the module comment.
- * Expected outcome: The hint follows `selectionBarHint`. `data-aim` on `#selection-panel` is `ranged` or `strike` while
+ * Expected outcome: The hint follows `selectionBarHint`. `data-aim` on `#selection-panel` is `ranged`, `strike`, or `launch` while
  *   that targeting is on, and absent otherwise; the styles color the border from it.
  * Exceptions: None.
  */
 export function renderSelectionBarState(): void {
-  const aim = S.airStrikeModeActive ? 'strike' : S.rangedModeActive ? 'ranged' : null;
+  const aim = S.missileLaunchModeActive ? 'launch' : S.airStrikeModeActive ? 'strike' : S.rangedModeActive ? 'ranged' : null;
   const panel = document.getElementById('selection-panel');
   if (panel) {
     if (aim) panel.dataset.aim = aim;
