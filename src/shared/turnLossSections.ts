@@ -1,9 +1,9 @@
 /**
  * Per-side loss sections for the turn-update popup.
  *
- * Purpose: The popup names each side that lost a visible unit or lost hexes, with the cause labels, unit names, and hex sentences.
+ * Purpose: The popup names each side that lost a visible unit, lost hexes, or controlled a hex hit by a visible missile launch.
  * When to use: Before the Updates section of a turn-update toast.
- * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral. A side that only lost hexes is included. A side that only gained hexes is omitted.
+ * Expected outcome: `Your Losses` for the viewer, then other seats by order, then Neutral. A side that only lost hexes, or only took missile infrastructure damage, is included. A side that only gained hexes is omitted.
  * Exceptions: None. This module does not import the logger.
  */
 
@@ -19,6 +19,16 @@ import { NEUTRAL_OWNER_ID } from './seatIds';
  * Exceptions: None.
  */
 const NO_HEX_LINES: ReadonlyMap<string, readonly string[]> = new Map();
+
+/**
+ * An empty missile-line map for a toast that has no seat-controlled strikes.
+ *
+ * Purpose: Callers that have no missile sentences can omit the map. One shared instance stays immutable.
+ * When to use: The default of `buildTurnLossSections`.
+ * Expected outcome: No missile sentences are appended.
+ * Exceptions: None.
+ */
+const NO_MISSILE_LINES: ReadonlyMap<string, readonly string[]> = new Map();
 
 /**
  * The same prefix `MAP_TOAST_SECTION_HEADER_PREFIX` uses for a bold toast header.
@@ -69,24 +79,33 @@ export interface TurnLossSectionSeat {
 }
 
 /**
- * Writes one section per owner that lost a visible unit or lost hexes.
+ * Writes one section per owner that lost a visible unit, lost hexes, or took missile infrastructure damage.
  *
- * Purpose: Unit losses and territory changes for one side stay together.
+ * Purpose: Unit losses, missile infrastructure damage, and territory changes for one side stay together.
  * When to use: `buildConsolidatedTurnUpdateToastMessage`.
- * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`, then that owner's hex sentences.
- *   An owner with empty buckets and no hex sentences is omitted. A null viewer does not get `Your Losses`.
+ * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`, then that owner's missile sentences, then that owner's hex sentences.
+ *   An owner with empty buckets, no missile sentences, and no hex sentences is omitted. A null viewer does not get `Your Losses`.
  * Exceptions: None.
  */
 export function buildTurnLossSections(
   summary: TurnLossSummary,
   viewerSeatId: string | null,
   seats: readonly TurnLossSectionSeat[],
-  hexLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_HEX_LINES
+  hexLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_HEX_LINES,
+  missileLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_MISSILE_LINES
 ): string[] {
   const lines: string[] = [];
-  for (const ownerId of orderedOwners(summary, viewerSeatId, seats, hexLinesByOwner)) {
+  for (const ownerId of orderedOwners(summary, viewerSeatId, seats, hexLinesByOwner, missileLinesByOwner)) {
     const header = headerFor(ownerId, viewerSeatId, seats);
-    lines.push(...sectionLines(summary, ownerId, header, hexLinesByOwner.get(ownerId) ?? []));
+    lines.push(
+      ...sectionLines(
+        summary,
+        ownerId,
+        header,
+        hexLinesByOwner.get(ownerId) ?? [],
+        missileLinesByOwner.get(ownerId) ?? []
+      )
+    );
   }
   return lines;
 }
@@ -94,18 +113,23 @@ export function buildTurnLossSections(
 /**
  * The owners that have a section, in toast order.
  *
- * Purpose: A side that only lost hexes still appears between the viewer and Neutral.
+ * Purpose: A side that only lost hexes, or only took missile infrastructure damage, still appears between the viewer and Neutral.
  * When to use: `buildTurnLossSections`.
- * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in neither source is absent.
+ * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in none of the three sources is absent.
  * Exceptions: None.
  */
 function orderedOwners(
   summary: TurnLossSummary,
   viewerSeatId: string | null,
   seats: readonly TurnLossSectionSeat[],
-  hexLinesByOwner: ReadonlyMap<string, readonly string[]>
+  hexLinesByOwner: ReadonlyMap<string, readonly string[]>,
+  missileLinesByOwner: ReadonlyMap<string, readonly string[]>
 ): string[] {
-  const ids = new Set<string>([...Object.keys(summary.byOwner), ...hexLinesByOwner.keys()]);
+  const ids = new Set<string>([
+    ...Object.keys(summary.byOwner),
+    ...hexLinesByOwner.keys(),
+    ...missileLinesByOwner.keys(),
+  ]);
   const ordered: string[] = [];
   if (viewerSeatId !== null && ids.has(viewerSeatId)) ordered.push(viewerSeatId);
   const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId && ownerId !== NEUTRAL_OWNER_ID);
@@ -170,25 +194,27 @@ function lossSectionTitle(seat: TurnLossSectionSeat | undefined, ownerId: string
 }
 
 /**
- * One owner's header, cause lines, and hex sentences, or nothing when that owner has none of them.
+ * One owner's header, cause lines, missile sentences, and hex sentences, or nothing when that owner has none of them.
  *
- * Purpose: Empty buckets must not open a section, and a side that only lost hexes still does.
+ * Purpose: Empty buckets must not open a section, and a side that only lost hexes or only took missile damage still does.
  * When to use: Each owner in `buildTurnLossSections`.
- * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the hex sentences.
+ * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the missile sentences, then the hex sentences.
  * Exceptions: None.
  */
 function sectionLines(
   summary: TurnLossSummary,
   ownerId: string,
   header: string,
-  hexLines: readonly string[]
+  hexLines: readonly string[],
+  missileLines: readonly string[]
 ): string[] {
   const buckets = summary.byOwner[ownerId];
   const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-  if (causes.length === 0 && hexLines.length === 0) return [];
+  if (causes.length === 0 && hexLines.length === 0 && missileLines.length === 0) return [];
   return [
     `${SECTION_HEADER_PREFIX}${header}`,
     ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+    ...missileLines,
     ...hexLines,
   ];
 }

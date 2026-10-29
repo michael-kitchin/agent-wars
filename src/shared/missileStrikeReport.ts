@@ -45,16 +45,16 @@ export function missileLaunchVisibleToViewer(
  *
  * Purpose: The strike line names only kinds the hex had.
  * When to use: Inside `formatMissileStrikeLine`.
- * Expected outcome: Null when `before` is 0. Otherwise a count phrase with a singular noun when `before` is 1.
+ * Expected outcome: Null when `before` is 0. Otherwise the destroyed count, singular when that count is 1.
  * Exceptions: None.
  */
 function flagPhrase(destroyed: number, before: number, singular: string, plural: string): string | null {
   if (before <= 0) return null;
-  return `${destroyed} of ${before} ${before === 1 ? singular : plural}`;
+  return `${destroyed} ${destroyed === 1 ? singular : plural}`;
 }
 
 /**
- * The Updates line for one launch.
+ * The strike sentence for one launch.
  *
  * Purpose: The turn report says what the missile cleared, in a fixed phrase.
  * When to use: Once per launch the viewer can see.

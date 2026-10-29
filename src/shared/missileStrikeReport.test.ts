@@ -50,7 +50,7 @@ test('formatMissileStrikeLine names the destroyed flags and a lost squadron', ()
       destroyedAirUnitIds: ['a2-a1'],
     }),
   });
-  assert.equal(line, 'Missile strike on Osaka: 276 of 290 city cells and 2 of 2 airports destroyed; 1 squadron lost.');
+  assert.equal(line, 'Missile strike on Osaka: 276 city cells and 2 airports destroyed; 1 squadron lost.');
 });
 
 test('formatMissileStrikeLine says when the hex had nothing to destroy', () => {
@@ -78,7 +78,7 @@ test('formatMissileStrikeLine uses singular nouns for one of each and plural squ
   });
   assert.equal(
     line,
-    'Missile strike on Osaka: 1 of 1 city cell, 0 of 1 airport, and 1 of 1 seaport destroyed; 2 squadrons lost.'
+    'Missile strike on Osaka: 1 city cell, 0 airports, and 1 seaport destroyed; 2 squadrons lost.'
   );
 });
 

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { emptyPlayerLossSummary } from './lossSummary';
-import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
 import { buildTurnLossSections, lossSectionOwnerId } from './turnLossSections';
 import { hexChangeLinesByOwner } from './turnReportLines';
 
@@ -94,6 +94,47 @@ test('hex sentences follow cause lines, and a hex-only side still gets a section
     '## Western Turkey Losses',
     'W. Turkey lost 1 hex to you.',
   ]);
+});
+
+test('a missile sentence follows cause lines and precedes hex sentences', () => {
+  const eastern = AI_SEAT_IDS[1];
+  const roster = [
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
+    { seatId: eastern, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+  ];
+  const hexLines = hexChangeLinesByOwner({
+    viewerSeatId: HUMAN_SEAT_ID,
+    seats: roster,
+    transitions: [{ h3Index: 'a', from: HUMAN_SEAT_ID, to: eastern }],
+  });
+  const lines = buildTurnLossSections(
+    {
+      byOwner: {
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+      },
+    },
+    HUMAN_SEAT_ID,
+    roster,
+    hexLines,
+    new Map([[HUMAN_SEAT_ID, ['Missile strike on Osaka: 1 city cell destroyed.']]])
+  );
+  assert.deepEqual(lines, [
+    '## Your Losses',
+    'Ranged attack: 1st Infantry',
+    'Missile strike on Osaka: 1 city cell destroyed.',
+    'You lost 1 hex to E. Turkey.',
+  ]);
+});
+
+test('a side with only a missile sentence still has a section', () => {
+  const lines = buildTurnLossSections(
+    { byOwner: {} },
+    null,
+    [{ seatId: AI_SEAT_IDS[0], seatOrder: 1, homeRegion: 'Western Turkey' }],
+    undefined,
+    new Map([[AI_SEAT_IDS[0], ['Missile strike on Osaka: 0 airports destroyed.']]])
+  );
+  assert.deepEqual(lines, ['## Western Turkey Losses', 'Missile strike on Osaka: 0 airports destroyed.']);
 });
 
 test('lossSectionOwnerId reads the header and breaks a shared name by seat order', () => {

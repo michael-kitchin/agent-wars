@@ -1,3 +1,4 @@
+import { type MissileStrikeToastLine } from '../../shared/consolidatedTurnUpdateToast';
 import { formatMissileStrikeLine, MISSILE_STRIKE_UNNAMED_PLACE } from '../../shared/missileStrikeReport';
 import type { MissileLaunchRecord } from '../../shared/ipc/missileTypes';
 import type { ReadyResult, RemovedUnitSnapshot, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
@@ -391,11 +392,11 @@ export async function announceResolutionTurnUpdate(
  *
  * Purpose: Each line names the target hex the way the hex tooltip does.
  * When to use: From `announceResolutionTurnUpdate` only.
- * Expected outcome: One formatted line per record. A missing or failed caption uses the unnamed-hex words.
+ * Expected outcome: One entry per record, with that launch's controller id. A missing or failed caption uses the unnamed-hex words.
  * Exceptions: A rejected caption lookup is logged and becomes the unnamed place. It is not rethrown.
  */
-async function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | undefined): Promise<string[]> {
-  const lines: string[] = [];
+async function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | undefined): Promise<MissileStrikeToastLine[]> {
+  const lines: MissileStrikeToastLine[] = [];
   for (const record of launches ?? []) {
     let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
     try {
@@ -404,7 +405,7 @@ async function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | 
     } catch (err) {
       console.error('missile strike place name failed', err);
     }
-    lines.push(formatMissileStrikeLine({ placeName, record }));
+    lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
   }
   return lines;
 }

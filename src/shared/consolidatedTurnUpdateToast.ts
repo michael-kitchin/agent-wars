@@ -2,7 +2,7 @@
  * Shared consolidated map-toast message builder (turn-report sentences and an Updates section).
  */
 
-import { type SeatId, HUMAN_SEAT_ID } from './seatIds';
+import { type SeatId, HUMAN_SEAT_ID, isSeatId } from './seatIds';
 import { ALL_BUILD_UNIT_TYPES } from './ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from './ipcTypes';
 import { type TurnLossSummary } from './lossSummary';
@@ -145,19 +145,48 @@ export interface ConsolidatedTurnUpdateToastArgs {
    *
    * Contract: Output of `formatUnknownBattleAnnouncement`, or omitted when combat was inside vision.
    * When to use: Pass it only when a hex or victim was outside vision. A blank or whitespace value is omitted.
-   * Expected outcome: The last Updates line, after deployments, caps, and any combat-activity fallback.
+   * Expected outcome: The last Updates line, after deployments, caps, the combat-activity fallback, and any missile sentence that stays in Updates.
    * Exceptions: None. It does not replace loss sections or deployment lines.
    */
   unknownBattleLine?: string | null;
   /**
-   * Missile strike sentences for the Updates section.
+   * Missile strike sentences, each with the hex controller at launch.
    *
-   * Contract: One line per launch the viewer may see, already formatted.
+   * Contract: One entry per launch the viewer may see. `line` is already formatted. `controllerId` is a seat id, `neutral`, or null.
    * When to use: Strategic Ready after visibility filtering.
-   * Expected outcome: Appended after the other Updates lines and before the unknown-battle line.
-   * Exceptions: None. Omitted or empty adds nothing.
+   * Expected outcome: A seat controller's line is that side's loss section, after the cause lines and before the hex sentences. `neutral` and null stay in Updates, after deployments or the combat-activity fallback, and before the unknown-battle line.
+   * Exceptions: None. Omitted, or a blank line, adds nothing. A seat line is not copied into Updates.
    */
-  missileStrikeLines?: readonly string[];
+  missileStrikeLines?: readonly MissileStrikeToastLine[];
+}
+
+/**
+ * One missile strike sentence and the side that controlled the target.
+ *
+ * Purpose: The toast can file the sentence under that side, or under Updates when the hex has no seat controller.
+ * When to use: `buildConsolidatedTurnUpdateToastMessage`.
+ * Expected outcome: A seat id means that side's loss section. Null, `neutral`, and every other value mean Updates.
+ * Exceptions: None.
+ */
+export interface MissileStrikeToastLine {
+  /**
+   * Who controlled the target hex when the missile launched.
+   *
+   * Contract: A seat id, `neutral`, or null when the hex has no controller.
+   * When to use: Choosing the section.
+   * Expected outcome: `isSeatId` selects a loss section. Every other value selects Updates.
+   * Exceptions: None.
+   */
+  readonly controllerId: string | null;
+  /**
+   * The formatted strike sentence.
+   *
+   * Contract: Output of `formatMissileStrikeLine`, possibly with surrounding whitespace.
+   * When to use: The body line. A blank value is dropped.
+   * Expected outcome: The trimmed sentence.
+   * Exceptions: None.
+   */
+  readonly line: string;
 }
 
 /**
@@ -173,23 +202,55 @@ function stripLeadingBullet(line: string): string {
 }
 
 /**
+ * Splits missile sentences by who controlled the target.
+ *
+ * Purpose: A seat's damage belongs in that side's loss section. A neutral or uncontrolled hex stays in Updates.
+ * When to use: `buildConsolidatedTurnUpdateToastMessage` before the loss sections are built.
+ * Expected outcome: `byOwner` keeps launch order for each seat. `updates` keeps launch order for every other controller. A blank line is dropped.
+ * Exceptions: None.
+ */
+function splitMissileStrikeLines(lines: readonly MissileStrikeToastLine[] | undefined): {
+  readonly byOwner: ReadonlyMap<string, readonly string[]>;
+  readonly updates: readonly string[];
+} {
+  const byOwner = new Map<string, string[]>();
+  const updates: string[] = [];
+  for (const entry of lines ?? []) {
+    const line = entry.line.trim();
+    if (line.length === 0) continue;
+    const controllerId = entry.controllerId;
+    if (controllerId !== null && isSeatId(controllerId)) {
+      const existing = byOwner.get(controllerId);
+      if (existing) existing.push(line);
+      else byOwner.set(controllerId, [line]);
+    } else {
+      updates.push(line);
+    }
+  }
+  return { byOwner, updates };
+}
+
+/**
  * Builds the consolidated map toast message with turn-report sentences and an Updates section.
  *
  * Purpose: Single popup formatter replacing flat direct-fire/melee bullet lists.
  * When to use: Strategic Ready and tactical commit paths in `readyHandler` before `showMapToast`.
  * Expected outcome: Newline-separated message with `##` section headers; `null` when all sections would be empty.
- *   Side sections come first, with hex sentences after that side's cause lines. Updates holds deployments, caps, and the fallback.
+ *   Side sections come first. A seat-controlled missile sentence follows that side's cause lines and precedes its hex sentences.
+ *   Updates holds deployments, caps, the fallback, and a missile sentence whose hex is neutral or uncontrolled.
  *   A non-empty `unknownBattleLine` is the last Updates line.
  * Exceptions: None.
  */
 export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUpdateToastArgs): string | null {
   const { readyResult, combatFallbackBullets, turnReport } = args;
+  const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
   const sections: string[] = [];
   const lossSections = buildTurnLossSections(
     args.turnLossSummary,
     turnReport?.viewerSeatId ?? null,
     turnReport?.seats ?? [],
-    turnReport ? hexChangeLinesByOwner(turnReport) : undefined
+    turnReport ? hexChangeLinesByOwner(turnReport) : undefined,
+    missileLines.byOwner
   );
   sections.push(...lossSections);
   let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
@@ -197,8 +258,7 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
   const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';
-  const missileStrikeLines = (args.missileStrikeLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-  if (missileStrikeLines.length > 0) otherLines = [...otherLines, ...missileStrikeLines];
+  if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
   if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
