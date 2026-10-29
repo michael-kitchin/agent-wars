@@ -1108,17 +1108,30 @@
 
   // src/shared/turnLossSections.ts
   var NO_HEX_LINES = /* @__PURE__ */ new Map();
+  var NO_MISSILE_LINES = /* @__PURE__ */ new Map();
   var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES) {
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, missileLinesByOwner = NO_MISSILE_LINES) {
     const lines = [];
-    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner)) {
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, missileLinesByOwner)) {
       const header = headerFor(ownerId, viewerSeatId2, seats);
-      lines.push(...sectionLines(summary, ownerId, header, hexLinesByOwner.get(ownerId) ?? []));
+      lines.push(
+        ...sectionLines(
+          summary,
+          ownerId,
+          header,
+          hexLinesByOwner.get(ownerId) ?? [],
+          missileLinesByOwner.get(ownerId) ?? []
+        )
+      );
     }
     return lines;
   }
-  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner) {
-    const ids = /* @__PURE__ */ new Set([...Object.keys(summary.byOwner), ...hexLinesByOwner.keys()]);
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, missileLinesByOwner) {
+    const ids = /* @__PURE__ */ new Set([
+      ...Object.keys(summary.byOwner),
+      ...hexLinesByOwner.keys(),
+      ...missileLinesByOwner.keys()
+    ]);
     const ordered = [];
     if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
     const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
@@ -1147,13 +1160,14 @@
     const name = seat?.homeRegion.trim() ?? "";
     return `${name.length > 0 ? name : ownerId} Losses`;
   }
-  function sectionLines(summary, ownerId, header, hexLines) {
+  function sectionLines(summary, ownerId, header, hexLines, missileLines) {
     const buckets = summary.byOwner[ownerId];
     const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-    if (causes.length === 0 && hexLines.length === 0) return [];
+    if (causes.length === 0 && hexLines.length === 0 && missileLines.length === 0) return [];
     return [
       `${SECTION_HEADER_PREFIX}${header}`,
       ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+      ...missileLines,
       ...hexLines
     ];
   }
@@ -35302,14 +35316,33 @@ ${bonuses}`;
   function stripLeadingBullet(line) {
     return line.replace(/^\u2022\s*/, "");
   }
+  function splitMissileStrikeLines(lines) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const updates = [];
+    for (const entry of lines ?? []) {
+      const line = entry.line.trim();
+      if (line.length === 0) continue;
+      const controllerId = entry.controllerId;
+      if (controllerId !== null && isSeatId(controllerId)) {
+        const existing = byOwner.get(controllerId);
+        if (existing) existing.push(line);
+        else byOwner.set(controllerId, [line]);
+      } else {
+        updates.push(line);
+      }
+    }
+    return { byOwner, updates };
+  }
   function buildConsolidatedTurnUpdateToastMessage(args) {
     const { readyResult, combatFallbackBullets, turnReport } = args;
+    const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
     const sections = [];
     const lossSections = buildTurnLossSections(
       args.turnLossSummary,
       turnReport?.viewerSeatId ?? null,
       turnReport?.seats ?? [],
-      turnReport ? hexChangeLinesByOwner(turnReport) : void 0
+      turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
+      missileLines.byOwner
     );
     sections.push(...lossSections);
     let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
@@ -35317,8 +35350,7 @@ ${bonuses}`;
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }
     const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
-    const missileStrikeLines = (args.missileStrikeLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-    if (missileStrikeLines.length > 0) otherLines = [...otherLines, ...missileStrikeLines];
+    if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
     if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
     if (otherLines.length > 0) {
       sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
@@ -35338,7 +35370,7 @@ ${bonuses}`;
   }
   function flagPhrase(destroyed, before, singular, plural) {
     if (before <= 0) return null;
-    return `${destroyed} of ${before} ${before === 1 ? singular : plural}`;
+    return `${destroyed} ${destroyed === 1 ? singular : plural}`;
   }
   function formatMissileStrikeLine(args) {
     const record = args.record;
@@ -35870,7 +35902,7 @@ ${bonuses}`;
       } catch (err) {
         console.error("missile strike place name failed", err);
       }
-      lines.push(formatMissileStrikeLine({ placeName, record }));
+      lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
     }
     return lines;
   }
