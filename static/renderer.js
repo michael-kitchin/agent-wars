@@ -9,7 +9,7 @@
     return `${CREDITS_SYMBOL}${formattedNumber}`;
   }
   function formatCompactHireCost(fee, upkeep) {
-    const perTurn = `${CREDITS_SYMBOL}${upkeep} / turn`;
+    const perTurn = `${CREDITS_SYMBOL}${upkeep}/turn`;
     const extra = fee - upkeep;
     if (extra > 0) return `${CREDITS_SYMBOL}${extra} + ${perTurn}`;
     return perTurn;
@@ -277,7 +277,7 @@
     return `${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
   }
   function formatMercenaryTooltipValue(upkeep) {
-    return `${formatCreditsAmount(String(upkeep))} / turn`;
+    return `${formatCreditsAmount(String(upkeep))}/turn`;
   }
   function capitalizeUnitType(unitType) {
     return unitType.charAt(0).toUpperCase() + unitType.slice(1);

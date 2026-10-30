@@ -214,8 +214,8 @@ export function legalOrderActionsForMode(
  * know what the parser will drop rather than guessing from examples.
  * When to use: Appended to the JSON contract instruction.
  * Expected outcome: Top-level array and legacy field bans in both modes; standing-order and
- * memory/production bans only in tactical; current-cell march ban only in strategic; both modes
- * name stacking as legal.
+ * memory/production bans only in tactical; both modes drop a current-cell move as already
+ * arrived; both modes name stacking as legal.
  * Exceptions: None.
  */
 export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
@@ -237,11 +237,12 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
       TACTICAL_STANDING_ORDER_PROHIBITION,
       'memoryUpdates and productionOrders are not accepted this beat.',
       'Strategic hex codes are never valid field values this beat.',
+      "An explicit_move to the sub-unit's current cell is dropped as already arrived.",
     ].join(' ');
   }
   return [
     ...shared,
-    "A march to the unit's current cell is dropped as already arrived.",
+    "A march or explicit_move to the unit's current cell is dropped as already arrived.",
     ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
     ...(gates.includeMissileActions === true
       ? ['Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use missileLaunches.']

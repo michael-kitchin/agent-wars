@@ -18,7 +18,28 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 4. If your change alters user-visible behavior, update the requirement text in the same change.
 5. If the spec is silent or ambiguous, add an Open Question rather than inventing a requirement.
 
-`npm run ui:smoke` checks the layout after a change. It builds the app and starts it in Electron with a throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable), three times over that folder. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window. The second reopens that match, opens a battle in it, shows that battle at the 800 × 600 minimum too, leaves it with Exit Battle, hides the new-game choices, and starts a new regional match from the header button. The third reopens the regional match as a finished one, hides the new-game choices and shows them again, and shows its game-over screen at the 800 × 600 minimum too. Between sessions the run changes only its throwaway copy of the match: before the second it moves the enemy's land units into the hex where the player has the most, so a battle can start there, and before the third it marks the match as lost (`scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node). The run writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails. The frame's checks are in `scripts/ui-smoke/ui-smoke-checks.cjs`, the console's are in `scripts/ui-smoke/ui-smoke-console-checks.cjs`, the checks for the later scenarios (the small window, the reopened match, the battle, the regional match, and the finished match) are in `scripts/ui-smoke/ui-smoke-scenario-checks.cjs`, the checks of the minimap panel, the legend, and Leaflet's controls are in `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, the checks of the battle header are in `scripts/ui-smoke/ui-smoke-battle-checks.cjs`, and the checks of the new-game screen are in `scripts/ui-smoke/ui-smoke-new-game-checks.cjs`; add one to the matching file when a layout rule needs a machine check. Scenes that click units find them through the game state and the main map (`scripts/ui-smoke/ui-smoke-map.cjs`), and the steps on the new-game overlay are in `scripts/ui-smoke/ui-smoke-new-game.cjs`.
+`npm run doc:shots` rebuilds the pictures in [how-to-play.md](how-to-play.md). It builds the app, rebuilds the native module for Electron, and starts the app with a throwaway user-data folder (`AGENT_WARS_USER_DATA_DIR`) and `--force-device-scale-factor=1`. Shots are written straight into `doc/media/`, and a capture that fails keeps the old file. The run has three groups, `tokens`, `setup`, and `match`, and runs them in that order. To run only some of them, pass `-- --only <group>` once per group. Map tiles need an internet connection. The run never opens a native file dialog.
+
+`npm run ui:smoke` checks the layout after a change. It builds the app, then starts it in Electron three times over one throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable):
+
+1. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window.
+2. The second reopens that match, opens a battle in it, shows that battle at the 800 × 600 minimum, and leaves it with Exit Battle. It then hides the new-game choices and starts a new regional match from the header button.
+3. The third reopens the regional match as a finished one, hides the new-game choices and shows them again, and shows its game-over screen at the 800 × 600 minimum.
+
+Between sessions, the run changes only its throwaway copy of the match. Before the second session, it moves the enemy's land units into the hex where the player has the most, so a battle can start there. Before the third, it marks the match as lost. Those edits are in `scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node.
+
+The run writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails.
+
+When a layout rule needs a machine check, add one to the matching file in `scripts/ui-smoke/`:
+
+- The frame: `ui-smoke-checks.cjs`
+- The console: `ui-smoke-console-checks.cjs`
+- The later scenarios (the small window, the reopened match, the battle, the regional match, and the finished match): `ui-smoke-scenario-checks.cjs`
+- The minimap panel, the legend, and Leaflet's controls: `ui-smoke-map-chrome-checks.cjs`
+- The battle header: `ui-smoke-battle-checks.cjs`
+- The new-game screen: `ui-smoke-new-game-checks.cjs`
+
+Scenes that click units find them through the game state and the main map (`ui-smoke-map.cjs`). The steps on the new-game overlay are in `ui-smoke-new-game.cjs`.
 
 ## Routing Table
 

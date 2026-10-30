@@ -268,6 +268,8 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   assert.match(strategic, /top-level/i);
   assert.ok(strategic.includes('movementOrders'));
   assert.match(strategic, /current (cell|hex)/i);
+  assert.ok(strategic.includes('explicit_move'));
+  assert.ok(strategic.includes('already arrived'));
   assert.match(strategic, /stack/i);
   assert.doesNotMatch(strategic, /one-step destination that holds a friendly unit is not legal/i);
 
@@ -279,6 +281,8 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   });
   assert.ok(tactical.includes('assign_order'));
   assert.ok(tactical.includes('cancel_order'));
+  assert.ok(tactical.includes("sub-unit's current cell"));
+  assert.ok(tactical.includes('already arrived'));
   assert.match(tactical, /stack/i);
   assert.doesNotMatch(tactical, /one-step destination that holds a friendly unit is not legal/i);
   assert.ok(!tactical.includes('infantry cannot'));

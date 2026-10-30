@@ -33,7 +33,11 @@ import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { applyParsedMissileLaunches } from './missileLaunchOrderParsing';
-import { dedupeByUnitKeepLast, unitIdsWhoseEarlierRowsWereDiscarded } from './requestOrdersFlowSupport';
+import {
+  dedupeByUnitKeepLast,
+  explicitMoveAlreadyArrivedReason,
+  unitIdsWhoseEarlierRowsWereDiscarded,
+} from './requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
 
 /**
@@ -331,6 +335,17 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   for (const order of mergedMovement) {
     if (seenUnits.has(order.unitId)) {
       dropReasons.push(`Duplicate order for ${aiOrderUnitLabel(order.unitId)}`);
+      continue;
+    }
+    const unitH3Index = tacticalBattle
+      ? tacticalBattle.subUnits.find((unit) => unit.id === order.unitId)?.h3Index
+      : planState.units.find((unit) => unit.id === order.unitId)?.h3Index;
+    const alreadyArrived = unitH3Index
+      ? explicitMoveAlreadyArrivedReason(unitH3Index, order.toH3Index)
+      : null;
+    if (alreadyArrived) {
+      dropReasons.push(`${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${alreadyArrived}`);
+      seenUnits.add(order.unitId);
       continue;
     }
     if (tacticalBattle) {

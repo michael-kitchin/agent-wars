@@ -441,6 +441,33 @@ export function summarizeToolCallNamesForAiLog(
 }
 
 /**
+ * Reason when an AI explicit_move names the hex the unit already occupies.
+ *
+ * Purpose: A zero-length AI move is not a hold. The apply loop and validateAiOrder share this so both theaters drop it.
+ * When to use: After the unit's current hex and the order destination are both H3 indexes.
+ * Expected outcome: `already arrived` when the indexes are equal, otherwise null. Trace log names whether they match.
+ * Exceptions: None.
+ */
+export const EXPLICIT_MOVE_ALREADY_ARRIVED_REASON = 'already arrived';
+
+/**
+ * Reports whether an AI explicit_move destination is the unit's current hex.
+ *
+ * Purpose: Callers drop that row instead of storing a hold. Both theaters use the same comparison.
+ * When to use: With two H3 indexes, before reachability checks.
+ * Expected outcome: `already arrived` when the indexes are equal, otherwise null.
+ * Exceptions: None.
+ */
+export function explicitMoveAlreadyArrivedReason(
+  unitH3Index: string,
+  destinationH3Index: string
+): string | null {
+  const sameHex = unitH3Index === destinationH3Index;
+  logTrace('requestOrdersFlowSupport explicitMoveAlreadyArrivedReason', { sameHex });
+  return sameHex ? EXPLICIT_MOVE_ALREADY_ARRIVED_REASON : null;
+}
+
+/**
  * Collapses duplicate unit-target rows so the last occurrence wins (LLM sometimes repeats tool outputs).
  *
  * Purpose: Stabilizes order application when the model emits redundant movement/support rows.

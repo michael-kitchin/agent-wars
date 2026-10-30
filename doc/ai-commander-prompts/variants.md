@@ -86,7 +86,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 | Surface | Contract |
 | --- | --- |
-| system | With planning off and standing orders also off, include the fallback adjacent-cell listing: one line per own unit giving its current cell as a hold option plus the legal empty neighbours. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
+| system | With planning off and standing orders also off, include the fallback adjacent-cell listing: one line per own unit that names its legal empty neighbours and tells the model to omit explicit_move to stay. The schema block adds that a destination on the unit's current cell is dropped as already arrived. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
 | user | Point at the fallback listing as the only source of move destinations when it is present; otherwise point at the tools. |
 | tools | The routing and distance tools disappear with the planning group; the assessment and estimate tools disappear with theirs. |
 | envelope | unchanged in shape. Movement remains legal, but the destination rule changes to the fallback listing. |

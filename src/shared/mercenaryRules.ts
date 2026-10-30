@@ -362,7 +362,23 @@ export function hireShortageLabel(
  * Exceptions: None.
  */
 export interface OneUnitRaiseOffer {
+  /**
+   * Production points one unit of this type costs.
+   *
+   * Contract: Compared with the capacity still left. A cost of 0 is not a capacity shortage.
+   * When to use: When deciding whether a count of one fits the hex.
+   * Expected outcome: A non-negative production cost.
+   * Exceptions: None.
+   */
   readonly unitCost: number;
+  /**
+   * Credits taken when a raise of this type is placed.
+   *
+   * Contract: A fee of 0 is not a credit shortage. A fee equal to the balance is enough.
+   * When to use: When deciding whether a count of one fits the present treasury.
+   * Expected outcome: A non-negative credit fee.
+   * Exceptions: None.
+   */
   readonly fee: number;
 }
 
@@ -395,7 +411,7 @@ export function oneUnitRaiseShortage(
  *
  * Purpose: The type select shows the production cost and the credit price.
  * When to use: One option in the raise select.
- * Expected outcome: `Infantry (⚒20 + ¤3 / turn)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
+ * Expected outcome: `Infantry (⚒20 + ¤3/turn)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
  * Exceptions: None.
  */
 export function formatHireOptionLabel(option: {
@@ -438,11 +454,11 @@ export function formatHireOrderLabel(order: {
  *
  * Purpose: Anyone who can see the unit can see what it costs to keep. The caller adds the Mercenary label.
  * When to use: After the date-of-birth line, beside `MERCENARY_TOOLTIP_LABEL`, when the unit is a mercenary.
- * Expected outcome: The credits symbol, the amount, and ` / turn`. An upkeep of 0 is `¤0 / turn`.
+ * Expected outcome: The credits symbol, the amount, and `/turn`, with no space before the slash. An upkeep of 0 is `¤0/turn`.
  * Exceptions: None.
  */
 export function formatMercenaryTooltipValue(upkeep: number): string {
-  return `${formatCreditsAmount(String(upkeep))} / turn`;
+  return `${formatCreditsAmount(String(upkeep))}/turn`;
 }
 
 /**

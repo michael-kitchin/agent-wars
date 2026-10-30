@@ -16,6 +16,7 @@ import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/he
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import {
   closeGameDatabaseForTests,
+  dbGetAll,
   dbGetOne,
   dbRun,
   getAiPendingOrders,
@@ -38,6 +39,7 @@ import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
 import { missileReachSet } from '../gameActions/missileReach';
+import { getValidDestinations } from '../oneStepMoveDestinations';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -155,13 +157,22 @@ test('a second-seat consultation orders only that seat', async (t) => {
       assert.ok(first && second, 'both AI seats should have infantry');
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [first.h3Index, second.id]);
       ensureStrategicCoordinateRegistryInitialized();
-      const destination = h3ToCode(first.h3Index, { mode: 'strategic' });
+      const neighbor = getValidDestinations(
+        { id: second.id, h3Index: first.h3Index, unitType: 'infantry' },
+        getGameState()
+      ).find((hex) => hex !== first.h3Index);
+      if (!neighbor) {
+        t.skip('owning infantry has no hex other than its current cell');
+        return;
+      }
+      const ownDestination = h3ToCode(neighbor, { mode: 'strategic' });
+      const otherDestination = ownDestination;
       const content = JSON.stringify({
         message: 'hold',
         strategy: 'hold',
         orders: [
-          { action: 'explicit_move', unitId: second.id, destination },
-          { action: 'explicit_move', unitId: first.id, destination },
+          { action: 'explicit_move', unitId: second.id, destination: ownDestination },
+          { action: 'explicit_move', unitId: first.id, destination: otherDestination },
         ],
         airStrikes: [],
         ferryOrders: [],
@@ -184,6 +195,7 @@ test('a second-seat consultation orders only that seat', async (t) => {
       });
       assert.equal(result.success, true, result.error);
       assert.deepEqual(result.orders.map((order) => order.unitId), [second.id]);
+      assert.equal(result.orders[0]?.toH3Index, neighbor);
       const drops = result.dropReasons ?? [];
       assert.ok(
         drops.some((reason) => reason.includes(first.id) || reason.includes("own side")),
@@ -205,6 +217,101 @@ test('a second-seat consultation orders only that seat', async (t) => {
       const otherPending = getAiPendingOrders('opponent');
       assert.deepEqual(ownPending?.movementOrders.map((order) => order.unitId), [second.id]);
       assert.equal(otherPending, null);
+    });
+  } finally {
+    openRouter.setChatTransportOverrideForTests(null);
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+/**
+ * An explicit_move onto the unit's current hex is dropped, and a move to another hex is kept.
+ *
+ * Purpose: A zero-length AI move is not stored as a hold.
+ * When to use: After the apply loop drops a same-hex explicit_move.
+ * Expected outcome: Only the unit ordered to a different hex appears in `orders`, and a drop reason says already arrived.
+ * Exceptions: Skips when the regional pack is not extracted or the seat has fewer than two movable land units.
+ */
+test('a same-hex explicit_move is dropped and a different hex is kept', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-seats-same-hex-'));
+  const restoreElectron = installElectronMock(userData);
+  delete require.cache[require.resolve('./openRouter')];
+  const openRouter = require('./openRouter') as {
+    saveKey: (key: string) => void;
+    setSelectedModel: (modelId: string) => void;
+    setChatTransportOverrideForTests: (override: ((payload: { key: string }) => Promise<{
+      ok: true;
+      status: number;
+      headers: Record<string, string>;
+      bodyText: string;
+    }>) | null) => void;
+    requestOrders: (
+      state: ReturnType<typeof getGameState>,
+      modelId: string,
+      options: { seatId: (typeof AI_SEAT_IDS)[number]; enabledToolNames: string[]; usePrecomputation: boolean }
+    ) => Promise<{ success: boolean; orders: { unitId: string; toH3Index: string }[]; dropReasons?: string[]; error?: string }>;
+  };
+  const memory = require('./commanderKeyMemory') as {
+    writeSeatApiKeys: (entries: readonly { seatId: string; apiKey: string }[]) => void;
+  };
+  try {
+    openRouter.setSelectedModel('test-model');
+    await withThreeSeatMatch(async () => {
+      memory.writeSeatApiKeys([{ seatId: AI_SEAT_IDS[0], apiKey: 'test-openrouter-key' }]);
+      const seatId = AI_SEAT_IDS[0];
+      const land = dbGetAll<{ id: string; h3_index: string; unit_type: string }>(
+        `SELECT id, h3_index, unit_type FROM units WHERE player = ? AND unit_type IN ('infantry', 'armor') ORDER BY id LIMIT 2`,
+        [seatId]
+      );
+      if (land.length < 2) {
+        t.skip('the first seat has fewer than two land units');
+        return;
+      }
+      const [idle, moving] = land;
+      ensureStrategicCoordinateRegistryInitialized();
+      const neighbor = getValidDestinations(
+        { id: moving.id, h3Index: moving.h3_index, unitType: moving.unit_type },
+        getGameState()
+      ).find((hex) => hex !== moving.h3_index);
+      if (!neighbor) {
+        t.skip('the moving unit has no hex other than its current cell');
+        return;
+      }
+      const content = JSON.stringify({
+        message: 'hold',
+        strategy: 'hold',
+        orders: [
+          { action: 'explicit_move', unitId: idle.id, destination: h3ToCode(idle.h3_index, { mode: 'strategic' }) },
+          { action: 'explicit_move', unitId: moving.id, destination: h3ToCode(neighbor, { mode: 'strategic' }) },
+        ],
+        airStrikes: [],
+        ferryOrders: [],
+        callbacks: [],
+      });
+      openRouter.setChatTransportOverrideForTests(async () => ({
+        ok: true as const,
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({ choices: [{ message: { content } }] }),
+      }));
+      const result = await openRouter.requestOrders(getGameState(), 'test-model', {
+        seatId,
+        enabledToolNames: [],
+        usePrecomputation: false,
+      });
+      assert.equal(result.success, true, result.error);
+      assert.deepEqual(result.orders.map((order) => order.unitId), [moving.id]);
+      assert.equal(result.orders[0]?.toH3Index, neighbor);
+      assert.ok(
+        (result.dropReasons ?? []).some((reason) => reason.includes('already arrived')),
+        `expected an already-arrived drop: ${(result.dropReasons ?? []).join(' | ')}`
+      );
     });
   } finally {
     openRouter.setChatTransportOverrideForTests(null);

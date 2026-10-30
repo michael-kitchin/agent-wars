@@ -200,7 +200,8 @@ Every item marked `required` in [`information-decision-model.md`](information-de
 | `ATTENTION_FLAGS` | `## Attention Flags` |
 | `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER` | Combat and attack rules |
 | `MOVE_BUDGET`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION` | Combat and attack rules, and the envelope movement clause |
-| `HOLD_FIRE_SEMANTICS`, `ORDER_TYPE_LEGALITY`, `MARCH_CURRENT_HEX_RULE`, `STANDING_ORDER_STATE`, `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION` | `# Standing Order Status` and the standing-order guidance bullet |
+| `HOLD_FIRE_SEMANTICS`, `ORDER_TYPE_LEGALITY`, `STANDING_ORDER_STATE`, `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION` | `# Standing Order Status` and the standing-order guidance bullet |
+| `MARCH_CURRENT_HEX_RULE` | The standing-order guidance bullet and the invalid-output clause of the response envelope |
 | `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS` | `# Air Operations Status` |
 | `EMBARK_STATE`, `EMBARK_HEX`, `EMBARK_LEGALITY`, `NAVAL_MOVEMENT_DOMAIN` | `# Naval Transport Status` and the combat rules paragraph |
 | `PRODUCTION_*` | `# Production Status` |

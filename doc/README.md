@@ -8,7 +8,7 @@ Shipping version as of this writing: **2.10.0** (`package.json`). Phase 0 (hybri
 
 | Document | Role | Status |
 | --- | --- | --- |
-| [how-to-play.md](how-to-play.md) | Player guide: setup, global and regional maps, turn order, targeting, air power, sealift, building, battles, roads and rail, unit bonuses, common surprises, messages, and controls | **Current UI.** Downloads and the OpenRouter key are under Play it in the root [README.md](../README.md). Per-surface detail is in [ux/](ux/). |
+| [how-to-play.md](how-to-play.md) | Player guide, in this order: winning and losing, setup on global and regional maps, saving and loading, controls, turn order, a units table, building, credits and hiring, fortifications, targeting, air power, ballistic missiles, sealift, battles with roads and rail, unit bonuses, common surprises, and messages | **Current UI.** Downloads and the OpenRouter key are under Play it in the root [README.md](../README.md). Per-surface detail is in [ux/](ux/). |
 | [save-files.md](save-files.md) | How a match is written to an `.agentwars` file and opened again, including what the file omits and the version rule | **Current.** Matches `EXPECTED_USER_VERSION` and `MACHINE_LOCAL_CONFIG_KEYS`. |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |

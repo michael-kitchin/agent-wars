@@ -58,7 +58,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `FIRST_LEG_TRUNCATION` | [`tactical-prompt.md`](tactical-prompt.md) | Combat rules; required coaching |
 | `NAVAL_MOVEMENT_DOMAIN` | [`strategic-prompt.md`](strategic-prompt.md) | Combat rules; required coaching |
 | `ORDER_TYPE_LEGALITY` | [`strategic-prompt.md`](strategic-prompt.md) | Legal actions table |
-| `MARCH_CURRENT_HEX_RULE` | [`strategic-prompt.md`](strategic-prompt.md) | Legal actions table; coaching item 8 |
+| `MARCH_CURRENT_HEX_RULE` | both mode files | Legal actions; invalid-output rules; strategic coaching item 8 |
 | `AIR_ORDER_RESTRICTIONS` | both mode files | Air operations status; legal actions |
 | `EMBARK_LEGALITY` | both mode files | Naval transport status |
 | `PRODUCTION_QUEUES` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |

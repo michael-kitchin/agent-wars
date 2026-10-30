@@ -37,6 +37,7 @@ import { isEmbarkedLandUnit } from '../gameActions/sealift';
 import { landUnitGridRouteBlockReason } from '../gameActions/strategicOrderValidation';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
+import { explicitMoveAlreadyArrivedReason } from './requestOrdersFlowSupport';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
 import { buildToolDefinitions } from './openRouterToolCatalog';
@@ -406,7 +407,7 @@ export async function listModels(key: string): Promise<{ models: ModelItem[] } |
 
  * Purpose: Supports maintainability by documenting why `validateAiOrder` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: `{ valid: false, reason: 'already arrived' }` when the destination is the unit's current hex. Other failures keep their existing reasons.
  * Exceptions: None.
  */
 function validateAiOrder(
@@ -420,6 +421,8 @@ function validateAiOrder(
   if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
   if (unit.player !== seatId) return { valid: false, reason: "A commander can order only its own side's units" };
   if (isMissileUnitType(unit.unitType)) return { valid: false, reason: MISSILE_CANNOT_MOVE_REASON };
+  const alreadyArrived = explicitMoveAlreadyArrivedReason(unit.h3Index, order.toH3Index);
+  if (alreadyArrived) return { valid: false, reason: alreadyArrived };
 
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.toH3Index)) return { valid: false, reason: 'Destination not on map' };
@@ -436,7 +439,6 @@ function validateAiOrder(
       state
     );
     if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
-    /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
   } else {
     const validDests = getValidDestinations(unit, state, destinationOptions);
     if (!validDests.includes(order.toH3Index)) {

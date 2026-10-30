@@ -181,7 +181,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 | Action | Required fields | Legality rules the prompt must state |
 | --- | --- | --- |
-| `explicit_move` | `unitId` or `unitIds`, `destination` | One tactical cell for this beat. Prefer an option-row target for those sub-units, or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. A destination beyond the beat budget is clamped to the first reachable leg. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
+| `explicit_move` | `unitId` or `unitIds`, `destination` | One tactical cell for this beat. Prefer an option-row target for those sub-units, or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. A destination beyond the beat budget is clamped to the first reachable leg, and one on the sub-unit's current cell is dropped as already arrived. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
 | `ranged_attack` | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included — not "ranged-only" units. One per sub-unit per beat, resolved from beat-start positions. |
 | `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
@@ -211,6 +211,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
 7. A ranged target must not be the acting sub-unit's own move destination.
 8. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
+9. An explicit_move to the sub-unit's current cell is dropped as already arrived.
 
 ## 4. Required tactical coaching
 

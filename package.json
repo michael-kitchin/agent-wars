@@ -19,6 +19,7 @@
     "verify:modularization": "npm run build:main && npm run build:renderer && npm run lint && npm run check:renderer-types && npm run check:circular && node scripts/run-main-node-tests.cjs --manifest scripts/verify-modularization-tests.manifest",
     "start": "npm run generated:extract && npm run rebuild:native:electron && electron .",
     "ui:smoke": "npm run build && npm run rebuild:native:electron && node scripts/ui-smoke/ui-smoke.cjs",
+    "doc:shots": "npm run build && npm run rebuild:native:electron && node scripts/doc-shots/doc-shots.cjs",
     "rebuild:native": "npm run rebuild:native:electron",
     "rebuild:native:electron": "node scripts/rebuild-native.cjs --runtime=electron",
     "rebuild:native:node": "node scripts/rebuild-native.cjs --runtime=node",

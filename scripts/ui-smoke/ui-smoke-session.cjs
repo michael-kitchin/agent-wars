@@ -52,15 +52,17 @@ const FINISHED_MATCH_EDIT = Object.freeze([
  * Starts the built app on a user-data folder and waits for its window.
  *
  * Purpose: Every session of the run starts the same way, and every page error lands in the report.
- * When to use: Once per session. Pass the same folder to reopen the match the previous session left.
+ * When to use: Once per session. Pass the same folder to reopen the match the previous session left. Pass
+ *   `options.extraArgs` for Electron switches, such as `--force-device-scale-factor=1`; they go before the app path.
  * Expected outcome: `{ app, page }` once the window's document has loaded. Uncaught page errors are added to
  *   `report.pageErrors`, and console errors to `report.consoleErrors`.
  * Exceptions: Throws when the app does not start within 60 seconds.
  */
-async function launchApp(userDataDir, report) {
+async function launchApp(userDataDir, report, options = {}) {
+  const extraArgs = options.extraArgs || [];
   const app = await electron.launch({
     executablePath: require('electron'),
-    args: [REPO_ROOT],
+    args: [...extraArgs, REPO_ROOT],
     cwd: REPO_ROOT,
     env: { ...process.env, AGENT_WARS_USER_DATA_DIR: userDataDir },
     timeout: 60000,
@@ -104,7 +106,8 @@ const EDIT_ATTEMPTS = Object.freeze({ count: 5, delayMs: 1000 });
  * Purpose: Sets up a state that play cannot reach on cue, such as a hex both sides hold or a finished match.
  * When to use: Between two sessions, after `app.close()` has returned. Only on the run's throwaway folder.
  * Expected outcome: Every statement runs in one transaction under Electron's own Node, which can load the SQLite
- *   module the smoke run built for Electron. A failed attempt is retried after a short wait.
+ *   module the smoke run built for Electron. Returns that script's stdout, one changed-row line per statement.
+ *   A failed attempt is retried after a short wait.
  * Exceptions: Throws, with the script's output, when the file is missing or the last attempt fails.
  */
 async function editSavedMatch(userDataDir, statements) {
@@ -112,8 +115,12 @@ async function editSavedMatch(userDataDir, statements) {
   const args = [script, savedMatchFile(userDataDir), JSON.stringify(statements)];
   for (let attempt = 1; ; attempt += 1) {
     try {
-      execFileSync(require('electron'), args, { cwd: REPO_ROOT, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'pipe' });
-      return;
+      return execFileSync(require('electron'), args, {
+        cwd: REPO_ROOT,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
     } catch (err) {
       if (attempt >= EDIT_ATTEMPTS.count) {
         const output = `${err.stdout || ''}${err.stderr || ''}`.trim();

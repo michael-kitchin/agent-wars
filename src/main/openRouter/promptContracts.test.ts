@@ -244,6 +244,7 @@ function testStrategicPromptDoesNotMarchToCurrentHex(): void {
   const guidance = buildToolUsageGuidance(flags, true, 'strategic');
   assert.ok(/already arrived/i.test(guidance), 'must warn that current-hex marches are dropped');
   assert.ok(/defend to hold/i.test(guidance));
+  assert.match(guidance, /explicit_move to the unit's current Hex is dropped as already arrived/i);
 }
 
 /**
@@ -493,7 +494,7 @@ function testStandingOrderActionsGatedByIncludeStandingOrderActions(): void {
  * Purpose: The fallback and orders-only returns teach a memory write. Planning consults already carry the JSON
  * contract, so they must not also receive this sentence.
  * When to use: After editing `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` or the early returns in `getMovementOrderInstruction`.
- * Expected outcome: Memory-only flags include `content`. Planning plus memory does not include `memoryUpdates entry`.
+ * Expected outcome: Memory-only flags include `content` and say a current-cell destination is dropped. Planning plus memory does not include `memoryUpdates entry`.
  * Exceptions: AssertionError when the fallback example omits content or the planning return gains the suffix.
  */
 function testFallbackMemoryExampleIncludesContent(): void {
@@ -503,6 +504,8 @@ function testFallbackMemoryExampleIncludesContent(): void {
   assert.strictEqual(memoryOnly.fallbackMovementEnabled, true);
   const fallback = getMovementOrderInstruction(memoryOnly, 'strategic');
   assert.ok(fallback.includes('content'), 'fallback memory example must name content');
+  assert.ok(fallback.includes('already arrived'), 'fallback must say a current-cell destination is dropped');
+  assert.ok(!fallback.includes('current cell = hold'), 'fallback must not call the current cell a hold');
   const planning = getMovementOrderInstruction(getToolFlags(['plan_route', 'memory_read']), 'strategic');
   assert.ok(!planning.includes('memoryUpdates entry'), 'planning return must not append the memory suffix');
 }

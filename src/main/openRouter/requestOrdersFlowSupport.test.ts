@@ -10,6 +10,7 @@ import {
   buildToolBudgetExceededWarning,
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   dedupeByUnitKeepLast,
+  explicitMoveAlreadyArrivedReason,
   unitIdsWhoseEarlierRowsWereDiscarded,
   type PromptLogArtifactKind,
 } from './requestOrdersFlowSupport';
@@ -97,4 +98,17 @@ test('keep-last reports earlier duplicate rows and still keeps the last row', ()
     { unitId: 'a', mark: 2 },
     { unitId: 'b', mark: 2 },
   ]);
+});
+
+/**
+ * A same-hex explicit_move is already arrived; a different hex is not.
+ *
+ * Purpose: The apply loop drops a zero-length AI move and keeps a move to another hex.
+ * When to use: After edits to `explicitMoveAlreadyArrivedReason`.
+ * Expected outcome: Equal indexes return `already arrived`. Different indexes return null.
+ * Exceptions: None.
+ */
+test('explicitMoveAlreadyArrivedReason matches only the unit hex', () => {
+  assert.equal(explicitMoveAlreadyArrivedReason('abc', 'abc'), 'already arrived');
+  assert.equal(explicitMoveAlreadyArrivedReason('abc', 'def'), null);
 });

@@ -102,13 +102,104 @@ async function captureMainMap(page) {
  * Exceptions: Throws when the hex index is not valid.
  */
 async function hexClientPoint(page, h3Index) {
-  const [lat, lng] = h3.cellToLatLng(h3Index);
-  return page.evaluate(({ handle, latLng }) => {
+  return latLngClientPoint(page, h3.cellToLatLng(h3Index));
+}
+
+/**
+ * Returns the window point of a latitude and longitude on the main map.
+ *
+ * Purpose: Hex corners and hex centers are projected the same way, so a crop can frame a whole hex.
+ * When to use: After `captureMainMap`. Pass `[lat, lng]` in degrees.
+ * Expected outcome: `{ x, y }` in CSS pixels of the window. The point may lie outside the window.
+ * Exceptions: Throws when the main map handle is not set.
+ */
+async function latLngClientPoint(page, latLng) {
+  return page.evaluate(({ handle, latLng: target }) => {
     const map = window[handle];
-    const point = map.latLngToContainerPoint(latLng);
+    const point = map.latLngToContainerPoint(target);
     const box = map.getContainer().getBoundingClientRect();
     return { x: box.x + point.x, y: box.y + point.y };
-  }, { handle: MAP_HANDLE, latLng: [lat, lng] });
+  }, { handle: MAP_HANDLE, latLng: [latLng[0], latLng[1]] });
+}
+
+/**
+ * Zooms the map in on a hex, one mouse-wheel notch at a time, until an element shows.
+ *
+ * Purpose: Battle and build markers show only when the map is zoomed in past its starting zoom.
+ * When to use: After `captureMainMap`, with the selector of a marker drawn on that hex.
+ * Expected outcome: True once the selector is visible, false after `maxNotches` notches without it. It never clicks.
+ * Exceptions: Throws when the hex index is not valid.
+ */
+async function zoomUntilVisible(page, h3Index, selector, maxNotches) {
+  for (let notch = 0; notch < maxNotches && !(await page.isVisible(selector)); notch += 1) {
+    const point = await hexClientPoint(page, h3Index);
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.wheel(0, -120);
+    await page.waitForTimeout(MAP_WAIT_MS.settle);
+  }
+  return page.isVisible(selector);
+}
+
+/**
+ * Reads the main map's zoom level.
+ *
+ * Purpose: A script that zooms in for one picture can return to the zoom it started from.
+ * When to use: After `captureMainMap`.
+ * Expected outcome: Leaflet's zoom, which may be fractional.
+ * Exceptions: Throws when the main map handle is not set.
+ */
+async function readMapZoom(page) {
+  return page.evaluate((handle) => window[handle].getZoom(), MAP_HANDLE);
+}
+
+/**
+ * Sets the main map's zoom level around its current center, without animation.
+ *
+ * Purpose: Returns the map to a stored zoom, or steps it toward one.
+ * When to use: After `captureMainMap`.
+ * Expected outcome: The map is at `zoom` once the settle wait has passed.
+ * Exceptions: Throws when the main map handle is not set.
+ */
+async function setMapZoom(page, zoom) {
+  await page.evaluate(({ handle, target }) => window[handle].setZoom(target, { animate: false }), { handle: MAP_HANDLE, target: zoom });
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
+}
+
+/**
+ * Centers the main map on a hex, without animation and without changing the zoom.
+ *
+ * Purpose: A picture of one hex needs that hex in the middle of the map, clear of the panels at its edges.
+ * When to use: After `captureMainMap`.
+ * Expected outcome: The hex center is the map's center once the settle wait has passed.
+ * Exceptions: Throws when the hex index is not valid or the main map handle is not set.
+ */
+async function panMapToHex(page, h3Index) {
+  const [lat, lng] = h3.cellToLatLng(h3Index);
+  await page.evaluate(({ handle, latLng }) => window[handle].panTo(latLng, { animate: false }), { handle: MAP_HANDLE, latLng: [lat, lng] });
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
+}
+
+/**
+ * Pans the main map, without animation or a zoom change, so the midpoint between two hex centers lands on a window point.
+ *
+ * Purpose: A picture of an order line can sit right beside the panel it is taken with, so the crop stays small and
+ *   the line stays large in it.
+ * When to use: After `captureMainMap`, with the line's two hexes and a point in CSS pixels of the window that lies
+ *   over the map.
+ * Expected outcome: The midpoint is at `clientPoint` once the settle wait has passed. Re-read hex points afterwards.
+ * Exceptions: Throws when a hex index is not valid or the main map handle is not set.
+ */
+async function panMidpointTo(page, fromHex, toHex, clientPoint) {
+  const ends = [h3.cellToLatLng(fromHex), h3.cellToLatLng(toHex)];
+  await page.evaluate(({ handle, ends: [a, b], target }) => {
+    const map = window[handle];
+    const box = map.getContainer().getBoundingClientRect();
+    const pa = map.latLngToContainerPoint(a);
+    const pb = map.latLngToContainerPoint(b);
+    const mid = { x: box.x + (pa.x + pb.x) / 2, y: box.y + (pa.y + pb.y) / 2 };
+    map.panBy([mid.x - target.x, mid.y - target.y], { animate: false });
+  }, { handle: MAP_HANDLE, ends, target: clientPoint });
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
 }
 
 /**
@@ -322,12 +413,7 @@ async function readBattle(page) {
  */
 async function enterBattleAt(page, h3Index) {
   const marker = `#tactical-entry-layer .tactical-entry-btn[data-h3-index="${h3Index}"]`;
-  for (let notch = 0; notch < MAX_BATTLE_ZOOM_NOTCHES && !(await page.isVisible(marker)); notch += 1) {
-    const point = await hexClientPoint(page, h3Index);
-    await page.mouse.move(point.x, point.y);
-    await page.mouse.wheel(0, -120);
-    await page.waitForTimeout(MAP_WAIT_MS.settle);
-  }
+  await zoomUntilVisible(page, h3Index, marker, MAX_BATTLE_ZOOM_NOTCHES);
   await page.click(marker);
   await page.waitForFunction(() => (document.getElementById('battle-header-status')?.textContent || '').startsWith('Beat 1 · Tactical planning'), null, { timeout: MAP_WAIT_MS.battle });
   await page.waitForTimeout(MAP_WAIT_MS.settle);
@@ -420,14 +506,25 @@ async function dragGrip(page, gripSelector, dx, dy) {
 module.exports = {
   LAND_UNIT_TYPES,
   captureMainMap,
+  clearSelection,
   contestedHexEdit,
   enterBattleAt,
+  hexClientPoint,
+  latLngClientPoint,
+  loneHumanUnits,
+  panMapToHex,
+  panMidpointTo,
   queueBattleMarch,
+  readMapZoom,
   selectLoneBattleUnit,
   dragGrip,
   dragSelectionPanelGrip,
   readGameState,
   selectLoneUnit,
   selectHumanStack,
+  selectUnitInItsHex,
+  setMapZoom,
   queueLoneUnitMarch,
+  unitCountByHex,
+  zoomUntilVisible,
 };

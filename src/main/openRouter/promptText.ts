@@ -360,11 +360,11 @@ export function buildToolUsageGuidance(
 }
 
 /**
- * Defines the `buildAdjacentCellsFallbackBlock` function shape (export function buildAdjacentCellsFallbackBlock( state: GameStateSnapshot, opponentUnits: { id: string; h3Index: string; unitType: string }[], coordMap).
-
- * Purpose: Supports maintainability by documenting why `buildAdjacentCellsFallbackBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Lists one-step move hexes for the mode with no planning tools and no standing orders.
+ *
+ * Purpose: That mode's only destination list must not offer the unit's current cell. An explicit_move there is dropped as already arrived, so staying is omitting the order.
+ * When to use: When `fallbackMovementEnabled` is true, from the system-prompt builder.
+ * Expected outcome: One line per own unit. A line with neighbours says `move to:` those codes and tells the model to omit explicit_move to stay. A line with none says to omit explicit_move. Empty when no unit has a coordinate.
  * Exceptions: None.
  */
 export function buildAdjacentCellsFallbackBlock(
@@ -373,6 +373,7 @@ export function buildAdjacentCellsFallbackBlock(
   coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string },
   getValidDestinationsUnoccupied: (unit: { h3Index: string; unitType: string }, state: GameStateSnapshot) => string[]
 ): string {
+  logDebug('promptText buildAdjacentCellsFallbackBlock', { unitCount: opponentUnits.length });
   const { latLngByH3, format } = coordMap;
   const occupied = new Set(state.units.map((row) => row.h3Index));
   const lines: string[] = [];
@@ -392,7 +393,10 @@ export function buildAdjacentCellsFallbackBlock(
       .filter((h3) => h3 === u.h3Index || !occupied.has(h3))
       .filter((h3) => latLngByH3.has(h3))
       .map((h3) => format(h3));
-    const cells = dests.length ? `${current} (hold), or move to: ${dests.join(', ')}` : `${current} (hold only; no empty adjacent cells)`;
+    const moves = dests.filter((code) => code !== current);
+    const cells = moves.length
+      ? `move to: ${moves.join(', ')}. Omit explicit_move to stay.`
+      : 'Omit explicit_move to stay. No empty adjacent cell is listed.';
     lines.push(`${u.id}: ${cells}`);
   }
   if (lines.length === 0) return '';
@@ -404,7 +408,7 @@ export function buildAdjacentCellsFallbackBlock(
 
  * Purpose: When planning tools are on and a briefing is present, approach/move/melee dests may be copied from Best Options This Turn Target Hexes into explicit_move, or from plan_route orderToHexCode. Without a briefing, dests come from plan_route only.
  * When to use: `buildFinalJsonContractInstruction` after computing tool flags.
- * Expected outcome: One or more sentences appended to the final JSON schema block; tactical mode also describes first-leg truncation.
+ * Expected outcome: One or more sentences appended to the final JSON schema block; tactical mode also describes first-leg truncation. The fallback sentence tells the model to copy a listed move hex and to omit explicit_move to stay.
  * Exceptions: None.
  */
 export function getMovementOrderInstruction(
@@ -418,6 +422,13 @@ export function getMovementOrderInstruction(
    */
   hasPrecomputedBriefing = true
 ): string {
+  logDebug('promptText getMovementOrderInstruction', {
+    planningEnabled: flags.planningEnabled,
+    ordersEnabled: flags.ordersEnabled,
+    fallbackMovementEnabled: flags.fallbackMovementEnabled,
+    coordinateMode,
+    hasPrecomputedBriefing,
+  });
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
   const tacticalMarchReachabilityClause =
     coordinateMode === 'tactical'
@@ -447,7 +458,7 @@ export function getMovementOrderInstruction(
     const memoryHint = flags.memoryEnabled ? ' After your analysis, add memoryUpdates in final JSON if needed. ' : '';
     return (
       memoryHint +
-      'Without planning/standing-order tools, use explicit_move with "destination" set only to a briefing hex code from the "Adjacent cells (fallback)" list (current cell = hold, or an adjacent listed cell).' +
+      'Without planning/standing-order tools, use explicit_move with "destination" set only to a move hex from the "Adjacent cells (fallback)" list. Omit explicit_move to stay; a destination on the unit\'s current cell is dropped as already arrived.' +
       memorySuffix
     );
   }

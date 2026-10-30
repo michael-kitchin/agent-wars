@@ -277,7 +277,7 @@ explicit_move (include "destination": briefing hex code for this beat's march; a
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. A ranged action's target must not be the acting unit's own move destination. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
+An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. A ranged action's target must not be the acting unit's own move destination. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is dropped as already arrived.
 
 Do not emit assign_order or cancel_order for tactical sub-unit ids. memoryUpdates and productionOrders are not accepted this beat.
 

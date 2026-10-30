@@ -208,7 +208,7 @@ test('a mercenary identity adds the Mercenary line after the date of birth', () 
     identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryUpkeep: 3 },
   });
   const dob = html.indexOf('<strong>DOB:</strong>');
-  const mercenary = html.indexOf(`<strong>Mercenary:</strong> ${CREDITS_SYMBOL}3 / turn`);
+  const mercenary = html.indexOf(`<strong>Mercenary:</strong> ${CREDITS_SYMBOL}3/turn`);
   assert.ok(dob >= 0 && mercenary > dob);
   assert.equal(html.includes('upkeep'), false);
 });
