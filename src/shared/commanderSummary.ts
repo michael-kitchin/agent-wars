@@ -65,10 +65,10 @@ const NO_MODEL_SUMMARY = 'No model · standing orders only';
  *
  * Purpose: The row and the commander card ask the player to pick a model.
  * When to use: `formatCommanderButtonLabel` only.
- * Expected outcome: "Select Model."
+ * Expected outcome: "Select Model"
  * Exceptions: None.
  */
-const NO_MODEL_BUTTON_LABEL = 'Select Model.';
+const NO_MODEL_BUTTON_LABEL = 'Select Model';
 
 /**
  * One sentence for a commander's model, effort, and doctrine.
@@ -93,7 +93,7 @@ export function formatCommanderSummary(input: CommanderSummaryInput): string {
  *
  * Purpose: A side with no model shows an invitation. A side with a model shows the same sentence as standings.
  * When to use: The new-game commander button and the commander-card summary button.
- * Expected outcome: "Select Model." when no model is set. Otherwise `formatCommanderSummary`.
+ * Expected outcome: "Select Model" when no model is set. Otherwise `formatCommanderSummary`.
  * Exceptions: None.
  */
 export function formatCommanderButtonLabel(input: CommanderSummaryInput): string {

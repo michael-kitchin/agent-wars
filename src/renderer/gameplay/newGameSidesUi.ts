@@ -160,7 +160,7 @@ function defaultCommander(): NewGameCommanderInput {
  *
  * Purpose: The button invites a model choice, or names the model that is set.
  * When to use: Rendering an AI row.
- * Expected outcome: "Select Model." when no model is set. Otherwise the model name, the effort when one is set, and the doctrine.
+ * Expected outcome: "Select Model" when no model is set. Otherwise the model name, the effort when one is set, and the doctrine.
  * Exceptions: None.
  */
 function commanderButtonLabel(commander: NewGameCommanderInput | null): string {

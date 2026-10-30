@@ -183,7 +183,7 @@ function statusOf(seat: SeatSnapshot): CommanderStatus {
  *
  * Purpose: The button shows the same label the new-game rows use.
  * When to use: `cardElement`.
- * Expected outcome: "Select Model." when the seat has no model. Otherwise the model, the effort, and the doctrine.
+ * Expected outcome: "Select Model" when the seat has no model. Otherwise the model, the effort, and the doctrine.
  * Exceptions: None.
  */
 function summaryText(seat: SeatSnapshot): string {

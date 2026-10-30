@@ -22670,7 +22670,7 @@ ${bonuses}`;
 
   // src/shared/commanderSummary.ts
   var NO_MODEL_SUMMARY = "No model \xB7 standing orders only";
-  var NO_MODEL_BUTTON_LABEL = "Select Model.";
+  var NO_MODEL_BUTTON_LABEL = "Select Model";
   function formatCommanderSummary(input) {
     const modelName = displayModelName(input.modelLabel);
     if (!modelName) return NO_MODEL_SUMMARY;

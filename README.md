@@ -63,7 +63,7 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 ![New game screen.](doc/media/first-start-game.png)
 
-2. For each AI opponent, click on **Select Model.** to enter your [OpenRouter](https://openrouter.ai) API key, reasoning, doctrine, and a model from Anthropic, Google, OpenAI, SpaceX/xAI, etc.
+2. For each AI opponent, click on **Select Model** to enter your [OpenRouter](https://openrouter.ai) API key, reasoning, doctrine, and a model from Anthropic, Google, OpenAI, SpaceX/xAI, etc.
 
   - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
   - Ollama/other local model support is on my radar (pun intended, I guess).

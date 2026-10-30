@@ -37,7 +37,7 @@ test('a commander summary names the model, the effort, and the doctrine', () => 
 test('the commander button invites a model choice when none is set', () => {
   assert.equal(
     formatCommanderButtonLabel({ modelLabel: null, reasoningEffort: 'low', doctrineChoice: 'balanced' }),
-    'Select Model.'
+    'Select Model'
   );
   assert.equal(
     formatCommanderButtonLabel({ modelLabel: 'Nova Lite 1.0', reasoningEffort: null, doctrineChoice: 'cautious' }),

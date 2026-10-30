@@ -32,7 +32,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- "Game Options.": Victory rule, turn limit, bonuses, fog of war, and Auto-start AI.
+- "Game Options": Victory rule, turn limit, bonuses, fog of war, and Auto-start AI.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.

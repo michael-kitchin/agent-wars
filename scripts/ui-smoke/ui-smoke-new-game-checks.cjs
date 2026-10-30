@@ -469,7 +469,7 @@ const NEW_GAME_CHECKS = Object.freeze([
     run: (p, el) => {
       const button = el('#new-game-options-btn');
       if (!button.shown) return 'Game Options is hidden';
-      if (button.text !== 'Game Options.') return `the options button reads "${button.text}"`;
+      if (button.text !== 'Game Options') return `the options button reads "${button.text}"`;
       if (!(button.y > el('.new-game-units').y)) return 'Game Options is not under the unit row';
       return el('#new-game-section-victory').shown ? 'Victory is shown on the setup panel' : null;
     },
