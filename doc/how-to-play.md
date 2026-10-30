@@ -181,7 +181,7 @@ A hex needs the urban cells in this table, and anything named under **Also needs
 
 ## Credits and mercenaries
 
-Each side has a treasury, starting at 0. It never goes below 0. Neutral has none. Only you see yours. The top bar shows it after Production as `¤N`, and turns short when the balance will not cover this turn's upkeep. When upkeep is above 0, the suffix is `−¤N/turn`.
+Each side has a treasury, starting at 0. It never goes below 0. Neutral has none. Only you see yours. The top bar shows it after Production as `¤N`, and turns short when the balance will not cover this turn's upkeep. When upkeep is above 0, the suffix is ` + ¤N/turn`.
 
 A Credits queue item costs `creditsItemCost()` production points, the active map's infantry price, and adds `CREDITS_PER_ITEM` (20) credits on every map. Fees and upkeep come from the global reference prices (`mercenaryReferenceCost`), so they are the same on every map: infantry 3 credits per turn (5 in an Advanced city), armor 5 (10), naval 13 (25), air 8 (15). Raising costs one turn of that upkeep. Rehiring costs two. That fee is the unit's upkeep for the turn it arrives, so it is not charged again the same turn.
 

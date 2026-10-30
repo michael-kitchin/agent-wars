@@ -409,11 +409,11 @@ function citiesReadout(
  */
 export interface TopBarStatParts {
   /**
-   * Production value, such as "+⚒1,530".
+   * Production value, such as "⚒1,530".
    *
-   * Contract: Always starts with "+", then `PRODUCTION_CAPACITY_SYMBOL`.
+   * Contract: Always starts with `PRODUCTION_CAPACITY_SYMBOL`.
    * When to use: `#topbar-stat-production`.
-   * Expected outcome: The plus, the production symbol, and the count grouped with commas past 999.
+   * Expected outcome: The production symbol and the count grouped with commas past 999.
    * Exceptions: None.
    */
   readonly production: string;
@@ -499,11 +499,11 @@ export interface TopBarStatParts {
    */
   readonly credits: string;
   /**
-   * The upkeep suffix, such as "−¤3/turn".
+   * The upkeep suffix, such as " + ¤3/turn".
    *
    * Contract: Empty when upkeep is 0 or the view has no economy.
    * When to use: `#topbar-stat-credits-suffix`.
-   * Expected outcome: A minus sign, `CREDITS_SYMBOL`, the upkeep, and `/turn`, or `''`.
+   * Expected outcome: A space, a plus, a space, `CREDITS_SYMBOL`, the upkeep, and `/turn`, or `''`.
    * Exceptions: None.
    */
   readonly creditsSuffix: string;
@@ -526,12 +526,12 @@ function formatCount(value: number): string {
  *
  * Purpose: Keeps the number format in one place.
  * When to use: After `computeTopBarStats`.
- * Expected outcome: For example production "+⚒1,530", credits "¤120" or empty, forces "10" and "/34", homes "12" and "/15".
+ * Expected outcome: For example production "⚒1,530", credits "¤120" or empty, forces "10" and "/34", homes "12" and "/15".
  * Exceptions: None.
  */
 export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {
   return {
-    production: `+${formatProductionCapacityAmount(formatCount(stats.productionPerTurn))}`,
+    production: formatProductionCapacityAmount(formatCount(stats.productionPerTurn)),
     forces: formatCount(stats.unitsFielded),
     forcesCap: `/${formatCount(stats.unitCap)}`,
     humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : '—',

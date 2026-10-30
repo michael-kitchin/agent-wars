@@ -69,7 +69,7 @@ test('computeTopBarStats treats missing lists as empty', () => {
 test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () => {
   const stats = computeTopBarStats({ ...input, strategicInfrastructure: [{ h3Index: 'a', urbanHexCount: 1530 }] }, notNeutral);
   assert.deepEqual(formatTopBarStatParts(stats), {
-    production: `+${PRODUCTION_CAPACITY_SYMBOL}1,530`,
+    production: `${PRODUCTION_CAPACITY_SYMBOL}1,530`,
     forces: '4',
     forcesCap: '/36',
     humanHome: '2',

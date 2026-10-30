@@ -236,7 +236,7 @@
     return count === 1 ? "1 hire order could not be filled, so it was not charged." : `${count} hire orders could not be filled, so they were not charged.`;
   }
   function formatCreditsUpkeepSuffix(upkeep) {
-    return upkeep === 0 ? "" : `\u2212${formatCreditsAmount(String(upkeep))}/turn`;
+    return upkeep === 0 ? "" : ` + ${formatCreditsAmount(String(upkeep))}/turn`;
   }
   function formatCreditsTooltip(funds) {
     const mercenaryWord = funds.mercenaryCount === 1 ? "mercenary" : "mercenaries";
@@ -16425,7 +16425,7 @@
 
   // src/renderer/rendering/mercenaryBadgeDrawing.ts
   var MERCENARY_BADGE_TEXT = CREDITS_SYMBOL;
-  var MERCENARY_BADGE_FONT = "bold 11px system-ui, sans-serif";
+  var MERCENARY_BADGE_FONT = "bold 14px system-ui, sans-serif";
   function drawMercenaryBadge(ctx, x, y) {
     ctx.save();
     ctx.font = MERCENARY_BADGE_FONT;
@@ -29546,7 +29546,7 @@ ${bonuses}`;
   }
   function formatTopBarStatParts(stats) {
     return {
-      production: `+${formatProductionCapacityAmount(formatCount(stats.productionPerTurn))}`,
+      production: formatProductionCapacityAmount(formatCount(stats.productionPerTurn)),
       forces: formatCount(stats.unitsFielded),
       forcesCap: `/${formatCount(stats.unitCap)}`,
       humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : "\u2014",

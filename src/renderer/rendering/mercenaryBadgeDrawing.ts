@@ -12,8 +12,8 @@ import { CREDITS_SYMBOL } from '../../shared/economySymbols';
 /** The character drawn on a mercenary token. */
 export const MERCENARY_BADGE_TEXT = CREDITS_SYMBOL;
 
-/** Font for the mercenary badge. */
-export const MERCENARY_BADGE_FONT = 'bold 11px system-ui, sans-serif';
+/** Font for the mercenary badge. 14 px keeps the currency sign readable at the token center. */
+export const MERCENARY_BADGE_FONT = 'bold 14px system-ui, sans-serif';
 
 /**
  * Draws one credits symbol at a token center.

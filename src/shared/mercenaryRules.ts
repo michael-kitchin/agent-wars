@@ -267,11 +267,11 @@ export function formatHireOrdersUnfilledLine(count: number): string {
  *
  * Purpose: The readout shows upkeep beside the balance when the seat has mercenaries to pay.
  * When to use: The credits stat. Pass 0 when upkeep is 0.
- * Expected outcome: An empty string, or a minus sign, the credits symbol, the upkeep, and `/turn`.
+ * Expected outcome: An empty string, or a space, a plus, a space, the credits symbol, the upkeep, and `/turn`.
  * Exceptions: None.
  */
 export function formatCreditsUpkeepSuffix(upkeep: number): string {
-  return upkeep === 0 ? '' : `\u2212${formatCreditsAmount(String(upkeep))}/turn`;
+  return upkeep === 0 ? '' : ` + ${formatCreditsAmount(String(upkeep))}/turn`;
 }
 
 /**

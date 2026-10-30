@@ -2,7 +2,7 @@
  * Mercenary prices and the hire-panel labels.
  *
  * Purpose: Upkeep stays on the global prices, and the hire menu shows the compact price.
- * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, `formatHireOrderLabel`, `hireShortageLabel`, or `oneUnitRaiseShortage`.
+ * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, `formatHireOrderLabel`, `formatCreditsUpkeepSuffix`, `hireShortageLabel`, or `oneUnitRaiseShortage`.
  * Expected outcome: The cases below.
  * Exceptions: None.
  */
@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
-import { formatCompactHireCost, formatCompactRaiseCost, formatProductionCapacityAmount } from './economySymbols';
+import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
 import { unitCostFor } from './gameRules';
 import {
   HIRE_ALLOCATED_BOTH,
@@ -26,6 +26,7 @@ import {
   formatHireEntryLabel,
   formatHireOptionLabel,
   formatHireOrderLabel,
+  formatCreditsUpkeepSuffix,
   mercenaryHireFee,
   mercenaryUpkeepFor,
   raiseCapacityForHex,
@@ -96,6 +97,11 @@ test('a rehire order shows the extra above one turn', () => {
 test('a hire marker shows the production figure alone', () => {
   const figure = formatProductionCapacityAmount('12');
   assert.equal(formatHireEntryLabel(figure), figure);
+});
+
+test('the credits suffix joins upkeep with a spaced plus', () => {
+  assert.equal(formatCreditsUpkeepSuffix(0), '');
+  assert.equal(formatCreditsUpkeepSuffix(3), ` + ${formatCreditsAmount('3')}/turn`);
 });
 
 test('hire capacity shows the production amount still available', () => {
