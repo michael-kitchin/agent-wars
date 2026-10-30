@@ -71,7 +71,10 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Legend: Show or hide the terrain legend and its style choice.
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
-- Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
+- Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
+- Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and this turn's hire fees.
+- Hire marker, hire count, Hire, and remove: `hireEntryTooltipText`, `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
+- Hire type, when the list has no value: `hireTypeTooltipText`. When a type is selected, `queueItemTooltipText` for that type.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes. Hidden while observing.
 - Enemy homes readout: Hexes of every active enemy home that you hold, out of all of those hexes. A knocked-out side's home is left out. Hidden while observing, and hidden in a match that ends on a turn limit.
 - Cities readout: City hexes you hold, your place, and how many sides are still playing. The tip lists every active side. Shown only in a match that ends on a turn limit. While observing, the tip has no "(you)".
@@ -104,11 +107,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Build marker: Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.
 - Tactical entry marker: Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.
 - Single-hex add: Add a queue row. It starts as the first unit type this hex can build.
-- Single-hex type: Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.
+- Single-hex type, when the list has no value: Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored (`buildTypeTooltipText`). When a value is selected, `queueItemTooltipText` for that item.
 - Single-hex count: Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.
 - Single-hex Keep building: After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building. A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.
 - Multi-hex add: Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.
-- Multi-hex type: Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.
+- Multi-hex type, when the list has no value: Change the unit type for this row on every selected hex. A hex that cannot build the type skips it (`multiBuildTypeTooltipText`). When a value is selected, `queueItemTooltipText` for that item. The every-hex instruction stays on this empty sentence and on the add and count tips.
 - Multi-hex count: Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.
 - Multi-hex Keep building: After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building. A fortification row keeps fortifying city cells until every one is fortified, then the queue pauses.
 - Sealift slot: Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.
@@ -117,12 +120,21 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Ignore: Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.
 - Exit Battle during a fight: Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.
 - Exit Battle on the annihilation result: Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.
+- Build or hire close: Close this popup (`buildPopupCloseTooltipText`).
+- Single-hex queue remove: Remove this row from the queue (`singleHexQueueRemoveTooltipText`).
+- Multi-hex queue remove: Remove this row on every selected hex (`multiHexQueueRemoveTooltipText`).
+- Build tab: Show the build queue for this hex (`buildTabTooltipText`).
+- Hire tab: Show hiring for this hex (`hireTabTooltipText`).
+- Stack callout close: Close this list (`stackCalloutCloseTooltipText`).
+- Stack row toggle, when the unit is not selected: Select only this unit and close the list. Shift toggles it and leaves the list open (`stackUnitToggleUnselectedTooltipText`).
+- Stack row toggle, when the unit is selected: Remove this unit from the selection and close the list. Shift toggles it and leaves the list open (`stackUnitToggleSelectedTooltipText`).
+- Stack `+ All` without Shift: Select every unit you can select in this hex and close the list (`stackSelectAllTooltipText`).
+- Stack `+ All` with Shift: Add every unit you can select in this hex. The list stays open (`stackAddAllTooltipText`).
+- Stack `- All`: Remove every unit you can select in this hex. The list stays open (`stackRemoveAllTooltipText`).
 
 ## Controls with no tip
 
 - The map toast dismiss control and the AI strategy toast dismiss control.
-- The stack callout close control, and its per-unit selection controls, including "+ All" and "- All".
-- The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
 - Order rows in the Orders tab, and their cancel controls.
 - The cancel control on an order in the selection panel.
 - The reticle while it is greyed out and neither reason applies.
@@ -178,7 +190,12 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`)
+- `src/renderer/chrome/hireTooltipText.ts`
+- `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
+- `src/renderer/chrome/syncQueueItemSelectTooltip.ts` (`syncQueueItemSelectTooltip`)
+- `src/shared/popupControlTooltipText.ts`
+- `src/shared/mercenaryRules.ts` (`formatCreditsTooltip`, `formatMercenaryTooltipValue`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
 - `src/renderer/chrome/frameTooltipText.ts`

@@ -31,6 +31,7 @@ import {
   topLevelHeading,
 } from './promptSpec/sectionHeadings';
 import { buildProductionCostRulesLine, buildProductionIncomeRule } from './promptSpec/gameRuleText';
+import { BUILD_STATUS_COLUMN_HEADER, buildBuildabilityRule } from './promptSpec/gameRuleMercenaryText';
 
 /**
  * Sentence used when production tools are on but no controlled hex has an editable queue.
@@ -211,6 +212,15 @@ seaportCount?: unknown;
    * Exceptions: None.
    */
   fortifiableCount?: unknown;
+  /**
+   * Whether building is paused on this hex.
+   *
+   * Contract: True only when the queue cannot spend because the seat has no unit or fortification there.
+   * When to use: The Building column.
+   * Expected outcome: True, false, or absent.
+   * Exceptions: None.
+   */
+  buildPaused?: unknown;
     /**
    * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes?: unknown;).
 
@@ -285,6 +295,15 @@ seaports: number;
    * Exceptions: None.
    */
   fortified: string;
+  /**
+   * Whether this hex is building.
+   *
+   * Contract: `paused` or `yes`.
+   * When to use: The Building column.
+   * Expected outcome: `paused` only when the snapshot says building is paused.
+   * Exceptions: None.
+   */
+  building: string;
     /**
    * Specifies the contract for the `available` member (available: string;).
 
@@ -363,6 +382,7 @@ function normalizeControlledHexQueueRow(
     airports,
     seaports,
     fortified: `${fortifiedCount}/${fortifiedCount + fortifiableCount}`,
+    building: row.buildPaused === true ? 'paused' : 'yes',
     available,
     entries,
     hasQueuedEntries: entriesList.length > 0,
@@ -418,6 +438,7 @@ export function buildProductionBriefingBlock(args: {
     `Your current unit counts: ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${opponentCounts[unitType]}/${caps[unitType]}`).join(', ')}.`
   );
   lines.push(buildProductionIncomeRule());
+  lines.push(buildBuildabilityRule());
   if (maxedTypes.length > 0) {
     lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);
     lines.push(PRODUCTION_CAP_QUEUE_GUIDANCE);
@@ -449,9 +470,9 @@ export function buildProductionBriefingBlock(args: {
   }
   lines.push(
     ...buildPromptTableLines(
-      ['Hex', 'Urban Hexes', FORTIFIED_COLUMN_HEADER, 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue'],
-      selectedRows.map((row) => [row.hexText, row.urban, row.fortified, row.airports, row.seaports, row.available, row.entries]),
-      ['—', '—', '—', '—', '—', '—', '—']
+      ['Hex', 'Urban Hexes', FORTIFIED_COLUMN_HEADER, 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue', BUILD_STATUS_COLUMN_HEADER],
+      selectedRows.map((row) => [row.hexText, row.urban, row.fortified, row.airports, row.seaports, row.available, row.entries, row.building]),
+      ['—', '—', '—', '—', '—', '—', '—', '—']
     )
   );
   return lines.join('\n');

@@ -155,7 +155,26 @@ export function isProductionDetailShown(): boolean {
 }
 
 /**
- * True when the human controls the hex and it has positive urban production capacity.
+ * Whether a hex index is one the human can build on.
+ *
+ * Purpose: Shift-select must not pull a Hire marker into a multi-hex build popup.
+ * When to use: A build-entry click, with the hex that was clicked and each hex already selected.
+ * Expected outcome: True when that hex is on the snapshot and passes the human urban production test.
+ * Exceptions: None.
+ */
+export function isHumanBuildEntryHexIndex(state: GameStateSnapshot | null, h3Index: string): boolean {
+  const hex = state?.hexes.find((row) => row.h3Index === h3Index);
+  if (!state || !hex) return false;
+  return isStrategicHexHumanUrbanProduction(state, hex);
+}
+
+/**
+ * Whether the human can open a build queue on this hex.
+ *
+ * Purpose: Build markers and canvas labels share one eligibility test.
+ * When to use: With a hex from the snapshot.
+ * Expected outcome: True when the human controls the hex and it has urban production.
+ * Exceptions: None.
  */
 export function isStrategicHexHumanUrbanProduction(
   state: GameStateSnapshot,
@@ -206,6 +225,7 @@ export function formatProductionQueueAwareLabel(
   const queue = getBuildQueueSummaryForHex(state, h3Index);
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
+  if (queue?.buildPaused === true) return `${capacityText} / ∞t`;
   const nextUnitType = queue?.nextUnitType;
   const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
   if (nextUnitType === FORTIFICATION_QUEUE_ITEM) {

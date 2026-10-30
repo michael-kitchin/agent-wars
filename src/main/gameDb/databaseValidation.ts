@@ -40,6 +40,8 @@ export const GAME_DB_REQUIRED_TABLES = [
   'res_s_control',
   'res_s_build_queue',
   'res_s_build_progress',
+  'res_s_treasury',
+  'res_s_hire_orders',
   'res_s_infrastructure',
   'res_t_feature_overrides',
   'turn_notes_history',

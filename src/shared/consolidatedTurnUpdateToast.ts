@@ -5,6 +5,12 @@
 import { type SeatId, HUMAN_SEAT_ID, isSeatId, NEUTRAL_OWNER_ID } from './seatIds';
 import { ALL_BUILD_UNIT_TYPES } from './ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from './ipcTypes';
+import { formatCreditsAddedLine } from './creditsRules';
+import {
+  formatHireOrdersUnfilledLine,
+  formatMercenariesHiredLine,
+  formatUnitsDesertedLine,
+} from './mercenaryRules';
 import { formatFortificationsBuiltLine } from './fortificationRules';
 import { type TurnLossSummary } from './lossSummary';
 import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
@@ -98,6 +104,14 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   if (deployedLine) lines.push(deployedLine);
   const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
   if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
+  const creditsAdded = readyResult.humanCreditsAdded ?? 0;
+  if (creditsAdded > 0) lines.push(formatCreditsAddedLine(creditsAdded));
+  const mercenariesHired = readyResult.humanMercenariesHired ?? 0;
+  if (mercenariesHired > 0) lines.push(formatMercenariesHiredLine(mercenariesHired));
+  const unitsDeserted = readyResult.humanUnitsDeserted ?? 0;
+  if (unitsDeserted > 0) lines.push(formatUnitsDesertedLine(unitsDeserted));
+  const hireOrdersUnfilled = readyResult.humanHireOrdersUnfilled ?? 0;
+  if (hireOrdersUnfilled > 0) lines.push(formatHireOrdersUnfilledLine(hireOrdersUnfilled));
   const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
   if (deploymentCapLine) lines.push(deploymentCapLine);
   return lines;
@@ -170,6 +184,15 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None. Blank lines are dropped.
    */
   fortificationLines?: readonly string[];
+  /**
+   * Sentences for production that paused away from the seat's units.
+   *
+   * Contract: The renderer names the hexes.
+   * When to use: Strategic Ready, after the paused-hex names are known.
+   * Expected outcome: Trimmed lines follow the fortification pause lines.
+   * Exceptions: None. Blank lines are dropped.
+   */
+  productionPauseLines?: readonly string[];
   /**
    * Fortification sentences, each with the owner who held the hex.
    *
@@ -364,6 +387,8 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
   if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
   if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
   if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
+  const productionPauseLines = (args.productionPauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+  if (productionPauseLines.length > 0) otherLines = [...otherLines, ...productionPauseLines];
   if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);

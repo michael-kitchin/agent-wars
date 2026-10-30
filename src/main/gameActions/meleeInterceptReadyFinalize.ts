@@ -22,6 +22,7 @@ import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../s
 import { evaluateEndOfTurnOutcome, recordEndOfTurnOutcome } from './endOfTurnOutcome';
 import type { EndOfTurnOutcome } from './endOfTurnOutcomeRules';
 import { applyKnockout, type KnockoutCoordinates } from './knockoutConsequences';
+import { resolveMercenariesAtEndOfTurn } from './mercenaryTurnStep';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 import { logDebug } from '../logger';
 import type { BuildUnitType } from '../../shared/ipc/productionTypes';
@@ -140,7 +141,7 @@ humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
    * Expected outcome: May be empty.
    * Exceptions: None.
    */
-aiMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
+aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
     /**
    * Specifies the contract for the `embarkedFollowMoves` member (embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 
@@ -318,6 +319,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     });
   }
   const productionSummary = processProductionAfterControlResolution();
+  const mercenarySummary = resolveMercenariesAtEndOfTurn({ turnNumber, coordinates: args.knockoutCoordinates });
   const deployedUnitsByType = productionSummary.deployedByPlayer.get(HUMAN_SEAT_ID) ?? {};
   const finalUnits = listUnitsForSnapshot();
   const humanHexesLost = controlTransitions.filter(
@@ -518,6 +520,21 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
       : undefined,
     humanFortificationsBuilt: (productionSummary.fortificationsBuiltByPlayer.get(HUMAN_SEAT_ID) ?? 0) > 0
       ? productionSummary.fortificationsBuiltByPlayer.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanCreditsAdded: (productionSummary.creditsAddedByPlayer.get(HUMAN_SEAT_ID) ?? 0) > 0
+      ? productionSummary.creditsAddedByPlayer.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanBuildPausedHexes: (productionSummary.buildPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
+      ? productionSummary.buildPausedHexesByPlayer.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanMercenariesHired: (mercenarySummary.hiredBySeat.get(HUMAN_SEAT_ID) ?? 0) > 0
+      ? mercenarySummary.hiredBySeat.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanUnitsDeserted: (mercenarySummary.desertedBySeat.get(HUMAN_SEAT_ID) ?? 0) > 0
+      ? mercenarySummary.desertedBySeat.get(HUMAN_SEAT_ID)
+      : undefined,
+    humanHireOrdersUnfilled: (mercenarySummary.unfilledOrdersBySeat.get(HUMAN_SEAT_ID) ?? 0) > 0
+      ? mercenarySummary.unfilledOrdersBySeat.get(HUMAN_SEAT_ID)
       : undefined,
     humanFortificationQueuePausedHexes:
       (productionSummary.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0

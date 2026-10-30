@@ -464,6 +464,7 @@ function drawGameScene(
       player: u.player,
       unitType: u.unitType,
       h3Index: u.h3Index,
+      ...(u.isMercenary === true ? { isMercenary: true } : {}),
     })) as GameStateSnapshot['units'];
     const anim = S.resolutionMoveAnimation;
     const tacticalUnitsForMarchPlayback = anim

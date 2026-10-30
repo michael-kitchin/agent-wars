@@ -56,6 +56,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 3 turns has a message, strategy, or loss | omitted |
 | `# Production Status` | `buildProductionBriefingBlock` | `flags.productionEnabled` | omitted |
+| `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
 | `# Your Strategic Memory` | `getInjectionText` (`memory.ts`) | `flags.memoryEnabled` | omitted |
 | `## Persistent (Active Strategic Context)` | same | whenever the memory block is present | one row of `—` |

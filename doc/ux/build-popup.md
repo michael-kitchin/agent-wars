@@ -4,7 +4,7 @@ The single-hex build queue, and the markers that open it.
 
 ## Purpose
 
-Let the player queue unit production on one hex they control.
+Let the player queue unit production on one hex they control, and hire mercenaries on a hex that allows it.
 
 ## Availability
 
@@ -17,18 +17,22 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 - Production per turn, or none when the hex has no production.
 - Queue cost and turns to complete, or none when the queue is empty. Turns show as unknown when they cannot be estimated. Costs and prerequisites are in the [combat rules](../combat-rules-v3.md). Per-side caps are in [game size and unit caps](../game-size-unit-caps.md).
 - The title "Build Queue" when the hex can build.
-- One row per queued entry: unit type, count, and a remove control. The type list is infantry, armor, naval, air, and missile (`ALL_BUILD_UNIT_TYPES`), and Fortification (`FORTIFICATION_QUEUE_ITEM`) while the hex still has an intact city cell (`getAvailableBuildQueueItemTypes`, intact count above 0). That includes a hex whose city cells are all already fortified. A missile row is offered only when the hex meets that type's urban gate (`buildMinimumUrbanCells`). On the global map that gate is the Advanced count, 21. One fortification item fortifies one cell that is not yet fortified, at `fortificationCostPerCell()`. When none of those remain, the queue pauses and Keep building stays on. Fortification has no cap.
+- One row per queued entry: unit type, count, and a remove control. The type list is infantry, armor, naval, air, and missile (`ALL_BUILD_UNIT_TYPES`), and Fortification (`FORTIFICATION_QUEUE_ITEM`) while the hex still has an intact city cell (`getAvailableBuildQueueItemTypes`, intact count above 0). That includes a hex whose city cells are all already fortified. A missile row is offered only when the hex meets that type's urban gate (`buildMinimumUrbanCells`). On the global map that gate is the Advanced count, 21. One fortification item fortifies one cell that is not yet fortified, at `fortificationCostPerCell()`. When none of those remain, the queue pauses and Keep building stays on. Fortification has no cap. Credits (`CREDITS_QUEUE_ITEM`, label `CREDITS_QUEUE_ITEM_LABEL`) is in that list when the hex has urban production. It costs `creditsItemCost()` production points and adds `CREDITS_PER_ITEM` (20) credits on every map. It has no cap. When the queue is paused because the hex is outside the home and holds none of the seat's units or fortifications, the popup shows that pause and the queue does not spend. Keep building stays on.
+- A hex that can both build and hire opens on Build and Hire tabs (`BUILD_TAB_LABEL`, `HIRE_TAB_LABEL` in `src/shared/mercenaryRules.ts`). The choice is remembered for that hex. A hex that can only hire opens the Hire panel with no Build tab. Hire markers (`hireEntryHexesForHuman`) appear at the same zoom as build markers, on explored hexes in the human snapshot's `hireHexes` that are not build hexes, and only those near the view (`HIRE_ENTRY_VIEW_MARGIN_PX`).
+- The Hire panel shows the treasury, upkeep per turn, and this turn's hire fees, a warning when credits are below upkeep plus fees, raise options with a count, Neutral units that can be rehired, this turn's orders with a remove control, and a note that hired units arrive at the end of the turn. A blocked hex shows the reason. When the hire view cannot be loaded, the panel shows `HIRE_VIEW_FAILED` ("Hiring information could not be loaded.") and a close control. Tips are in [control-tooltips.md](control-tooltips.md).
 - A Keep building checkbox when the queue can arm it.
 - When the hex cannot build, the reason, or "This hex cannot build units."
 - A hex the player does not control shows the production summary and no queue editor.
-- Control tips for a build marker, the queue controls, and Keep building are in [control-tooltips.md](control-tooltips.md).
+- Control tips for a build marker, the queue controls, Keep building, the close control, each row's remove control, and the Build and Hire tabs are in [control-tooltips.md](control-tooltips.md).
+- The popup opens `TOOLTIP_OFFSET_PX` (12) below and to the right of the click, then shifts so it stays inside the window (`placeAnchoredPopup`). It may cover the top bar, the console, or the minimap. A popup taller or wider than the window sits against the top and left and may still be clipped. Growing the queue, or switching between Build and Hire, moves it again without hiding it.
 
 ## Inputs and Responses
 
 ### Mouse
 
 - When the player clicks a build marker without Shift, that hex becomes the only selected build hex and this popup opens. Clicking that same marker again while the popup is open closes it.
-- When the player Shift-clicks a marker, that hex toggles in the build selection. Dropping to zero hexes closes the popup. Dropping to one hex returns to this popup. Adding a second hex switches to the multi-hex popup.
+- When the player Shift-clicks a build marker, that hex toggles in the build selection. Dropping to zero hexes closes the popup. Dropping to one hex returns to this popup. Adding a second hex switches to the multi-hex popup. Shift on a Hire marker, or on a build marker while a Hire popup is open, acts as a plain click. A Hire hex is never part of a selection of two or more.
+- Hire, a raise count, a rehire row, and an order's remove control call `placeHireOrder` or `removeHireOrder`. A failure shows that reason. Success refreshes the panel. Playback ignores those clicks.
 - When the player clicks the add control, a new queue row is added for the first available unit type.
 - When the player changes a row's unit type or count, that row updates. A failure shows an error toast and leaves the previous queue.
 - When the player clicks a row's remove control, that row is removed.
@@ -84,7 +88,15 @@ None.
 - `src/shared/fortificationRules.ts` (`FORTIFICATION_QUEUE_ITEM`, `FORTIFICATION_QUEUE_ITEM_LABEL`)
 - `src/main/productionRules.ts` (`getAvailableBuildQueueItemTypes`)
 - `src/renderer/chrome/controlTooltipText.ts` (`KEEP_BUILDING_FORTIFICATION_NOTE`)
+- `src/shared/anchoredPopupPlacement.ts` (`placeAnchoredPopup`)
+- `src/renderer/chrome/placeAnchoredPopup.ts` (`placeOpenBuildPopup`)
+- `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
+- `src/shared/popupControlTooltipText.ts`
 - `src/renderer/gameplay/buildQueuePopupFormatting.ts`
 - `src/renderer/gameplay/buildQueueKeepBuilding.ts`
 - `src/renderer/gameplay/productionOverlayHelpers.ts`
 - `src/renderer/map/initCore.ts`
+- `src/renderer/gameplay/buildHirePopup.ts` (`renderBuildOrHirePopupIntoMount`)
+- `src/renderer/gameplay/hirePanel.ts`
+- `src/renderer/gameplay/hireEntryMarkers.ts`
+- `src/main/ipc/mercenaryIpcHandler.ts` (`getHexHireView`, `placeHireOrder`, `removeHireOrder`)

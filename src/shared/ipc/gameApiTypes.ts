@@ -16,6 +16,7 @@ import type {
   SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
+import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
@@ -472,6 +473,33 @@ cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: bo
    * Exceptions: None.
    */
 getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;
+  /**
+   * Reads the hire panel for one hex.
+   *
+   * Contract: Null when the hex is not on the map.
+   * When to use: Opening the Hire tab.
+   * Expected outcome: Funds, options, candidates, and pending orders.
+   * Exceptions: None.
+   */
+  getHexHireView: (payload: { h3Index: string }) => Promise<HexHireView | null>;
+  /**
+   * Stores one hire order for the human seat.
+   *
+   * Contract: Does not check that the treasury can pay.
+   * When to use: A Hire button.
+   * Expected outcome: Success and an order id, or a reason.
+   * Exceptions: None.
+   */
+  placeHireOrder: (payload: HireOrderRequest) => Promise<HireMutationResult>;
+  /**
+   * Removes one of the human seat's hire orders.
+   *
+   * Contract: Another seat's id does not match.
+   * When to use: A pending order's remove button.
+   * Expected outcome: Success, or a reason.
+   * Exceptions: None.
+   */
+  removeHireOrder: (payload: { orderId: number }) => Promise<HireMutationResult>;
     /**
    * Specifies the contract for the `addHexBuildQueueEntry` member (addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;).
 

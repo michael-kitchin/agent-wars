@@ -466,6 +466,8 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM res_s_control');
   run('DELETE FROM res_s_build_queue');
   run('DELETE FROM res_s_build_progress');
+  run('DELETE FROM res_s_treasury');
+  run('DELETE FROM res_s_hire_orders');
   seedInitialHexControlFromUnitOccupancy(deps);
   seedInitialHexControlFromHomeRegions(deps, resolved);
   logHomeRegionControlParity(deps, resolved.map((seat) => ({

@@ -1,4 +1,5 @@
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
+import { BUILD_PAUSED_NOTE } from '../../shared/productionBuildability';
 
 /**
  * Normalizes a build count input to the one-to-99 digits-only contract.
@@ -27,4 +28,19 @@ export function sanitizeBuildCountInputText(raw: string): string {
  */
 export function escapeBuildPopupHtml(text: string): string {
   return escapeHtmlText(text);
+}
+
+/**
+ * The paused-building note for the single-hex popup.
+ *
+ * Purpose: The player sees why a queue outside home is not spending.
+ * When to use: When the snapshot says the hex is paused and the viewer controls it.
+ * Expected outcome: A `div.build-no-urban` holding `BUILD_PAUSED_NOTE`.
+ * Exceptions: None.
+ */
+export function createBuildPausedNote(): HTMLDivElement {
+  const note = document.createElement('div');
+  note.className = 'build-no-urban';
+  note.textContent = BUILD_PAUSED_NOTE;
+  return note;
 }

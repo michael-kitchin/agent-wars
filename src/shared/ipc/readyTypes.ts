@@ -291,7 +291,7 @@ aiMovesLog?: string[];
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
     /**
    * Specifies the contract for the `humanMoves` member (humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 
@@ -621,6 +621,51 @@ humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
    * Exceptions: None.
    */
   humanFortificationsBuilt?: number;
+  /**
+   * Credits the human seat's production added this turn.
+   *
+   * Contract: The Updates line reports this count.
+   * When to use: After production, when the count is above 0.
+   * Expected outcome: Omitted when none were added.
+   * Exceptions: None.
+   */
+  humanCreditsAdded?: number;
+  /**
+   * Hexes where the human seat's production paused this turn.
+   *
+   * Contract: The Updates line names these hexes.
+   * When to use: After production, when at least one hex paused.
+   * Expected outcome: Omitted when the list is empty.
+   * Exceptions: None.
+   */
+  humanBuildPausedHexes?: readonly string[];
+  /**
+   * Mercenaries the human seat hired this turn.
+   *
+   * Contract: The Updates line reports this count.
+   * When to use: After payroll, when the count is above 0.
+   * Expected outcome: Omitted when none were hired.
+   * Exceptions: None.
+   */
+  humanMercenariesHired?: number;
+  /**
+   * Units of the human seat that deserted for lack of pay, cargo included.
+   *
+   * Contract: The Updates line reports this count.
+   * When to use: After payroll, when the count is above 0.
+   * Expected outcome: Omitted when none deserted.
+   * Exceptions: None.
+   */
+  humanUnitsDeserted?: number;
+  /**
+   * Human hire orders that hired nobody.
+   *
+   * Contract: The Updates line reports this count. A partial raise is omitted.
+   * When to use: After payroll, when the count is above 0.
+   * Expected outcome: Omitted when every order hired at least one unit.
+   * Exceptions: None.
+   */
+  humanHireOrdersUnfilled?: number;
   /**
    * Hexes whose fortification queue paused because no city cell remains.
    *

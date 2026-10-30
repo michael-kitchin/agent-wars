@@ -77,6 +77,8 @@ test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () =
     enemyHomeTotal: '/2',
     cities: '',
     citiesTooltip: '',
+    credits: '',
+    creditsSuffix: '',
   });
   assert.equal(formatForcesBreakdown(stats), 'infantry 2 of 12, armor 1 of 8, naval 0 of 8, air 1 of 6, missile 0 of 2');
 });
@@ -156,4 +158,14 @@ test('computeTopBarStats omits both home readouts for a null viewer and still li
   assert.equal(stats.cities?.summary, null);
   assert.equal(stats.cities?.tooltip.includes('(you)'), false);
   assert.equal(stats.productionPerTurn, 0);
+  assert.equal(stats.credits, null);
+});
+
+test('credits are short when they cannot cover upkeep and pending fees', () => {
+  const stats = computeTopBarStats({
+    units: [],
+    mercenaryEconomy: { credits: 5, upkeepPerTurn: 3, pendingHireFees: 4, mercenaryCount: 1 },
+  }, notNeutral);
+  assert.equal(stats.credits?.short, true);
+  assert.equal(stats.credits?.credits, 5);
 });

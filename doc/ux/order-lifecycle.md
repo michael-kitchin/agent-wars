@@ -36,6 +36,10 @@ Sealift embark and debark are not draft orders. They apply immediately from the 
 
 Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md](build-popup.md).
 
+### Hire
+
+A hire order is a raise or a rehire placed during planning (`placeHireOrder`). It can be removed until Ready (`removeHireOrder`). It does not check the treasury. At the end of the turn `resolveMercenariesAtEndOfTurn` fills it or drops it. A dropped order is not charged. The human cannot place or remove one during a tactical battle. See [build-popup.md](build-popup.md) and [combat-rules-v3.md](../combat-rules-v3.md) §2.1.
+
 ## Lifecycle
 
 - Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, air strikes, and missile launches are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.

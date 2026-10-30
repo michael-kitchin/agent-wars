@@ -83,7 +83,7 @@ Element documents share a fixed heading set:
 - [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, and the blocked-order and effects tooltips that appear after the pointer rests. The effects tooltip then stays on that cell. The blocked notice hides a short time after the pointer stops.
 - [control-tooltips.md](ux/control-tooltips.md): the one-second tip on buttons, fields, checkboxes, and dropdowns, and the controls that have none.
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
-- [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
+- [build-popup.md](ux/build-popup.md): the single-hex build queue popup, the Hire panel on that same popup, and the markers that open them.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block, and the battle header it becomes in a battle.
 - [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Offer tactical battles, How to play, and Quit.
@@ -115,6 +115,13 @@ Element documents share a fixed heading set:
 - Contested hex: a strategic hex with units from both sides, eligible for a tactical battle.
 - Fog of war: hidden information the player has not yet earned. The rules are in the combat rules.
 - Fortification: a flag on one intact city cell. The hex's controller builds it, one cell per queue item, at the infantry cost (`fortificationCostPerCell`). It soaks one hit on that controller's units and blocks a change of control until none remain. The map draws it as ticks. The rules are in [combat-rules-v3.md](combat-rules-v3.md).
+- Credits: a queue item (`CREDITS_QUEUE_ITEM`) that costs `creditsItemCost()` production points and adds `CREDITS_PER_ITEM` (20) to that seat's treasury on every map.
+- Treasury: one balance per seat, starting at 0, never negative. Neutral has none. Only that seat's view includes it.
+- Mercenary: a seat-owned unit with `is_mercenary` set. It does not count toward unit caps. A missile is never one. Neutral is never one.
+- Raise: an order to hire new mercenaries on a hex, at one turn of upkeep each.
+- Rehire: an order to hire one Neutral unit the seat can see, at two turns of upkeep.
+- Upkeep: what a mercenary costs each turn, from `mercenaryUpkeepFor` and `mercenaryReferenceCost`. The same numbers on every map.
+- Desertion: unpaid mercenaries become ordinary Neutral units at the end of the turn. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §2.1.
 
 ## Element and Mode Matrix
 

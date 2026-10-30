@@ -63,6 +63,7 @@ import { registerOpenRouterIpcHandler } from './ipc/openRouterIpcHandler';
 import { registerCommanderPoolIpcHandler } from './ipc/commanderPoolIpcHandler';
 import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
+import { registerMercenaryIpcHandler } from './ipc/mercenaryIpcHandler';
 import { forgetAutoSaveTurnKey, rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
 import { resetCommanderPool } from './openRouter/commanderPool';
 import { readSeatApiKey, storeNewMatchCommanderKeys, updateRememberedCommander, writeSeatApiKey } from './openRouter/commanderKeyMemory';
@@ -568,6 +569,7 @@ function registerIpcHandlers(): void {
   registerCommanderPoolIpcHandler(ipcMain);
   registerEndMatchIpcHandler(ipcMain);
   registerMissileLaunchIpcHandler(ipcMain);
+  registerMercenaryIpcHandler(ipcMain);
   registerSaveLoadIpcHandler(ipcMain, () => mainWindow, sendActivityLog);
 }
 

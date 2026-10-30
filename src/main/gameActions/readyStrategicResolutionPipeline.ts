@@ -368,7 +368,7 @@ export function executeReadyStrategicTurn(
   const aiMoves = allOrders.flatMap((order) => {
     const unit = unitsBeforeMove.find((candidate) => candidate.id === order.unitId);
     if (!unit || unit.player === HUMAN_SEAT_ID || unit.h3Index === order.toH3Index) return [];
-    return [{ unitId: order.unitId, fromH3Index: unit.h3Index, toH3Index: order.toH3Index }];
+    return [{ unitId: order.unitId, fromH3Index: unit.h3Index, toH3Index: order.toH3Index, player: unit.player }];
   });
   for (const order of allOrders) {
     autoDebarkNonHumanLandUnitIfMovingIndependently(order.unitId, order.toH3Index);

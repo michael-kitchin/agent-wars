@@ -35,7 +35,7 @@ Global home regions may overlap. Exclusive sets, the intersection, and contested
 
 ## How you win
 
-Evaluated at end of turn after combat, movement, control, and production (`decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`). The same rules apply to a two-sided match. An active seat is knocked out when any of these hold, and every reason that holds is stored:
+Evaluated at end of turn after combat, movement, control, production, and mercenary payroll and hires (`decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`). Payroll does not change the outcome. The outcome does not look at units. The same rules apply to a two-sided match. An active seat is knocked out when any of these hold, and every reason that holds is stored:
 
 1. **Home control.** Another active seat meets the control rule against this seat's home. On the global map that is every strategic hex of the home. On a regional map the held hexes must contain at least 75% of that home's generated urban cells. Bombing does not lower that target. A home with no generated urban cells falls back to every hex.
 2. **No city hexes.** The seat controls no strategic hex whose current urban count is greater than zero.
@@ -45,7 +45,7 @@ When those knockouts would leave no active seat, none are recorded. The seats ar
 
 The goal sentence (`buildWinConditionReminderClause` in `scenarioGoals.ts`) states last side standing, the three knockout conditions, the mutual-wipe sentence, and, when the stored rule is `most_city_hexes_at_turn_limit`, the turn limit. Deathmatch omits that sentence. The Scenario Objective block still lists two paths: controlling the enemy home, and eliminating that home's urban production. On a regional map the control sentence is the 75% urban-cell share. One progress line per enemy follows: that home's urban cells in hexes you control. A second line, your home urban cells in hexes that enemy controls, is included only when that enemy holds any. On the global map the control sentence is every enemy home hex. The hex-count lines in the coaching block remain territory.
 
-Losing every strategic unit does not by itself end the match. `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyFinalize.ts` records the outcome from `evaluateEndOfTurnOutcome`, so a side with no units left keeps playing and can still build until a knockout or the turn limit.
+Losing every strategic unit does not by itself end the match. `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyFinalize.ts` records the outcome from `evaluateEndOfTurnOutcome`, so a side with no units left keeps playing and can still build until a knockout or the turn limit. Building outside the home still requires one of that side's units or fortifications on the hex. A home hex keeps spending. A queue elsewhere pauses and keeps its points.
 
 Tactical battles do **not** restate home-region victory. The tactical goal is to engage and defeat forces in the footprint (`buildTacticalBattleGoalClause`).
 

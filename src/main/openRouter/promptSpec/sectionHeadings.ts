@@ -155,6 +155,16 @@ export const SECTION_TITLE_AIR_OPERATIONS_STATUS = 'Air Operations Status' as co
 export const SECTION_TITLE_MISSILE_FORCES = 'Missile Forces' as const;
 
 /**
+ * Title of the mercenaries block, without ATX hashes.
+ *
+ * Purpose: Treasury, upkeep, and the units a seat can hire.
+ * When to use: Strategic prompts when the seat has an economy. Omitted in a battle.
+ * Expected outcome: Mercenary coaching can point at this section.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_MERCENARIES = 'Mercenaries' as const;
+
+/**
  * Title of the naval transport status block, without ATX hashes.
  *
  * Purpose: Capacity, cargo, and embark hexes. strategic-prompt.md section 1.10; tactical-prompt.md section 2.10.

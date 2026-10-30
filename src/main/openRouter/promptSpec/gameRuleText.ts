@@ -55,6 +55,7 @@ import type { TacticalMovementCategory } from '../../../shared/tacticalTerrainMo
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
 import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 import { buildFortificationProductionRulePart, buildFortificationRule } from './gameRuleFortificationText';
+import { buildCreditsProductionRulePart } from './gameRuleMercenaryText';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -536,7 +537,7 @@ export function buildProductionCostRulesLine(): string {
     if (unitType === 'air') extras.push('requires airport');
     return `${unitType} cost ${cost} (${extras.join(' + ')})`;
   });
-  return `Rules: ${parts.join(', ')}. ${buildFortificationProductionRulePart()}.`;
+  return `Rules: ${parts.join(', ')}. ${buildFortificationProductionRulePart()}. ${buildCreditsProductionRulePart()}.`;
 }
 
 /**

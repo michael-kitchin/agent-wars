@@ -16,6 +16,9 @@ import {
   multiBuildTypeTooltipText,
   multiKeepBuildingTooltipText,
 } from '../chrome/controlTooltipText';
+import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
+import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
+import { buildPopupCloseTooltipText, multiHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
 import {
   buildQueueTemplateFromSnapshot,
   countEligibleBuildHexes,
@@ -249,6 +252,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     closeBtn.type = 'button';
     closeBtn.className = 'unit-select build-close-btn';
     closeBtn.textContent = '×';
+    closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
     closeBtn.addEventListener('click', deps.hideBuildPopup);
     closeRow.appendChild(closeBtn);
     deps.mount.appendChild(closeRow);
@@ -256,6 +260,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     errorLine.className = 'build-no-urban';
     errorLine.textContent = 'Failed to load build queues for the selected hexes.';
     deps.mount.appendChild(errorLine);
+    placeOpenBuildPopup();
     return;
   }
 
@@ -266,6 +271,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   closeBtn.type = 'button';
   closeBtn.className = 'unit-select build-close-btn';
   closeBtn.textContent = '×';
+  closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
   closeBtn.addEventListener('click', deps.hideBuildPopup);
   closeRow.appendChild(closeBtn);
   deps.mount.appendChild(closeRow);
@@ -337,7 +343,6 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     const row = document.createElement('div');
     row.className = 'build-queue-row';
     const typeSelect = document.createElement('select');
-    typeSelect.setAttribute('data-control-tooltip', multiBuildTypeTooltipText);
     const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
       (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
     );
@@ -349,6 +354,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       typeSelect.appendChild(opt);
     }
     typeSelect.value = entry.unitType;
+    syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
     row.appendChild(typeSelect);
 
     const countInput = document.createElement('input');
@@ -371,6 +377,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     row.appendChild(countInput);
 
     typeSelect.addEventListener('change', async () => {
+      syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
       if (buildQueueEditBlockedByPlayback()) {
         void renderMultiBuildQueueIntoMount(deps);
         return;
@@ -405,6 +412,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     removeBtn.type = 'button';
     removeBtn.className = 'unit-select';
     removeBtn.textContent = 'x';
+    removeBtn.setAttribute('data-control-tooltip', multiHexQueueRemoveTooltipText);
     removeBtn.addEventListener('click', async () => {
       if (buildQueueEditBlockedByPlayback()) return;
       await commitEditedTemplate(
@@ -431,4 +439,5 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     },
   });
   deps.mount.appendChild(section);
+  placeOpenBuildPopup();
 }

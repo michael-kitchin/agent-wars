@@ -8,6 +8,7 @@ import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { syncObserveChrome } from '../gameplay/observeChrome';
 import { formatTopBarDateBlock } from '../../shared/topBarDateBlock';
 import { buildTopBarSideChips, type TopBarSideChip, type TopBarSidesBlock } from '../../shared/topBarSides';
+import { formatCreditsTooltip } from '../../shared/mercenaryRules';
 import { computeTopBarStats, formatForcesBreakdown, formatTopBarStatParts } from '../../shared/topBarStats';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
@@ -290,6 +291,10 @@ function renderTopBarStats(state: GameStateSnapshot | null): void {
     setHostHidden('topbar-stat-human-home-host', false);
     setHostHidden('topbar-stat-enemy-home-host', false);
     setHostHidden('topbar-stat-cities-host', true);
+    setText('topbar-stat-credits', '—');
+    setText('topbar-stat-credits-suffix', '');
+    setHostHidden('topbar-stat-credits-host', true);
+    document.getElementById('topbar-stat-credits-host')?.classList.remove('is-short');
     return;
   }
   const viewer = readoutViewerSeatId(state.seats ?? [], S.viewAs);
@@ -309,6 +314,12 @@ function renderTopBarStats(state: GameStateSnapshot | null): void {
   setHostHidden('topbar-stat-cities-host', stats.cities === null);
   document.getElementById('topbar-stat-cities-host')?.setAttribute('data-control-tooltip', parts.citiesTooltip);
   document.getElementById('topbar-stat-forces-host')?.setAttribute('data-control-tooltip', forcesStatTooltipText(formatForcesBreakdown(stats)));
+  setText('topbar-stat-credits', parts.credits);
+  setText('topbar-stat-credits-suffix', parts.creditsSuffix);
+  setHostHidden('topbar-stat-credits-host', stats.credits === null);
+  const creditsHost = document.getElementById('topbar-stat-credits-host');
+  creditsHost?.classList.toggle('is-short', stats.credits?.short === true);
+  if (stats.credits) creditsHost?.setAttribute('data-control-tooltip', formatCreditsTooltip(stats.credits));
 }
 
 /**

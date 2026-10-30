@@ -5,6 +5,7 @@ import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
 import { MEMORY_TOOL_NAMES } from '../tools/memory';
 import { STANDING_ORDER_TOOL_NAMES } from '../tools/standingOrders';
 import { PRODUCTION_TOOL_NAMES } from '../tools/productionTools';
+import { MERCENARY_TOOL_NAMES } from '../tools/mercenaryTools';
 
 /**
  * Tool group registry and derived capability flags for OpenRouter tool gating.
@@ -62,7 +63,7 @@ export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'estimation', label: 'Estimation', toolNames: COMBAT_ESTIMATION_TOOL_NAMES },
   { id: 'memory', label: 'Memory', toolNames: MEMORY_TOOL_NAMES },
   { id: 'orders', label: 'Orders', toolNames: STANDING_ORDER_TOOL_NAMES },
-  { id: 'production', label: 'Production', toolNames: PRODUCTION_TOOL_NAMES },
+  { id: 'production', label: 'Production', toolNames: [...PRODUCTION_TOOL_NAMES, ...MERCENARY_TOOL_NAMES] },
 ];
 
 /**

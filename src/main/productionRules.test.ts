@@ -44,8 +44,10 @@ function testBuildTypeAvailabilityGates(): void {
   assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1, 1), ['infantry', 'armor', 'air']);
   assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 1), ['infantry', 'armor', 'naval', 'air']);
   const withCity = getAvailableBuildQueueItemTypes(1, 0, 0, 1);
-  assert.strictEqual(withCity[withCity.length - 1], 'fortification');
-  assert.strictEqual(getAvailableBuildQueueItemTypes(1, 0, 0, 0).includes('fortification'), false);
+  assert.deepStrictEqual(withCity.slice(-2), ['fortification', 'credits']);
+  const urbanOnly = getAvailableBuildQueueItemTypes(1, 0, 0, 0);
+  assert.strictEqual(urbanOnly[urbanOnly.length - 1], 'credits');
+  assert.strictEqual(urbanOnly.includes('fortification'), false);
   assert.deepStrictEqual(getAvailableBuildQueueItemTypes(0, 0, 0, 0), []);
 }
 

@@ -1,4 +1,6 @@
 import { isNeutralBorderHex } from './h3Resolutions';
+import type { MercenaryEconomySnapshot, MercenaryFunds } from './ipc/mercenaryTypes';
+import { formatCreditsUpkeepSuffix } from './mercenaryRules';
 import { getMaxUnitsPerType, parseGameSize } from './gameSize';
 import { countControlledHexesInRegion } from './homeRegionRules';
 import { ALL_BUILD_UNIT_TYPES, type BuildUnitType } from './ipc/productionTypes';
@@ -23,7 +25,7 @@ export interface TopBarStatsInput {
    * Expected outcome: Units whose player is `human` count toward Forces.
    * Exceptions: None.
    */
-  readonly units: ReadonlyArray<{ readonly player: string; readonly unitType: string }>;
+  readonly units: ReadonlyArray<{ readonly player: string; readonly unitType: string; readonly isMercenary?: boolean }>;
   /**
    * The match's game size.
    *
@@ -87,6 +89,15 @@ export interface TopBarStatsInput {
    * Exceptions: None.
    */
   readonly victory?: VictorySettings;
+  /**
+   * The viewer's treasury, when the snapshot has one.
+   *
+   * Contract: Absent on observe-all and when the database is closed.
+   * When to use: Pass `state.mercenaryEconomy`.
+   * Expected outcome: The credits readout. Absent means the readout is hidden.
+   * Exceptions: None.
+   */
+  readonly mercenaryEconomy?: MercenaryEconomySnapshot;
 }
 
 /**
@@ -246,6 +257,15 @@ export interface TopBarStats {
    * Exceptions: None.
    */
   readonly cities: { readonly summary: string | null; readonly tooltip: string } | null;
+  /**
+   * The viewer's credits, or null when this view has no treasury.
+   *
+   * Contract: `short` is true when credits are below upkeep plus pending hire fees.
+   * When to use: The Credits readout. Hide it when this is null.
+   * Expected outcome: The funds from `mercenaryEconomy`, plus `short`.
+   * Exceptions: None.
+   */
+  readonly credits: (MercenaryFunds & { readonly short: boolean }) | null;
 }
 
 /**
@@ -283,6 +303,26 @@ export function computeTopBarStats(
     yourHome: viewer === null ? null : holdOf(input, viewer, homeHexesOf(input, viewer)),
     enemyHomes: viewer === null || turnLimit !== null ? null : holdOf(input, viewer, enemyHomeHexesOf(input, viewer)),
     cities: turnLimit === null ? null : citiesReadout(input, viewer, turnLimit),
+    credits: creditsReadout(input.mercenaryEconomy),
+  };
+}
+
+/**
+ * The credits readout, or null when this view has no economy.
+ *
+ * Purpose: Observe-all has no treasury, so the readout stays hidden.
+ * When to use: `computeTopBarStats`.
+ * Expected outcome: `short` when the balance cannot cover upkeep and pending fees.
+ * Exceptions: None.
+ */
+function creditsReadout(economy: MercenaryEconomySnapshot | undefined): (MercenaryFunds & { readonly short: boolean }) | null {
+  if (!economy) return null;
+  return {
+    credits: economy.credits,
+    upkeepPerTurn: economy.upkeepPerTurn,
+    pendingHireFees: economy.pendingHireFees,
+    mercenaryCount: economy.mercenaryCount,
+    short: economy.credits < economy.upkeepPerTurn + economy.pendingHireFees,
   };
 }
 
@@ -448,6 +488,24 @@ export interface TopBarStatParts {
    * Exceptions: None.
    */
   readonly citiesTooltip: string;
+  /**
+   * The credits balance, such as "20".
+   *
+   * Contract: Empty when the view has no economy.
+   * When to use: `#topbar-stat-credits`.
+   * Expected outcome: A grouped whole number, or `''`.
+   * Exceptions: None.
+   */
+  readonly credits: string;
+  /**
+   * The upkeep suffix, such as "−3/turn".
+   *
+   * Contract: Empty when upkeep is 0 or the view has no economy.
+   * When to use: `#topbar-stat-credits-suffix`.
+   * Expected outcome: A minus sign, the upkeep, and `/turn`, or `''`.
+   * Exceptions: None.
+   */
+  readonly creditsSuffix: string;
 }
 
 /**
@@ -481,6 +539,8 @@ export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {
     enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : '',
     cities: stats.cities?.summary ?? '',
     citiesTooltip: stats.cities?.tooltip ?? '',
+    credits: stats.credits ? formatCount(stats.credits.credits) : '',
+    creditsSuffix: stats.credits ? formatCreditsUpkeepSuffix(stats.credits.upkeepPerTurn) : '',
   };
 }
 

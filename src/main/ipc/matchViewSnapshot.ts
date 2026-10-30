@@ -8,9 +8,12 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { withBuildPausedFlags } from '../../shared/productionBuildability';
 import { resolveMatchView } from '../../shared/observeModeControls';
 import { HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
 import { getGameState, getGameStateForPlayer, getSeatRoster } from '../gameDb';
+import { gameDbOps } from '../gameDb/dbConnection';
+import { withHireHexes } from '../gameDb/mercenaryEconomyRead';
 import { logDebug, logError } from '../logger';
 
 /**
@@ -24,14 +27,14 @@ import { logDebug, logError } from '../logger';
 function omniscientSnapshot(): GameStateSnapshot {
   const state = getGameState();
   const allHexes = state.hexes.map((hex) => hex.h3Index);
-  return {
+  return withBuildPausedFlags({
     ...state,
     visibleHexes: allHexes,
     exploredHexes: allHexes,
     staleHexes: [],
     enemyIntel: [],
     playerPerspective: 'all',
-  };
+  }, null);
 }
 
 /**
@@ -54,5 +57,7 @@ export function readMatchSnapshot(requested: unknown): GameStateSnapshot {
   logDebug('readMatchSnapshot', { view: decision.view });
   if (decision.view === 'all') return omniscientSnapshot();
   const seatId: SeatId = decision.view === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : decision.view;
-  return getGameStateForPlayer(seatId, { maskUnexploredTerrain: false });
+  const snapshot = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false });
+  if (seatId !== HUMAN_SEAT_ID) return snapshot;
+  return withHireHexes(gameDbOps, snapshot, seatId);
 }

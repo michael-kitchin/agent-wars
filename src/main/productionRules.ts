@@ -4,6 +4,7 @@
 
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
 import { buildMinimumUrbanCells } from '../shared/gameRules';
+import { CREDITS_QUEUE_ITEM } from '../shared/creditsRules';
 import { FORTIFICATION_QUEUE_ITEM } from '../shared/fortificationRules';
 import { logTrace } from './logger';
 import {
@@ -12,6 +13,7 @@ import {
   UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE,
 } from '../shared/productionConfig';
 import {
+  ALL_BUILD_QUEUE_ITEM_TYPES,
   ALL_BUILD_UNIT_TYPES,
   isBuildQueueItemType,
   isBuildUnitType,
@@ -20,6 +22,7 @@ import {
 } from '../shared/ipc/productionTypes';
 
 export {
+  ALL_BUILD_QUEUE_ITEM_TYPES,
   ALL_BUILD_UNIT_TYPES,
   isBuildQueueItemType,
   isBuildUnitType,
@@ -246,7 +249,7 @@ export function isValidBuildCount(value: number): boolean {
  *
  * Purpose: Menus and pruning share one list. A fortification needs an intact city cell, not merely urban rubble.
  * When to use: Eligibility, Keep building, and queue pruning. Pass 0 intact cells wherever urban count is 0.
- * Expected outcome: The unit list from `getAvailableBuildUnitTypes`, then `fortification` when `intactCityCells` is above 0.
+ * Expected outcome: The unit list from `getAvailableBuildUnitTypes`, then `fortification` when `intactCityCells` is above 0, then `credits` when `urbanHexCount` is above 0.
  * Exceptions: None.
  */
 export function getAvailableBuildQueueItemTypes(
@@ -256,8 +259,9 @@ export function getAvailableBuildQueueItemTypes(
   intactCityCells: number
 ): BuildQueueItemType[] {
   const available = getAvailableBuildUnitTypes(urbanHexCount, seaportCount, airportCount);
-  const items: BuildQueueItemType[] =
-    intactCityCells > 0 ? [...available, FORTIFICATION_QUEUE_ITEM] : [...available];
+  const items: BuildQueueItemType[] = [...available];
+  if (intactCityCells > 0) items.push(FORTIFICATION_QUEUE_ITEM);
+  if (urbanHexCount > 0) items.push(CREDITS_QUEUE_ITEM);
   logTrace('getAvailableBuildQueueItemTypes', {
     urbanHexCount,
     seaportCount,

@@ -16,6 +16,7 @@ import {
   UNIT_TYPE_LABELS,
 } from '../core/constants';
 import { paletteForCurrentOwner } from './ownerColors';
+import { drawMercenaryBadge } from './mercenaryBadgeDrawing';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -357,6 +358,10 @@ export function drawUnits(
     ctx.fillStyle = '#000';
     ctx.fillText(String(count), badgeX, badgeY);
   }
+  for (const token of tokens) {
+    if (!token.units.some((unit) => unit.isMercenary === true)) continue;
+    drawMercenaryBadge(ctx, token.top.x, token.top.y);
+  }
 }
 
 /**
@@ -411,6 +416,7 @@ export function drawStaleEnemyIntel(
     intelState: 'stale' as const,
     lastSeenTurn: row.lastSeenTurn,
     staleUntilTurn: row.staleUntilTurn,
+    player: row.player,
   }));
   const byUnitId = new Map<string, (typeof fallbackIntel)[number]>();
   for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
@@ -422,7 +428,14 @@ export function drawStaleEnemyIntel(
       intelState: 'stale',
       lastSeenTurn: row.lastSeenTurn,
       staleUntilTurn: row.staleUntilTurn,
+      player: row.player,
     });
+  }
+  for (const unitId of [...byUnitId.keys()]) {
+    if (state.units.some((unit) => unit.id === unitId && unit.player === viewer)) {
+      S.clientStaleEnemyIntelByUnitId.delete(unitId);
+      byUnitId.delete(unitId);
+    }
   }
   const intel = Array.from(byUnitId.values());
   if (intel.length === 0) return;
@@ -445,7 +458,7 @@ export function drawStaleEnemyIntel(
     if (alpha <= 0) continue;
     const types = new Set(rows.map((r) => inferUnitTypeLabelFromId(r.unitId)));
     const label = types.size === 1 ? [...types][0]! : '*';
-    const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+    const owners = new Set(rows.map((row) => row.player ?? unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
     const ownerId = owners.size === 1 ? [...owners][0]! : null;
     const mixedOwners = owners.size > 1;
     const fillColor = mixedOwners

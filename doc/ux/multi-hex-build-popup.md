@@ -8,7 +8,7 @@ Apply one queue template to every selected build hex, and show which hexes can a
 
 ## Availability
 
-Opens in Strategic planning when two or more build hexes are selected. Selection rules are in [build-popup.md](build-popup.md): a plain click keeps one hex, and Shift-click adds or removes hexes. Closing, Escape, and outside presses use the same rules as the single-hex popup. While the tactical battles list is open, an open popup stays as it was and does not accept clicks. During Resolution playback, queue edits are ignored until playback ends, the same as the single-hex popup.
+Opens in Strategic planning when two or more build hexes are selected. It stays build-only. A Hire marker is never part of that selection. Shift on a Hire marker, or on a build marker while a Hire popup is open, acts as a plain click. Selection rules are in [build-popup.md](build-popup.md): a plain click keeps one hex, and Shift-click adds or removes build hexes. Closing, Escape, and outside presses use the same rules as the single-hex popup. While the tactical battles list is open, an open popup stays as it was and does not accept clicks. During Resolution playback, queue edits are ignored until playback ends, the same as the single-hex popup.
 
 ## Information Displayed
 
@@ -17,10 +17,11 @@ Opens in Strategic planning when two or more build hexes are selected. Selection
 - Production per turn for the selected hexes added together, under Tech when that line is shown and under the hex codes when it is not.
 - A combined queue summary: cost and turns for the template as applied to those hexes.
 - The title "Build Queue".
-- One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes. The types are infantry, armor, naval, air, and missile, and Fortification while a selected hex still has an intact city cell. A hex that does not meet the missile urban gate (`buildMinimumUrbanCells`) skips a missile row. A hex with no intact city cell skips a fortification row. A hex whose city cells are all already fortified still takes the row, and that queue pauses when it is spent.
+- One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes. The types are infantry, armor, naval, air, and missile, Fortification while a selected hex still has an intact city cell, and Credits (`CREDITS_QUEUE_ITEM`) while a selected hex has urban production. A hex that does not meet the missile urban gate (`buildMinimumUrbanCells`) skips a missile row. A hex with no intact city cell skips a fortification row. A hex whose city cells are all already fortified still takes the row, and that queue pauses when it is spent. A hex with no urban production skips a credits row. Credits has no cap. It costs `creditsItemCost()` and adds `CREDITS_PER_ITEM` (20) on every map.
 - A Keep building checkbox. It shows as checked only when every selected hex has Keep building on. It can be changed only when every selected hex can arm it.
 - If the queues fail to load, "Failed to load build queues for the selected hexes." That failure shows no Tech line.
-- Control tips for the queue controls and Keep building are in [control-tooltips.md](control-tooltips.md).
+- Control tips for the queue controls, Keep building, the close control, and each row's remove control are in [control-tooltips.md](control-tooltips.md).
+- The popup uses the same window placement as the [single-hex popup](build-popup.md). Growing the template moves it again without hiding it (`placeAnchoredPopup`).
 
 Shared row editing is the same as [build-popup.md](build-popup.md). Costs and caps stay in the [combat rules](../combat-rules-v3.md) and [game size and unit caps](../game-size-unit-caps.md).
 
@@ -78,8 +79,13 @@ None.
 
 - `static/index.html` (`#build-popup`, `#build-popup-body`)
 - `src/renderer/gameplay/buildQueueMultiPopup.ts`
+- `src/shared/anchoredPopupPlacement.ts` (`placeAnchoredPopup`)
+- `src/renderer/chrome/placeAnchoredPopup.ts` (`placeOpenBuildPopup`)
+- `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
+- `src/shared/popupControlTooltipText.ts`
 - `src/renderer/gameplay/buildQueueMultiSelect.ts`
 - `src/renderer/gameplay/buildQueuePopup.ts`
 - `src/renderer/gameplay/buildQueueKeepBuilding.ts`
 - `src/main/productionRules.ts` (`getAvailableBuildQueueItemTypes`)
 - `src/shared/fortificationRules.ts` (`FORTIFICATION_QUEUE_ITEM`)
+- `src/shared/creditsRules.ts` (`CREDITS_QUEUE_ITEM`, `creditsItemCost`, `CREDITS_PER_ITEM`)

@@ -534,3 +534,38 @@ aside#sidebar.tactical-strategic-suppress {
 .melee-intercept-table tr {
   border-bottom: 1px solid var(--chrome-border);
 }
+.build-popup.build-popup-wide { max-width: 280px; }
+.build-popup-tab-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
+  border-bottom: 1px solid var(--chrome-border);
+  margin: 0 0 0.5rem 0;
+}
+.build-popup-tab-bar button {
+  padding: 0.35rem 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 12px;
+  background: var(--chrome-bg);
+  color: var(--button-off-text);
+  border: 1px solid var(--button-off-border);
+  border-bottom: 2px solid transparent;
+  border-radius: 2px 2px 0 0;
+  margin-bottom: -1px;
+}
+.build-popup-tab-bar button:hover { background: var(--chrome-bg); }
+.build-popup-tab-bar button:disabled {
+  color: var(--chrome-disabled);
+  cursor: default;
+  background: var(--chrome-bg);
+}
+.build-popup-tab-bar button[aria-selected="true"] {
+  font-weight: 600;
+  background: var(--chrome-bg);
+  color: var(--button-text);
+  border-color: var(--button-border);
+  border-bottom-color: var(--chrome-accent-edge);
+}
+.build-popup-tab-bar button[aria-selected="true"]:hover { background: var(--chrome-bg); }
+.hire-funds-warning { color: var(--chrome-error); font-size: 11px; }

@@ -5,7 +5,7 @@ import {
   type BuildQueueTemplateEntry,
   type HexBuildQueueSnapshot,
 } from '../../shared/ipcTypes';
-import { FORTIFICATION_QUEUE_ITEM, FORTIFICATION_QUEUE_ITEM_LABEL } from '../../shared/fortificationRules';
+import { formatBuildQueueItemLabel } from '../../shared/buildQueueItemLabels';
 import { escapeBuildPopupHtml } from './buildQueuePopupFormatting';
 
 /**
@@ -103,7 +103,7 @@ export function buildQueueTemplateFromSnapshot(snapshot: HexBuildQueueSnapshot):
  *
  * Purpose: Supports the union-type dropdown while retaining canonical unit-type ordering.
  * When to use: Multi-hex popup rendering and selecting the default type for a new row.
- * Expected outcome: A deterministic subset of infantry, armor, naval, air.
+ * Expected outcome: `ALL_BUILD_QUEUE_ITEM_TYPES` limited to types at least one snapshot lists, in that order. That includes missile, fortification, and credits when a selected hex can build them.
  * Exceptions: Empty input returns an empty array.
  */
 export function unionAvailableBuildUnitTypes(snapshots: HexBuildQueueSnapshot[]): BuildQueueItemType[] {
@@ -139,10 +139,7 @@ export function formatBuildUnitTypeOptionLabel(
   eligibleCount: number,
   selectedHexCount: number
 ): string {
-  const typeLabel =
-    unitType === FORTIFICATION_QUEUE_ITEM
-      ? FORTIFICATION_QUEUE_ITEM_LABEL
-      : unitType.charAt(0).toUpperCase() + unitType.slice(1);
+  const typeLabel = formatBuildQueueItemLabel(unitType);
   if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
     return `${typeLabel} (all hexes)`;
   }

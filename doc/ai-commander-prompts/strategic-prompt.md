@@ -132,10 +132,16 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `# Production Status`
 
 - **Include:** when production tools are enabled. **Omit** otherwise, and omit every production clause elsewhere in the prompt.
-- **Content order:** cost and infrastructure minimum per type; the per-side deployment cap per type at this game size; own current counts against those caps; income and spending rule; the maxed-type list and the blocked-queue rule when any type is at cap; resolution timing; then the queue table.
+- **Content order:** cost and infrastructure minimum per type, then the credits sentence from `buildCreditsProductionRulePart`; the per-side deployment cap per type at this game size; own current counts against those caps; income and spending rule; `buildBuildabilityRule`; the maxed-type list and the blocked-queue rule when any type is at cap; resolution timing; then the queue table. The table's last column is `Building` (`BUILD_STATUS_COLUMN_HEADER`), `paused` or `yes`.
 - **Items:** `PRODUCTION_RULES_COSTS`, `PRODUCTION_CAPS`, `PRODUCTION_INCOME`, `PRODUCTION_CAP_QUEUE_RULE`, `PRODUCTION_TIMING`, `PRODUCTION_QUEUES`.
 - **Empty-state:** when no controlled cell has an editable queue, replace the table with a single sentence saying so. When the production subsystem is unavailable, state the engine's reason rather than inventing one.
 - **Model use:** decides which cells queue which type this turn.
+
+#### `# Mercenaries`
+
+- **Include:** on a strategic prompt when the snapshot has `mercenaryEconomy`, and either production tools are on or the seat has a mercenary. **Omit** in a battle, when the economy is absent, and when production is off and the seat has no mercenary.
+- **Content:** `buildMercenaryRule` when production is on, or `buildMercenaryUpkeepRule` when it is off. When production is on, `MERCENARY_ENVELOPE_ROWS_SENTENCE` follows that rule. Then `formatMercenaryFundsLine`, and `MERCENARY_FUNDS_WARNING` when credits are below upkeep plus fees. The seat's mercenaries follow. Only when production is on, rehire candidates and raise options follow those. `buildProductionSubmitClause` appends the same hire-row sentence when production tools are on. Upkeep in that rule is `infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15)`.
+- **Model use:** decides whether to queue credits and which hire rows to add. The Sides block adds `MERCENARY_ID_PREFIX_NOTE` when any unit in the match is a mercenary.
 
 #### `# Your Strategic Memory`
 
@@ -293,7 +299,7 @@ Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md
 | `ferryOrders` entry | `unitId` or `unitIds`, `destination` | Airport to airport within the ferry radius. A unit that strikes this turn must not also ferry; a ferry order for a striking unit is discarded. |
 | `missileLaunches` entry | `unitId` or `unitIds`, `targetHexCode` | Present only when the opponent has a missile and the consult is strategic. One launch per missile. The target is an explored hex within `missileRangeHexes()`. A missile cannot be given march, patrol, pursue, defend, or ranged orders. |
 | `memoryUpdates` entry | write or delete with a key, and content plus tier for a write | Keys are short and restricted to letters, digits, hyphen, and underscore; content is length-limited. There is no memory write tool. |
-| `productionOrders` entry | `action`, `hex`, `unitType`, `count` | Count is a whole number from one to ninety-nine. `unitType` is `ALL_BUILD_QUEUE_ITEM_TYPES`, which adds `fortification`. Each entry replaces that cell's whole queue with one type and count. An entry missing `action` or a required field is dropped. At least one `set_build_queue` is required this turn when any controlled hex has an empty queue, or a queue blocked at cap while another type can still be built. Fortification is not a unit and is not a cap alternative. |
+| `productionOrders` entry | one of three closed rows | `set_build_queue` has `hex`, `unitType` (`ALL_BUILD_QUEUE_ITEM_TYPES`, including `fortification` and `credits`), and `count`. `raise_mercenaries` has `hex`, a hireable `unitType`, and `count`. `rehire_mercenary` has `unitId`. An entry missing `action` or a required field is dropped. At least one `set_build_queue` is required this turn when any controlled hex has an empty queue, or a queue blocked at cap while another type can still be built. Fortification and credits are not units and are not cap alternatives. The submit clause appends `MERCENARY_ENVELOPE_ROWS_SENTENCE`. |
 
 ### 3.3 Option row to envelope field mapping
 

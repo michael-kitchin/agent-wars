@@ -9,7 +9,8 @@
  */
 
 import { logDebug } from '../../logger';
-import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../productionRules';
+import { HIREABLE_UNIT_TYPES } from '../../../shared/mercenaryRules';
 import { STANDING_ORDER_TYPES } from '../../tools/standingOrdersShared';
 import { TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
 import { envelopeFieldsForGates, legalOrderActionsForMode, type EnvelopeGates } from './envelopeContract';
@@ -62,7 +63,7 @@ const MEMORY_TIERS: readonly string[] = ['persistent', 'stored'];
  * Expected outcome: Same values the parser accepts.
  * Exceptions: None.
  */
-const PRODUCTION_ORDER_ACTIONS: readonly string[] = ['set_build_queue'];
+const PRODUCTION_ORDER_ACTIONS = ['set_build_queue', 'raise_mercenaries', 'rehire_mercenary'] as const;
 
 /**
  * Schema for a plain string value.
@@ -121,6 +122,26 @@ function closedObjectSchema(
  */
 function arraySchema(items: Readonly<Record<string, unknown>>): Record<string, unknown> {
   return { type: 'array', items };
+}
+
+/**
+ * One closed production-order row for a single action.
+ *
+ * Purpose: Each action lists only the fields it requires, so a provider does not strip a rehire's unit id or demand a hex.
+ * When to use: The `productionOrders` items union.
+ * Expected outcome: `action` is a one-value enum and every field of that row is required.
+ * Exceptions: None.
+ */
+function productionOrderRowSchema(action: (typeof PRODUCTION_ORDER_ACTIONS)[number]): Record<string, unknown> {
+  const actionField = enumSchema([action]);
+  if (action === 'rehire_mercenary') {
+    return closedObjectSchema({ action: actionField, unitId: STRING_SCHEMA }, ['action', 'unitId']);
+  }
+  const unitType = action === 'raise_mercenaries' ? enumSchema(HIREABLE_UNIT_TYPES) : enumSchema(ALL_BUILD_QUEUE_ITEM_TYPES);
+  return closedObjectSchema(
+    { action: actionField, hex: STRING_SCHEMA, unitType, count: { type: 'integer' } },
+    ['action', 'hex', 'unitType', 'count']
+  );
 }
 
 /**
@@ -421,17 +442,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'memoryUpdates':
       return arraySchema({ anyOf: memoryUpdateRowSchemas() });
     case 'productionOrders':
-      return arraySchema(
-        closedObjectSchema(
-          {
-            action: enumSchema(PRODUCTION_ORDER_ACTIONS),
-            hex: STRING_SCHEMA,
-            unitType: enumSchema(ALL_BUILD_QUEUE_ITEM_TYPES),
-            count: { type: 'integer' },
-          },
-          ['action', 'hex', 'unitType', 'count']
-        )
-      );
+      return arraySchema({ anyOf: PRODUCTION_ORDER_ACTIONS.map((action) => productionOrderRowSchema(action)) });
     default:
       throw new Error(`envelopeJsonSchema: no schema for envelope field "${field}"`);
   }

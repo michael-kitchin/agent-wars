@@ -57,7 +57,7 @@ export function decodeOpenRouterToolArgsForExecution(
         return { ...a, targetHex: codeToLatLngRounded(th, context) };
       }
     }
-    if (toolName === 'set_build_queue' || toolName === 'query_production') {
+    if (toolName === 'set_build_queue' || toolName === 'query_production' || toolName === 'query_mercenaries' || toolName === 'hire_mercenaries') {
       const hx = a.hex;
       if (typeof hx === 'string' && HEX_CODE_PATTERN.test(hx)) {
         return { ...a, hex: codeToLatLngRounded(hx, context) };

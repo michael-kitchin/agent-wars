@@ -403,14 +403,15 @@ function refreshFogOfWarIntelForPlayer(
     if (!existingIntelIds.has(enemy.id)) newContactIds.push(enemy.id);
     currentEnemyHexes.add(enemy.h3Index);
     ops.run(
-      `INSERT INTO player_unit_intel (player_id, enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn)
-       VALUES (?, ?, ?, 'current', ?, ?)
+      `INSERT INTO player_unit_intel (player_id, enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn, enemy_player)
+       VALUES (?, ?, ?, 'current', ?, ?, ?)
        ON CONFLICT(player_id, enemy_unit_id) DO UPDATE SET
          last_known_h3_index = excluded.last_known_h3_index,
          intel_state = 'current',
          last_seen_turn = excluded.last_seen_turn,
-         stale_until_turn = excluded.stale_until_turn`,
-      [playerId, enemy.id, enemy.h3Index, currentTurn, currentTurn + STALE_INTEL_TURNS]
+         stale_until_turn = excluded.stale_until_turn,
+         enemy_player = excluded.enemy_player`,
+      [playerId, enemy.id, enemy.h3Index, currentTurn, currentTurn + STALE_INTEL_TURNS, enemy.player]
     );
   }
   const intelRows = ops.getAll<{ enemy_unit_id: string; last_known_h3_index: string; stale_until_turn: number | null }>(
@@ -529,6 +530,7 @@ export function getGameStateForPlayer(
         intelState: 'current' as const,
         lastSeenTurn: state.turnNumber,
         staleUntilTurn: state.turnNumber + STALE_INTEL_TURNS,
+        player: u.player,
       };
     });
     return withFogMetadata({ ...state, visibleHexes: allHexes, exploredHexes: allHexes, staleHexes: [], enemyIntel, playerPerspective: playerId }, false);
@@ -557,8 +559,9 @@ export function getGameStateForPlayer(
     intel_state: 'current' | 'stale';
     last_seen_turn: number;
     stale_until_turn: number;
+    enemy_player: string | null;
   }>(
-    `SELECT enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn
+    `SELECT enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn, enemy_player
      FROM player_unit_intel WHERE player_id = ? ORDER BY enemy_unit_id`,
     [playerId]
   );
@@ -571,6 +574,7 @@ export function getGameStateForPlayer(
       intelState: row.intel_state,
       lastSeenTurn: row.last_seen_turn,
       staleUntilTurn: row.stale_until_turn,
+      ...(row.enemy_player ? { player: row.enemy_player } : {}),
     };
   });
   return withFogMetadata({

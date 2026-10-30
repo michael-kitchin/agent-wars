@@ -311,6 +311,7 @@ export function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
         player: u.player,
         unitType: u.unitType,
         h3Index: u.h3Index,
+        ...(u.isMercenary === true ? { isMercenary: true } : {}),
       })) as GameStateSnapshot['units'];
       const merged = mergeTacticalSubUnitsForMarchPlayback(
         tacticalUnits,
@@ -329,6 +330,7 @@ export function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
         player: u.player,
         unitType: u.unitType,
         h3Index: u.h3Index,
+        ...(u.isMercenary === true ? { isMercenary: true } : {}),
       })),
       movingIds: undefined,
     };

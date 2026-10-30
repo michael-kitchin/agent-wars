@@ -11,6 +11,7 @@ import { playerIdCodeFor } from '../../../shared/unitIds';
 import { sortSeatsByOrder } from '../../../shared/seatRoster';
 import type { SeatId } from '../../../shared/seatIds';
 import { logDebug } from '../../logger';
+import { MERCENARY_ID_PREFIX_NOTE } from './gameRuleMercenaryText';
 
 /**
  * One roster row the Sides table can print.
@@ -74,6 +75,15 @@ export function buildSidesPromptBlock(args: {
   readonly ownSeatId: SeatId;
   readonly seats: readonly SidesPromptSeat[];
   readonly includeNeutral: boolean;
+  /**
+   * Whether to add the note that a rehired unit keeps its old id prefix.
+   *
+   * Contract: Omitted means false.
+   * When to use: When the match has at least one mercenary.
+   * Expected outcome: The note is the last line.
+   * Exceptions: None.
+   */
+  readonly includeMercenaryNote?: boolean;
 }): string {
   logDebug('sidesBlock buildSidesPromptBlock', {
     ownSeatId: args.ownSeatId,
@@ -101,5 +111,6 @@ export function buildSidesPromptBlock(args: {
   if (args.includeNeutral) {
     lines.push(`| Neutral | (keeps the prefix of the side it came from) | none | ${NEUTRAL_STATUS} |`);
   }
+  if (args.includeMercenaryNote) lines.push(MERCENARY_ID_PREFIX_NOTE);
   return lines.join('\n');
 }

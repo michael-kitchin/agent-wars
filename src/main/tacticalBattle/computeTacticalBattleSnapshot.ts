@@ -574,6 +574,7 @@ export function computeTacticalBattleSnapshot(
           ...(parent.origin ? { origin: parent.origin } : {}),
           ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(parent.origin?.birthH3Index) } : {}),
           ...(techOn ? { techLevel: techLevelForBirthHex(parent.origin?.birthH3Index) } : {}),
+          ...(parent.isMercenary === true ? { isMercenary: true } : {}),
         });
       };
       while (placed < n) {

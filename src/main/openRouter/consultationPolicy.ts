@@ -3,7 +3,7 @@
  *
  * Purpose: Centralizes opponent/human activity predicates and `shouldConsult` composition so `afterResolution.ts` stays orchestration-only.
  * When to use: Imported only from `afterResolution.ts` and unit tests; no DB or IPC side effects.
- * Expected outcome: Same boolean decisions as the inlined pre-refactor logic; no `logDebug` here (callers log).
+ * Expected outcome: Same boolean decisions as the inlined pre-refactor logic, except a unit's current owner is used before the id prefix. No `logDebug` here (callers log).
  * Exceptions: None; predicates are total on their inputs.
  */
 
@@ -180,18 +180,18 @@ export function seatHadStrategicResolutionUnitActions(
  *
  * Purpose: Drives the human-observable LLM branch when the opponent was active and callbacks did not fire.
  * When to use: `afterResolution` with opponent-perspective `GameStateSnapshot`.
- * Expected outcome: Unchanged contract vs pre-refactor implementation.
+ * Expected outcome: True when another seat moved, ferried, struck, launched at this seat, or scored a kill. A move uses `aiMoves[].player`. A kill uses the live unit's player, then `removedUnits`, then the id prefix.
  * Exceptions: None.
  */
 export function enemyHadStrategicResolutionObservableActions(
-  r: StrategicResolutionHumanActivitySlice & Pick<ReadyResult, 'aiMoves'>,
+  r: StrategicResolutionHumanActivitySlice & Pick<ReadyResult, 'aiMoves' | 'removedUnits'>,
   state: GameStateSnapshot,
   seatId: AiSeatId
 ): boolean {
   logTrace('enemyHadStrategicResolutionObservableActions', { seatId, unitCount: state.units.length });
   if (hasNonNoopMarchMoves(r.humanMoves)) return true;
   if ((r.aiMoves ?? []).some((move) => {
-    const owner = unitIdOwnerFromId(move.unitId);
+    const owner = move.player ?? unitIdOwnerFromId(move.unitId);
     return owner !== null && owner !== seatId && isSeatId(owner);
   })) return true;
   if ((r.resolvedFerryMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
@@ -199,6 +199,8 @@ export function enemyHadStrategicResolutionObservableActions(
   if ((r.missileLaunches ?? []).some((launch) => launch.player !== seatId && isSeatId(launch.player) && launch.targetControllerId === seatId)) {
     return true;
   }
+  const ownerByUnitId = new Map(state.units.map((unit) => [unit.id, unit.player]));
+  const removedOwnerByUnitId = new Map((r.removedUnits ?? []).map((unit) => [unit.id, unit.player]));
   const killBuckets: ReadonlyArray<ReadonlyArray<{ killerIds: string[] }> | undefined> = [
     r.killsByDirectFire,
     r.killsByReturnFire,
@@ -207,7 +209,9 @@ export function enemyHadStrategicResolutionObservableActions(
   for (const bucket of killBuckets) {
     for (const edge of bucket ?? []) {
       if (edge.killerIds.some((killerId) => {
-        const owner = unitIdOwnerFromId(killerId);
+        const owner = ownerByUnitId.get(killerId)
+          ?? removedOwnerByUnitId.get(killerId)
+          ?? unitIdOwnerFromId(killerId);
         return owner !== null && owner !== seatId && isSeatId(owner);
       })) return true;
     }

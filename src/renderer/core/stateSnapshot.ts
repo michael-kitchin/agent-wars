@@ -220,7 +220,7 @@ export async function refreshGameStateFromMain(
  *
  * Purpose: The build popup and map production marks must match the queue main just stored.
  * When to use: After a successful build-queue IPC mutation.
- * Expected outcome: The map redraws from the fresh snapshot; sidebar selection and standing orders stay as they were.
+ * Expected outcome: The map and the top bar refresh from the fresh snapshot; sidebar selection and standing orders stay as they were.
  * Exceptions: Logs `refreshGameStateAfterBuildQueueChange failed:` and does not rethrow.
  */
 export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void> {
@@ -228,7 +228,7 @@ export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQu
     deps,
     {
       refreshStandingOrders: false,
-      updateGameStateSidebarUi: false,
+      updateGameStateSidebarUi: true,
       updateSelectionUi: false,
       updateGameOverUi: false,
       updateReadyButton: false,
@@ -387,12 +387,17 @@ export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | n
         h3Index: enemy.h3Index,
         lastSeenTurn: comparablePrevious.turnNumber,
       });
+      if (state.units.some((unit) => unit.id === enemy.id && unit.player === viewer)) {
+        S.clientStaleEnemyIntelByUnitId.delete(enemy.id);
+        continue;
+      }
       if (!hasFogData || !visibleHexes.has(enemy.h3Index)) {
         S.clientStaleEnemyIntelByUnitId.set(enemy.id, {
           unitId: enemy.id,
           lastKnownH3Index: enemy.h3Index,
           lastSeenTurn: comparablePrevious.turnNumber,
           staleUntilTurn: comparablePrevious.turnNumber + 2,
+          player: enemy.player,
         });
       }
     }
@@ -400,9 +405,10 @@ export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | n
 
   for (const [unitId, stale] of S.clientStaleEnemyIntelByUnitId) {
     const isNowVisible = visibleEnemyIdsNow.has(unitId);
+    const rehiredByViewer = state.units.some((unit) => unit.id === unitId && unit.player === viewer);
     const contradictedOnVisibleHex = hasFogData && visibleHexes.has(stale.lastKnownH3Index) && !visibleEnemyHexesNow.has(stale.lastKnownH3Index);
     const expired = currentTurn > stale.staleUntilTurn;
-    if (isNowVisible || contradictedOnVisibleHex || expired) {
+    if (isNowVisible || rehiredByViewer || contradictedOnVisibleHex || expired) {
       S.clientStaleEnemyIntelByUnitId.delete(unitId);
       S.lastRenderedVisibleEnemyByUnitId.delete(unitId);
     }

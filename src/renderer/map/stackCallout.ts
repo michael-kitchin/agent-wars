@@ -1,4 +1,12 @@
 import { TOOLTIP_OFFSET_PX, UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
+import { placeOpenStackCallout } from '../chrome/placeAnchoredPopup';
+import {
+  stackAddAllTooltipText,
+  stackCalloutCloseTooltipText,
+  stackRemoveAllTooltipText,
+  stackSelectAllTooltipText,
+  stackUnitToggleTooltipText,
+} from '../../shared/popupControlTooltipText';
 import { rendererSharedState as S } from '../core/state';
 import {
   addUnitsToSelection,
@@ -311,6 +319,7 @@ export function showStackCallout(
   closeBtn.className = 'unit-select stack-close-btn';
   closeBtn.textContent = '×';
   closeBtn.style.marginRight = 'auto';
+  closeBtn.setAttribute('data-control-tooltip', stackCalloutCloseTooltipText);
   closeBtn.addEventListener('click', () => {
     hideStackCallout();
   });
@@ -322,6 +331,7 @@ export function showStackCallout(
     selectAllBtn.type = 'button';
     selectAllBtn.className = 'unit-select';
     selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
+    selectAllBtn.setAttribute('data-control-tooltip', stackSelectAllTooltipText);
     selectAllBtn.addEventListener('click', () => {
       onStackAllActionClick('selectAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
@@ -331,6 +341,7 @@ export function showStackCallout(
     addAllBtn.type = 'button';
     addAllBtn.className = 'unit-select';
     addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
+    addAllBtn.setAttribute('data-control-tooltip', stackAddAllTooltipText);
     addAllBtn.addEventListener('click', () => {
       onStackAllActionClick('addAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
@@ -338,6 +349,7 @@ export function showStackCallout(
     removeAllBtn.type = 'button';
     removeAllBtn.className = 'unit-select';
     removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
+    removeAllBtn.setAttribute('data-control-tooltip', stackRemoveAllTooltipText);
     removeAllBtn.addEventListener('click', () => {
       onStackAllActionClick('removeAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
@@ -357,6 +369,7 @@ export function showStackCallout(
       btn.type = 'button';
       btn.className = 'unit-select stack-unit-toggle';
       btn.textContent = S.selectedUnitIds.includes(u.id) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+      btn.setAttribute('data-control-tooltip', stackUnitToggleTooltipText(S.selectedUnitIds.includes(u.id)));
       btn.addEventListener('click', () => {
         onStackSingleUnitToggleClick(u.id, S.selectedUnitIds.includes(u.id), units, clientX, clientY);
       });
@@ -370,6 +383,7 @@ export function showStackCallout(
   calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   calloutEl.setAttribute('aria-label', formatStackTooltip(units));
   calloutEl.classList.remove('hidden');
+  placeOpenStackCallout();
   void renderSealiftSection(sorted, calloutEl);
 }
 

@@ -176,9 +176,52 @@ function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
 }
 
 /**
- * Defines the `testHumanHadStrategicResolutionObservableActionsQuiet` function shape.
+ * A move whose stored owner is this seat is not enemy activity, even when the id prefix is another side's.
+ *
+ * Purpose: A rehired unit keeps its first owner's prefix.
+ * When to use: Same module.
+ * Expected outcome: False.
+ * Exceptions: None.
+ */
+function testOwnSeatPlayerOnAnAiMoveIsNotEnemyActivity(): void {
+  assert.strictEqual(
+    enemyHadStrategicResolutionObservableActions(
+      {
+        aiMoves: [{ unitId: 'h1-i1', fromH3Index: '81193ffffffffff', toH3Index: '81195ffffffffff', player: 'opponent' }],
+      },
+      emptyOpponentState(),
+      'opponent'
+    ),
+    false
+  );
+}
 
- * Purpose: No moves, ferry, strikes, or kill edges means no human observable activity.
+/**
+ * A removed killer's stored owner beats the side encoded in its id.
+ *
+ * Purpose: A rehired unit that dies this turn is no longer on the live roster.
+ * When to use: Same module.
+ * Expected outcome: False when that owner is the seat being asked about.
+ * Exceptions: None.
+ */
+function testRemovedUnitOwnerBeatsIdPrefix(): void {
+  assert.strictEqual(
+    enemyHadStrategicResolutionObservableActions(
+      {
+        killsByDirectFire: [{ victimId: 'a1-i1', killerIds: ['h1-t1'] }],
+        removedUnits: [{ id: 'h1-t1', player: 'opponent', unitType: 'armor', h3Index: '81193ffffffffff' }],
+      },
+      emptyOpponentState(),
+      'opponent'
+    ),
+    false
+  );
+}
+
+/**
+ * No moves, ferry, strikes, or kill edges means no observable activity.
+ *
+ * Purpose: The quiet turn does not call the model from this predicate.
  * When to use: Same module.
  * Expected outcome: False.
  * Exceptions: None.
@@ -228,6 +271,8 @@ function run(): void {
   testOpponentHadTacticalBeatResolutionActionsDetectsMarch();
   testHumanHadStrategicResolutionObservableActionsHumanMove();
   testHumanHadStrategicResolutionObservableActionsKillFallback();
+  testOwnSeatPlayerOnAnAiMoveIsNotEnemyActivity();
+  testRemovedUnitOwnerBeatsIdPrefix();
   testHumanHadStrategicResolutionObservableActionsQuiet();
   testHumanHadTacticalBeatResolutionActionsHumanMarch();
   console.log('afterResolutionConsultationGates.test.ts passed');

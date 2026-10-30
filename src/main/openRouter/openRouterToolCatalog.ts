@@ -1,4 +1,6 @@
-import { ALL_BUILD_QUEUE_ITEM_TYPES, ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
+import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../productionRules';
+import { HIREABLE_UNIT_TYPES } from '../../shared/mercenaryRules';
 import { NAVAL_PLAN_ROUTE_PROMPT_SUFFIX } from '../navalMovementMessages';
 import { logTrace } from '../logger';
 
@@ -244,6 +246,34 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       required: ['hex', 'unitType', 'count'],
     },
     promptLine: 'set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.',
+  },
+  {
+    name: 'query_mercenaries',
+    description: 'Read your treasury, upkeep, and hire orders, or what you can hire in one cell.',
+    parameters: {
+      type: 'object',
+      properties: {
+        hex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Optional briefing hex code for one cell' },
+      },
+    },
+    promptLine: 'query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.',
+  },
+  {
+    name: 'hire_mercenaries',
+    description: 'Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['raise', 'rehire', 'cancel'], description: 'raise, rehire, or cancel' },
+        hex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Cell to raise in, as a briefing hex code' },
+        unitType: { type: 'string', enum: [...HIREABLE_UNIT_TYPES], description: 'Unit type to raise' },
+        count: { type: 'number', description: 'How many to raise (1..99)' },
+        unitId: { type: 'string', description: 'Neutral unit to rehire' },
+        orderId: { type: 'number', description: 'Hire order to cancel' },
+      },
+      required: ['action'],
+    },
+    promptLine: 'hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. Orders fill at the end of the turn.',
   },
 ];
 

@@ -115,7 +115,8 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Production Status` | Kept and extended — 1.6 adds the income rule |
+| `# Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
+| `# Mercenaries` | Added. Treasury, upkeep, and, when production tools are on, rehire and raise tables. Production off keeps the upkeep-only form when the seat has mercenaries. |
 | `## Controlled Hex Queues` | Kept — 1.6 and 2 |
 | `# Your Strategic Memory` | Kept and extended — 1.6 adds write limits |
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |

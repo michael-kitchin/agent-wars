@@ -4,6 +4,7 @@ export * from './productionTypes';
 export * from './ordersTypes';
 export * from './missileTypes';
 export * from './fortificationTypes';
+export * from './mercenaryTypes';
 export * from './gameStateTypes';
 export * from './openRouterTypes';
 export * from './combatResultTypes';

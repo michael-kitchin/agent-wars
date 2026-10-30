@@ -750,6 +750,7 @@ clientStaleEnemyIntelByUnitId: new Map<
       lastKnownH3Index: string;
       lastSeenTurn: number;
       staleUntilTurn: number;
+      player?: string; // owner when known; the id prefix can be stale
     }
   >(),
     /**

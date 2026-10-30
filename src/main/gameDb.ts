@@ -59,6 +59,8 @@ import {
 } from './gameDb/fogState';
 import { mergeMeleeCandidateHexesIntoHumanFogSnapshot } from './gameActions/meleeInterceptPendingState';
 import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './gameDb/attachTacticalSessionToGameState';
+import { withMercenaryEconomy } from './gameDb/mercenaryEconomyRead';
+import { withBuildPausedFlags } from '../shared/productionBuildability';
 import { resolveGameDbFileUnderUserData } from './gameDb/canonicalDbPath';
 import {
   allocateNextUnitDisplayOrderWithOps,
@@ -107,6 +109,17 @@ export {
   setTacticalCellFortified,
 } from './gameDb/fortificationStateAccess';
 export {
+  addTreasuryCredits,
+  deleteAllHireOrders,
+  deleteHireOrder,
+  getTreasuryCredits,
+  insertHireOrder,
+  listAllHireOrders,
+  listHireOrdersForSeat,
+  listMercenaryUnitsForSeat,
+  setTreasuryCredits,
+} from './gameDb/mercenaryStateAccess';
+export {
   addAiLossEventsSinceConsultation,
   addCombatSinceConsultation,
   clearAiLossEventsSinceConsultation,
@@ -134,7 +147,7 @@ export {
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 25;
+export const EXPECTED_USER_VERSION = 26;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -695,6 +708,8 @@ export function getGameStateForPlayer(
   if (playerId === HUMAN_SEAT_ID) {
     base = mergeMeleeCandidateHexesIntoHumanFogSnapshot(base);
   }
+  base = withMercenaryEconomy(gameDbOps, base, playerId);
+  base = withBuildPausedFlags(base, base.fogOfWarEnabled === false ? null : playerId);
   return mergeActiveTacticalSessionIntoGameStateSnapshot(base, { scope: 'getGameStateForPlayer', playerId });
 }
 

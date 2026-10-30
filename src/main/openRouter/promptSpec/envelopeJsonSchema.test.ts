@@ -518,8 +518,13 @@ function testMissileLaunchesSchemaFollowsTheFlag(): void {
 function testProductionOrderEnumIncludesFortification(): void {
   const properties = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
   const production = asRecord(properties.productionOrders, 'productionOrders');
-  const text = JSON.stringify(production);
-  assert.ok(text.includes('fortification'));
+  const items = asRecord(production.items, 'productionOrders.items');
+  const branches = items.anyOf as unknown[];
+  assert.deepEqual(Object.keys(items), ['anyOf']);
+  assert.equal(branches.length, 3);
+  assert.ok(JSON.stringify(branches[0]).includes('fortification'));
+  assert.ok(JSON.stringify(production).includes('raise_mercenaries'));
+  assert.ok(JSON.stringify(production).includes('rehire_mercenary'));
 }
 
 run();

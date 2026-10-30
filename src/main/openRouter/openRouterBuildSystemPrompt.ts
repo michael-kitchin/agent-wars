@@ -13,6 +13,7 @@ import {
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
 import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
 import { buildMissileForcesBriefingBlock } from './briefingSectionsMissiles';
+import { buildMercenariesBriefingBlock } from './briefingSectionsMercenaries';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
@@ -186,9 +187,11 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const productionBlock = flags.productionEnabled ? injection.productionText + '\n\n' : '';
   const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
   const missileRaw = buildMissileForcesBriefingBlock(state, format, coordinateContext.mode);
+  const mercenaryRaw = buildMercenariesBriefingBlock(state, format, coordinateContext.mode, { productionEnabled: flags.productionEnabled });
   const sealiftRaw = buildSealiftBriefingBlock(state, format, coordinateContext.mode);
   const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
   const missileBlock = missileRaw ? `${missileRaw}\n\n` : '';
+  const mercenaryBlock = mercenaryRaw ? `${mercenaryRaw}\n\n` : '';
   const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
 
   const hasRanged = opponentUnits.some((u) => unitHasDirectRangedPlanning(u.unitType, tacticalBattleActive));
@@ -293,12 +296,13 @@ ${contextCoaching}
         ownSeatId: ownSeat,
         seats: sidesSeatsForPrompt(state, ownSeat),
         includeNeutral: state.units.some((unit) => isNeutralOwnerId(unit.player)),
+        includeMercenaryNote: state.units.some((unit) => unit.isMercenary === true),
       });
   const sidesPrefix = sidesBlock.length > 0 ? `${sidesBlock}\n\n` : '';
   const scenarioPrefix = scenarioObjectiveBlock.length > 0 ? `${scenarioObjectiveBlock}\n\n` : '';
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
   const finalJsonContract = buildFinalJsonContractInstruction({

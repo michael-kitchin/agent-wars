@@ -11,6 +11,8 @@ import {
 } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import { isSeatId } from '../../shared/seatIds';
+import { isHexBuildableNow } from './productionBuildability';
 import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
@@ -19,6 +21,7 @@ import {
   isValidBuildCount,
   type BuildQueueItemType,
 } from '../productionRules';
+import { CREDITS_NOT_AVAILABLE_REASON, CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
 import { FORTIFICATION_NOT_AVAILABLE_REASON, FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import type {
   ApplyBuildQueueTemplateResult,
@@ -202,6 +205,15 @@ entries: HexBuildQueueEntryView[];
    * Exceptions: None.
    */
   keepBuildingUnitType: BuildQueueItemType | null;
+  /**
+   * Whether production is paused on this hex.
+   *
+   * Contract: Present and true only when the requester controls the hex and cannot build there. Omitted otherwise.
+   * When to use: The build popup's paused note.
+   * Expected outcome: True, or absent.
+   * Exceptions: None.
+   */
+  buildPaused?: boolean;
 }
 
 /**
@@ -251,9 +263,9 @@ noBuildReason: string | null;
  * Exceptions: None.
  */
 function unavailableQueueItemReason(unitType: BuildQueueItemType): string {
-  return unitType === FORTIFICATION_QUEUE_ITEM
-    ? FORTIFICATION_NOT_AVAILABLE_REASON
-    : `Unit type "${unitType}" is not available for this hex.`;
+  if (unitType === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_NOT_AVAILABLE_REASON;
+  if (unitType === CREDITS_QUEUE_ITEM) return CREDITS_NOT_AVAILABLE_REASON;
+  return `Unit type "${unitType}" is not available for this hex.`;
 }
 
 /**
@@ -323,7 +335,8 @@ function syncStandingOrderAfterQueueMutation(h3Index: string): void {
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
-  const productionView = buildProductionEligibilityView(h3Index, getStrategicInfrastructureForHex(h3Index));
+  const infra = getStrategicInfrastructureForHex(h3Index);
+  const productionView = buildProductionEligibilityView(h3Index, infra);
   const standing = getKeepBuildingForHex(h3Index);
   return {
     h3Index,
@@ -344,6 +357,9 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
     })),
     keepBuilding: standing.keepBuilding,
     keepBuildingUnitType: standing.keepBuildingUnitType,
+    ...(controlledByRequester && isSeatId(requestingPlayerId) && !isHexBuildableNow(requestingPlayerId, h3Index, infra.fortifiedCount)
+      ? { buildPaused: true as const }
+      : {}),
   };
 }
 

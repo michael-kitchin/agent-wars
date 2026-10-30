@@ -147,7 +147,7 @@ humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
    * Expected outcome: May be empty. Includes Neutral when Neutral marched.
    * Exceptions: None.
    */
-aiMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
+aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
     /**
    * Specifies the contract for the `embarkedFollowMoves` member (embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 

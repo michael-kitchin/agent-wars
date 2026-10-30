@@ -9,6 +9,7 @@ import type { UnitOriginTooltipBonuses, UnitOriginTooltipIdentity } from '../../
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import type { TechLevel } from '../../shared/techBonusTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
+import { isHireableUnitType, mercenaryUpkeepFor } from '../../shared/mercenaryRules';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -134,10 +135,28 @@ function formedLabelFor(unitId: string): string | null {
  * Exceptions: None.
  */
 function tooltipIdentityFor(unitId: string): UnitOriginTooltipIdentity {
+  const mercenaryUpkeep = mercenaryUpkeepForLiveUnit(unitId);
   return {
     displayName: S.unitDisplayNameById.get(unitId) ?? '',
     formedLabel: formedLabelFor(unitId),
+    ...(mercenaryUpkeep != null ? { mercenaryUpkeep } : {}),
   };
+}
+
+/**
+ * Upkeep of a live mercenary, from the battle or the strategic map.
+ *
+ * Purpose: The flag tooltip shows the cost only for a mercenary the player can see.
+ * When to use: `tooltipIdentityFor`.
+ * Expected outcome: The upkeep, or null when the unit is not a hireable mercenary.
+ * Exceptions: None.
+ */
+function mercenaryUpkeepForLiveUnit(unitId: string): number | null {
+  const battle = S.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+  const strategic = S.gameState?.units.find((unit) => unit.id === unitId);
+  const unit = battle ?? strategic;
+  if (!unit || unit.isMercenary !== true || !isHireableUnitType(unit.unitType)) return null;
+  return mercenaryUpkeepFor(unit.unitType, unit.techLevel);
 }
 
 /**

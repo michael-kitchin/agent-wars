@@ -3,6 +3,8 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
+import { hireEntryHexesForHuman } from '../shared/hireEntryHexes';
+import { hireEntryButtonHtml, hireEntryRowForHex } from './gameplay/hireEntryMarkers';
 import {
   applyModifierDrivenPopoverCloseRules,
   hideStackCallout,
@@ -300,6 +302,7 @@ function syncBuildEntryButton(): void {
   const map = getMainLeafletMap() as
     | {
         latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+        getSize: () => { x: number; y: number };
       }
     | null;
   if (!map) {
@@ -326,11 +329,17 @@ function syncBuildEntryButton(): void {
     top: number;
     hasCapacity: boolean;
     selected: boolean;
+    kind: 'build' | 'hire';
   }> = [];
+  const hireHexes = hireEntryHexesForHuman(S.gameState);
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored) continue;
-    if (!isStrategicHexHumanUrbanProduction(S.gameState, hx)) continue;
+    if (!isStrategicHexHumanUrbanProduction(S.gameState, hx)) {
+      const hireRow = hireEntryRowForHex(hx.h3Index, hexCenterPx(hx.h3Index), map.getSize(), hireHexes);
+      if (hireRow) rows.push(hireRow);
+      continue;
+    }
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
     const hasInfraSymbols = hasVisibleStrategicInfrastructureGlyphs(hx.h3Index, tacticalOn, visibleUnitHexes);
     const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
@@ -349,6 +358,7 @@ function syncBuildEntryButton(): void {
       top: Math.round(textY),
       hasCapacity: true,
       selected: selectedBuildHexes.has(hx.h3Index),
+      kind: 'build',
     });
   }
   if (rows.length === 0) {
@@ -357,13 +367,14 @@ function syncBuildEntryButton(): void {
   }
   rows.sort((a, b) => a.h3.localeCompare(b.h3));
   const layerKey = rows
-    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}`)
+    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}`)
     .join(';');
   if (layerKey !== S.lastBuildEntryLayerKey) {
     const html = rows
-      .map(
-        (r) =>
-          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
+      .map((r) =>
+        r.kind === 'hire'
+          ? hireEntryButtonHtml(r)
+          : `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
       )
       .join('');
     layer.innerHTML = html;
@@ -412,6 +423,7 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
   const L = getLeafletGlobal();
   if (!L) return;
   const overlayContext = buildProductionOverlayContext(S.gameState);
+  const hireHexes = hireEntryHexesForHuman(S.gameState);
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored && !overlayContext.productionDetailShown) continue;
@@ -449,6 +461,7 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
     if (hasClickableBuildEntryForHex) {
       continue;
     }
+    if (explored && hireHexes.has(hx.h3Index) && shouldShowBuildEntryZoom()) continue;
     const sizePx = hasInfraSymbols || hasVisibleUnits ? '10px' : '11px';
     const useBold = controlledByHuman && hasUrbanCapacity;
     ctx.font = `${useBold ? 'bold ' : ''}${sizePx} system-ui, sans-serif`;

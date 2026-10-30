@@ -8,6 +8,7 @@ import type { WeatherState } from '../weatherBonusTypes';
 import type { GameMapProfile } from '../gameMapTypes';
 import type { SeatSnapshot } from '../seatRoster';
 import type { GameEndReason, VictorySettings } from '../victoryRules';
+import type { MercenaryEconomySnapshot } from './mercenaryTypes';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -109,6 +110,15 @@ units: {
      */
     formedTurn?: number;
     /**
+     * Whether this unit is a mercenary.
+     *
+     * Contract: Present and true only for a mercenary. Ordinary units omit the field. Neutral units are never mercenaries.
+     * When to use: The token badge, caps, and upkeep. Anyone who can see the unit can see the flag.
+     * Expected outcome: True, or absent.
+     * Exceptions: None.
+     */
+    isMercenary?: boolean;
+    /**
      * Strategic sealift: naval carrier id when cargo is still assigned (`unit_transport_assignments`).
      *
      * Contract: Present on strategic snapshots from `listUnitsForSnapshot`; tactical battles may use `embarkedOnSubUnitId` instead.
@@ -196,6 +206,7 @@ enemyIntel?: {
     intelState: 'current' | 'stale';
     lastSeenTurn: number;
     staleUntilTurn: number;
+    player?: string;
   }[];
     /**
    * Specifies the contract for the `playerPerspective` member (playerPerspective?: string;).
@@ -305,6 +316,15 @@ currentDateLabel?: string;
    * Exceptions: None.
    */
 techBonusEnabled?: boolean;
+  /**
+   * The viewer's treasury, upkeep, and pending hire fees.
+   *
+   * Contract: Set only on one seat's snapshot. Absent on the observe-all snapshot and when the database is closed.
+   * When to use: The credits readout. Do not show another seat's balance.
+   * Expected outcome: That seat's funds.
+   * Exceptions: None.
+   */
+  mercenaryEconomy?: MercenaryEconomySnapshot;
     /**
    * How strong the tech bonus is.
    *
@@ -445,6 +465,7 @@ strategicBuildQueueTotals?: {
     nextUnitType: BuildQueueItemType | null;
     nextRemainingCount: number | null;
     storedPoints: number;
+    buildPaused?: boolean;
   }[];
     /**
    * Specifies the contract for the `strategicInfrastructure` member (strategicInfrastructure?: { h3Index: string; urbanHexCount: number; airportCount: number; seaportCount: number; }[];).

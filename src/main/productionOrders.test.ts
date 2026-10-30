@@ -107,8 +107,55 @@ function testNormalizeProductionOrdersAcceptsFortification(): void {
     strategicCtx
   );
   assert.strictEqual(parsed.validOrders.length, 1);
-  assert.strictEqual(parsed.validOrders[0]?.unitType, 'fortification');
+  const order = parsed.validOrders[0];
+  assert.ok(order?.action === 'set_build_queue');
+  assert.strictEqual(order.unitType, 'fortification');
   assert.strictEqual(parsed.droppedReasons.length, 0);
+}
+
+/**
+ * Accepts a credits queue item.
+ *
+ * Purpose: The model may queue credits once the briefing explains them.
+ * When to use: After the queue item check accepts every build-queue item.
+ * Expected outcome: One valid order and no drop.
+ * Exceptions: None.
+ */
+function testNormalizeProductionOrdersAcceptsCredits(): void {
+  const [hx0] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [{ action: 'set_build_queue', hex: hx0, unitType: 'credits', count: 1 }],
+    strategicCtx
+  );
+  assert.strictEqual(parsed.validOrders.length, 1);
+  const order = parsed.validOrders[0];
+  assert.ok(order?.action === 'set_build_queue');
+  assert.strictEqual(order.unitType, 'credits');
+  assert.strictEqual(parsed.droppedReasons.length, 0);
+}
+
+/**
+ * Accepts a raise row and a rehire row, and drops a raise that omits the count.
+ *
+ * Purpose: The envelope may hire as well as queue.
+ * When to use: After the normalizer accepts the three actions.
+ * Expected outcome: Two valid rows and one drop.
+ * Exceptions: None.
+ */
+function testNormalizeProductionOrdersAcceptsHireRows(): void {
+  const [hx0] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [
+      { action: 'raise_mercenaries', hex: hx0, unitType: 'infantry', count: 2 },
+      { action: 'rehire_mercenary', unitId: 'h1-i1' },
+      { action: 'raise_mercenaries', hex: hx0, unitType: 'infantry' },
+    ],
+    strategicCtx
+  );
+  assert.strictEqual(parsed.validOrders.length, 2);
+  assert.strictEqual(parsed.validOrders[0]?.action, 'raise_mercenaries');
+  assert.strictEqual(parsed.validOrders[1]?.action, 'rehire_mercenary');
+  assert.strictEqual(parsed.droppedReasons.length, 1);
 }
 
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
@@ -132,6 +179,8 @@ function run(): void {
     { name: 'count bounds', fn: testNormalizeProductionOrdersRejectsOutOfBoundsCount },
     { name: 'array contract', fn: testNormalizeProductionOrdersRequiresArrayWhenPresent },
     { name: 'fortification order', fn: testNormalizeProductionOrdersAcceptsFortification },
+    { name: 'credits order', fn: testNormalizeProductionOrdersAcceptsCredits },
+    { name: 'hire rows', fn: testNormalizeProductionOrdersAcceptsHireRows },
   ];
   for (const test of tests) {
     try {

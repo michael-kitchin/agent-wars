@@ -6,13 +6,13 @@
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
+  ALL_BUILD_QUEUE_ITEM_TYPES,
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
+  isBuildQueueItemType,
   isBuildUnitType,
   isValidBuildCount,
 } from '../productionRules';
-import { ALL_BUILD_QUEUE_ITEM_TYPES, isBuildQueueItemType } from '../../shared/ipc/productionTypes';
-import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import { getStrategicInfrastructureForHex } from '../gameDb';
 import {
   addHexBuildQueueEntry,
@@ -22,6 +22,7 @@ import {
   type HexBuildQueueView,
 } from '../gameActions';
 import type { LatLng } from './pathfinding';
+import { resolveHexArgument } from './toolHexArgument';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from '../productionCaps';
@@ -64,42 +65,6 @@ function toDisplayLatLng(ll: [number, number]): [number, number] {
 }
 
 /**
- * Defines the `resolveHexArgument` function shape (function resolveHexArgument( args: { hex?: unknown }, resolveToH3: (lat: number, lng: number) => string | undefined ): { ok: true; h3Index: string } | {).
-
- * Purpose: Supports maintainability by documenting why `resolveHexArgument` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function resolveHexArgument(
-  args: { hex?: unknown },
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): { ok: true; h3Index: string } | { ok: false; error: string } {
-  const rawHex = args.hex;
-  if (!Array.isArray(rawHex) || rawHex.length < 2) {
-    return {
-      ok: false,
-      error:
-        'hex must be provided as a two-character briefing code from the operational map per the tool schema (decoded to a map cell before this check).',
-    };
-  }
-  const lat = Number(rawHex[0]);
-  const lng = Number(rawHex[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return {
-      ok: false,
-      error:
-        'hex argument did not decode to usable numeric coordinates; pass a valid briefing hex code from the map or tables.',
-    };
-  }
-  const h3Index = resolveToH3(lat, lng);
-  if (!h3Index) {
-    return { ok: false, error: 'hex did not resolve to a known map cell in the current briefing context.' };
-  }
-  return { ok: true, h3Index };
-}
-
-/**
  * Serializes one hex queue for opponent `query_production` / `set_build_queue` tool results.
  *
  * Purpose: AI summaries must list the same queueable types as the production briefing (omit capped types when an alternative exists).
@@ -114,9 +79,10 @@ function summarizeQueue(
 ): Record<string, unknown> {
   const ll = latLngByH3.get(queue.h3Index);
   const unitTypes = filterQueueableUnitTypes(queue.availableUnitTypes.filter(isBuildUnitType), maxedTypes);
-  const availableUnitTypes = queue.availableUnitTypes.includes(FORTIFICATION_QUEUE_ITEM)
-    ? [...unitTypes, FORTIFICATION_QUEUE_ITEM]
-    : unitTypes;
+  const extras = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
+    (item) => !isBuildUnitType(item) && queue.availableUnitTypes.includes(item)
+  );
+  const availableUnitTypes = [...unitTypes, ...extras];
   const counts = queue.controlledByRequester ? getStrategicInfrastructureForHex(queue.h3Index) : null;
   return {
     hex: ll ? toDisplayLatLng(ll) : null,
@@ -127,6 +93,7 @@ function summarizeQueue(
     seaportCount: queue.seaportCount,
     ...(counts ? { fortifiedCount: counts.fortifiedCount, fortifiableCount: counts.fortifiableCount } : {}),
     availableUnitTypes,
+    ...(queue.controlledByRequester ? { buildPaused: queue.buildPaused === true } : {}),
     buildSectionVisible: queue.buildSectionVisible,
     noBuildReason: queue.noBuildReason,
     entries: queue.entries.map((entry) => ({
@@ -227,7 +194,7 @@ function setBuildQueue(
   if (!queueableTypes.includes(args.unitType)) {
     return reject(
       `set_build_queue unitType ${args.unitType} is not available for this hex; available: ${
-        queueableTypes.join(', ') || 'none'
+        queueableTypes.filter(isBuildQueueItemType).join(', ') || 'none'
       }.`,
       resolved.h3Index
     );

@@ -191,6 +191,9 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 11px;
   font-weight: 500;
 }
+.topbar-stat.is-short .topbar-stat-value {
+  color: var(--chrome-error);
+}
 /* Narrow windows keep the numbers. Each readout's tip still names it. */
 @media (max-width: 1359px) {
   .topbar-stat-caption {

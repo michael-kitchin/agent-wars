@@ -7,19 +7,17 @@
  * Exceptions: Propagates SQLite errors after rolling back the knockout transaction.
  */
 
-import { isMissileUnitType } from '../../shared/missileRules';
 import { NEUTRAL_OWNER_ID, type SeatId } from '../../shared/seatIds';
 import {
   clearBuildQueueAndProgressForHex,
   dbGetAll,
   dbRun,
-  getGameState,
   setHexController,
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
-import { executeStandingOrderActionForPlayer } from '../tools/standingOrdersCore';
-import { insertMissileHoldOrder } from '../tools/missileHoldOrder';
-import type { LatLng } from '../tools/pathfinding';
+import { convertUnitsToNeutral, type KnockoutCoordinates } from './unitOwnershipTransfer';
+
+export type { KnockoutCoordinates } from './unitOwnershipTransfer';
 
 /**
  * What one knockout changed.
@@ -60,35 +58,6 @@ export interface KnockoutApplied {
 }
 
 /**
- * Coordinate helpers the standing-order writer needs.
- *
- * Contract: `latLngByH3` covers the hexes still on the map. `resolveToH3` is the inverse used by order assignment.
- * When to use: The same pair `executeReadyStrategicTurn` built for this turn.
- * Expected outcome: A defend order can name the unit's current hex.
- * Exceptions: None.
- */
-export interface KnockoutCoordinates {
-  /**
-   * Center of each strategic hex.
-   *
-   * Contract: Keys are H3 indexes. Values are latitude and longitude.
-   * When to use: The defend order's hex.
-   * Expected outcome: A unit's current hex is present when that hex is on the map.
-   * Exceptions: None.
-   */
-  readonly latLngByH3: Map<string, LatLng>;
-  /**
-   * Resolves a center back to an H3 index.
-   *
-   * Contract: Returns undefined when the point is not a known hex.
-   * When to use: Standing-order assignment.
-   * Expected outcome: The inverse of `latLngByH3` for map hexes.
-   * Exceptions: None.
-   */
-  readonly resolveToH3: (lat: number, lng: number) => string | undefined;
-}
-
-/**
  * Deletes one seat's commander and fog rows.
  *
  * Purpose: A knocked-out seat no longer consults, remembers, or keeps a private view.
@@ -106,6 +75,8 @@ function deleteSeatPrivateRows(seatId: SeatId): void {
     'ai_loss_events_since_consultation',
     'player_hex_intel',
     'player_unit_intel',
+    'res_s_treasury',
+    'res_s_hire_orders',
   ];
   for (const table of tables) {
     dbRun(`DELETE FROM ${table} WHERE player_id = ?`, [seatId]);
@@ -134,35 +105,9 @@ export function applyKnockout(seatId: SeatId, coordinates: KnockoutCoordinates):
       setHexController(hex.h3Index, NEUTRAL_OWNER_ID);
       clearBuildQueueAndProgressForHex(hex.h3Index);
     }
-    const units = dbGetAll<{ id: string; h3Index: string; unitType: string }>(
-      'SELECT id, h3_index AS h3Index, unit_type AS unitType FROM units WHERE player = ?',
-      [seatId]
-    );
-    dbRun('UPDATE units SET player = ? WHERE player = ?', [NEUTRAL_OWNER_ID, seatId]);
-    const snapshot = getGameState();
-    for (const unit of units) {
-      if (isMissileUnitType(unit.unitType)) {
-        insertMissileHoldOrder({
-          playerId: NEUTRAL_OWNER_ID,
-          unitId: unit.id,
-          h3Index: unit.h3Index,
-          createdTurn: snapshot.turnNumber,
-        });
-        continue;
-      }
-      const result = executeStandingOrderActionForPlayer(
-        NEUTRAL_OWNER_ID,
-        'assign_order',
-        { unitId: unit.id, order: { type: 'defend', defendHex: coordinates.latLngByH3.get(unit.h3Index) } },
-        snapshot,
-        coordinates.latLngByH3,
-        coordinates.resolveToH3
-      );
-      if (result.status === 'error') {
-        logError('applyKnockout could not assign a defend order', { seatId, unitId: unit.id, error: result.error });
-      }
-    }
-    const applied = { seatId, hexesTurnedNeutral: hexes.length, unitsTurnedNeutral: units.length };
+    const unitIds = dbGetAll<{ id: string }>('SELECT id FROM units WHERE player = ?', [seatId]).map((row) => row.id);
+    const unitsTurnedNeutral = convertUnitsToNeutral(unitIds, coordinates);
+    const applied = { seatId, hexesTurnedNeutral: hexes.length, unitsTurnedNeutral };
     dbRun('COMMIT');
     logDebug('applyKnockout done', applied);
     return applied;

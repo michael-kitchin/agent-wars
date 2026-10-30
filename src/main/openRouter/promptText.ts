@@ -3,7 +3,8 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
-import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../../shared/ipc/productionTypes';
+import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../productionRules';
+import { MERCENARY_ENVELOPE_ROWS_SENTENCE } from './promptSpec/gameRuleMercenaryText';
 import { logDebug, logTrace } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
@@ -472,7 +473,8 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
     ' Any productionOrders item missing "action" or required fields is dropped.' +
     ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
     ` ${PRODUCTION_CAP_GUIDANCE}` +
-    ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.'
+    ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.' +
+    ` ${MERCENARY_ENVELOPE_ROWS_SENTENCE}`
   );
 }
 

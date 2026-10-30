@@ -119,11 +119,12 @@ When this guide and the running app disagree, the app wins until this file is up
 - **Strategic status icons (live):** Outside a battle and outside battle-detail zoom, status icons sit above each world hex. Weather shows while the Weather tab is on, in either view. Turning Tech on, or holding T, adds the tech icon. One icon is centered; a hex with both shows them side by side, tech on the left, 2 px apart. The files are the same tech and weather SVGs as the hex tooltip. Behavior is in [ux/map-surface.md](ux/map-surface.md).
 - **Unit state:** Selection, movement-in-progress, and pending orders should be obvious (e.g., outline, halo, or icon badge). Strength or health (e.g., bars or numeric) should be readable at default zoom without cluttering the map.
 - **Stacking:** When multiple units occupy one hex, show stack count and/or a compact summary (e.g., icon + number). Detail on click or in the unit panel.
+- **Mercenary badge:** A token that still contains a mercenary draws `$` (`MERCENARY_BADGE_TEXT`) low and centered, in bold 11 px, with a 2 px white stroke and a black fill (`drawMercenaryBadge`).
 
 ### 2.3 Top Bar
 
 - **Contents:** Turn number, phase (e.g., Planning / Resolving), and current player or “Your turn” indicator. Global resources (e.g., IPCs or equivalent) if applicable. Keep height minimal.
-- **Live app:** A 44 px bar: the game menu button, one chip per side, the Production, Forces, Your home, and Enemy homes readouts (Cities instead of Enemy homes when the match has a turn limit), then the date and turn on two lines, and disabled Settings and Help buttons. Captions hide below a 1360 px window. In a battle the bar is the battle header, and Exit Battle sits beside Settings. On the new-game screen the bar is the new-game bar. See [ux/top-bar.md](ux/top-bar.md).
+- **Live app:** A 44 px bar: the game menu button, one chip per side, the Production, Credits, Forces, Your home, and Enemy homes readouts (Cities instead of Enemy homes when the match has a turn limit), then the date and turn on two lines, and disabled Settings and Help buttons. Credits is hidden when that side has no treasury readout. It uses the short color when credits are below upkeep plus this turn's hire fees (`is-short`, `--chrome-error`). Captions hide below a 1360 px window. In a battle the bar is the battle header, and Exit Battle sits beside Settings. On the new-game screen the bar is the new-game bar. See [ux/top-bar.md](ux/top-bar.md).
 - **Style:** Neutral background, clear labels, numeric values prominent. Use the same type scale as the rest of the UI. Optional: small icons next to resources or phase for quick scanning.
 
 ### 2.4 Bottom Bar (Orders and Actions)
@@ -159,7 +160,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 - **Trigger:** Production is initiated from a production-capable hex (or from a dedicated build menu reachable from the map or top/sidebar). Prefer an inline panel or sidebar section over a full modal so the map stays visible.
 - **Contents:** List of buildable units with cost and build time; current resources; optional build queue and ETA. Selection of placement hex when applicable (e.g. production hex). Keep the model simple (e.g. one resource, fixed menu) per Axis & Allies–style design.
-- **Live app:** The queue also offers Fortification, one intact city cell per item, at `fortificationCostPerCell()`. The row pauses when every such cell is fortified. It is not a unit and has no cap.
+- **Live app:** The queue also offers Fortification, one intact city cell per item, at `fortificationCostPerCell()`, and Credits, at `creditsItemCost()`, which adds `CREDITS_PER_ITEM` (20). Neither is a unit and neither has a cap. A hex that can build and hire uses Build and Hire tabs (`.build-popup-tab-bar`). A Hire-only marker uses the same teal entry with the class `hire-entry-btn`. The short-funds line is `.hire-funds-warning` in `var(--chrome-error)` at 11 px. The wide popup is `.build-popup.build-popup-wide` at a 280 px max width.
 - **Style:** Same typography and color system as the rest of the UI. Use the same accent for affordability vs. unaffordable. Clear primary action (e.g. “Build” or “Queue”) and cancel/close.
 
 ### 2.10 Replay Controls

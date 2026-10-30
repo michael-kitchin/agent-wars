@@ -31,21 +31,21 @@ export function isBuildUnitType(value: unknown): value is BuildUnitType {
 }
 
 /**
- * Queue order: the five unit types, then a fortification.
+ * Queue order: the five unit types, then a fortification, then credits.
  *
  * Purpose: Menus, templates, and eligibility lists share one order.
- * When to use: Anywhere a build queue offers items, including a fortification.
- * Expected outcome: Unit types stay in cap order. `fortification` is last.
+ * When to use: Anywhere a build queue offers items, including a fortification or a credits purchase.
+ * Expected outcome: Unit types stay in cap order. `fortification` follows them. `credits` is last.
  * Exceptions: None.
  */
-export const ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, 'fortification'] as const;
+export const ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, 'fortification', 'credits'] as const;
 
 /**
- * A build-queue row: a unit type, or a fortification.
+ * A build-queue row: a unit type, a fortification, or a credits purchase.
  *
- * Purpose: Queue rows are not limited to units. A fortification is not a `BuildUnitType`.
+ * Purpose: Queue rows are not limited to units. A fortification and a credits purchase are not `BuildUnitType` values.
  * When to use: Queue snapshots, templates, Keep building, and production spend.
- * Expected outcome: Exhaustive switches cover the five unit types and `fortification`.
+ * Expected outcome: Exhaustive switches cover the five unit types, `fortification`, and `credits`.
  * Exceptions: None.
  */
 export type BuildQueueItemType = (typeof ALL_BUILD_QUEUE_ITEM_TYPES)[number];
@@ -53,7 +53,7 @@ export type BuildQueueItemType = (typeof ALL_BUILD_QUEUE_ITEM_TYPES)[number];
 /**
  * Narrows unknown input to a build-queue item.
  *
- * Purpose: IPC and stored Keep-building values can name a fortification.
+ * Purpose: IPC and stored Keep-building values can name a fortification or a credits purchase.
  * When to use: Before accepting a queue type from JSON or the database.
  * Expected outcome: TypeScript narrows `value` to `BuildQueueItemType` when `true`.
  * Exceptions: None. Returns false for any other value.
@@ -273,6 +273,15 @@ entries: HexBuildQueueEntrySnapshot[];
    * Exceptions: None.
    */
   keepBuildingUnitType: BuildQueueItemType | null;
+  /**
+   * Whether production is paused on this hex.
+   *
+   * Contract: Present and true only when the requester controls the hex and cannot build there. Omitted otherwise.
+   * When to use: The build popup's paused note. Edits stay allowed.
+   * Expected outcome: True, or absent.
+   * Exceptions: None.
+   */
+  buildPaused?: boolean;
 }
 
 /**

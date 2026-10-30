@@ -5,12 +5,12 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import { coordinateContextSeatId, HEX_CODE_PATTERN, type CoordinateContext } from '../briefing/map/coordinateContext';
-import { codeToH3, codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
+import { HEX_CODE_PATTERN, type CoordinateContext } from '../briefing/map/coordinateContext';
+import { codeToH3 } from '../briefing/map/hexCodeTranslator';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/pathfinding';
 import { executeProductionTools } from '../tools/productionTools';
-import { normalizeProductionOrders } from '../productionOrders';
+import { applyProductionOrdersFromEnvelope } from './productionOrdersApply';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
@@ -500,49 +500,6 @@ function normalizeFerryOrders(
 }
 
 /**
- * Defines the `processProductionOrdersArray` function shape (function processProductionOrdersArray( entries: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
-
- * Purpose: Supports maintainability by documenting why `processProductionOrdersArray` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function processProductionOrdersArray(
-  entries: unknown,
-  state: GameStateSnapshot,
-  latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined,
-  context: CoordinateContext
-): { appliedCount: number; droppedReasons: string[] } {
-  const normalized = normalizeProductionOrders(entries, context);
-  const droppedReasons = [...normalized.droppedReasons];
-  let appliedCount = 0;
-  for (const order of normalized.validOrders) {
-    let hexLatLng: [number, number];
-    try {
-      hexLatLng = codeToLatLngRounded(order.hex, context);
-    } catch {
-      droppedReasons.push(`production ${order.action} @ ${order.hex}: hex code could not be translated`);
-      continue;
-    }
-    const args = { hex: hexLatLng, unitType: order.unitType, count: order.count };
-    const result = executeProductionTools(coordinateContextSeatId(context), order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
-    if (result.status === 'ok') {
-      appliedCount += 1;
-      continue;
-    }
-    droppedReasons.push(`production ${order.action} @ ${order.hex}: ${result.error ?? 'failed'}`);
-  }
-  logDebug('openRouter processProductionOrdersArray', {
-    requestedCount: Array.isArray(entries) ? entries.length : 0,
-    appliedCount,
-    droppedCount: droppedReasons.length,
-    droppedReasons,
-  });
-  return { appliedCount, droppedReasons };
-}
-
-/**
  * Defines the `parseOrdersResponse` function shape (export function parseOrdersResponse( content, resolveToH3, state, latLngByH3, productionEnabled, context )).
 
  * Purpose: Supports maintainability by documenting why `parseOrdersResponse` exists.
@@ -688,7 +645,7 @@ export function parseOrdersResponse(
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {
-          const productionResult = processProductionOrdersArray(obj.productionOrders, state, latLngByH3, resolveToH3, context);
+          const productionResult = applyProductionOrdersFromEnvelope(obj.productionOrders, state, latLngByH3, resolveToH3, context, executeProductionTools);
           productionAppliedCount = productionResult.appliedCount;
           productionDropReasons = productionResult.droppedReasons;
         } else if (obj.productionOrders !== undefined) {

@@ -12,7 +12,7 @@ Caps are per side and per type. Small is the current baseline. Medium is twice S
 - Medium: infantry 24, armor 16, naval 16, air 12, missile 4
 - Large: infantry 36, armor 24, naval 24, air 18, missile 6
 
-A fortification is not one of these types. It has no cap (`FORTIFICATION_QUEUE_ITEM`).
+A fortification is not one of these types. It has no cap (`FORTIFICATION_QUEUE_ITEM`). A credits item is not a unit either (`CREDITS_QUEUE_ITEM`). A mercenary is a unit, and it does not count toward these caps: the unit-count query excludes `is_mercenary`.
 
 ## Selection
 

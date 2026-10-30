@@ -2,7 +2,7 @@
 
 One strategic prompt from a single consultation, laid out for reading on GitHub. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the capture prints that object on one line.
 
-The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation, with the changed sentences (identity, goal, Sides table, home lines, loss labels, legend, roster line, and message) brought in line with the builders. A three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`. The turn-limit number is not in this capture. The reply is [example-strategic-response.md](example-strategic-response.md).
+The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation, with the changed sentences (identity, goal, Sides table, home lines, loss labels, legend, roster line, message, cost line, and buildability rule) brought in line with the builders. A live prompt with production on also includes `# Mercenaries` after air operations. This capture has no mercenaries, so that section is the rule in `buildMercenaryRule`, then `To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.`, then `Treasury: 0 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders this turn: 0 credits.` The rehire and raise tables depend on the board and are not reconstructed here. A three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`. The turn-limit number is not in this capture. The reply is [example-strategic-response.md](example-strategic-response.md).
 
 ---
 
@@ -253,13 +253,15 @@ Turn 39:
 
 # Production Status
 
-Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item).
+Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item). a credits item costs 20 production points and adds 20 credits to your treasury (queue unitType "credits").
 
 Deployment caps (per side): infantry 12, armor 8, naval 8, air 6, missile 2.
 
 Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile 0/2.
 
 A controlled cell earns production points equal to its urban count each turn and spends them in queue order.
+
+You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn. Elsewhere a queue pauses and keeps banking its points.
 
 You are currently at maximum for: infantry, naval, air.
 
@@ -269,18 +271,18 @@ Production progress/spawn resolves after Ready, after combat and control resolut
 
 ## Controlled Hex Queues
 
-| Hex | Urban Hexes | Fortified | Airports | Seaports | Available Unit Types | Current Queue |
-| --- | --- | --- | --- | --- | --- | --- |
-| EJ | 80 | 0/80 | 8 | 4 | armor | — |
-| FO | 65 | 0/65 | 2 | 2 | armor | — |
-| ER | 50 | 0/50 | 4 | 3 | armor | — |
-| FZ | 44 | 0/44 | 2 | 3 | armor | 1 air (blocked: at cap) |
-| DN | 39 | 0/39 | 4 | 2 | armor | 1 naval (blocked: at cap) |
-| EH | 39 | 0/39 | 4 | 4 | armor | 1 air (blocked: at cap) |
-| E0 | 34 | 0/34 | 4 | 2 | armor | 1 air (blocked: at cap) |
-| DJ | 33 | 0/33 | 4 | 4 | armor | 1 air (blocked: at cap) |
-| E3 | 27 | 0/27 | 1 | 0 | armor | 1 air (blocked: at cap) |
-| GF | 27 | 0/27 | 2 | 1 | armor | 1 air (blocked: at cap) |
+| Hex | Urban Hexes | Fortified | Airports | Seaports | Available Unit Types | Current Queue | Building |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EJ | 80 | 0/80 | 8 | 4 | armor | — | yes |
+| FO | 65 | 0/65 | 2 | 2 | armor | — | yes |
+| ER | 50 | 0/50 | 4 | 3 | armor | — | yes |
+| FZ | 44 | 0/44 | 2 | 3 | armor | 1 air (blocked: at cap) | yes |
+| DN | 39 | 0/39 | 4 | 2 | armor | 1 naval (blocked: at cap) | yes |
+| EH | 39 | 0/39 | 4 | 4 | armor | 1 air (blocked: at cap) | yes |
+| E0 | 34 | 0/34 | 4 | 2 | armor | 1 air (blocked: at cap) | yes |
+| DJ | 33 | 0/33 | 4 | 4 | armor | 1 air (blocked: at cap) | yes |
+| E3 | 27 | 0/27 | 1 | 0 | armor | 1 air (blocked: at cap) | yes |
+| GF | 27 | 0/27 | 2 | 1 | armor | 1 air (blocked: at cap) | yes |
 
 # Your Strategic Memory
 
@@ -437,6 +439,8 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 4. query_orders(unitId?, all?) - Check standing order statuses.
 5. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
 6. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
+7. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
+8. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. Orders fill at the end of the turn.
 
 HOW TO USE THESE TOOLS EFFECTIVELY:
 
@@ -522,11 +526,11 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
-"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air|missile|fortification","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
+"productionOrders" entries MUST include "action" on every item. Required forms: {"action":"set_build_queue","hex":"`<two-char code>`","unitType":"infantry|armor|naval|air|missile|fortification|credits","count":1..99}. Any productionOrders item missing "action" or required fields is dropped. when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built, include at least one set_build_queue this turn.
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 
-A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.
+A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.
 
 Example (illustrative only — use briefing hex codes and unit ids from this operational map, not these placeholders). Emit compact JSON with no markdown fence:
 

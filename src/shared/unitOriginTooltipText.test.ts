@@ -193,6 +193,25 @@ test('the Tech row names Basic or Advanced, and a missing tier stays None', () =
 });
 
 /**
+ * Checks that a mercenary's upkeep follows the date of birth.
+ *
+ * Purpose: The flag tooltip is how a player sees what a mercenary costs.
+ * When to use: After changing the identity lines.
+ * Expected outcome: The Mercenary line is after DOB.
+ * Exceptions: AssertionError when the line is missing or out of order.
+ */
+test('a mercenary identity adds the Mercenary line after the date of birth', () => {
+  const html = formatUnitOriginTooltipHtml({
+    origin,
+    bonuses: NONE,
+    identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryUpkeep: 3 },
+  });
+  const dob = html.indexOf('<strong>DOB:</strong>');
+  const mercenary = html.indexOf('<strong>Mercenary:</strong> upkeep 3 credits per turn');
+  assert.ok(dob >= 0 && mercenary > dob);
+});
+
+/**
  * Checks that equal birth fields count as the same origin and one differing field does not.
  *
  * Purpose: Loss toasts share one flag per display name, so two units from the same place must still get that flag.

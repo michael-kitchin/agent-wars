@@ -118,6 +118,15 @@ export interface TacticalSubUnitSnapshot {
    * Exceptions: None.
    */
   techLevel?: TechLevel;
+  /**
+   * Whether the parent strategic unit is a mercenary.
+   *
+   * Contract: Present and true only when the parent is a mercenary.
+   * When to use: The battle token badge and the unit tooltip.
+   * Expected outcome: True, or absent.
+   * Exceptions: None.
+   */
+  isMercenary?: boolean;
 }
 
 /**

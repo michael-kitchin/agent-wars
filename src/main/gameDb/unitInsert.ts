@@ -81,6 +81,15 @@ export interface NewUnitRow {
    * Exceptions: None.
    */
   readonly formedTurn: number;
+  /**
+   * Whether the new unit is a mercenary.
+   *
+   * Contract: Absent or false writes 0. True writes 1. A mercenary missile is rejected by the table check.
+   * When to use: A raised mercenary. Ordinary production omits it.
+   * Expected outcome: The `is_mercenary` column.
+   * Exceptions: None.
+   */
+  readonly isMercenary?: boolean;
 }
 
 /**
@@ -98,13 +107,14 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
     birthTacticalH3Index: row.origin?.birthTacticalH3Index ?? null,
     birthCountryCode: row.origin?.birthCountryCode ?? null,
     formedTurn: row.formedTurn,
+    isMercenary: row.isMercenary === true,
   });
   run(
     `INSERT INTO units (
        id, player, unit_type, display_order, h3_index,
        birth_h3_index, birth_res_t_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code,
-       birth_area_id, birth_area_name, formed_turn
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       birth_area_id, birth_area_name, formed_turn, is_mercenary
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.player,
@@ -120,6 +130,7 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
       row.origin?.birthAreaId ?? row.origin?.birthCountryName ?? null,
       row.origin?.birthAreaName ?? row.origin?.birthCountryName ?? null,
       row.formedTurn,
+      row.isMercenary === true ? 1 : 0,
     ]
   );
 }

@@ -223,11 +223,39 @@ function testOpponentBuildQueueAppliesDuringTacticalBattle(): void {
   });
 }
 
+/**
+ * A queue outside the seat's home, with none of its units there, reports that building is paused.
+ *
+ * Purpose: The model must see the pause the engine already applies.
+ * When to use: After `query_production` copies `buildPaused` for the requesting seat.
+ * Expected outcome: `buildPaused` is true.
+ * Exceptions: None.
+ */
+function testQueryProductionReportsBuildPausedOutsideHome(): void {
+  withTempGameDb('aw-tool6-paused-', () => {
+    const state = getGameState();
+    const homes = new Set(Object.values(state.homeRegionHexesBySeat ?? {}).flat());
+    const hex = state.hexes.find((row) => !homes.has(row.h3Index));
+    assert.ok(hex);
+    setHexController(hex.h3Index, 'opponent');
+    setStrategicInfrastructureForHex(hex.h3Index, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    const fresh = getGameState();
+    const { latLngByH3, resolveToH3 } = buildCoordHelpers(fresh);
+    const position = latLngByH3.get(hex.h3Index);
+    assert.ok(position);
+    const result = executeProductionTools('opponent', 'query_production', { hex: position }, fresh, latLngByH3, resolveToH3);
+    assert.equal(result.status, 'ok');
+    const production = result.status === 'ok' && typeof result.production === 'object' && result.production ? result.production : undefined;
+    assert.equal(production && 'buildPaused' in production ? production.buildPaused : undefined, true);
+  });
+}
+
 function run(): void {
   testSetBuildQueueRejectsCappedTypeWhenAlternativeExists();
   testSetBuildQueueAllowsCappedTypeWhenNoAlternative();
   testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed();
   testOpponentBuildQueueAppliesDuringTacticalBattle();
+  testQueryProductionReportsBuildPausedOutsideHome();
   console.log('productionTools.test.ts passed');
 }
 

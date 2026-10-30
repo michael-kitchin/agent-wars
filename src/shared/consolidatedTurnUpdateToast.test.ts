@@ -42,6 +42,47 @@ test('one fortified city cell is reported after deployments', () => {
   ]);
 });
 
+test('a production pause line follows the fortification pause line', () => {
+  const message = buildConsolidatedTurnUpdateToastMessage({
+    readyResult: { success: true },
+    turnLossSummary: emptyTurnLossSummary(),
+    combatFallbackBullets: [],
+    fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
+    productionPauseLines: ['Building is paused at Vienna, which holds none of your units or fortifications.'],
+  });
+  assert.equal(
+    message,
+    [
+      '## Updates',
+      'Every city cell at Prague is fortified, so its build queue is paused.',
+      'Building is paused at Vienna, which holds none of your units or fortifications.',
+    ].join('\n')
+  );
+});
+
+test('credits added are reported after fortifications', () => {
+  assert.deepEqual(buildOtherTurnUpdatePrimaryLines({ success: true, humanCreditsAdded: 20 }), [
+    '20 credits added to the treasury.',
+  ]);
+});
+
+test('hire lines follow credits and precede the deployment cap', () => {
+  assert.deepEqual(buildOtherTurnUpdatePrimaryLines({
+    success: true,
+    humanCreditsAdded: 20,
+    humanMercenariesHired: 2,
+    humanUnitsDeserted: 1,
+    humanHireOrdersUnfilled: 3,
+    humanDeploymentCapReachedUnitTypes: ['infantry'],
+  }), [
+    '20 credits added to the treasury.',
+    '2 mercenaries hired.',
+    '1 unit deserted for lack of pay.',
+    '3 hire orders could not be filled, so they were not charged.',
+    'Maximum human infantry units deployed.',
+  ]);
+});
+
 test('a paused fortification line follows a neutral missile sentence and precedes the unknown-battle line', () => {
   const message = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },

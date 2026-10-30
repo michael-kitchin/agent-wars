@@ -58,8 +58,16 @@ export const productionStatTooltipText =
  * Expected outcome: For example "Units you have fielded, out of the most this game size allows: infantry 3 of 12, ...".
  * Exceptions: None.
  */
+export const forcesStatTooltipLead = 'Units you have fielded, out of the most this game size allows';
+
+/**
+ * Purpose: Lists units fielded against the game-size cap for each type.
+ * When to use: Whenever the Forces readout is refreshed, with the breakdown from `formatForcesBreakdown`.
+ * Expected outcome: `${forcesStatTooltipLead}: ${breakdown}.`
+ * Exceptions: None.
+ */
 export function forcesStatTooltipText(breakdown: string): string {
-  return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
+  return `${forcesStatTooltipLead}: ${breakdown}.`;
 }
 
 /**

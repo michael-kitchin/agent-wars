@@ -21,6 +21,7 @@ import {
 } from '../openRouter/resolutionPlaybackDeferral';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { fortificationReportLinesFor, fortificationUpdateLinesFor } from './fortificationUpdateLines';
+import { productionPauseUpdateLinesFor } from './productionPauseUpdateLines';
 import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
 
 /**
@@ -87,11 +88,16 @@ export function deriveCombatVisibilityClassification(
   const viewerInvolved = (ownerId: string | null | undefined): boolean => viewerSeatId !== null && ownerId === viewerSeatId;
   const viewerIsHuman = viewerSeatId !== null && isHumanSeatId(viewerSeatId);
   const removedById = new Map<string, RemovedUnitSnapshot>((readyResult.removedUnits ?? []).map((u) => [u.id, u] as const));
+  const killerOwner = (id: string): string | null => {
+    const removedPlayer = removedById.get(id)?.player;
+    if (removedPlayer) return removedPlayer;
+    return S.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
+  };
   const friendlyInvolvedKillVictimIds = new Set<string>(
     allKills
       .filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(unitIdOwnerFromId(id)));
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
         const victimIsFriendly = viewerInvolved(victim?.player);
         return killerIsFriendly || victimIsFriendly;
       })
@@ -357,6 +363,7 @@ export async function announceResolutionTurnUpdate(
   }
   const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
   const fortificationLines = await fortificationUpdateLinesFor(readySlice);
+  const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
   const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
     viewerSeatId,
     exploredHexes: getExploredHexSet(S.gameState),
@@ -373,6 +380,7 @@ export async function announceResolutionTurnUpdate(
     unknownBattleLine,
     missileStrikeLines,
     fortificationLines,
+    productionPauseLines,
     fortificationReportLines,
   });
   if (updateText) {

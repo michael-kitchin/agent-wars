@@ -1,1083 +1,4 @@
 (() => {
-  // src/shared/aiConsultationLimits.ts
-  var AI_MODEL_REQUEST_TIMEOUT_MS = 9e4;
-  var AI_MODEL_REQUEST_RETRY_COUNT = 1;
-  var AI_CONSULTATION_WALL_CLOCK_MS = 3e5;
-  var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
-
-  // src/renderer/core/constants.ts
-  var BACKGROUND_COLOR = "#e0dcd4";
-  var UNIT_RADIUS = 18;
-  var SELECTION_RING_COLOR = "#f2c14e";
-  var SELECTION_RING_WIDTH = 3;
-  var UNIT_TYPE_LABELS = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'I').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "I",
-    /**
-       * Documents the object literal property `armor` (armor: 'A').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "A",
-    /**
-       * Documents the object literal property `naval` (naval: 'N').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "N",
-    /**
-       * Documents the object literal property `air` (air: 'S').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "S",
-    missile: "M"
-  };
-  var ORDER_LINE_WIDTH = 2.5;
-  var ORDER_ARROW_SIZE = 10;
-  var ORDER_LINE_CASING_COLOR = "rgba(255, 255, 255, 0.8)";
-  var ORDER_LINE_CASING_PAD = 1.5;
-  var TOOLTIP_OFFSET_PX = 12;
-  var HEX_DETAILS_TOOLTIP_DELAY_MS = 1e3;
-  var HEX_DETAILS_TOOLTIP_REST_PX = 6;
-  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
-  var TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
-  var TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
-  var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
-  var MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
-  var INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
-  var OPENROUTER_TOOL_GROUPS = [
-    { id: "precomputation", label: "Precomputation" },
-    { id: "events", label: "Events" },
-    { id: "planning", label: "Planning" },
-    { id: "assessment", label: "Assessment" },
-    { id: "estimation", label: "Estimation" },
-    { id: "memory", label: "Memory" },
-    { id: "orders", label: "Orders" },
-    { id: "production", label: "Production" }
-  ];
-  var UNIT_SELECT_GLYPH = "+";
-  var UNIT_DESELECT_GLYPH = "-";
-  var TOAST_DURATION_MS = 24e3;
-  var READY_REQUEST_TIMEOUT_MS = 12e4;
-  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS + 5e3;
-  var UNIT_ICON_HIT_PAD_PX = 2;
-  var BUILD_ENTRY_HIT_PAD_PX = 2;
-  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
-  var STACK_OFFSET_X = 6;
-  var STACK_OFFSET_Y = -3;
-  var COUNT_BADGE_OFFSET = 16;
-  var MULTI_PLAYER_FILL = "#b0b0b0";
-  var MULTI_PLAYER_STROKE = "#222222";
-  var MULTI_PLAYER_GLYPH_FILTER = "brightness(0.133)";
-  var OWNERSHIP_BORDER_ALPHA = 0.75;
-  var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
-  var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
-  var RANGE_PERIMETER_MISSILE_COLOR = "#B91C1C";
-  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
-  var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
-  var RANGE_PERIMETER_LINE_CAP = "butt";
-  var RANGE_SUPPORT_CONNECTOR_LINE_CAP = "round";
-  var RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
-  var RANGE_PERIMETER_ALPHA = 0.75;
-  var MOVEMENT_HOVER_VALID_ALPHA = 0.55;
-  var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
-  var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
-  var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
-  var RANGE_PERIMETER_DASH_MIN_GAP_PX = 8;
-  var RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION = 1;
-  var RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION = 1;
-  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX = 8;
-  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX = 8;
-  var RANGE_PERIMETER_FLOW_PX_PER_SEC = 12;
-
-  // src/renderer/core/state.ts
-  var rendererSharedState = {
-    /**
-       * Documents the object literal property `buildEntryButtonPointerInside` (buildEntryButtonPointerInside: false).
-    
-       * Purpose: Supports maintainability by documenting why `buildEntryButtonPointerInside` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    buildEntryButtonPointerInside: false,
-    /**
-       * Documents the object literal property `lastPointerClientX` (lastPointerClientX: 0).
-    
-       * Purpose: Supports maintainability by documenting why `lastPointerClientX` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastPointerClientX: 0,
-    /**
-       * Documents the object literal property `lastPointerClientY` (lastPointerClientY: 0).
-    
-       * Purpose: Supports maintainability by documenting why `lastPointerClientY` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastPointerClientY: 0,
-    /**
-       * Documents the object literal property `terrainTooltipDelayTimer` (terrainTooltipDelayTimer: null as ReturnType<typeof setTimeout> | null).
-    
-       * Purpose: Supports maintainability by documenting why `terrainTooltipDelayTimer` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainTooltipDelayTimer: null,
-    /**
-       * Documents the object literal property `buildEntryDefaultMapZoom` (buildEntryDefaultMapZoom: null as number | null).
-    
-       * Purpose: Supports maintainability by documenting why `buildEntryDefaultMapZoom` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    buildEntryDefaultMapZoom: null,
-    /**
-       * Documents the object literal property `lastBuildEntryLayerKey` (lastBuildEntryLayerKey: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `lastBuildEntryLayerKey` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastBuildEntryLayerKey: null,
-    /**
-       * Documents the object literal property `tacticalBattleSnapshot` (tacticalBattleSnapshot: null as TacticalBattleSnapshot | null).
-    
-       * Purpose: Holds the active tactical battle layout and sub-units while the renderer is in tactical map mode.
-       * When to use: Set after a successful `startTacticalBattle` IPC; cleared when the tactical session ends.
-       * Expected outcome: When non-null, terrain and unit drawing use tactical constraints instead of global strategic view.
-       * Exceptions: None.
-       */
-    tacticalBattleSnapshot: null,
-    /**
-       * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
-    
-       * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
-       * When to use: Updated alongside `tactical-entry-layer` innerHTML synchronization.
-       * Expected outcome: Fewer DOM writes during pan/zoom redraws.
-       * Exceptions: None.
-       */
-    lastTacticalEntryLayerKey: null,
-    /**
-       * Documents the object literal property `tacticalEntryButtonPointerInside` (tacticalEntryButtonPointerInside: false).
-    
-       * Purpose: Tracks whether the pointer is over a tactical-entry button for consistent click hit-testing with build-entry.
-       * When to use: Pointer handlers on the tactical-entry layer update this flag.
-       * Expected outcome: Map dragging does not steal clicks intended for tactical entry.
-       * Exceptions: None.
-       */
-    tacticalEntryButtonPointerInside: false,
-    /**
-       * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
-    
-       * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
-       * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while a tactical advance is waiting on its commit.
-       * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
-       * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
-       */
-    tacticalPhasePlanning: true,
-    /**
-       * Documents the object literal property `tacticalAnnihilationOutcomeDialog` (tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null).
-    
-       * Purpose: While non-null, the tactical annihilation win/loss modal is shown and Exit Battle in the battle header stays hidden until the player confirms `Exit Battle`.
-       * When to use: Set when `getTacticalAnnihilationOutcome` is terminal during tactical planning; cleared on acknowledged exit, new game, or strategic reconciliation that drops the tactical session.
-       * Expected outcome: Blocks Ready and map interaction (via `setMainUIControlsEnabled`) until dismissal; mirrors strategic `updateGameOverUI` message strings for win/loss.
-       * Exceptions: None; keep `null` whenever no tactical snapshot exists.
-       */
-    tacticalAnnihilationOutcomeDialog: null,
-    /**
-       * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
-    
-       * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
-       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
-       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
-       * Exceptions: None.
-       */
-    preTacticalLeafletMinZoom: null,
-    /**
-       * Documents the object literal property `preTacticalLeafletMaxZoom` (preTacticalLeafletMaxZoom: null as number | null).
-    
-       * Purpose: Stores the main map max zoom before tactical constraints so it can be restored after tactical exit.
-       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
-       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
-       * Exceptions: None.
-       */
-    preTacticalLeafletMaxZoom: null,
-    /**
-       * Documents the object literal property `strategicScenarioInitialLeafletView` (strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null).
-    
-       * Purpose: Remembers the main-map center and zoom from the first `applyInitialCameraForState` of the current match so leaving tactical mode can restore that framing instead of fitting the entire world.
-       * When to use: Written when the scenario initial camera is applied; read in `exitTacticalMapView`; cleared on new game alongside `initialCameraApplied`.
-       * Expected outcome: Post-tactical strategic view matches the opening scenario extent when available.
-       * Exceptions: When null (before first camera apply), tactical exit falls back to world `fitBounds`.
-       */
-    strategicScenarioInitialLeafletView: null,
-    /**
-       * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).
-    
-       * Purpose: Supports maintainability by documenting why `strategicDominantTerrainKindByH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    strategicDominantTerrainKindByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `strategicTerrainSummaryByH3` (strategicTerrainSummaryByH3: new Map<string, string>()).
-    
-       * Purpose: Supports maintainability by documenting why `strategicTerrainSummaryByH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    strategicTerrainSummaryByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `strategicFeaturesSummaryByH3` (strategicFeaturesSummaryByH3: new Map<string, string | null>()).
-    
-       * Purpose: Supports maintainability by documenting why `strategicFeaturesSummaryByH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    strategicFeaturesSummaryByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `strategicFeatureCountsByH3` (strategicFeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
-    
-       * Purpose: Supports maintainability by documenting why `strategicFeatureCountsByH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    strategicFeatureCountsByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `terrainTooltipHtmlByContentKey` (terrainTooltipHtmlByContentKey: new Map<string, string>()).
-    
-       * Purpose: Supports maintainability by documenting why `terrainTooltipHtmlByContentKey` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainTooltipHtmlByContentKey: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `terrainTooltipRequestSeq` (terrainTooltipRequestSeq: 0).
-    
-       * Purpose: Supports maintainability by documenting why `terrainTooltipRequestSeq` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainTooltipRequestSeq: 0,
-    /**
-       * Documents the object literal property `terrainTooltipRestoreTimer` (terrainTooltipRestoreTimer: null as ReturnType<typeof setTimeout> | null).
-    
-       * Purpose: Supports maintainability by documenting why `terrainTooltipRestoreTimer` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainTooltipRestoreTimer: null,
-    /**
-       * Documents the object literal property `selectedHexIndex` (selectedHexIndex: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `selectedHexIndex` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    selectedHexIndex: null,
-    /**
-    * Ordered strategic hex ids controlled by the build-popup multi-selection (insertion order).
-    *
-    * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
-    * When to use: Build-entry button chrome, Shift-toggle policy, and multi-hex popup rendering.
-    * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
-    * deselect re-anchor. Plain click replaces the set and popup close clears it.
-    * Exceptions: Only build-entry button interactions may add or remove members.
-    */
-    selectedBuildHexH3s: [],
-    /**
-       * Documents the object literal property `hoveredHexH3` (hoveredHexH3: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `hoveredHexH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hoveredHexH3: null,
-    /**
-       * Documents the object literal property `hoveredDetailHexH3` (hoveredDetailHexH3: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `hoveredDetailHexH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hoveredDetailHexH3: null,
-    /**
-       * Documents the object literal property `hideTerrainFillWhileHeld` (hideTerrainFillWhileHeld: false).
-    
-       * Purpose: Supports maintainability by documenting why `hideTerrainFillWhileHeld` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hideTerrainFillWhileHeld: false,
-    /**
-       * Documents the object literal property `selectedUnitIds` (selectedUnitIds: [] as string[]).
-    
-       * Purpose: Supports maintainability by documenting why `selectedUnitIds` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    selectedUnitIds: [],
-    /**
-       * Documents the object literal property `selectedUnitIdsAtMouseDown` (selectedUnitIdsAtMouseDown: [] as string[]).
-    
-       * Purpose: Supports maintainability by documenting why `selectedUnitIdsAtMouseDown` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    selectedUnitIdsAtMouseDown: [],
-    /**
-    * Epoch milliseconds when `selectedUnitIdsAtMouseDown` was last copied from the live selection. `0` means no gesture is open.
-    *
-    * Purpose: Lets the second press of a double-click keep the units the player had selected instead of resnapshotting whatever the first click selected.
-    * When to use: Written by the main-map pointer-down listener. Reset to `0` everywhere the snapshot array is cleared.
-    * Expected outcome: A press inside the gesture window leaves the snapshot array untouched.
-    * Exceptions: None.
-    */
-    gestureSelectionSnapshotAtMs: 0,
-    /**
-    * Client X of the press that took the current gesture snapshot.
-    *
-    * Purpose: A second press far from this point is a new click, not the second half of a double-click, so the snapshot must be retaken.
-    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
-    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
-    * Exceptions: None.
-    */
-    gestureSelectionAnchorClientX: 0,
-    /**
-    * Client Y of the press that took the current gesture snapshot.
-    *
-    * Purpose: Pairs with `gestureSelectionAnchorClientX` for the double-click distance check.
-    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
-    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
-    * Exceptions: None.
-    */
-    gestureSelectionAnchorClientY: 0,
-    /**
-    * True while Shift is held as the multi-select modifier.
-    *
-    * Purpose: Hides committed paths and hover previews, and switches the stack callout from Select All to Add All / Remove All.
-    * When to use: Set on Shift keydown, cleared on Shift keyup and window blur. Clicks also read `event.shiftKey`.
-    * Expected outcome: `false` whenever Shift is up and the window is focused.
-    * Exceptions: None.
-    */
-    shiftKeyActive: false,
-    /**
-       * Documents the object literal property `pendingSelectTimeout` (pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null).
-    
-       * Purpose: Supports maintainability by documenting why `pendingSelectTimeout` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    pendingSelectTimeout: null,
-    /**
-    * Timer that will open the stack callout after a single click, or `null` when no open is waiting.
-    *
-    * Purpose: The callout is layered above the map, so opening it on the first click would swallow the second click of a double-click. Waiting out the single-select delay lets a double-click on a stack icon plan an order instead.
-    * When to use: Written only by `scheduleDeferredStackCallout`; cleared by `clearDeferredStackCalloutTimer`.
-    * Expected outcome: The callout appears only if this timer is allowed to fire.
-    * Exceptions: None.
-    */
-    pendingStackCalloutTimeout: null,
-    /**
-    * Client X of the click that scheduled the pending stack callout.
-    *
-    * Purpose: A press away from this point means the player moved on, so the popup must not still appear there; a press on the same point is the second half of a double-click and must leave it scheduled.
-    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
-    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
-    * Exceptions: None.
-    */
-    pendingStackCalloutAnchorClientX: 0,
-    /**
-    * Client Y of the click that scheduled the pending stack callout.
-    *
-    * Purpose: Pairs with `pendingStackCalloutAnchorClientX` for the press-away distance check.
-    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
-    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
-    * Exceptions: None.
-    */
-    pendingStackCalloutAnchorClientY: 0,
-    /**
-       * Documents the object literal property `humanStandingOrders` (humanStandingOrders: [] as HumanStandingOrderSnapshot[]).
-    
-       * Purpose: Supports maintainability by documenting why `humanStandingOrders` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    humanStandingOrders: [],
-    /**
-       * Documents the object literal property `hoverRoutePreview` (hoverRoutePreview: null as HoverRoutePreviewState | null).
-    
-       * Purpose: Supports maintainability by documenting why `hoverRoutePreview` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hoverRoutePreview: null,
-    /**
-       * Documents the object literal property `hoverPreviewRequestSeq` (hoverPreviewRequestSeq: 0).
-    
-       * Purpose: Supports maintainability by documenting why `hoverPreviewRequestSeq` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hoverPreviewRequestSeq: 0,
-    /**
-       * Documents the object literal property `pendingRangedAttacks` (pendingRangedAttacks: [] as RangedAttackOrder[]).
-    
-       * Purpose: Supports maintainability by documenting why `pendingRangedAttacks` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    pendingRangedAttacks: [],
-    /**
-       * Documents the object literal property `pendingAirStrikes` (pendingAirStrikes: [] as AirStrikeOrder[]).
-    
-       * Purpose: Supports maintainability by documenting why `pendingAirStrikes` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    pendingAirStrikes: [],
-    /**
-    * Queued missile launches the next Ready will send.
-    *
-    * Purpose: Holds the human's aimed launches until Ready submits them or a new game clears them.
-    * When to use: Written when a launch is planned or cancelled. Read by the Orders tab and the map arrows.
-    * Expected outcome: Empty until the player double-clicks a target while missile aiming is on.
-    * Exceptions: None.
-    */
-    pendingMissileLaunches: [],
-    /**
-       * Documents the object literal property `pendingFerryOrders` (pendingFerryOrders: [] as FerryOrder[]).
-    
-       * Purpose: Supports maintainability by documenting why `pendingFerryOrders` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    pendingFerryOrders: [],
-    /**
-       * Documents the object literal property `pendingEmbarkOrders` (pendingEmbarkOrders: [] as EmbarkOrder[]).
-    
-       * Purpose: Queues human sealift embark drafts as tactical sub-unit pairs until tactical Ready commits them (strategic `updateSealiftSlot` is blocked during tactical battles).
-       * When to use: Stack callout sealift controls while `tacticalBattleSnapshot` is set; clear on tactical Ready commit, exit, stash, or new game.
-       * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same tactical hex.
-       * Exceptions: None.
-       */
-    pendingEmbarkOrders: [],
-    /**
-       * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as TacticalPendingMarchRow[]).
-    
-       * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
-       * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
-       * Expected outcome: Sidebar lists tactical destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
-       * Exceptions: None.
-       */
-    tacticalPendingMarches: [],
-    /**
-       * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
-    
-       * Purpose: Supports maintainability by documenting why `hideCommittedOrderLinesAfterReady` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    hideCommittedOrderLinesAfterReady: false,
-    /**
-       * Documents the object literal property `rangedModeActive` (rangedModeActive: false).
-    
-       * Purpose: Supports maintainability by documenting why `rangedModeActive` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    rangedModeActive: false,
-    /**
-       * Documents the object literal property `airStrikeModeActive` (airStrikeModeActive: false).
-    
-       * Purpose: Supports maintainability by documenting why `airStrikeModeActive` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    airStrikeModeActive: false,
-    /**
-    * Whether the reticle is aiming a missile launch.
-    *
-    * Purpose: The next double-click places a launch instead of a march.
-    * When to use: Set by the reticle. Cleared by a second click, an empty selection, or a successful launch.
-    * Expected outcome: True only while missiles are selected and the player is choosing a target.
-    * Exceptions: None. A battle never turns this on.
-    */
-    missileLaunchModeActive: false,
-    /**
-       * Cached lat/lng vertex loops for the range perimeter overlay (recomputed when signature changes).
-    
-       * Purpose: Avoids rebuilding H3 disks and edge chains every animation frame.
-       * When to use: Read by `drawRangePerimeterOverlay`; written by `refreshRangePerimeterCacheIfNeeded`.
-       * Expected outcome: `null` when mode inactive or selection invalid; otherwise one or more closed loops.
-       * Exceptions: None.
-       */
-    rangePerimeterLoopsLatLng: null,
-    /**
-       * Signature of mode, battle, and selection used to invalidate `rangePerimeterLoopsLatLng`.
-    
-       * Purpose: Detects when perimeter geometry must be recomputed.
-       * When to use: Compared on each draw while ranged/strike planning is active.
-       * Expected outcome: Changes when `selectedUnitIds`, mode flags, or enclosing battle hex changes.
-       * Exceptions: None.
-       */
-    rangePerimeterSignature: null,
-    /**
-       * Active `requestAnimationFrame` id for flowing range perimeter dashes, or null when idle.
-    
-       * Purpose: Ensures a single animation loop while planning mode is active.
-       * When to use: Set by `ensureRangePerimeterAnimation` / `tickRangePerimeterAnimation`.
-       * Expected outcome: Non-null only during ranged/strike mode without resolution playback.
-       * Exceptions: None.
-       */
-    rangePerimeterAnimationFrameId: null,
-    /**
-       * Documents the object literal property `airStrikeTargetType` (airStrikeTargetType: 'units' as AirStrikeTargetType).
-    
-       * Purpose: Supports maintainability by documenting why `airStrikeTargetType` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    airStrikeTargetType: "units",
-    /**
-       * Documents the object literal property `stackCalloutModalActive` (stackCalloutModalActive: false).
-    
-       * Purpose: Supports maintainability by documenting why `stackCalloutModalActive` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    stackCalloutModalActive: false,
-    /**
-       * Documents the object literal property `buildPopupHexH3` (buildPopupHexH3: null as string | null).
-    
-       * Purpose: Supports maintainability by documenting why `buildPopupHexH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    buildPopupHexH3: null,
-    /**
-    * Ordered queue rows broadcast across selected production hexes while multi-select is active.
-    *
-    * Purpose: Preserves rows unavailable at some hexes even though those rows are filtered from persistence.
-    * When to use: Selection size two or greater; clear when collapsing to one or closing the popup.
-    * Expected outcome: Multi-edit controls remain stable across per-hex eligibility differences and async edits via stable `rowKey`.
-    * Exceptions: Single-hex mode continues to read and mutate database entry ids directly.
-    */
-    buildQueueTemplate: [],
-    /**
-       * Documents the object literal property `buildPopupRequestSeq` (buildPopupRequestSeq: 0).
-    
-       * Purpose: Supports maintainability by documenting why `buildPopupRequestSeq` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    buildPopupRequestSeq: 0,
-    /**
-       * Documents the object literal property `gameState` (gameState: null as GameStateSnapshot | null).
-    
-       * Purpose: Supports maintainability by documenting why `gameState` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    gameState: null,
-    /**
-       * Documents the object literal property `unitDisplayNameById` (unitDisplayNameById: new Map<string, string>()).
-    
-       * Purpose: Supports maintainability by documenting why `unitDisplayNameById` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    unitDisplayNameById: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `tacticalTerrainOverridesByH3` (tacticalTerrainOverridesByH3: new Map< string, { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean } >()).
-    
-       * Purpose: Supports maintainability by documenting why `tacticalTerrainOverridesByH3` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    tacticalTerrainOverridesByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `tacticalCityOverlayLabelByH3` (tacticalCityOverlayLabelByH3: new Map<string, string>()).
-    
-       * Purpose: Caches reduced tactical city labels for the tactical city overlay while tactical hexes are visible.
-       * When to use: Hydrated at startup from main-process IPC; read only from terrain overlay passes.
-       * Expected outcome: Keys are tactical child indexes; values are display strings already tie-broken per naming rules.
-       * Exceptions: None.
-       */
-    tacticalCityOverlayLabelByH3: /* @__PURE__ */ new Map(),
-    /**
-    * Generated urban-cell count for each strategic hex that can produce units.
-    *
-    * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
-    * When to use: Hydrated once per session from `game:getStrategicBaselineUrbanHexCounts`. A missing hex produces nothing.
-    * Expected outcome: Keys are strategic indexes. Values are integers of at least 1.
-    * Exceptions: None.
-    */
-    baselineUrbanHexCountByStrategicH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `tacticalRoadRailSidesByH3` (tacticalRoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
-    
-       * Purpose: Caches road/rail side masks for tactical cells used by the tactical transport overlay renderer (gameplay truth: booleans).
-       * When to use: Hydrated once per session from `game:getTacticalRoadRailOverlays` alongside terrain overrides.
-       * Expected outcome: Parallel boolean arrays match the exported JSON contract for each stored cell.
-       * Exceptions: None.
-       */
-    tacticalRoadRailSidesByH3: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `tacticalTransportVectorOverlayRows` (tacticalTransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
-    
-       * Purpose: Caches optional display-only transport polylines for the Leaflet vector overlay.
-       * When to use: Hydrated from `game:getTacticalTransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
-       * Expected outcome: Empty array when vector artifact is absent; populated rows use WGS84 `[lat, lng]` tuples.
-       * Exceptions: None.
-       */
-    tacticalTransportVectorOverlayRows: [],
-    /**
-       * Documents the object literal property `terrainInfraStrategicAirport` (terrainInfraStrategicAirport: new Set<string>()).
-    
-       * Purpose: Supports maintainability by documenting why `terrainInfraStrategicAirport` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainInfraStrategicAirport: /* @__PURE__ */ new Set(),
-    /**
-       * Documents the object literal property `terrainInfraStrategicSeaport` (terrainInfraStrategicSeaport: new Set<string>()).
-    
-       * Purpose: Supports maintainability by documenting why `terrainInfraStrategicSeaport` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainInfraStrategicSeaport: /* @__PURE__ */ new Set(),
-    /**
-       * Documents the object literal property `terrainInfraTacticalAirport` (terrainInfraTacticalAirport: new Set<string>()).
-    
-       * Purpose: Supports maintainability by documenting why `terrainInfraTacticalAirport` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainInfraTacticalAirport: /* @__PURE__ */ new Set(),
-    /**
-       * Documents the object literal property `terrainInfraTacticalSeaport` (terrainInfraTacticalSeaport: new Set<string>()).
-    
-       * Purpose: Supports maintainability by documenting why `terrainInfraTacticalSeaport` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    terrainInfraTacticalSeaport: /* @__PURE__ */ new Set(),
-    /**
-       * Documents the object literal property `tacticalChildrenByParent` (tacticalChildrenByParent: new Map<string, string[]>()).
-    
-       * Purpose: Supports maintainability by documenting why `tacticalChildrenByParent` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    tacticalChildrenByParent: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `tacticalVisible` (tacticalVisible: false).
-    
-       * Purpose: Supports maintainability by documenting why `tacticalVisible` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    tacticalVisible: false,
-    /**
-       * Documents the object literal property `resolutionMoveAnimation` (resolutionMoveAnimation: null as ResolutionMoveAnimationState).
-    
-       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimation` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    resolutionMoveAnimation: null,
-    /**
-       * Documents the object literal property `resolutionMoveAnimationFrameId` (resolutionMoveAnimationFrameId: null as number | null).
-    
-       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimationFrameId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    resolutionMoveAnimationFrameId: null,
-    /**
-    * True while main deferred strategic post-resolution LLM consultation until playback notify + push.
-    *
-    * Purpose: Gates Ready + Run prefetch until `registerPostResolutionConsultationListener` receives a matching push.
-    * When to use: Strategic Ready path when `ReadyResult.postResolutionConsultDeferred` is true until push clears this flag.
-    * Expected outcome: Cleared when push applies or on new game / fatal mismatch recovery.
-    * Exceptions: None.
-    */
-    pendingDeferredStrategicPostResolutionConsult: false,
-    /**
-    * True while main deferred tactical post-beat LLM consultation until playback notify + push.
-    *
-    * Purpose: Mirrors `pendingDeferredStrategicPostResolutionConsult` for tactical event-driven Run commits.
-    * When to use: Tactical commit returned `tacticalPostBeatConsultDeferred` until `registerPostTacticalBeatConsultationListener` fires.
-    * Expected outcome: Cleared when tactical push applies or tactical session ends.
-    * Exceptions: None.
-    */
-    pendingDeferredTacticalPostBeatConsult: false,
-    /**
-    * True once the renderer has told main that resolution playback finished for the armed deferred consultation.
-    *
-    * Purpose: Main starts the deferred consultation on that notify, so the Ready "AI:" timer starts then rather than
-    * during the playback animation.
-    * When to use: Reset to false wherever a deferred strategic or tactical consultation is armed; set to true when its
-    * playback-complete notify is sent. Read through `isDeferredResolutionConsultRunning`.
-    * Expected outcome: Meaningful only while a deferred consultation is pending; a stale true value is ignored once the
-    * pending flags clear.
-    * Exceptions: None.
-    */
-    deferredResolutionConsultNotifySent: false,
-    /**
-       * Documents the object literal property `initialCameraApplied` (initialCameraApplied: false).
-    
-       * Purpose: Supports maintainability by documenting why `initialCameraApplied` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    initialCameraApplied: false,
-    /**
-       * Documents the object literal property `clientStaleEnemyIntelByUnitId` (clientStaleEnemyIntelByUnitId: new Map< string, { unitId: string; lastKnownH3Index: string; lastSeenTurn: number; staleUnt).
-    
-       * Purpose: Supports maintainability by documenting why `clientStaleEnemyIntelByUnitId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    clientStaleEnemyIntelByUnitId: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `lastRenderedVisibleEnemyByUnitId` (lastRenderedVisibleEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
-    
-       * Purpose: Supports maintainability by documenting why `lastRenderedVisibleEnemyByUnitId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastRenderedVisibleEnemyByUnitId: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `lastObservedEnemyByUnitId` (lastObservedEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
-    
-       * Purpose: Supports maintainability by documenting why `lastObservedEnemyByUnitId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastObservedEnemyByUnitId: /* @__PURE__ */ new Map(),
-    /**
-       * Documents the object literal property `redrawRafId` (redrawRafId: null as number | null).
-    
-       * Purpose: Supports maintainability by documenting why `redrawRafId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    redrawRafId: null,
-    /**
-       * Documents the object literal property `canvasMetrics` (canvasMetrics: null as { w: number; h: number; dpr: number } | null).
-    
-       * Purpose: Supports maintainability by documenting why `canvasMetrics` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    canvasMetrics: null,
-    /**
-       * Documents the object literal property `openRouterToolGroups` (openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS] as { id: string; label: string }[]).
-    
-       * Purpose: Supports maintainability by documenting why `openRouterToolGroups` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS],
-    /**
-       * Documents the object literal property `enabledToolGroups` (enabledToolGroups: new Set<string>(OPENROUTER_TOOL_GROUPS.map((g) => g.id))).
-    
-       * Purpose: Supports maintainability by documenting why `enabledToolGroups` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    enabledToolGroups: new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id)),
-    /**
-       * Documents the object literal property `toolInvocationCounts` (toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])) as Record< string, number >).
-    
-       * Purpose: Supports maintainability by documenting why `toolInvocationCounts` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])),
-    /**
-       * Documents the object literal property `runButtonOn` (runButtonOn: false).
-    
-       * Purpose: Supports maintainability by documenting why `runButtonOn` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    runButtonOn: false,
-    /**
-       * Documents the object literal property `useEventDrivenConsultation` (useEventDrivenConsultation: true).
-    
-       * Purpose: Supports maintainability by documenting why `useEventDrivenConsultation` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    useEventDrivenConsultation: true,
-    /**
-       * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
-    
-       * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    precomputedToolInvocationCounts: null,
-    /**
-       * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
-       * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
-    
-       * Purpose: Single latch for the full async Ready pipeline including post-`ready` resolution playback setup.
-       * When to use: Written only in `readyHandler`; read by `updateReadyButtonState` and the handler’s re-entry guard.
-       * Expected outcome: At most one Ready completion run at a time; button reflects disabled state while true.
-       * Exceptions: Cleared in `finally` even when the handler returns early (e.g. AI planning wait toast).
-       */
-    readyRequestInFlight: false,
-    /**
-       * Documents the object literal property `readyBtnAiWaitStartTime` (readyBtnAiWaitStartTime: null as number | null).
-    
-       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitStartTime` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    readyBtnAiWaitStartTime: null,
-    /**
-       * Documents the object literal property `readyBtnAiWaitIntervalId` (readyBtnAiWaitIntervalId: null as ReturnType<typeof setInterval> | null).
-    
-       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitIntervalId` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    readyBtnAiWaitIntervalId: null,
-    /**
-       * Documents the object literal property `toastHideTimer` (toastHideTimer: null as ReturnType<typeof setTimeout> | null).
-    
-       * Purpose: Supports maintainability by documenting why `toastHideTimer` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    toastHideTimer: null,
-    /**
-       * Documents the object literal property `aiStrategyToastHideTimer` (aiStrategyToastHideTimer: null as ReturnType<typeof setTimeout> | null).
-    
-       * Purpose: Supports maintainability by documenting why `aiStrategyToastHideTimer` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    aiStrategyToastHideTimer: null,
-    /**
-       * Documents the object literal property `lastAppliedMapInteractionCursor` (lastAppliedMapInteractionCursor: '').
-    
-       * Purpose: Supports maintainability by documenting why `lastAppliedMapInteractionCursor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    lastAppliedMapInteractionCursor: "",
-    /**
-     * Which side a watch is looking through.
-     *
-     * Purpose: All sides shows every hex. A seat id shows that seat's fog.
-     * When to use: `getGameState` while no human seat is active, and the View as control.
-     * Expected outcome: `'all'` until the player picks a seat. A new match resets it.
-     * Exceptions: None.
-     */
-    viewAs: "all",
-    /**
-     * Whether Ready should press itself once every commander is ready.
-     *
-     * Purpose: A watch can advance without a click. Watch the rest turns it on.
-     * When to use: The footer checkbox, and the press that follows playback.
-     * Expected outcome: False for a new match. True after Watch the rest, until the player turns it off or Ready fails.
-     * Exceptions: None.
-     */
-    autoAdvance: false
-  };
-
-  // src/shared/selectionUnitIdSets.ts
-  function selectionUnitIdSetsDiffer(before, after) {
-    if (before.length !== after.length) return true;
-    const beforeSet = new Set(before);
-    return after.some((id) => !beforeSet.has(id));
-  }
-
-  // src/shared/ipc/productionTypes.ts
-  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air", "missile"];
-  function isBuildUnitType(value) {
-    return typeof value === "string" && ALL_BUILD_UNIT_TYPES.includes(value);
-  }
-  var ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, "fortification"];
-
-  // src/shared/lossSummary.ts
-  var LOSS_TYPE_NAME_LIST_MAX = 3;
-  var GROUP_LABEL_BY_TYPE = {
-    naval: "Naval",
-    air: "Air",
-    armor: "Armored",
-    infantry: "Infantry",
-    missile: "Missile"
-  };
-  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
-  function emptyPlayerLossSummary() {
-    return { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
-  }
-  function emptyTurnLossSummary() {
-    return { byOwner: {} };
-  }
-  function isKnownLossType(unitType) {
-    return isBuildUnitType(unitType);
-  }
-  function formatLossEntries(units) {
-    if (units.length === 0) return "";
-    const counts = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
-    for (const unit of units) {
-      if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
-    }
-    const parts = [];
-    for (const unit of units) {
-      if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
-        parts.push(unit.displayName);
-      }
-    }
-    for (const unitType of GROUP_ORDER) {
-      const count = counts[unitType];
-      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
-    }
-    return parts.join(", ");
-  }
-  var CAUSE_SPECS = [
-    { key: "ranged", label: "Ranged attack" },
-    { key: "melee", label: "Melee attack" },
-    { key: "returnFire", label: "Return fire" },
-    { key: "airStrike", label: "Air strike" },
-    { key: "missileStrike", label: "Missile strike" },
-    { key: "other", label: "Other losses" }
-  ];
-  var LOSS_CAUSE_LABELS = CAUSE_SPECS.map((spec) => spec.label);
-  var LOSS_CAUSE_KEYS = CAUSE_SPECS.map((spec) => spec.key);
-  function formatPlayerLossLinesMultiline(summary) {
-    const lines = [];
-    for (const spec of CAUSE_SPECS) {
-      const units = summary[spec.key];
-      if (units.length === 0) continue;
-      const text = formatLossEntries(units);
-      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
-    }
-    return lines;
-  }
-
-  // src/shared/lossToastUnitSegments.ts
-  var GROUP_TYPE_BY_LABEL = {
-    Naval: "naval",
-    Air: "air",
-    Armored: "armor",
-    Infantry: "infantry",
-    Missile: "missile"
-  };
-  var GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
-  var VICTIM_SEPARATOR = ", ";
-  var BULLET_PREFIX = "\u2022 ";
-  function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
-    const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
-    const body = line.slice(bullet.length);
-    const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
-    if (!label) return [{ text: line, unitDisplayName: null }];
-    const prefix = `${bullet}${label}: `;
-    const tokens = body.slice(label.length + 2).split(VICTIM_SEPARATOR);
-    const segments = [{ text: prefix, unitDisplayName: null }];
-    tokens.forEach((token, index) => {
-      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
-      segments.push(victimSegment(token, knownDisplayNames));
-    });
-    return segments;
-  }
-  function victimSegment(token, knownDisplayNames) {
-    if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
-    const match = GROUP_TOKEN.exec(token);
-    const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ""] : void 0;
-    if (match && unitType) {
-      return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
-    }
-    return { text: token, unitDisplayName: null };
-  }
-
   // src/shared/seatIds.ts
   var HUMAN_SEAT_ID = "human";
   var AI_SEAT_IDS = ["opponent", "opponent2", "opponent3", "opponent4"];
@@ -1108,476 +29,434 @@
     return index < 0 ? null : index + 1;
   }
 
-  // src/shared/turnLossSections.ts
-  var NO_HEX_LINES = /* @__PURE__ */ new Map();
-  var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
-  var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES) {
-    const lines = [];
-    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner)) {
-      const header = headerFor(ownerId, viewerSeatId2, seats);
-      lines.push(
-        ...sectionLines(
-          summary,
-          ownerId,
-          header,
-          hexLinesByOwner.get(ownerId) ?? [],
-          strikeLinesByOwner.get(ownerId) ?? []
-        )
-      );
-    }
-    return lines;
-  }
-  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner) {
-    const ids = /* @__PURE__ */ new Set([
-      ...Object.keys(summary.byOwner),
-      ...hexLinesByOwner.keys(),
-      ...strikeLinesByOwner.keys()
-    ]);
-    const ordered = [];
-    if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
-    const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
-    others.sort((left, right) => compareOwners(left, right, seats));
-    ordered.push(...others);
-    if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
-    return ordered;
-  }
-  function headerFor(ownerId, viewerSeatId2, seats) {
-    if (viewerSeatId2 !== null && ownerId === viewerSeatId2) return "Your Losses";
-    if (ownerId === NEUTRAL_OWNER_ID) return "Neutral Losses";
-    return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
-  }
-  function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
-    if (headerTitle === "Your Losses") return viewerSeatId2;
-    if (headerTitle === "Neutral Losses") return NEUTRAL_OWNER_ID;
-    if (!headerTitle.endsWith(" Losses")) return null;
-    const name = headerTitle.slice(0, -" Losses".length);
-    const matches = seats.filter((seat) => {
-      const home = seat.homeRegion.trim();
-      return (home.length > 0 ? home : seat.seatId) === name;
-    }).sort((left, right) => left.seatOrder - right.seatOrder);
-    return matches[0]?.seatId ?? null;
-  }
-  function lossSectionTitle(seat, ownerId) {
-    const name = seat?.homeRegion.trim() ?? "";
-    return `${name.length > 0 ? name : ownerId} Losses`;
-  }
-  function sectionLines(summary, ownerId, header, hexLines, strikeLines) {
-    const buckets = summary.byOwner[ownerId];
-    const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-    if (causes.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
-    return [
-      `${SECTION_HEADER_PREFIX}${header}`,
-      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
-      ...strikeLines,
-      ...hexLines
-    ];
-  }
-  function compareOwners(left, right, seats) {
-    const leftSeat = seats.find((row) => row.seatId === left);
-    const rightSeat = seats.find((row) => row.seatId === right);
-    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
-    if (leftSeat) return -1;
-    if (rightSeat) return 1;
-    return left.localeCompare(right, "en");
+  // src/shared/hireEntryHexes.ts
+  function hireEntryHexesForHuman(state) {
+    if (state.playerPerspective !== HUMAN_SEAT_ID) return /* @__PURE__ */ new Set();
+    const human = state.seats?.find((seat) => seat.seatId === HUMAN_SEAT_ID);
+    if (state.seats && (human == null || human.outTurn !== null)) return /* @__PURE__ */ new Set();
+    const hexes = state.mercenaryEconomy?.hireHexes;
+    if (!hexes) return /* @__PURE__ */ new Set();
+    return new Set(hexes);
   }
 
-  // src/shared/shortSideName.ts
-  var COMPASS_PREFIXES = [
-    ["Northern", "N."],
-    ["Southern", "S."],
-    ["Eastern", "E."],
-    ["Western", "W."],
-    ["Central", "C."],
-    ["North", "N."],
-    ["South", "S."],
-    ["East", "E."],
-    ["West", "W."]
-  ];
-  var DIRECTION_STEMS = [
-    ["central", "C"],
-    ["north", "N"],
-    ["south", "S"],
-    ["east", "E"],
-    ["west", "W"]
-  ];
-  var TRAILING_ABBREVIATION = / \([A-Z]{2,}\)$/;
-  function sideHomeNameKey(displayName) {
-    return displayName.trim().replace(TRAILING_ABBREVIATION, "");
-  }
-  function cutAtFirstSeparator(displayName) {
-    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
-    if (separatorAt.length === 0) return displayName;
-    return displayName.slice(0, Math.min(...separatorAt));
-  }
-  function shortenLeadingCompass(name) {
-    for (const [word, short] of COMPASS_PREFIXES) {
-      if (name === word) return short;
-      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+  // src/shared/activeGameMap.ts
+  var GLOBAL_GAME_MAP = {
+    id: "global",
+    displayName: "Global",
+    strategicResolution: 1,
+    tacticalResolution: 4,
+    controlWinMinUrbanShare: null,
+    rules: {
+      infantryCost: 20,
+      armorCost: 40,
+      navalCost: 100,
+      airCost: 60,
+      missileCost: 200,
+      missileRangeHexes: 12,
+      armorMinUrbanCells: 2,
+      airMinUrbanCells: 5,
+      navalMinUrbanCells: 10,
+      advancedMinUrbanCells: 21,
+      strategicStrikeUrbanCells: 9
+    },
+    scaleranks: {
+      urbanOverlay: 5,
+      airport: 5,
+      seaport: 5,
+      cityLabel: 6
     }
-    return name;
+  };
+  var activeProfile = GLOBAL_GAME_MAP;
+  var profileResetters = [];
+  function registerActiveGameMapReset(reset) {
+    profileResetters.push(reset);
   }
-  function isOnlySingleLetterWords(value) {
-    const words = value.split(/\s+/).map((word) => word.replace(/[^A-Za-z]/g, "")).filter((word) => word.length > 0);
-    return words.length > 0 && words.every((word) => word.length === 1);
+  function assignActiveProfile(profile) {
+    activeProfile = profile;
+    for (const reset of profileResetters) reset();
   }
-  function hasUnclosedParenthesis(value) {
-    let open = 0;
-    for (const char of value) {
-      if (char === "(") open += 1;
-      else if (char === ")") open -= 1;
-      if (open < 0) return true;
+  function activeGameMap() {
+    return activeProfile;
+  }
+  function setActiveGameMap(profile) {
+    assignActiveProfile(profile);
+  }
+
+  // src/shared/creditsRules.ts
+  var CREDITS_QUEUE_ITEM = "credits";
+  var CREDITS_ITEM_INFANTRY_MULTIPLIER = 1;
+  var CREDITS_PER_ITEM = GLOBAL_GAME_MAP.rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER;
+  var CREDITS_QUEUE_ITEM_LABEL = "Credits";
+  function formatCreditsAddedLine(count) {
+    return count === 1 ? "1 credit added to the treasury." : `${count} credits added to the treasury.`;
+  }
+
+  // src/shared/mercenaryRules.ts
+  var MERCENARY_UPKEEP_DIVISOR = 8;
+  var MERCENARY_ADVANCED_TECH_MULTIPLIER = 2;
+  var HIREABLE_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
+  var BUILD_TAB_LABEL = "Build";
+  var HIRE_TAB_LABEL = "Hire";
+  var HIRE_BUTTON_LABEL = "Hire";
+  var RAISE_SECTION_TITLE = "Raise";
+  var REHIRE_SECTION_TITLE = "Neutral units";
+  var PENDING_HIRE_SECTION_TITLE = "Orders this turn";
+  var CREDITS_LINE_LABEL = "Credits";
+  var UPKEEP_LINE_LABEL = "Upkeep";
+  var HIRE_FEES_LINE_LABEL = "Hire orders";
+  var RAISE_CAPACITY_LABEL = "Capacity";
+  var HIRE_FUNDS_WARNING = "Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.";
+  var HIRE_ARRIVAL_NOTE = "Hired units arrive at the end of this turn and take orders next turn. Upkeep is due every turn after that.";
+  var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
+  var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
+  var MERCENARY_TOOLTIP_LABEL = "Mercenary";
+  function isHireableUnitType(value) {
+    return typeof value === "string" && HIREABLE_UNIT_TYPES.includes(value);
+  }
+  function mercenaryTechMultiplier(techLevel) {
+    return techLevel === "advanced" ? MERCENARY_ADVANCED_TECH_MULTIPLIER : 1;
+  }
+  function mercenaryReferenceCost(unitType) {
+    switch (unitType) {
+      case "infantry":
+        return GLOBAL_GAME_MAP.rules.infantryCost;
+      case "armor":
+        return GLOBAL_GAME_MAP.rules.armorCost;
+      case "naval":
+        return GLOBAL_GAME_MAP.rules.navalCost;
+      case "air":
+        return GLOBAL_GAME_MAP.rules.airCost;
+      default: {
+        const unexpected = unitType;
+        return unexpected;
+      }
     }
-    return open !== 0;
   }
-  function compassLetters(lettersOnly) {
-    let rest = lettersOnly.toLowerCase();
-    if (rest.length === 0) return null;
-    let letters = "";
-    while (rest.length > 0) {
-      const stem = DIRECTION_STEMS.find(([name]) => rest.startsWith(name));
-      if (!stem) return null;
-      letters += stem[1];
-      rest = rest.slice(stem[0].length);
-      if (rest.startsWith("ern")) rest = rest.slice(3);
+  function mercenaryUpkeepFor(unitType, techLevel) {
+    return Math.ceil(
+      mercenaryReferenceCost(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR
+    );
+  }
+  function formatMercenariesHiredLine(count) {
+    return count === 1 ? "1 mercenary hired." : `${count} mercenaries hired.`;
+  }
+  function formatUnitsDesertedLine(count) {
+    return count === 1 ? "1 unit deserted for lack of pay." : `${count} units deserted for lack of pay.`;
+  }
+  function formatHireOrdersUnfilledLine(count) {
+    return count === 1 ? "1 hire order could not be filled, so it was not charged." : `${count} hire orders could not be filled, so they were not charged.`;
+  }
+  function formatCreditsUpkeepSuffix(upkeep) {
+    return upkeep === 0 ? "" : `\u2212${upkeep}/turn`;
+  }
+  function formatCreditsTooltip(funds) {
+    const mercenaryWord = funds.mercenaryCount === 1 ? "mercenary" : "mercenaries";
+    return `Credits pay for mercenaries. You hold ${funds.credits}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${funds.upkeepPerTurn} per turn, and this turn's hire orders cost ${funds.pendingHireFees}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
+  }
+  function formatHireEntryLabel(productionText) {
+    return `${productionText} \xB7 Hire`;
+  }
+  function formatHireEntryAriaLabel(h3Index) {
+    return `Open hiring for ${h3Index}`;
+  }
+  function formatRaiseCapacityValue(left, perTurn) {
+    return `$${left} of $${perTurn} this turn`;
+  }
+  function formatHireOptionLabel(option2) {
+    return `${capitalizeUnitType(option2.unitType)} (capacity $${option2.unitCost}, fee ${option2.fee}, upkeep ${option2.upkeep})`;
+  }
+  function formatHireOrderLabel(order) {
+    if (order.kind === "rehire") {
+      return `Rehire ${order.displayName ?? capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
     }
-    return letters.length > 0 ? letters : null;
+    return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
   }
-  function lettersFromFullName(body) {
-    let letters = "";
-    for (const token of body.split(/\s+/)) {
-      const lettersOnly = token.replace(/[^A-Za-z]/g, "");
-      if (lettersOnly.length === 0) continue;
-      const compass = compassLetters(lettersOnly);
-      if (compass !== null) {
-        letters += compass;
+  function formatMercenaryTooltipValue(upkeep) {
+    return `upkeep ${upkeep} credits per turn`;
+  }
+  function capitalizeUnitType(unitType) {
+    return unitType.charAt(0).toUpperCase() + unitType.slice(1);
+  }
+
+  // src/shared/ipc/productionTypes.ts
+  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air", "missile"];
+  function isBuildUnitType(value) {
+    return typeof value === "string" && ALL_BUILD_UNIT_TYPES.includes(value);
+  }
+  var ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, "fortification", "credits"];
+  function isBuildQueueItemType(value) {
+    return typeof value === "string" && ALL_BUILD_QUEUE_ITEM_TYPES.includes(value);
+  }
+
+  // src/shared/fortificationRules.ts
+  var FORTIFICATION_QUEUE_ITEM = "fortification";
+  var FORTIFICATION_COST_INFANTRY_MULTIPLIER = 1;
+  var FORTIFICATION_QUEUE_ITEM_LABEL = "Fortification";
+  var FORTIFIED_TOOLTIP_LABEL = "Fortified";
+  var FORTIFIED_LEGEND_LABEL = "Fortified";
+  var FORTIFIED_CELL_VARIANT_LABEL = "Fortified urban";
+  var FORTIFIED_CELL_BLOCKED_REASON = "Enemy fortifications block that cell. Destroy them with fire first.";
+  var FORTIFIED_CELL_BLOCKED_HOVER = "Blocked: Fortified";
+  var FORTIFICATION_UNNAMED_PLACE = "an unnamed hex";
+  function formatFortifiedTooltipValue(fortified, intactCityCells) {
+    const noun = intactCityCells === 1 ? "city cell" : "city cells";
+    return `${fortified} of ${intactCityCells} ${noun}`;
+  }
+  function formatFortificationReportLine(args) {
+    const hitWord = args.lost === 1 ? "hit" : "hits";
+    const remainingPhrase = args.remaining === 0 ? "none remain" : args.remaining === 1 ? "1 remains" : `${args.remaining} remain`;
+    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}; ${remainingPhrase}.`;
+  }
+  function formatFortificationsBuiltLine(count) {
+    return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
+  }
+  function joinPlaceNames(placeNames) {
+    if (placeNames.length <= 1) return placeNames[0] ?? "";
+    if (placeNames.length === 2) return `${placeNames[0]} and ${placeNames[1]}`;
+    return `${placeNames.slice(0, -1).join(", ")}, and ${placeNames[placeNames.length - 1]}`;
+  }
+  function formatFortificationQueuePausedLine(placeNames) {
+    if (placeNames.length === 1) {
+      return `Every city cell at ${placeNames[0]} is fortified, so its build queue is paused.`;
+    }
+    return `Every city cell is fortified at ${joinPlaceNames(placeNames)}, so their build queues are paused.`;
+  }
+
+  // src/shared/gameRules.ts
+  function unitCostFor(unitType) {
+    const rules = activeGameMap().rules;
+    switch (unitType) {
+      case "infantry":
+        return rules.infantryCost;
+      case "armor":
+        return rules.armorCost;
+      case "naval":
+        return rules.navalCost;
+      case "air":
+        return rules.airCost;
+      case "missile":
+        return rules.missileCost;
+      default: {
+        const unexpected = unitType;
+        throw new Error(`Unknown unit type ${String(unexpected)}`);
+      }
+    }
+  }
+  function advancedTechMinUrbanCells() {
+    return activeGameMap().rules.advancedMinUrbanCells;
+  }
+  function fortificationCostPerCell() {
+    return activeGameMap().rules.infantryCost * FORTIFICATION_COST_INFANTRY_MULTIPLIER;
+  }
+  function creditsItemCost() {
+    return activeGameMap().rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER;
+  }
+  function buildQueueItemCostFor(itemType) {
+    if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
+    if (itemType === CREDITS_QUEUE_ITEM) return creditsItemCost();
+    return unitCostFor(itemType);
+  }
+
+  // src/shared/productionConfig.ts
+  var UNIT_COST_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 20).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: GLOBAL_GAME_MAP.rules.infantryCost,
+    /**
+       * Documents the object literal property `armor` (armor: 40).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: GLOBAL_GAME_MAP.rules.armorCost,
+    /**
+       * Documents the object literal property `naval` (naval: 100).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: GLOBAL_GAME_MAP.rules.navalCost,
+    /**
+       * Documents the object literal property `air` (air: 60).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: GLOBAL_GAME_MAP.rules.airCost,
+    missile: GLOBAL_GAME_MAP.rules.missileCost
+  };
+  var MAX_UNITS_PER_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 12).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: 12,
+    /**
+       * Documents the object literal property `armor` (armor: 8).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: 8,
+    /**
+       * Documents the object literal property `naval` (naval: 8).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: 8,
+    /**
+       * Documents the object literal property `air` (air: 6).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: 6,
+    missile: 2
+  };
+  function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
+    if (!nextUnitType) return null;
+    const unitCost = buildQueueItemCostFor(nextUnitType);
+    const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
+    if (safeCapacity <= 0) return null;
+    const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
+    const deficit = Math.max(0, unitCost - safeStoredPoints);
+    return Math.max(1, Math.ceil(deficit / safeCapacity));
+  }
+  function applyProduction(entries, storedPoints, urbanHexCount) {
+    const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    const updated = sorted.map((entry) => ({ ...entry }));
+    const spawnedUnitTypes = [];
+    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    let idx = 0;
+    while (idx < updated.length) {
+      const entry = updated[idx];
+      const unitCost = buildQueueItemCostFor(entry.unitType);
+      if (!Number.isInteger(unitCost) || unitCost <= 0 || points < unitCost) break;
+      const maxBuildable = Math.floor(points / unitCost);
+      const built = Math.min(maxBuildable, entry.remainingCount);
+      if (built <= 0) break;
+      if (isBuildUnitType(entry.unitType)) {
+        for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+      }
+      points -= built * unitCost;
+      entry.remainingCount -= built;
+      if (entry.remainingCount <= 0) {
+        updated.splice(idx, 1);
         continue;
       }
-      for (const char of token) {
-        if (char >= "A" && char <= "Z") letters += char;
-      }
+      idx++;
     }
-    return letters;
+    for (let i = 0; i < updated.length; i++) {
+      updated[i].queueIndex = i;
+    }
+    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
   }
-  function shortSideName(displayName) {
-    const body = sideHomeNameKey(displayName);
-    const shortened = shortenLeadingCompass(cutAtFirstSeparator(body));
-    const candidate = isOnlySingleLetterWords(shortened) || hasUnclosedParenthesis(shortened) ? letterFormOrBody(body, shortened) : shortened;
-    if (body.length > 0 && candidate.length > body.length) return body;
-    return candidate;
+  function sumQueuedProductionCost(entries) {
+    let sum = 0;
+    for (const row of entries) {
+      const cost = buildQueueItemCostFor(row.unitType);
+      sum += cost * Math.max(0, Math.trunc(row.count));
+    }
+    return sum;
   }
-  function letterFormOrBody(body, shortened) {
-    const letters = lettersFromFullName(body);
-    if (letters.length <= 1) return body.length > 0 ? body : shortened;
-    return letters;
+  function estimateTurnsToCompleteQueuedProduction(entries, storedPoints, capacityPerTurn) {
+    let working = entries.map((e) => ({
+      id: e.id,
+      queueIndex: e.queueIndex,
+      unitType: e.unitType,
+      remainingCount: Math.max(0, Math.trunc(e.count))
+    })).sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    let stored = Math.max(0, Math.trunc(storedPoints));
+    const cap = Math.max(0, Math.trunc(capacityPerTurn));
+    const remainingUnits = () => working.reduce((acc, row) => acc + row.remainingCount, 0);
+    if (remainingUnits() === 0) return 0;
+    if (cap < 1) return null;
+    let turns = 0;
+    const maxTurns = 1e6;
+    while (remainingUnits() > 0) {
+      const before = JSON.stringify({ working, stored });
+      const result = applyProduction(working, stored, cap);
+      working = result.updatedEntries;
+      stored = result.storedPoints;
+      turns++;
+      const after = JSON.stringify({ working, stored });
+      if (after === before) return null;
+      if (turns > maxTurns) return null;
+    }
+    return turns;
   }
 
-  // src/shared/seatRoster.ts
-  var HUMAN_SEAT_KIND = "human";
-  var AI_SEAT_KIND = "ai";
-  var DOCTRINES = ["aggressive", "balanced", "cautious"];
-  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
-  function sortSeatsByOrder(seats) {
-    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  // src/shared/gameSize.ts
+  var GAME_SIZE_MULTIPLIER = {
+    small: 1,
+    medium: 2,
+    large: 3
+  };
+  var UNIT_TYPE_DISPLAY_NAME = {
+    infantry: "Infantry",
+    armor: "Armor",
+    naval: "Naval",
+    air: "Air",
+    missile: "Missile"
+  };
+  function parseGameSize(raw) {
+    if (typeof raw !== "string") return "small";
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === "small" || normalized === "medium" || normalized === "large") return normalized;
+    return "small";
   }
-  function isSeatActive(seat) {
-    return seat.outTurn === null;
+  function getMaxUnitsPerType(size) {
+    const multiplier = GAME_SIZE_MULTIPLIER[parseGameSize(size)];
+    return {
+      infantry: MAX_UNITS_PER_TYPE.infantry * multiplier,
+      armor: MAX_UNITS_PER_TYPE.armor * multiplier,
+      naval: MAX_UNITS_PER_TYPE.naval * multiplier,
+      air: MAX_UNITS_PER_TYPE.air * multiplier,
+      missile: MAX_UNITS_PER_TYPE.missile * multiplier
+    };
   }
-  function activeAiSeats(seats) {
-    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
-  }
-  function findHumanSeat(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
-  }
-
-  // src/shared/turnReportLines.ts
-  function hexChangeLinesByOwner(input) {
-    const lostTo = /* @__PURE__ */ new Map();
-    for (const row of input.transitions) {
-      if (row.from === null || row.to === null || row.from === row.to) continue;
-      addHexCount(lostTo, row.from, row.to);
-    }
-    const lines = /* @__PURE__ */ new Map();
-    for (const [ownerId, counterparts] of lostTo) {
-      lines.set(ownerId, [hexSentence(ownerId, counterparts, input)]);
-    }
-    return lines;
-  }
-  function addHexCount(counts, ownerId, counterpartId) {
-    const row = counts.get(ownerId) ?? /* @__PURE__ */ new Map();
-    row.set(counterpartId, (row.get(counterpartId) ?? 0) + 1);
-    counts.set(ownerId, row);
-  }
-  function hexSentence(ownerId, counterparts, input) {
-    let total = 0;
-    for (const count of counterparts.values()) total += count;
-    const names = [...counterparts.keys()].sort((left, right) => compareCounterparts(left, right, input)).map((counterpartId) => partyLabel(counterpartId, input, "list"));
-    const hexWord = total === 1 ? "hex" : "hexes";
-    return `${partyLabel(ownerId, input, "subject")} lost ${total} ${hexWord} to ${joinPartyNames(names)}.`;
-  }
-  function ownerName(ownerId, seats) {
-    if (isNeutralOwnerId(ownerId)) return "Neutral";
-    const seat = seats.find((row) => row.seatId === ownerId);
-    return seat ? hexLabelForSeat(seat) : ownerId;
-  }
-  function hexLabelForSeat(seat) {
-    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
-  }
-  function partyLabel(ownerId, input, place) {
-    if (input.viewerSeatId !== null && ownerId === input.viewerSeatId) return place === "subject" ? "You" : "you";
-    return ownerName(ownerId, input.seats);
-  }
-  function compareCounterparts(left, right, input) {
-    const leftViewer = input.viewerSeatId !== null && left === input.viewerSeatId;
-    const rightViewer = input.viewerSeatId !== null && right === input.viewerSeatId;
-    if (leftViewer !== rightViewer) return leftViewer ? -1 : 1;
-    const byName = ownerName(left, input.seats).localeCompare(ownerName(right, input.seats), "en");
-    if (byName !== 0) return byName;
-    const leftOrder = input.seats.find((row) => row.seatId === left)?.seatOrder ?? 9e3;
-    const rightOrder = input.seats.find((row) => row.seatId === right)?.seatOrder ?? 9e3;
-    return leftOrder - rightOrder || left.localeCompare(right, "en");
-  }
-  function joinPartyNames(names) {
-    if (names.length <= 1) return names[0] ?? "";
-    if (names.length === 2) return `${names[0]} and ${names[1]}`;
-    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-  }
-  function hexNameForSeat(seat) {
-    if (aiIndexForSeatId(seat.seatId) == null) return null;
-    return hexLabelForSeat(seat);
-  }
-  function headerNameForSeat(seat) {
-    if (aiIndexForSeatId(seat.seatId) == null) return null;
-    const home = seat.homeRegion.trim();
-    return home.length > 0 ? home : seat.seatId;
-  }
-  function seatForDisplayedName(seats, name, nameOf) {
-    const matches = seats.filter((seat) => nameOf(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
-    return matches[0] ?? null;
-  }
-  function markInBody(body, seats, sectionOwnerId) {
-    const hexMarks = hexSentenceMarks(body, seats, sectionOwnerId);
-    if (hexMarks !== null) return hexMarks;
-    if (body === "Your Losses" || body === "Neutral Losses" || !body.endsWith(" Losses")) return [];
-    const name = body.slice(0, -" Losses".length);
-    const seat = seatForDisplayedName(seats, name, headerNameForSeat);
-    if (!seat) return [];
-    return [{ seatId: seat.seatId, start: 0, end: name.length }];
-  }
-  function hexSentenceMarks(body, seats, sectionOwnerId) {
-    const loss = /^(.+) lost (\d+) hex(?:es)? to (.+)\.$/.exec(body);
-    const gain = loss ? null : /^(.+) took (\d+) hex(?:es)? from (.+)\.$/.exec(body);
-    const match = loss ?? gain;
-    if (!match) return null;
-    const subject = match[1] ?? "";
-    const verb = loss ? "lost" : "took";
-    if (!body.startsWith(`${subject} ${verb} `)) return null;
-    const marks = [];
-    const used = /* @__PURE__ */ new Set();
-    const subjectSeat = seatForHexName(subject, seats, used, sectionOwnerId);
-    if (subjectSeat) {
-      used.add(subjectSeat.seatId);
-      marks.push({ seatId: subjectSeat.seatId, start: 0, end: subject.length });
-    }
-    const list = match[3] ?? "";
-    if (!body.endsWith(`${list}.`)) return marks;
-    let cursor = body.length - (list.length + 1);
-    for (const name of splitJoinedNames(list)) {
-      if (!body.startsWith(name, cursor)) return marks;
-      const seat = seatForHexName(name, seats, used, null);
-      if (seat) {
-        used.add(seat.seatId);
-        marks.push({ seatId: seat.seatId, start: cursor, end: cursor + name.length });
-      }
-      cursor += name.length;
-      if (body.startsWith(", and ", cursor)) cursor += ", and ".length;
-      else if (body.startsWith(", ", cursor)) cursor += 2;
-      else if (body.startsWith(" and ", cursor)) cursor += " and ".length;
-    }
-    return marks;
-  }
-  function splitJoinedNames(list) {
-    if (!list.includes(", ")) {
-      const andAt = list.indexOf(" and ");
-      if (andAt < 0) return [list];
-      return [list.slice(0, andAt), list.slice(andAt + " and ".length)];
-    }
-    const parts = list.split(", ");
-    const last = parts[parts.length - 1] ?? "";
-    if (last.startsWith("and ")) parts[parts.length - 1] = last.slice("and ".length);
-    return parts;
-  }
-  function seatForHexName(name, seats, used, preferredId) {
-    if (name === "You" || name === "you" || name === "Neutral") return null;
-    const matches = seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
-    if (preferredId) {
-      const preferred = matches.find((seat) => seat.seatId === preferredId);
-      if (preferred) return preferred;
-    }
-    return matches[0] ?? null;
-  }
-  function sideNameMarksForLine(line, seats, sectionOwnerId = null) {
-    let offset = 0;
-    let body = line;
-    if (body.startsWith("\u2022 ")) {
-      offset += 2;
-      body = body.slice(2);
-    }
-    if (body.startsWith("## ")) {
-      offset += 3;
-      body = body.slice(3);
-    }
-    return markInBody(body, seats, sectionOwnerId).map((mark) => ({
-      seatId: mark.seatId,
-      start: mark.start + offset,
-      end: mark.end + offset
+  function gameSizeCapPreviewRows(size) {
+    const caps = getMaxUnitsPerType(size);
+    return ALL_BUILD_UNIT_TYPES.map((unitType) => ({
+      unitType,
+      displayName: UNIT_TYPE_DISPLAY_NAME[unitType],
+      cap: caps[unitType]
     }));
   }
 
-  // src/shared/seatPalette.ts
-  var SEAT_PALETTES = [
-    { map: "#115E59", forceBar: "#1B8A82", text: "#7DCEC8" },
-    { map: "#9D174D", forceBar: "#B02A62", text: "#F0B4C8" },
-    { map: "#C2410C", forceBar: "#EA580C", text: "#FDBA74" },
-    { map: "#2563EB", forceBar: "#3B82F6", text: "#A9C1F5" }
-  ];
-  var NEUTRAL_PALETTE = {
-    map: "#141414",
-    heldHexOutline: "#1F1F1F",
-    forceBar: "#9CA3AF",
-    text: "#D9D9D9"
-  };
-  function miniTokenColors(palette) {
-    return { fill: palette.map, glyph: "#ffffff", ring: palette.text };
-  }
-  function paletteForOwner(ownerId, seats) {
-    if (ownerId == null) return null;
-    if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;
-    const seat = seats.find((row) => row.seatId === ownerId);
-    if (!seat) return null;
-    const palette = SEAT_PALETTES[seat.seatOrder - 1];
-    return palette ?? null;
-  }
-
-  // src/shared/observeModeControls.ts
-  function activeHumanSeatId(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
-  }
-  function isObservingRoster(seats) {
-    return seats.length > 0 && activeHumanSeatId(seats) === null;
-  }
-  function observeModeControls(seats) {
-    const observing = isObservingRoster(seats);
-    return {
-      observing,
-      ordersEnabled: !observing,
-      buildEnabled: false,
-      forcesEnabled: false,
-      unitSelectionEnabled: !observing,
-      magnifierEnabled: !observing,
-      hexOnlySelection: observing
-    };
-  }
-  function readoutViewerSeatId(seats, viewAs) {
-    if (seats.length === 0) return void 0;
-    if (!observeModeControls(seats).observing) {
-      return activeHumanSeatId(seats);
+  // src/shared/unitCountsByType.ts
+  function getPlayerUnitCountsByType(units, playerId) {
+    const counts = { infantry: 0, armor: 0, naval: 0, air: 0, missile: 0 };
+    for (const unit of units) {
+      if (unit.player !== playerId) continue;
+      if (unit.isMercenary === true) continue;
+      if (!isBuildUnitType(unit.unitType)) continue;
+      counts[unit.unitType] += 1;
     }
-    if (viewAs === "all") return null;
-    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
-    return chosen?.seatId ?? null;
-  }
-  function staleIntelViewer(playerPerspective) {
-    if (playerPerspective === "all") return null;
-    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
-    return HUMAN_SEAT_ID;
-  }
-
-  // src/shared/unitIds.ts
-  var UNIT_TYPE_ID_CODES = {
-    infantry: "i",
-    armor: "t",
-    naval: "n",
-    air: "a",
-    missile: "m"
-  };
-  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itnam])(\d+)$/;
-  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
-  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
-    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
-  );
-  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
-  function isPositiveInteger(value) {
-    return Number.isInteger(value) && value > 0;
-  }
-  function hasForbiddenLeadingZero(digits) {
-    return digits.startsWith("0");
-  }
-  function parseStrategicUnitId(unitId) {
-    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const playerLetter = match[1];
-    const playerIndexDigits = match[2];
-    const typeCode = match[3];
-    const ordinalDigits = match[4];
-    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-    const playerIndex = Number.parseInt(playerIndexDigits, 10);
-    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
-    if (!unitType) return null;
-    const ordinal3 = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal3)) return null;
-    if (playerLetter === "h") {
-      if (playerIndex !== 1) return null;
-      return { player: HUMAN_SEAT_ID, unitType, ordinal: ordinal3 };
-    }
-    if (playerIndex < 1 || playerIndex > 4) return null;
-    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal: ordinal3 };
-  }
-  function parseTacticalSubUnitId(unitId) {
-    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const parentUnitId = match[1];
-    const slotDigits = match[2];
-    if (hasForbiddenLeadingZero(slotDigits)) return null;
-    const slot = Number.parseInt(slotDigits, 10);
-    if (!isPositiveInteger(slot)) return null;
-    return { parentUnitId, slot };
-  }
-  function unitTypeFromUnitId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.unitType;
-    if (unitId.includes("-infantry-")) return "infantry";
-    if (unitId.includes("-armor-")) return "armor";
-    if (unitId.includes("-naval-")) return "naval";
-    if (unitId.includes("-air-")) return "air";
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
-    return null;
-  }
-  function unitIdOwnerFromId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.player;
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) {
-      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
-      if (parentOwner) return parentOwner;
-    }
-    if (unitId.startsWith("opponent-")) return AI_SEAT_IDS[0];
-    if (unitId.startsWith("human-")) return HUMAN_SEAT_ID;
-    return null;
-  }
-
-  // src/renderer/rendering/ownerColors.ts
-  function paletteSeats() {
-    return rendererSharedState.gameState?.seats ?? [];
-  }
-  function paletteForCurrentOwner(ownerId) {
-    if (ownerId == null || ownerId === "") return null;
-    const seats = paletteSeats();
-    const palette = paletteForOwner(ownerId, seats);
-    if (palette) return palette;
-    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
-    return null;
+    return counts;
   }
 
   // node_modules/h3-js/dist/browser/h3-js.es.js
@@ -15782,49 +14661,6 @@
     return rad * 180 / Math.PI;
   }
 
-  // src/shared/activeGameMap.ts
-  var GLOBAL_GAME_MAP = {
-    id: "global",
-    displayName: "Global",
-    strategicResolution: 1,
-    tacticalResolution: 4,
-    controlWinMinUrbanShare: null,
-    rules: {
-      infantryCost: 20,
-      armorCost: 40,
-      navalCost: 100,
-      airCost: 60,
-      missileCost: 200,
-      missileRangeHexes: 12,
-      armorMinUrbanCells: 2,
-      airMinUrbanCells: 5,
-      navalMinUrbanCells: 10,
-      advancedMinUrbanCells: 21,
-      strategicStrikeUrbanCells: 9
-    },
-    scaleranks: {
-      urbanOverlay: 5,
-      airport: 5,
-      seaport: 5,
-      cityLabel: 6
-    }
-  };
-  var activeProfile = GLOBAL_GAME_MAP;
-  var profileResetters = [];
-  function registerActiveGameMapReset(reset) {
-    profileResetters.push(reset);
-  }
-  function assignActiveProfile(profile) {
-    activeProfile = profile;
-    for (const reset of profileResetters) reset();
-  }
-  function activeGameMap() {
-    return activeProfile;
-  }
-  function setActiveGameMap(profile) {
-    assignActiveProfile(profile);
-  }
-
   // src/shared/loadedStrategicFootprint.ts
   var footprint = null;
   var footprintSet = null;
@@ -15874,6 +14710,1699 @@
   }
   function isNeutralBorderHex(h3Index) {
     return loadedHexRole(h3Index) === "neutral_border";
+  }
+
+  // src/shared/hexLlmCodeAssignment.ts
+  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  var strategicH3ToCodeSingleton = null;
+  function indexToCode(index) {
+    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
+      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
+    }
+    const hi = Math.floor(index / CODE_ALPHABET.length);
+    const lo = index % CODE_ALPHABET.length;
+    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
+  }
+  function sortCellsForStableLlmCodes(cells) {
+    const decorated = cells.map((h3) => {
+      const [lat, lng] = cellToLatLng(h3);
+      return { h3, lat, lng };
+    });
+    decorated.sort((a, b) => {
+      if (a.lat !== b.lat) return b.lat - a.lat;
+      if (a.lng !== b.lng) return a.lng - b.lng;
+      return a.h3.localeCompare(b.h3);
+    });
+    return decorated.map((d) => d.h3);
+  }
+  function buildStrategicH3ToCodeMap() {
+    const footprint2 = loadedStrategicFootprint();
+    const strategicSet = new Set(footprint2 ?? []);
+    if (!footprint2) {
+      const res0 = getRes0Cells();
+      for (const r0 of res0) {
+        for (const child of cellToChildren(r0, strategicH3Resolution())) {
+          strategicSet.add(child);
+        }
+      }
+    }
+    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
+    const h3ToCode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < sorted.length; i++) {
+      h3ToCode.set(sorted[i], indexToCode(i));
+    }
+    return h3ToCode;
+  }
+  function getStrategicH3ToCodeMap() {
+    if (!strategicH3ToCodeSingleton) {
+      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
+    }
+    return strategicH3ToCodeSingleton;
+  }
+  function resetStrategicHexCodeCache() {
+    strategicH3ToCodeSingleton = null;
+  }
+  registerActiveGameMapReset(resetStrategicHexCodeCache);
+  function getStrategicHexCode(h3Index) {
+    return getStrategicH3ToCodeMap().get(h3Index);
+  }
+  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
+    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
+    const idx = children.indexOf(childTacticalH3Index);
+    if (idx < 0) return void 0;
+    return indexToCode(idx);
+  }
+  function getLlmHexLocationParenLabelForNamingTarget(target) {
+    if (target.resolution === 1) {
+      const c = getStrategicHexCode(target.h3Index);
+      return c ? `(${c})` : null;
+    }
+    const parent = strategicParentOf(target.h3Index);
+    const parentCode = getStrategicHexCode(parent);
+    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
+    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+  }
+
+  // src/shared/tacticalBattleFootprint.ts
+  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
+  var footprintByKey = /* @__PURE__ */ new Map();
+  function resetTacticalBattleFootprintCache() {
+    footprintByKey.clear();
+  }
+  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
+  function frozenCodeMap(entries) {
+    const map = new Map(entries);
+    const reject = () => {
+      throw new TypeError("tactical battle footprint code map is frozen");
+    };
+    map.set = reject;
+    map.delete = reject;
+    map.clear = reject;
+    return map;
+  }
+  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
+    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
+    const coreSet = new Set(coreChildH3Indexes);
+    const cells = new Set(coreChildH3Indexes);
+    for (const cell of coreChildH3Indexes) {
+      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
+        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
+      }
+    }
+    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
+    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
+    return { coreChildH3Indexes, h3Indexes, codeByH3 };
+  }
+  function tacticalBattleFootprint(enclosingStrategicH3Index) {
+    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
+    const cached = footprintByKey.get(key);
+    if (cached) return cached;
+    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
+    footprintByKey.set(key, built);
+    return built;
+  }
+  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
+    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
+  }
+  function tacticalBattleTerrainKindByCell(args) {
+    const kinds = {};
+    for (const cell of args.cells) {
+      const tacticalKind = args.tacticalKindByH3.get(cell);
+      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
+        kinds[cell] = tacticalKind;
+        continue;
+      }
+      let parentKind;
+      try {
+        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
+      } catch {
+        parentKind = void 0;
+      }
+      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
+    }
+    return kinds;
+  }
+
+  // src/shared/selectionUnitIdSets.ts
+  function selectionUnitIdSetsDiffer(before, after) {
+    if (before.length !== after.length) return true;
+    const beforeSet = new Set(before);
+    return after.some((id) => !beforeSet.has(id));
+  }
+
+  // src/shared/aiConsultationLimits.ts
+  var AI_MODEL_REQUEST_TIMEOUT_MS = 9e4;
+  var AI_MODEL_REQUEST_RETRY_COUNT = 1;
+  var AI_CONSULTATION_WALL_CLOCK_MS = 3e5;
+  var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
+
+  // src/renderer/core/constants.ts
+  var BACKGROUND_COLOR = "#e0dcd4";
+  var UNIT_RADIUS = 18;
+  var SELECTION_RING_COLOR = "#f2c14e";
+  var SELECTION_RING_WIDTH = 3;
+  var UNIT_TYPE_LABELS = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'I').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "I",
+    /**
+       * Documents the object literal property `armor` (armor: 'A').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "A",
+    /**
+       * Documents the object literal property `naval` (naval: 'N').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "N",
+    /**
+       * Documents the object literal property `air` (air: 'S').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "S",
+    missile: "M"
+  };
+  var ORDER_LINE_WIDTH = 2.5;
+  var ORDER_ARROW_SIZE = 10;
+  var ORDER_LINE_CASING_COLOR = "rgba(255, 255, 255, 0.8)";
+  var ORDER_LINE_CASING_PAD = 1.5;
+  var TOOLTIP_OFFSET_PX = 12;
+  var HEX_DETAILS_TOOLTIP_DELAY_MS = 1e3;
+  var HEX_DETAILS_TOOLTIP_REST_PX = 6;
+  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
+  var TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
+  var TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+  var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
+  var MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
+  var INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
+  var OPENROUTER_TOOL_GROUPS = [
+    { id: "precomputation", label: "Precomputation" },
+    { id: "events", label: "Events" },
+    { id: "planning", label: "Planning" },
+    { id: "assessment", label: "Assessment" },
+    { id: "estimation", label: "Estimation" },
+    { id: "memory", label: "Memory" },
+    { id: "orders", label: "Orders" },
+    { id: "production", label: "Production" }
+  ];
+  var UNIT_SELECT_GLYPH = "+";
+  var UNIT_DESELECT_GLYPH = "-";
+  var TOAST_DURATION_MS = 24e3;
+  var READY_REQUEST_TIMEOUT_MS = 12e4;
+  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS + 5e3;
+  var UNIT_ICON_HIT_PAD_PX = 2;
+  var BUILD_ENTRY_HIT_PAD_PX = 2;
+  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
+  var STACK_OFFSET_X = 6;
+  var STACK_OFFSET_Y = -3;
+  var COUNT_BADGE_OFFSET = 16;
+  var MULTI_PLAYER_FILL = "#b0b0b0";
+  var MULTI_PLAYER_STROKE = "#222222";
+  var MULTI_PLAYER_GLYPH_FILTER = "brightness(0.133)";
+  var OWNERSHIP_BORDER_ALPHA = 0.75;
+  var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
+  var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
+  var RANGE_PERIMETER_MISSILE_COLOR = "#B91C1C";
+  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
+  var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
+  var RANGE_PERIMETER_LINE_CAP = "butt";
+  var RANGE_SUPPORT_CONNECTOR_LINE_CAP = "round";
+  var RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
+  var RANGE_PERIMETER_ALPHA = 0.75;
+  var MOVEMENT_HOVER_VALID_ALPHA = 0.55;
+  var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
+  var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
+  var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
+  var RANGE_PERIMETER_DASH_MIN_GAP_PX = 8;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION = 1;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION = 1;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX = 8;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX = 8;
+  var RANGE_PERIMETER_FLOW_PX_PER_SEC = 12;
+
+  // src/renderer/core/state.ts
+  var rendererSharedState = {
+    /**
+       * Documents the object literal property `buildEntryButtonPointerInside` (buildEntryButtonPointerInside: false).
+    
+       * Purpose: Supports maintainability by documenting why `buildEntryButtonPointerInside` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    buildEntryButtonPointerInside: false,
+    /**
+       * Documents the object literal property `lastPointerClientX` (lastPointerClientX: 0).
+    
+       * Purpose: Supports maintainability by documenting why `lastPointerClientX` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastPointerClientX: 0,
+    /**
+       * Documents the object literal property `lastPointerClientY` (lastPointerClientY: 0).
+    
+       * Purpose: Supports maintainability by documenting why `lastPointerClientY` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastPointerClientY: 0,
+    /**
+       * Documents the object literal property `terrainTooltipDelayTimer` (terrainTooltipDelayTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipDelayTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainTooltipDelayTimer: null,
+    /**
+       * Documents the object literal property `buildEntryDefaultMapZoom` (buildEntryDefaultMapZoom: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `buildEntryDefaultMapZoom` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    buildEntryDefaultMapZoom: null,
+    /**
+       * Documents the object literal property `lastBuildEntryLayerKey` (lastBuildEntryLayerKey: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `lastBuildEntryLayerKey` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastBuildEntryLayerKey: null,
+    /**
+       * Documents the object literal property `tacticalBattleSnapshot` (tacticalBattleSnapshot: null as TacticalBattleSnapshot | null).
+    
+       * Purpose: Holds the active tactical battle layout and sub-units while the renderer is in tactical map mode.
+       * When to use: Set after a successful `startTacticalBattle` IPC; cleared when the tactical session ends.
+       * Expected outcome: When non-null, terrain and unit drawing use tactical constraints instead of global strategic view.
+       * Exceptions: None.
+       */
+    tacticalBattleSnapshot: null,
+    /**
+       * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
+    
+       * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
+       * When to use: Updated alongside `tactical-entry-layer` innerHTML synchronization.
+       * Expected outcome: Fewer DOM writes during pan/zoom redraws.
+       * Exceptions: None.
+       */
+    lastTacticalEntryLayerKey: null,
+    /**
+       * Documents the object literal property `tacticalEntryButtonPointerInside` (tacticalEntryButtonPointerInside: false).
+    
+       * Purpose: Tracks whether the pointer is over a tactical-entry button for consistent click hit-testing with build-entry.
+       * When to use: Pointer handlers on the tactical-entry layer update this flag.
+       * Expected outcome: Map dragging does not steal clicks intended for tactical entry.
+       * Exceptions: None.
+       */
+    tacticalEntryButtonPointerInside: false,
+    /**
+       * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
+    
+       * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
+       * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while a tactical advance is waiting on its commit.
+       * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
+       * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
+       */
+    tacticalPhasePlanning: true,
+    /**
+       * Documents the object literal property `tacticalAnnihilationOutcomeDialog` (tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null).
+    
+       * Purpose: While non-null, the tactical annihilation win/loss modal is shown and Exit Battle in the battle header stays hidden until the player confirms `Exit Battle`.
+       * When to use: Set when `getTacticalAnnihilationOutcome` is terminal during tactical planning; cleared on acknowledged exit, new game, or strategic reconciliation that drops the tactical session.
+       * Expected outcome: Blocks Ready and map interaction (via `setMainUIControlsEnabled`) until dismissal; mirrors strategic `updateGameOverUI` message strings for win/loss.
+       * Exceptions: None; keep `null` whenever no tactical snapshot exists.
+       */
+    tacticalAnnihilationOutcomeDialog: null,
+    /**
+       * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
+    
+       * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
+       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+       * Exceptions: None.
+       */
+    preTacticalLeafletMinZoom: null,
+    /**
+       * Documents the object literal property `preTacticalLeafletMaxZoom` (preTacticalLeafletMaxZoom: null as number | null).
+    
+       * Purpose: Stores the main map max zoom before tactical constraints so it can be restored after tactical exit.
+       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+       * Exceptions: None.
+       */
+    preTacticalLeafletMaxZoom: null,
+    /**
+       * Documents the object literal property `strategicScenarioInitialLeafletView` (strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null).
+    
+       * Purpose: Remembers the main-map center and zoom from the first `applyInitialCameraForState` of the current match so leaving tactical mode can restore that framing instead of fitting the entire world.
+       * When to use: Written when the scenario initial camera is applied; read in `exitTacticalMapView`; cleared on new game alongside `initialCameraApplied`.
+       * Expected outcome: Post-tactical strategic view matches the opening scenario extent when available.
+       * Exceptions: When null (before first camera apply), tactical exit falls back to world `fitBounds`.
+       */
+    strategicScenarioInitialLeafletView: null,
+    /**
+       * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `strategicDominantTerrainKindByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    strategicDominantTerrainKindByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `strategicTerrainSummaryByH3` (strategicTerrainSummaryByH3: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `strategicTerrainSummaryByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    strategicTerrainSummaryByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `strategicFeaturesSummaryByH3` (strategicFeaturesSummaryByH3: new Map<string, string | null>()).
+    
+       * Purpose: Supports maintainability by documenting why `strategicFeaturesSummaryByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    strategicFeaturesSummaryByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `strategicFeatureCountsByH3` (strategicFeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
+    
+       * Purpose: Supports maintainability by documenting why `strategicFeatureCountsByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    strategicFeatureCountsByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `terrainTooltipHtmlByContentKey` (terrainTooltipHtmlByContentKey: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipHtmlByContentKey` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainTooltipHtmlByContentKey: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `terrainTooltipRequestSeq` (terrainTooltipRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainTooltipRequestSeq: 0,
+    /**
+       * Documents the object literal property `terrainTooltipRestoreTimer` (terrainTooltipRestoreTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipRestoreTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainTooltipRestoreTimer: null,
+    /**
+       * Documents the object literal property `selectedHexIndex` (selectedHexIndex: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `selectedHexIndex` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    selectedHexIndex: null,
+    /**
+    * Ordered strategic hex ids controlled by the build-popup multi-selection (insertion order).
+    *
+    * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
+    * When to use: Build-entry button chrome, Shift-toggle policy, and multi-hex popup rendering.
+    * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
+    * deselect re-anchor. Plain click replaces the set and popup close clears it.
+    * Exceptions: Only build-entry button interactions may add or remove members.
+    */
+    selectedBuildHexH3s: [],
+    /**
+       * Documents the object literal property `hoveredHexH3` (hoveredHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoveredHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hoveredHexH3: null,
+    /**
+       * Documents the object literal property `hoveredDetailHexH3` (hoveredDetailHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoveredDetailHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hoveredDetailHexH3: null,
+    /**
+       * Documents the object literal property `hideTerrainFillWhileHeld` (hideTerrainFillWhileHeld: false).
+    
+       * Purpose: Supports maintainability by documenting why `hideTerrainFillWhileHeld` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hideTerrainFillWhileHeld: false,
+    /**
+       * Documents the object literal property `selectedUnitIds` (selectedUnitIds: [] as string[]).
+    
+       * Purpose: Supports maintainability by documenting why `selectedUnitIds` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    selectedUnitIds: [],
+    /**
+       * Documents the object literal property `selectedUnitIdsAtMouseDown` (selectedUnitIdsAtMouseDown: [] as string[]).
+    
+       * Purpose: Supports maintainability by documenting why `selectedUnitIdsAtMouseDown` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    selectedUnitIdsAtMouseDown: [],
+    /**
+    * Epoch milliseconds when `selectedUnitIdsAtMouseDown` was last copied from the live selection. `0` means no gesture is open.
+    *
+    * Purpose: Lets the second press of a double-click keep the units the player had selected instead of resnapshotting whatever the first click selected.
+    * When to use: Written by the main-map pointer-down listener. Reset to `0` everywhere the snapshot array is cleared.
+    * Expected outcome: A press inside the gesture window leaves the snapshot array untouched.
+    * Exceptions: None.
+    */
+    gestureSelectionSnapshotAtMs: 0,
+    /**
+    * Client X of the press that took the current gesture snapshot.
+    *
+    * Purpose: A second press far from this point is a new click, not the second half of a double-click, so the snapshot must be retaken.
+    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+    * Exceptions: None.
+    */
+    gestureSelectionAnchorClientX: 0,
+    /**
+    * Client Y of the press that took the current gesture snapshot.
+    *
+    * Purpose: Pairs with `gestureSelectionAnchorClientX` for the double-click distance check.
+    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+    * Exceptions: None.
+    */
+    gestureSelectionAnchorClientY: 0,
+    /**
+    * True while Shift is held as the multi-select modifier.
+    *
+    * Purpose: Hides committed paths and hover previews, and switches the stack callout from Select All to Add All / Remove All.
+    * When to use: Set on Shift keydown, cleared on Shift keyup and window blur. Clicks also read `event.shiftKey`.
+    * Expected outcome: `false` whenever Shift is up and the window is focused.
+    * Exceptions: None.
+    */
+    shiftKeyActive: false,
+    /**
+       * Documents the object literal property `pendingSelectTimeout` (pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `pendingSelectTimeout` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    pendingSelectTimeout: null,
+    /**
+    * Timer that will open the stack callout after a single click, or `null` when no open is waiting.
+    *
+    * Purpose: The callout is layered above the map, so opening it on the first click would swallow the second click of a double-click. Waiting out the single-select delay lets a double-click on a stack icon plan an order instead.
+    * When to use: Written only by `scheduleDeferredStackCallout`; cleared by `clearDeferredStackCalloutTimer`.
+    * Expected outcome: The callout appears only if this timer is allowed to fire.
+    * Exceptions: None.
+    */
+    pendingStackCalloutTimeout: null,
+    /**
+    * Client X of the click that scheduled the pending stack callout.
+    *
+    * Purpose: A press away from this point means the player moved on, so the popup must not still appear there; a press on the same point is the second half of a double-click and must leave it scheduled.
+    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+    * Exceptions: None.
+    */
+    pendingStackCalloutAnchorClientX: 0,
+    /**
+    * Client Y of the click that scheduled the pending stack callout.
+    *
+    * Purpose: Pairs with `pendingStackCalloutAnchorClientX` for the press-away distance check.
+    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+    * Exceptions: None.
+    */
+    pendingStackCalloutAnchorClientY: 0,
+    /**
+       * Documents the object literal property `humanStandingOrders` (humanStandingOrders: [] as HumanStandingOrderSnapshot[]).
+    
+       * Purpose: Supports maintainability by documenting why `humanStandingOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    humanStandingOrders: [],
+    /**
+       * Documents the object literal property `hoverRoutePreview` (hoverRoutePreview: null as HoverRoutePreviewState | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoverRoutePreview` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hoverRoutePreview: null,
+    /**
+       * Documents the object literal property `hoverPreviewRequestSeq` (hoverPreviewRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `hoverPreviewRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hoverPreviewRequestSeq: 0,
+    /**
+       * Documents the object literal property `pendingRangedAttacks` (pendingRangedAttacks: [] as RangedAttackOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingRangedAttacks` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    pendingRangedAttacks: [],
+    /**
+       * Documents the object literal property `pendingAirStrikes` (pendingAirStrikes: [] as AirStrikeOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingAirStrikes` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    pendingAirStrikes: [],
+    /**
+    * Queued missile launches the next Ready will send.
+    *
+    * Purpose: Holds the human's aimed launches until Ready submits them or a new game clears them.
+    * When to use: Written when a launch is planned or cancelled. Read by the Orders tab and the map arrows.
+    * Expected outcome: Empty until the player double-clicks a target while missile aiming is on.
+    * Exceptions: None.
+    */
+    pendingMissileLaunches: [],
+    /**
+       * Documents the object literal property `pendingFerryOrders` (pendingFerryOrders: [] as FerryOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingFerryOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    pendingFerryOrders: [],
+    /**
+       * Documents the object literal property `pendingEmbarkOrders` (pendingEmbarkOrders: [] as EmbarkOrder[]).
+    
+       * Purpose: Queues human sealift embark drafts as tactical sub-unit pairs until tactical Ready commits them (strategic `updateSealiftSlot` is blocked during tactical battles).
+       * When to use: Stack callout sealift controls while `tacticalBattleSnapshot` is set; clear on tactical Ready commit, exit, stash, or new game.
+       * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same tactical hex.
+       * Exceptions: None.
+       */
+    pendingEmbarkOrders: [],
+    /**
+       * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as TacticalPendingMarchRow[]).
+    
+       * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
+       * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
+       * Expected outcome: Sidebar lists tactical destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
+       * Exceptions: None.
+       */
+    tacticalPendingMarches: [],
+    /**
+       * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
+    
+       * Purpose: Supports maintainability by documenting why `hideCommittedOrderLinesAfterReady` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    hideCommittedOrderLinesAfterReady: false,
+    /**
+       * Documents the object literal property `rangedModeActive` (rangedModeActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `rangedModeActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    rangedModeActive: false,
+    /**
+       * Documents the object literal property `airStrikeModeActive` (airStrikeModeActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `airStrikeModeActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    airStrikeModeActive: false,
+    /**
+    * Whether the reticle is aiming a missile launch.
+    *
+    * Purpose: The next double-click places a launch instead of a march.
+    * When to use: Set by the reticle. Cleared by a second click, an empty selection, or a successful launch.
+    * Expected outcome: True only while missiles are selected and the player is choosing a target.
+    * Exceptions: None. A battle never turns this on.
+    */
+    missileLaunchModeActive: false,
+    /**
+       * Cached lat/lng vertex loops for the range perimeter overlay (recomputed when signature changes).
+    
+       * Purpose: Avoids rebuilding H3 disks and edge chains every animation frame.
+       * When to use: Read by `drawRangePerimeterOverlay`; written by `refreshRangePerimeterCacheIfNeeded`.
+       * Expected outcome: `null` when mode inactive or selection invalid; otherwise one or more closed loops.
+       * Exceptions: None.
+       */
+    rangePerimeterLoopsLatLng: null,
+    /**
+       * Signature of mode, battle, and selection used to invalidate `rangePerimeterLoopsLatLng`.
+    
+       * Purpose: Detects when perimeter geometry must be recomputed.
+       * When to use: Compared on each draw while ranged/strike planning is active.
+       * Expected outcome: Changes when `selectedUnitIds`, mode flags, or enclosing battle hex changes.
+       * Exceptions: None.
+       */
+    rangePerimeterSignature: null,
+    /**
+       * Active `requestAnimationFrame` id for flowing range perimeter dashes, or null when idle.
+    
+       * Purpose: Ensures a single animation loop while planning mode is active.
+       * When to use: Set by `ensureRangePerimeterAnimation` / `tickRangePerimeterAnimation`.
+       * Expected outcome: Non-null only during ranged/strike mode without resolution playback.
+       * Exceptions: None.
+       */
+    rangePerimeterAnimationFrameId: null,
+    /**
+       * Documents the object literal property `airStrikeTargetType` (airStrikeTargetType: 'units' as AirStrikeTargetType).
+    
+       * Purpose: Supports maintainability by documenting why `airStrikeTargetType` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    airStrikeTargetType: "units",
+    /**
+       * Documents the object literal property `stackCalloutModalActive` (stackCalloutModalActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `stackCalloutModalActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    stackCalloutModalActive: false,
+    /**
+       * Documents the object literal property `buildPopupHexH3` (buildPopupHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `buildPopupHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    buildPopupHexH3: null,
+    /**
+    * Ordered queue rows broadcast across selected production hexes while multi-select is active.
+    *
+    * Purpose: Preserves rows unavailable at some hexes even though those rows are filtered from persistence.
+    * When to use: Selection size two or greater; clear when collapsing to one or closing the popup.
+    * Expected outcome: Multi-edit controls remain stable across per-hex eligibility differences and async edits via stable `rowKey`.
+    * Exceptions: Single-hex mode continues to read and mutate database entry ids directly.
+    */
+    buildQueueTemplate: [],
+    /**
+       * Documents the object literal property `buildPopupRequestSeq` (buildPopupRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `buildPopupRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    buildPopupRequestSeq: 0,
+    /**
+       * Documents the object literal property `gameState` (gameState: null as GameStateSnapshot | null).
+    
+       * Purpose: Supports maintainability by documenting why `gameState` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    gameState: null,
+    /**
+       * Documents the object literal property `unitDisplayNameById` (unitDisplayNameById: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `unitDisplayNameById` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    unitDisplayNameById: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `tacticalTerrainOverridesByH3` (tacticalTerrainOverridesByH3: new Map< string, { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean } >()).
+    
+       * Purpose: Supports maintainability by documenting why `tacticalTerrainOverridesByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    tacticalTerrainOverridesByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `tacticalCityOverlayLabelByH3` (tacticalCityOverlayLabelByH3: new Map<string, string>()).
+    
+       * Purpose: Caches reduced tactical city labels for the tactical city overlay while tactical hexes are visible.
+       * When to use: Hydrated at startup from main-process IPC; read only from terrain overlay passes.
+       * Expected outcome: Keys are tactical child indexes; values are display strings already tie-broken per naming rules.
+       * Exceptions: None.
+       */
+    tacticalCityOverlayLabelByH3: /* @__PURE__ */ new Map(),
+    /**
+    * Generated urban-cell count for each strategic hex that can produce units.
+    *
+    * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
+    * When to use: Hydrated once per session from `game:getStrategicBaselineUrbanHexCounts`. A missing hex produces nothing.
+    * Expected outcome: Keys are strategic indexes. Values are integers of at least 1.
+    * Exceptions: None.
+    */
+    baselineUrbanHexCountByStrategicH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `tacticalRoadRailSidesByH3` (tacticalRoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
+    
+       * Purpose: Caches road/rail side masks for tactical cells used by the tactical transport overlay renderer (gameplay truth: booleans).
+       * When to use: Hydrated once per session from `game:getTacticalRoadRailOverlays` alongside terrain overrides.
+       * Expected outcome: Parallel boolean arrays match the exported JSON contract for each stored cell.
+       * Exceptions: None.
+       */
+    tacticalRoadRailSidesByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `tacticalTransportVectorOverlayRows` (tacticalTransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
+    
+       * Purpose: Caches optional display-only transport polylines for the Leaflet vector overlay.
+       * When to use: Hydrated from `game:getTacticalTransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
+       * Expected outcome: Empty array when vector artifact is absent; populated rows use WGS84 `[lat, lng]` tuples.
+       * Exceptions: None.
+       */
+    tacticalTransportVectorOverlayRows: [],
+    /**
+       * Documents the object literal property `terrainInfraStrategicAirport` (terrainInfraStrategicAirport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraStrategicAirport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainInfraStrategicAirport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraStrategicSeaport` (terrainInfraStrategicSeaport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraStrategicSeaport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainInfraStrategicSeaport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraTacticalAirport` (terrainInfraTacticalAirport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraTacticalAirport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainInfraTacticalAirport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraTacticalSeaport` (terrainInfraTacticalSeaport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraTacticalSeaport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    terrainInfraTacticalSeaport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `tacticalChildrenByParent` (tacticalChildrenByParent: new Map<string, string[]>()).
+    
+       * Purpose: Supports maintainability by documenting why `tacticalChildrenByParent` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    tacticalChildrenByParent: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `tacticalVisible` (tacticalVisible: false).
+    
+       * Purpose: Supports maintainability by documenting why `tacticalVisible` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    tacticalVisible: false,
+    /**
+       * Documents the object literal property `resolutionMoveAnimation` (resolutionMoveAnimation: null as ResolutionMoveAnimationState).
+    
+       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimation` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    resolutionMoveAnimation: null,
+    /**
+       * Documents the object literal property `resolutionMoveAnimationFrameId` (resolutionMoveAnimationFrameId: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimationFrameId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    resolutionMoveAnimationFrameId: null,
+    /**
+    * True while main deferred strategic post-resolution LLM consultation until playback notify + push.
+    *
+    * Purpose: Gates Ready + Run prefetch until `registerPostResolutionConsultationListener` receives a matching push.
+    * When to use: Strategic Ready path when `ReadyResult.postResolutionConsultDeferred` is true until push clears this flag.
+    * Expected outcome: Cleared when push applies or on new game / fatal mismatch recovery.
+    * Exceptions: None.
+    */
+    pendingDeferredStrategicPostResolutionConsult: false,
+    /**
+    * True while main deferred tactical post-beat LLM consultation until playback notify + push.
+    *
+    * Purpose: Mirrors `pendingDeferredStrategicPostResolutionConsult` for tactical event-driven Run commits.
+    * When to use: Tactical commit returned `tacticalPostBeatConsultDeferred` until `registerPostTacticalBeatConsultationListener` fires.
+    * Expected outcome: Cleared when tactical push applies or tactical session ends.
+    * Exceptions: None.
+    */
+    pendingDeferredTacticalPostBeatConsult: false,
+    /**
+    * True once the renderer has told main that resolution playback finished for the armed deferred consultation.
+    *
+    * Purpose: Main starts the deferred consultation on that notify, so the Ready "AI:" timer starts then rather than
+    * during the playback animation.
+    * When to use: Reset to false wherever a deferred strategic or tactical consultation is armed; set to true when its
+    * playback-complete notify is sent. Read through `isDeferredResolutionConsultRunning`.
+    * Expected outcome: Meaningful only while a deferred consultation is pending; a stale true value is ignored once the
+    * pending flags clear.
+    * Exceptions: None.
+    */
+    deferredResolutionConsultNotifySent: false,
+    /**
+       * Documents the object literal property `initialCameraApplied` (initialCameraApplied: false).
+    
+       * Purpose: Supports maintainability by documenting why `initialCameraApplied` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    initialCameraApplied: false,
+    /**
+       * Documents the object literal property `clientStaleEnemyIntelByUnitId` (clientStaleEnemyIntelByUnitId: new Map< string, { unitId: string; lastKnownH3Index: string; lastSeenTurn: number; staleUnt).
+    
+       * Purpose: Supports maintainability by documenting why `clientStaleEnemyIntelByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    clientStaleEnemyIntelByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `lastRenderedVisibleEnemyByUnitId` (lastRenderedVisibleEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
+    
+       * Purpose: Supports maintainability by documenting why `lastRenderedVisibleEnemyByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastRenderedVisibleEnemyByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `lastObservedEnemyByUnitId` (lastObservedEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
+    
+       * Purpose: Supports maintainability by documenting why `lastObservedEnemyByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastObservedEnemyByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `redrawRafId` (redrawRafId: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `redrawRafId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    redrawRafId: null,
+    /**
+       * Documents the object literal property `canvasMetrics` (canvasMetrics: null as { w: number; h: number; dpr: number } | null).
+    
+       * Purpose: Supports maintainability by documenting why `canvasMetrics` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    canvasMetrics: null,
+    /**
+       * Documents the object literal property `openRouterToolGroups` (openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS] as { id: string; label: string }[]).
+    
+       * Purpose: Supports maintainability by documenting why `openRouterToolGroups` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS],
+    /**
+       * Documents the object literal property `enabledToolGroups` (enabledToolGroups: new Set<string>(OPENROUTER_TOOL_GROUPS.map((g) => g.id))).
+    
+       * Purpose: Supports maintainability by documenting why `enabledToolGroups` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    enabledToolGroups: new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id)),
+    /**
+       * Documents the object literal property `toolInvocationCounts` (toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])) as Record< string, number >).
+    
+       * Purpose: Supports maintainability by documenting why `toolInvocationCounts` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])),
+    /**
+       * Documents the object literal property `runButtonOn` (runButtonOn: false).
+    
+       * Purpose: Supports maintainability by documenting why `runButtonOn` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    runButtonOn: false,
+    /**
+       * Documents the object literal property `useEventDrivenConsultation` (useEventDrivenConsultation: true).
+    
+       * Purpose: Supports maintainability by documenting why `useEventDrivenConsultation` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    useEventDrivenConsultation: true,
+    /**
+       * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    precomputedToolInvocationCounts: null,
+    /**
+       * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
+       * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
+    
+       * Purpose: Single latch for the full async Ready pipeline including post-`ready` resolution playback setup.
+       * When to use: Written only in `readyHandler`; read by `updateReadyButtonState` and the handler’s re-entry guard.
+       * Expected outcome: At most one Ready completion run at a time; button reflects disabled state while true.
+       * Exceptions: Cleared in `finally` even when the handler returns early (e.g. AI planning wait toast).
+       */
+    readyRequestInFlight: false,
+    /**
+       * Documents the object literal property `readyBtnAiWaitStartTime` (readyBtnAiWaitStartTime: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitStartTime` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    readyBtnAiWaitStartTime: null,
+    /**
+       * Documents the object literal property `readyBtnAiWaitIntervalId` (readyBtnAiWaitIntervalId: null as ReturnType<typeof setInterval> | null).
+    
+       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitIntervalId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    readyBtnAiWaitIntervalId: null,
+    /**
+       * Documents the object literal property `toastHideTimer` (toastHideTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `toastHideTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    toastHideTimer: null,
+    /**
+       * Documents the object literal property `aiStrategyToastHideTimer` (aiStrategyToastHideTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `aiStrategyToastHideTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    aiStrategyToastHideTimer: null,
+    /**
+       * Documents the object literal property `lastAppliedMapInteractionCursor` (lastAppliedMapInteractionCursor: '').
+    
+       * Purpose: Supports maintainability by documenting why `lastAppliedMapInteractionCursor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    lastAppliedMapInteractionCursor: "",
+    /**
+     * Which side a watch is looking through.
+     *
+     * Purpose: All sides shows every hex. A seat id shows that seat's fog.
+     * When to use: `getGameState` while no human seat is active, and the View as control.
+     * Expected outcome: `'all'` until the player picks a seat. A new match resets it.
+     * Exceptions: None.
+     */
+    viewAs: "all",
+    /**
+     * Whether Ready should press itself once every commander is ready.
+     *
+     * Purpose: A watch can advance without a click. Watch the rest turns it on.
+     * When to use: The footer checkbox, and the press that follows playback.
+     * Expected outcome: False for a new match. True after Watch the rest, until the player turns it off or Ready fails.
+     * Exceptions: None.
+     */
+    autoAdvance: false
+  };
+
+  // src/shared/lossSummary.ts
+  var LOSS_TYPE_NAME_LIST_MAX = 3;
+  var GROUP_LABEL_BY_TYPE = {
+    naval: "Naval",
+    air: "Air",
+    armor: "Armored",
+    infantry: "Infantry",
+    missile: "Missile"
+  };
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
+  function emptyPlayerLossSummary() {
+    return { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
+  }
+  function emptyTurnLossSummary() {
+    return { byOwner: {} };
+  }
+  function isKnownLossType(unitType) {
+    return isBuildUnitType(unitType);
+  }
+  function formatLossEntries(units) {
+    if (units.length === 0) return "";
+    const counts = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
+    for (const unit of units) {
+      if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
+    }
+    const parts = [];
+    for (const unit of units) {
+      if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
+        parts.push(unit.displayName);
+      }
+    }
+    for (const unitType of GROUP_ORDER) {
+      const count = counts[unitType];
+      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
+    }
+    return parts.join(", ");
+  }
+  var CAUSE_SPECS = [
+    { key: "ranged", label: "Ranged attack" },
+    { key: "melee", label: "Melee attack" },
+    { key: "returnFire", label: "Return fire" },
+    { key: "airStrike", label: "Air strike" },
+    { key: "missileStrike", label: "Missile strike" },
+    { key: "other", label: "Other losses" }
+  ];
+  var LOSS_CAUSE_LABELS = CAUSE_SPECS.map((spec) => spec.label);
+  var LOSS_CAUSE_KEYS = CAUSE_SPECS.map((spec) => spec.key);
+  function formatPlayerLossLinesMultiline(summary) {
+    const lines = [];
+    for (const spec of CAUSE_SPECS) {
+      const units = summary[spec.key];
+      if (units.length === 0) continue;
+      const text = formatLossEntries(units);
+      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
+    }
+    return lines;
+  }
+
+  // src/shared/lossToastUnitSegments.ts
+  var GROUP_TYPE_BY_LABEL = {
+    Naval: "naval",
+    Air: "air",
+    Armored: "armor",
+    Infantry: "infantry",
+    Missile: "missile"
+  };
+  var GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
+  var VICTIM_SEPARATOR = ", ";
+  var BULLET_PREFIX = "\u2022 ";
+  function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
+    const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
+    const body = line.slice(bullet.length);
+    const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
+    if (!label) return [{ text: line, unitDisplayName: null }];
+    const prefix = `${bullet}${label}: `;
+    const tokens = body.slice(label.length + 2).split(VICTIM_SEPARATOR);
+    const segments = [{ text: prefix, unitDisplayName: null }];
+    tokens.forEach((token, index) => {
+      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
+      segments.push(victimSegment(token, knownDisplayNames));
+    });
+    return segments;
+  }
+  function victimSegment(token, knownDisplayNames) {
+    if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
+    const match = GROUP_TOKEN.exec(token);
+    const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ""] : void 0;
+    if (match && unitType) {
+      return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
+    }
+    return { text: token, unitDisplayName: null };
+  }
+
+  // src/shared/turnLossSections.ts
+  var NO_HEX_LINES = /* @__PURE__ */ new Map();
+  var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
+  var SECTION_HEADER_PREFIX = "## ";
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES) {
+    const lines = [];
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner)) {
+      const header = headerFor(ownerId, viewerSeatId2, seats);
+      lines.push(
+        ...sectionLines(
+          summary,
+          ownerId,
+          header,
+          hexLinesByOwner.get(ownerId) ?? [],
+          strikeLinesByOwner.get(ownerId) ?? []
+        )
+      );
+    }
+    return lines;
+  }
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner) {
+    const ids = /* @__PURE__ */ new Set([
+      ...Object.keys(summary.byOwner),
+      ...hexLinesByOwner.keys(),
+      ...strikeLinesByOwner.keys()
+    ]);
+    const ordered = [];
+    if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
+    const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
+    others.sort((left, right) => compareOwners(left, right, seats));
+    ordered.push(...others);
+    if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
+    return ordered;
+  }
+  function headerFor(ownerId, viewerSeatId2, seats) {
+    if (viewerSeatId2 !== null && ownerId === viewerSeatId2) return "Your Losses";
+    if (ownerId === NEUTRAL_OWNER_ID) return "Neutral Losses";
+    return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
+  }
+  function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
+    if (headerTitle === "Your Losses") return viewerSeatId2;
+    if (headerTitle === "Neutral Losses") return NEUTRAL_OWNER_ID;
+    if (!headerTitle.endsWith(" Losses")) return null;
+    const name = headerTitle.slice(0, -" Losses".length);
+    const matches = seats.filter((seat) => {
+      const home = seat.homeRegion.trim();
+      return (home.length > 0 ? home : seat.seatId) === name;
+    }).sort((left, right) => left.seatOrder - right.seatOrder);
+    return matches[0]?.seatId ?? null;
+  }
+  function lossSectionTitle(seat, ownerId) {
+    const name = seat?.homeRegion.trim() ?? "";
+    return `${name.length > 0 ? name : ownerId} Losses`;
+  }
+  function sectionLines(summary, ownerId, header, hexLines, strikeLines) {
+    const buckets = summary.byOwner[ownerId];
+    const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
+    if (causes.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
+    return [
+      `${SECTION_HEADER_PREFIX}${header}`,
+      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+      ...strikeLines,
+      ...hexLines
+    ];
+  }
+  function compareOwners(left, right, seats) {
+    const leftSeat = seats.find((row) => row.seatId === left);
+    const rightSeat = seats.find((row) => row.seatId === right);
+    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
+    if (leftSeat) return -1;
+    if (rightSeat) return 1;
+    return left.localeCompare(right, "en");
+  }
+
+  // src/shared/shortSideName.ts
+  var COMPASS_PREFIXES = [
+    ["Northern", "N."],
+    ["Southern", "S."],
+    ["Eastern", "E."],
+    ["Western", "W."],
+    ["Central", "C."],
+    ["North", "N."],
+    ["South", "S."],
+    ["East", "E."],
+    ["West", "W."]
+  ];
+  var DIRECTION_STEMS = [
+    ["central", "C"],
+    ["north", "N"],
+    ["south", "S"],
+    ["east", "E"],
+    ["west", "W"]
+  ];
+  var TRAILING_ABBREVIATION = / \([A-Z]{2,}\)$/;
+  function sideHomeNameKey(displayName) {
+    return displayName.trim().replace(TRAILING_ABBREVIATION, "");
+  }
+  function cutAtFirstSeparator(displayName) {
+    const separatorAt = [" & ", ", ", " and "].map((separator) => displayName.indexOf(separator)).filter((index) => index >= 0);
+    if (separatorAt.length === 0) return displayName;
+    return displayName.slice(0, Math.min(...separatorAt));
+  }
+  function shortenLeadingCompass(name) {
+    for (const [word, short] of COMPASS_PREFIXES) {
+      if (name === word) return short;
+      if (name.startsWith(`${word} `)) return `${short} ${name.slice(word.length + 1)}`;
+    }
+    return name;
+  }
+  function isOnlySingleLetterWords(value) {
+    const words = value.split(/\s+/).map((word) => word.replace(/[^A-Za-z]/g, "")).filter((word) => word.length > 0);
+    return words.length > 0 && words.every((word) => word.length === 1);
+  }
+  function hasUnclosedParenthesis(value) {
+    let open = 0;
+    for (const char of value) {
+      if (char === "(") open += 1;
+      else if (char === ")") open -= 1;
+      if (open < 0) return true;
+    }
+    return open !== 0;
+  }
+  function compassLetters(lettersOnly) {
+    let rest = lettersOnly.toLowerCase();
+    if (rest.length === 0) return null;
+    let letters = "";
+    while (rest.length > 0) {
+      const stem = DIRECTION_STEMS.find(([name]) => rest.startsWith(name));
+      if (!stem) return null;
+      letters += stem[1];
+      rest = rest.slice(stem[0].length);
+      if (rest.startsWith("ern")) rest = rest.slice(3);
+    }
+    return letters.length > 0 ? letters : null;
+  }
+  function lettersFromFullName(body) {
+    let letters = "";
+    for (const token of body.split(/\s+/)) {
+      const lettersOnly = token.replace(/[^A-Za-z]/g, "");
+      if (lettersOnly.length === 0) continue;
+      const compass = compassLetters(lettersOnly);
+      if (compass !== null) {
+        letters += compass;
+        continue;
+      }
+      for (const char of token) {
+        if (char >= "A" && char <= "Z") letters += char;
+      }
+    }
+    return letters;
+  }
+  function shortSideName(displayName) {
+    const body = sideHomeNameKey(displayName);
+    const shortened = shortenLeadingCompass(cutAtFirstSeparator(body));
+    const candidate = isOnlySingleLetterWords(shortened) || hasUnclosedParenthesis(shortened) ? letterFormOrBody(body, shortened) : shortened;
+    if (body.length > 0 && candidate.length > body.length) return body;
+    return candidate;
+  }
+  function letterFormOrBody(body, shortened) {
+    const letters = lettersFromFullName(body);
+    if (letters.length <= 1) return body.length > 0 ? body : shortened;
+    return letters;
+  }
+
+  // src/shared/seatRoster.ts
+  var HUMAN_SEAT_KIND = "human";
+  var AI_SEAT_KIND = "ai";
+  var DOCTRINES = ["aggressive", "balanced", "cautious"];
+  var DOCTRINE_CHOICES = [...DOCTRINES, "random"];
+  function sortSeatsByOrder(seats) {
+    return [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function isSeatActive(seat) {
+    return seat.outTurn === null;
+  }
+  function activeAiSeats(seats) {
+    return sortSeatsByOrder(seats.filter((seat) => isSeatActive(seat) && seat.kind === AI_SEAT_KIND));
+  }
+  function findHumanSeat(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
+  }
+
+  // src/shared/turnReportLines.ts
+  function hexChangeLinesByOwner(input) {
+    const lostTo = /* @__PURE__ */ new Map();
+    for (const row of input.transitions) {
+      if (row.from === null || row.to === null || row.from === row.to) continue;
+      addHexCount(lostTo, row.from, row.to);
+    }
+    const lines = /* @__PURE__ */ new Map();
+    for (const [ownerId, counterparts] of lostTo) {
+      lines.set(ownerId, [hexSentence(ownerId, counterparts, input)]);
+    }
+    return lines;
+  }
+  function addHexCount(counts, ownerId, counterpartId) {
+    const row = counts.get(ownerId) ?? /* @__PURE__ */ new Map();
+    row.set(counterpartId, (row.get(counterpartId) ?? 0) + 1);
+    counts.set(ownerId, row);
+  }
+  function hexSentence(ownerId, counterparts, input) {
+    let total = 0;
+    for (const count of counterparts.values()) total += count;
+    const names = [...counterparts.keys()].sort((left, right) => compareCounterparts(left, right, input)).map((counterpartId) => partyLabel(counterpartId, input, "list"));
+    const hexWord = total === 1 ? "hex" : "hexes";
+    return `${partyLabel(ownerId, input, "subject")} lost ${total} ${hexWord} to ${joinPartyNames(names)}.`;
+  }
+  function ownerName(ownerId, seats) {
+    if (isNeutralOwnerId(ownerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === ownerId);
+    return seat ? hexLabelForSeat(seat) : ownerId;
+  }
+  function hexLabelForSeat(seat) {
+    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+  }
+  function partyLabel(ownerId, input, place) {
+    if (input.viewerSeatId !== null && ownerId === input.viewerSeatId) return place === "subject" ? "You" : "you";
+    return ownerName(ownerId, input.seats);
+  }
+  function compareCounterparts(left, right, input) {
+    const leftViewer = input.viewerSeatId !== null && left === input.viewerSeatId;
+    const rightViewer = input.viewerSeatId !== null && right === input.viewerSeatId;
+    if (leftViewer !== rightViewer) return leftViewer ? -1 : 1;
+    const byName = ownerName(left, input.seats).localeCompare(ownerName(right, input.seats), "en");
+    if (byName !== 0) return byName;
+    const leftOrder = input.seats.find((row) => row.seatId === left)?.seatOrder ?? 9e3;
+    const rightOrder = input.seats.find((row) => row.seatId === right)?.seatOrder ?? 9e3;
+    return leftOrder - rightOrder || left.localeCompare(right, "en");
+  }
+  function joinPartyNames(names) {
+    if (names.length <= 1) return names[0] ?? "";
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  }
+  function hexNameForSeat(seat) {
+    if (aiIndexForSeatId(seat.seatId) == null) return null;
+    return hexLabelForSeat(seat);
+  }
+  function headerNameForSeat(seat) {
+    if (aiIndexForSeatId(seat.seatId) == null) return null;
+    const home = seat.homeRegion.trim();
+    return home.length > 0 ? home : seat.seatId;
+  }
+  function seatForDisplayedName(seats, name, nameOf) {
+    const matches = seats.filter((seat) => nameOf(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    return matches[0] ?? null;
+  }
+  function markInBody(body, seats, sectionOwnerId) {
+    const hexMarks = hexSentenceMarks(body, seats, sectionOwnerId);
+    if (hexMarks !== null) return hexMarks;
+    if (body === "Your Losses" || body === "Neutral Losses" || !body.endsWith(" Losses")) return [];
+    const name = body.slice(0, -" Losses".length);
+    const seat = seatForDisplayedName(seats, name, headerNameForSeat);
+    if (!seat) return [];
+    return [{ seatId: seat.seatId, start: 0, end: name.length }];
+  }
+  function hexSentenceMarks(body, seats, sectionOwnerId) {
+    const loss = /^(.+) lost (\d+) hex(?:es)? to (.+)\.$/.exec(body);
+    const gain = loss ? null : /^(.+) took (\d+) hex(?:es)? from (.+)\.$/.exec(body);
+    const match = loss ?? gain;
+    if (!match) return null;
+    const subject = match[1] ?? "";
+    const verb = loss ? "lost" : "took";
+    if (!body.startsWith(`${subject} ${verb} `)) return null;
+    const marks = [];
+    const used = /* @__PURE__ */ new Set();
+    const subjectSeat = seatForHexName(subject, seats, used, sectionOwnerId);
+    if (subjectSeat) {
+      used.add(subjectSeat.seatId);
+      marks.push({ seatId: subjectSeat.seatId, start: 0, end: subject.length });
+    }
+    const list = match[3] ?? "";
+    if (!body.endsWith(`${list}.`)) return marks;
+    let cursor = body.length - (list.length + 1);
+    for (const name of splitJoinedNames(list)) {
+      if (!body.startsWith(name, cursor)) return marks;
+      const seat = seatForHexName(name, seats, used, null);
+      if (seat) {
+        used.add(seat.seatId);
+        marks.push({ seatId: seat.seatId, start: cursor, end: cursor + name.length });
+      }
+      cursor += name.length;
+      if (body.startsWith(", and ", cursor)) cursor += ", and ".length;
+      else if (body.startsWith(", ", cursor)) cursor += 2;
+      else if (body.startsWith(" and ", cursor)) cursor += " and ".length;
+    }
+    return marks;
+  }
+  function splitJoinedNames(list) {
+    if (!list.includes(", ")) {
+      const andAt = list.indexOf(" and ");
+      if (andAt < 0) return [list];
+      return [list.slice(0, andAt), list.slice(andAt + " and ".length)];
+    }
+    const parts = list.split(", ");
+    const last = parts[parts.length - 1] ?? "";
+    if (last.startsWith("and ")) parts[parts.length - 1] = last.slice("and ".length);
+    return parts;
+  }
+  function seatForHexName(name, seats, used, preferredId) {
+    if (name === "You" || name === "you" || name === "Neutral") return null;
+    const matches = seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    if (preferredId) {
+      const preferred = matches.find((seat) => seat.seatId === preferredId);
+      if (preferred) return preferred;
+    }
+    return matches[0] ?? null;
+  }
+  function sideNameMarksForLine(line, seats, sectionOwnerId = null) {
+    let offset = 0;
+    let body = line;
+    if (body.startsWith("\u2022 ")) {
+      offset += 2;
+      body = body.slice(2);
+    }
+    if (body.startsWith("## ")) {
+      offset += 3;
+      body = body.slice(3);
+    }
+    return markInBody(body, seats, sectionOwnerId).map((mark) => ({
+      seatId: mark.seatId,
+      start: mark.start + offset,
+      end: mark.end + offset
+    }));
+  }
+
+  // src/shared/seatPalette.ts
+  var SEAT_PALETTES = [
+    { map: "#115E59", forceBar: "#1B8A82", text: "#7DCEC8" },
+    { map: "#9D174D", forceBar: "#B02A62", text: "#F0B4C8" },
+    { map: "#C2410C", forceBar: "#EA580C", text: "#FDBA74" },
+    { map: "#2563EB", forceBar: "#3B82F6", text: "#A9C1F5" }
+  ];
+  var NEUTRAL_PALETTE = {
+    map: "#141414",
+    heldHexOutline: "#1F1F1F",
+    forceBar: "#9CA3AF",
+    text: "#D9D9D9"
+  };
+  function miniTokenColors(palette) {
+    return { fill: palette.map, glyph: "#ffffff", ring: palette.text };
+  }
+  function paletteForOwner(ownerId, seats) {
+    if (ownerId == null) return null;
+    if (isNeutralOwnerId(ownerId)) return NEUTRAL_PALETTE;
+    const seat = seats.find((row) => row.seatId === ownerId);
+    if (!seat) return null;
+    const palette = SEAT_PALETTES[seat.seatOrder - 1];
+    return palette ?? null;
+  }
+
+  // src/shared/observeModeControls.ts
+  function activeHumanSeatId(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND && seat.outTurn == null)?.seatId ?? null;
+  }
+  function isObservingRoster(seats) {
+    return seats.length > 0 && activeHumanSeatId(seats) === null;
+  }
+  function observeModeControls(seats) {
+    const observing = isObservingRoster(seats);
+    return {
+      observing,
+      ordersEnabled: !observing,
+      buildEnabled: false,
+      forcesEnabled: false,
+      unitSelectionEnabled: !observing,
+      magnifierEnabled: !observing,
+      hexOnlySelection: observing
+    };
+  }
+  function readoutViewerSeatId(seats, viewAs) {
+    if (seats.length === 0) return void 0;
+    if (!observeModeControls(seats).observing) {
+      return activeHumanSeatId(seats);
+    }
+    if (viewAs === "all") return null;
+    const chosen = seats.find((seat) => seat.seatId === viewAs && seat.outTurn == null);
+    return chosen?.seatId ?? null;
+  }
+  function staleIntelViewer(playerPerspective) {
+    if (playerPerspective === "all") return null;
+    if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
+    return HUMAN_SEAT_ID;
+  }
+
+  // src/shared/unitIds.ts
+  var UNIT_TYPE_ID_CODES = {
+    infantry: "i",
+    armor: "t",
+    naval: "n",
+    air: "a",
+    missile: "m"
+  };
+  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itnam])(\d+)$/;
+  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
+  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
+    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
+  );
+  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
+  function isPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+  function hasForbiddenLeadingZero(digits) {
+    return digits.startsWith("0");
+  }
+  function parseStrategicUnitId(unitId) {
+    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const playerLetter = match[1];
+    const playerIndexDigits = match[2];
+    const typeCode = match[3];
+    const ordinalDigits = match[4];
+    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
+    const playerIndex = Number.parseInt(playerIndexDigits, 10);
+    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
+    if (!unitType) return null;
+    const ordinal3 = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal3)) return null;
+    if (playerLetter === "h") {
+      if (playerIndex !== 1) return null;
+      return { player: HUMAN_SEAT_ID, unitType, ordinal: ordinal3 };
+    }
+    if (playerIndex < 1 || playerIndex > 4) return null;
+    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal: ordinal3 };
+  }
+  function parseTacticalSubUnitId(unitId) {
+    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const parentUnitId = match[1];
+    const slotDigits = match[2];
+    if (hasForbiddenLeadingZero(slotDigits)) return null;
+    const slot = Number.parseInt(slotDigits, 10);
+    if (!isPositiveInteger(slot)) return null;
+    return { parentUnitId, slot };
+  }
+  function unitTypeFromUnitId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.unitType;
+    if (unitId.includes("-infantry-")) return "infantry";
+    if (unitId.includes("-armor-")) return "armor";
+    if (unitId.includes("-naval-")) return "naval";
+    if (unitId.includes("-air-")) return "air";
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
+    return null;
+  }
+  function unitIdOwnerFromId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.player;
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) {
+      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
+      if (parentOwner) return parentOwner;
+    }
+    if (unitId.startsWith("opponent-")) return AI_SEAT_IDS[0];
+    if (unitId.startsWith("human-")) return HUMAN_SEAT_ID;
+    return null;
+  }
+
+  // src/renderer/rendering/ownerColors.ts
+  function paletteSeats() {
+    return rendererSharedState.gameState?.seats ?? [];
+  }
+  function paletteForCurrentOwner(ownerId) {
+    if (ownerId == null || ownerId === "") return null;
+    const seats = paletteSeats();
+    const palette = paletteForOwner(ownerId, seats);
+    if (palette) return palette;
+    if (seats.length === 0 && ownerId === HUMAN_SEAT_ID) return SEAT_PALETTES[0] ?? null;
+    return null;
+  }
+
+  // src/renderer/rendering/mercenaryBadgeDrawing.ts
+  var MERCENARY_BADGE_TEXT = "$";
+  var MERCENARY_BADGE_FONT = "bold 11px system-ui, sans-serif";
+  var MERCENARY_BADGE_Y_OFFSET_RATIO = 0.6;
+  function drawMercenaryBadge(ctx, x, y) {
+    const badgeY = y + UNIT_RADIUS * MERCENARY_BADGE_Y_OFFSET_RATIO;
+    ctx.save();
+    ctx.font = MERCENARY_BADGE_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.strokeText(MERCENARY_BADGE_TEXT, x, badgeY);
+    ctx.fillStyle = "#000";
+    ctx.fillText(MERCENARY_BADGE_TEXT, x, badgeY);
+    ctx.restore();
   }
 
   // src/shared/mapExtent.ts
@@ -16827,6 +17356,10 @@
       ctx.fillStyle = "#000";
       ctx.fillText(String(count), badgeX, badgeY);
     }
+    for (const token of tokens) {
+      if (!token.units.some((unit) => unit.isMercenary === true)) continue;
+      drawMercenaryBadge(ctx, token.top.x, token.top.y);
+    }
   }
   function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
     const viewer = staleIntelViewer(state.playerPerspective);
@@ -16864,7 +17397,8 @@
       lastKnownH3Index: row.lastKnownH3Index,
       intelState: "stale",
       lastSeenTurn: row.lastSeenTurn,
-      staleUntilTurn: row.staleUntilTurn
+      staleUntilTurn: row.staleUntilTurn,
+      player: row.player
     }));
     const byUnitId = /* @__PURE__ */ new Map();
     for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
@@ -16875,8 +17409,15 @@
         lastKnownH3Index: row.lastKnownH3Index,
         intelState: "stale",
         lastSeenTurn: row.lastSeenTurn,
-        staleUntilTurn: row.staleUntilTurn
+        staleUntilTurn: row.staleUntilTurn,
+        player: row.player
       });
+    }
+    for (const unitId of [...byUnitId.keys()]) {
+      if (state.units.some((unit) => unit.id === unitId && unit.player === viewer)) {
+        rendererSharedState.clientStaleEnemyIntelByUnitId.delete(unitId);
+        byUnitId.delete(unitId);
+      }
     }
     const intel = Array.from(byUnitId.values());
     if (intel.length === 0) return;
@@ -16898,7 +17439,7 @@
       if (alpha <= 0) continue;
       const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
       const label = types.size === 1 ? [...types][0] : "*";
-      const owners = new Set(rows.map((row) => unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
+      const owners = new Set(rows.map((row) => row.player ?? unitIdOwnerFromId(row.unitId)).filter((owner) => owner != null));
       const ownerId = owners.size === 1 ? [...owners][0] : null;
       const mixedOwners = owners.size > 1;
       const fillColor = mixedOwners ? MULTI_PLAYER_FILL : paletteForCurrentOwner(ownerId ?? AI_SEAT_IDS[0])?.map ?? "#333";
@@ -19563,71 +20104,6 @@
     return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
   }
 
-  // src/shared/fortificationRules.ts
-  var FORTIFICATION_QUEUE_ITEM = "fortification";
-  var FORTIFICATION_COST_INFANTRY_MULTIPLIER = 1;
-  var FORTIFICATION_QUEUE_ITEM_LABEL = "Fortification";
-  var FORTIFIED_TOOLTIP_LABEL = "Fortified";
-  var FORTIFIED_LEGEND_LABEL = "Fortified";
-  var FORTIFIED_CELL_VARIANT_LABEL = "Fortified urban";
-  var FORTIFIED_CELL_BLOCKED_REASON = "Enemy fortifications block that cell. Destroy them with fire first.";
-  var FORTIFIED_CELL_BLOCKED_HOVER = "Blocked: Fortified";
-  var FORTIFICATION_UNNAMED_PLACE = "an unnamed hex";
-  function formatFortifiedTooltipValue(fortified, intactCityCells) {
-    const noun = intactCityCells === 1 ? "city cell" : "city cells";
-    return `${fortified} of ${intactCityCells} ${noun}`;
-  }
-  function formatFortificationReportLine(args) {
-    const hitWord = args.lost === 1 ? "hit" : "hits";
-    const remainingPhrase = args.remaining === 0 ? "none remain" : args.remaining === 1 ? "1 remains" : `${args.remaining} remain`;
-    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}; ${remainingPhrase}.`;
-  }
-  function formatFortificationsBuiltLine(count) {
-    return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
-  }
-  function joinPlaceNames(placeNames) {
-    if (placeNames.length <= 1) return placeNames[0] ?? "";
-    if (placeNames.length === 2) return `${placeNames[0]} and ${placeNames[1]}`;
-    return `${placeNames.slice(0, -1).join(", ")}, and ${placeNames[placeNames.length - 1]}`;
-  }
-  function formatFortificationQueuePausedLine(placeNames) {
-    if (placeNames.length === 1) {
-      return `Every city cell at ${placeNames[0]} is fortified, so its build queue is paused.`;
-    }
-    return `Every city cell is fortified at ${joinPlaceNames(placeNames)}, so their build queues are paused.`;
-  }
-
-  // src/shared/gameRules.ts
-  function unitCostFor(unitType) {
-    const rules = activeGameMap().rules;
-    switch (unitType) {
-      case "infantry":
-        return rules.infantryCost;
-      case "armor":
-        return rules.armorCost;
-      case "naval":
-        return rules.navalCost;
-      case "air":
-        return rules.airCost;
-      case "missile":
-        return rules.missileCost;
-      default: {
-        const unexpected = unitType;
-        throw new Error(`Unknown unit type ${String(unexpected)}`);
-      }
-    }
-  }
-  function advancedTechMinUrbanCells() {
-    return activeGameMap().rules.advancedMinUrbanCells;
-  }
-  function fortificationCostPerCell() {
-    return activeGameMap().rules.infantryCost * FORTIFICATION_COST_INFANTRY_MULTIPLIER;
-  }
-  function buildQueueItemCostFor(itemType) {
-    if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
-    return unitCostFor(itemType);
-  }
-
   // src/shared/missileRules.ts
   var MISSILE_UNIT_TYPE = "missile";
   function isMissileUnitType(unitType) {
@@ -20079,6 +20555,9 @@
     }
     const formedLabel = identity.formedLabel?.trim() ?? "";
     if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
+    if (identity.mercenaryUpkeep != null) {
+      lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(formatMercenaryTooltipValue(identity.mercenaryUpkeep))}`);
+    }
     return lines;
   }
   function formatUnitOriginTooltipHtml(input) {
@@ -20109,9 +20588,9 @@
     const body = rows.length > 0 ? rows.join("\n") : "None";
     const bonuses = `<strong>Bonuses:</strong>
 ${body}`;
-    const head = identityLines(input.origin, input.identity);
-    if (head.length === 0) return bonuses;
-    return `${head.join("\n")}
+    const head2 = identityLines(input.origin, input.identity);
+    if (head2.length === 0) return bonuses;
+    return `${head2.join("\n")}
 
 ${bonuses}`;
   }
@@ -20152,10 +20631,19 @@ ${bonuses}`;
     return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? "global"));
   }
   function tooltipIdentityFor(unitId) {
+    const mercenaryUpkeep = mercenaryUpkeepForLiveUnit(unitId);
     return {
       displayName: rendererSharedState.unitDisplayNameById.get(unitId) ?? "",
-      formedLabel: formedLabelFor(unitId)
+      formedLabel: formedLabelFor(unitId),
+      ...mercenaryUpkeep != null ? { mercenaryUpkeep } : {}
     };
+  }
+  function mercenaryUpkeepForLiveUnit(unitId) {
+    const battle = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit2) => unit2.id === unitId);
+    const strategic = rendererSharedState.gameState?.units.find((unit2) => unit2.id === unitId);
+    const unit = battle ?? strategic;
+    if (!unit || unit.isMercenary !== true || !isHireableUnitType(unit.unitType)) return null;
+    return mercenaryUpkeepFor(unit.unitType, unit.techLevel);
   }
   function selectedBonusOptions() {
     const state = rendererSharedState.gameState;
@@ -20491,1202 +20979,6 @@ ${bonuses}`;
   function isNewGameOverlayOpen() {
     const overlay = document.getElementById("game-over-overlay");
     return overlay != null && !overlay.classList.contains("hidden");
-  }
-
-  // src/shared/hexLlmCodeAssignment.ts
-  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  var strategicH3ToCodeSingleton = null;
-  function indexToCode(index) {
-    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
-      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
-    }
-    const hi = Math.floor(index / CODE_ALPHABET.length);
-    const lo = index % CODE_ALPHABET.length;
-    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
-  }
-  function sortCellsForStableLlmCodes(cells) {
-    const decorated = cells.map((h3) => {
-      const [lat, lng] = cellToLatLng(h3);
-      return { h3, lat, lng };
-    });
-    decorated.sort((a, b) => {
-      if (a.lat !== b.lat) return b.lat - a.lat;
-      if (a.lng !== b.lng) return a.lng - b.lng;
-      return a.h3.localeCompare(b.h3);
-    });
-    return decorated.map((d) => d.h3);
-  }
-  function buildStrategicH3ToCodeMap() {
-    const footprint2 = loadedStrategicFootprint();
-    const strategicSet = new Set(footprint2 ?? []);
-    if (!footprint2) {
-      const res0 = getRes0Cells();
-      for (const r0 of res0) {
-        for (const child of cellToChildren(r0, strategicH3Resolution())) {
-          strategicSet.add(child);
-        }
-      }
-    }
-    const sorted = sortCellsForStableLlmCodes([...strategicSet]);
-    const h3ToCode = /* @__PURE__ */ new Map();
-    for (let i = 0; i < sorted.length; i++) {
-      h3ToCode.set(sorted[i], indexToCode(i));
-    }
-    return h3ToCode;
-  }
-  function getStrategicH3ToCodeMap() {
-    if (!strategicH3ToCodeSingleton) {
-      strategicH3ToCodeSingleton = buildStrategicH3ToCodeMap();
-    }
-    return strategicH3ToCodeSingleton;
-  }
-  function resetStrategicHexCodeCache() {
-    strategicH3ToCodeSingleton = null;
-  }
-  registerActiveGameMapReset(resetStrategicHexCodeCache);
-  function getStrategicHexCode(h3Index) {
-    return getStrategicH3ToCodeMap().get(h3Index);
-  }
-  function getTacticalChildCodeWithinParent(parentStrategicH3Index, childTacticalH3Index, childResolution = tacticalH3Resolution()) {
-    const children = sortCellsForStableLlmCodes(cellToChildren(parentStrategicH3Index, childResolution));
-    const idx = children.indexOf(childTacticalH3Index);
-    if (idx < 0) return void 0;
-    return indexToCode(idx);
-  }
-  function getLlmHexLocationParenLabelForNamingTarget(target) {
-    if (target.resolution === 1) {
-      const c = getStrategicHexCode(target.h3Index);
-      return c ? `(${c})` : null;
-    }
-    const parent = strategicParentOf(target.h3Index);
-    const parentCode = getStrategicHexCode(parent);
-    const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
-    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
-  }
-
-  // src/shared/tacticalBattleFootprint.ts
-  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
-  var footprintByKey = /* @__PURE__ */ new Map();
-  function resetTacticalBattleFootprintCache() {
-    footprintByKey.clear();
-  }
-  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
-  function frozenCodeMap(entries) {
-    const map = new Map(entries);
-    const reject = () => {
-      throw new TypeError("tactical battle footprint code map is frozen");
-    };
-    map.set = reject;
-    map.delete = reject;
-    map.clear = reject;
-    return map;
-  }
-  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
-    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
-    const coreSet = new Set(coreChildH3Indexes);
-    const cells = new Set(coreChildH3Indexes);
-    for (const cell of coreChildH3Indexes) {
-      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
-        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
-      }
-    }
-    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
-    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
-    return { coreChildH3Indexes, h3Indexes, codeByH3 };
-  }
-  function tacticalBattleFootprint(enclosingStrategicH3Index) {
-    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
-    const cached = footprintByKey.get(key);
-    if (cached) return cached;
-    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
-    footprintByKey.set(key, built);
-    return built;
-  }
-  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
-    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
-  }
-  function tacticalBattleTerrainKindByCell(args) {
-    const kinds = {};
-    for (const cell of args.cells) {
-      const tacticalKind = args.tacticalKindByH3.get(cell);
-      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
-        kinds[cell] = tacticalKind;
-        continue;
-      }
-      let parentKind;
-      try {
-        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
-      } catch {
-        parentKind = void 0;
-      }
-      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
-    }
-    return kinds;
-  }
-
-  // src/shared/hexNamingCaption.ts
-  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
-  function formatHexNamingCaptionHtml(caption) {
-    const { text } = caption;
-    let html = "";
-    let cursor = 0;
-    for (const span of caption.spans) {
-      html += escapeHtmlText(text.slice(cursor, span.start));
-      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
-      const name = escapeHtmlText(text.slice(span.start, span.end));
-      if (span.role === "heading") {
-        const hasColon = text[span.end] === ":";
-        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
-        cursor = hasColon ? span.end + 1 : span.end;
-      } else {
-        html += `${flag}${name}`;
-        cursor = span.end;
-      }
-    }
-    return html + escapeHtmlText(text.slice(cursor));
-  }
-
-  // src/shared/progressFormatting.ts
-  function computeRoundedPercentage(numerator, denominator) {
-    if (denominator <= 0) return 0;
-    return Math.round(numerator / denominator * 100);
-  }
-
-  // src/shared/homeRegionRules.ts
-  function resolveHomeRegionOwnerIdentity(input) {
-    const owners = declaredHomeSeatIds(input);
-    if (owners.length === 0) return null;
-    const intersectionSet = new Set(
-      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(homeListsForIntersection(input))
-    );
-    if (owners.length >= 2 || intersectionSet.has(input.h3Index)) return { kind: "shared" };
-    return { kind: "single", seatId: owners[0] };
-  }
-  function declaredHomeSeatIds(input) {
-    const bySeat = input.homeRegionHexesBySeat;
-    if (!bySeat) return [];
-    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(input.h3Index)).map(([seatId]) => seatId);
-  }
-  function homeListsForIntersection(input) {
-    const bySeat = input.homeRegionHexesBySeat;
-    if (!bySeat) return [];
-    return Object.values(bySeat);
-  }
-  function uniqueSortedHexes(hexes) {
-    return [...new Set(hexes)].sort();
-  }
-  function computeIntersectingHomeRegionHexes(homeHexLists) {
-    const counts = /* @__PURE__ */ new Map();
-    for (const list of homeHexLists) {
-      for (const h3Index of new Set(list)) {
-        counts.set(h3Index, (counts.get(h3Index) ?? 0) + 1);
-      }
-    }
-    const shared = [...counts.entries()].filter(([, count]) => count >= 2).map(([h3Index]) => h3Index);
-    return uniqueSortedHexes(shared);
-  }
-  function hasHomeRegionMetadata(state) {
-    const lists = Object.values(state.homeRegionHexesBySeat ?? {});
-    return lists.some((hexes) => hexes.length > 0);
-  }
-  function ownershipPerspective(value) {
-    if (value === "all") return "all";
-    if (value !== void 0 && isSeatId(value)) return value;
-    return HUMAN_SEAT_ID;
-  }
-  function isHexOwnershipVisibleToPerspective(input) {
-    if (input.playerPerspective === "all") return true;
-    if (input.visibleHexes.has(input.h3Index)) return true;
-    if (!hasHomeRegionMetadata(input)) return false;
-    const intersectionSet = new Set(
-      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(Object.values(input.homeRegionHexesBySeat ?? {}))
-    );
-    if (intersectionSet.has(input.h3Index)) return true;
-    const ownHomeHexSet = new Set(input.homeRegionHexesBySeat?.[input.playerPerspective] ?? []);
-    return ownHomeHexSet.has(input.h3Index);
-  }
-  function resolveOwnershipBorderStyle(input) {
-    const isHomeHex = declaredHomeSeatIds(input).length > 0;
-    const controller = input.controllerPlayerId ?? null;
-    if (isHomeHex) {
-      if (controller != null && isSeatId(controller)) return { kind: "outlined", ownerId: controller };
-      return { kind: "outlinedNeutral" };
-    }
-    if (!input.isOwnershipVisible) return { kind: "none" };
-    if (controller != null && isSeatId(controller)) return { kind: "normal", ownerId: controller };
-    if (controller != null && isNeutralOwnerId(controller)) return { kind: "outlinedNeutral" };
-    return { kind: "none" };
-  }
-  function countControlledHexesInRegion(controlRows, regionHexes, playerId) {
-    const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
-    const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));
-    const controlled = uniqueRegionHexes.filter((h3Index) => controlByHex.get(h3Index) === playerId).length;
-    const total = uniqueRegionHexes.length;
-    const pct = computeRoundedPercentage(controlled, total);
-    return { controlled, total, pct };
-  }
-
-  // src/shared/sideLabels.ts
-  function homeSeatIdsAtHex(h3Index, lists) {
-    const bySeat = lists.homeRegionHexesBySeat;
-    if (!bySeat) return [];
-    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
-  }
-  function viewerSeatIdForRoster(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
-  }
-  function abbreviatedSideName(seat) {
-    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
-  }
-  function controllerSideLabel(controllerId, seats) {
-    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
-    const seat = seats.find((row) => row.seatId === controllerId);
-    return seat ? abbreviatedSideName(seat) : controllerId;
-  }
-  function homesInOrder(homeSeatIds, seats) {
-    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
-  }
-  function formatHexControlLabel(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    const controllerName = controllerSideLabel(args.controllerId, args.seats);
-    if (homes.length === 0) return controllerName;
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => abbreviatedSideName(seat));
-      return `${controllerName} (${names.join(" & ")} homes)`;
-    }
-    const home = homes[0];
-    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
-    return `${controllerName} (${abbreviatedSideName(home)} home)`;
-  }
-  function formatUnitNameForViewer(args) {
-    if (isNeutralOwnerId(args.ownerId)) return `Neutral \xB7 ${args.baseName}`;
-    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
-    if (args.seats.length === 2) return args.baseName;
-    const seat = args.seats.find((row) => row.seatId === args.ownerId);
-    if (!seat) return args.baseName;
-    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
-  }
-  function formatHomeChip(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
-      return { kind: "home", text: "Home" };
-    }
-    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => shortSideName(seat.homeRegion));
-      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
-    }
-    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
-    return null;
-  }
-
-  // src/shared/statusIconHtml.ts
-  var STATUS_ICON_CLASS_NAME = "status-icon";
-  var STATUS_ICON = Object.freeze({
-    up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
-    doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
-    down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
-    doubleDown: Object.freeze({ file: "arrow_down_double.svg", alt: "--" }),
-    blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
-  });
-  var EFFECT_SYMBOL_KIND = Object.freeze({
-    "+": "up",
-    "-": "down",
-    x: "blocked"
-  });
-  function formatStatusIconHtml(kind) {
-    const icon = STATUS_ICON[kind];
-    const src = escapeHtmlText(`status/${icon.file}`);
-    const alt = escapeHtmlText(icon.alt);
-    return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
-  }
-  function formatEffectSymbolPrefixHtml(symbols) {
-    const icons = [];
-    for (const symbol of symbols) {
-      const kind = EFFECT_SYMBOL_KIND[symbol];
-      if (kind) icons.push(formatStatusIconHtml(kind));
-    }
-    return icons.join("|");
-  }
-
-  // src/shared/terrainEffectsForTooltip.ts
-  var SYMBOL_ORDER = ["x", "-", "+"];
-  var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
-  var MOVEMENT_UNIT_LABEL = {
-    infantry: "Infantry",
-    armor: "Armored",
-    naval: "Naval"
-  };
-  function wrapTerrainEffectSymbolSetForDisplay(symbols) {
-    if (!symbols) return "";
-    return `(${symbols})`;
-  }
-  function unwrapTerrainEffectSymbolSetFromDisplay(display) {
-    const match = /^\(([-x+/]+)\)$/.exec(display);
-    return match ? match[1] : display;
-  }
-  function formatTerrainEffectLabel(category, unit) {
-    return unit === "All" ? `All ${category}` : `${unit} ${category}`;
-  }
-  function formatTerrainEffectSymbolPrefixHtml(symbols) {
-    return formatEffectSymbolPrefixHtml(symbols);
-  }
-  function formatTerrainEffectEntryPlain(symbols, category, unit) {
-    return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
-  }
-  function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
-    return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
-  }
-  function formatTerrainEffectEntries(grouped) {
-    const entries = [];
-    for (const [key, symbols] of grouped) {
-      const slash = formatSymbolSet(symbols);
-      if (!slash) continue;
-      const pipe = key.indexOf("|");
-      const category = key.slice(0, pipe);
-      const unit = key.slice(pipe + 1);
-      entries.push(formatTerrainEffectEntryPlain(slash, category, unit));
-    }
-    return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
-  }
-  function formatTerrainEffectEntryHtml(entry) {
-    const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
-    if (!match) return entry;
-    return formatTerrainEffectEntryHtmlFromParts(
-      unwrapTerrainEffectSymbolSetFromDisplay(match[1]),
-      match[3],
-      match[2]
-    );
-  }
-  function formatTerrainEffectsLineHtml(line) {
-    return line.split(", ").map(formatTerrainEffectEntryHtml).join(", ");
-  }
-  function buildTerrainEffectGroupedMap(input) {
-    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
-    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
-    const movementByUnit = /* @__PURE__ */ new Map();
-    for (const unitType of MOVEMENT_UNIT_TYPES) {
-      const label = MOVEMENT_UNIT_LABEL[unitType];
-      const symbol = movementSymbolForUnit(unitType, cat, input, hasTransport);
-      if (symbol) {
-        movementByUnit.set(label, /* @__PURE__ */ new Set([symbol]));
-      }
-    }
-    const movementOccupiable = [...occupiableMovementUnits(cat, input)];
-    if (hasTransport && !movementOccupiable.includes("Infantry")) {
-      movementOccupiable.push("Infantry", "Armored");
-    }
-    const rangeByUnit = /* @__PURE__ */ new Map();
-    applyRangeSymbols(rangeByUnit, cat, input);
-    const grouped = /* @__PURE__ */ new Map();
-    collapseCategoryEntries(grouped, "Movement", movementByUnit, movementOccupiable);
-    collapseCategoryEntries(grouped, "Range", rangeByUnit, occupiableRangeUnits(cat, input));
-    return grouped;
-  }
-  function computeTerrainEffectsLine(input) {
-    const formatted = formatTerrainEffectEntries(buildTerrainEffectGroupedMap(input));
-    return formatted.length > 0 ? formatted.join(", ") : null;
-  }
-  function computeTerrainEffectsLineHtml(input) {
-    const plain = computeTerrainEffectsLine(input);
-    return plain == null ? null : formatTerrainEffectsLineHtml(plain);
-  }
-  function formatSymbolSet(symbols) {
-    return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
-  }
-  function movementEffectSymbolForUnit(unitType, input) {
-    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
-    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
-    return movementSymbolForUnit(unitType, cat, input, hasTransport);
-  }
-  function movementSymbolForUnit(unitType, cat, input, hasTransport) {
-    if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
-      return "+";
-    }
-    if (input.isRubble && (unitType === "infantry" || unitType === "armor")) {
-      const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
-      if (rubbleCost === Infinity) {
-        if (shouldSuppressMovementBlock(unitType, cat)) return null;
-        return "x";
-      }
-      if (input.hasRoad || input.hasRail) return null;
-      return "-";
-    }
-    if (input.isUrban) {
-      if (unitType === "infantry" || unitType === "armor") return "-";
-      return null;
-    }
-    const cost = tacticalEnterHexMovementCost(unitType, cat);
-    if (cost === Infinity) {
-      if (shouldSuppressMovementBlock(unitType, cat)) return null;
-      return "x";
-    }
-    if (cost === 2) return "-";
-    return null;
-  }
-  function shouldSuppressMovementBlock(unitType, cat) {
-    if (unitType === "naval") {
-      return cat !== "water" && cat !== "coastal";
-    }
-    if (unitType === "infantry" || unitType === "armor") {
-      return cat === "water";
-    }
-    return false;
-  }
-  function applyRangeSymbols(rangeByUnit, cat, input) {
-    const rangedCap = cat === "forests" || input.isUrban || input.isRubble;
-    if (rangedCap) {
-      addSymbol(rangeByUnit, "Infantry", "-");
-      addSymbol(rangeByUnit, "Armored", "-");
-    }
-  }
-  function addSymbol(map, unit, symbol) {
-    const existing = map.get(unit) ?? /* @__PURE__ */ new Set();
-    existing.add(symbol);
-    map.set(unit, existing);
-  }
-  function occupiableMovementUnits(cat, input) {
-    const units = [];
-    if (isInfantryOrArmorOccupiable(cat, input)) {
-      units.push("Infantry", "Armored");
-    }
-    if (isNavalTacticalCellNavigable({
-      resolvedKindForCell: input.terrainKind,
-      parentTerrain: input.parentTerrain,
-      parentTerrainKind: input.parentTerrainKind,
-      isSeaportCell: input.isSeaport
-    })) {
-      units.push("Naval");
-    }
-    return units;
-  }
-  function occupiableRangeUnits(cat, input) {
-    return occupiableMovementUnits(cat, input);
-  }
-  function isInfantryOrArmorOccupiable(cat, input) {
-    if (input.isUrban || input.isRubble) return true;
-    return isInfantryOrArmorTacticalSpawnCell({
-      resolvedKindForCell: input.terrainKind,
-      parentTerrain: input.parentTerrain,
-      parentTerrainKind: input.parentTerrainKind
-    });
-  }
-  function collapseCategoryEntries(grouped, category, byUnit, occupiable) {
-    const occupiableWithSymbols = occupiable.filter((u) => {
-      const set = byUnit.get(u);
-      return set !== void 0 && set.size > 0;
-    });
-    const collapsedUnits = /* @__PURE__ */ new Set();
-    if (occupiableWithSymbols.length >= 2) {
-      const reference = formatSymbolSet(byUnit.get(occupiableWithSymbols[0]));
-      const allSame = occupiableWithSymbols.every(
-        (u) => formatSymbolSet(byUnit.get(u)) === reference
-      );
-      if (allSame && reference.length > 0) {
-        grouped.set(`${category}|All`, new Set(byUnit.get(occupiableWithSymbols[0])));
-        for (const u of occupiableWithSymbols) collapsedUnits.add(u);
-      }
-    }
-    for (const [unit, symbols] of byUnit) {
-      if (collapsedUnits.has(unit)) continue;
-      if (symbols.size === 0) continue;
-      grouped.set(`${category}|${unit}`, new Set(symbols));
-    }
-  }
-
-  // src/shared/terrainCoverRules.ts
-  var TERRAIN_COVER_BY_CATEGORY = Object.freeze({
-    plains: Object.freeze({ surface: 0, air: 0 }),
-    forests: Object.freeze({ surface: 2, air: 1 }),
-    mountains: Object.freeze({ surface: 2, air: 0 }),
-    wetlands: Object.freeze({ surface: 1, air: 0 }),
-    desert: Object.freeze({ surface: 0, air: 0 }),
-    arctic: Object.freeze({ surface: 0, air: 0 }),
-    coastal: Object.freeze({ surface: 0, air: 0 }),
-    water: Object.freeze({ surface: 0, air: 0 })
-  });
-  var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
-  function terrainCoverPairFor(place) {
-    const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
-    const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
-    const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
-    const citySurface = place.city === true ? 2 : 0;
-    const cityAir = place.city === true ? 1 : 0;
-    const ruggedSurface = place.rugged === true ? 2 : 0;
-    return {
-      surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface),
-      air: Math.max(terrain.air, urbanAir, cityAir)
-    };
-  }
-  function terrainCoverFor(place, shooter) {
-    return terrainCoverPairFor(place)[shooter];
-  }
-  function tacticalCellCoverPlace(battle, tacticalH3) {
-    return {
-      terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3),
-      isUrban: battle.tacticalIsUrbanByH3?.[tacticalH3] === true,
-      isRubble: battle.tacticalIsRubbleByH3?.[tacticalH3] === true
-    };
-  }
-  function terrainCoverSourceLabel(place) {
-    if (place.isRubble === true) return "Rubble";
-    if (place.isUrban === true) return "Urban";
-    const category = normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land");
-    if (category === "forests") return "Forest";
-    if (category === "mountains") return "Mountain";
-    if (category === "wetlands") return "Wetlands";
-    return null;
-  }
-  var GROUND_NAVAL_COVER_LABEL = "Ground & Naval Cover";
-  var AIR_COVER_LABEL = "Air Cover";
-  function coverClauseHtml(value, label) {
-    if (value <= 0) return null;
-    const kind = value >= 2 ? "doubleUp" : "up";
-    return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
-  }
-  function formatTerrainCoverTooltipHtml(pair) {
-    const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
-      (part) => part != null
-    );
-    return parts.length > 0 ? parts.join(", ") : null;
-  }
-  function presentEffectHtml(html) {
-    if (html == null) return null;
-    return html.trim().length > 0 ? html : null;
-  }
-  function joinHexTooltipEffectsHtml(movementRangeHtml2, coverHtml) {
-    const movement = presentEffectHtml(movementRangeHtml2);
-    const cover = presentEffectHtml(coverHtml);
-    if (movement == null && cover == null) return null;
-    if (movement == null) return cover;
-    if (cover == null) return movement;
-    return `${movement}, ${cover}`;
-  }
-  function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
-    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("doubleDown")}Armored Movement` : null;
-    const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
-    return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
-  }
-
-  // src/shared/tooltipSectionGap.ts
-  var TOOLTIP_SECTION_GAP_HTML = '<br/><span style="display:block;height:0.5em"></span>';
-
-  // src/renderer/rendererTacticalHydration.ts
-  function applyTacticalCityOverlayRows(cityRows, roadRailRows, vectorRows) {
-    const nextCities = /* @__PURE__ */ new Map();
-    for (const row of cityRows) {
-      if (row.label) nextCities.set(row.h3Index, row.label);
-    }
-    rendererSharedState.tacticalCityOverlayLabelByH3 = nextCities;
-    const nextRoadRail = /* @__PURE__ */ new Map();
-    for (const row of roadRailRows) {
-      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
-    }
-    rendererSharedState.tacticalRoadRailSidesByH3 = nextRoadRail;
-    rendererSharedState.tacticalTransportVectorOverlayRows = vectorRows.map((row) => ({
-      kind: row.kind,
-      points: row.points.map((p) => [p[0], p[1]])
-    }));
-  }
-  function applyStrategicBaselineUrbanHexCounts(rows) {
-    const next = /* @__PURE__ */ new Map();
-    for (const row of rows) {
-      if (!row.h3Index || !Number.isFinite(row.urbanHexCount)) continue;
-      const count = Math.trunc(row.urbanHexCount);
-      if (count <= 0) continue;
-      next.set(row.h3Index, count);
-    }
-    rendererSharedState.baselineUrbanHexCountByStrategicH3 = next;
-    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-  }
-  function baselineUrbanHexCountForStrategicHex(h3Index) {
-    const count = rendererSharedState.baselineUrbanHexCountByStrategicH3.get(h3Index);
-    return count == null || !Number.isFinite(count) ? 0 : count;
-  }
-
-  // src/renderer/map/terrainTooltipHtml.ts
-  function formatLlmLocationBoldPrefixHtml(namingTarget) {
-    if (!namingTarget) return "";
-    const battle = rendererSharedState.tacticalBattleSnapshot;
-    if (battle) {
-      const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
-      const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
-      if (!strategicCode || !tacticalCode) return "";
-      return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
-    }
-    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
-    if (!label) return "";
-    return `<strong>${escapeHtmlText(label)}</strong> `;
-  }
-  function formatTerrainVariantSuffix(state) {
-    const variants = [];
-    if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
-    else if (state.isFortifiedCell) variants.push(`${formatUrbanSwatchHtml()}${FORTIFIED_CELL_VARIANT_LABEL}`);
-    else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
-    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
-  }
-  function resolveStrategicHexForControlLine(namingTarget) {
-    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.enclosingStrategicH3Index;
-    if (!namingTarget) return null;
-    if (namingTarget.resolution === 1) return namingTarget.h3Index;
-    try {
-      return strategicParentOf(namingTarget.h3Index);
-    } catch {
-      return null;
-    }
-  }
-  function getTooltipControlLabel(namingTarget) {
-    if (!rendererSharedState.gameState) return "Unknown";
-    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
-    if (!strategicHex) return "Unknown";
-    const controller = (rendererSharedState.gameState.strategicControl ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
-    const homeSeatIds = homeSeatIdsAtHex(strategicHex, rendererSharedState.gameState);
-    const label = formatHexControlLabel({
-      controllerId: controller,
-      homeSeatIds,
-      seats: rendererSharedState.gameState.seats ?? []
-    });
-    if (homeSeatIds.length > 0) return label;
-    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-    const perspective = ownershipPerspective(rendererSharedState.gameState.playerPerspective);
-    const ownershipVisible = isHexOwnershipVisibleToPerspective({
-      h3Index: strategicHex,
-      playerPerspective: perspective,
-      visibleHexes,
-      homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
-      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-    });
-    if (!ownershipVisible) return "Unknown";
-    return label;
-  }
-  function tooltipWeather(namingTarget) {
-    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
-    if (!namingTarget) return null;
-    if (!rendererSharedState.gameState) return null;
-    const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
-    if (!strategicHex) return null;
-    return rendererSharedState.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
-  }
-  function parentStrategicHex(h3Index) {
-    try {
-      return strategicParentOf(h3Index);
-    } catch {
-      return null;
-    }
-  }
-  function movementRangeHtml(state, namingTarget) {
-    if (namingTarget?.resolution !== 4) return null;
-    return computeTerrainEffectsLineHtml({
-      terrainKind: state.terrainKind,
-      parentTerrain: state.parentTerrain,
-      parentTerrainKind: state.parentTerrainKind,
-      isUrban: state.isUrban,
-      isRubble: state.isRubble,
-      isSeaport: state.isSeaport,
-      hasRoad: state.hasRoad,
-      hasRail: state.hasRail
-    });
-  }
-  function coverPair(state, namingTarget) {
-    if (!namingTarget) return null;
-    if (namingTarget.resolution === 1) {
-      const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
-      return hex?.terrainKind ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true }) : null;
-    }
-    return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
-  }
-  function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
-    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
-    const techLine = producedUnitTechLineHtml(namingTarget);
-    const showControlLine = namingTarget?.resolution === 1;
-    const controlLine = showControlLine ? `<strong>Control:</strong> ${escapeHtmlText(getTooltipControlLabel(namingTarget))}` : null;
-    const terrainValue = state.strategicTerrainSummary != null ? formatTerrainNameListHtml(state.strategicTerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
-    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-    const weather = tooltipWeather(namingTarget);
-    const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-    const featuresLine = state.strategicFeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.strategicFeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
-    const pair = coverPair(state, namingTarget);
-    const effectsHtml = strategicHexEffectsBodyHtml(
-      namingTarget?.resolution ?? null,
-      namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
-      pair,
-      movementRangeHtml(state, namingTarget)
-    );
-    const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
-    const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
-    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
-    const fortifiedCount = state.fortifiedCount ?? 0;
-    const fortifiedLine = fortifiedCount > 0 ? `<strong>${FORTIFIED_TOOLTIP_LABEL}:</strong> ${formatFortifiedTooltipValue(fortifiedCount, state.intactCityCells ?? fortifiedCount)}` : null;
-    const resolution = namingTarget?.resolution;
-    const orderedLines = resolution === 1 ? [controlLine, productionLine, fortifiedLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
-    const bodyParts = orderedLines.filter((line) => line != null);
-    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
-    if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
-    return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
-  }
-  function terrainTooltipContentKey(state, namingCaption, namingTarget) {
-    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
-    const namingKey = namingCaption?.text ?? "";
-    const urbanKey = state.isUrban ? "1" : "0";
-    const rubbleKey = state.isRubble ? "1" : "0";
-    const featuresKey = state.features.join("|");
-    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
-    const strategicTerrainSummaryKey = state.strategicTerrainSummary ?? "";
-    const strategicFeaturesSummaryKey = state.strategicFeaturesSummary ?? "";
-    const weatherKey = tooltipWeather(namingTarget) ?? "";
-    const pair = coverPair(state, namingTarget);
-    const coverKey = pair == null ? "none" : `${pair.surface}:${pair.air}`;
-    const controlKey = getTooltipControlLabel(namingTarget);
-    const parentTerrainKey = state.parentTerrain;
-    const parentTerrainKindKey = state.parentTerrainKind;
-    const seaportKey = state.isSeaport ? "1" : "0";
-    const roadKey = state.hasRoad ? "1" : "0";
-    const railKey = state.hasRail ? "1" : "0";
-    const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
-    const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : "x";
-    const fortifiedKey = state.fortifiedCount == null ? "x" : String(state.fortifiedCount);
-    const intactKey = state.intactCityCells == null ? "x" : String(state.intactCityCells);
-    const fortifiedCellKey = state.isFortifiedCell ? "1" : "0";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}::${fortifiedKey}::${intactKey}::${fortifiedCellKey}`;
-  }
-  function producedUnitTechLineHtml(namingTarget) {
-    if (namingTarget?.resolution !== 1) return null;
-    return formatProducedUnitTechLineHtml({
-      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
-      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)
-    });
-  }
-  function strategicHexStopsArmor(h3Index) {
-    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === h3Index);
-    return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
-  }
-  function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
-    const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
-    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
-    if (cachedHtml !== void 0) return cachedHtml;
-    const html = formatTerrainTooltipHtml(state, namingCaption, namingTarget);
-    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
-    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-    return html;
-  }
-
-  // src/renderer/map/terrainTooltipStrategicState.ts
-  var namingLineByLookupKey = /* @__PURE__ */ new Map();
-  var EMPTY_TERRAIN_EFFECT_FIELDS = {
-    parentTerrain: "",
-    parentTerrainKind: "",
-    isSeaport: false,
-    hasRoad: false,
-    hasRail: false
-  };
-  function parentPassabilityForStrategicHex(parentH3) {
-    if (!rendererSharedState.gameState) return "land";
-    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === parentH3);
-    return hx?.terrain ?? "land";
-  }
-  function tacticalRoadRailSideMasksForChild(detailH3) {
-    const roadRail = rendererSharedState.tacticalRoadRailSidesByH3.get(detailH3);
-    return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
-  }
-  function tacticalEffectFieldsForChild(parentH3, detailH3) {
-    if (!infraGlyphsAllowedForTacticalChild(parentH3, detailH3)) {
-      return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
-    }
-    const parentKind = terrainKindForStrategicHex(parentH3);
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
-    return {
-      parentTerrain: parentPassabilityForStrategicHex(parentH3),
-      parentTerrainKind: parentKind,
-      isSeaport: rendererSharedState.terrainInfraTacticalSeaport.has(detailH3),
-      hasRoad: transportSideMaskHasAnyTrue(roadSides),
-      hasRail: transportSideMaskHasAnyTrue(railSides)
-    };
-  }
-  function clearTerrainTooltipTimer() {
-    if (rendererSharedState.terrainTooltipDelayTimer !== null) {
-      clearTimeout(rendererSharedState.terrainTooltipDelayTimer);
-      rendererSharedState.terrainTooltipDelayTimer = null;
-    }
-  }
-  function hideTerrainTooltipVisual() {
-    rendererSharedState.terrainTooltipRequestSeq++;
-    const el = document.getElementById("hex-tooltip");
-    if (el) {
-      el.classList.add("hidden");
-      el.setAttribute("aria-hidden", "true");
-    }
-  }
-  function terrainStateForStrategicHex(h3) {
-    if (!rendererSharedState.gameState) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
-    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === h3);
-    if (!hx) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
-    return {
-      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains"),
-      isUrban: false,
-      isRubble: false
-    };
-  }
-  function terrainKindForStrategicHex(h3) {
-    return terrainStateForStrategicHex(h3).terrainKind;
-  }
-  function infraGlyphsAllowedForStrategicHex(h3) {
-    if (!isHexExploredByPlayer(h3)) return false;
-    return true;
-  }
-  function infraGlyphsAllowedForTacticalChild(parentH3, childH3) {
-    if (!isHexExploredByPlayer(parentH3)) return false;
-    void childH3;
-    return true;
-  }
-  function featureLabelsForStrategicHex(h3) {
-    if (!infraGlyphsAllowedForStrategicHex(h3)) return [];
-    const counts = getStrategicFeatureCounts(h3);
-    const labels = [];
-    if (counts.airportCount > 0) labels.push("Airports");
-    if (counts.seaportCount > 0) labels.push("Seaports");
-    return labels;
-  }
-  function transportSideMaskHasAnyTrue(mask) {
-    if (!mask || mask.length === 0) return false;
-    return mask.some((v) => v === true);
-  }
-  function battleTerrainTooltipState(detailH3, battle) {
-    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
-    const tacticalKindByH3 = /* @__PURE__ */ new Map();
-    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
-      tacticalKindByH3.set(detailH3, override.terrainKind);
-    }
-    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
-    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
-      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
-    }
-    const enclosingKind = loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || "plains";
-    const terrainKind = tacticalBattleTerrainKindByCell({
-      cells: [detailH3],
-      tacticalKindByH3,
-      enclosingKind,
-      loadedStrategicKindByH3
-    })[detailH3] ?? enclosingKind;
-    const features = [];
-    if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push("Airport");
-    if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push("Seaport");
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
-    if (transportSideMaskHasAnyTrue(roadSides)) features.push("Road");
-    if (transportSideMaskHasAnyTrue(railSides)) features.push("Rail");
-    return {
-      terrainKind,
-      isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
-      isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
-      isFortifiedCell: battle.tacticalFortificationOwnerByH3?.[detailH3] != null,
-      features,
-      urbanHexCount: null,
-      strategicTerrainSummary: null,
-      strategicFeaturesSummary: null,
-      parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
-      parentTerrainKind: enclosingKind,
-      isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
-      hasRoad: transportSideMaskHasAnyTrue(roadSides),
-      hasRail: transportSideMaskHasAnyTrue(railSides)
-    };
-  }
-  function featureLabelsForTacticalChild(parentH3, childH3) {
-    if (!infraGlyphsAllowedForTacticalChild(parentH3, childH3)) return [];
-    const labels = [];
-    if (rendererSharedState.terrainInfraTacticalAirport.has(childH3)) labels.push("Airport");
-    if (rendererSharedState.terrainInfraTacticalSeaport.has(childH3)) labels.push("Seaport");
-    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(childH3);
-    if (transportSideMaskHasAnyTrue(roadSides)) labels.push("Road");
-    if (transportSideMaskHasAnyTrue(railSides)) labels.push("Rail");
-    return labels;
-  }
-  function countUrbanTacticalHexesInStrategicHex(parentH3) {
-    let children = rendererSharedState.tacticalChildrenByParent.get(parentH3);
-    if (!children) {
-      children = tacticalChildrenOf(parentH3);
-      rendererSharedState.tacticalChildrenByParent.set(parentH3, children);
-    }
-    let count = 0;
-    for (const child of children) {
-      if (rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.isUrban) count++;
-    }
-    return count;
-  }
-  function getUrbanProductionCapacityForHex(h3Index) {
-    return countUrbanTacticalHexesInStrategicHex(h3Index);
-  }
-  function roundToNearestInteger(value) {
-    return Math.round(value);
-  }
-  function formatPercentInteger(value) {
-    return value.toLocaleString();
-  }
-  function clearStrategicTooltipSummaryCaches() {
-    rendererSharedState.strategicDominantTerrainKindByH3.clear();
-    rendererSharedState.strategicTerrainSummaryByH3.clear();
-    rendererSharedState.strategicFeaturesSummaryByH3.clear();
-    rendererSharedState.strategicFeatureCountsByH3.clear();
-    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-  }
-  function getStrategicFeatureCounts(h3) {
-    const cached = rendererSharedState.strategicFeatureCountsByH3.get(h3);
-    if (cached) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    let airportCount = 0;
-    let seaportCount = 0;
-    for (const child of children) {
-      if (rendererSharedState.terrainInfraTacticalAirport.has(child)) airportCount++;
-      if (rendererSharedState.terrainInfraTacticalSeaport.has(child)) seaportCount++;
-    }
-    const counts = { airportCount, seaportCount };
-    rendererSharedState.strategicFeatureCountsByH3.set(h3, counts);
-    return counts;
-  }
-  function getStrategicDominantTerrainKind(h3, parentKind) {
-    const cached = rendererSharedState.strategicDominantTerrainKindByH3.get(h3);
-    if (cached !== void 0) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    if (children.length <= 0) {
-      rendererSharedState.strategicDominantTerrainKindByH3.set(h3, parentKind);
-      return parentKind;
-    }
-    const counts = /* @__PURE__ */ new Map();
-    for (const child of children) {
-      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-      counts.set(kind, (counts.get(kind) ?? 0) + 1);
-    }
-    let dominantKind = parentKind;
-    let dominantCount = -1;
-    for (const [kind, count] of counts.entries()) {
-      if (count > dominantCount || count === dominantCount && kind.localeCompare(dominantKind) < 0) {
-        dominantKind = kind;
-        dominantCount = count;
-      }
-    }
-    rendererSharedState.strategicDominantTerrainKindByH3.set(h3, dominantKind);
-    return dominantKind;
-  }
-  function getStrategicTerrainSummary(h3, parentKind) {
-    const cached = rendererSharedState.strategicTerrainSummaryByH3.get(h3);
-    if (cached !== void 0) return cached;
-    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
-    if (!children) {
-      children = tacticalChildrenOf(h3);
-      rendererSharedState.tacticalChildrenByParent.set(h3, children);
-    }
-    const total = children.length;
-    if (total <= 0) {
-      const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
-      rendererSharedState.strategicTerrainSummaryByH3.set(h3, fallback);
-      return fallback;
-    }
-    const counts = /* @__PURE__ */ new Map();
-    for (const child of children) {
-      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-      counts.set(kind, (counts.get(kind) ?? 0) + 1);
-    }
-    const entries = Array.from(counts.entries()).sort((a, b) => {
-      if (b[1] !== a[1]) return b[1] - a[1];
-      return a[0].localeCompare(b[0]);
-    });
-    if (entries.length <= 3) {
-      const parts2 = entries.map(([kind, count]) => {
-        const pct = roundToNearestInteger(count * 100 / total);
-        return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-      });
-      const summary2 = parts2.join(", ");
-      rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary2);
-      return summary2;
-    }
-    const topTwo = entries.slice(0, 2);
-    const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
-    const parts = topTwo.map(([kind, count]) => {
-      const pct = roundToNearestInteger(count * 100 / total);
-      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-    });
-    const otherPct = roundToNearestInteger((total - topTwoCount) * 100 / total);
-    parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
-    const summary = parts.join(", ");
-    rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary);
-    return summary;
-  }
-  function getStrategicFeaturesSummary(h3) {
-    if (rendererSharedState.strategicFeaturesSummaryByH3.has(h3)) return rendererSharedState.strategicFeaturesSummaryByH3.get(h3) ?? null;
-    if (!infraGlyphsAllowedForStrategicHex(h3)) {
-      rendererSharedState.strategicFeaturesSummaryByH3.set(h3, null);
-      return null;
-    }
-    const { airportCount, seaportCount } = getStrategicFeatureCounts(h3);
-    const parts = [];
-    if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
-    if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
-    const summary = parts.length > 0 ? parts.join(", ") : null;
-    rendererSharedState.strategicFeaturesSummaryByH3.set(h3, summary);
-    return summary;
-  }
-  function terrainTooltipStateForStrategicHex(h3) {
-    const state = terrainStateForStrategicHex(h3);
-    const infra = infraGlyphsAllowedForStrategicHex(h3) ? rendererSharedState.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3) : void 0;
-    const fortifiedCount = infra ? infra.fortifiedCount ?? 0 : void 0;
-    const intactCityCells = infra ? fortifiedCount + (infra.fortifiableCount ?? 0) : void 0;
-    return {
-      ...state,
-      ...EMPTY_TERRAIN_EFFECT_FIELDS,
-      features: featureLabelsForStrategicHex(h3),
-      urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
-      strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
-      strategicFeaturesSummary: getStrategicFeaturesSummary(h3),
-      ...fortifiedCount === void 0 ? {} : { fortifiedCount, intactCityCells }
-    };
-  }
-  function terrainStateForPointer(clientX, clientY, fallbackStrategicH3) {
-    if (!rendererSharedState.gameState) {
-      return {
-        terrainKind: "Unknown",
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        strategicTerrainSummary: null,
-        strategicFeaturesSummary: null,
-        ...EMPTY_TERRAIN_EFFECT_FIELDS
-      };
-    }
-    const tacticalOn = shouldRenderTacticalHexes();
-    if (!tacticalOn) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const map = getMainLeafletMap();
-    if (!map) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const L = getLeafletGlobal();
-    if (!L) {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-    try {
-      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
-      const battle = rendererSharedState.tacticalBattleSnapshot;
-      if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
-      const parentH3 = strategicParentOf(detailH3);
-      const parentKind = terrainKindForStrategicHex(parentH3);
-      const detail = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
-      return {
-        terrainKind: detail?.terrainKind ?? parentKind,
-        isUrban: detail?.isUrban ?? false,
-        isRubble: detail?.isRubble ?? false,
-        isFortifiedCell: detail?.isFortified === true,
-        features: featureLabelsForTacticalChild(parentH3, detailH3),
-        urbanHexCount: null,
-        strategicTerrainSummary: null,
-        strategicFeaturesSummary: null,
-        ...tacticalEffectFieldsForChild(parentH3, detailH3)
-      };
-    } catch {
-      if (!fallbackStrategicH3) {
-        return {
-          terrainKind: "Unknown",
-          isUrban: false,
-          isRubble: false,
-          features: [],
-          urbanHexCount: null,
-          strategicTerrainSummary: null,
-          strategicFeaturesSummary: null,
-          ...EMPTY_TERRAIN_EFFECT_FIELDS
-        };
-      }
-      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
-    }
-  }
-  function namingLookupTargetForPointer(clientX, clientY, fallbackStrategicH3) {
-    const tacticalOn = shouldRenderTacticalHexes();
-    if (!tacticalOn) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const map = getMainLeafletMap();
-    if (!map) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const L = getLeafletGlobal();
-    if (!L) {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-    const rect = map.getContainer().getBoundingClientRect();
-    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-    try {
-      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
-      return { h3Index: detailH3, resolution: 4 };
-    } catch {
-      if (!fallbackStrategicH3) return null;
-      return { h3Index: fallbackStrategicH3, resolution: 1 };
-    }
-  }
-  function namingLookupKey(target) {
-    if (!target) return null;
-    return `${target.resolution}:${target.h3Index}`;
-  }
-  async function getCachedNamingLineForTarget(target) {
-    const key = namingLookupKey(target);
-    if (!key || !target) return null;
-    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
-    if (!window.gameApi?.getHexNamingTooltipLine) return null;
-    try {
-      const caption = await window.gameApi.getHexNamingTooltipLine(target);
-      namingLineByLookupKey.set(key, caption ?? null);
-      return caption ?? null;
-    } catch (err) {
-      console.error("getHexNamingTooltipLine failed:", err);
-      namingLineByLookupKey.set(key, null);
-      return null;
-    }
   }
 
   // src/renderer/chrome/controlTooltip.ts
@@ -23541,8 +22833,9 @@ ${bonuses}`;
   function unavailableTooltipText(name) {
     return `${name} is not available in this version.`;
   }
+  var forcesStatTooltipLead = "Units you have fielded, out of the most this game size allows";
   function forcesStatTooltipText(breakdown) {
-    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
+    return `${forcesStatTooltipLead}: ${breakdown}.`;
   }
   var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
   var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
@@ -23641,30 +22934,30 @@ ${bonuses}`;
     entry.dataset.fresh = "true";
     entry.dataset.reportKind = kind;
     if (meta?.senderSeatId) entry.dataset.senderSeatId = meta.senderSeatId;
-    const head = document.createElement("div");
-    head.className = "console-report-head";
+    const head2 = document.createElement("div");
+    head2.className = "console-report-head";
     if (tag) {
       const tagEl = document.createElement("span");
       tagEl.className = "console-report-tag";
       tagEl.textContent = tag;
-      head.append(tagEl);
+      head2.append(tagEl);
     }
     const kindEl = document.createElement("span");
     kindEl.className = "console-report-kind";
     kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
-    head.append(kindEl);
+    head2.append(kindEl);
     if (meta?.modelLabel) {
       const model = document.createElement("span");
       model.className = "console-report-model";
       model.textContent = meta.modelLabel;
-      head.append(model);
+      head2.append(model);
     }
-    if (kind === "turn") head.append(createReplayPlaceholder());
+    if (kind === "turn") head2.append(createReplayPlaceholder());
     const content = document.createElement("div");
     content.className = "console-report-body";
     if (meta?.messageText !== void 0) content.append(messageReportBody(meta));
     else content.append(...Array.from(body.cloneNode(true).childNodes));
-    entry.append(head, content);
+    entry.append(head2, content);
     entry.hidden = !consoleReportVisible(kind, meta?.senderSeatId ?? null, reportSenderFilter);
     list.prepend(entry);
     while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
@@ -23999,6 +23292,1301 @@ ${bonuses}`;
     if (!rendererSharedState.gameState) return false;
     const explored = getExploredHexSet(rendererSharedState.gameState);
     return explored.has(h3Index);
+  }
+
+  // src/shared/hexNamingCaption.ts
+  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
+  function formatHexNamingCaptionHtml(caption) {
+    const { text } = caption;
+    let html = "";
+    let cursor = 0;
+    for (const span of caption.spans) {
+      html += escapeHtmlText(text.slice(cursor, span.start));
+      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
+      const name = escapeHtmlText(text.slice(span.start, span.end));
+      if (span.role === "heading") {
+        const hasColon = text[span.end] === ":";
+        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
+        cursor = hasColon ? span.end + 1 : span.end;
+      } else {
+        html += `${flag}${name}`;
+        cursor = span.end;
+      }
+    }
+    return html + escapeHtmlText(text.slice(cursor));
+  }
+
+  // src/shared/progressFormatting.ts
+  function computeRoundedPercentage(numerator, denominator) {
+    if (denominator <= 0) return 0;
+    return Math.round(numerator / denominator * 100);
+  }
+
+  // src/shared/homeRegionRules.ts
+  function resolveHomeRegionOwnerIdentity(input) {
+    const owners = declaredHomeSeatIds(input);
+    if (owners.length === 0) return null;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(homeListsForIntersection(input))
+    );
+    if (owners.length >= 2 || intersectionSet.has(input.h3Index)) return { kind: "shared" };
+    return { kind: "single", seatId: owners[0] };
+  }
+  function declaredHomeSeatIds(input) {
+    const bySeat = input.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(input.h3Index)).map(([seatId]) => seatId);
+  }
+  function homeListsForIntersection(input) {
+    const bySeat = input.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.values(bySeat);
+  }
+  function uniqueSortedHexes(hexes) {
+    return [...new Set(hexes)].sort();
+  }
+  function computeIntersectingHomeRegionHexes(homeHexLists) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const list of homeHexLists) {
+      for (const h3Index of new Set(list)) {
+        counts.set(h3Index, (counts.get(h3Index) ?? 0) + 1);
+      }
+    }
+    const shared = [...counts.entries()].filter(([, count]) => count >= 2).map(([h3Index]) => h3Index);
+    return uniqueSortedHexes(shared);
+  }
+  function hasHomeRegionMetadata(state) {
+    const lists = Object.values(state.homeRegionHexesBySeat ?? {});
+    return lists.some((hexes) => hexes.length > 0);
+  }
+  function ownershipPerspective(value) {
+    if (value === "all") return "all";
+    if (value !== void 0 && isSeatId(value)) return value;
+    return HUMAN_SEAT_ID;
+  }
+  function isHexOwnershipVisibleToPerspective(input) {
+    if (input.playerPerspective === "all") return true;
+    if (input.visibleHexes.has(input.h3Index)) return true;
+    if (!hasHomeRegionMetadata(input)) return false;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(Object.values(input.homeRegionHexesBySeat ?? {}))
+    );
+    if (intersectionSet.has(input.h3Index)) return true;
+    const ownHomeHexSet = new Set(input.homeRegionHexesBySeat?.[input.playerPerspective] ?? []);
+    return ownHomeHexSet.has(input.h3Index);
+  }
+  function resolveOwnershipBorderStyle(input) {
+    const isHomeHex = declaredHomeSeatIds(input).length > 0;
+    const controller = input.controllerPlayerId ?? null;
+    if (isHomeHex) {
+      if (controller != null && isSeatId(controller)) return { kind: "outlined", ownerId: controller };
+      return { kind: "outlinedNeutral" };
+    }
+    if (!input.isOwnershipVisible) return { kind: "none" };
+    if (controller != null && isSeatId(controller)) return { kind: "normal", ownerId: controller };
+    if (controller != null && isNeutralOwnerId(controller)) return { kind: "outlinedNeutral" };
+    return { kind: "none" };
+  }
+  function countControlledHexesInRegion(controlRows, regionHexes, playerId) {
+    const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
+    const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));
+    const controlled = uniqueRegionHexes.filter((h3Index) => controlByHex.get(h3Index) === playerId).length;
+    const total = uniqueRegionHexes.length;
+    const pct = computeRoundedPercentage(controlled, total);
+    return { controlled, total, pct };
+  }
+
+  // src/shared/sideLabels.ts
+  function homeSeatIdsAtHex(h3Index, lists) {
+    const bySeat = lists.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
+  }
+  function viewerSeatIdForRoster(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
+  }
+  function abbreviatedSideName(seat) {
+    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+  }
+  function controllerSideLabel(controllerId, seats) {
+    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === controllerId);
+    return seat ? abbreviatedSideName(seat) : controllerId;
+  }
+  function homesInOrder(homeSeatIds, seats) {
+    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function formatHexControlLabel(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    const controllerName = controllerSideLabel(args.controllerId, args.seats);
+    if (homes.length === 0) return controllerName;
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => abbreviatedSideName(seat));
+      return `${controllerName} (${names.join(" & ")} homes)`;
+    }
+    const home = homes[0];
+    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
+    return `${controllerName} (${abbreviatedSideName(home)} home)`;
+  }
+  function formatUnitNameForViewer(args) {
+    if (isNeutralOwnerId(args.ownerId)) return `Neutral \xB7 ${args.baseName}`;
+    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
+    if (args.seats.length === 2) return args.baseName;
+    const seat = args.seats.find((row) => row.seatId === args.ownerId);
+    if (!seat) return args.baseName;
+    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
+  }
+  function formatHomeChip(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
+      return { kind: "home", text: "Home" };
+    }
+    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => shortSideName(seat.homeRegion));
+      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
+    }
+    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
+    return null;
+  }
+
+  // src/shared/statusIconHtml.ts
+  var STATUS_ICON_CLASS_NAME = "status-icon";
+  var STATUS_ICON = Object.freeze({
+    up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
+    doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
+    down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
+    doubleDown: Object.freeze({ file: "arrow_down_double.svg", alt: "--" }),
+    blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
+  });
+  var EFFECT_SYMBOL_KIND = Object.freeze({
+    "+": "up",
+    "-": "down",
+    x: "blocked"
+  });
+  function formatStatusIconHtml(kind) {
+    const icon = STATUS_ICON[kind];
+    const src = escapeHtmlText(`status/${icon.file}`);
+    const alt = escapeHtmlText(icon.alt);
+    return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
+  }
+  function formatEffectSymbolPrefixHtml(symbols) {
+    const icons = [];
+    for (const symbol of symbols) {
+      const kind = EFFECT_SYMBOL_KIND[symbol];
+      if (kind) icons.push(formatStatusIconHtml(kind));
+    }
+    return icons.join("|");
+  }
+
+  // src/shared/terrainEffectsForTooltip.ts
+  var SYMBOL_ORDER = ["x", "-", "+"];
+  var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
+  var MOVEMENT_UNIT_LABEL = {
+    infantry: "Infantry",
+    armor: "Armored",
+    naval: "Naval"
+  };
+  function wrapTerrainEffectSymbolSetForDisplay(symbols) {
+    if (!symbols) return "";
+    return `(${symbols})`;
+  }
+  function unwrapTerrainEffectSymbolSetFromDisplay(display) {
+    const match = /^\(([-x+/]+)\)$/.exec(display);
+    return match ? match[1] : display;
+  }
+  function formatTerrainEffectLabel(category, unit) {
+    return unit === "All" ? `All ${category}` : `${unit} ${category}`;
+  }
+  function formatTerrainEffectSymbolPrefixHtml(symbols) {
+    return formatEffectSymbolPrefixHtml(symbols);
+  }
+  function formatTerrainEffectEntryPlain(symbols, category, unit) {
+    return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
+  }
+  function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
+    return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
+  }
+  function formatTerrainEffectEntries(grouped) {
+    const entries = [];
+    for (const [key, symbols] of grouped) {
+      const slash = formatSymbolSet(symbols);
+      if (!slash) continue;
+      const pipe = key.indexOf("|");
+      const category = key.slice(0, pipe);
+      const unit = key.slice(pipe + 1);
+      entries.push(formatTerrainEffectEntryPlain(slash, category, unit));
+    }
+    return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
+  }
+  function formatTerrainEffectEntryHtml(entry) {
+    const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
+    if (!match) return entry;
+    return formatTerrainEffectEntryHtmlFromParts(
+      unwrapTerrainEffectSymbolSetFromDisplay(match[1]),
+      match[3],
+      match[2]
+    );
+  }
+  function formatTerrainEffectsLineHtml(line) {
+    return line.split(", ").map(formatTerrainEffectEntryHtml).join(", ");
+  }
+  function buildTerrainEffectGroupedMap(input) {
+    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+    const movementByUnit = /* @__PURE__ */ new Map();
+    for (const unitType of MOVEMENT_UNIT_TYPES) {
+      const label = MOVEMENT_UNIT_LABEL[unitType];
+      const symbol = movementSymbolForUnit(unitType, cat, input, hasTransport);
+      if (symbol) {
+        movementByUnit.set(label, /* @__PURE__ */ new Set([symbol]));
+      }
+    }
+    const movementOccupiable = [...occupiableMovementUnits(cat, input)];
+    if (hasTransport && !movementOccupiable.includes("Infantry")) {
+      movementOccupiable.push("Infantry", "Armored");
+    }
+    const rangeByUnit = /* @__PURE__ */ new Map();
+    applyRangeSymbols(rangeByUnit, cat, input);
+    const grouped = /* @__PURE__ */ new Map();
+    collapseCategoryEntries(grouped, "Movement", movementByUnit, movementOccupiable);
+    collapseCategoryEntries(grouped, "Range", rangeByUnit, occupiableRangeUnits(cat, input));
+    return grouped;
+  }
+  function computeTerrainEffectsLine(input) {
+    const formatted = formatTerrainEffectEntries(buildTerrainEffectGroupedMap(input));
+    return formatted.length > 0 ? formatted.join(", ") : null;
+  }
+  function computeTerrainEffectsLineHtml(input) {
+    const plain = computeTerrainEffectsLine(input);
+    return plain == null ? null : formatTerrainEffectsLineHtml(plain);
+  }
+  function formatSymbolSet(symbols) {
+    return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
+  }
+  function movementEffectSymbolForUnit(unitType, input) {
+    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+    return movementSymbolForUnit(unitType, cat, input, hasTransport);
+  }
+  function movementSymbolForUnit(unitType, cat, input, hasTransport) {
+    if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
+      return "+";
+    }
+    if (input.isRubble && (unitType === "infantry" || unitType === "armor")) {
+      const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
+      if (rubbleCost === Infinity) {
+        if (shouldSuppressMovementBlock(unitType, cat)) return null;
+        return "x";
+      }
+      if (input.hasRoad || input.hasRail) return null;
+      return "-";
+    }
+    if (input.isUrban) {
+      if (unitType === "infantry" || unitType === "armor") return "-";
+      return null;
+    }
+    const cost = tacticalEnterHexMovementCost(unitType, cat);
+    if (cost === Infinity) {
+      if (shouldSuppressMovementBlock(unitType, cat)) return null;
+      return "x";
+    }
+    if (cost === 2) return "-";
+    return null;
+  }
+  function shouldSuppressMovementBlock(unitType, cat) {
+    if (unitType === "naval") {
+      return cat !== "water" && cat !== "coastal";
+    }
+    if (unitType === "infantry" || unitType === "armor") {
+      return cat === "water";
+    }
+    return false;
+  }
+  function applyRangeSymbols(rangeByUnit, cat, input) {
+    const rangedCap = cat === "forests" || input.isUrban || input.isRubble;
+    if (rangedCap) {
+      addSymbol(rangeByUnit, "Infantry", "-");
+      addSymbol(rangeByUnit, "Armored", "-");
+    }
+  }
+  function addSymbol(map, unit, symbol) {
+    const existing = map.get(unit) ?? /* @__PURE__ */ new Set();
+    existing.add(symbol);
+    map.set(unit, existing);
+  }
+  function occupiableMovementUnits(cat, input) {
+    const units = [];
+    if (isInfantryOrArmorOccupiable(cat, input)) {
+      units.push("Infantry", "Armored");
+    }
+    if (isNavalTacticalCellNavigable({
+      resolvedKindForCell: input.terrainKind,
+      parentTerrain: input.parentTerrain,
+      parentTerrainKind: input.parentTerrainKind,
+      isSeaportCell: input.isSeaport
+    })) {
+      units.push("Naval");
+    }
+    return units;
+  }
+  function occupiableRangeUnits(cat, input) {
+    return occupiableMovementUnits(cat, input);
+  }
+  function isInfantryOrArmorOccupiable(cat, input) {
+    if (input.isUrban || input.isRubble) return true;
+    return isInfantryOrArmorTacticalSpawnCell({
+      resolvedKindForCell: input.terrainKind,
+      parentTerrain: input.parentTerrain,
+      parentTerrainKind: input.parentTerrainKind
+    });
+  }
+  function collapseCategoryEntries(grouped, category, byUnit, occupiable) {
+    const occupiableWithSymbols = occupiable.filter((u) => {
+      const set = byUnit.get(u);
+      return set !== void 0 && set.size > 0;
+    });
+    const collapsedUnits = /* @__PURE__ */ new Set();
+    if (occupiableWithSymbols.length >= 2) {
+      const reference = formatSymbolSet(byUnit.get(occupiableWithSymbols[0]));
+      const allSame = occupiableWithSymbols.every(
+        (u) => formatSymbolSet(byUnit.get(u)) === reference
+      );
+      if (allSame && reference.length > 0) {
+        grouped.set(`${category}|All`, new Set(byUnit.get(occupiableWithSymbols[0])));
+        for (const u of occupiableWithSymbols) collapsedUnits.add(u);
+      }
+    }
+    for (const [unit, symbols] of byUnit) {
+      if (collapsedUnits.has(unit)) continue;
+      if (symbols.size === 0) continue;
+      grouped.set(`${category}|${unit}`, new Set(symbols));
+    }
+  }
+
+  // src/shared/terrainCoverRules.ts
+  var TERRAIN_COVER_BY_CATEGORY = Object.freeze({
+    plains: Object.freeze({ surface: 0, air: 0 }),
+    forests: Object.freeze({ surface: 2, air: 1 }),
+    mountains: Object.freeze({ surface: 2, air: 0 }),
+    wetlands: Object.freeze({ surface: 1, air: 0 }),
+    desert: Object.freeze({ surface: 0, air: 0 }),
+    arctic: Object.freeze({ surface: 0, air: 0 }),
+    coastal: Object.freeze({ surface: 0, air: 0 }),
+    water: Object.freeze({ surface: 0, air: 0 })
+  });
+  var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
+  function terrainCoverPairFor(place) {
+    const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
+    const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
+    const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
+    const citySurface = place.city === true ? 2 : 0;
+    const cityAir = place.city === true ? 1 : 0;
+    const ruggedSurface = place.rugged === true ? 2 : 0;
+    return {
+      surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface),
+      air: Math.max(terrain.air, urbanAir, cityAir)
+    };
+  }
+  function terrainCoverFor(place, shooter) {
+    return terrainCoverPairFor(place)[shooter];
+  }
+  function tacticalCellCoverPlace(battle, tacticalH3) {
+    return {
+      terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3),
+      isUrban: battle.tacticalIsUrbanByH3?.[tacticalH3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[tacticalH3] === true
+    };
+  }
+  function terrainCoverSourceLabel(place) {
+    if (place.isRubble === true) return "Rubble";
+    if (place.isUrban === true) return "Urban";
+    const category = normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land");
+    if (category === "forests") return "Forest";
+    if (category === "mountains") return "Mountain";
+    if (category === "wetlands") return "Wetlands";
+    return null;
+  }
+  var GROUND_NAVAL_COVER_LABEL = "Ground & Naval Cover";
+  var AIR_COVER_LABEL = "Air Cover";
+  function coverClauseHtml(value, label) {
+    if (value <= 0) return null;
+    const kind = value >= 2 ? "doubleUp" : "up";
+    return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
+  }
+  function formatTerrainCoverTooltipHtml(pair) {
+    const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
+      (part) => part != null
+    );
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
+  function presentEffectHtml(html) {
+    if (html == null) return null;
+    return html.trim().length > 0 ? html : null;
+  }
+  function joinHexTooltipEffectsHtml(movementRangeHtml2, coverHtml) {
+    const movement = presentEffectHtml(movementRangeHtml2);
+    const cover = presentEffectHtml(coverHtml);
+    if (movement == null && cover == null) return null;
+    if (movement == null) return cover;
+    if (cover == null) return movement;
+    return `${movement}, ${cover}`;
+  }
+  function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
+    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("doubleDown")}Armored Movement` : null;
+    const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
+    return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
+  }
+
+  // src/shared/tooltipSectionGap.ts
+  var TOOLTIP_SECTION_GAP_HTML = '<br/><span style="display:block;height:0.5em"></span>';
+
+  // src/renderer/rendererTacticalHydration.ts
+  function applyTacticalCityOverlayRows(cityRows, roadRailRows, vectorRows) {
+    const nextCities = /* @__PURE__ */ new Map();
+    for (const row of cityRows) {
+      if (row.label) nextCities.set(row.h3Index, row.label);
+    }
+    rendererSharedState.tacticalCityOverlayLabelByH3 = nextCities;
+    const nextRoadRail = /* @__PURE__ */ new Map();
+    for (const row of roadRailRows) {
+      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
+    }
+    rendererSharedState.tacticalRoadRailSidesByH3 = nextRoadRail;
+    rendererSharedState.tacticalTransportVectorOverlayRows = vectorRows.map((row) => ({
+      kind: row.kind,
+      points: row.points.map((p) => [p[0], p[1]])
+    }));
+  }
+  function applyStrategicBaselineUrbanHexCounts(rows) {
+    const next = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      if (!row.h3Index || !Number.isFinite(row.urbanHexCount)) continue;
+      const count = Math.trunc(row.urbanHexCount);
+      if (count <= 0) continue;
+      next.set(row.h3Index, count);
+    }
+    rendererSharedState.baselineUrbanHexCountByStrategicH3 = next;
+    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+  }
+  function baselineUrbanHexCountForStrategicHex(h3Index) {
+    const count = rendererSharedState.baselineUrbanHexCountByStrategicH3.get(h3Index);
+    return count == null || !Number.isFinite(count) ? 0 : count;
+  }
+
+  // src/renderer/map/terrainTooltipHtml.ts
+  function formatLlmLocationBoldPrefixHtml(namingTarget) {
+    if (!namingTarget) return "";
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
+      if (!strategicCode || !tacticalCode) return "";
+      return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
+    }
+    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
+    if (!label) return "";
+    return `<strong>${escapeHtmlText(label)}</strong> `;
+  }
+  function formatTerrainVariantSuffix(state) {
+    const variants = [];
+    if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+    else if (state.isFortifiedCell) variants.push(`${formatUrbanSwatchHtml()}${FORTIFIED_CELL_VARIANT_LABEL}`);
+    else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
+    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
+  }
+  function resolveStrategicHexForControlLine(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.enclosingStrategicH3Index;
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) return namingTarget.h3Index;
+    try {
+      return strategicParentOf(namingTarget.h3Index);
+    } catch {
+      return null;
+    }
+  }
+  function getTooltipControlLabel(namingTarget) {
+    if (!rendererSharedState.gameState) return "Unknown";
+    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
+    if (!strategicHex) return "Unknown";
+    const controller = (rendererSharedState.gameState.strategicControl ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
+    const homeSeatIds = homeSeatIdsAtHex(strategicHex, rendererSharedState.gameState);
+    const label = formatHexControlLabel({
+      controllerId: controller,
+      homeSeatIds,
+      seats: rendererSharedState.gameState.seats ?? []
+    });
+    if (homeSeatIds.length > 0) return label;
+    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
+    const perspective = ownershipPerspective(rendererSharedState.gameState.playerPerspective);
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: strategicHex,
+      playerPerspective: perspective,
+      visibleHexes,
+      homeRegionHexesBySeat: rendererSharedState.gameState.homeRegionHexesBySeat,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (!ownershipVisible) return "Unknown";
+    return label;
+  }
+  function tooltipWeather(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
+    if (!namingTarget) return null;
+    if (!rendererSharedState.gameState) return null;
+    const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
+    if (!strategicHex) return null;
+    return rendererSharedState.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
+  }
+  function parentStrategicHex(h3Index) {
+    try {
+      return strategicParentOf(h3Index);
+    } catch {
+      return null;
+    }
+  }
+  function movementRangeHtml(state, namingTarget) {
+    if (namingTarget?.resolution !== 4) return null;
+    return computeTerrainEffectsLineHtml({
+      terrainKind: state.terrainKind,
+      parentTerrain: state.parentTerrain,
+      parentTerrainKind: state.parentTerrainKind,
+      isUrban: state.isUrban,
+      isRubble: state.isRubble,
+      isSeaport: state.isSeaport,
+      hasRoad: state.hasRoad,
+      hasRail: state.hasRail
+    });
+  }
+  function coverPair(state, namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) {
+      const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
+      return hex?.terrainKind ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true }) : null;
+    }
+    return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
+  }
+  function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+    const techLine = producedUnitTechLineHtml(namingTarget);
+    const showControlLine = namingTarget?.resolution === 1;
+    const controlLine = showControlLine ? `<strong>Control:</strong> ${escapeHtmlText(getTooltipControlLabel(namingTarget))}` : null;
+    const terrainValue = state.strategicTerrainSummary != null ? formatTerrainNameListHtml(state.strategicTerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
+    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+    const weather = tooltipWeather(namingTarget);
+    const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
+    const featuresLine = state.strategicFeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.strategicFeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
+    const pair = coverPair(state, namingTarget);
+    const effectsHtml = strategicHexEffectsBodyHtml(
+      namingTarget?.resolution ?? null,
+      namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
+      pair,
+      movementRangeHtml(state, namingTarget)
+    );
+    const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
+    const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
+    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const fortifiedCount = state.fortifiedCount ?? 0;
+    const fortifiedLine = fortifiedCount > 0 ? `<strong>${FORTIFIED_TOOLTIP_LABEL}:</strong> ${formatFortifiedTooltipValue(fortifiedCount, state.intactCityCells ?? fortifiedCount)}` : null;
+    const resolution = namingTarget?.resolution;
+    const orderedLines = resolution === 1 ? [controlLine, productionLine, fortifiedLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
+    const bodyParts = orderedLines.filter((line) => line != null);
+    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
+    if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
+    return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
+  }
+  function terrainTooltipContentKey(state, namingCaption, namingTarget) {
+    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
+    const namingKey = namingCaption?.text ?? "";
+    const urbanKey = state.isUrban ? "1" : "0";
+    const rubbleKey = state.isRubble ? "1" : "0";
+    const featuresKey = state.features.join("|");
+    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
+    const strategicTerrainSummaryKey = state.strategicTerrainSummary ?? "";
+    const strategicFeaturesSummaryKey = state.strategicFeaturesSummary ?? "";
+    const weatherKey = tooltipWeather(namingTarget) ?? "";
+    const pair = coverPair(state, namingTarget);
+    const coverKey = pair == null ? "none" : `${pair.surface}:${pair.air}`;
+    const controlKey = getTooltipControlLabel(namingTarget);
+    const parentTerrainKey = state.parentTerrain;
+    const parentTerrainKindKey = state.parentTerrainKind;
+    const seaportKey = state.isSeaport ? "1" : "0";
+    const roadKey = state.hasRoad ? "1" : "0";
+    const railKey = state.hasRail ? "1" : "0";
+    const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
+    const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)) : "x";
+    const fortifiedKey = state.fortifiedCount == null ? "x" : String(state.fortifiedCount);
+    const intactKey = state.intactCityCells == null ? "x" : String(state.intactCityCells);
+    const fortifiedCellKey = state.isFortifiedCell ? "1" : "0";
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${strategicTerrainSummaryKey}::${strategicFeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}::${fortifiedKey}::${intactKey}::${fortifiedCellKey}`;
+  }
+  function producedUnitTechLineHtml(namingTarget) {
+    if (namingTarget?.resolution !== 1) return null;
+    return formatProducedUnitTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)
+    });
+  }
+  function strategicHexStopsArmor(h3Index) {
+    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === h3Index);
+    return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
+  }
+  function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
+    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
+    if (cachedHtml !== void 0) return cachedHtml;
+    const html = formatTerrainTooltipHtml(state, namingCaption, namingTarget);
+    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
+    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+    return html;
+  }
+
+  // src/renderer/map/terrainTooltipStrategicState.ts
+  var namingLineByLookupKey = /* @__PURE__ */ new Map();
+  var EMPTY_TERRAIN_EFFECT_FIELDS = {
+    parentTerrain: "",
+    parentTerrainKind: "",
+    isSeaport: false,
+    hasRoad: false,
+    hasRail: false
+  };
+  function parentPassabilityForStrategicHex(parentH3) {
+    if (!rendererSharedState.gameState) return "land";
+    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === parentH3);
+    return hx?.terrain ?? "land";
+  }
+  function tacticalRoadRailSideMasksForChild(detailH3) {
+    const roadRail = rendererSharedState.tacticalRoadRailSidesByH3.get(detailH3);
+    return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
+  }
+  function tacticalEffectFieldsForChild(parentH3, detailH3) {
+    if (!infraGlyphsAllowedForTacticalChild(parentH3, detailH3)) {
+      return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
+    }
+    const parentKind = terrainKindForStrategicHex(parentH3);
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+    return {
+      parentTerrain: parentPassabilityForStrategicHex(parentH3),
+      parentTerrainKind: parentKind,
+      isSeaport: rendererSharedState.terrainInfraTacticalSeaport.has(detailH3),
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
+    };
+  }
+  function clearTerrainTooltipTimer() {
+    if (rendererSharedState.terrainTooltipDelayTimer !== null) {
+      clearTimeout(rendererSharedState.terrainTooltipDelayTimer);
+      rendererSharedState.terrainTooltipDelayTimer = null;
+    }
+  }
+  function hideTerrainTooltipVisual() {
+    rendererSharedState.terrainTooltipRequestSeq++;
+    const el = document.getElementById("hex-tooltip");
+    if (el) {
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+    }
+  }
+  function terrainStateForStrategicHex(h3) {
+    if (!rendererSharedState.gameState) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
+    const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === h3);
+    if (!hx) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
+    return {
+      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains"),
+      isUrban: false,
+      isRubble: false
+    };
+  }
+  function terrainKindForStrategicHex(h3) {
+    return terrainStateForStrategicHex(h3).terrainKind;
+  }
+  function infraGlyphsAllowedForStrategicHex(h3) {
+    if (!isHexExploredByPlayer(h3)) return false;
+    return true;
+  }
+  function infraGlyphsAllowedForTacticalChild(parentH3, childH3) {
+    if (!isHexExploredByPlayer(parentH3)) return false;
+    void childH3;
+    return true;
+  }
+  function featureLabelsForStrategicHex(h3) {
+    if (!infraGlyphsAllowedForStrategicHex(h3)) return [];
+    const counts = getStrategicFeatureCounts(h3);
+    const labels = [];
+    if (counts.airportCount > 0) labels.push("Airports");
+    if (counts.seaportCount > 0) labels.push("Seaports");
+    return labels;
+  }
+  function transportSideMaskHasAnyTrue(mask) {
+    if (!mask || mask.length === 0) return false;
+    return mask.some((v) => v === true);
+  }
+  function battleTerrainTooltipState(detailH3, battle) {
+    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
+    const tacticalKindByH3 = /* @__PURE__ */ new Map();
+    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
+      tacticalKindByH3.set(detailH3, override.terrainKind);
+    }
+    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
+    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
+      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
+    }
+    const enclosingKind = loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || "plains";
+    const terrainKind = tacticalBattleTerrainKindByCell({
+      cells: [detailH3],
+      tacticalKindByH3,
+      enclosingKind,
+      loadedStrategicKindByH3
+    })[detailH3] ?? enclosingKind;
+    const features = [];
+    if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push("Airport");
+    if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push("Seaport");
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) features.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) features.push("Rail");
+    return {
+      terrainKind,
+      isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+      isFortifiedCell: battle.tacticalFortificationOwnerByH3?.[detailH3] != null,
+      features,
+      urbanHexCount: null,
+      strategicTerrainSummary: null,
+      strategicFeaturesSummary: null,
+      parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
+      parentTerrainKind: enclosingKind,
+      isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
+    };
+  }
+  function featureLabelsForTacticalChild(parentH3, childH3) {
+    if (!infraGlyphsAllowedForTacticalChild(parentH3, childH3)) return [];
+    const labels = [];
+    if (rendererSharedState.terrainInfraTacticalAirport.has(childH3)) labels.push("Airport");
+    if (rendererSharedState.terrainInfraTacticalSeaport.has(childH3)) labels.push("Seaport");
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(childH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) labels.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) labels.push("Rail");
+    return labels;
+  }
+  function countUrbanTacticalHexesInStrategicHex(parentH3) {
+    let children = rendererSharedState.tacticalChildrenByParent.get(parentH3);
+    if (!children) {
+      children = tacticalChildrenOf(parentH3);
+      rendererSharedState.tacticalChildrenByParent.set(parentH3, children);
+    }
+    let count = 0;
+    for (const child of children) {
+      if (rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.isUrban) count++;
+    }
+    return count;
+  }
+  function getUrbanProductionCapacityForHex(h3Index) {
+    return countUrbanTacticalHexesInStrategicHex(h3Index);
+  }
+  function roundToNearestInteger(value) {
+    return Math.round(value);
+  }
+  function formatPercentInteger(value) {
+    return value.toLocaleString();
+  }
+  function clearStrategicTooltipSummaryCaches() {
+    rendererSharedState.strategicDominantTerrainKindByH3.clear();
+    rendererSharedState.strategicTerrainSummaryByH3.clear();
+    rendererSharedState.strategicFeaturesSummaryByH3.clear();
+    rendererSharedState.strategicFeatureCountsByH3.clear();
+    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+  }
+  function getStrategicFeatureCounts(h3) {
+    const cached = rendererSharedState.strategicFeatureCountsByH3.get(h3);
+    if (cached) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    let airportCount = 0;
+    let seaportCount = 0;
+    for (const child of children) {
+      if (rendererSharedState.terrainInfraTacticalAirport.has(child)) airportCount++;
+      if (rendererSharedState.terrainInfraTacticalSeaport.has(child)) seaportCount++;
+    }
+    const counts = { airportCount, seaportCount };
+    rendererSharedState.strategicFeatureCountsByH3.set(h3, counts);
+    return counts;
+  }
+  function getStrategicDominantTerrainKind(h3, parentKind) {
+    const cached = rendererSharedState.strategicDominantTerrainKindByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    if (children.length <= 0) {
+      rendererSharedState.strategicDominantTerrainKindByH3.set(h3, parentKind);
+      return parentKind;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    let dominantKind = parentKind;
+    let dominantCount = -1;
+    for (const [kind, count] of counts.entries()) {
+      if (count > dominantCount || count === dominantCount && kind.localeCompare(dominantKind) < 0) {
+        dominantKind = kind;
+        dominantCount = count;
+      }
+    }
+    rendererSharedState.strategicDominantTerrainKindByH3.set(h3, dominantKind);
+    return dominantKind;
+  }
+  function getStrategicTerrainSummary(h3, parentKind) {
+    const cached = rendererSharedState.strategicTerrainSummaryByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = rendererSharedState.tacticalChildrenByParent.get(h3);
+    if (!children) {
+      children = tacticalChildrenOf(h3);
+      rendererSharedState.tacticalChildrenByParent.set(h3, children);
+    }
+    const total = children.length;
+    if (total <= 0) {
+      const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
+      rendererSharedState.strategicTerrainSummaryByH3.set(h3, fallback);
+      return fallback;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    const entries = Array.from(counts.entries()).sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      return a[0].localeCompare(b[0]);
+    });
+    if (entries.length <= 3) {
+      const parts2 = entries.map(([kind, count]) => {
+        const pct = roundToNearestInteger(count * 100 / total);
+        return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+      });
+      const summary2 = parts2.join(", ");
+      rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary2);
+      return summary2;
+    }
+    const topTwo = entries.slice(0, 2);
+    const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
+    const parts = topTwo.map(([kind, count]) => {
+      const pct = roundToNearestInteger(count * 100 / total);
+      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+    });
+    const otherPct = roundToNearestInteger((total - topTwoCount) * 100 / total);
+    parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
+    const summary = parts.join(", ");
+    rendererSharedState.strategicTerrainSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function getStrategicFeaturesSummary(h3) {
+    if (rendererSharedState.strategicFeaturesSummaryByH3.has(h3)) return rendererSharedState.strategicFeaturesSummaryByH3.get(h3) ?? null;
+    if (!infraGlyphsAllowedForStrategicHex(h3)) {
+      rendererSharedState.strategicFeaturesSummaryByH3.set(h3, null);
+      return null;
+    }
+    const { airportCount, seaportCount } = getStrategicFeatureCounts(h3);
+    const parts = [];
+    if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
+    if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
+    const summary = parts.length > 0 ? parts.join(", ") : null;
+    rendererSharedState.strategicFeaturesSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function terrainTooltipStateForStrategicHex(h3) {
+    const state = terrainStateForStrategicHex(h3);
+    const infra = infraGlyphsAllowedForStrategicHex(h3) ? rendererSharedState.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3) : void 0;
+    const fortifiedCount = infra ? infra.fortifiedCount ?? 0 : void 0;
+    const intactCityCells = infra ? fortifiedCount + (infra.fortifiableCount ?? 0) : void 0;
+    return {
+      ...state,
+      ...EMPTY_TERRAIN_EFFECT_FIELDS,
+      features: featureLabelsForStrategicHex(h3),
+      urbanHexCount: countUrbanTacticalHexesInStrategicHex(h3),
+      strategicTerrainSummary: getStrategicTerrainSummary(h3, state.terrainKind),
+      strategicFeaturesSummary: getStrategicFeaturesSummary(h3),
+      ...fortifiedCount === void 0 ? {} : { fortifiedCount, intactCityCells }
+    };
+  }
+  function terrainStateForPointer(clientX, clientY, fallbackStrategicH3) {
+    if (!rendererSharedState.gameState) {
+      return {
+        terrainKind: "Unknown",
+        isUrban: false,
+        isRubble: false,
+        features: [],
+        urbanHexCount: null,
+        strategicTerrainSummary: null,
+        strategicFeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS
+      };
+    }
+    const tacticalOn = shouldRenderTacticalHexes();
+    if (!tacticalOn) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      const battle = rendererSharedState.tacticalBattleSnapshot;
+      if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
+      const parentH3 = strategicParentOf(detailH3);
+      const parentKind = terrainKindForStrategicHex(parentH3);
+      const detail = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
+      return {
+        terrainKind: detail?.terrainKind ?? parentKind,
+        isUrban: detail?.isUrban ?? false,
+        isRubble: detail?.isRubble ?? false,
+        isFortifiedCell: detail?.isFortified === true,
+        features: featureLabelsForTacticalChild(parentH3, detailH3),
+        urbanHexCount: null,
+        strategicTerrainSummary: null,
+        strategicFeaturesSummary: null,
+        ...tacticalEffectFieldsForChild(parentH3, detailH3)
+      };
+    } catch {
+      if (!fallbackStrategicH3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          strategicTerrainSummary: null,
+          strategicFeaturesSummary: null,
+          ...EMPTY_TERRAIN_EFFECT_FIELDS
+        };
+      }
+      return terrainTooltipStateForStrategicHex(fallbackStrategicH3);
+    }
+  }
+  function namingLookupTargetForPointer(clientX, clientY, fallbackStrategicH3) {
+    const tacticalOn = shouldRenderTacticalHexes();
+    if (!tacticalOn) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      return { h3Index: detailH3, resolution: 4 };
+    } catch {
+      if (!fallbackStrategicH3) return null;
+      return { h3Index: fallbackStrategicH3, resolution: 1 };
+    }
+  }
+  function namingLookupKey(target) {
+    if (!target) return null;
+    return `${target.resolution}:${target.h3Index}`;
+  }
+  async function getCachedNamingLineForTarget(target) {
+    const key = namingLookupKey(target);
+    if (!key || !target) return null;
+    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
+    if (!window.gameApi?.getHexNamingTooltipLine) return null;
+    try {
+      const caption = await window.gameApi.getHexNamingTooltipLine(target);
+      namingLineByLookupKey.set(key, caption ?? null);
+      return caption ?? null;
+    } catch (err) {
+      console.error("getHexNamingTooltipLine failed:", err);
+      namingLineByLookupKey.set(key, null);
+      return null;
+    }
+  }
+
+  // src/shared/mapViewMode.ts
+  var DEFAULT_WEATHER_ICONS_SHOWN = true;
+  var DEFAULT_TECH_VIEW_CHOSEN = false;
+  var DEFAULT_CONTROL_BORDERS_SHOWN = true;
+  var DEFAULT_PRODUCTION_DETAIL_CHOSEN = false;
+  function isMapLayerShown(input) {
+    if (input.tKeyHeld) return true;
+    return input.layerChosen && !input.inBattle && !input.newGameOverlayOpen;
+  }
+
+  // src/renderer/map/mapViewModeState.ts
+  var weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
+  var techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
+  var controlBordersShown = DEFAULT_CONTROL_BORDERS_SHOWN;
+  var productionDetailChosen = DEFAULT_PRODUCTION_DETAIL_CHOSEN;
+  function areWeatherIconsShown() {
+    return weatherIconsShown;
+  }
+  function setWeatherIconsShown(shown) {
+    weatherIconsShown = shown;
+  }
+  function isTechViewChosen() {
+    return techViewChosen;
+  }
+  function setTechViewChosen(chosen) {
+    techViewChosen = chosen;
+  }
+  function areControlBordersShown() {
+    return controlBordersShown;
+  }
+  function setControlBordersShown(shown) {
+    controlBordersShown = shown;
+  }
+  function isProductionDetailChosen() {
+    return productionDetailChosen;
+  }
+  function setProductionDetailChosen(chosen) {
+    productionDetailChosen = chosen;
+  }
+
+  // src/renderer/gameplay/productionOverlayHelpers.ts
+  function getControllerForHex(state, h3Index) {
+    const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
+    return row?.controllerPlayerId ?? null;
+  }
+  function getUrbanProductionCapacityForHex2(h3Index) {
+    return getUrbanProductionCapacityForHex(h3Index);
+  }
+  function isMapInspectionModeHeld() {
+    return rendererSharedState.hideTerrainFillWhileHeld;
+  }
+  function isChosenLayerShown(layerChosen) {
+    return isMapLayerShown({
+      tKeyHeld: rendererSharedState.hideTerrainFillWhileHeld,
+      layerChosen,
+      inBattle: rendererSharedState.tacticalBattleSnapshot != null,
+      // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
+      newGameOverlayOpen: layerChosen && isNewGameOverlayOpen()
+    });
+  }
+  function areTechIconsShown() {
+    return isChosenLayerShown(isTechViewChosen());
+  }
+  function isProductionDetailShown() {
+    return isChosenLayerShown(isProductionDetailChosen());
+  }
+  function isHumanBuildEntryHexIndex(state, h3Index) {
+    const hex = state?.hexes.find((row) => row.h3Index === h3Index);
+    if (!state || !hex) return false;
+    return isStrategicHexHumanUrbanProduction(state, hex);
+  }
+  function isStrategicHexHumanUrbanProduction(state, hx) {
+    if (getControllerForHex(state, hx.h3Index) !== HUMAN_SEAT_ID) return false;
+    return getUrbanProductionCapacityForHex2(hx.h3Index) > 0;
+  }
+  function getBuildQueueSummaryForHex(state, h3Index) {
+    return state.strategicBuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
+  }
+  function getUnitCountsByTypeForPlayer(state, playerId) {
+    return getPlayerUnitCountsByType(state.units, playerId);
+  }
+  function isFogOfWarDisabledForSnapshot(state) {
+    return state.fogOfWarEnabled === false;
+  }
+  function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
+    const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
+    const queue = getBuildQueueSummaryForHex(state, h3Index);
+    const queuedUnits = queue?.queuedUnits ?? 0;
+    if (queuedUnits <= 0) return capacityText;
+    if (queue?.buildPaused === true) return `${capacityText} / \u221Et`;
+    const nextUnitType = queue?.nextUnitType;
+    const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
+    if (nextUnitType === FORTIFICATION_QUEUE_ITEM) {
+      const fortifiable = state.strategicInfrastructure?.find((row) => row.h3Index === h3Index)?.fortifiableCount ?? 0;
+      if (fortifiable <= 0) return `${capacityText} / \u221Et`;
+    }
+    if (!nextUnitType || capacityPerTurn <= 0) {
+      return `${capacityText} / ?t`;
+    }
+    if (controller && isSeatId(controller) && isBuildUnitType(nextUnitType)) {
+      const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
+      if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
+        return `${capacityText} / \u221Et`;
+      }
+    }
+    const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
+    if (turns === null) return `${capacityText} / ?t`;
+    return `${capacityText} / ${turns.toLocaleString()}t`;
+  }
+  function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
+    if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
+    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
+  }
+  function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
+    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
+  }
+  function unitCountsForReveal(state) {
+    const seatIds = (state.seats ?? []).map((seat) => seat.seatId);
+    const ids = seatIds.length > 0 ? seatIds : [HUMAN_SEAT_ID];
+    const counts = {};
+    for (const seatId of ids) counts[seatId] = getUnitCountsByTypeForPlayer(state, seatId);
+    return counts;
+  }
+  function buildProductionOverlayContext(state) {
+    const mapInspectionHeld = isMapInspectionModeHeld();
+    const productionDetailShown = isProductionDetailShown();
+    const revealAllControllerQueues = productionDetailShown && isFogOfWarDisabledForSnapshot(state);
+    return {
+      mapInspectionHeld,
+      productionDetailShown,
+      revealAllControllerQueues,
+      unitHexes: new Set(state.units.map((u) => u.h3Index)),
+      unitCountsByPlayer: revealAllControllerQueues ? unitCountsForReveal(state) : void 0
+    };
+  }
+
+  // src/renderer/chrome/hireTooltipText.ts
+  var hireEntryTooltipText = "Click to hire on this hex. Shift-click does not add it to a group of build queues, and the click does nothing during playback.";
+  var hireTypeTooltipText = "Choose the unit type this order raises.";
+  var hireCountTooltipText = "How many of that type to raise, from 1 to 99.";
+  var hireSubmitTooltipText = "Place this hire order. It is charged at the end of the turn if it can be filled.";
+  var hireRemoveTooltipText = "Remove this hire order.";
+
+  // src/renderer/gameplay/hireEntryMarkers.ts
+  var HIRE_ENTRY_VIEW_MARGIN_PX = 40;
+  function isPointInMapView(point, size, margin) {
+    return point.x >= -margin && point.y >= -margin && point.x <= size.x + margin && point.y <= size.y + margin;
+  }
+  function hireEntryRowForHex(h3Index, center, mapSize, hireHexes) {
+    if (!hireHexes.has(h3Index)) return null;
+    if (!isPointInMapView(center, mapSize, HIRE_ENTRY_VIEW_MARGIN_PX)) return null;
+    const capacityText = `$${getUrbanProductionCapacityForHex2(h3Index).toLocaleString()}`;
+    return {
+      h3: h3Index,
+      label: formatHireEntryLabel(capacityText),
+      left: Math.round(center.x),
+      top: Math.round(center.y),
+      hasCapacity: false,
+      selected: false,
+      kind: "hire"
+    };
+  }
+  function hireEntryButtonHtml(row) {
+    return `<button type="button" class="build-entry-btn hire-entry-btn" data-h3-index="${row.h3}" data-control-tooltip="${hireEntryTooltipText}" style="left:${row.left}px;top:${row.top}px;transform:translate(-50%, -50%);" aria-label="${formatHireEntryAriaLabel(row.h3)}">${row.label}</button>`;
+  }
+
+  // src/shared/anchoredPopupPlacement.ts
+  function placeAnchoredPopup(args) {
+    const preferredLeft = args.anchorX + args.offsetPx;
+    const preferredTop = args.anchorY + args.offsetPx;
+    const maxLeft = Math.max(0, args.viewportWidth - args.popupWidth);
+    const maxTop = Math.max(0, args.viewportHeight - args.popupHeight);
+    return {
+      left: Math.min(Math.max(0, preferredLeft), maxLeft),
+      top: Math.min(Math.max(0, preferredTop), maxTop)
+    };
+  }
+
+  // src/renderer/chrome/placeAnchoredPopup.ts
+  function placeAnchoredPopupElement(popup, anchorX, anchorY) {
+    if (popup.classList.contains("hidden")) return;
+    const rect = popup.getBoundingClientRect();
+    const placed = placeAnchoredPopup({
+      anchorX,
+      anchorY,
+      popupWidth: rect.width,
+      popupHeight: rect.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      offsetPx: TOOLTIP_OFFSET_PX
+    });
+    popup.style.left = `${placed.left}px`;
+    popup.style.top = `${placed.top}px`;
+  }
+  function placeOpenPopupFromDataAttributes(popup) {
+    const xAttr = popup.getAttribute("data-x");
+    const yAttr = popup.getAttribute("data-y");
+    if (xAttr === null || yAttr === null || xAttr.trim() === "" || yAttr.trim() === "") return;
+    const anchorX = Number(xAttr);
+    const anchorY = Number(yAttr);
+    if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) return;
+    placeAnchoredPopupElement(popup, anchorX, anchorY);
+  }
+  function placeOpenBuildPopup() {
+    const popup = document.getElementById("build-popup");
+    if (!(popup instanceof HTMLElement)) return;
+    placeOpenPopupFromDataAttributes(popup);
+  }
+  function placeOpenStackCallout() {
+    const popup = document.getElementById("stack-callout");
+    if (!(popup instanceof HTMLElement)) return;
+    placeOpenPopupFromDataAttributes(popup);
+  }
+
+  // src/shared/popupControlTooltipText.ts
+  var buildPopupCloseTooltipText = "Close this popup.";
+  var singleHexQueueRemoveTooltipText = "Remove this row from the queue.";
+  var multiHexQueueRemoveTooltipText = "Remove this row on every selected hex.";
+  var buildTabTooltipText = "Show the build queue for this hex.";
+  var hireTabTooltipText = "Show hiring for this hex.";
+  var stackCalloutCloseTooltipText = "Close this list.";
+  var stackUnitToggleUnselectedTooltipText = "Select only this unit and close the list. Shift toggles it and leaves the list open.";
+  var stackUnitToggleSelectedTooltipText = "Remove this unit from the selection and close the list. Shift toggles it and leaves the list open.";
+  var stackSelectAllTooltipText = "Select every unit you can select in this hex and close the list.";
+  var stackAddAllTooltipText = "Add every unit you can select in this hex. The list stays open.";
+  var stackRemoveAllTooltipText = "Remove every unit you can select in this hex. The list stays open.";
+  function stackUnitToggleTooltipText(selected) {
+    return selected ? stackUnitToggleSelectedTooltipText : stackUnitToggleUnselectedTooltipText;
   }
 
   // src/renderer/core/parityDiagnostics.ts
@@ -26105,7 +26693,9 @@ ${bonuses}`;
       if (!unitId) continue;
       const btn = row.querySelector("button.stack-unit-toggle");
       if (!btn) continue;
-      btn.textContent = rendererSharedState.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+      const selected = rendererSharedState.selectedUnitIds.includes(unitId);
+      btn.textContent = selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+      btn.setAttribute("data-control-tooltip", stackUnitToggleTooltipText(selected));
       btn.style.visibility = nonSelectableUnitIds.has(unitId) ? "hidden" : "visible";
     }
   }
@@ -26170,11 +26760,13 @@ ${bonuses}`;
     const h3Index = units[0]?.h3Index;
     if (!h3Index) {
       removeSealiftSection(calloutEl);
+      placeOpenStackCallout();
       return;
     }
     const api = window.gameApi;
     if (!api) {
       removeSealiftSection(calloutEl);
+      placeOpenStackCallout();
       return;
     }
     const tacticalSealiftMode = !!rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index);
@@ -26195,6 +26787,7 @@ ${bonuses}`;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
       if (!state.showSealiftSection) {
         removeSealiftSection(calloutEl);
+        placeOpenStackCallout();
         return;
       }
       const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
@@ -26345,6 +26938,7 @@ ${bonuses}`;
       if (generation !== sealiftSectionRenderGeneration) return;
       removeSealiftSection(calloutEl);
       calloutEl.appendChild(section);
+      placeOpenStackCallout();
     } catch (err) {
       console.error("sealift stack section failed:", err);
     }
@@ -26491,6 +27085,7 @@ ${bonuses}`;
     closeBtn.className = "unit-select stack-close-btn";
     closeBtn.textContent = "\xD7";
     closeBtn.style.marginRight = "auto";
+    closeBtn.setAttribute("data-control-tooltip", stackCalloutCloseTooltipText);
     closeBtn.addEventListener("click", () => {
       hideStackCallout();
     });
@@ -26501,6 +27096,7 @@ ${bonuses}`;
       selectAllBtn.type = "button";
       selectAllBtn.className = "unit-select";
       selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
+      selectAllBtn.setAttribute("data-control-tooltip", stackSelectAllTooltipText);
       selectAllBtn.addEventListener("click", () => {
         onStackAllActionClick("selectAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
@@ -26510,6 +27106,7 @@ ${bonuses}`;
       addAllBtn.type = "button";
       addAllBtn.className = "unit-select";
       addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
+      addAllBtn.setAttribute("data-control-tooltip", stackAddAllTooltipText);
       addAllBtn.addEventListener("click", () => {
         onStackAllActionClick("addAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
@@ -26517,6 +27114,7 @@ ${bonuses}`;
       removeAllBtn.type = "button";
       removeAllBtn.className = "unit-select";
       removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
+      removeAllBtn.setAttribute("data-control-tooltip", stackRemoveAllTooltipText);
       removeAllBtn.addEventListener("click", () => {
         onStackAllActionClick("removeAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
@@ -26536,6 +27134,7 @@ ${bonuses}`;
         btn.type = "button";
         btn.className = "unit-select stack-unit-toggle";
         btn.textContent = rendererSharedState.selectedUnitIds.includes(u.id) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+        btn.setAttribute("data-control-tooltip", stackUnitToggleTooltipText(rendererSharedState.selectedUnitIds.includes(u.id)));
         btn.addEventListener("click", () => {
           onStackSingleUnitToggleClick(u.id, rendererSharedState.selectedUnitIds.includes(u.id), units, clientX, clientY);
         });
@@ -26548,6 +27147,7 @@ ${bonuses}`;
     calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     calloutEl.setAttribute("aria-label", formatStackTooltip(units));
     calloutEl.classList.remove("hidden");
+    placeOpenStackCallout();
     void renderSealiftSection(sorted, calloutEl);
   }
   function resolveUnitsForStackCalloutRefresh(unitIds, state) {
@@ -26952,337 +27552,6 @@ ${bonuses}`;
     if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
     if (!Number.isFinite(input.advancedMinUrbanCells)) return null;
     return input.baselineUrbanHexCount >= input.advancedMinUrbanCells ? "advanced" : "basic";
-  }
-
-  // src/shared/productionConfig.ts
-  var UNIT_COST_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 20).
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: GLOBAL_GAME_MAP.rules.infantryCost,
-    /**
-       * Documents the object literal property `armor` (armor: 40).
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: GLOBAL_GAME_MAP.rules.armorCost,
-    /**
-       * Documents the object literal property `naval` (naval: 100).
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: GLOBAL_GAME_MAP.rules.navalCost,
-    /**
-       * Documents the object literal property `air` (air: 60).
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: GLOBAL_GAME_MAP.rules.airCost,
-    missile: GLOBAL_GAME_MAP.rules.missileCost
-  };
-  var MAX_UNITS_PER_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 12).
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: 12,
-    /**
-       * Documents the object literal property `armor` (armor: 8).
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: 8,
-    /**
-       * Documents the object literal property `naval` (naval: 8).
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: 8,
-    /**
-       * Documents the object literal property `air` (air: 6).
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: 6,
-    missile: 2
-  };
-  function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
-    if (!nextUnitType) return null;
-    const unitCost = buildQueueItemCostFor(nextUnitType);
-    const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
-    if (safeCapacity <= 0) return null;
-    const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
-    const deficit = Math.max(0, unitCost - safeStoredPoints);
-    return Math.max(1, Math.ceil(deficit / safeCapacity));
-  }
-  function applyProduction(entries, storedPoints, urbanHexCount) {
-    const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-    const updated = sorted.map((entry) => ({ ...entry }));
-    const spawnedUnitTypes = [];
-    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
-    let idx = 0;
-    while (idx < updated.length) {
-      const entry = updated[idx];
-      const unitCost = buildQueueItemCostFor(entry.unitType);
-      if (!Number.isInteger(unitCost) || unitCost <= 0 || points < unitCost) break;
-      const maxBuildable = Math.floor(points / unitCost);
-      const built = Math.min(maxBuildable, entry.remainingCount);
-      if (built <= 0) break;
-      if (isBuildUnitType(entry.unitType)) {
-        for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
-      }
-      points -= built * unitCost;
-      entry.remainingCount -= built;
-      if (entry.remainingCount <= 0) {
-        updated.splice(idx, 1);
-        continue;
-      }
-      idx++;
-    }
-    for (let i = 0; i < updated.length; i++) {
-      updated[i].queueIndex = i;
-    }
-    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
-  }
-  function sumQueuedProductionCost(entries) {
-    let sum = 0;
-    for (const row of entries) {
-      const cost = buildQueueItemCostFor(row.unitType);
-      sum += cost * Math.max(0, Math.trunc(row.count));
-    }
-    return sum;
-  }
-  function estimateTurnsToCompleteQueuedProduction(entries, storedPoints, capacityPerTurn) {
-    let working = entries.map((e) => ({
-      id: e.id,
-      queueIndex: e.queueIndex,
-      unitType: e.unitType,
-      remainingCount: Math.max(0, Math.trunc(e.count))
-    })).sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-    let stored = Math.max(0, Math.trunc(storedPoints));
-    const cap = Math.max(0, Math.trunc(capacityPerTurn));
-    const remainingUnits = () => working.reduce((acc, row) => acc + row.remainingCount, 0);
-    if (remainingUnits() === 0) return 0;
-    if (cap < 1) return null;
-    let turns = 0;
-    const maxTurns = 1e6;
-    while (remainingUnits() > 0) {
-      const before = JSON.stringify({ working, stored });
-      const result = applyProduction(working, stored, cap);
-      working = result.updatedEntries;
-      stored = result.storedPoints;
-      turns++;
-      const after = JSON.stringify({ working, stored });
-      if (after === before) return null;
-      if (turns > maxTurns) return null;
-    }
-    return turns;
-  }
-
-  // src/shared/gameSize.ts
-  var GAME_SIZE_MULTIPLIER = {
-    small: 1,
-    medium: 2,
-    large: 3
-  };
-  var UNIT_TYPE_DISPLAY_NAME = {
-    infantry: "Infantry",
-    armor: "Armor",
-    naval: "Naval",
-    air: "Air",
-    missile: "Missile"
-  };
-  function parseGameSize(raw) {
-    if (typeof raw !== "string") return "small";
-    const normalized = raw.trim().toLowerCase();
-    if (normalized === "small" || normalized === "medium" || normalized === "large") return normalized;
-    return "small";
-  }
-  function getMaxUnitsPerType(size) {
-    const multiplier = GAME_SIZE_MULTIPLIER[parseGameSize(size)];
-    return {
-      infantry: MAX_UNITS_PER_TYPE.infantry * multiplier,
-      armor: MAX_UNITS_PER_TYPE.armor * multiplier,
-      naval: MAX_UNITS_PER_TYPE.naval * multiplier,
-      air: MAX_UNITS_PER_TYPE.air * multiplier,
-      missile: MAX_UNITS_PER_TYPE.missile * multiplier
-    };
-  }
-  function gameSizeCapPreviewRows(size) {
-    const caps = getMaxUnitsPerType(size);
-    return ALL_BUILD_UNIT_TYPES.map((unitType) => ({
-      unitType,
-      displayName: UNIT_TYPE_DISPLAY_NAME[unitType],
-      cap: caps[unitType]
-    }));
-  }
-
-  // src/shared/unitCountsByType.ts
-  function getPlayerUnitCountsByType(units, playerId) {
-    const counts = { infantry: 0, armor: 0, naval: 0, air: 0, missile: 0 };
-    for (const unit of units) {
-      if (unit.player !== playerId) continue;
-      if (!isBuildUnitType(unit.unitType)) continue;
-      counts[unit.unitType] += 1;
-    }
-    return counts;
-  }
-
-  // src/shared/mapViewMode.ts
-  var DEFAULT_WEATHER_ICONS_SHOWN = true;
-  var DEFAULT_TECH_VIEW_CHOSEN = false;
-  var DEFAULT_CONTROL_BORDERS_SHOWN = true;
-  var DEFAULT_PRODUCTION_DETAIL_CHOSEN = false;
-  function isMapLayerShown(input) {
-    if (input.tKeyHeld) return true;
-    return input.layerChosen && !input.inBattle && !input.newGameOverlayOpen;
-  }
-
-  // src/renderer/map/mapViewModeState.ts
-  var weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
-  var techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
-  var controlBordersShown = DEFAULT_CONTROL_BORDERS_SHOWN;
-  var productionDetailChosen = DEFAULT_PRODUCTION_DETAIL_CHOSEN;
-  function areWeatherIconsShown() {
-    return weatherIconsShown;
-  }
-  function setWeatherIconsShown(shown) {
-    weatherIconsShown = shown;
-  }
-  function isTechViewChosen() {
-    return techViewChosen;
-  }
-  function setTechViewChosen(chosen) {
-    techViewChosen = chosen;
-  }
-  function areControlBordersShown() {
-    return controlBordersShown;
-  }
-  function setControlBordersShown(shown) {
-    controlBordersShown = shown;
-  }
-  function isProductionDetailChosen() {
-    return productionDetailChosen;
-  }
-  function setProductionDetailChosen(chosen) {
-    productionDetailChosen = chosen;
-  }
-
-  // src/renderer/gameplay/productionOverlayHelpers.ts
-  function getControllerForHex(state, h3Index) {
-    const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
-    return row?.controllerPlayerId ?? null;
-  }
-  function getUrbanProductionCapacityForHex2(h3Index) {
-    return getUrbanProductionCapacityForHex(h3Index);
-  }
-  function isMapInspectionModeHeld() {
-    return rendererSharedState.hideTerrainFillWhileHeld;
-  }
-  function isChosenLayerShown(layerChosen) {
-    return isMapLayerShown({
-      tKeyHeld: rendererSharedState.hideTerrainFillWhileHeld,
-      layerChosen,
-      inBattle: rendererSharedState.tacticalBattleSnapshot != null,
-      // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
-      newGameOverlayOpen: layerChosen && isNewGameOverlayOpen()
-    });
-  }
-  function areTechIconsShown() {
-    return isChosenLayerShown(isTechViewChosen());
-  }
-  function isProductionDetailShown() {
-    return isChosenLayerShown(isProductionDetailChosen());
-  }
-  function isStrategicHexHumanUrbanProduction(state, hx) {
-    if (getControllerForHex(state, hx.h3Index) !== HUMAN_SEAT_ID) return false;
-    return getUrbanProductionCapacityForHex2(hx.h3Index) > 0;
-  }
-  function getBuildQueueSummaryForHex(state, h3Index) {
-    return state.strategicBuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
-  }
-  function getUnitCountsByTypeForPlayer(state, playerId) {
-    return getPlayerUnitCountsByType(state.units, playerId);
-  }
-  function isFogOfWarDisabledForSnapshot(state) {
-    return state.fogOfWarEnabled === false;
-  }
-  function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
-    const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
-    const queue = getBuildQueueSummaryForHex(state, h3Index);
-    const queuedUnits = queue?.queuedUnits ?? 0;
-    if (queuedUnits <= 0) return capacityText;
-    const nextUnitType = queue?.nextUnitType;
-    const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
-    if (nextUnitType === FORTIFICATION_QUEUE_ITEM) {
-      const fortifiable = state.strategicInfrastructure?.find((row) => row.h3Index === h3Index)?.fortifiableCount ?? 0;
-      if (fortifiable <= 0) return `${capacityText} / \u221Et`;
-    }
-    if (!nextUnitType || capacityPerTurn <= 0) {
-      return `${capacityText} / ?t`;
-    }
-    if (controller && isSeatId(controller) && isBuildUnitType(nextUnitType)) {
-      const countsByType = unitCountsByPlayer?.[controller] ?? getUnitCountsByTypeForPlayer(state, controller);
-      if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
-        return `${capacityText} / \u221Et`;
-      }
-    }
-    const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
-    if (turns === null) return `${capacityText} / ?t`;
-    return `${capacityText} / ${turns.toLocaleString()}t`;
-  }
-  function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
-    if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
-    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
-  }
-  function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
-    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
-  }
-  function unitCountsForReveal(state) {
-    const seatIds = (state.seats ?? []).map((seat) => seat.seatId);
-    const ids = seatIds.length > 0 ? seatIds : [HUMAN_SEAT_ID];
-    const counts = {};
-    for (const seatId of ids) counts[seatId] = getUnitCountsByTypeForPlayer(state, seatId);
-    return counts;
-  }
-  function buildProductionOverlayContext(state) {
-    const mapInspectionHeld = isMapInspectionModeHeld();
-    const productionDetailShown = isProductionDetailShown();
-    const revealAllControllerQueues = productionDetailShown && isFogOfWarDisabledForSnapshot(state);
-    return {
-      mapInspectionHeld,
-      productionDetailShown,
-      revealAllControllerQueues,
-      unitHexes: new Set(state.units.map((u) => u.h3Index)),
-      unitCountsByPlayer: revealAllControllerQueues ? unitCountsForReveal(state) : void 0
-    };
   }
 
   // src/renderer/map/leafletMainMapProjection.ts
@@ -28858,15 +29127,15 @@ ${bonuses}`;
   }
   function paint(section, standings) {
     section.replaceChildren();
-    const head = document.createElement("div");
-    head.className = "game-over-standings-head";
+    const head2 = document.createElement("div");
+    head2.className = "game-over-standings-head";
     const kicker = document.createElement("p");
     kicker.className = "game-over-standings-kicker";
     kicker.textContent = "Result";
     const date = document.createElement("p");
     date.className = "game-over-standings-date";
     date.textContent = standings.dateLine;
-    head.append(kicker, date);
+    head2.append(kicker, date);
     const result = document.createElement("p");
     result.className = "game-over-standings-result";
     result.textContent = standings.resultLine;
@@ -28880,7 +29149,7 @@ ${bonuses}`;
     const totalCost = document.createElement("span");
     totalCost.textContent = standings.totalCost;
     total.append(totalName, totalCost);
-    section.append(head, result, list, total);
+    section.append(head2, result, list, total);
   }
   function rowElement(row) {
     const item = document.createElement("li");
@@ -29155,7 +29424,18 @@ ${bonuses}`;
       unitCap,
       yourHome: viewer === null ? null : holdOf(input, viewer, homeHexesOf(input, viewer)),
       enemyHomes: viewer === null || turnLimit !== null ? null : holdOf(input, viewer, enemyHomeHexesOf(input, viewer)),
-      cities: turnLimit === null ? null : citiesReadout(input, viewer, turnLimit)
+      cities: turnLimit === null ? null : citiesReadout(input, viewer, turnLimit),
+      credits: creditsReadout(input.mercenaryEconomy)
+    };
+  }
+  function creditsReadout(economy) {
+    if (!economy) return null;
+    return {
+      credits: economy.credits,
+      upkeepPerTurn: economy.upkeepPerTurn,
+      pendingHireFees: economy.pendingHireFees,
+      mercenaryCount: economy.mercenaryCount,
+      short: economy.credits < economy.upkeepPerTurn + economy.pendingHireFees
     };
   }
   function holdOf(input, viewer, hexes) {
@@ -29203,7 +29483,9 @@ ${bonuses}`;
       enemyHome: stats.enemyHomes ? formatCount(stats.enemyHomes.held) : "\u2014",
       enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : "",
       cities: stats.cities?.summary ?? "",
-      citiesTooltip: stats.cities?.tooltip ?? ""
+      citiesTooltip: stats.cities?.tooltip ?? "",
+      credits: stats.credits ? formatCount(stats.credits.credits) : "",
+      creditsSuffix: stats.credits ? formatCreditsUpkeepSuffix(stats.credits.upkeepPerTurn) : ""
     };
   }
   function formatForcesBreakdown(stats) {
@@ -29470,6 +29752,10 @@ ${bonuses}`;
       setHostHidden("topbar-stat-human-home-host", false);
       setHostHidden("topbar-stat-enemy-home-host", false);
       setHostHidden("topbar-stat-cities-host", true);
+      setText("topbar-stat-credits", "\u2014");
+      setText("topbar-stat-credits-suffix", "");
+      setHostHidden("topbar-stat-credits-host", true);
+      document.getElementById("topbar-stat-credits-host")?.classList.remove("is-short");
       return;
     }
     const viewer = readoutViewerSeatId(state.seats ?? [], rendererSharedState.viewAs);
@@ -29489,6 +29775,12 @@ ${bonuses}`;
     setHostHidden("topbar-stat-cities-host", stats.cities === null);
     document.getElementById("topbar-stat-cities-host")?.setAttribute("data-control-tooltip", parts.citiesTooltip);
     document.getElementById("topbar-stat-forces-host")?.setAttribute("data-control-tooltip", forcesStatTooltipText(formatForcesBreakdown(stats)));
+    setText("topbar-stat-credits", parts.credits);
+    setText("topbar-stat-credits-suffix", parts.creditsSuffix);
+    setHostHidden("topbar-stat-credits-host", stats.credits === null);
+    const creditsHost = document.getElementById("topbar-stat-credits-host");
+    creditsHost?.classList.toggle("is-short", stats.credits?.short === true);
+    if (stats.credits) creditsHost?.setAttribute("data-control-tooltip", formatCreditsTooltip(stats.credits));
   }
   function renderTopBarStatus(state) {
     syncObserveChrome();
@@ -29775,8 +30067,8 @@ ${bonuses}`;
   function formatOrderRowDetail(parts) {
     const code = parts.targetCode && parts.targetCode.length > 0 ? parts.targetCode : "?";
     const distance2 = parts.distanceHexes == null ? "?" : String(parts.distanceHexes);
-    const note = parts.note ? ` \xB7 ${parts.note}` : "";
-    return `\u2192 ${code} \xB7 ${distance2}h${note}`;
+    const note2 = parts.note ? ` \xB7 ${parts.note}` : "";
+    return `\u2192 ${code} \xB7 ${distance2}h${note2}`;
   }
   function formatQueuedOrdersSubtitle(queuedCount, turnNumber, battleBeat) {
     const when = battleBeat == null ? `turn ${turnNumber}` : `beat ${battleBeat}`;
@@ -31339,12 +31631,12 @@ ${bonuses}`;
       return null;
     }
   }
-  function formatUnitToTargetDetail(state, unitId, targetH3Index, battle, note) {
+  function formatUnitToTargetDetail(state, unitId, targetH3Index, battle, note2) {
     const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, battle);
     return formatOrderRowDetail({
       targetCode: orderTargetHexCode(targetH3Index, battle ?? null),
       distanceHexes: originH3 ? computeGridDistanceForLabel(originH3, targetH3Index) : null,
-      note
+      note: note2
     });
   }
   function formatPendingRangedAttackSidebarLabel(state, order, battle) {
@@ -34177,7 +34469,8 @@ ${bonuses}`;
         id: u.id,
         player: u.player,
         unitType: u.unitType,
-        h3Index: u.h3Index
+        h3Index: u.h3Index,
+        ...u.isMercenary === true ? { isMercenary: true } : {}
       }));
       const anim2 = rendererSharedState.resolutionMoveAnimation;
       const tacticalUnitsForMarchPlayback = anim2 ? mergeTacticalSubUnitsForMarchPlayback(tacticalUnits, anim2.tacticalMarchPlaybackUnits) : tacticalUnits;
@@ -34898,6 +35191,148 @@ ${bonuses}`;
     });
   }
 
+  // src/shared/buildQueueItemLabels.ts
+  function formatBuildQueueItemLabel(item) {
+    if (item === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_QUEUE_ITEM_LABEL;
+    if (item === CREDITS_QUEUE_ITEM) return CREDITS_QUEUE_ITEM_LABEL;
+    return item.charAt(0).toUpperCase() + item.slice(1);
+  }
+
+  // src/shared/consolidatedTurnUpdateToast.ts
+  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
+  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
+  var DEPLOYED_LINE_TYPE_ORDER = ["armor", "infantry", "naval", "air", "missile"];
+  function joinWithSerialComma(parts) {
+    if (parts.length <= 1) return parts[0] ?? "";
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+    return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+  }
+  function formatDeployedUnitsLine(deployed) {
+    if (!deployed) return null;
+    const parts = [];
+    for (const unitType of DEPLOYED_LINE_TYPE_ORDER) {
+      const count = deployed[unitType] ?? 0;
+      if (count > 0) parts.push(`${count.toLocaleString()} ${unitType}`);
+    }
+    if (parts.length === 0) return null;
+    const total = DEPLOYED_LINE_TYPE_ORDER.reduce((sum, unitType) => sum + (deployed[unitType] ?? 0), 0);
+    const noun = total === 1 ? "unit" : "units";
+    return `${joinWithSerialComma(parts)} ${noun} deployed`;
+  }
+  function formatDeploymentCapReachedLine(cappedTypes, player) {
+    if (player !== HUMAN_SEAT_ID) return null;
+    if (!cappedTypes || cappedTypes.length === 0) return null;
+    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
+    if (ordered.length === 0) return null;
+    return `Maximum human ${joinWithSerialComma([...ordered])} units deployed.`;
+  }
+  function buildOtherTurnUpdatePrimaryLines(readyResult) {
+    const lines = [];
+    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
+    if (deployedLine) lines.push(deployedLine);
+    const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
+    if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
+    const creditsAdded = readyResult.humanCreditsAdded ?? 0;
+    if (creditsAdded > 0) lines.push(formatCreditsAddedLine(creditsAdded));
+    const mercenariesHired = readyResult.humanMercenariesHired ?? 0;
+    if (mercenariesHired > 0) lines.push(formatMercenariesHiredLine(mercenariesHired));
+    const unitsDeserted = readyResult.humanUnitsDeserted ?? 0;
+    if (unitsDeserted > 0) lines.push(formatUnitsDesertedLine(unitsDeserted));
+    const hireOrdersUnfilled = readyResult.humanHireOrdersUnfilled ?? 0;
+    if (hireOrdersUnfilled > 0) lines.push(formatHireOrdersUnfilledLine(hireOrdersUnfilled));
+    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
+    if (deploymentCapLine) lines.push(deploymentCapLine);
+    return lines;
+  }
+  function stripLeadingBullet(line) {
+    return line.replace(/^\u2022\s*/, "");
+  }
+  function splitMissileStrikeLines(lines) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const updates = [];
+    for (const entry of lines ?? []) {
+      const line = entry.line.trim();
+      if (line.length === 0) continue;
+      const controllerId = entry.controllerId;
+      if (controllerId !== null && isSeatId(controllerId)) {
+        const existing = byOwner.get(controllerId);
+        if (existing) existing.push(line);
+        else byOwner.set(controllerId, [line]);
+      } else {
+        updates.push(line);
+      }
+    }
+    return { byOwner, updates };
+  }
+  function splitFortificationReportLines(lines) {
+    const byOwner = /* @__PURE__ */ new Map();
+    const updates = [];
+    for (const entry of lines ?? []) {
+      const line = entry.line.trim();
+      if (line.length === 0) continue;
+      const ownerId = entry.ownerId;
+      if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
+        const existing = byOwner.get(ownerId);
+        if (existing) existing.push(line);
+        else byOwner.set(ownerId, [line]);
+      } else {
+        updates.push(line);
+      }
+    }
+    return { byOwner, updates };
+  }
+  function mergeStrikeLines(missileLines, fortificationLines) {
+    const merged = /* @__PURE__ */ new Map();
+    for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
+    for (const [ownerId, lines] of fortificationLines) {
+      const existing = merged.get(ownerId);
+      if (existing) existing.push(...lines);
+      else merged.set(ownerId, [...lines]);
+    }
+    return merged;
+  }
+  function buildConsolidatedTurnUpdateToastMessage(args) {
+    const { readyResult, combatFallbackBullets, turnReport } = args;
+    const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
+    const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
+    const sections = [];
+    const lossSections = buildTurnLossSections(
+      args.turnLossSummary,
+      turnReport?.viewerSeatId ?? null,
+      turnReport?.seats ?? [],
+      turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
+      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
+    );
+    sections.push(...lossSections);
+    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
+    if (lossSections.length === 0 && otherLines.length === 0) {
+      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
+    }
+    const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
+    const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
+    if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
+    if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
+    const productionPauseLines = (args.productionPauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (productionPauseLines.length > 0) otherLines = [...otherLines, ...productionPauseLines];
+    if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
+    if (otherLines.length > 0) {
+      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
+      sections.push(...otherLines);
+    }
+    if (sections.length === 0) return null;
+    return sections.join("\n");
+  }
+
+  // src/shared/productionBuildability.ts
+  var BUILD_PAUSED_NOTE = "Building is paused here: this hex is outside your home region and holds none of your units or fortifications. Its points still bank. Have a unit here at the end of a turn to build again.";
+  function formatBuildPausedLine(placeNames) {
+    if (placeNames.length === 1) {
+      return `Building is paused at ${placeNames[0]}, which holds none of your units or fortifications.`;
+    }
+    return `Building is paused at ${joinWithSerialComma(placeNames)}, which hold none of your units or fortifications.`;
+  }
+
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -34909,6 +35344,12 @@ ${bonuses}`;
   }
   function escapeBuildPopupHtml(text) {
     return escapeHtmlText(text);
+  }
+  function createBuildPausedNote() {
+    const note2 = document.createElement("div");
+    note2.className = "build-no-urban";
+    note2.textContent = BUILD_PAUSED_NOTE;
+    return note2;
   }
 
   // src/renderer/gameplay/buildQueueMultiSelect.ts
@@ -34939,7 +35380,7 @@ ${bonuses}`;
     return snapshots.filter((snapshot2) => snapshot2.availableUnitTypes.includes(unitType)).length;
   }
   function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
-    const typeLabel = unitType === FORTIFICATION_QUEUE_ITEM ? FORTIFICATION_QUEUE_ITEM_LABEL : unitType.charAt(0).toUpperCase() + unitType.slice(1);
+    const typeLabel = formatBuildQueueItemLabel(unitType);
     if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
       return `${typeLabel} (all hexes)`;
     }
@@ -34989,6 +35430,26 @@ ${bonuses}`;
     label.appendChild(text);
     row.appendChild(label);
     args.section.appendChild(row);
+  }
+
+  // src/shared/queueItemTooltipText.ts
+  var QUEUE_ITEM_TOOLTIP_TEXT = {
+    infantry: "The cheapest unit. It cannot shoot on the world map, and it can shoot in a battle.",
+    armor: "Costs more than infantry, shoots one hex on the world map, and cannot enter mountains, wetlands, or arctic.",
+    naval: "Needs a seaport, shoots two hexes on the world map, and can carry land units.",
+    air: "Strikes from an airport and does not march. A hex needs an airport to build it.",
+    missile: "Launches once on the world map and is then gone. It cannot fire in a battle.",
+    fortification: "Protects one city cell. It is not a unit, and a hit removes it before a unit.",
+    credits: "Adds 20 credits to the treasury. It is not a unit and does not count toward a unit cap."
+  };
+  function queueItemTooltipText(value) {
+    if (!isBuildQueueItemType(value)) return null;
+    return QUEUE_ITEM_TOOLTIP_TEXT[value];
+  }
+
+  // src/renderer/chrome/syncQueueItemSelectTooltip.ts
+  function syncQueueItemSelectTooltip(select, emptyText) {
+    select.setAttribute("data-control-tooltip", queueItemTooltipText(select.value) ?? emptyText);
   }
 
   // src/renderer/gameplay/buildQueueMultiPopup.ts
@@ -35072,31 +35533,34 @@ ${bonuses}`;
         loadedCount: snapshots.length
       });
       deps.mount.innerHTML = "";
-      const closeRow2 = document.createElement("div");
-      closeRow2.className = "build-popup-close-row";
+      const closeRow3 = document.createElement("div");
+      closeRow3.className = "build-popup-close-row";
       const closeBtn2 = document.createElement("button");
       closeBtn2.type = "button";
       closeBtn2.className = "unit-select build-close-btn";
       closeBtn2.textContent = "\xD7";
+      closeBtn2.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
       closeBtn2.addEventListener("click", deps.hideBuildPopup);
-      closeRow2.appendChild(closeBtn2);
-      deps.mount.appendChild(closeRow2);
+      closeRow3.appendChild(closeBtn2);
+      deps.mount.appendChild(closeRow3);
       const errorLine = document.createElement("div");
       errorLine.className = "build-no-urban";
       errorLine.textContent = "Failed to load build queues for the selected hexes.";
       deps.mount.appendChild(errorLine);
+      placeOpenBuildPopup();
       return;
     }
     deps.mount.innerHTML = "";
-    const closeRow = document.createElement("div");
-    closeRow.className = "build-popup-close-row";
+    const closeRow2 = document.createElement("div");
+    closeRow2.className = "build-popup-close-row";
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "unit-select build-close-btn";
     closeBtn.textContent = "\xD7";
+    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
     closeBtn.addEventListener("click", deps.hideBuildPopup);
-    closeRow.appendChild(closeBtn);
-    deps.mount.appendChild(closeRow);
+    closeRow2.appendChild(closeBtn);
+    deps.mount.appendChild(closeRow2);
     const section = document.createElement("div");
     section.className = "build-queue-section";
     const descriptionLine = document.createElement("div");
@@ -35131,8 +35595,8 @@ ${bonuses}`;
     productionSpacer.style.height = "0.5em";
     section.appendChild(productionSpacer);
     const unionTypes = unionAvailableBuildUnitTypes(snapshots);
-    const head = document.createElement("div");
-    head.className = "build-queue-head";
+    const head2 = document.createElement("div");
+    head2.className = "build-queue-head";
     const title = document.createElement("span");
     title.className = "build-queue-title";
     title.textContent = "Build Queue";
@@ -35150,9 +35614,9 @@ ${bonuses}`;
         createBuildQueueTemplateRow(defaultUnitType, 1)
       ]);
     });
-    head.appendChild(title);
-    head.appendChild(buildBtn);
-    section.appendChild(head);
+    head2.appendChild(title);
+    head2.appendChild(buildBtn);
+    section.appendChild(head2);
     const list = document.createElement("div");
     list.className = "build-queue-list";
     rendererSharedState.buildQueueTemplate.forEach((entry) => {
@@ -35160,7 +35624,6 @@ ${bonuses}`;
       const row = document.createElement("div");
       row.className = "build-queue-row";
       const typeSelect = document.createElement("select");
-      typeSelect.setAttribute("data-control-tooltip", multiBuildTypeTooltipText);
       const rowTypes = ALL_BUILD_QUEUE_ITEM_TYPES.filter(
         (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
       );
@@ -35172,6 +35635,7 @@ ${bonuses}`;
         typeSelect.appendChild(opt);
       }
       typeSelect.value = entry.unitType;
+      syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
       row.appendChild(typeSelect);
       const countInput = document.createElement("input");
       countInput.setAttribute("data-control-tooltip", multiBuildCountTooltipText);
@@ -35192,6 +35656,7 @@ ${bonuses}`;
       });
       row.appendChild(countInput);
       typeSelect.addEventListener("change", async () => {
+        syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
         if (buildQueueEditBlockedByPlayback()) {
           void renderMultiBuildQueueIntoMount(deps);
           return;
@@ -35225,6 +35690,7 @@ ${bonuses}`;
       removeBtn.type = "button";
       removeBtn.className = "unit-select";
       removeBtn.textContent = "x";
+      removeBtn.setAttribute("data-control-tooltip", multiHexQueueRemoveTooltipText);
       removeBtn.addEventListener("click", async () => {
         if (buildQueueEditBlockedByPlayback()) return;
         await commitEditedTemplate(
@@ -35251,6 +35717,318 @@ ${bonuses}`;
       }
     });
     deps.mount.appendChild(section);
+    placeOpenBuildPopup();
+  }
+
+  // src/renderer/gameplay/hirePanel.ts
+  async function fetchHirePanelData(h3Index) {
+    let view = null;
+    let caption = null;
+    try {
+      view = await window.gameApi?.getHexHireView({ h3Index }) ?? null;
+    } catch (err) {
+      console.error("getHexHireView failed:", err);
+    }
+    try {
+      if (window.gameApi?.getHexNamingTooltipLine) {
+        caption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+      }
+    } catch (err) {
+      console.error("getHexNamingTooltipLine failed:", err);
+    }
+    return { view, caption };
+  }
+  function renderHirePanel(panel, h3Index, data, deps) {
+    panel.innerHTML = "";
+    panel.appendChild(closeRow(deps));
+    appendCaption(panel, h3Index, data.caption);
+    const view = data.view;
+    if (!view) {
+      panel.appendChild(note(HIRE_VIEW_FAILED));
+      if (!panel.hidden) placeOpenBuildPopup();
+      return;
+    }
+    appendFunds(panel, view);
+    if (!view.hireAvailable && view.unavailableReason) panel.appendChild(note(view.unavailableReason));
+    if (view.raise) appendRaise(panel, h3Index, view, deps);
+    else if (view.raiseBlockedReason) panel.appendChild(note(view.raiseBlockedReason));
+    if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
+    if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
+    panel.appendChild(note(HIRE_ARRIVAL_NOTE));
+    if (!panel.hidden) placeOpenBuildPopup();
+  }
+  function closeRow(deps) {
+    const row = document.createElement("div");
+    row.className = "build-popup-close-row";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "unit-select build-close-btn";
+    button.textContent = "\xD7";
+    button.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
+    button.addEventListener("click", () => deps.hideBuildPopup());
+    row.appendChild(button);
+    return row;
+  }
+  function appendCaption(panel, h3Index, caption) {
+    const strategicCode = getStrategicHexCode(h3Index);
+    const prefix = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : "";
+    const text = caption && caption.text.trim().length > 0 ? `${prefix}${formatHexNamingCaptionHtml(caption)}` : prefix;
+    if (!text) return;
+    const line = document.createElement("div");
+    line.innerHTML = text;
+    const spacer = document.createElement("div");
+    spacer.style.height = "0.5em";
+    panel.append(line, spacer);
+  }
+  function appendFunds(panel, view) {
+    const funds = view.funds;
+    panel.appendChild(fundLine(CREDITS_LINE_LABEL, String(funds.credits)));
+    panel.appendChild(fundLine(UPKEEP_LINE_LABEL, `${funds.upkeepPerTurn} / turn`));
+    if (funds.pendingHireFees > 0) panel.appendChild(fundLine(HIRE_FEES_LINE_LABEL, String(funds.pendingHireFees)));
+    if (funds.credits < funds.upkeepPerTurn + funds.pendingHireFees) panel.appendChild(note(HIRE_FUNDS_WARNING, "hire-funds-warning"));
+  }
+  function fundLine(label, value) {
+    const line = document.createElement("div");
+    line.innerHTML = `<strong>${label}:</strong> ${escapeBuildPopupHtml(value)}`;
+    return line;
+  }
+  function note(text, className = "build-no-urban") {
+    const line = document.createElement("div");
+    line.className = className;
+    line.textContent = text;
+    return line;
+  }
+  function appendRaise(panel, h3Index, view, deps) {
+    const raise = view.raise;
+    if (!raise) return;
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    section.appendChild(head(RAISE_SECTION_TITLE));
+    const capacity = document.createElement("div");
+    capacity.innerHTML = `<strong>${RAISE_CAPACITY_LABEL}:</strong> ${escapeBuildPopupHtml(formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn))}`;
+    const row = document.createElement("div");
+    row.className = "build-queue-row";
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "unit-select";
+    for (const option2 of raise.options) {
+      const choice = document.createElement("option");
+      choice.value = option2.unitType;
+      choice.textContent = formatHireOptionLabel(option2);
+      typeSelect.appendChild(choice);
+    }
+    syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+    typeSelect.addEventListener("change", () => {
+      syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+    });
+    const countInput = document.createElement("input");
+    countInput.type = "text";
+    countInput.className = "build-count-input";
+    countInput.maxLength = 2;
+    countInput.inputMode = "numeric";
+    countInput.value = "1";
+    countInput.setAttribute("data-control-tooltip", hireCountTooltipText);
+    countInput.addEventListener("keydown", (event) => {
+      const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
+      if (allowed.includes(event.key)) return;
+      if (/^\d$/.test(event.key)) return;
+      event.preventDefault();
+    });
+    countInput.addEventListener("input", () => {
+      const raw = sanitizeBuildCountInputText(countInput.value);
+      if (countInput.value !== raw) countInput.value = raw;
+    });
+    const button = hireButton();
+    button.addEventListener("click", () => {
+      const count = parseInt(sanitizeBuildCountInputText(countInput.value), 10);
+      void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({
+        kind: "raise",
+        h3Index,
+        unitType: typeSelect.value,
+        count
+      }));
+    });
+    row.append(typeSelect, countInput, button);
+    section.append(capacity, row);
+    panel.appendChild(section);
+  }
+  function appendRehires(panel, h3Index, view, deps) {
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    section.appendChild(head(REHIRE_SECTION_TITLE));
+    for (const unit of view.rehireUnits) {
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const label = document.createElement("span");
+      label.className = "unit-label";
+      setUnitNameContent(label, unit.unitId, unit.displayName);
+      const fee = document.createElement("span");
+      fee.textContent = String(unit.fee);
+      const button = hireButton();
+      button.addEventListener("click", () => {
+        void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({ kind: "rehire", unitId: unit.unitId }));
+      });
+      row.append(label, fee, button);
+      section.appendChild(row);
+    }
+    panel.appendChild(section);
+  }
+  function appendOrders(panel, h3Index, view, deps) {
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
+    for (const order of view.pendingOrders) {
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const label = document.createElement("span");
+      label.textContent = formatHireOrderLabel(order);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "unit-select";
+      button.textContent = "x";
+      button.setAttribute("data-control-tooltip", hireRemoveTooltipText);
+      button.addEventListener("click", () => {
+        void submitHire(panel, h3Index, deps, () => window.gameApi.removeHireOrder({ orderId: order.orderId }));
+      });
+      row.append(label, button);
+      section.appendChild(row);
+    }
+    panel.appendChild(section);
+  }
+  function head(title) {
+    const row = document.createElement("div");
+    row.className = "build-queue-head";
+    const text = document.createElement("span");
+    text.className = "build-queue-title";
+    text.textContent = title;
+    row.appendChild(text);
+    return row;
+  }
+  function hireButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "unit-select";
+    button.textContent = HIRE_BUTTON_LABEL;
+    button.setAttribute("data-control-tooltip", hireSubmitTooltipText);
+    return button;
+  }
+  async function submitHire(panel, h3Index, deps, mutate) {
+    if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
+    if (!window.gameApi?.placeHireOrder || !window.gameApi.removeHireOrder) return;
+    let result;
+    try {
+      result = await mutate();
+    } catch (err) {
+      console.error("hire order failed:", err);
+      if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+      deps.showMapToast(HIRE_ORDER_UPDATE_FAILED, { isError: true });
+      return;
+    }
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    if (!result.success) {
+      deps.showMapToast(result.reason ?? HIRE_ORDER_UPDATE_FAILED, { isError: true });
+      return;
+    }
+    await deps.refreshGameStateAfterBuildQueueChange();
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    const data = await fetchHirePanelData(h3Index);
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || !panel.isConnected) return;
+    renderHirePanel(panel, h3Index, data, deps);
+  }
+
+  // src/renderer/gameplay/buildHirePopup.ts
+  var tabHex = null;
+  var tabChoice = "build";
+  var hireRequestSeq = 0;
+  async function renderBuildOrHirePopupIntoMount(mount, h3Index, deps) {
+    const popup = document.getElementById("build-popup");
+    if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
+      popup?.classList.remove("build-popup-wide");
+      await deps.renderBuildPanel(mount, h3Index);
+      return;
+    }
+    const requestSeq = ++hireRequestSeq;
+    const data = await fetchHirePanelData(h3Index);
+    if (rendererSharedState.buildPopupHexH3 !== h3Index || requestSeq !== hireRequestSeq) return;
+    if (isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && (data.view == null || data.view.hireAvailable === false)) {
+      popup?.classList.remove("build-popup-wide");
+      await deps.renderBuildPanel(mount, h3Index);
+      return;
+    }
+    if (!isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index)) {
+      mount.innerHTML = "";
+      popup?.classList.add("build-popup-wide");
+      const panel = document.createElement("div");
+      panel.className = "hire-panel";
+      mount.appendChild(panel);
+      if (data.view == null) {
+        renderHireFailure(panel, deps);
+        placeOpenBuildPopup();
+        return;
+      }
+      renderHirePanel(panel, h3Index, data, deps);
+      return;
+    }
+    if (tabHex !== h3Index) {
+      tabHex = h3Index;
+      tabChoice = "build";
+    }
+    mount.innerHTML = "";
+    popup?.classList.add("build-popup-wide");
+    const tabBar = document.createElement("div");
+    tabBar.className = "build-popup-tab-bar";
+    tabBar.setAttribute("role", "tablist");
+    const buildTab = tabButton(BUILD_TAB_LABEL);
+    const hireTab = tabButton(HIRE_TAB_LABEL);
+    tabBar.append(buildTab, hireTab);
+    const buildPanel = document.createElement("div");
+    buildPanel.setAttribute("role", "tabpanel");
+    const hirePanel = document.createElement("div");
+    hirePanel.className = "hire-panel";
+    hirePanel.setAttribute("role", "tabpanel");
+    mount.append(tabBar, buildPanel, hirePanel);
+    const show = (choice) => {
+      tabChoice = choice;
+      tabHex = h3Index;
+      buildTab.setAttribute("aria-selected", choice === "build" ? "true" : "false");
+      hireTab.setAttribute("aria-selected", choice === "hire" ? "true" : "false");
+      buildPanel.hidden = choice !== "build";
+      hirePanel.hidden = choice !== "hire";
+    };
+    buildTab.addEventListener("click", () => {
+      show("build");
+      placeOpenBuildPopup();
+    });
+    hireTab.addEventListener("click", () => {
+      show("hire");
+      placeOpenBuildPopup();
+    });
+    show(tabChoice);
+    renderHirePanel(hirePanel, h3Index, data, deps);
+    await deps.renderBuildPanel(buildPanel, h3Index);
+  }
+  function tabButton(label) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "tab");
+    button.textContent = label;
+    if (label === BUILD_TAB_LABEL) button.setAttribute("data-control-tooltip", buildTabTooltipText);
+    else if (label === HIRE_TAB_LABEL) button.setAttribute("data-control-tooltip", hireTabTooltipText);
+    return button;
+  }
+  function renderHireFailure(panel, deps) {
+    const closeRow2 = document.createElement("div");
+    closeRow2.className = "build-popup-close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select build-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
+    closeBtn.addEventListener("click", () => deps.hideBuildPopup());
+    closeRow2.appendChild(closeBtn);
+    const note2 = document.createElement("div");
+    note2.className = "build-no-urban";
+    note2.textContent = HIRE_VIEW_FAILED;
+    panel.append(closeRow2, note2);
   }
 
   // src/renderer/gameplay/buildQueuePopup.ts
@@ -35313,6 +36091,7 @@ ${bonuses}`;
     }
     function restoreRejectedBuildQueueControls(typeSelect, countInput, entry) {
       typeSelect.value = entry.unitType;
+      syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
       countInput.value = String(entry.count);
     }
     function rejectedBuildQueueEditStillShown(typeSelect, countInput, submittedUnitType, submittedCountText) {
@@ -35358,15 +36137,16 @@ ${bonuses}`;
       }
       if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot2 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
       mount.innerHTML = "";
-      const closeRow = document.createElement("div");
-      closeRow.className = "build-popup-close-row";
+      const closeRow2 = document.createElement("div");
+      closeRow2.className = "build-popup-close-row";
       const closeBtn = document.createElement("button");
       closeBtn.type = "button";
       closeBtn.className = "unit-select build-close-btn";
       closeBtn.textContent = "\xD7";
+      closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
       closeBtn.addEventListener("click", () => hideBuildPopup3());
-      closeRow.appendChild(closeBtn);
-      mount.appendChild(closeRow);
+      closeRow2.appendChild(closeBtn);
+      mount.appendChild(closeRow2);
       const section = document.createElement("div");
       section.className = "build-queue-section";
       const strategicCode = getStrategicHexCode(h3Index);
@@ -35424,8 +36204,12 @@ ${bonuses}`;
       const productionSpacer = document.createElement("div");
       productionSpacer.style.height = "0.5em";
       section.appendChild(productionSpacer);
+      if (snapshot2.controlledByRequester && snapshot2.buildPaused === true) {
+        section.appendChild(createBuildPausedNote());
+      }
       if (!snapshot2.controlledByRequester) {
         mount.appendChild(section);
+        placeOpenBuildPopup();
         return;
       }
       if (!snapshot2.buildSectionVisible) {
@@ -35434,10 +36218,11 @@ ${bonuses}`;
         noUrban.textContent = snapshot2.noBuildReason ?? "This hex cannot build units.";
         section.appendChild(noUrban);
         mount.appendChild(section);
+        placeOpenBuildPopup();
         return;
       }
-      const head = document.createElement("div");
-      head.className = "build-queue-head";
+      const head2 = document.createElement("div");
+      head2.className = "build-queue-head";
       const title = document.createElement("span");
       title.className = "build-queue-title";
       title.textContent = "Build Queue";
@@ -35454,12 +36239,11 @@ ${bonuses}`;
           refreshState: true
         });
         if (!success) return;
-        const body = document.getElementById("build-popup-body");
-        if (body) void renderBuildQueueIntoMount(body, h3Index);
+        void renderBuildQueueIntoMount(mount, h3Index);
       });
-      head.appendChild(title);
-      head.appendChild(buildBtn);
-      section.appendChild(head);
+      head2.appendChild(title);
+      head2.appendChild(buildBtn);
+      section.appendChild(head2);
       const list = document.createElement("div");
       list.className = "build-queue-list";
       const options = snapshot2.availableUnitTypes;
@@ -35467,14 +36251,14 @@ ${bonuses}`;
         const row = document.createElement("div");
         row.className = "build-queue-row";
         const typeSelect = document.createElement("select");
-        typeSelect.setAttribute("data-control-tooltip", buildTypeTooltipText);
         for (const unitType of options) {
           const opt = document.createElement("option");
           opt.value = unitType;
-          opt.textContent = unitType === FORTIFICATION_QUEUE_ITEM ? FORTIFICATION_QUEUE_ITEM_LABEL : unitType.charAt(0).toUpperCase() + unitType.slice(1);
+          opt.textContent = formatBuildQueueItemLabel(unitType);
           typeSelect.appendChild(opt);
         }
         typeSelect.value = entry.unitType;
+        syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
         const countInput = document.createElement("input");
         countInput.setAttribute("data-control-tooltip", buildCountTooltipText);
         countInput.type = "text";
@@ -35518,6 +36302,7 @@ ${bonuses}`;
           void renderBuildQueueIntoMount(mount, h3Index);
         }
         typeSelect.addEventListener("change", async () => {
+          syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
           await submitBuildQueueEntryEdit("Failed to update build queue entry.");
         });
         row.appendChild(typeSelect);
@@ -35535,6 +36320,7 @@ ${bonuses}`;
         removeBtn.type = "button";
         removeBtn.className = "unit-select";
         removeBtn.textContent = "x";
+        removeBtn.setAttribute("data-control-tooltip", singleHexQueueRemoveTooltipText);
         removeBtn.addEventListener("click", async () => {
           if (!window.gameApi?.removeHexBuildQueueEntry) return;
           const success = await runBuildQueueMutation({
@@ -35570,6 +36356,7 @@ ${bonuses}`;
         }
       });
       mount.appendChild(section);
+      placeOpenBuildPopup();
     }
     function clientPointForBuildEntryHex(h3Index, fallbackClientX, fallbackClientY) {
       const layer = document.getElementById("build-entry-layer");
@@ -35585,12 +36372,13 @@ ${bonuses}`;
     }
     async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
       if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
+      const multiSelect = shiftKey && isHumanBuildEntryHexIndex(rendererSharedState.gameState, h3Index) && rendererSharedState.selectedBuildHexH3s.every((hex) => isHumanBuildEntryHexIndex(rendererSharedState.gameState, hex));
       const lifecycleRevision = popupLifecycleRevision;
       if (isHoverOrderPlanningActive() || deps.shouldRenderTacticalHexes()) return;
       rendererSharedState.selectedHexIndex = h3Index;
       const popup = document.getElementById("build-popup");
       const popupOpen = !!popup && !popup.classList.contains("hidden");
-      if (!shiftKey) {
+      if (!multiSelect) {
         const togglesSinglePopup = rendererSharedState.selectedBuildHexH3s.length === 1 && rendererSharedState.selectedBuildHexH3s[0] === h3Index && popupOpen && rendererSharedState.buildPopupHexH3 === h3Index;
         if (togglesSinglePopup) {
           hideBuildPopup3();
@@ -35669,6 +36457,12 @@ ${bonuses}`;
       deps.requestRedraw();
       if (wasOpen) deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
     }
+    const popupDeps = {
+      renderBuildPanel: renderBuildQueueIntoMount,
+      hideBuildPopup: hideBuildPopup3,
+      refreshGameStateAfterBuildQueueChange: deps.refreshGameStateAfterBuildQueueChange,
+      showMapToast: deps.showMapToast
+    };
     function showBuildPopup2(h3Index, clientX, clientY) {
       if (isHoverOrderPlanningActive()) return;
       if (deps.shouldRenderTacticalHexes()) return;
@@ -35687,7 +36481,7 @@ ${bonuses}`;
       el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
       el.classList.remove("hidden");
       el.setAttribute("aria-hidden", "false");
-      void renderBuildQueueIntoMount(body, h3Index);
+      void renderBuildOrHirePopupIntoMount(body, h3Index, popupDeps);
       deps.requestRedraw();
     }
     function refreshBuildPopupIfOpen2() {
@@ -35698,125 +36492,9 @@ ${bonuses}`;
       const el = document.getElementById("build-popup");
       const body = document.getElementById("build-popup-body");
       if (!el || el.classList.contains("hidden") || !rendererSharedState.buildPopupHexH3 || !body) return;
-      void renderBuildQueueIntoMount(body, rendererSharedState.buildPopupHexH3);
+      void renderBuildOrHirePopupIntoMount(body, rendererSharedState.buildPopupHexH3, popupDeps);
     }
     return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup3, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
-  }
-
-  // src/shared/consolidatedTurnUpdateToast.ts
-  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
-  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
-  var DEPLOYED_LINE_TYPE_ORDER = ["armor", "infantry", "naval", "air", "missile"];
-  function joinWithSerialComma(parts) {
-    if (parts.length <= 1) return parts[0] ?? "";
-    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-    return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
-  }
-  function formatDeployedUnitsLine(deployed) {
-    if (!deployed) return null;
-    const parts = [];
-    for (const unitType of DEPLOYED_LINE_TYPE_ORDER) {
-      const count = deployed[unitType] ?? 0;
-      if (count > 0) parts.push(`${count.toLocaleString()} ${unitType}`);
-    }
-    if (parts.length === 0) return null;
-    const total = DEPLOYED_LINE_TYPE_ORDER.reduce((sum, unitType) => sum + (deployed[unitType] ?? 0), 0);
-    const noun = total === 1 ? "unit" : "units";
-    return `${joinWithSerialComma(parts)} ${noun} deployed`;
-  }
-  function formatDeploymentCapReachedLine(cappedTypes, player) {
-    if (player !== HUMAN_SEAT_ID) return null;
-    if (!cappedTypes || cappedTypes.length === 0) return null;
-    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
-    if (ordered.length === 0) return null;
-    return `Maximum human ${joinWithSerialComma([...ordered])} units deployed.`;
-  }
-  function buildOtherTurnUpdatePrimaryLines(readyResult) {
-    const lines = [];
-    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
-    if (deployedLine) lines.push(deployedLine);
-    const fortifiedCount = readyResult.humanFortificationsBuilt ?? 0;
-    if (fortifiedCount > 0) lines.push(formatFortificationsBuiltLine(fortifiedCount));
-    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, HUMAN_SEAT_ID);
-    if (deploymentCapLine) lines.push(deploymentCapLine);
-    return lines;
-  }
-  function stripLeadingBullet(line) {
-    return line.replace(/^\u2022\s*/, "");
-  }
-  function splitMissileStrikeLines(lines) {
-    const byOwner = /* @__PURE__ */ new Map();
-    const updates = [];
-    for (const entry of lines ?? []) {
-      const line = entry.line.trim();
-      if (line.length === 0) continue;
-      const controllerId = entry.controllerId;
-      if (controllerId !== null && isSeatId(controllerId)) {
-        const existing = byOwner.get(controllerId);
-        if (existing) existing.push(line);
-        else byOwner.set(controllerId, [line]);
-      } else {
-        updates.push(line);
-      }
-    }
-    return { byOwner, updates };
-  }
-  function splitFortificationReportLines(lines) {
-    const byOwner = /* @__PURE__ */ new Map();
-    const updates = [];
-    for (const entry of lines ?? []) {
-      const line = entry.line.trim();
-      if (line.length === 0) continue;
-      const ownerId = entry.ownerId;
-      if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
-        const existing = byOwner.get(ownerId);
-        if (existing) existing.push(line);
-        else byOwner.set(ownerId, [line]);
-      } else {
-        updates.push(line);
-      }
-    }
-    return { byOwner, updates };
-  }
-  function mergeStrikeLines(missileLines, fortificationLines) {
-    const merged = /* @__PURE__ */ new Map();
-    for (const [ownerId, lines] of missileLines) merged.set(ownerId, [...lines]);
-    for (const [ownerId, lines] of fortificationLines) {
-      const existing = merged.get(ownerId);
-      if (existing) existing.push(...lines);
-      else merged.set(ownerId, [...lines]);
-    }
-    return merged;
-  }
-  function buildConsolidatedTurnUpdateToastMessage(args) {
-    const { readyResult, combatFallbackBullets, turnReport } = args;
-    const missileLines = splitMissileStrikeLines(args.missileStrikeLines);
-    const fortificationReports = splitFortificationReportLines(args.fortificationReportLines);
-    const sections = [];
-    const lossSections = buildTurnLossSections(
-      args.turnLossSummary,
-      turnReport?.viewerSeatId ?? null,
-      turnReport?.seats ?? [],
-      turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
-      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
-    );
-    sections.push(...lossSections);
-    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
-    if (lossSections.length === 0 && otherLines.length === 0) {
-      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
-    }
-    const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
-    const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-    if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
-    if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
-    if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
-    if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
-    if (otherLines.length > 0) {
-      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
-      sections.push(...otherLines);
-    }
-    if (sections.length === 0) return null;
-    return sections.join("\n");
   }
 
   // src/shared/missileStrikeReport.ts
@@ -36160,6 +36838,9 @@ ${bonuses}`;
   async function fortificationUpdateLinesFor(readySlice) {
     const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
     if (hexes.length === 0) return [];
+    return [formatFortificationQueuePausedLine(await placeNamesForHexes(hexes))];
+  }
+  async function placeNamesForHexes(hexes) {
     const names = [];
     for (const h3Index of hexes) {
       let placeName = FORTIFICATION_UNNAMED_PLACE;
@@ -36167,11 +36848,11 @@ ${bonuses}`;
         const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
         placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
       } catch (err) {
-        console.error("fortification place name failed", err);
+        console.error("place name lookup failed", err);
       }
       names.push(placeName);
     }
-    return [formatFortificationQueuePausedLine(names)];
+    return names;
   }
   async function fortificationReportLinesFor(readySlice, viewer) {
     const lines = [];
@@ -36192,16 +36873,28 @@ ${bonuses}`;
     return lines;
   }
 
+  // src/renderer/gameplay/productionPauseUpdateLines.ts
+  async function productionPauseUpdateLinesFor(readySlice) {
+    const hexes = readySlice.humanBuildPausedHexes ?? [];
+    if (hexes.length === 0) return [];
+    return [formatBuildPausedLine(await placeNamesForHexes(hexes))];
+  }
+
   // src/renderer/gameplay/readyResolutionAnnouncements.ts
   function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
     const allKills = readyResult.kills ?? [];
     const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
     const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
     const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
+    const killerOwner = (id) => {
+      const removedPlayer = removedById.get(id)?.player;
+      if (removedPlayer) return removedPlayer;
+      return rendererSharedState.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
+    };
     const friendlyInvolvedKillVictimIds = new Set(
       allKills.filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(unitIdOwnerFromId(id)));
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
         const victimIsFriendly = viewerInvolved(victim?.player);
         return killerIsFriendly || victimIsFriendly;
       }).map((k) => k.victimId)
@@ -36365,6 +37058,7 @@ ${bonuses}`;
     }
     const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
     const fortificationLines = await fortificationUpdateLinesFor(readySlice);
+    const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
     const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
       viewerSeatId: viewerSeatId2,
       exploredHexes: getExploredHexSet(rendererSharedState.gameState)
@@ -36381,6 +37075,7 @@ ${bonuses}`;
       unknownBattleLine,
       missileStrikeLines,
       fortificationLines,
+      productionPauseLines,
       fortificationReportLines
     });
     if (updateText) {
@@ -37281,7 +37976,7 @@ ${bonuses}`;
       deps,
       {
         refreshStandingOrders: false,
-        updateGameStateSidebarUi: false,
+        updateGameStateSidebarUi: true,
         updateSelectionUi: false,
         updateGameOverUi: false,
         updateReadyButton: false,
@@ -37378,21 +38073,27 @@ ${bonuses}`;
           h3Index: enemy.h3Index,
           lastSeenTurn: comparablePrevious.turnNumber
         });
+        if (state.units.some((unit) => unit.id === enemy.id && unit.player === viewer)) {
+          rendererSharedState.clientStaleEnemyIntelByUnitId.delete(enemy.id);
+          continue;
+        }
         if (!hasFogData || !visibleHexes.has(enemy.h3Index)) {
           rendererSharedState.clientStaleEnemyIntelByUnitId.set(enemy.id, {
             unitId: enemy.id,
             lastKnownH3Index: enemy.h3Index,
             lastSeenTurn: comparablePrevious.turnNumber,
-            staleUntilTurn: comparablePrevious.turnNumber + 2
+            staleUntilTurn: comparablePrevious.turnNumber + 2,
+            player: enemy.player
           });
         }
       }
     }
     for (const [unitId, stale] of rendererSharedState.clientStaleEnemyIntelByUnitId) {
       const isNowVisible = visibleEnemyIdsNow.has(unitId);
+      const rehiredByViewer = state.units.some((unit) => unit.id === unitId && unit.player === viewer);
       const contradictedOnVisibleHex = hasFogData && visibleHexes.has(stale.lastKnownH3Index) && !visibleEnemyHexesNow.has(stale.lastKnownH3Index);
       const expired = currentTurn > stale.staleUntilTurn;
-      if (isNowVisible || contradictedOnVisibleHex || expired) {
+      if (isNowVisible || rehiredByViewer || contradictedOnVisibleHex || expired) {
         rendererSharedState.clientStaleEnemyIntelByUnitId.delete(unitId);
         rendererSharedState.lastRenderedVisibleEnemyByUnitId.delete(unitId);
       }
@@ -38906,7 +39607,8 @@ ${bonuses}`;
           id: u.id,
           player: u.player,
           unitType: u.unitType,
-          h3Index: u.h3Index
+          h3Index: u.h3Index,
+          ...u.isMercenary === true ? { isMercenary: true } : {}
         }));
         const merged = mergeTacticalSubUnitsForMarchPlayback(
           tacticalUnits,
@@ -38924,7 +39626,8 @@ ${bonuses}`;
           id: u.id,
           player: u.player,
           unitType: u.unitType,
-          h3Index: u.h3Index
+          h3Index: u.h3Index,
+          ...u.isMercenary === true ? { isMercenary: true } : {}
         })),
         movingIds: void 0
       };
@@ -40601,10 +41304,15 @@ ${bonuses}`;
     const visibleUnitHexes = new Set(rendererSharedState.gameState.units.map((u) => u.h3Index));
     const selectedBuildHexes = new Set(rendererSharedState.selectedBuildHexH3s);
     const rows = [];
+    const hireHexes = hireEntryHexesForHuman(rendererSharedState.gameState);
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer(hx.h3Index);
       if (!explored) continue;
-      if (!isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx)) continue;
+      if (!isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx)) {
+        const hireRow = hireEntryRowForHex(hx.h3Index, hexCenterPx(hx.h3Index), map.getSize(), hireHexes);
+        if (hireRow) rows.push(hireRow);
+        continue;
+      }
       const capacityPerTurn = getUrbanProductionCapacityForHex2(hx.h3Index);
       const hasInfraSymbols = hasVisibleStrategicInfrastructureGlyphs4(hx.h3Index, tacticalOn, visibleUnitHexes);
       const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
@@ -40621,7 +41329,8 @@ ${bonuses}`;
         left: Math.round(center.x),
         top: Math.round(textY),
         hasCapacity: true,
-        selected: selectedBuildHexes.has(hx.h3Index)
+        selected: selectedBuildHexes.has(hx.h3Index),
+        kind: "build"
       });
     }
     if (rows.length === 0) {
@@ -40629,10 +41338,10 @@ ${bonuses}`;
       return;
     }
     rows.sort((a, b) => a.h3.localeCompare(b.h3));
-    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}`).join(";");
+    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}`).join(";");
     if (layerKey !== rendererSharedState.lastBuildEntryLayerKey) {
       const html = rows.map(
-        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
+        (r) => r.kind === "hire" ? hireEntryButtonHtml(r) : `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
       ).join("");
       layer.innerHTML = html;
       rendererSharedState.lastBuildEntryLayerKey = layerKey;
@@ -40657,6 +41366,7 @@ ${bonuses}`;
     const L = getLeafletGlobal();
     if (!L) return;
     const overlayContext = buildProductionOverlayContext(rendererSharedState.gameState);
+    const hireHexes = hireEntryHexesForHuman(rendererSharedState.gameState);
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer(hx.h3Index);
       if (!explored && !overlayContext.productionDetailShown) continue;
@@ -40688,6 +41398,7 @@ ${bonuses}`;
       if (hasClickableBuildEntryForHex) {
         continue;
       }
+      if (explored && hireHexes.has(hx.h3Index) && shouldShowBuildEntryZoom()) continue;
       const sizePx = hasInfraSymbols || hasVisibleUnits ? "10px" : "11px";
       const useBold = controlledByHuman && hasUrbanCapacity;
       ctx.font = `${useBold ? "bold " : ""}${sizePx} system-ui, sans-serif`;

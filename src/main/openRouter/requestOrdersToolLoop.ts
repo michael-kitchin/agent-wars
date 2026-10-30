@@ -19,6 +19,7 @@ import { executeCombatEstimation } from '../tools/combatEstimation';
 import { executeMemory } from '../tools/memory';
 import { executeStandingOrders } from '../tools/standingOrders';
 import { executeProductionTools } from '../tools/productionTools';
+import { executeMercenaryTools, isMercenaryToolName } from '../tools/mercenaryTools';
 import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
 import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
@@ -554,7 +555,9 @@ export async function runRequestOrdersToolLoop(
         const toolState = tacticalBattle ? planState : state;
         const actingSeatId = coordinateContextSeatId(coordinateContext);
         const result =
-          toolName.includes('order') || toolName.includes('standing')
+          isMercenaryToolName(toolName)
+            ? executeMercenaryTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
+            : toolName.includes('order') || toolName.includes('standing')
             ? executeStandingOrders(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
             : toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production')
               ? executeProductionTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)

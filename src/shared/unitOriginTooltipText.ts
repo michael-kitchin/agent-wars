@@ -8,6 +8,7 @@ import { weatherTagsInDisplayOrder } from './weatherBonusRules';
 import { formatWeatherIconHtml } from './weatherIcons';
 import { formatTechTierHtml } from './featureIconHtml';
 import type { TechLevel } from './techBonusTypes';
+import { formatMercenaryTooltipValue, MERCENARY_TOOLTIP_LABEL } from './mercenaryRules';
 
 /**
  * Name and formation date shown above the Bonuses block.
@@ -36,6 +37,15 @@ export interface UnitOriginTooltipIdentity {
    * Exceptions: None.
    */
   readonly formedLabel: string | null;
+  /**
+   * Upkeep of this unit when it is a mercenary.
+   *
+   * Contract: Set only for a mercenary of a hireable type.
+   * When to use: The line after the date of birth.
+   * Expected outcome: Credits per turn, or absent.
+   * Exceptions: None.
+   */
+  readonly mercenaryUpkeep?: number;
 }
 
 /**
@@ -177,6 +187,9 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
   }
   const formedLabel = identity.formedLabel?.trim() ?? '';
   if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
+  if (identity.mercenaryUpkeep != null) {
+    lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(formatMercenaryTooltipValue(identity.mercenaryUpkeep))}`);
+  }
   return lines;
 }
 

@@ -1,9 +1,9 @@
 /**
- * Builds the Updates line for fortification queues that paused this turn.
+ * Place names for Updates lines that name hexes.
  *
- * Purpose: Place names come from the same caption lookup as missile sentences, which this module's caller does not have.
+ * Purpose: Fortification pauses and production pauses share one caption lookup.
  * When to use: Strategic Ready, before the consolidated toast is built.
- * Expected outcome: One paused-queue sentence when any hex paused, otherwise an empty list.
+ * Expected outcome: One sentence per helper, or an empty list when nothing applies.
  * Exceptions: A rejected caption lookup is logged and becomes the unnamed place. It is not rethrown.
  */
 
@@ -23,6 +23,18 @@ import type { ReadyResult } from '../../shared/ipcTypes';
 export async function fortificationUpdateLinesFor(readySlice: ReadyResult): Promise<string[]> {
   const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
   if (hexes.length === 0) return [];
+  return [formatFortificationQueuePausedLine(await placeNamesForHexes(hexes))];
+}
+
+/**
+ * Looks up a display name for each hex.
+ *
+ * Purpose: Updates lines name places instead of hex indexes.
+ * When to use: From the fortification and production pause helpers.
+ * Expected outcome: One name per hex, in order. A missing caption is `FORTIFICATION_UNNAMED_PLACE`.
+ * Exceptions: A rejected lookup is logged as `place name lookup failed` and uses the unnamed place.
+ */
+export async function placeNamesForHexes(hexes: readonly string[]): Promise<string[]> {
   const names: string[] = [];
   for (const h3Index of hexes) {
     let placeName = FORTIFICATION_UNNAMED_PLACE;
@@ -30,11 +42,11 @@ export async function fortificationUpdateLinesFor(readySlice: ReadyResult): Prom
       const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
       placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
     } catch (err) {
-      console.error('fortification place name failed', err);
+      console.error('place name lookup failed', err);
     }
     names.push(placeName);
   }
-  return [formatFortificationQueuePausedLine(names)];
+  return names;
 }
 
 /**

@@ -4,67 +4,34 @@
  */
 
 import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, isBuildQueueItemType, type BuildQueueItemType } from './productionRules';
+import { isHireableUnitType, type HireableUnitType } from '../shared/mercenaryRules';
 import { logTrace } from './logger';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from './briefing/map/coordinateContext';
 import { isHexCodeValidForContext } from './briefing/map/hexCoordinates';
 
 /**
- * Documents the `ProductionOrderAction` type alias (export type ProductionOrderAction).
-
- * Purpose: Supports maintainability by documenting why `ProductionOrderAction` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * One production row the envelope may store.
+ *
+ * Purpose: A queue replacement, a raise, and a rehire are different shapes.
+ * When to use: After `normalizeProductionOrders` accepts a row.
+ * Expected outcome: The action names which fields are present.
  * Exceptions: None.
  */
-export type ProductionOrderAction = 'set_build_queue';
+export type ProductionOrder =
+  | { readonly action: 'set_build_queue'; readonly hex: string; readonly unitType: BuildQueueItemType; readonly count: number }
+  | { readonly action: 'raise_mercenaries'; readonly hex: string; readonly unitType: HireableUnitType; readonly count: number }
+  | { readonly action: 'rehire_mercenary'; readonly unitId: string };
 
 /**
- * Documents the `ProductionOrder` interface as a named contract surface (export interface ProductionOrder).
-
- * Purpose: Supports maintainability by documenting why `ProductionOrder` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The action names a production row may use.
+ *
+ * Purpose: Callers that only need the name stay in step with the row union.
+ * When to use: Logging and drop reasons.
+ * Expected outcome: One of the three actions.
  * Exceptions: None.
  */
-export interface ProductionOrder {
-    /**
-   * Specifies the contract for the `action` member (action: ProductionOrderAction;).
-
-   * Contract: Describes stable behavior for callers of `action` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-action: ProductionOrderAction;
-    /**
-   * Specifies the contract for the `hex` member (hex: string).
-
-   * Contract: Two-character briefing hex code in the active strategic registry.
-   * When to use: LLM `productionOrders` entries for `set_build_queue`.
-   * Expected outcome: Validated against the active coordinate context before execution.
-   * Exceptions: None.
-   */
-hex: string;
-    /**
-   * Specifies the contract for the `unitType` member (unitType: BuildQueueItemType;).
-
-   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-unitType: BuildQueueItemType;
-    /**
-   * Specifies the contract for the `count` member (count: number;).
-
-   * Contract: Describes stable behavior for callers of `count` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-count: number;
-}
+export type ProductionOrderAction = ProductionOrder['action'];
 
 /**
  * Documents the `NormalizeProductionOrdersResult` interface as a named contract surface (export interface NormalizeProductionOrdersResult).
@@ -152,9 +119,19 @@ export function normalizeProductionOrders(raw: unknown, context: CoordinateConte
       hex?: unknown;
       unitType?: unknown;
       count?: unknown;
+      unitId?: unknown;
     };
     const action = row.action;
-    if (action !== 'set_build_queue') {
+    if (action === 'rehire_mercenary') {
+      const unitId = typeof row.unitId === 'string' ? row.unitId.trim() : '';
+      if (!unitId) {
+        droppedReasons.push(`${prefix}: rehire_mercenary requires unitId.`);
+        continue;
+      }
+      validOrders.push({ action, unitId });
+      continue;
+    }
+    if (action !== 'set_build_queue' && action !== 'raise_mercenaries') {
       droppedReasons.push(`${prefix}: unknown action.`);
       continue;
     }
@@ -168,6 +145,21 @@ export function normalizeProductionOrders(raw: unknown, context: CoordinateConte
       continue;
     }
     const hex = hexRaw;
+    if (action === 'raise_mercenaries') {
+      if (!isHireableUnitType(row.unitType)) {
+        droppedReasons.push(`${prefix}: raise_mercenaries requires unitType.`);
+        continue;
+      }
+      const count = parseBuildCount(row.count);
+      if (count === undefined) {
+        droppedReasons.push(
+          `${prefix}: raise_mercenaries count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`
+        );
+        continue;
+      }
+      validOrders.push({ action, hex, unitType: row.unitType, count });
+      continue;
+    }
     if (!isBuildQueueItemType(row.unitType)) {
       droppedReasons.push(`${prefix}: set_build_queue requires unitType.`);
       continue;

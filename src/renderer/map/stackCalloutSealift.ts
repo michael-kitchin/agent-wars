@@ -3,6 +3,7 @@ import { rendererSharedState as S } from '../core/state';
 import { setUnitNameContent } from '../core/unitOriginFlags';
 import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from '../tactical/tacticalEmbarkSealiftMerge';
 import { sealiftDebarkTooltipText, sealiftSelectTooltipText } from '../chrome/controlTooltipText';
+import { placeOpenStackCallout } from '../chrome/placeAnchoredPopup';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import type { GameStateSnapshot, SealiftStackState } from '../../shared/ipcTypes';
 import {
@@ -75,11 +76,13 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
   const h3Index = units[0]?.h3Index;
   if (!h3Index) {
     removeSealiftSection(calloutEl);
+    placeOpenStackCallout();
     return;
   }
   const api = window.gameApi;
   if (!api) {
     removeSealiftSection(calloutEl);
+    placeOpenStackCallout();
     return;
   }
   const tacticalSealiftMode = !!S.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index);
@@ -106,6 +109,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) {
       removeSealiftSection(calloutEl);
+      placeOpenStackCallout();
       return;
     }
     const nonSelectableEmbarkedIds = state.navalRows
@@ -270,6 +274,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
     if (generation !== sealiftSectionRenderGeneration) return;
     removeSealiftSection(calloutEl);
     calloutEl.appendChild(section);
+    placeOpenStackCallout();
   } catch (err) {
     console.error('sealift stack section failed:', err);
   }

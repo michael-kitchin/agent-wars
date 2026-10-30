@@ -219,7 +219,7 @@ Spell these exactly. Later phases refer to them.
 | `isHireableUnitType(value: unknown): value is HireableUnitType` | type guard |
 | `HireKind` | `'raise' \| 'rehire'` |
 | `mercenaryTechMultiplier(techLevel: TechLevel \| undefined): number` | `MERCENARY_ADVANCED_TECH_MULTIPLIER` for `'advanced'`, otherwise `1` |
-| `mercenaryReferenceCost(unitType: HireableUnitType): number` | the type's price in `GLOBAL_GAME_MAP.rules` (`infantryCost`, `armorCost`, `navalCost`, `airCost`), whatever map is active |
+| `mercenaryReferenceCost(unitType: HireableUnitType): number` | the type's price in `GLOBAL_GAME_MAP.rules` (`infantryCost`, `armorCost`, `navalCost`, `airCost`). Always the global profile. Never `activeGameMap()`. |
 | `mercenaryUpkeepFor(unitType: HireableUnitType, techLevel: TechLevel \| undefined): number` | `Math.ceil(mercenaryReferenceCost(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR)` |
 | `mercenaryHireFee(kind: HireKind, upkeep: number): number` | `upkeep` for `'raise'`, `upkeep * MERCENARY_REHIRE_FEE_MULTIPLIER` for `'rehire'` |
 | `raiseCapacityForHex(urbanHexCount: number, neutralBorder: boolean): number` | `0` on a neutral border, otherwise `max(0, trunc(urbanHexCount)) * MERCENARY_RAISE_CAPACITY_MULTIPLIER` |
@@ -446,7 +446,7 @@ Add `creditsItemCost()` to `src/shared/gameRules.ts`, importing `CREDITS_ITEM_IN
 
 **Schema** (`src/main/gameDb/schema.ts`):
 
-- `units` gains `is_mercenary INTEGER NOT NULL DEFAULT 0,` right after `formed_turn`, then the unit constraint on its own line, and keeps the `FOREIGN KEY` line last. SQLite rejects a column that follows a table constraint.
+- `units` gains `is_mercenary INTEGER NOT NULL DEFAULT 0,` right after `formed_turn`, then the unit constraint on its own line, and keeps the `FOREIGN KEY` line last. SQLite rejects a column that follows a table constraint. Column-list `INSERT INTO units` statements that omit `is_mercenary` keep working because of that default.
 - `player_unit_intel` gains `enemy_player TEXT`.
 - Add `res_s_treasury` and `res_s_hire_orders` after `res_s_build_progress`.
 - The `res_s_build_queue.unit_type` and `res_s_build_progress.keep_building_unit_type` CHECK lists gain `'credits'`.
@@ -507,6 +507,7 @@ export function listMercenaryUnitsForSeat(ops: BasicDbOps, seatId: SeatId): Merc
 - `insertHireOrder` returns the new id from `SELECT last_insert_rowid() AS id`.
 - `deleteHireOrder` deletes only a row of that seat, then returns whether `SELECT changes() AS n` is above 0. `run` returns nothing.
 - `listMercenaryUnitsForSeat` selects `id, unit_type, h3_index, birth_h3_index` where `player = ? AND is_mercenary = 1`, ordered by `id`.
+- Reads (`getTreasuryCredits`, both hire-order lists, `listMercenaryUnitsForSeat`) use `logTrace`. Writes (`setTreasuryCredits`, `addTreasuryCredits`, `insertHireOrder`, `deleteHireOrder`, `deleteAllHireOrders`) use `logDebug`. A skipped bad row uses `logError`.
 
 Add thin wrappers that pass `gameDbOps` in [`src/main/gameDb/mercenaryStateAccess.ts`](../src/main/gameDb/mercenaryStateAccess.ts), as `fortificationStateAccess.ts` does. Re-export the wrappers from `src/main/gameDb.ts` beside the fortification exports.
 
@@ -519,7 +520,7 @@ Add thin wrappers that pass `gameDbOps` in [`src/main/gameDb/mercenaryStateAcces
   - a raise order with a `neutral_unit_id`, and a rehire order without one, are both rejected by the table;
   - `insertHireOrder`, `listHireOrdersForSeat`, and `deleteHireOrder` round-trip, and `deleteHireOrder` refuses another seat's order;
   - the `res_s_build_queue` table accepts a `credits` row;
-  - **caps:** with the human's infantry count at its cap made up only of mercenaries, a home-hex queue of `infantry ×1` with enough stored points spawns one infantry after `processProductionAfterControlResolution()`.
+  - **caps:** delete the human's ordinary infantry, insert only mercenary infantry up to the infantry cap, and queue `infantry ×1` on a home hex with enough stored points. `processProductionAfterControlResolution()` still spawns one infantry. Do not also fill the cap with ordinary infantry; that would block the spawn this case exists to prove.
 - [`src/shared/mercenaryRules.test.ts`](../src/shared/mercenaryRules.test.ts): `mercenaryUpkeepFor` gives infantry 3, Advanced infantry 5, naval 13, Advanced naval 25, on the global map and again inside `withGameMap` with a profile whose infantry price is 60; `mercenaryHireFee('rehire', 5)` is 10; `raiseCapacityForHex(12, false)` is 24, and with `true` it is 0.
 - `getPlayerUnitCountsByType` ignores a unit with `isMercenary: true` (add the case to its existing test, or to the shared rules test if it has none).
 
@@ -553,6 +554,7 @@ No `doc/` edits.
 | `unavailableQueueItemReason` | its own text (above) |
 | option labels in `buildQueuePopup.ts` and `buildQueueMultiSelect.ts` | the shared label helper (below) |
 | `formatProductionQueueAwareLabel` | nothing: credits never show `∞t` |
+| `applyProduction` and `estimateTurnsToNextSpawn` in `productionConfig.ts` | nothing: once `buildQueueItemCostFor` prices `credits`, the simulator already spends it and spawns nothing, because it pushes a spawn only for `isBuildUnitType`. Do not add a credits branch there |
 | the two schema CHECK lists | already done in Phase 1 |
 
 If the compiler reports a site where a queue item reaches a unit-only path, treat `credits` exactly as `fortification` is treated there, and list it. Never widen the cap types: `MAX_UNITS_PER_TYPE`, `DEPLOYMENT_CAP_TYPE_ORDER`, `capReachedByPlayer`, and `DeployedUnitsByType`.
@@ -656,7 +658,7 @@ export function withMercenaryEconomy(ops: GuardedDbOps, state: GameStateSnapshot
   - For a raise, it is `mercenaryHireFee('raise', mercenaryUpkeepFor(order.unitType, tier of order.h3Index)) * order.unitCount`.
   - For a rehire, it reads `unit_type, birth_h3_index` of `order.neutralUnitId` and returns `mercenaryHireFee('rehire', mercenaryUpkeepForUnit(...))`. A missing unit gives 0, logged.
 - **`readMercenaryFunds`** sums the seat's mercenary upkeep from `listMercenaryUnitsForSeat`, sums `hireOrderFee` over `listHireOrdersForSeat`, and reads the treasury.
-- **`withMercenaryEconomy`** returns `state` unchanged when `!ops.hasDb()`. Otherwise it returns `{ ...state, mercenaryEconomy: readMercenaryFunds(ops, seatId) }`.
+- **`withMercenaryEconomy`** returns `state` unchanged when `!ops.hasDb()`. Otherwise it returns `{ ...state, mercenaryEconomy: readMercenaryFunds(ops, seatId) }`. `readMercenaryFunds`, `mercenaryUpkeepForUnit`, and `hireOrderFee` are reads and use `logTrace`.
 - `GameStateSnapshot` (`gameStateTypes.ts`) gains `mercenaryEconomy?: MercenaryEconomySnapshot`, imported with `import type` from `./mercenaryTypes`.
 
 In the facade `getGameStateForPlayer` (`src/main/gameDb.ts`), apply `withMercenaryEconomy(gameDbOps, base, playerId)` after the human melee-candidate merge and before the tactical-session merge. The observe-all snapshot (`omniscientSnapshot`) gets no economy.
@@ -774,7 +776,7 @@ export function isHexBuildableNow(seatId: SeatId, h3Index: string, fortifiedCoun
 
 **Planning views.**
 
-- `HexBuildQueueSnapshot` (`productionTypes.ts`) and `HexBuildQueueView` (`buildQueue.ts`) gain `buildPaused?: boolean`. In `buildQueueViewForRequester`, bind `const infra = getStrategicInfrastructureForHex(h3Index)`, pass it where the row is passed inline today, and set the field to `controlledByRequester && isSeatId(requestingPlayerId) && !isHexBuildableNow(requestingPlayerId, h3Index, infra.fortifiedCount)`. Edits stay allowed on a paused hex.
+- `HexBuildQueueSnapshot` (`productionTypes.ts`) and `HexBuildQueueView` (`buildQueue.ts`) gain `buildPaused?: boolean`. In `buildQueueViewForRequester`, bind `const infra = getStrategicInfrastructureForHex(h3Index)`, pass it where the row is passed inline today, and set `buildPaused: true` only when `controlledByRequester && isSeatId(requestingPlayerId) && !isHexBuildableNow(requestingPlayerId, h3Index, infra.fortifiedCount)`. Omit the field otherwise. Setting `false` would change snapshots that compare the whole view. Edits stay allowed on a paused hex.
 - `strategicBuildQueueTotals` rows (`gameStateTypes.ts`) gain `buildPaused?: boolean`. The facade `getGameStateForPlayer` (`src/main/gameDb.ts`) applies `withBuildPausedFlags(base, base.fogOfWarEnabled === false ? null : playerId)` beside `withMercenaryEconomy`. `omniscientSnapshot` (`src/main/ipc/matchViewSnapshot.ts`) returns `withBuildPausedFlags({ …its current object… }, null)`, so the observe-all view shows every side's pauses. `fogState.ts` does not change for this.
 
 **Map and popup.**
@@ -792,9 +794,9 @@ export function isHexBuildableNow(seatId: SeatId, h3Index: string, fortifiedCoun
   It returns one `formatBuildPausedLine(names)` line when any hex paused. Do not copy the name lookup: extract the caption loop of `fortificationUpdateLinesFor` (`fortificationUpdateLines.ts`) into an exported `placeNamesForHexes(hexes: readonly string[]): Promise<string[]>` in that file, which falls back to `FORTIFICATION_UNNAMED_PLACE` as it does today. Call it from `fortificationUpdateLinesFor` and from `productionPauseUpdateLinesFor`; leave `fortificationReportLinesFor` as it is. In the helper, log `'place name lookup failed'`, and widen the module's header comment to cover the other Updates lines it now serves.
 - **Toast argument.** `ConsolidatedTurnUpdateToastArgs` gains `productionPauseLines?: readonly string[]`. They are trimmed, blank ones dropped, and appended right after `fortificationLines`. `announceResolutionTurnUpdate` awaits the new function and passes them.
 
-**Existing tests.** A production test that queues on a seat-controlled hex outside that seat's home region, with none of its units there, now sees a pause.
+**Existing tests.** A production test that queues on a seat-controlled hex outside that seat's home region, with none of its units there, now sees a pause. A fresh match's controlled hexes are that seat's home region, so most production tests keep building.
 
-- For each test that fails for that reason only, change its setup, not the rule: pick a hex in the seat's home region, or put one of the seat's units on the hex with `insertUnitRow`.
+- For each test that fails for that reason only, change its setup, not the rule: pick a hex in the seat's home region, or put one of the seat's units on the hex with `insertUnitRow`. Do not weaken the pause.
 - Keep `gameActionsProduction.test.ts` at or under its starting line count; change a hex choice in place there.
 - List every test you changed.
 
@@ -826,7 +828,7 @@ No `doc/` edits.
 
 ## Phase 4: Change unit owners safely
 
-**Goal.** Shared helpers move units to and from Neutral. Code that guessed a unit's owner from its id now reads the real owner. Nothing calls the new helpers outside tests and knockout yet, so play is unchanged.
+**Goal.** Shared helpers move units to and from Neutral. Code that guessed a unit's owner from its id now reads the real owner. Knockout is the only caller outside tests. A match where nobody is knocked out plays as before. After a knockout, Neutral units no longer count as their old side when the AI decides whether to consult, when the turn report decides whether a kill involved the viewer, or when stale markers are colored. That is the second deliberate change named in Working rules.
 
 **Ownership helpers.** Create [`src/main/gameActions/unitOwnershipTransfer.ts`](../src/main/gameActions/unitOwnershipTransfer.ts):
 
@@ -854,7 +856,7 @@ Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into thi
   2. Delete its `standing_orders` rows, and the seat's `player_unit_intel` row for it.
   3. Run `UPDATE units SET player = ?, is_mercenary = 1, display_order = ? WHERE id = ? AND player = 'neutral'`, with the display order from `allocateNextUnitDisplayOrder(unitType, seatId)`.
 
-**Knockout.** `applyKnockout` keeps `deleteSeatPrivateRows` and the hex loop. It then reads the seat's unit ids and calls `convertUnitsToNeutral(ids, coordinates)` in place of its own `UPDATE` and per-unit loop. Its result counts and its existing tests must not change.
+**Knockout.** `applyKnockout` keeps `deleteSeatPrivateRows` and the hex loop. It then reads the seat's unit ids and calls `convertUnitsToNeutral(ids, coordinates)` in place of its own `UPDATE` and per-unit loop. Its result counts and its existing tests must not change. The only product `UPDATE` that sets `player` to Neutral is this one. Replacing it is enough. Do not search for a second conversion.
 
 **Owners in the AI consult check.**
 
@@ -867,7 +869,7 @@ Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into thi
 
 **Owners of stale intel.**
 
-- `refreshFogOfWarIntelForPlayer` (`fogState.ts`) writes `enemy_player` from the enemy unit's `player`, in both the insert and the update of `player_unit_intel`.
+- `refreshFogOfWarIntelForPlayer` (`fogState.ts`) writes `enemy_player` from the enemy unit's `player` on the one `INSERT INTO player_unit_intel ... ON CONFLICT DO UPDATE`. Add the column to the insert list, the `VALUES`, and the `DO UPDATE` set. There is no second statement for current intel. The later `UPDATE ... SET intel_state = 'stale'` leaves `enemy_player` as last written.
 - `GameStateSnapshot.enemyIntel[]` (`gameStateTypes.ts`) gains `player?: string`. `getGameStateForPlayer` reads the column into it. The fog-off branch sets `player: u.player`.
 - In the renderer:
   - the `clientStaleEnemyIntelByUnitId` entry type (`core/state.ts`) gains `player?: string; // owner when known; the id prefix can be stale`, on one line, which is all that file's budget allows;
@@ -891,7 +893,7 @@ Move the `KnockoutCoordinates` interface from `knockoutConsequences.ts` into thi
 1. `npm test`.
 2. `npm run check:circular`.
 3. `npm run build:renderer`.
-4. `npm start`. Play three turns and confirm nothing has changed.
+4. `npm start`. Play three turns with no knockout and confirm nothing has changed. A knockout may change those three owner reads. That is intended.
 
 No `doc/` edits.
 
@@ -971,7 +973,7 @@ export function settleMercenaryPayroll(args: {
 }): PayrollResult
 ```
 
-- **`shuffleWithSeed`** copies the list and runs a Fisher-Yates shuffle driven by `createSeededRng(seed)`.
+- **`shuffleWithSeed`** copies the list, then runs Fisher-Yates from `i = length - 1` down to `1`: `j = Math.floor(rng() * (i + 1))` and swap `i` with `j`. `rng` is `createSeededRng(seed)`, which returns a number in `[0, 1)`.
 - **`settleMercenaryPayroll`:**
   1. `total` is the sum of upkeep. When `total <= credits`, it returns no deserters and `credits - total`.
   2. Otherwise, sort the mercenaries into three kinds:
@@ -980,10 +982,11 @@ export function settleMercenaryPayroll(args: {
      - **riders**: a `carriedByShipId` that is not a mercenary in the list. They are aboard a ship that is not a mercenary, so they can never desert. `riderUpkeep` is the sum of their upkeep.
 
      A mercenary aboard a mercenary ship is part of that ship's group, not a kind of its own. Each pool is sorted by id and then shuffled: pool A with `shuffleWithSeed(poolA, seed)`, pool B with `shuffleWithSeed(poolB, (seed + 1) >>> 0)`.
-  3. `remaining` starts as the sum of the walkers' and ships' group upkeep. Walk pool A, then pool B, while `remaining > credits`. Each one walked is drawn: subtract its group upkeep.
-  4. Walk the drawn ones again in reverse draw order. Keep, and pay, each one whose group upkeep still fits in `credits - remaining`: add it back to `remaining`. The others desert, each ship with all of its cargo ids.
-     - The reverse order keeps loaded ships, drawn last, ahead of walkers, so loaded ships still desert last.
+  3. `remaining` starts as the sum of the walkers' and ships' group upkeep. A group whose upkeep is not a positive integer is not drawn: a `0` upkeep would never reduce `remaining`, and the walk would not end. Walk pool A, then pool B, while `remaining > credits`. Each one walked is drawn: subtract its group upkeep.
+  4. Walk the drawn ones again in reverse draw order. Keep, and pay, each one whose group upkeep still fits in `credits - remaining`: add it back to `remaining`. The others desert, each ship with all of its `cargoIds`.
+     - Walkers are drawn before loaded ships. The reverse keep-pass considers the last drawn group first, so a cheap loaded ship is kept ahead of a walker when both were drawn and only one fits. Do not invert either pass.
      - The second walk is what makes the rule "pay as many as you can afford": a cheap unit drawn early is not lost because an expensive one was drawn later.
+     - A deserting ship's `cargoIds` all turn Neutral, including a cargo unit that is not a mercenary. Do not filter that list down to mercenaries.
   5. Riders are paid from what is left, and any shortfall on them is forgiven: `creditsAfter` is `max(0, credits - remaining - riderUpkeep)`.
 
   Riders are judged last because they cannot desert: a walker deserting would save nothing that a rider's forgiven upkeep does not already cover.
@@ -995,6 +998,8 @@ export function readHexHireView(h3Index: string, seatId: SeatId): HexHireView | 
 export function executePlaceHireOrder(seatId: SeatId, request: HireOrderRequest): HireMutationResult
 export function executeRemoveHireOrder(seatId: SeatId, orderId: number): HireMutationResult
 ```
+
+`readHexHireView` is a read and uses `logTrace`. The two execute functions are writes and use `logDebug`.
 
 Inside the module, one private helper serves the view and placement, so the view and the checks cannot drift:
 
@@ -1059,11 +1064,8 @@ export function resolveMercenariesAtEndOfTurn(args: {
 
 1. **Early return.** When no unit has `is_mercenary = 1` and no hire order exists, return empty maps. Open no transaction and draw no number.
 2. **Transaction.** Run the rest in `BEGIN`/`COMMIT`. On error, `logError`, `ROLLBACK`, and rethrow, as `applyKnockout` does.
-3. **Payroll.** For each active roster seat, in seat order, that has mercenaries:
-   - Build `PayrollMercenary` rows from `listMercenaryUnitsForSeat`, with:
-     - `upkeep` from `mercenaryUpkeepForUnit`;
-     - `carriedByShipId` from `unit_transport_assignments`;
-     - `cargoIds` from `listCargoUnitIdsForShip`.
+3. **Payroll.** For each seat in `getSeatRoster()` order whose `outTurn` is null and that has mercenaries:
+   - Build `PayrollMercenary` rows from `listMercenaryUnitsForSeat`. Read `unit_transport_assignments` once. `carriedByShipId` and `cargoIds` both come from that read, so a mercenary aboard a mercenary ship is always in that ship's `cargoIds` and cannot fall out of every pool. `upkeep` comes from `mercenaryUpkeepForUnit`.
    - Seed with `hashStringToUint32(`${getGameSeed()}|${turnNumber}|desert|${seatId}`)`, settle, call `convertUnitsToNeutral(deserterIds, coordinates)`, and `setTreasuryCredits(seatId, creditsAfter)`.
 4. **Hires.** Read `listAllHireOrders()`. Drop and log any row whose seat is not active.
    - Shuffle the rest with `shuffleWithSeed(orders, hashStringToUint32(`${getGameSeed()}|${turnNumber}|hire`))`.
@@ -1085,12 +1087,12 @@ export function resolveMercenariesAtEndOfTurn(args: {
      - its fee exceeds the seat's credits.
 
      Otherwise call `transferNeutralUnitToSeat` and subtract the fee.
-   - Count hired units and unfilled orders per seat, and write each seat's credits with `setTreasuryCredits`.
+   - Count hired units and unfilled orders per seat, and write each seat's credits with `setTreasuryCredits`. A raise with `n > 0` counts as `n` hired and is not an unfilled order. Only `n === 0`, a blocked order, or a rehire that is not filled increments the unfilled count. Orders dropped because the seat is inactive are logged and counted in neither map.
 5. **Clean up.** `deleteAllHireOrders()`, then `COMMIT`.
 
 **Wire it in.**
 
-- In `finalizeReadyTurnAfterMelee`, right after `processProductionAfterControlResolution()`, call `resolveMercenariesAtEndOfTurn({ turnNumber, coordinates: args.knockoutCoordinates })`.
+- In `finalizeReadyTurnAfterMelee`, immediately after `processProductionAfterControlResolution()` and before `listUnitsForSnapshot()`, call `resolveMercenariesAtEndOfTurn({ turnNumber, coordinates: args.knockoutCoordinates })`. `evaluateEndOfTurnOutcome` does not look at units, so the new units do not change victory. Do not place the call after `recordEndOfTurnOutcome`: that function sets `outTurn` before `applyKnockout`, and this step's active-seat check would then skip a seat that still owns mercenaries.
 - Set three `ReadyResult` fields for the human seat, each omitted when 0, and add them to the IPC mirror and its union:
   - `humanMercenariesHired` from `hiredBySeat`;
   - `humanUnitsDeserted` from `desertedBySeat`;
@@ -1168,18 +1170,18 @@ It returns an empty set unless all of these hold:
 
 Otherwise it returns those hexes. Observing, or viewing as an AI seat, shows no Hire markers.
 
-**Markers** (`syncBuildEntryButton`, `renderer.ts`):
+**Markers.** `renderer.ts` may gain at most 22 lines in this whole plan, and this phase is that allowance. Put the hire-row fields and the hire-button HTML in new [`src/renderer/gameplay/hireEntryMarkers.ts`](../src/renderer/gameplay/hireEntryMarkers.ts). `syncBuildEntryButton` only branches and calls it.
 
 - **Rows.** Compute the hire set once before the loop with `hireEntryHexesForHuman(S.gameState)`. Each hex row gets a kind:
   - `'build'` when `isStrategicHexHumanUrbanProduction(S.gameState, hx)`, as now;
-  - otherwise `'hire'` when the hire set has the hex;
+  - otherwise `'hire'` when the hire set has the hex and the helper says the center is in view;
   - otherwise skip it.
 
-  Keep `if (!explored) continue;` and the `isStrategicHexHumanUrbanProduction(S.gameState, hx)` call as written; two tests read them.
-- **Only markers in view.** With fog off, or late in a match, the hire set can hold hundreds of hexes, and this layer rebuilds its HTML on every pan frame. Skip a hire row whose center lies more than `HIRE_ENTRY_VIEW_MARGIN_PX` (40, a constant in new `src/renderer/gameplay/hireEntryMarkers.ts`) outside the map's size. Read the size with Leaflet's `map.getSize()`, adding `getSize: () => { x: number; y: number }` to the local cast type. The same module exports `isPointInMapView(point, size, margin)` for that test. Build rows are not culled.
-- **Hire rows.** The label is `formatHireEntryLabel(capacityText)`, where `capacityText` is ``$${capacityPerTurn.toLocaleString()}``, the hex's production figure without the queue suffix the canvas label adds. The marker hides that canvas label, so it must carry the figure. `hasCapacity` is false, and `selected` is false.
-- **Markup.** A hire button gets the extra class `hire-entry-btn`, `data-control-tooltip` set to `hireEntryTooltipText`, and the aria label `formatHireEntryAriaLabel(h3)`. The kind joins the layer key.
-- **Canvas labels.** In `drawStrategicProductionOverlays`, compute the hire set once, and skip the canvas label also when `explored && hireSet.has(hx.h3Index) && shouldShowBuildEntryZoom()`. Otherwise it would sit under the marker.
+  Keep these source strings verbatim. [`rendererProductionAirConsolidation.test.ts`](../src/main/rendererProductionAirConsolidation.test.ts) reads them: `if (!explored) continue;`, `isStrategicHexHumanUrbanProduction(S.gameState, hx)`, `const hasClickableBuildEntryForHex =`, and `if (hasClickableBuildEntryForHex) {`.
+- **Only markers in view.** With fog off, or late in a match, the hire set can hold hundreds of hexes, and this layer rebuilds its HTML on every pan frame. `hireEntryMarkers.ts` exports `HIRE_ENTRY_VIEW_MARGIN_PX` (40) and `isPointInMapView(point, size, margin)`. Skip a hire row whose center lies more than that margin outside the map's size. Read the size with Leaflet's `map.getSize()`, adding `getSize: () => { x: number; y: number }` to the local cast type in `renderer.ts`. Build rows are not culled.
+- **Hire rows.** The helper's label is `formatHireEntryLabel(capacityText)`. `capacityText` is ``$${getUrbanProductionCapacityForHex(h3).toLocaleString()}``, the same production figure the build-marker loop uses, without the queue suffix the canvas label adds. It is not raise capacity and not `urban_hex_count`. The marker hides that canvas label, so it must carry the figure. `hasCapacity` is false, and `selected` is false.
+- **Markup.** The helper returns a hire button with the extra class `hire-entry-btn`, `data-control-tooltip` set to `hireEntryTooltipText`, and the aria label `formatHireEntryAriaLabel(h3)`. The kind joins the layer key. That key change and the helper call are part of the 22-line allowance.
+- **Canvas labels.** In `drawStrategicProductionOverlays`, compute the hire set once. Keep `const hasClickableBuildEntryForHex` and `if (hasClickableBuildEntryForHex) {` exactly. After that `if`, add a second `continue` when `explored && hireSet.has(hx.h3Index) && shouldShowBuildEntryZoom()`. Do not fold the hire skip into the existing condition. Otherwise the canvas label would sit under the marker.
 
 **Popup.**
 
@@ -1189,7 +1191,7 @@ Otherwise it returns those hexes. Observing, or viewing as an AI seat, shows no 
   ```
   It finds the hex in `state.hexes` and returns `isStrategicHexHumanUrbanProduction(state, hex)`, or false when the state or the hex is missing. Do not change `isStrategicHexHumanUrbanProduction`.
 - **Shift.** In `processBuildEntryClick` (`buildQueuePopup.ts`), honor Shift only when the clicked hex and every already selected hex pass `isHumanBuildEntryHexIndex`. Bind `const multiSelect = shiftKey && …` after the existing playback and hover-planning returns, and use it in place of `shiftKey` below that line. `mapGestureWiring.test.ts` requires the playback return to stay the function's first statement, and must pass unchanged. A Hire marker never joins a multi-hex selection, and Shift on a build marker while a Hire popup is open acts as a plain click.
-- **Add button.** The Add button's success handler re-renders into `mount`, not into `document.getElementById('build-popup-body')`. They are the same element today; in a tabbed popup the mount is the Build panel.
+- **Add button.** Only the success handler inside `renderBuildQueueIntoMount` that calls `getElementById('build-popup-body')` and then `renderBuildQueueIntoMount` switches to its `mount` argument. They are the same element today; in a tabbed popup the mount is the Build panel. `showBuildPopup` and `refreshBuildPopupIfOpen` still pass the popup body into the wrapper below. Do not retarget those two.
 - **Wrapper.** Create [`src/renderer/gameplay/buildHirePopup.ts`](../src/renderer/gameplay/buildHirePopup.ts):
   ```ts
   export interface BuildHirePopupDeps {
@@ -1227,10 +1229,10 @@ Otherwise it returns those hexes. Observing, or viewing as an AI seat, shows no 
     1. A close row like the build popup's, calling `deps.hideBuildPopup`.
     2. The hex code and naming caption, as `renderBuildQueueIntoMount` builds them.
     3. When `data.view` is null, a `div.build-no-urban` with `HIRE_VIEW_FAILED`, and nothing more.
-    4. The funds lines:
-       - `<strong>Credits:</strong> n`;
-       - `<strong>Upkeep:</strong> n / turn`;
-       - `<strong>Hire orders:</strong> n`, when the fees are above 0;
+    4. The funds lines, using the named constants, not new string literals:
+       - `<strong>${CREDITS_LINE_LABEL}:</strong> n`;
+       - `<strong>${UPKEEP_LINE_LABEL}:</strong> n / turn`;
+       - `<strong>${HIRE_FEES_LINE_LABEL}:</strong> n`, when the fees are above 0;
        - a `div.hire-funds-warning` with `HIRE_FUNDS_WARNING` when `credits < upkeepPerTurn + pendingHireFees`.
     5. When `hireAvailable` is false, a `div.build-no-urban` with `view.unavailableReason`.
     6. When `view.raise` is set:
@@ -1266,7 +1268,7 @@ export function drawMercenaryBadge(ctx: CanvasRenderingContext2D, x: number, y: 
 
 It draws `MERCENARY_BADGE_TEXT` centered at `(x, y + UNIT_RADIUS * MERCENARY_BADGE_Y_OFFSET_RATIO)`, in `MERCENARY_BADGE_FONT`, with a 2 px white stroke and black fill, inside `save`/`restore`, like the count badge.
 
-- **Strategic tokens.** In `drawUnits` (`unitDrawing.ts`), after the count-badge loop, call it at each token's `top` position when any unit of that hex has `isMercenary === true`. Do not add a parameter to `drawOneUnitMarker`.
+- **Strategic tokens.** In `drawUnits` (`unitDrawing.ts`), after the count-badge loop, call it once at that token's `top` when any unit still in that token's list has `isMercenary === true`. `drawUnits` already drops ids in `movingUnitIds`, which is what keeps a moving token from gaining a `$`. Do not badge every marker in the hex, and do not badge a token whose only mercenaries were excluded as moving. Do not add a parameter to `drawOneUnitMarker`.
 - **Battle tokens:**
   - `TacticalSubUnitSnapshot` gains `isMercenary?: boolean`. `computeTacticalBattleSnapshot` copies it from the parent, only when true, beside `techLevel`.
   - The three projections of sub-units into drawable units copy it: in `gameScene.ts`, and the two in `wiredEntryCallbacks.ts`.
@@ -1441,7 +1443,7 @@ export function executeMercenaryTools(
   - `query_mercenaries` prompt line: `query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.`
   - `hire_mercenaries` prompt line: `hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. Orders fill at the end of the turn.`
 - **Group.** The `production` group's `toolNames` becomes `[...PRODUCTION_TOOL_NAMES, ...MERCENARY_TOOL_NAMES]`. The tools are then enabled with production and excluded in battles.
-- **Dispatch.** In `requestOrdersToolLoop.ts`, test `isMercenaryToolName(toolName)` first in the routing chain, and call `executeMercenaryTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)`.
+- **Dispatch.** `requestOrdersToolLoop.ts` is already over 600 lines and may gain at most 3. One import, and one leading arm on the existing ternary: `isMercenaryToolName(toolName) ? executeMercenaryTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3) :` the current `toolName.includes('order')` arm. Do not add a helper in this file. `hire_mercenaries` does not contain the substring `order`. The explicit arm is what keeps it out of pathfinding.
 - **Arguments.** `decodeOpenRouterToolArgsForExecution` decodes `hex` for both tools, beside `set_build_queue`.
 - **Results.** `encodeOpenRouterToolResultForLlm` sends both tools through `deepRedactGeoCoordinateFields`, beside `assess_unit`.
 

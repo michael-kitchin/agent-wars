@@ -5,6 +5,8 @@ import type {
   FerryOrder,
 } from '../shared/ipcTypes';
 import { isBuildQueueItemType, type BuildQueueItemType } from '../shared/ipc/productionTypes';
+import type { HireOrderRequest } from '../shared/ipc/mercenaryTypes';
+import { HIRE_COUNT_MAX, HIRE_COUNT_MIN, isHireableUnitType } from '../shared/mercenaryRules';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPushTypes';
 
 /**
@@ -349,4 +351,43 @@ export function parseHumanTacticalCommitPayload(
       aiPlanningRunEnabled,
     },
   };
+}
+
+/**
+ * Accepts a raise or a rehire payload.
+ *
+ * Purpose: The hire handler does not pass an unreadable body to the game action.
+ * When to use: `game:placeHireOrder`.
+ * Expected outcome: The request, or null when the kind, hex, type, count, or unit id is missing.
+ * Exceptions: None.
+ */
+export function parseHireOrderPayload(payload: unknown): HireOrderRequest | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const body = payload as { kind?: unknown; h3Index?: unknown; unitType?: unknown; count?: unknown; unitId?: unknown };
+  if (body.kind === 'raise') {
+    if (typeof body.h3Index !== 'string' || !isHireableUnitType(body.unitType)) return null;
+    if (!Number.isInteger(body.count) || (body.count as number) < HIRE_COUNT_MIN || (body.count as number) > HIRE_COUNT_MAX) {
+      return null;
+    }
+    return { kind: 'raise', h3Index: body.h3Index, unitType: body.unitType, count: body.count as number };
+  }
+  if (body.kind === 'rehire' && typeof body.unitId === 'string' && body.unitId.length > 0) {
+    return { kind: 'rehire', unitId: body.unitId };
+  }
+  return null;
+}
+
+/**
+ * Accepts a hire-order id to remove.
+ *
+ * Purpose: A missing or non-positive id is not a removal.
+ * When to use: `game:removeHireOrder`.
+ * Expected outcome: The order id, or null.
+ * Exceptions: None.
+ */
+export function parseHireOrderRemovalPayload(payload: unknown): { orderId: number } | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const orderId = (payload as { orderId?: unknown }).orderId;
+  if (typeof orderId !== 'number' || !Number.isInteger(orderId) || orderId <= 0) return null;
+  return { orderId };
 }

@@ -76,6 +76,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `Strategic context:` block | always | always (tactical variant) | n/a |
 | `# Air Operations Status` | when the opponent has at least one air unit | when the opponent has at least one air sub-unit in this battle | omit the section |
 | `# Missile Forces` | when the opponent has at least one missile | never | omit the section |
+| `# Mercenaries` | when the snapshot has an economy and production is on, or the seat has a mercenary | never | omit. Production off keeps the upkeep-only form when the seat has a mercenary |
 | `# Naval Transport Status` | when the opponent has at least one naval unit | when the opponent has at least one naval sub-unit in this battle | omit the section |
 | `# Available Tools` | always | always | `No tools available.` |
 | Observed enemy roster line | always | always | the helper's empty-roster phrasing |
@@ -111,6 +112,8 @@ Tool inventory and per-consult availability:
 | `query_orders` | orders | when standing-order tools are enabled | never |
 | `query_production` | production | when production tools are enabled | never |
 | `set_build_queue` | production | when production tools are enabled | never |
+| `query_mercenaries` | production | when production tools are enabled | never |
+| `hire_mercenaries` | production | when production tools are enabled | never |
 
 `assign_order`, `cancel_order`, `memory_write`, and `memory_delete` are **not** tools. They are envelope actions. The prompt must never present them as callable.
 

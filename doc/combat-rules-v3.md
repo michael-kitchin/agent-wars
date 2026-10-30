@@ -31,7 +31,7 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 
 ## 2. Unit roster (strategic level)
 
-The game has five unit types. A match has two to four sides, and each side is seeded the same way in its own home (`trySeedScenarioRegionVsRegion` in `src/main/gameDb/seeding/regionScenarioSeeding.ts`). Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. See [game-size-unit-caps.md](game-size-unit-caps.md).
+The game has five unit types. A match has two to four sides, and each side is seeded the same way in its own home (`trySeedScenarioRegionVsRegion` in `src/main/gameDb/seeding/regionScenarioSeeding.ts`). Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. A mercenary does not count toward those caps (`is_mercenary` is excluded from the unit-count query). See [game-size-unit-caps.md](game-size-unit-caps.md).
 
 | Size | Infantry | Armor | Naval | Air | Missile |
 |------|---------|-------|-------|-----|---------|
@@ -62,6 +62,22 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
   The costs and urban minimums in the roster are the global map. `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts` read the active map. Infantry's urban minimum stays 1. On a regional map the costs, minimums, and strike size come from that map's manifest.
 
   A fortification is a queue item, not a unit (`FORTIFICATION_QUEUE_ITEM`, `'fortification'`, in `src/shared/fortificationRules.ts`). It is not in `ALL_BUILD_UNIT_TYPES` and has no deployment cap. One item fortifies one intact city cell (`is_urban = 1` and `is_rubble = 0` and not already fortified). An airport-only or seaport-only cell cannot be fortified. The cost is `fortificationCostPerCell()`: the map's infantry cost times `FORTIFICATION_COST_INFANTRY_MULTIPLIER` (1), so 20 on the global map. The cell is chosen from that hex's remaining intact unfortified city cells by a seed of its own (`fortificationPlacementSeed`), not by the combat die. When none remain, the queue pauses the way a capped unit pauses, and keep-building may still be on. A neutral-border hex cannot fortify. Ownership of a fortification is the strategic hex's controller. It is not stored on the cell.
+
+  A credits item is also a queue item, not a unit (`CREDITS_QUEUE_ITEM`, `'credits'`, in `src/shared/creditsRules.ts`). It has no deployment cap. It costs `creditsItemCost()` production points, the active map's infantry price times `CREDITS_ITEM_INFANTRY_MULTIPLIER` (1). Completing one adds `CREDITS_PER_ITEM` (20) credits on every map, including a regional map whose infantry price is not 20.
+
+  A queue spends only in the seat's home region, or on a hex that holds at least one of that seat's units at the end of the turn (a unit aboard a ship counts), or on a hex that seat has fortified. Elsewhere the queue pauses: points stay banked, the queue and **Keep building** stay, and nothing is spent. That pause is not a prune. `getAvailableBuildQueueItemTypes` does not apply it.
+
+### 2.1 Credits and mercenaries
+
+Each seat has one treasury (`res_s_treasury`), starting at 0. It is never negative. Neutral has none. Only that seat's snapshot includes `mercenaryEconomy`. A knockout deletes the row.
+
+Credits hire mercenaries. A mercenary is a seat-owned unit with `is_mercenary` set. Neutral is never a mercenary, and a missile is never one. Anyone who can see the unit can see the flag. The token draws a `$` (`MERCENARY_BADGE_TEXT`). Birth-hex control does not change because a mercenary was raised there.
+
+Fees and upkeep come from `mercenaryReferenceCost` on `GLOBAL_GAME_MAP`, then `mercenaryUpkeepFor`: `ceil(reference × mercenaryTechMultiplier ÷ MERCENARY_UPKEEP_DIVISOR)`. The divisor is 8. The multiplier is `MERCENARY_ADVANCED_TECH_MULTIPLIER` (2) only when the tech bonus is on and the birth hex is advanced; otherwise it is 1. The same numbers apply on every map: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. A raise fee is one turn of that upkeep. A rehire fee is `MERCENARY_REHIRE_FEE_MULTIPLIER` (2) times upkeep. The fee is that unit's upkeep for the turn it is hired, so it pays no second upkeep the same turn.
+
+A raise or a rehire is placed during planning and does not check the treasury. An order the end of the turn cannot fill costs nothing. The human cannot place one during a tactical battle. A raise is allowed on an explored hex that is not another active seat's home, that holds no unit of another owner (Neutral included), and that is not fortified by anyone else. Capacity is production points, twice the hex's city cells (`MERCENARY_RAISE_CAPACITY_MULTIPLIER`), measured against the active map's `unitCostFor`. A rehire names a Neutral unit the seat can see that is hireable, not embarked, not loaded, and not standing in a hex another owner has fortified. The seat judges occupancy on what it sees when it places the order, and the engine judges the true board when the turn ends.
+
+`resolveMercenariesAtEndOfTurn` runs after production and before the outcome is recorded. It returns before opening a transaction or drawing a number when the match has no mercenary and no hire order. Otherwise each active seat pays upkeep, then deserts, then every seat's hire orders run in one shuffle. Desertion (`settleMercenaryPayroll`) draws groups whose upkeep the treasury cannot cover: units on foot, then loaded mercenary ships, each pool shuffled from a seed of the match seed, the turn, and the seat. A second pass keeps a drawn group when the credits still unpaid would cover it. A mercenary aboard a ship that is not itself a mercenary is not drawn; that upkeep is forgiven and the remainder is clamped at 0. A deserting ship turns every unit in its cargo Neutral, including a regular unit of the same seat. Hires then fill in one shuffle seeded from the match seed and the turn, with no seat in that seed. A raise that meets units the seat could not see is left unfilled. Two seats that order the same Neutral unit leave one order unfilled.
 
   Air strikes that destroy urban cells permanently reduce the production rate. On the global map one strategic hit destroys 9 tactical urban cells (`strategicUrbanCellsDestroyedPerHit` in `src/shared/gameRules.ts`). On a regional map the same hit destroys the strike size stored in that map's manifest.
 
@@ -370,10 +386,12 @@ Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Ne
    each hit strips one fortification (§4.6).
 11. Post-melee air unit check: if an airport hex is no longer owned by the
     air unit's player, the based air unit is destroyed.
-12. Production, control, fog refresh, game-over check, clear pending orders,
-    advance turn, set phase back to planning (strategic only). Production
-    spends a queued fortification on one intact city cell (§2). Control skips
-    a hex whose `fortifiedCount` is still above 0.
+12. Production, then mercenary payroll and hires (§2.1), then the game-over
+    check and knockouts, then clear pending orders, advance the turn, refresh
+    fog, and set phase back to planning (strategic only). Production spends a
+    queued fortification on one intact city cell and a credits item into the
+    treasury (§2). Control, which is resolved before production, skips a hex
+    whose `fortifiedCount` is still above 0.
 ```
 
 No player input during steps 2–12 except the melee-intercept dialog at step 10.
@@ -402,10 +420,15 @@ No player input during steps 2–12 except the melee-intercept dialog at step 10
 - **Knockout of a fortified hex:** The hex becomes Neutral and its fortifications stay. Neutral does not strip them by the knockout itself (§14.1).
 - **A contested fortified hex:** Units fight, and the controller's losses are soaked (§4.9). The controller does not change while any fortification remains.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked during transit. The ferry is an instantaneous relocation.
-- **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport), missile **0**. A missile does not reveal hexes. Unexplored hexes are never seen, and they do not show fortification ticks or the fortified count. An explored hex shows those the same way it shows city and rubble. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
+- **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport), missile **0**. A missile does not reveal hexes. Unexplored hexes are never seen, and they do not show fortification ticks or the fortified count. An explored hex shows those the same way it shows city and rubble. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. The marker's color is the owner stored on that report (`player_unit_intel.enemy_player`). When the report has no owner, the color follows the side encoded in the unit id. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
 - **hold_fire:** A standing order that suppresses both DEFEND auto-engagement and the tempo sweep for that unit until replaced. Omitting an attack is not the same as `hold_fire`. A missile is built with `hold_fire`, and that order cannot be cancelled.
 - **A missile alone against another side:** A hex that holds units of two sides is a melee hex, including when one side's only unit there is a missile. The missile does not roll (`unitTypeRollsInCombat`). The other side's units that do roll can still hit it. It is removed last on its side (`compareCasualtyOrder`).
 - **Several missiles on one hex:** Each missile with a pending launch fires its own launch. They do not combine into one roll. In melee they still do not roll, and they are removed after every non-missile on that side.
+- **Two seats hire the same unit:** Hire orders fill in one seeded shuffle after payroll. The first order that takes a Neutral unit leaves the other unfilled, and the unfilled order is not charged.
+- **A loaded mercenary ship deserts:** The ship and every unit in its cargo become Neutral, including a regular unit of the same seat. `is_mercenary` is cleared in that same update.
+- **Mercenaries aboard a regular ship:** They are not in a desertion draw. Their upkeep is forgiven. The treasury does not go below 0. A mercenary aboard a mercenary ship is part of that ship's group and deserts with it.
+- **A raise meets hidden units:** The order was legal on what the seat could see. At resolution the true board is occupied, so the order is not filled and costs nothing.
+- **A deserter or a rehire shares a hex:** A deserter that remains beside its former side's units, or a unit rehired into a hex that still holds another owner's units, leaves that hex with two owners. It fights in melee at the next resolution. Neutral units count as another owner.
 
 ---
 
@@ -715,6 +738,6 @@ A side with no remaining strategic units has not lost by that fact alone. The ma
 
 ### 14.1 Knockout and Neutral
 
-`applyKnockout` in `src/main/gameActions/knockoutConsequences.ts` runs for each seat knocked out on the turn, after the outcome is recorded. That seat's land becomes Neutral and its build queues and progress are cleared. Its units become Neutral and keep their ids. A missile receives `hold_fire` through `insertMissileHoldOrder` and does not launch. Every other unit receives a `defend` standing order on its current hex, so a garrison holds and fires. A ship that is still loaded keeps that `defend` only until the next turn's landing check. The seat's standing orders, memory, callbacks, pending orders, consultation combat and loss rows, and fog intel are deleted. Neutral does not build, and a Neutral-controlled hex accrues no production.
+`applyKnockout` in `src/main/gameActions/knockoutConsequences.ts` runs for each seat knocked out on the turn, after the outcome is recorded. That seat's land becomes Neutral and its build queues and progress are cleared. Its treasury and its hire orders are deleted. Its units become Neutral and keep their ids, and `is_mercenary` is cleared, so a mercenary becomes an ordinary Neutral unit. A missile receives `hold_fire` through `insertMissileHoldOrder` and does not launch. Every other unit receives a `defend` standing order on its current hex, so a garrison holds and fires. A ship that is still loaded keeps that `defend` only until the next turn's landing check. The seat's standing orders, memory, callbacks, pending orders, consultation combat and loss rows, and fog intel are deleted. Neutral does not build, and a Neutral-controlled hex accrues no production.
 
 On later turns, Neutral garrisons hold and fire from those `defend` orders. A loaded ship that is already on a landing hex unloads there: the cargo assignment is removed, and the ship and the cargo each receive `defend` on that hex. A landing hex is one where `canManualDebarkAtHex` is true for Neutral (native coastal, wetlands, a land seaport, or a water seaport Neutral controls). Otherwise the ship marches toward the nearest reachable empty landing hex, or toward an occupied one when no empty landing has a route, with `engageEnRoute`. A ship with no route is deleted with its cargo. Neutral infantry and armor take every empty hex they enter, including a hex they only pass through, except a hex that still has a fortification. A Neutral ship does not take a hex by sailing. Fortifications that were on a knocked-out seat's hex stay, and Neutral is then their owner.

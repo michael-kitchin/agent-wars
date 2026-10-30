@@ -32,6 +32,9 @@ import type {
   SetHexesKeepBuildingResult,
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
+  HexHireView,
+  HireMutationResult,
+  HireOrderRequest,
   NewGameIpcPayload,
   NewGameMapPreview,
   NewGameMapPreviewRequest,
@@ -94,6 +97,9 @@ const IPC_GAME = {
   validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
   cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
   getHexBuildQueue: 'game:getHexBuildQueue',
+  getHexHireView: 'game:getHexHireView',
+  placeHireOrder: 'game:placeHireOrder',
+  removeHireOrder: 'game:removeHireOrder',
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
@@ -586,6 +592,36 @@ cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: bool
    */
 getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot | null> =>
     ipcRenderer.invoke(IPC_GAME.getHexBuildQueue, payload),
+  /**
+   * Reads the hire panel for one hex.
+   *
+   * Purpose: The Hire tab fills from one call.
+   * When to use: Opening or refreshing the panel.
+   * Expected outcome: The view, or null when the hex is missing.
+   * Exceptions: None.
+   */
+  getHexHireView: (payload: { h3Index: string }): Promise<HexHireView | null> =>
+    ipcRenderer.invoke(IPC_GAME.getHexHireView, payload),
+  /**
+   * Stores one hire order.
+   *
+   * Purpose: Planning records the order without charging credits.
+   * When to use: A Hire button.
+   * Expected outcome: Success and the order id, or a reason.
+   * Exceptions: None.
+   */
+  placeHireOrder: (payload: HireOrderRequest): Promise<HireMutationResult> =>
+    ipcRenderer.invoke(IPC_GAME.placeHireOrder, payload),
+  /**
+   * Removes one hire order.
+   *
+   * Purpose: The player can take an order back until Ready.
+   * When to use: A pending order's remove button.
+   * Expected outcome: Success, or a reason.
+   * Exceptions: None.
+   */
+  removeHireOrder: (payload: { orderId: number }): Promise<HireMutationResult> =>
+    ipcRenderer.invoke(IPC_GAME.removeHireOrder, payload),
     /**
    * Documents the object literal property `addHexBuildQueueEntry` (addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> => ipcRenderer.invoke().
 

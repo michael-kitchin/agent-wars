@@ -1,6 +1,6 @@
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { BuildQueueItemType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
-import { FORTIFICATION_QUEUE_ITEM, FORTIFICATION_QUEUE_ITEM_LABEL } from '../../shared/fortificationRules';
+import { formatBuildQueueItemLabel } from '../../shared/buildQueueItemLabels';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
@@ -16,13 +16,18 @@ import {
   appendKeepBuildingCheckbox,
   canArmKeepBuilding,
 } from './buildQueueKeepBuilding';
-import { escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { createBuildPausedNote, escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { renderBuildOrHirePopupIntoMount, type BuildHirePopupDeps } from './buildHirePopup';
+import { isHumanBuildEntryHexIndex } from './productionOverlayHelpers';
 import {
   buildAddTooltipText,
   buildCountTooltipText,
   buildTypeTooltipText,
   keepBuildingTooltipText,
 } from '../chrome/controlTooltipText';
+import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
+import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
+import { buildPopupCloseTooltipText, singleHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
@@ -237,7 +242,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    *
    * Purpose: The control changes before the server can reject it, and a refetch that returns no snapshot would leave that rejected value on screen.
    * When to use: After a type or count mutation returns failure, before re-rendering the mount.
-   * Expected outcome: The select shows `entry.unitType` and the count field shows `entry.count`. Assigning the values does not dispatch a change or input event.
+   * Expected outcome: The select shows `entry.unitType`, its tip matches that type, and the count field shows `entry.count`. Assigning the values does not dispatch a change or input event.
    * Exceptions: None.
    */
   function restoreRejectedBuildQueueControls(
@@ -246,6 +251,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     entry: { unitType: BuildQueueItemType; count: number }
   ): void {
     typeSelect.value = entry.unitType;
+    syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
     countInput.value = String(entry.count);
   }
 
@@ -323,6 +329,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     closeBtn.type = 'button';
     closeBtn.className = 'unit-select build-close-btn';
     closeBtn.textContent = '×';
+    closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
     closeBtn.addEventListener('click', () => hideBuildPopup());
     closeRow.appendChild(closeBtn);
     mount.appendChild(closeRow);
@@ -387,9 +394,13 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     const productionSpacer = document.createElement('div');
     productionSpacer.style.height = '0.5em';
     section.appendChild(productionSpacer);
+    if (snapshot.controlledByRequester && snapshot.buildPaused === true) {
+      section.appendChild(createBuildPausedNote());
+    }
 
     if (!snapshot.controlledByRequester) {
       mount.appendChild(section);
+      placeOpenBuildPopup();
       return;
     }
     if (!snapshot.buildSectionVisible) {
@@ -398,6 +409,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       noUrban.textContent = snapshot.noBuildReason ?? 'This hex cannot build units.';
       section.appendChild(noUrban);
       mount.appendChild(section);
+      placeOpenBuildPopup();
       return;
     }
 
@@ -419,8 +431,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         refreshState: true,
       });
       if (!success) return;
-      const body = document.getElementById('build-popup-body');
-      if (body) void renderBuildQueueIntoMount(body, h3Index);
+      void renderBuildQueueIntoMount(mount, h3Index);
     });
     head.appendChild(title);
     head.appendChild(buildBtn);
@@ -433,17 +444,14 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       const row = document.createElement('div');
       row.className = 'build-queue-row';
       const typeSelect = document.createElement('select');
-      typeSelect.setAttribute('data-control-tooltip', buildTypeTooltipText);
       for (const unitType of options) {
         const opt = document.createElement('option');
         opt.value = unitType;
-        opt.textContent =
-          unitType === FORTIFICATION_QUEUE_ITEM
-            ? FORTIFICATION_QUEUE_ITEM_LABEL
-            : unitType.charAt(0).toUpperCase() + unitType.slice(1);
+        opt.textContent = formatBuildQueueItemLabel(unitType);
         typeSelect.appendChild(opt);
       }
       typeSelect.value = entry.unitType;
+      syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
       const countInput = document.createElement('input');
       countInput.setAttribute('data-control-tooltip', buildCountTooltipText);
       countInput.type = 'text';
@@ -498,6 +506,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         void renderBuildQueueIntoMount(mount, h3Index);
       }
       typeSelect.addEventListener('change', async () => {
+        syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
         await submitBuildQueueEntryEdit('Failed to update build queue entry.');
       });
       row.appendChild(typeSelect);
@@ -517,6 +526,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       removeBtn.type = 'button';
       removeBtn.className = 'unit-select';
       removeBtn.textContent = 'x';
+      removeBtn.setAttribute('data-control-tooltip', singleHexQueueRemoveTooltipText);
       removeBtn.addEventListener('click', async () => {
         if (!window.gameApi?.removeHexBuildQueueEntry) return;
         const success = await runBuildQueueMutation({
@@ -553,6 +563,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       },
     });
     mount.appendChild(section);
+    placeOpenBuildPopup();
   }
 
   /**
@@ -595,13 +606,16 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     shiftKey: boolean
   ): Promise<void> {
     if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
+    const multiSelect = shiftKey
+      && isHumanBuildEntryHexIndex(S.gameState, h3Index)
+      && S.selectedBuildHexH3s.every((hex) => isHumanBuildEntryHexIndex(S.gameState, hex));
     const lifecycleRevision = popupLifecycleRevision;
     if (isHoverOrderPlanningActive() || deps.shouldRenderTacticalHexes()) return;
     S.selectedHexIndex = h3Index;
     const popup = document.getElementById('build-popup');
     const popupOpen = !!popup && !popup.classList.contains('hidden');
 
-    if (!shiftKey) {
+    if (!multiSelect) {
       const togglesSinglePopup =
         S.selectedBuildHexH3s.length === 1 &&
         S.selectedBuildHexH3s[0] === h3Index &&
@@ -728,6 +742,13 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    * returns leave toast visibility unchanged.
    * Exceptions: None.
    */
+  const popupDeps: BuildHirePopupDeps = {
+    renderBuildPanel: renderBuildQueueIntoMount,
+    hideBuildPopup,
+    refreshGameStateAfterBuildQueueChange: deps.refreshGameStateAfterBuildQueueChange,
+    showMapToast: deps.showMapToast,
+  };
+
   function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
     if (isHoverOrderPlanningActive()) return;
     if (deps.shouldRenderTacticalHexes()) return;
@@ -746,7 +767,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove('hidden');
     el.setAttribute('aria-hidden', 'false');
-    void renderBuildQueueIntoMount(body, h3Index);
+    void renderBuildOrHirePopupIntoMount(body, h3Index, popupDeps);
     deps.requestRedraw();
   }
 
@@ -758,7 +779,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     const el = document.getElementById('build-popup');
     const body = document.getElementById('build-popup-body');
     if (!el || el.classList.contains('hidden') || !S.buildPopupHexH3 || !body) return;
-    void renderBuildQueueIntoMount(body, S.buildPopupHexH3);
+    void renderBuildOrHirePopupIntoMount(body, S.buildPopupHexH3, popupDeps);
   }
 
   return { handleBuildEntryClick, hideBuildPopup, showBuildPopup, refreshBuildPopupIfOpen };

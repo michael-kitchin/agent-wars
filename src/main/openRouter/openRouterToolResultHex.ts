@@ -285,6 +285,8 @@ export function encodeOpenRouterToolResultForLlm(
     }
     if (
       toolName === 'assess_unit' ||
+      toolName === 'query_mercenaries' ||
+      toolName === 'hire_mercenaries' ||
       toolName === 'assess_hex' ||
       toolName === 'estimate_combat' ||
       toolName === 'assign_order' ||

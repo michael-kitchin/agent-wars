@@ -1,5 +1,6 @@
 import type { BuildQueueItemType, BuildUnitType } from './ipcTypes';
 import { activeGameMap } from './activeGameMap';
+import { CREDITS_ITEM_INFANTRY_MULTIPLIER, CREDITS_QUEUE_ITEM } from './creditsRules';
 import { FORTIFICATION_COST_INFANTRY_MULTIPLIER, FORTIFICATION_QUEUE_ITEM } from './fortificationRules';
 
 /**
@@ -107,14 +108,27 @@ export function fortificationCostPerCell(): number {
 }
 
 /**
+ * Returns the production points one credits item costs on the active map.
+ *
+ * Purpose: A credits purchase spends the map's infantry price and adds a fixed number of credits.
+ * When to use: Queue spend, the build popup, and the production prompt. The credits added are `CREDITS_PER_ITEM`, not this number.
+ * Expected outcome: The active map's infantry cost times `CREDITS_ITEM_INFANTRY_MULTIPLIER`.
+ * Exceptions: None.
+ */
+export function creditsItemCost(): number {
+  return activeGameMap().rules.infantryCost * CREDITS_ITEM_INFANTRY_MULTIPLIER;
+}
+
+/**
  * Returns the production cost of one queued item on the active map.
  *
  * Purpose: Queue spend and estimates charge a fortification without treating it as a unit.
  * When to use: Keep-building refill, turn estimates, and the production spend loop.
- * Expected outcome: `fortificationCostPerCell` for a fortification. `unitCostFor` for a unit.
+ * Expected outcome: `fortificationCostPerCell` for a fortification. `creditsItemCost` for credits. `unitCostFor` for a unit.
  * Exceptions: Throws when `itemType` is not a build-queue item. `unitCostFor` throws for an unknown unit.
  */
 export function buildQueueItemCostFor(itemType: BuildQueueItemType): number {
   if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
+  if (itemType === CREDITS_QUEUE_ITEM) return creditsItemCost();
   return unitCostFor(itemType);
 }

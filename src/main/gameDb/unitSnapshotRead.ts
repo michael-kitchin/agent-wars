@@ -157,6 +157,15 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    * Exceptions: None.
    */
   formed_turn: number;
+  /**
+   * 1 when the unit is a mercenary.
+   *
+   * Contract: 0 for an ordinary unit. The snapshot omits `isMercenary` unless this is 1.
+   * When to use: Maps to optional `isMercenary` on snapshot units.
+   * Expected outcome: 0 or 1.
+   * Exceptions: None.
+   */
+  is_mercenary: number;
 }
 
 /**
@@ -199,6 +208,7 @@ function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'
     h3Index: row.h3_index,
     displayOrder: typeof row.display_order === 'number' ? row.display_order : undefined,
     ...(typeof row.formed_turn === 'number' ? { formedTurn: row.formed_turn } : {}),
+    ...(row.is_mercenary === 1 ? { isMercenary: true } : {}),
   };
   if (typeof row.embarked_on_naval_unit_id === 'string' && row.embarked_on_naval_unit_id.length > 0) {
     unit.embarkedOnNavalUnitId = row.embarked_on_naval_unit_id;
@@ -234,6 +244,7 @@ export function listUnitsForSnapshotWithGetAll(
             u.birth_area_id,
             u.birth_area_name,
             u.formed_turn,
+            u.is_mercenary,
             uta.naval_unit_id AS embarked_on_naval_unit_id
      FROM units u
      LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`

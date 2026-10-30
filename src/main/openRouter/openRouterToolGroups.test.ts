@@ -15,6 +15,13 @@ test('filterToolNamesForTacticalBattle: keeps battle tools from every enabled gr
   );
 });
 
+test('the production group contains the mercenary tools', () => {
+  const production = TOOL_GROUP_REGISTRY.find((group) => group.id === 'production');
+  assert.ok(production);
+  assert.ok(production.toolNames.includes('query_mercenaries'));
+  assert.ok(production.toolNames.includes('hire_mercenaries'));
+});
+
 test('filterToolNamesForTacticalBattle: honors disabled tool groups', () => {
   const planningOnly = getToolNamesForEnabledGroups(['planning']);
   assert.deepEqual(

@@ -1,4 +1,5 @@
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
+import { stackUnitToggleTooltipText } from '../../shared/popupControlTooltipText';
 import { rendererSharedState as S } from '../core/state';
 import { removeUnitsFromSelection } from '../core/selection';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -44,7 +45,7 @@ export function currentStackCalloutNonSelectableUnitIds(): ReadonlySet<string> {
  *
  * Purpose: Embark hides a toggle without removing its row. Debark shows that same button, so its mark has to follow selection rather than the mark from when the list opened.
  * When to use: After the stack list is built and whenever sealift state changes which units are selectable.
- * Expected outcome: A non-selectable unit's toggle stays in the layout and is hidden. Every other toggle is visible and shows select or unselect for the current selection.
+ * Expected outcome: A non-selectable unit's toggle stays in the layout and is hidden. Every other toggle is visible, shows select or unselect for the current selection, and its tip matches that mark.
  * Exceptions: None.
  */
 export function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void {
@@ -56,7 +57,9 @@ export function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElemen
     if (!unitId) continue;
     const btn = row.querySelector('button.stack-unit-toggle') as HTMLButtonElement | null;
     if (!btn) continue;
-    btn.textContent = S.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+    const selected = S.selectedUnitIds.includes(unitId);
+    btn.textContent = selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+    btn.setAttribute('data-control-tooltip', stackUnitToggleTooltipText(selected));
     btn.style.visibility = nonSelectableUnitIds.has(unitId) ? 'hidden' : 'visible';
   }
 }
