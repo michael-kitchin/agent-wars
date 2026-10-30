@@ -269,7 +269,7 @@ export function onStackAllActionClick(
  *
  * Purpose: Shows each unit in that hex, including a single unit, with its origin flag and selection controls.
  * When to use: From the deferred map-click callout, after the single-click delay.
- * Expected outcome: The popup is shown unless strategic units are hidden at this zoom, or a hover order preview is aimed at a hex other than the one every selected unit already occupies. A preview of that hex does not block the popup.
+ * Expected outcome: The popup is shown at the click plus the offset, then moved inside the window, unless strategic units are hidden at this zoom, or a hover order preview is aimed at a hex other than the one every selected unit already occupies. A preview of that hex does not block the popup. Adding or removing the sealift section moves it again.
  * Exceptions: Returns without throwing when the callout elements are missing.
  */
 export function showStackCallout(

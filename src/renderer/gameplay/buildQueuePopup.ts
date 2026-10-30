@@ -737,9 +737,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    * upper/lower-right toasts that would obscure planning UI.
    * When to use: After a successful build-entry click that is not blocked by hover
    * order planning or tactical hex rendering.
-   * Expected outcome: Popup is positioned and shown with queue content; planning
-   * chrome toasts are hidden once (not suppressed for later show calls). Early
-   * returns leave toast visibility unchanged.
+   * Expected outcome: The popup opens at the click plus the offset, then each finished paint moves it inside the window. Planning chrome toasts are hidden once (not suppressed for later show calls). Early returns leave toast visibility unchanged.
    * Exceptions: None.
    */
   const popupDeps: BuildHirePopupDeps = {
