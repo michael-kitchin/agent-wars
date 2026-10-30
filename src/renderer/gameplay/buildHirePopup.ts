@@ -1,7 +1,7 @@
 /**
  * Chooses a Build panel, a Hire panel, or both, for one hex.
  *
- * Purpose: A city the human can build and hire shows tabs. A hire-only hex shows Hire. Several selected hexes stay build-only.
+ * Purpose: A city shows both tabs when a raise, a rehire, a pending order, or a raise shortage is on the hire view. A hire-only hex shows Hire. Several selected hexes stay build-only.
  * When to use: `showBuildPopup` and `refreshBuildPopupIfOpen`. The Add button still renders the Build panel into its own mount.
  * Expected outcome: The mount shows the panel that matches the hex. A stale reply does not paint.
  * Exceptions: None. A failed hire read shows the failure sentence.

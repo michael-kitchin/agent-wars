@@ -84,8 +84,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /Units Without Standing Orders/i);
   assert.doesNotMatch(text, /already holds a legal hex/i);
   assert.match(text, /When the cell is —/);
-  assert.match(text, /assign defend on its current hex/i);
-  assert.match(text, /only when an enemy is already observed/);
+  assert.match(text, /including when no enemy is observed/);
   assert.match(text, /enemy-occupied hex/);
   assert.match(text, /Use pursue only when you supply an enemy unit id/);
   assert.match(text, /inside this turn's movement budget, including weather/);

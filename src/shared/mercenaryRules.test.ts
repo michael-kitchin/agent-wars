@@ -2,7 +2,7 @@
  * Mercenary prices and the hire-panel labels.
  *
  * Purpose: Upkeep stays on the global prices, and the hire menu shows the compact price.
- * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, or `formatHireOrderLabel`.
+ * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, `formatHireOrderLabel`, `hireShortageLabel`, or `oneUnitRaiseShortage`.
  * Expected outcome: The cases below.
  * Exceptions: None.
  */
@@ -10,11 +10,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
-import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
+import { formatCompactHireCost, formatCompactRaiseCost, formatProductionCapacityAmount } from './economySymbols';
 import { unitCostFor } from './gameRules';
 import {
+  HIRE_SHORT_BOTH,
+  HIRE_SHORT_CREDITS,
+  HIRE_SHORT_PRODUCTION,
   RAISE_CAPACITY_LABEL,
-  formatHireCreditsValue,
+  hireShortageLabel,
+  oneUnitRaiseShortage,
+  formatRaiseCapacityValue,
   formatHireEntryLabel,
   formatHireOptionLabel,
   formatHireOrderLabel,
@@ -90,14 +95,28 @@ test('a hire marker shows the production figure alone', () => {
   assert.equal(formatHireEntryLabel(figure), figure);
 });
 
-test('hire credits show the balance and upkeep, including zero upkeep', () => {
-  assert.equal(
-    formatHireCreditsValue(85, 5),
-    `${formatCreditsAmount('85')} + ${formatCreditsAmount('5')} / turn`
-  );
-  assert.equal(
-    formatHireCreditsValue(85, 0),
-    `${formatCreditsAmount('85')} + ${formatCreditsAmount('0')} / turn`
-  );
+test('hire capacity shows the production amount still available', () => {
   assert.equal(RAISE_CAPACITY_LABEL, 'Production (Hire)');
+  assert.equal(formatRaiseCapacityValue(140), formatProductionCapacityAmount('140'));
+});
+
+test('the shortage label names only the part of a raise that does not fit', () => {
+  assert.equal(hireShortageLabel(0, 5, 20, 40), HIRE_SHORT_CREDITS);
+  assert.equal(hireShortageLabel(10, 5, 40, 20), HIRE_SHORT_PRODUCTION);
+  assert.equal(hireShortageLabel(0, 5, 40, 20), HIRE_SHORT_BOTH);
+  assert.equal(hireShortageLabel(10, 5, 20, 40), null);
+  assert.equal(hireShortageLabel(0, 0, 0, 0), null);
+});
+
+test('the raise row is offered only when one unit fits both limits', () => {
+  const infantry = { unitCost: 20, fee: 3 };
+  const armor = { unitCost: 40, fee: 5 };
+  assert.equal(oneUnitRaiseShortage([infantry], 20, 3), null);
+  assert.equal(oneUnitRaiseShortage([infantry], 0, 3), HIRE_SHORT_PRODUCTION);
+  assert.equal(oneUnitRaiseShortage([infantry], 20, 0), HIRE_SHORT_CREDITS);
+  assert.equal(oneUnitRaiseShortage([infantry], 0, 0), HIRE_SHORT_BOTH);
+  assert.equal(oneUnitRaiseShortage([infantry, armor], 20, 3), null);
+  assert.equal(oneUnitRaiseShortage([infantry, armor], 20, 0), HIRE_SHORT_CREDITS);
+  assert.equal(oneUnitRaiseShortage([{ unitCost: 20, fee: 5 }, { unitCost: 40, fee: 3 }], 20, 3), HIRE_SHORT_BOTH);
+  assert.equal(oneUnitRaiseShortage([], 0, 0), null);
 });

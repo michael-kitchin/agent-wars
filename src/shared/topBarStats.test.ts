@@ -162,11 +162,16 @@ test('computeTopBarStats omits both home readouts for a null viewer and still li
   assert.equal(stats.credits, null);
 });
 
-test('credits are short when they cannot cover upkeep and pending fees', () => {
-  const stats = computeTopBarStats({
+test('credits are short when they cannot cover upkeep', () => {
+  const covered = computeTopBarStats({
     units: [],
     mercenaryEconomy: { credits: 5, upkeepPerTurn: 3, pendingHireFees: 4, mercenaryCount: 1 },
   }, notNeutral);
-  assert.equal(stats.credits?.short, true);
-  assert.equal(stats.credits?.credits, 5);
+  assert.equal(covered.credits?.short, false);
+  assert.equal(covered.credits?.credits, 5);
+  const short = computeTopBarStats({
+    units: [],
+    mercenaryEconomy: { credits: 2, upkeepPerTurn: 3, pendingHireFees: 0, mercenaryCount: 1 },
+  }, notNeutral);
+  assert.equal(short.credits?.short, true);
 });

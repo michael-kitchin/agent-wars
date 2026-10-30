@@ -584,3 +584,4 @@ aside#sidebar.tactical-strategic-suppress {
 }
 .build-popup-tab-bar button[aria-selected="true"]:hover { background: var(--chrome-bg); }
 .hire-funds-warning { color: var(--chrome-error); font-size: 11px; }
+.hire-panel .hire-orders .build-queue-head { margin-bottom: 0.5em; }

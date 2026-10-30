@@ -1,9 +1,11 @@
 import { logDebug, logError } from '../../logger';
+import { storedStrategicTerrainKind } from '../../../shared/landTraversalStrategic';
 import { loadedHexRole } from '../../../shared/loadedStrategicFootprint';
 import { getOrderedHexList } from '../../mapData';
 import { assertTerrainMetadataMatchesHexList } from '../../terrainMetadataLoad';
 import {
   ensureTerrainClassificationCacheLoaded,
+  getStrategicLandMassByH3,
   getStrategicProductionContext,
   getTacticalFeatureRowsForSeeding,
   getTerrainStrategicKindsFromCache,
@@ -32,10 +34,10 @@ const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
 /**
  * Defines the `seedHexesFromTerrainMetadata` function shape (export function seedHexesFromTerrainMetadata(): void).
 
- * Purpose: Supports maintainability by documenting why `seedHexesFromTerrainMetadata` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Writes the terrain the map, the briefing, and passability read for the rest of the match. A water-dominant hex land units can enter is stored as coastal.
+ * When to use: New-match reset, once the database is open. Do not call it to relabel hexes in an existing match.
+ * Expected outcome: Each ordered hex is inserted. `terrain` is the passability of the stored kind, and `terrain_kind` is that kind. A water-dominant hex that land units can occupy below the water cap is stored as coastal. Nothing is inserted when no database is open.
+ * Exceptions: Throws when a hex has no classified kind.
  */
 export function seedHexesFromTerrainMetadata(): void {
   logDebug('gameDb seedHexesFromTerrainMetadata');
@@ -43,13 +45,15 @@ export function seedHexesFromTerrainMetadata(): void {
   ensureTerrainClassificationCacheLoaded();
   const hexes = getOrderedHexList();
   const byH3 = getTerrainStrategicKindsFromCache();
+  const landMassByH3 = getStrategicLandMassByH3();
   assertTerrainMetadataMatchesHexList(byH3, hexes);
   for (const h3 of hexes) {
-    const kind = byH3.get(h3);
-    if (!kind) {
+    const classifiedKind = byH3.get(h3);
+    if (!classifiedKind) {
       logError('gameDb seedHexesFromTerrainMetadata: missing row', new Error(`no classified kind for ${h3}`));
       throw new Error(`terrain metadata missing h3_index ${h3}`);
     }
+    const kind = storedStrategicTerrainKind(classifiedKind, landMassByH3.get(h3) ?? null);
     const terrain = pipelineTerrainToPassability(kind);
     run('INSERT INTO hexes (h3_index, terrain, terrain_kind, map_role) VALUES (?, ?, ?, ?)', [
       h3,

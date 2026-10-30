@@ -37,11 +37,11 @@ export interface MercenaryFunds {
    */
   readonly upkeepPerTurn: number;
   /**
-   * Fees of hire orders placed this turn.
+   * Credits already taken for this turn's hire orders.
    *
-   * Contract: Not charged until an order fills. An unfilled order costs nothing.
-   * When to use: The warning that compares credits with upkeep plus fees.
-   * Expected outcome: The sum of the seat's current hire-order fees.
+   * Contract: The sum of `reservedCredits` on the seat's orders. An order stored with 0 still settles by charging only what fills.
+   * When to use: The credits tip and the mercenary funds line. Do not add it to upkeep when deciding whether the balance is short.
+   * Expected outcome: The amount already removed from `credits`. Removing an order returns its part of this sum.
    * Exceptions: None.
    */
   readonly pendingHireFees: number;
@@ -151,9 +151,9 @@ export interface HireRaiseView {
    */
   readonly capacityLeft: number;
   /**
-   * Types that still fit in `capacityLeft`.
+   * Types for which one unit fits both `capacityLeft` and the present balance.
    *
-   * Contract: Empty when nothing affordable remains.
+   * Contract: Each option passes `hireShortageLabel` at a count of one. Empty only when `raise` itself is absent.
    * When to use: The type select.
    * Expected outcome: A subset of the types the hex could raise.
    * Exceptions: None.
@@ -313,17 +313,17 @@ export interface HexHireView {
    * The seat's treasury figures.
    *
    * Contract: The same shape as the top bar.
-   * When to use: The funds lines and the short-credits warning.
+   * When to use: The production line and the shortage label.
    * Expected outcome: Current credits, upkeep, fees, and mercenary count.
    * Exceptions: None.
    */
   readonly funds: MercenaryFunds;
   /**
-   * Whether the seat may place an order here or already has one.
+   * Whether the Hire tab should remain for this hex.
    *
-   * Contract: True when raising or rehiring is possible, or when a pending order remains.
+   * Contract: True when `raise` is set, `raiseShortage` is set, a rehire remains, or a pending order remains, unless the hex itself is blocked and no pending order remains. A build hex drops the Hire tab when this is false, so a shortage keeps it true.
    * When to use: Choosing a Hire marker, a Hire tab, or a blocked message.
-   * Expected outcome: False only when there is nothing to do and no order to remove.
+   * Expected outcome: False only when there is nothing to show and nothing to remove.
    * Exceptions: None.
    */
   readonly hireAvailable: boolean;
@@ -339,7 +339,7 @@ export interface HexHireView {
   /**
    * What can still be raised here.
    *
-   * Contract: Null when raising is blocked or nothing fits the remaining capacity.
+   * Contract: Null when raising is blocked, or when `raiseShortage` names why no type fits one unit.
    * When to use: The raise section.
    * Expected outcome: A view, or null.
    * Exceptions: None.
@@ -348,12 +348,21 @@ export interface HexHireView {
   /**
    * Why raising is blocked.
    *
-   * Contract: Null when `raise` is set. Set when raising is blocked, including when earlier orders used the capacity.
+   * Contract: Null when `raise` is set, and null when `raiseShortage` already explains the hidden row. Set for an occupied hex, a fortified hex, or a hex with no base capacity.
    * When to use: The raise section's blocked message.
    * Expected outcome: A player-facing sentence, or null.
    * Exceptions: None.
    */
   readonly raiseBlockedReason: string | null;
+  /**
+   * Why no raise type fits one unit.
+   *
+   * Contract: One of the three shortage sentences when the hex has raise options, raising is not otherwise blocked, and `oneUnitRaiseShortage` is non-null. Otherwise null.
+   * When to use: The Hire tab when the raise row is hidden.
+   * Expected outcome: The sentence to show with no raise controls, or null.
+   * Exceptions: None.
+   */
+  readonly raiseShortage: string | null;
   /**
    * Neutral units here that the seat can still order.
    *
@@ -378,7 +387,7 @@ export interface HexHireView {
  * A request to place one hire order.
  *
  * Purpose: The renderer and the AI submit the same payload.
- * When to use: `placeHireOrder`. Placement does not check that the treasury can pay.
+ * When to use: `placeHireOrder`. Placement takes the fee from the treasury when the order is stored.
  * Expected outcome: A raise names a hex, a type, and a count. A rehire names a unit id.
  * Exceptions: None. The handler rejects a payload that matches neither shape.
  */

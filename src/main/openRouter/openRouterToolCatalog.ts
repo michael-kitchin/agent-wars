@@ -260,7 +260,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   },
   {
     name: 'hire_mercenaries',
-    description: 'Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order.',
+    description: 'Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.',
     parameters: {
       type: 'object',
       properties: {
@@ -273,7 +273,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['action'],
     },
-    promptLine: 'hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. Orders fill at the end of the turn.',
+    promptLine: 'hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.',
   },
 ];
 

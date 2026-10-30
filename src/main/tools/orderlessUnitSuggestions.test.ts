@@ -5,7 +5,7 @@
  * as already-arrived, so those units stayed orderless and idle every turn. The suggestion column exists to break that
  * loop, and it only works if the hex it offers is legal, closes on the enemy, and is never the unit's current hex.
  * When to use: After edits to `orderlessUnitSuggestions.ts` or the shared approach helpers in `assessUnitProximity.ts`.
- * Expected outcome: A closing march when an enemy is reachable, including an enemy-occupied hex inside this turn's budget. With no enemy, a march toward a passable enemy-home hex, or defend for an air unit that can strike. No march when the unit is already on the enemy or no home hex is usable.
+ * Expected outcome: A closing march when an enemy is reachable, including an enemy-occupied hex inside this turn's budget. With no enemy, a march toward a passable enemy-home hex, or defend for an orderless air unit. No march when the unit is already on the enemy or no home hex is usable. A missile is omitted.
  * Exceptions: Throws when the world map has no geodesic land-mass chain of the required length.
  */
 
@@ -186,7 +186,7 @@ function testBlindUnitIsOmittedWhenHomeListIsMissingOrEmpty(): void {
  * Purpose: Air units reposition by ferry and `assignOrder` rejects march/pursue/patrol for them, so a suggestion here
  * would walk the model straight into a rejected order every turn.
  * When to use: After changing the eligibility check or `AIR_INELIGIBLE_ORDER_TYPES`.
- * Expected outcome: The air unit is absent from the returned map even though an enemy is reachable.
+ * Expected outcome: Defend on the air unit's current hex even though an enemy is reachable. The order type is not march.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
 function testAirUnitsAreNeverOfferedAMarchDestination(): void {
@@ -203,11 +203,11 @@ function testAirUnitsAreNeverOfferedAMarchDestination(): void {
     'opponent-air-idle',
   ]);
 
-  assert.strictEqual(
-    suggestions.has('opponent-air-idle'),
-    false,
-    'air units cannot take a march order, so they must not be offered a march destination'
-  );
+  assert.deepStrictEqual(suggestions.get('opponent-air-idle'), {
+    orderType: 'defend',
+    destinationH3: chain[0],
+  });
+  assert.notStrictEqual(suggestions.get('opponent-air-idle')?.orderType, 'march');
 }
 
 /**
@@ -594,35 +594,38 @@ function testBlindLandMarchSkipsAHomeHexTheRouteCannotEnter(): void {
 }
 
 /**
- * Ensures an air unit that can strike is told to defend on its current hex.
+ * Ensures an orderless air unit is told to defend on its current hex.
  *
- * Purpose: Air cannot march, and a striking air unit with no order stops striking. Defend on the hex it already
- * occupies keeps the strike available without inventing a ferry.
+ * Purpose: Air cannot march. Defend on the hex it already occupies is the mission whether or not a strike is listed.
  * When to use: After changing the air branch or the optional strike-id argument.
- * Expected outcome: Defend on the unit's current hex when its id is supplied. Absent when the set is omitted.
+ * Expected outcome: Defend on the unit's current hex when the strike-id set is omitted and when it contains the unit.
+ * A missile on the same chain is absent.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
 function testStrikingAirUnitIsToldToDefendOnItsCurrentHex(): void {
   const chain = findGeodesicLandMassChain(4);
   const state = buildLandChainState({
     chain,
-    units: [{ id: 'opponent-air-idle', player: 'opponent', unitType: 'air', h3Index: chain[0]! }],
+    units: [
+      { id: 'opponent-air-idle', player: 'opponent', unitType: 'air', h3Index: chain[0]! },
+      { id: 'opponent-m-idle', player: 'opponent', unitType: 'missile', h3Index: chain[1]! },
+    ],
   });
 
-  const omitted = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-air-idle']);
+  const omitted = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-air-idle', 'opponent-m-idle']);
   const defending = suggestApproachDestinationsForOrderlessUnits(
     'opponent',
     state,
-    ['opponent-air-idle'],
+    ['opponent-air-idle', 'opponent-m-idle'],
     undefined,
     new Set(['opponent-air-idle'])
   );
+  const defendOnBase = { orderType: 'defend' as const, destinationH3: chain[0] };
 
-  assert.strictEqual(omitted.has('opponent-air-idle'), false);
-  assert.deepStrictEqual(defending.get('opponent-air-idle'), {
-    orderType: 'defend',
-    destinationH3: chain[0],
-  });
+  assert.deepStrictEqual(omitted.get('opponent-air-idle'), defendOnBase);
+  assert.strictEqual(omitted.has('opponent-m-idle'), false);
+  assert.deepStrictEqual(defending.get('opponent-air-idle'), defendOnBase);
+  assert.strictEqual(defending.has('opponent-m-idle'), false);
 }
 
 const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
@@ -663,11 +666,11 @@ const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
     fn: testBlindLandMarchSkipsAHomeHexTheRouteCannotEnter,
   },
   {
-    name: 'suggestApproachDestinationsForOrderlessUnits tells a striking air unit to defend on its current hex',
+    name: 'suggestApproachDestinationsForOrderlessUnits defends an orderless air unit and omits a missile',
     fn: testStrikingAirUnitIsToldToDefendOnItsCurrentHex,
   },
   {
-    name: 'suggestApproachDestinationsForOrderlessUnits omits air units, which cannot march',
+    name: 'suggestApproachDestinationsForOrderlessUnits defends an air unit instead of marching it',
     fn: testAirUnitsAreNeverOfferedAMarchDestination,
   },
   {

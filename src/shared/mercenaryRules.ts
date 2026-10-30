@@ -55,15 +55,17 @@ export const REHIRE_SECTION_TITLE = 'Neutral units';
 /** Hire-panel heading for orders placed this turn. */
 export const PENDING_HIRE_SECTION_TITLE = 'Hire Queue';
 
-/** Label beside the treasury balance in the hire panel. */
-export const CREDITS_LINE_LABEL = 'Credits';
-
 /** Label beside remaining raise capacity in the hire panel. */
 export const RAISE_CAPACITY_LABEL = 'Production (Hire)';
 
-/** Warning when the treasury cannot cover upkeep plus hire fees. */
-export const HIRE_FUNDS_WARNING =
-  'Your credits do not cover upkeep plus these hire orders. Credits from this turn\'s production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.';
+/** Shown when the selected raise's fee is above the balance and its production cost still fits. */
+export const HIRE_SHORT_CREDITS = 'Not enough credits.';
+
+/** Shown when the selected raise's production cost is above the capacity left and its fee still fits. */
+export const HIRE_SHORT_PRODUCTION = 'Not enough production capacity.';
+
+/** Shown when the selected raise fits neither the balance nor the capacity left. */
+export const HIRE_SHORT_BOTH = 'Not enough credits or production capacity.';
 
 /** Shown when the hire view could not be loaded. */
 export const HIRE_VIEW_FAILED = 'Hiring information could not be loaded.';
@@ -104,10 +106,10 @@ export const RAISE_REASON_NO_CAPACITY = 'This hex has too little production to r
 /** Rejection when the chosen type is not among the hex's raise options. */
 export const RAISE_REASON_TYPE = 'That unit type cannot be raised here.';
 
-/** Rejection when the requested count exceeds remaining raise capacity. */
+/** Older count-capacity sentence. A raise that does not fit returns a shortage sentence. */
 export const RAISE_REASON_CAPACITY = 'That would raise more than this hex can raise this turn.';
 
-/** Shown when earlier raise orders already use the hex's capacity. */
+/** Older capacity-used sentence. The Hire tab shows a shortage sentence and hides this one. */
 export const RAISE_REASON_CAPACITY_USED = 'Your orders here already use this turn\'s raise capacity.';
 
 /** Rejection when the unit is not a visible Neutral unit that can be rehired. */
@@ -240,7 +242,7 @@ export function formatUnitsDesertedLine(count: number): string {
 /**
  * Formats the Updates line for hire orders that were not filled.
  *
- * Purpose: The player sees that an unfilled order cost nothing.
+ * Purpose: The player sees that an unfilled order did not keep its fee. A reserved fee for that order was returned.
  * When to use: When that count is above 0. A raise that filled at least one unit is not in this count.
  * Expected outcome: One sentence, singular or plural.
  * Exceptions: None.
@@ -266,9 +268,9 @@ export function formatCreditsUpkeepSuffix(upkeep: number): string {
 /**
  * Tooltip for the top-bar credits readout.
  *
- * Purpose: Explains the balance, upkeep, this turn's fees, and what happens when credits run short.
+ * Purpose: Explains the balance, upkeep, the hire amount already taken, and what happens when credits run short.
  * When to use: When the human view has a mercenary economy.
- * Expected outcome: One paragraph ending with how a credits item is priced.
+ * Expected outcome: One paragraph ending with how a credits item is priced. The hire sentence says that amount has already left the balance.
  * Exceptions: None.
  */
 export function formatCreditsTooltip(funds: {
@@ -281,7 +283,7 @@ export function formatCreditsTooltip(funds: {
   const balance = formatCreditsAmount(String(funds.credits));
   const upkeep = formatCreditsAmount(String(funds.upkeepPerTurn));
   const hireOrders = formatCreditsAmount(String(funds.pendingHireFees));
-  return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn, and this turn's hire orders cost ${hireOrders}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
+  return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn. This turn's hire orders already took ${hireOrders} from that balance, and removing an order returns it. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
 }
 
 /**
@@ -311,27 +313,72 @@ export function formatHireEntryAriaLabel(h3Index: string): string {
 /**
  * Value beside the raise-capacity label.
  *
- * Purpose: The hire panel shows production points still available this turn.
- * When to use: With capacity left and the hex's capacity for the turn.
- * Expected outcome: The production symbol, the amount left, ` of `, the symbol again, and `N this turn`.
+ * Purpose: The hire panel shows how much production is still free for raises.
+ * When to use: With the production points still available this turn.
+ * Expected outcome: The production symbol and that amount.
  * Exceptions: None.
  */
-export function formatRaiseCapacityValue(left: number, perTurn: number): string {
-  const leftText = formatProductionCapacityAmount(String(left));
-  const perTurnText = formatProductionCapacityAmount(String(perTurn));
-  return `${leftText} of ${perTurnText} this turn`;
+export function formatRaiseCapacityValue(left: number): string {
+  return formatProductionCapacityAmount(String(left));
 }
 
 /**
- * Value beside the Credits label in the hire panel.
+ * The Hire-tab sentence for a raise the balance or the remaining capacity cannot cover.
  *
- * Purpose: The balance and this turn's mercenary upkeep share one line.
- * When to use: With the seat's credits and `upkeepPerTurn`, including when upkeep is 0.
- * Expected outcome: The credits symbol, the balance, ` + `, the symbol, the upkeep, and ` / turn`. No thousands separators.
+ * Purpose: Names the shortage for one fee and one production cost. The Hire tab shows it when no type fits one unit, and again when a Hire click rejects the typed count.
+ * When to use: With the present balance, the selected fee, the selected production cost, and the capacity still left. The Hire click uses the typed count. A one-unit offer uses this for a single unit.
+ * Expected outcome: One of the three shortage sentences, or null when a fee of 0 is not a credit shortage, a production cost of 0 is not a capacity shortage, and an equal balance or equal capacity is enough.
  * Exceptions: None.
  */
-export function formatHireCreditsValue(credits: number, upkeepPerTurn: number): string {
-  return `${formatCreditsAmount(String(credits))} + ${formatCreditsAmount(String(upkeepPerTurn))} / turn`;
+export function hireShortageLabel(
+  balance: number,
+  fee: number,
+  productionCost: number,
+  capacityLeft: number
+): string | null {
+  const creditsShort = fee > 0 && fee > balance;
+  const productionShort = productionCost > 0 && productionCost > capacityLeft;
+  if (creditsShort && productionShort) return HIRE_SHORT_BOTH;
+  if (creditsShort) return HIRE_SHORT_CREDITS;
+  if (productionShort) return HIRE_SHORT_PRODUCTION;
+  return null;
+}
+
+/**
+ * One raise type measured at a count of one.
+ *
+ * Purpose: `oneUnitRaiseShortage` only needs the production cost and the fee.
+ * When to use: A raise option from the hire evaluation.
+ * Expected outcome: Those two numbers.
+ * Exceptions: None.
+ */
+export interface OneUnitRaiseOffer {
+  readonly unitCost: number;
+  readonly fee: number;
+}
+
+/**
+ * The sentence for a hex where no raise type fits one unit.
+ *
+ * Purpose: The Hire tab shows the raise row only when one unit fits both remaining production and the balance.
+ * When to use: With every raise option on the hex, the capacity still left, and the present balance. Do not use it to replace an occupied, fortified, or no-capacity sentence.
+ * Expected outcome: Null when the list is empty or some offer fits one unit, so the row can be shown. Otherwise one shortage sentence, which is the whole explanation and the row stays hidden.
+ * Exceptions: None.
+ */
+export function oneUnitRaiseShortage(
+  offers: readonly OneUnitRaiseOffer[],
+  capacityLeft: number,
+  balance: number
+): string | null {
+  if (offers.length === 0) return null;
+  if (offers.some((offer) => hireShortageLabel(balance, offer.fee, offer.unitCost, capacityLeft) == null)) {
+    return null;
+  }
+  const capacityFits = offers.some((offer) => offer.unitCost <= capacityLeft);
+  const creditsFit = offers.some((offer) => !(offer.fee > 0 && offer.fee > balance));
+  if (capacityFits && !creditsFit) return HIRE_SHORT_CREDITS;
+  if (!capacityFits && creditsFit) return HIRE_SHORT_PRODUCTION;
+  return HIRE_SHORT_BOTH;
 }
 
 /**

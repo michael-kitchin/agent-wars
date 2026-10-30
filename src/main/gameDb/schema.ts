@@ -192,6 +192,7 @@ export function getFullDdl(): string {
       unit_count INTEGER NOT NULL CHECK (unit_count BETWEEN 1 AND 99),
       neutral_unit_id TEXT,
       created_turn INTEGER NOT NULL,
+      reserved_credits INTEGER NOT NULL DEFAULT 0 CHECK (reserved_credits >= 0),
       CHECK (
         (kind = 'raise' AND neutral_unit_id IS NULL)
         OR (kind = 'rehire' AND neutral_unit_id IS NOT NULL AND unit_count = 1)

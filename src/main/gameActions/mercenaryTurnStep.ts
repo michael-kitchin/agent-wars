@@ -103,7 +103,7 @@ export function resolveMercenariesAtEndOfTurn(args: {
  *
  * Purpose: Desertion uses the board from before hiring, and later orders see units hired earlier.
  * When to use: Inside the transaction.
- * Expected outcome: The three maps. Credits are written after payroll and again after hires.
+ * Expected outcome: The three maps. Credits are written after payroll and again after hires. An order for a seat already out of the match is skipped and its reserved fee is not returned.
  * Exceptions: Propagates a database or conversion error to the caller, which rolls back.
  */
 function settleAndHire(args: {
@@ -189,14 +189,35 @@ function payrollRows(
 }
 
 /**
- * Fills a raise up to capacity, count, and credits.
+ * Fills a raise up to capacity and count, and refunds a reserved fee that did not fill.
  *
  * Purpose: A hex the seat has not explored and does not call home is not filled, even on the full board.
  * When to use: For one raise order. The context cache is rebuilt after a hire.
- * Expected outcome: How many units were created. 0 when the order cannot be filled.
+ * Expected outcome: How many units were created. 0 when the order cannot be filled. A reserved order is not charged again.
  * Exceptions: Propagates a unit-creation error.
  */
 function fillRaise(
+  order: HireOrderRow,
+  state: ReturnType<typeof getGameState>,
+  contexts: Map<SeatId, HireContext>,
+  raiseCostUsedByHex: Map<string, number>,
+  creditsBySeat: Map<SeatId, number>,
+  turnNumber: number
+): number {
+  const filled = unitsRaised(order, state, contexts, raiseCostUsedByHex, creditsBySeat, turnNumber);
+  refundReservedRemainder(order, filled, creditsBySeat);
+  return filled;
+}
+
+/**
+ * Creates the units a raise can still place.
+ *
+ * Purpose: A reserved raise is limited by room and count. An unreserved raise is also limited by the balance.
+ * When to use: From `fillRaise`, which refunds whatever a reserved order did not fill.
+ * Expected outcome: How many units were created. The credit map changes only for an unreserved charge.
+ * Exceptions: Propagates a unit-creation error.
+ */
+function unitsRaised(
   order: HireOrderRow,
   state: ReturnType<typeof getGameState>,
   contexts: Map<SeatId, HireContext>,
@@ -212,9 +233,9 @@ function fillRaise(
   if (!option) return 0;
   const used = raiseCostUsedByHex.get(order.h3Index) ?? 0;
   const room = Math.floor((evaluation.raiseCapacityPerTurn - used) / option.unitCost);
-  const credits = creditsOf(creditsBySeat, order.playerId);
-  const affordable = option.fee > 0 ? Math.floor(credits / option.fee) : 0;
-  const count = Math.min(order.unitCount, Math.max(0, room), Math.max(0, affordable));
+  const count = order.reservedCredits > 0
+    ? Math.min(order.unitCount, Math.max(0, room))
+    : affordableRaiseCount(order, room, option.fee, creditsBySeat);
   if (count <= 0) return 0;
   for (let i = 0; i < count; i += 1) {
     createStrategicUnit({
@@ -226,19 +247,60 @@ function fillRaise(
     });
   }
   raiseCostUsedByHex.set(order.h3Index, used + count * unitCostFor(order.unitType));
-  creditsBySeat.set(order.playerId, credits - count * option.fee);
+  if (order.reservedCredits === 0) {
+    const credits = creditsOf(creditsBySeat, order.playerId);
+    creditsBySeat.set(order.playerId, credits - count * option.fee);
+  }
   return count;
 }
 
 /**
- * Fills a rehire when the unit is still a candidate and the fee fits.
+ * How many unreserved units the balance and the room can still pay for.
+ *
+ * Purpose: An order stored before fees were reserved is charged only for the units that fill.
+ * When to use: From `unitsRaised` when `reservedCredits` is 0.
+ * Expected outcome: The count to create, or 0 when the fee does not fit.
+ * Exceptions: None.
+ */
+function affordableRaiseCount(
+  order: HireOrderRow,
+  room: number,
+  fee: number,
+  creditsBySeat: Map<SeatId, number>
+): number {
+  const credits = creditsOf(creditsBySeat, order.playerId);
+  const affordable = fee > 0 ? Math.floor(credits / fee) : 0;
+  return Math.min(order.unitCount, Math.max(0, room), Math.max(0, affordable));
+}
+
+/**
+ * Fills a rehire when the unit is still a candidate, and refunds a reserved fee that did not fill.
  *
  * Purpose: The second seat's order for the same unit fails once the first seat owns it.
  * When to use: For one rehire order.
- * Expected outcome: 1 when the unit changes owner. 0 when it does not.
+ * Expected outcome: 1 when the unit changes owner. 0 when it does not. A reserved order is not charged again.
  * Exceptions: Propagates a transfer error.
  */
 function fillRehire(
+  order: HireOrderRow,
+  state: ReturnType<typeof getGameState>,
+  contexts: Map<SeatId, HireContext>,
+  creditsBySeat: Map<SeatId, number>
+): number {
+  const filled = rehireFilled(order, state, contexts, creditsBySeat);
+  refundReservedRemainder(order, filled, creditsBySeat);
+  return filled;
+}
+
+/**
+ * Transfers a Neutral unit when it is still a rehire candidate.
+ *
+ * Purpose: A reserved rehire does not check the remaining balance. An unreserved one pays only if the fee fits.
+ * When to use: From `fillRehire`, which refunds a reserved fee when the transfer does not happen.
+ * Expected outcome: 1 when the unit changes owner. 0 when it does not.
+ * Exceptions: Propagates a transfer error.
+ */
+function rehireFilled(
   order: HireOrderRow,
   state: ReturnType<typeof getGameState>,
   contexts: Map<SeatId, HireContext>,
@@ -253,10 +315,30 @@ function fillRehire(
   const candidate = evaluation.rehireCandidates.find((row) => row.unitId === unitId);
   if (!candidate) return 0;
   const credits = creditsOf(creditsBySeat, order.playerId);
-  if (candidate.fee > credits) return 0;
+  if (order.reservedCredits === 0 && candidate.fee > credits) return 0;
   transferNeutralUnitToSeat(unitId, order.playerId);
-  creditsBySeat.set(order.playerId, credits - candidate.fee);
+  if (order.reservedCredits === 0) creditsBySeat.set(order.playerId, credits - candidate.fee);
   return 1;
+}
+
+/**
+ * Returns the reserved fee for the count a hire did not fill.
+ *
+ * Purpose: The end of the turn must not keep credits for units it did not create.
+ * When to use: After `unitsRaised` or `rehireFilled`. An unreserved order is left to the charge those functions already made.
+ * Expected outcome: The cached balance includes the unused reserved amount. A full fill changes nothing.
+ * Exceptions: None.
+ */
+function refundReservedRemainder(
+  order: HireOrderRow,
+  filled: number,
+  creditsBySeat: Map<SeatId, number>
+): void {
+  if (order.reservedCredits <= 0 || filled >= order.unitCount) return;
+  const perUnit = Math.trunc(order.reservedCredits / order.unitCount);
+  const refund = (order.unitCount - filled) * perUnit;
+  if (refund <= 0) return;
+  creditsBySeat.set(order.playerId, creditsOf(creditsBySeat, order.playerId) + refund);
 }
 
 /**

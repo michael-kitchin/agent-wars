@@ -21,9 +21,9 @@ export const BUILD_STATUS_COLUMN_HEADER = 'Building';
 /** How many rehire or raise rows a briefing shows. */
 export const MERCENARY_BRIEFING_MAX_ROWS = 10;
 
-/** Warning when credits do not cover upkeep plus hire fees. */
+/** Warning when credits do not cover mercenary upkeep. */
 export const MERCENARY_FUNDS_WARNING =
-  'Warning: your treasury does not cover upkeep plus this turn\'s hire orders. Credits produced this turn arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.';
+  'Warning: your treasury does not cover this turn\'s mercenary upkeep. Credits produced this turn arrive before upkeep is paid. Random mercenaries desert only if upkeep cannot be paid. Hire-order fees have already been taken from the balance.';
 
 /** Shown when the seat can see no Neutral unit it may rehire. */
 export const NO_REHIRE_CANDIDATES_LINE = 'No Neutral unit you can see can be rehired.';
@@ -72,7 +72,7 @@ export function buildBuildabilityRule(): string {
  * Exceptions: None.
  */
 export function buildMercenaryRule(): string {
-  return `Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see. Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. After that each mercenary costs its upkeep every turn: ${upkeepList()} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.`;
+  return `Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see. Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill. After that each mercenary costs its upkeep every turn: ${upkeepList()} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.`;
 }
 
 /**
@@ -92,12 +92,12 @@ export function buildMercenaryUpkeepRule(): string {
  *
  * Purpose: The model sees the same figures the top bar shows its seat.
  * When to use: After the rule, when the snapshot has an economy.
- * Expected outcome: Credits, upkeep, the mercenary count, and this turn's fees.
+ * Expected outcome: Credits, upkeep, the mercenary count, and the hire amount already taken from the treasury.
  * Exceptions: None.
  */
 export function formatMercenaryFundsLine(funds: MercenaryFunds): string {
   const word = funds.mercenaryCount === 1 ? 'mercenary' : 'mercenaries';
-  return `Treasury: ${funds.credits} credits. Mercenary upkeep: ${funds.upkeepPerTurn} credits per turn for ${funds.mercenaryCount} ${word}. Hire orders this turn: ${funds.pendingHireFees} credits.`;
+  return `Treasury: ${funds.credits} credits. Mercenary upkeep: ${funds.upkeepPerTurn} credits per turn for ${funds.mercenaryCount} ${word}. Hire orders already taken from the treasury this turn: ${funds.pendingHireFees} credits.`;
 }
 
 /**

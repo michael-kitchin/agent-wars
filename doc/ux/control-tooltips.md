@@ -73,7 +73,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
-- Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and this turn's hire fees. The balance, the upkeep, and this turn's hire fees start with `¤` (`CREDITS_SYMBOL`). The sentence that names `CREDITS_PER_ITEM` still says credits.
+- Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and the hire amount already taken from the balance. The balance, the upkeep, and that hire amount start with `¤` (`CREDITS_SYMBOL`). The sentence that names `CREDITS_PER_ITEM` still says credits.
 - Hire marker: `Hire Units` (`hireEntryTooltipText`). Hire count, Hire, and remove: `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
 - Hire type, when the list has no value: `hireTypeTooltipText`. When a type is selected, `queueItemTooltipText` for that type.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes. Hidden while observing.

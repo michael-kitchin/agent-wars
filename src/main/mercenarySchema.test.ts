@@ -101,6 +101,7 @@ test('hire orders round-trip and the table rejects a mismatched kind', () => {
       unitCount: 2,
       neutralUnitId: null,
       createdTurn: 1,
+      reservedCredits: 0,
     });
     const listed = listHireOrdersForSeat(HUMAN_SEAT_ID);
     assert.equal(listed.length, 1);
@@ -118,6 +119,7 @@ test('hire orders round-trip and the table rejects a mismatched kind', () => {
         unitCount: 1,
         neutralUnitId: 'h1-i1',
         createdTurn: 1,
+        reservedCredits: 0,
       });
     });
     assert.throws(() => {
@@ -129,6 +131,7 @@ test('hire orders round-trip and the table rejects a mismatched kind', () => {
         unitCount: 1,
         neutralUnitId: null,
         createdTurn: 1,
+        reservedCredits: 0,
       });
     });
   });

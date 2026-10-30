@@ -6,7 +6,7 @@
  * Weaker models skipped that join and marched units to their own hex, which is dropped as already-arrived — leaving the
  * unit orderless again next turn, permanently idle. Putting a legal mission beside the question breaks that loop.
  * When an enemy is visible the mission is still a one-step march that closes on that enemy. When none is visible, a
- * ground unit is pointed at the enemy home region and an air unit that can strike is told to defend where it sits.
+ * ground unit is pointed at the enemy home region. An air unit is told to defend where it sits, strike or not.
  * When to use: Strategic `getInjectionText` and the strategic briefing, for the ids being listed as having no standing order.
  * Expected outcome: A march or defend suggestion per unit that should be ordered, never a march to the unit's current hex.
  * Units with nowhere useful to go are absent from the map so the caller can render an em dash.
@@ -67,11 +67,11 @@ const EMPTY_LAND_MASS: LandMassByH3 = new Map();
  */
 export interface OrderlessMissionActionSignals {
   /**
-   * Units that can strike this turn, so an orderless air unit can be told to defend.
+   * Units with an air-strike row this turn.
    *
    * Contract: Names units whose Best Options row includes an air-strike label.
-   * When to use: Deciding whether an orderless air unit gets a defend mission.
-   * Expected outcome: A unit absent from the set is not told to defend.
+   * When to use: The debug log for this collection. An orderless air unit is told to defend whether or not it is in this set.
+   * Expected outcome: A unit absent from the set still receives a defend suggestion when it is air and orderless.
    * Exceptions: None.
    */
   airStrikeUnitIds: ReadonlySet<string>;
@@ -151,8 +151,8 @@ export interface OrderlessActionNeededSets {
  * once here keeps those surfaces from drifting and keeps the search off the per-unit path.
  * When to use: Once from strategic `getInjectionText` and once from strategic `formatBriefing`, for the ids that have
  * no standing order. Do not call it from `needsAction`.
- * Expected outcome: The suggestion map plus the one-step move ids. Air units appear in the map only when they have an
- * air strike row. An empty id list still scans rows, so a move id for a unit that was not requested can still be returned.
+ * Expected outcome: The suggestion map plus the one-step move ids. Every requested air unit appears in the map as
+ * defend on its current hex. An empty id list still scans rows, so a move id for a unit that was not requested can still be returned.
  * Exceptions: Throws when Best Options row collection throws, or when a blind land march cannot load the terrain cache.
  * A unit that cannot be scored is simply absent from the suggestion map.
  */
@@ -272,7 +272,7 @@ export interface OrderlessMissionSuggestion {
   /**
    * `assign_order` type the cell is asking for.
    *
-   * Contract: `march` is a ground unit; `defend` is an air unit that can strike.
+   * Contract: `march` is a ground unit; `defend` is an air unit, on the hex it already occupies.
    * When to use: Choosing the standing-order type to copy into the prompt.
    * Expected outcome: `defend` pairs with the air unit's current hex.
    * Exceptions: None.
@@ -422,17 +422,17 @@ function nearestEnemyHomeMarchHex(args: {
 }
 
 /**
- * Maps each orderless unit to one mission: a closing march, a home-region march, or defend for a striking air unit.
+ * Maps each orderless unit to one mission: a closing march, a home-region march, or defend for an air unit.
  *
  * Purpose: Gives the Standing Order Status table something concrete to offer for every unit it asks the model to order,
  * including the turns when no enemy unit has been seen yet.
  * When to use: Strategic briefing assembly, passing only the ids being listed as orderless. This runs a destination
- * search per distinct unit, so do not call it for the whole roster. Pass `airStrikeUnitIds` when this turn's Best
- * Options rows are already in hand; omit it to leave every air unit out.
+ * search per distinct unit, so do not call it for the whole roster. `airStrikeUnitIds` is recorded in the debug log
+ * and is not used to choose the mission.
  * Expected outcome: `unitId -> mission`. When any enemy is visible, a closing one-step march, enemy-occupied preferred,
  * and no home-region substitute when that step is missing. When no enemy is visible, a march toward the enemy home
- * region, or defend on the current hex for an air unit in `airStrikeUnitIds`. Omitted when the unit is missing, cannot
- * take the mission, or has no legal hex. A march is never the unit's own hex.
+ * region. An air unit is defend on its current hex whether or not it can strike and whether or not an enemy is visible.
+ * A missile is omitted. Omitted when the unit is missing, cannot take the mission, or has no legal hex. A march is never the unit's own hex.
  * Exceptions: A unit that cannot be scored is omitted. Loading the terrain cache for a blind land march throws if that
  * cache cannot be built.
  */
@@ -475,7 +475,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
     if (!unit) continue;
     let suggestion: OrderlessMissionSuggestion | null = null;
     if (standingOrderTypeRejectionReason(unit.unitType, 'march') !== null) {
-      if (airStrikeUnitIds?.has(unitId)) {
+      if (unit.unitType === 'air') {
         suggestion = { orderType: 'defend', destinationH3: unit.h3Index };
       }
     } else if (enemyVisible) {

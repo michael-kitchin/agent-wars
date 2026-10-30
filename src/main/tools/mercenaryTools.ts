@@ -3,7 +3,7 @@
  *
  * Purpose: The model reads the same hire view the panel uses, and places the same orders.
  * When to use: The tool loop and the production envelope, while production tools are enabled.
- * Expected outcome: `{ status: 'ok' }` or `{ status: 'error', error }`. Credits do not change here.
+ * Expected outcome: `{ status: 'ok' }` or `{ status: 'error', error }`. A successful place takes the fee. A successful cancel returns it.
  * Exceptions: A thrown error is logged and returned. It does not escape the tool loop.
  */
 
@@ -199,7 +199,7 @@ function rehire(seatId: AiSeatId, unitId: unknown): Record<string, unknown> {
  *
  * Purpose: A cancel names the order id from a query.
  * When to use: `action` is `cancel`.
- * Expected outcome: The treasury figures after the fee is gone. No order id.
+ * Expected outcome: The treasury figures after a reserved fee is returned. No order id.
  * Exceptions: Propagates a database error.
  */
 function cancelHire(seatId: AiSeatId, orderId: unknown): Record<string, unknown> {
@@ -212,7 +212,7 @@ function cancelHire(seatId: AiSeatId, orderId: unknown): Record<string, unknown>
 /**
  * The ok payload after a hire change, read again so the fees match the table.
  *
- * Purpose: The model sees the order id and what this turn's orders now cost.
+ * Purpose: The model sees the order id and the balance after the fee moved.
  * When to use: After a successful place or remove.
  * Expected outcome: Credits, pending fees, and the order id when one was created.
  * Exceptions: Propagates a database error.

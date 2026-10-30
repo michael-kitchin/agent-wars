@@ -33,6 +33,7 @@ import {
   ensureTurnStateRowWhenDbOpen,
   repairStrandedStrategicResolutionPhaseWhenDbOpen,
 } from './gameDb/databaseBootstrap';
+import { ensureHireOrderReservedCreditsColumn } from './gameDb/mercenaryState';
 import { getFullDdl } from './gameDb/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -143,7 +144,7 @@ export {
  * SQLite `user_version` that the current schema DDL produces.
  *
  * Purpose: Detects match databases created by an older schema. Bumping it also makes every saved game from an earlier version unloadable. Changing the shape of any JSON a save carries in `game_config`, without bumping this number, does the same, because an older or newer app would misread it.
- * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape. See `doc/save-files.md`.
+ * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` adds on open. See `doc/save-files.md`.
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
@@ -240,6 +241,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   setDbHandle(database);
   applyGameDbPragmas(database);
   database.exec(getFullDdl());
+  ensureHireOrderReservedCreditsColumn(gameDbOps);
   ensureStrategicInfrastructureSyncTriggers();
   ensureTurnStateRow();
   database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
@@ -279,6 +281,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     validateGameDatabaseOrThrow(d);
     setDbHandle(d);
     d = null;
+    ensureHireOrderReservedCreditsColumn(gameDbOps);
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
@@ -468,7 +471,7 @@ export interface OpenExistingGameDatabaseResult {
  *
  * Purpose: Launch and loading a save share the steps that attach an existing file.
  * When to use: When `canonicalPath` exists. A missing file is created by `initDatabase` instead.
- * Expected outcome: The process handle is that file. The stored map is loaded when the file has a match. Fog is refreshed. A fog failure is logged and does not fail the open. `mapLoadError` is the map failure message, or null.
+ * Expected outcome: The process handle is that file. A missing `reserved_credits` column is added without changing the user version. The stored map is loaded when the file has a match. Fog is refreshed. A fog failure is logged and does not fail the open. `mapLoadError` is the map failure message, or null.
  * Exceptions: Throws when the file cannot be opened or fails validation, after closing the temporary handle. Does not replace a corrupt file. A fog failure does not throw.
  */
 export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingGameDatabaseResult {
@@ -479,6 +482,7 @@ export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingG
     validateGameDatabaseOrThrow(pending);
     setDbHandle(pending);
     pending = null;
+    ensureHireOrderReservedCreditsColumn(gameDbOps);
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();

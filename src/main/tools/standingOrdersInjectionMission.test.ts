@@ -1,7 +1,7 @@
 /**
  * Tests for Suggested Destination cells in the units-without-orders table.
  *
- * Purpose: A blind ground unit must be shown a home-region hex it can march to, and a striking air unit must be shown
+ * Purpose: A blind ground unit must be shown a home-region hex it can march to, and an orderless air unit must be shown
  * defend on its current hex. Those are different orders, and the cell is the only place the model is told which is which.
  * When to use: After edits to `getInjectionText` or `suggestApproachDestinationsForOrderlessUnits`.
  * Expected outcome: The land row names the home hex and does not say defend. The air row says defend and names its hex.
@@ -41,7 +41,7 @@ function orderlessRow(text: string, unitId: string): string {
 }
 
 /**
- * Ensures a blind land unit is offered its home hex and a striking air unit is offered defend.
+ * Ensures a blind land unit is offered its home hex and an orderless air unit is offered defend.
  *
  * Purpose: These are the two cell shapes the coaching text teaches. An em dash, or a march for the air unit, sends the
  * model back to inventing orders the engine drops.
@@ -49,7 +49,7 @@ function orderlessRow(text: string, unitId: string): string {
  * Expected outcome: Land row contains the nearer home code and not `defend`. Air row contains `defend` and its own code.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
-function testBlindLandMarchAndStrikingAirDefendCells(): void {
+function testBlindLandMarchAndOrderlessAirDefendCells(): void {
   ensureStrategicCoordinateRegistryInitialized();
   const chain = findGeodesicLandMassChain(4);
   const homeCode = h3ToCode(chain[2]!, STRATEGIC);
@@ -96,8 +96,8 @@ function run(): void {
   openGameDatabaseAtPathForTests(path.join(tempDir, 't.sqlite'));
   try {
     resetGameForNewMatch();
-    testBlindLandMarchAndStrikingAirDefendCells();
-    console.log('OK standing order injection renders a blind march and a striking-air defend cell');
+    testBlindLandMarchAndOrderlessAirDefendCells();
+    console.log('OK standing order injection renders a blind march and an orderless-air defend cell');
   } finally {
     closeGameDatabaseForTests();
   }

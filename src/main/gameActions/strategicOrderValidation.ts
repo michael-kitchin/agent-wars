@@ -25,7 +25,7 @@ import { validateTacticalGroupFerryTarget } from '../tacticalBattle/tacticalFerr
 import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import { MISSILES_CANNOT_FIRE_IN_BATTLE_REASON, NO_SELECTED_MISSILES_REASON } from '../../shared/missileRules';
-import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import { FERRY_REASON_ALREADY_BASED, validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 import { validateMissileLaunchOrder } from './missileValidation';
 import type { SubmitOrdersResult } from './gameActionsTypes';
 import { isWithinGridRangeSafe } from './gridRange';
@@ -292,7 +292,7 @@ export function validateRangedAttack(
  *
  * Purpose: Keeps ranged, strike, and ferry group validators on one failure shape without merging their log lines.
  * When to use: From each public group validator after that validator's own log line.
- * Expected outcome: `{ success: true }` or `{ success: false, reason }` from the empty selection, the tactical callback, or the first failing unit.
+ * Expected outcome: `{ success: true }` or `{ success: false, reason }` from the empty selection, the tactical callback, or the first failing unit. A unit whose only failure is `ignorableReason` is skipped; the group still fails when every unit fails that way.
  * Exceptions: Caught and logged as `${logName}: exception`; returns `{ success: false, reason: String(err) }`.
  */
 function validateGroupTarget(args: {
@@ -301,6 +301,7 @@ function validateGroupTarget(args: {
   emptySelectionReason: string;
   validateTactical: (snap: TacticalBattleSnapshot, uniqueUnitIds: string[]) => SubmitOrdersResult;
   validateStrategicUnit: (unitId: string, strategicLabel: (id: string) => string) => { valid: boolean; reason?: string };
+  ignorableReason?: string;
 }): SubmitOrdersResult {
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
@@ -312,11 +313,22 @@ function validateGroupTarget(args: {
       return args.validateTactical(snap, uniqueUnitIds);
     }
     const strategicLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
+    let validCount = 0;
+    let ignoredReason: string | undefined;
     for (const unitId of uniqueUnitIds) {
       const result = args.validateStrategicUnit(unitId, strategicLabel);
-      if (!result.valid) {
-        return { success: false, reason: `${strategicLabel(unitId)}: ${result.reason}` };
+      if (result.valid) {
+        validCount += 1;
+        continue;
       }
+      if (args.ignorableReason != null && result.reason === args.ignorableReason) {
+        ignoredReason ??= `${strategicLabel(unitId)}: ${result.reason}`;
+        continue;
+      }
+      return { success: false, reason: `${strategicLabel(unitId)}: ${result.reason}` };
+    }
+    if (validCount === 0) {
+      return { success: false, reason: ignoredReason ?? args.emptySelectionReason };
     }
     return { success: true };
   } catch (err) {
@@ -411,7 +423,7 @@ export function validateGroupAirStrikeTarget(
  *
  * Purpose: Shared entry for group ferry targeting so each selected air unit keeps the same reason prefix.
  * When to use: Group ferry IPC and opponent tactical draft sanitizing.
- * Expected outcome: `{ success: true }` when every unit can ferry to the hex, or `{ success: false, reason }` for the first failure.
+ * Expected outcome: `{ success: true }` when at least one selected unit can ferry and every other failure is that the unit is already based there. `{ success: false, reason }` for the first other failure, or when every unit is already based there.
  * Exceptions: Logged as `validateGroupFerryTarget: exception` and returned as `{ success: false, reason }`.
  */
 export function validateGroupFerryTarget(
@@ -436,6 +448,7 @@ export function validateGroupFerryTarget(
         allowedPlayer: HUMAN_PLAYER_ID,
         displayLabelForUnit: strategicLabel,
       }),
+    ignorableReason: FERRY_REASON_ALREADY_BASED,
   });
 }
 

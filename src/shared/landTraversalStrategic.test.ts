@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
+  storedStrategicTerrainKind,
   STRATEGIC_LAND_MAX_WATER_PCT,
   type StrategicLandMassRecord,
 } from './landTraversalStrategic';
@@ -238,6 +239,25 @@ function testAfricaAsiaCorridorSharedContinent(): void {
 }
 
 /**
+ * Checks which classified kind is stored for a new match.
+ *
+ * Purpose: Seeding must keep non-water kinds and open ocean, and must store a land-traversable water hex as coastal.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: Plains stays plains. Water at 39.7% with a continent id is coastal. Water at the cap stays water. Water with no landmass ids stays water. A null record stays water.
+ * Exceptions: None.
+ */
+function testStoredStrategicTerrainKind(): void {
+  assert.strictEqual(storedStrategicTerrainKind('plains', record('p', 10, [1])), 'plains');
+  assert.strictEqual(storedStrategicTerrainKind('water', record('c', 39.7, [1])), 'coastal');
+  assert.strictEqual(
+    storedStrategicTerrainKind('water', record('w', STRATEGIC_LAND_MAX_WATER_PCT, [1])),
+    'water'
+  );
+  assert.strictEqual(storedStrategicTerrainKind('water', record('o', 40)), 'water');
+  assert.strictEqual(storedStrategicTerrainKind('water', null), 'water');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -246,6 +266,7 @@ function testAfricaAsiaCorridorSharedContinent(): void {
  * Exceptions: None.
  */
 function run(): void {
+  testStoredStrategicTerrainKind();
   testSameContinentLowWater();
   testSameContinentHighWaterBlocked();
   testDifferentContinentBlocked();

@@ -313,7 +313,7 @@ export function computeTopBarStats(
  *
  * Purpose: Observe-all has no treasury, so the readout stays hidden.
  * When to use: `computeTopBarStats`.
- * Expected outcome: `short` when the balance cannot cover upkeep and pending fees.
+ * Expected outcome: `short` when the balance cannot cover upkeep. Hire fees are already subtracted from the balance.
  * Exceptions: None.
  */
 function creditsReadout(economy: MercenaryEconomySnapshot | undefined): (MercenaryFunds & { readonly short: boolean }) | null {
@@ -323,7 +323,7 @@ function creditsReadout(economy: MercenaryEconomySnapshot | undefined): (Mercena
     upkeepPerTurn: economy.upkeepPerTurn,
     pendingHireFees: economy.pendingHireFees,
     mercenaryCount: economy.mercenaryCount,
-    short: economy.credits < economy.upkeepPerTurn + economy.pendingHireFees,
+    short: economy.credits < economy.upkeepPerTurn,
   };
 }
 

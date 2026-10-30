@@ -1,9 +1,9 @@
 /**
  * Reads and changes one seat's hire orders during planning.
  *
- * Purpose: The panel and the AI submit the same checks, and neither spends credits.
+ * Purpose: The panel and the AI submit the same checks, and both take the fee when the order is stored.
  * When to use: The hire IPC handlers. The end of the turn fills orders through a different module.
- * Expected outcome: A rejection names the first failing reason. A success stores or deletes one row.
+ * Expected outcome: A rejection names the first failing reason. A success stores or deletes one row and adjusts the treasury.
  * Exceptions: Propagates SQLite errors. A closed database fails inside the snapshot read.
  */
 
@@ -20,13 +20,14 @@ import {
   HIRE_COUNT_MAX,
   HIRE_COUNT_MIN,
   HIRE_REASON_COUNT,
+  HIRE_SHORT_CREDITS,
+  hireShortageLabel,
+  oneUnitRaiseShortage,
   HIRE_REASON_NOT_ACTIVE,
   HIRE_REASON_NOT_PLANNING,
   HIRE_REASON_NOTHING_HERE,
   HIRE_REASON_ORDER_MISSING,
   HIRE_REASON_TACTICAL,
-  RAISE_REASON_CAPACITY,
-  RAISE_REASON_CAPACITY_USED,
   RAISE_REASON_TYPE,
   REHIRE_REASON_ALREADY_ORDERED,
   REHIRE_REASON_NOT_ELIGIBLE,
@@ -38,12 +39,15 @@ import { getGameStateForPlayer, getSeatRoster } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
 import { hireOrderFee, readMercenaryFunds } from '../gameDb/mercenaryEconomyRead';
 import {
+  addTreasuryCredits,
   deleteHireOrder,
+  getTreasuryCredits,
   insertHireOrder,
   listHireOrdersForSeat,
+  spendTreasuryCredits,
   type HireOrderRow,
 } from '../gameDb/mercenaryState';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import {
   buildHireContext,
@@ -103,7 +107,7 @@ interface SeatHexHire {
  *
  * Purpose: One read fills funds, options, candidates, and pending orders.
  * When to use: When the panel opens or refreshes. A missing hex returns null.
- * Expected outcome: A view. `hireAvailable` is false only when there is nothing to order and nothing to remove.
+ * Expected outcome: A view. `hireAvailable` stays true when `raiseShortage` is set, so a build hex keeps the Hire tab. It is false only when the hex is blocked or there is nothing to show and nothing to remove.
  * Exceptions: Propagates a database error from the snapshot or the fund read.
  */
 export function readHexHireView(h3Index: string, seatId: SeatId): HexHireView | null {
@@ -112,16 +116,31 @@ export function readHexHireView(h3Index: string, seatId: SeatId): HexHireView | 
   if (!evaluated) return null;
   const displayName = buildStrategicUnitDisplayLabelResolver(evaluated.state.units);
   const pendingOrders = evaluated.ordersHere.map((order) => orderView(order, displayName));
-  const fitting = evaluated.evaluation.raiseOptions.filter((option) => option.unitCost <= evaluated.capacityLeft);
-  const raiseBlockedReason = evaluated.evaluation.raiseBlockedReason
-    ?? (evaluated.evaluation.raiseOptions.length > 0 && fitting.length === 0 ? RAISE_REASON_CAPACITY_USED : null);
-  const raise: HireRaiseView | null = raiseBlockedReason || fitting.length === 0
-    ? null
-    : {
-        capacityPerTurn: evaluated.evaluation.raiseCapacityPerTurn,
-        capacityLeft: evaluated.capacityLeft,
-        options: fitting,
-      };
+  const funds = readMercenaryFunds(gameDbOps, seatId);
+  const evaluationReason = evaluated.evaluation.raiseBlockedReason;
+  let raise: HireRaiseView | null = null;
+  let raiseShortage: string | null = null;
+  let raiseBlockedReason: string | null = evaluationReason;
+  if (evaluationReason == null) {
+    raiseShortage = oneUnitRaiseShortage(
+      evaluated.evaluation.raiseOptions,
+      evaluated.capacityLeft,
+      funds.credits
+    );
+    if (raiseShortage == null) {
+      const options = evaluated.evaluation.raiseOptions.filter((option) =>
+        hireShortageLabel(funds.credits, option.fee, option.unitCost, evaluated.capacityLeft) == null
+      );
+      if (options.length > 0) {
+        raise = {
+          capacityPerTurn: evaluated.evaluation.raiseCapacityPerTurn,
+          capacityLeft: evaluated.capacityLeft,
+          options,
+        };
+      }
+    }
+    raiseBlockedReason = null;
+  }
   const orderedRehires = new Set(
     evaluated.ordersHere.filter((order) => order.kind === 'rehire').map((order) => order.neutralUnitId)
   );
@@ -135,17 +154,18 @@ export function readHexHireView(h3Index: string, seatId: SeatId): HexHireView | 
       upkeep: candidate.upkeep,
     }));
   const hireAvailable = (
-    evaluated.evaluation.blockedReason == null && (raise != null || rehireUnits.length > 0)
+    evaluated.evaluation.blockedReason == null && (raise != null || raiseShortage != null || rehireUnits.length > 0)
   ) || pendingOrders.length > 0;
   return {
     h3Index,
-    funds: readMercenaryFunds(gameDbOps, seatId),
+    funds,
     hireAvailable,
     unavailableReason: hireAvailable
       ? null
       : evaluated.evaluation.blockedReason ?? raiseBlockedReason ?? HIRE_REASON_NOTHING_HERE,
     raise,
     raiseBlockedReason: raise ? null : raiseBlockedReason,
+    raiseShortage,
     rehireUnits,
     pendingOrders,
   };
@@ -154,9 +174,9 @@ export function readHexHireView(h3Index: string, seatId: SeatId): HexHireView | 
 /**
  * Stores one hire order when the hex still allows it.
  *
- * Purpose: Planning records the request. The end of the turn decides whether the treasury can pay.
+ * Purpose: Planning records the request and takes its fee from the treasury.
  * When to use: A raise names a hex, a type, and a count. A rehire names a Neutral unit.
- * Expected outcome: `{ success: true, orderId }` or the first rejection reason. Credits do not change.
+ * Expected outcome: `{ success: true, orderId }` or the first rejection reason. A fee above 0 lowers the balance. A refusal leaves the balance unchanged.
  * Exceptions: Propagates SQLite errors from the insert.
  */
 export function executePlaceHireOrder(seatId: SeatId, request: HireOrderRequest): HireMutationResult {
@@ -173,14 +193,17 @@ export function executePlaceHireOrder(seatId: SeatId, request: HireOrderRequest)
  *
  * Purpose: The player can take an order back until Ready.
  * When to use: With the order id from the hire view. Another seat's id does not match.
- * Expected outcome: Success, or the planning, battle, or missing-order reason.
+ * Expected outcome: Success, or the planning, battle, or missing-order reason. A reserved fee is returned only after the row is deleted.
  * Exceptions: Propagates SQLite errors.
  */
 export function executeRemoveHireOrder(seatId: SeatId, orderId: number): HireMutationResult {
   logDebug('gameActions executeRemoveHireOrder', { seatId, orderId });
   const rejected = planningGate(seatId);
   if (rejected) return rejected;
+  const reserved = listHireOrdersForSeat(gameDbOps, seatId).find((order) => order.id === orderId)?.reservedCredits;
+  if (reserved == null) return failure(HIRE_REASON_ORDER_MISSING);
   if (!deleteHireOrder(gameDbOps, seatId, orderId)) return failure(HIRE_REASON_ORDER_MISSING);
+  if (reserved > 0) addTreasuryCredits(gameDbOps, seatId, reserved);
   return { success: true };
 }
 
@@ -232,12 +255,12 @@ function seatIsActive(seatId: SeatId): boolean {
 }
 
 /**
- * Stores a raise after the hex and capacity checks.
+ * Stores a raise after the hex and shortage checks.
  *
- * Purpose: The count and the type are checked only for a raise.
+ * Purpose: The count and the type are checked only for a raise. A fee or a production cost the hex cannot cover is refused before the treasury changes.
  * When to use: From `executePlaceHireOrder`.
- * Expected outcome: The new order id, or the first failing reason.
- * Exceptions: Propagates SQLite errors.
+ * Expected outcome: The new order id, or the first failing reason. One of the three shortage sentences leaves the balance unchanged. A fee that still fits is reserved before the insert.
+ * Exceptions: Propagates SQLite errors. A failed insert returns the fee.
  */
 function placeRaise(
   seatId: SeatId,
@@ -252,8 +275,14 @@ function placeRaise(
   if (evaluated.evaluation.raiseBlockedReason) return failure(evaluated.evaluation.raiseBlockedReason);
   const option = evaluated.evaluation.raiseOptions.find((row) => row.unitType === request.unitType);
   if (!option) return failure(RAISE_REASON_TYPE);
-  if (option.unitCost * request.count > evaluated.capacityLeft) return failure(RAISE_REASON_CAPACITY);
-  const orderId = insertHireOrder(gameDbOps, {
+  const shortage = hireShortageLabel(
+    getTreasuryCredits(gameDbOps, seatId),
+    option.fee * request.count,
+    option.unitCost * request.count,
+    evaluated.capacityLeft
+  );
+  if (shortage) return failure(shortage);
+  return insertReservedOrder(seatId, option.fee * request.count, {
     playerId: seatId,
     kind: 'raise',
     h3Index: request.h3Index,
@@ -262,7 +291,6 @@ function placeRaise(
     neutralUnitId: null,
     createdTurn: currentTurn(),
   });
-  return { success: true, orderId };
 }
 
 /**
@@ -270,8 +298,8 @@ function placeRaise(
  *
  * Purpose: The order keeps the unit's hex and type so a later view can label it.
  * When to use: From `executePlaceHireOrder`.
- * Expected outcome: The new order id, or the first failing reason. Funds are not checked.
- * Exceptions: Propagates SQLite errors.
+ * Expected outcome: The new order id, or the first failing reason. The fee is reserved before the insert.
+ * Exceptions: Propagates SQLite errors. A failed insert returns the fee.
  */
 function placeRehire(seatId: SeatId, unitId: string): HireMutationResult {
   const state = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false });
@@ -280,13 +308,12 @@ function placeRehire(seatId: SeatId, unitId: string): HireMutationResult {
   const evaluated = evaluateHexForSeat(unit.h3Index, seatId);
   if (!evaluated) return failure(REHIRE_REASON_NOT_ELIGIBLE);
   if (evaluated.evaluation.blockedReason) return failure(evaluated.evaluation.blockedReason);
-  if (!evaluated.evaluation.rehireCandidates.some((candidate) => candidate.unitId === unitId)) {
-    return failure(REHIRE_REASON_NOT_ELIGIBLE);
-  }
+  const candidate = evaluated.evaluation.rehireCandidates.find((row) => row.unitId === unitId);
+  if (!candidate) return failure(REHIRE_REASON_NOT_ELIGIBLE);
   if (evaluated.ordersHere.some((order) => order.kind === 'rehire' && order.neutralUnitId === unitId)) {
     return failure(REHIRE_REASON_ALREADY_ORDERED);
   }
-  const orderId = insertHireOrder(gameDbOps, {
+  return insertReservedOrder(seatId, candidate.fee, {
     playerId: seatId,
     kind: 'rehire',
     h3Index: unit.h3Index,
@@ -295,7 +322,30 @@ function placeRehire(seatId: SeatId, unitId: string): HireMutationResult {
     neutralUnitId: unitId,
     createdTurn: currentTurn(),
   });
-  return { success: true, orderId };
+}
+
+/**
+ * Spends a hire fee and stores the order that reserved it.
+ *
+ * Purpose: A refused hire leaves the treasury unchanged, and a failed insert gives the fee back.
+ * When to use: After the hex checks have accepted a raise or a rehire.
+ * Expected outcome: The new order id, or the short-credits reason. A fee of 0 is stored with nothing reserved.
+ * Exceptions: Propagates an insert error after returning the spent fee.
+ */
+function insertReservedOrder(
+  seatId: SeatId,
+  fee: number,
+  row: Omit<HireOrderRow, 'id' | 'reservedCredits'>
+): HireMutationResult {
+  if (fee > 0 && !spendTreasuryCredits(gameDbOps, seatId, fee)) return failure(HIRE_SHORT_CREDITS);
+  try {
+    const orderId = insertHireOrder(gameDbOps, { ...row, reservedCredits: fee });
+    return { success: true, orderId };
+  } catch (err) {
+    logError('gameActions insertReservedOrder failed', { seatId, fee, error: err });
+    if (fee > 0) addTreasuryCredits(gameDbOps, seatId, fee);
+    throw err;
+  }
 }
 
 /**
@@ -313,7 +363,7 @@ function currentTurn(): number {
 /**
  * One pending order for the panel, including a rehire's display name.
  *
- * Purpose: The fee comes from the same helper as the treasury warning.
+ * Purpose: The queue label prices the order. The reserved amount is what the treasury already took.
  * When to use: Mapping `ordersHere`.
  * Expected outcome: A raise has a null unit id and display name. A missing rehire target has a fee of 0.
  * Exceptions: None.

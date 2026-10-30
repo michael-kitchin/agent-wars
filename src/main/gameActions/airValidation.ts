@@ -99,12 +99,15 @@ export function validateAirStrikeOrder(
   return { valid: true };
 }
 
+/** Player-facing refusal when a ferry destination is the air unit's current hex. */
+export const FERRY_REASON_ALREADY_BASED = 'Air unit is already based at that airport';
+
 /**
  * Checks whether one air unit may ferry to another controlled airport.
  *
  * Purpose: Single-unit ferry gate shared by group targeting and order submit.
  * When to use: After the caller has a unit id and a destination hex.
- * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering ownership, range, and intact owned airports.
+ * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering a move off the current base, ownership, range, and intact owned airports.
  * Exceptions: None. A closed database returns `{ valid: false, reason: 'Database not initialized' }`.
  */
 export function validateFerryOrder(
@@ -119,6 +122,9 @@ export function validateFerryOrder(
   if (!owned.ok) return owned.failure;
   const unit = owned.unit;
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
+  if (destinationH3Index === unit.h3_index) {
+    return { valid: false, reason: FERRY_REASON_ALREADY_BASED };
+  }
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
   const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;

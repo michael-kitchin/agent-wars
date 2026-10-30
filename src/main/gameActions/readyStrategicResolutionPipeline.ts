@@ -419,6 +419,13 @@ export function executeReadyStrategicTurn(
     );
     if (!unit || unit.unit_type !== 'air') continue;
     const originH3Index = unit.h3_index;
+    if (originH3Index === ferry.destinationH3Index) {
+      logDebug('readyStrategicResolutionPipeline skip ferry to current base', {
+        unitId: ferry.unitId,
+        h3Index: originH3Index,
+      });
+      continue;
+    }
     const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [ferry.unitId])?.birth_h3_index;
     const ferryRange = strategicFerryRangeOnState(
       { weatherTags: weatherTagsForBirthHex(birth) },

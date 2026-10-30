@@ -12,6 +12,8 @@ import { test } from 'node:test';
 import { unitCostFor } from '../shared/gameRules';
 import {
   HIRE_REASON_NOT_PLANNING,
+  HIRE_SHORT_CREDITS,
+  HIRE_SHORT_PRODUCTION,
   MERCENARY_RAISE_CAPACITY_MULTIPLIER,
   RAISE_REASON_OCCUPIED,
   mercenaryHireFee,
@@ -30,8 +32,8 @@ import {
   setTreasuryCredits,
 } from './gameDb';
 import { gameDbOps } from './gameDb/dbConnection';
-import { mercenaryUpkeepForUnit } from './gameDb/mercenaryEconomyRead';
-import { executePlaceHireOrder, readHexHireView } from './gameActions/hireOrders';
+import { mercenaryUpkeepForUnit, readMercenaryFunds } from './gameDb/mercenaryEconomyRead';
+import { executePlaceHireOrder, executeRemoveHireOrder, readHexHireView } from './gameActions/hireOrders';
 import { resolveMercenariesAtEndOfTurn } from './gameActions/mercenaryTurnStep';
 import { createStrategicUnit } from './gameActions/strategicUnitSpawn';
 import { convertUnitsToNeutral } from './gameActions/unitOwnershipTransfer';
@@ -64,7 +66,9 @@ test('a raise on an empty city creates mercenaries, charges the fee, and deletes
       unitCount: 1,
       neutralUnitId: null,
       createdTurn: 1,
+      reservedCredits: 0,
     });
+    assert.equal(readMercenaryFunds(gameDbOps, HUMAN_SEAT_ID).pendingHireFees, 0);
     resolveMercenariesAtEndOfTurn({ turnNumber: 1, coordinates: buildLatLngCoordinateMap(getOrderedHexList()) });
     const hired = dbGetOne<{ player: string; mercenary: number; birth: string | null; formed: number }>(
       `SELECT player, is_mercenary AS mercenary, birth_h3_index AS birth, formed_turn AS formed
@@ -102,6 +106,7 @@ test('a rehire makes a Neutral unit a mercenary and charges twice its upkeep', (
       unitCount: 1,
       neutralUnitId: unitId,
       createdTurn: 1,
+      reservedCredits: 0,
     });
     resolveMercenariesAtEndOfTurn({ turnNumber: 1, coordinates: buildLatLngCoordinateMap(getOrderedHexList()) });
     const hired = dbGetOne<{ player: string; mercenary: number }>(
@@ -139,6 +144,7 @@ test('two seats ordering one Neutral unit leave the loser\'s treasury unchanged'
         unitCount: 1,
         neutralUnitId: unitId,
         createdTurn: 1,
+        reservedCredits: 0,
       });
     }
     resolveMercenariesAtEndOfTurn({ turnNumber: 1, coordinates: buildLatLngCoordinateMap(getOrderedHexList()) });
@@ -201,6 +207,8 @@ test('no mercenary and no order leaves the treasury and units unchanged', () => 
 test('place accepts an empty city, rejects a visible enemy, and rejects a turn that is not planning', () => {
   withTempGameDb('aw-hire-place-', () => {
     const h3 = emptyRaiseHex();
+    const fee = infantryFee(h3, 'raise');
+    setTreasuryCredits(HUMAN_SEAT_ID, fee);
     const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
       kind: 'raise',
       h3Index: h3,
@@ -208,6 +216,7 @@ test('place accepts an empty city, rejects a visible enemy, and rejects a turn t
       count: 1,
     });
     assert.equal(placed.success, true);
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), 0);
     const view = readHexHireView(h3, HUMAN_SEAT_ID);
     assert.equal(view?.pendingOrders.length, 1);
     assert.equal(view?.pendingOrders[0]?.fee, infantryFee(h3, 'raise'));
@@ -235,6 +244,125 @@ test('place accepts an empty city, rejects a visible enemy, and rejects a turn t
     });
     assert.equal(closed.success, false);
     assert.equal(closed.reason, HIRE_REASON_NOT_PLANNING);
+  });
+});
+
+test('a raise the balance cannot pay is refused and changes nothing', () => {
+  withTempGameDb('aw-hire-short-', () => {
+    const h3 = emptyRaiseHex();
+    const balance = infantryFee(h3, 'raise') - 1;
+    setTreasuryCredits(HUMAN_SEAT_ID, balance);
+    const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
+      kind: 'raise',
+      h3Index: h3,
+      unitType: 'infantry',
+      count: 1,
+    });
+    assert.equal(placed.success, false);
+    assert.equal(placed.reason, HIRE_SHORT_CREDITS);
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), balance);
+    assert.equal(listAllHireOrders().length, 0);
+    const view = readHexHireView(h3, HUMAN_SEAT_ID);
+    assert.equal(view?.raise, null);
+    assert.equal(view?.raiseShortage, HIRE_SHORT_CREDITS);
+    assert.equal(view?.hireAvailable, true);
+    assert.equal(view?.unavailableReason, null);
+    assert.equal(view?.raiseBlockedReason, null);
+  });
+});
+
+test('a raise count the hex cannot produce is refused and does not spend', () => {
+  withTempGameDb('aw-hire-capacity-', () => {
+    const h3 = emptyRaiseHex();
+    const balance = infantryFee(h3, 'raise') * 2;
+    setTreasuryCredits(HUMAN_SEAT_ID, balance);
+    const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
+      kind: 'raise',
+      h3Index: h3,
+      unitType: 'infantry',
+      count: 2,
+    });
+    assert.equal(placed.success, false);
+    assert.equal(placed.reason, HIRE_SHORT_PRODUCTION);
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), balance);
+    assert.equal(readHexHireView(h3, HUMAN_SEAT_ID)?.pendingOrders.length, 0);
+  });
+});
+
+test('placing a raise reserves its fee and removing it returns the fee', () => {
+  withTempGameDb('aw-hire-reserve-', () => {
+    const h3 = emptyRaiseHex();
+    const fee = infantryFee(h3, 'raise');
+    setTreasuryCredits(HUMAN_SEAT_ID, fee + 2);
+    const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
+      kind: 'raise',
+      h3Index: h3,
+      unitType: 'infantry',
+      count: 1,
+    });
+    assert.equal(placed.success, true);
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), 2);
+    const reserved = dbGetOne<{ reserved: number }>(
+      'SELECT reserved_credits AS reserved FROM res_s_hire_orders WHERE id = ?',
+      [placed.orderId]
+    );
+    assert.equal(reserved?.reserved, fee);
+    assert.equal(readMercenaryFunds(gameDbOps, HUMAN_SEAT_ID).pendingHireFees, fee);
+    const removed = executeRemoveHireOrder(HUMAN_SEAT_ID, placed.orderId ?? 0);
+    assert.equal(removed.success, true);
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), fee + 2);
+    assert.equal(readMercenaryFunds(gameDbOps, HUMAN_SEAT_ID).pendingHireFees, 0);
+  });
+});
+
+test('a reserved raise that fills is not charged again', () => {
+  withTempGameDb('aw-hire-reserved-fill-', () => {
+    const h3 = emptyRaiseHex();
+    const fee = infantryFee(h3, 'raise');
+    setTreasuryCredits(HUMAN_SEAT_ID, fee);
+    const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
+      kind: 'raise',
+      h3Index: h3,
+      unitType: 'infantry',
+      count: 1,
+    });
+    assert.equal(placed.success, true);
+    resolveMercenariesAtEndOfTurn({ turnNumber: 1, coordinates: buildLatLngCoordinateMap(getOrderedHexList()) });
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), 0);
+    const hired = dbGetOne<{ mercenary: number }>(
+      'SELECT is_mercenary AS mercenary FROM units WHERE player = ? AND h3_index = ?',
+      [HUMAN_SEAT_ID, h3]
+    );
+    assert.equal(hired?.mercenary, 1);
+  });
+});
+
+test('a reserved raise the board rejects returns the reserved fee', () => {
+  withTempGameDb('aw-hire-reserved-reject-', () => {
+    const h3 = emptyRaiseHex();
+    const fee = infantryFee(h3, 'raise');
+    setTreasuryCredits(HUMAN_SEAT_ID, fee);
+    const placed = executePlaceHireOrder(HUMAN_SEAT_ID, {
+      kind: 'raise',
+      h3Index: h3,
+      unitType: 'infantry',
+      count: 1,
+    });
+    assert.equal(placed.success, true);
+    createStrategicUnit({
+      owner: otherSeat(),
+      unitType: 'infantry',
+      h3Index: h3,
+      turnNumber: 1,
+      isMercenary: false,
+    });
+    resolveMercenariesAtEndOfTurn({ turnNumber: 1, coordinates: buildLatLngCoordinateMap(getOrderedHexList()) });
+    assert.equal(getTreasuryCredits(HUMAN_SEAT_ID), fee);
+    const hired = dbGetOne<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM units WHERE player = ? AND is_mercenary = 1',
+      [HUMAN_SEAT_ID]
+    );
+    assert.equal(hired?.count, 0);
   });
 });
 

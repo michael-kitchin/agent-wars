@@ -440,7 +440,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 5. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
 6. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
 7. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
-8. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. Orders fill at the end of the turn.
+8. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
 
 HOW TO USE THESE TOOLS EFFECTIVELY:
 
@@ -461,7 +461,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 - For every unit listed under ## Units Without Standing Orders, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn's movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.
 
-  When Suggested Destination starts with defend, assign defend on that hex, including an air unit that can strike. Do not march an air unit. When the cell is —, do not invent a march. Assign defend on its current hex only when an enemy is already observed and the unit is on that enemy or has no closing step. Never march to the unit's current Hex; that order is dropped as already arrived and the unit stays idle.
+  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit's current Hex; that order is dropped as already arrived and the unit stays idle.
 
   Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn's movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.
 - Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders and marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.

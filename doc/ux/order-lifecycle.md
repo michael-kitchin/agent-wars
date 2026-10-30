@@ -38,7 +38,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 
 ### Hire
 
-A hire order is a raise or a rehire placed during planning (`placeHireOrder`). It can be removed until Ready (`removeHireOrder`). It does not check the treasury. At the end of the turn `resolveMercenariesAtEndOfTurn` fills it or drops it. A dropped order is not charged. The human cannot place or remove one during a tactical battle. See [build-popup.md](build-popup.md) and [combat-rules-v3.md](../combat-rules-v3.md) §2.1.
+A hire order is a raise or a rehire placed during planning (`placeHireOrder`). It can be removed until Ready (`removeHireOrder`). The fee is reserved when the order is stored and refunded when it is removed. A raise that does not fit the capacity still left or the balance is refused and leaves the treasury unchanged. At the end of the turn `resolveMercenariesAtEndOfTurn` fills it or drops it. A reserved count that does not fill is refunded. An order stored with no reserved credits is still charged only for what fills. The human cannot place or remove one during a tactical battle. See [build-popup.md](build-popup.md) and [combat-rules-v3.md](../combat-rules-v3.md) §2.1.
 
 ## Lifecycle
 

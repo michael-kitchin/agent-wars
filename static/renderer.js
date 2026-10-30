@@ -183,16 +183,20 @@
   var MERCENARY_UPKEEP_DIVISOR = 8;
   var MERCENARY_ADVANCED_TECH_MULTIPLIER = 2;
   var MERCENARY_REHIRE_FEE_MULTIPLIER = 2;
+  var HIRE_COUNT_MIN = 1;
+  var HIRE_COUNT_MAX = 99;
   var HIREABLE_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
   var BUILD_TAB_LABEL = "Build";
   var HIRE_TAB_LABEL = "Hire";
   var HIRE_BUTTON_LABEL = "Hire";
   var REHIRE_SECTION_TITLE = "Neutral units";
   var PENDING_HIRE_SECTION_TITLE = "Hire Queue";
-  var CREDITS_LINE_LABEL = "Credits";
   var RAISE_CAPACITY_LABEL = "Production (Hire)";
-  var HIRE_FUNDS_WARNING = "Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.";
+  var HIRE_SHORT_CREDITS = "Not enough credits.";
+  var HIRE_SHORT_PRODUCTION = "Not enough production capacity.";
+  var HIRE_SHORT_BOTH = "Not enough credits or production capacity.";
   var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
+  var RAISE_REASON_CAPACITY_USED = "Your orders here already use this turn's raise capacity.";
   var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
   var MERCENARY_TOOLTIP_LABEL = "Mercenary";
   function isHireableUnitType(value) {
@@ -239,7 +243,7 @@
     const balance = formatCreditsAmount(String(funds.credits));
     const upkeep = formatCreditsAmount(String(funds.upkeepPerTurn));
     const hireOrders = formatCreditsAmount(String(funds.pendingHireFees));
-    return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn, and this turn's hire orders cost ${hireOrders}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
+    return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn. This turn's hire orders already took ${hireOrders} from that balance, and removing an order returns it. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
   }
   function formatHireEntryLabel(productionText) {
     return productionText;
@@ -247,13 +251,16 @@
   function formatHireEntryAriaLabel(h3Index) {
     return `Open hiring for ${h3Index}`;
   }
-  function formatRaiseCapacityValue(left, perTurn) {
-    const leftText = formatProductionCapacityAmount(String(left));
-    const perTurnText = formatProductionCapacityAmount(String(perTurn));
-    return `${leftText} of ${perTurnText} this turn`;
+  function formatRaiseCapacityValue(left) {
+    return formatProductionCapacityAmount(String(left));
   }
-  function formatHireCreditsValue(credits, upkeepPerTurn) {
-    return `${formatCreditsAmount(String(credits))} + ${formatCreditsAmount(String(upkeepPerTurn))} / turn`;
+  function hireShortageLabel(balance, fee, productionCost, capacityLeft) {
+    const creditsShort = fee > 0 && fee > balance;
+    const productionShort = productionCost > 0 && productionCost > capacityLeft;
+    if (creditsShort && productionShort) return HIRE_SHORT_BOTH;
+    if (creditsShort) return HIRE_SHORT_CREDITS;
+    if (productionShort) return HIRE_SHORT_PRODUCTION;
+    return null;
   }
   function formatHireOptionLabel(option2) {
     const price = formatCompactRaiseCost(option2.unitCost, option2.fee, option2.upkeep);
@@ -29501,7 +29508,7 @@ ${bonuses}`;
       upkeepPerTurn: economy.upkeepPerTurn,
       pendingHireFees: economy.pendingHireFees,
       mercenaryCount: economy.mercenaryCount,
-      short: economy.credits < economy.upkeepPerTurn + economy.pendingHireFees
+      short: economy.credits < economy.upkeepPerTurn
     };
   }
   function holdOf(input, viewer, hexes) {
@@ -33115,12 +33122,18 @@ ${bonuses}`;
     );
   }
   function replacePendingFerryOrdersForSelected(selectedIds, destinationH3Index) {
+    const alreadyBased = new Set(
+      selectedIds.filter(
+        (unitId) => rendererSharedState.gameState?.units.some((unit) => unit.id === unitId && unit.h3Index === destinationH3Index)
+      )
+    );
+    const movingIds = selectedIds.filter((unitId) => !alreadyBased.has(unitId));
     replacePendingOrdersForSelected(
-      () => rendererSharedState.pendingFerryOrders,
+      () => rendererSharedState.pendingFerryOrders.filter((row) => !alreadyBased.has(row.unitId)),
       (next) => {
         rendererSharedState.pendingFerryOrders = next;
       },
-      selectedIds,
+      movingIds,
       (unitId) => ({ unitId, destinationH3Index })
     );
   }
@@ -35784,12 +35797,14 @@ ${bonuses}`;
       return;
     }
     appendFunds(panel, view);
-    if (view.funds.credits < view.funds.upkeepPerTurn + view.funds.pendingHireFees) {
-      panel.appendChild(note(HIRE_FUNDS_WARNING, "hire-funds-warning"));
-    }
-    if (!view.hireAvailable && view.unavailableReason) panel.appendChild(note(view.unavailableReason));
+    if (view.raiseShortage) appendShortage(panel, view.raiseShortage);
+    const unavailable = view.hireAvailable ? null : visibleBlockedReason(view.unavailableReason);
+    if (unavailable) panel.appendChild(note(unavailable));
     if (view.raise) appendRaise(panel, h3Index, view, deps);
-    else if (view.raiseBlockedReason) panel.appendChild(note(view.raiseBlockedReason));
+    else if (!view.raiseShortage) {
+      const raiseBlocked = visibleBlockedReason(view.raiseBlockedReason);
+      if (raiseBlocked && raiseBlocked !== unavailable) panel.appendChild(note(raiseBlocked));
+    }
     if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
     if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
     if (!panel.hidden) placeOpenBuildPopup();
@@ -35814,12 +35829,9 @@ ${bonuses}`;
     panel.append(techLine, spacer());
   }
   function appendFunds(panel, view) {
-    const funds = view.funds;
     const raise = view.raise;
-    if (raise) {
-      appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
-    }
-    appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatHireCreditsValue(funds.credits, funds.upkeepPerTurn));
+    if (!raise) return;
+    appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft));
   }
   function appendLabeledAmount(panel, label, value) {
     panel.append(fundLine(label, value), spacer());
@@ -35829,10 +35841,18 @@ ${bonuses}`;
     gap.style.height = "0.5em";
     return gap;
   }
+  function endsWithSpacer(panel) {
+    const last = panel.lastElementChild;
+    return last instanceof HTMLElement && last.style.height === "0.5em" && last.childNodes.length === 0;
+  }
   function fundLine(label, value) {
     const line = document.createElement("div");
     line.innerHTML = `<strong>${label}:</strong> ${escapeBuildPopupHtml(value)}`;
     return line;
+  }
+  function visibleBlockedReason(text) {
+    if (!text || text === RAISE_REASON_CAPACITY_USED) return null;
+    return text;
   }
   function note(text, className = "build-no-urban") {
     const line = document.createElement("div");
@@ -35840,9 +35860,20 @@ ${bonuses}`;
     line.textContent = text;
     return line;
   }
+  function appendShortage(panel, sentence) {
+    if (!sentence) return;
+    panel.append(note(sentence, "hire-funds-warning"), spacer());
+  }
+  function selectedHireCount(countText) {
+    const raw = sanitizeBuildCountInputText(countText);
+    const count = parseInt(raw, 10);
+    if (!Number.isInteger(count) || count < HIRE_COUNT_MIN || count > HIRE_COUNT_MAX) return null;
+    return count;
+  }
   function appendRaise(panel, h3Index, view, deps) {
     const raise = view.raise;
     if (!raise) return;
+    const shortage = document.createElement("div");
     const section = document.createElement("div");
     section.className = "build-queue-section";
     const row = document.createElement("div");
@@ -35855,18 +35886,28 @@ ${bonuses}`;
       choice.textContent = formatHireOptionLabel(option2);
       typeSelect.appendChild(choice);
     }
+    const countInput = createBuildCountInput(hireCountTooltipText, "1");
     syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
     typeSelect.addEventListener("change", () => {
       syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+      shortage.replaceChildren();
     });
-    const countInput = createBuildCountInput(hireCountTooltipText, "1");
     countInput.addEventListener("input", () => {
       const raw = sanitizeBuildCountInputText(countInput.value);
       if (countInput.value !== raw) countInput.value = raw;
+      shortage.replaceChildren();
     });
     const button = hireButton();
     button.addEventListener("click", () => {
-      const count = parseInt(sanitizeBuildCountInputText(countInput.value), 10);
+      const count = selectedHireCount(countInput.value);
+      const option2 = raise.options.find((row2) => row2.unitType === typeSelect.value);
+      if (count == null || !option2) return;
+      const label = hireShortageLabel(view.funds.credits, option2.fee * count, option2.unitCost * count, raise.capacityLeft);
+      if (label) {
+        shortage.replaceChildren();
+        appendShortage(shortage, label);
+        return;
+      }
       void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({
         kind: "raise",
         h3Index,
@@ -35876,7 +35917,7 @@ ${bonuses}`;
     });
     row.append(typeSelect, countInput, button);
     section.appendChild(row);
-    panel.appendChild(section);
+    panel.append(shortage, section);
   }
   function appendRehires(panel, h3Index, view, deps) {
     const section = document.createElement("div");
@@ -35900,8 +35941,9 @@ ${bonuses}`;
     panel.appendChild(section);
   }
   function appendOrders(panel, h3Index, view, deps) {
+    if (!endsWithSpacer(panel)) panel.appendChild(spacer());
     const section = document.createElement("div");
-    section.className = "build-queue-section";
+    section.className = "build-queue-section hire-orders";
     section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
     for (const order of view.pendingOrders) {
       const row = document.createElement("div");
@@ -35917,7 +35959,7 @@ ${bonuses}`;
         void submitHire(panel, h3Index, deps, () => window.gameApi.removeHireOrder({ orderId: order.orderId }));
       });
       row.append(label, button);
-      section.appendChild(row);
+      section.append(row, spacer());
     }
     panel.appendChild(section);
   }

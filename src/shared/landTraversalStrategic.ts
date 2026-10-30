@@ -5,6 +5,7 @@
 
 import { gridDisk } from 'h3-js';
 import { isOnMap } from './loadedStrategicFootprint';
+import type { PipelineTerrainKind } from './pipelineTerrain';
 
 /**
  * Documents the module-scope binding `STRATEGIC_LAND_MAX_WATER_PCT` (STRATEGIC_LAND_MAX_WATER_PCT).
@@ -102,6 +103,25 @@ export function landUnitCanOccupyHex(h3: string, data: LandMassByH3): boolean {
   const record = data.get(h3);
   if (!record) return false;
   return record.continentIds.length > 0 || record.islandIds.length > 0;
+}
+
+/**
+ * Chooses the terrain kind written into `hexes` when a match is seeded.
+ *
+ * Purpose: A water-dominant hex that land units can already enter should be stored as coastal so the database, briefing map, and renderer agree.
+ * When to use: Once per hex inside new-match seeding, after the classified kind and land-mass record are known. Do not call it to relabel an existing match.
+ * Expected outcome: The classified kind unchanged, except `water` becomes `coastal` when the record is land-occupiable and `waterPct` is strictly below `STRATEGIC_LAND_MAX_WATER_PCT`. A null record, a hex with no continent or island id, or a hex at or above that cap stays `water`.
+ * Exceptions: None.
+ */
+export function storedStrategicTerrainKind(
+  classifiedKind: PipelineTerrainKind,
+  record: StrategicLandMassRecord | null
+): PipelineTerrainKind {
+  if (classifiedKind !== 'water') return classifiedKind;
+  if (!record) return 'water';
+  const occupiable = landUnitCanOccupyHex(record.h3Index, new Map([[record.h3Index, record]]));
+  if (!occupiable || record.waterPct >= STRATEGIC_LAND_MAX_WATER_PCT) return 'water';
+  return 'coastal';
 }
 
 /**

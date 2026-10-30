@@ -11,23 +11,24 @@ import { formatCompactHireCost } from '../../shared/economySymbols';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { HexHireView, HireMutationResult } from '../../shared/ipc/mercenaryTypes';
-import type { HireableUnitType } from '../../shared/mercenaryRules';
-import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
-import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import {
-  CREDITS_LINE_LABEL,
   HIRE_BUTTON_LABEL,
-  HIRE_FUNDS_WARNING,
+  HIRE_COUNT_MAX,
+  HIRE_COUNT_MIN,
   HIRE_ORDER_UPDATE_FAILED,
   HIRE_VIEW_FAILED,
   PENDING_HIRE_SECTION_TITLE,
   RAISE_CAPACITY_LABEL,
+  RAISE_REASON_CAPACITY_USED,
   REHIRE_SECTION_TITLE,
-  formatHireCreditsValue,
   formatHireOptionLabel,
   formatHireOrderLabel,
   formatRaiseCapacityValue,
+  hireShortageLabel,
+  type HireableUnitType,
 } from '../../shared/mercenaryRules';
+import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
+import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 import { setUnitNameContent } from '../core/unitOriginFlags';
 import { rendererSharedState as S } from '../core/state';
@@ -102,7 +103,7 @@ export async function fetchHirePanelData(h3Index: string): Promise<HirePanelData
  *
  * Purpose: Opening the panel and a successful button share this paint.
  * When to use: With data from `fetchHirePanelData`. The panel element is the `div.hire-panel`.
- * Expected outcome: The sections in order. A null view stops after the failure sentence.
+ * Expected outcome: The sections in order. A shortage sentence and the Hire Queue heading each have a 0.5em gap. A null view stops after the failure sentence.
  * Exceptions: None.
  */
 export function renderHirePanel(
@@ -122,12 +123,14 @@ export function renderHirePanel(
     return;
   }
   appendFunds(panel, view);
-  if (view.funds.credits < view.funds.upkeepPerTurn + view.funds.pendingHireFees) {
-    panel.appendChild(note(HIRE_FUNDS_WARNING, 'hire-funds-warning'));
-  }
-  if (!view.hireAvailable && view.unavailableReason) panel.appendChild(note(view.unavailableReason));
+  if (view.raiseShortage) appendShortage(panel, view.raiseShortage);
+  const unavailable = view.hireAvailable ? null : visibleBlockedReason(view.unavailableReason);
+  if (unavailable) panel.appendChild(note(unavailable));
   if (view.raise) appendRaise(panel, h3Index, view, deps);
-  else if (view.raiseBlockedReason) panel.appendChild(note(view.raiseBlockedReason));
+  else if (!view.raiseShortage) {
+    const raiseBlocked = visibleBlockedReason(view.raiseBlockedReason);
+    if (raiseBlocked && raiseBlocked !== unavailable) panel.appendChild(note(raiseBlocked));
+  }
   if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
   if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
   if (!panel.hidden) placeOpenBuildPopup();
@@ -171,26 +174,23 @@ function appendTechLine(panel: HTMLElement, h3Index: string): void {
 }
 
 /**
- * Remaining raise capacity, then the treasury balance with per-turn upkeep.
+ * Remaining raise capacity.
  *
- * Purpose: These labeled amounts sit together, with the same gap the build panel uses between its lines.
+ * Purpose: The labeled amount uses the same gap the build panel uses between its lines.
  * When to use: When a view was loaded.
- * Expected outcome: Production (Hire) when raising is available, then Credits as the balance plus per-turn upkeep. A spacer follows each shown line.
+ * Expected outcome: Production (Hire) when raising is available, followed by a spacer. Nothing when the raise select is hidden.
  * Exceptions: None.
  */
 function appendFunds(panel: HTMLElement, view: HexHireView): void {
-  const funds = view.funds;
   const raise = view.raise;
-  if (raise) {
-    appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
-  }
-  appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatHireCreditsValue(funds.credits, funds.upkeepPerTurn));
+  if (!raise) return;
+  appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft));
 }
 
 /**
  * One labeled amount and the spacer under it.
  *
- * Purpose: Production (Hire) and Credits share the build panel's gap.
+ * Purpose: Production (Hire) uses the build panel's gap.
  * When to use: From `appendFunds`.
  * Expected outcome: A strong label, the value, and a 0.5em spacer.
  * Exceptions: None.
@@ -203,7 +203,7 @@ function appendLabeledAmount(panel: HTMLElement, label: string, value: string): 
  * The empty gap the build panel puts between its information lines.
  *
  * Purpose: Hire information uses the same 0.5em gap.
- * When to use: After a caption, a tech line, or a labeled amount.
+ * When to use: After a caption, a tech line, a labeled amount, a shortage sentence, or a hire-queue row.
  * Expected outcome: A div whose height is 0.5em.
  * Exceptions: None.
  */
@@ -214,10 +214,23 @@ function spacer(): HTMLDivElement {
 }
 
 /**
+ * Whether the panel already ends with the hire gap.
+ *
+ * Purpose: A shortage line already leaves that gap, and the queue must not add a second one.
+ * When to use: Before the Hire Queue heading.
+ * Expected outcome: True when the last element is an empty 0.5em spacer.
+ * Exceptions: None.
+ */
+function endsWithSpacer(panel: HTMLElement): boolean {
+  const last = panel.lastElementChild;
+  return last instanceof HTMLElement && last.style.height === '0.5em' && last.childNodes.length === 0;
+}
+
+/**
  * One labeled fund line.
  *
  * Purpose: The label is a named constant, not a new literal.
- * When to use: Production (Hire) and Credits.
+ * When to use: Production (Hire).
  * Expected outcome: A line whose strong text is the label.
  * Exceptions: None.
  */
@@ -225,6 +238,19 @@ function fundLine(label: string, value: string): HTMLDivElement {
   const line = document.createElement('div');
   line.innerHTML = `<strong>${label}:</strong> ${escapeBuildPopupHtml(value)}`;
   return line;
+}
+
+/**
+ * A blocked sentence the Hire tab still shows.
+ *
+ * Purpose: The capacity-used sentence is replaced by the shortage label.
+ * When to use: Before appending `unavailableReason` or `raiseBlockedReason`.
+ * Expected outcome: The sentence, or null when it is missing or it is the capacity-used sentence.
+ * Exceptions: None.
+ */
+function visibleBlockedReason(text: string | null): string | null {
+  if (!text || text === RAISE_REASON_CAPACITY_USED) return null;
+  return text;
 }
 
 /**
@@ -243,16 +269,45 @@ function note(text: string, className = 'build-no-urban'): HTMLDivElement {
 }
 
 /**
+ * Shows one shortage sentence, or nothing when the selected raise fits.
+ *
+ * Purpose: The Hire tab names the shortage without a second server read.
+ * When to use: On the panel when the raise row is hidden, or on the host above the controls when a Hire click rejects the typed count.
+ * Expected outcome: A warning div and a 0.5em spacer, or no change when `sentence` is null.
+ * Exceptions: None.
+ */
+function appendShortage(panel: HTMLElement, sentence: string | null): void {
+  if (!sentence) return;
+  panel.append(note(sentence, 'hire-funds-warning'), spacer());
+}
+
+/**
+ * The count the Hire button would submit.
+ *
+ * Purpose: The Hire click uses the same count the order will store.
+ * When to use: When the player clicks Hire on the raise row.
+ * Expected outcome: An integer from 1 to 99, or null when the field is not one.
+ * Exceptions: None.
+ */
+function selectedHireCount(countText: string): number | null {
+  const raw = sanitizeBuildCountInputText(countText);
+  const count = parseInt(raw, 10);
+  if (!Number.isInteger(count) || count < HIRE_COUNT_MIN || count > HIRE_COUNT_MAX) return null;
+  return count;
+}
+
+/**
  * The raise section.
  *
- * Purpose: The player picks a type and a count, then stores the order.
+ * Purpose: The player picks a type and a count, then stores the order when that count fits.
  * When to use: When `view.raise` is set.
- * Expected outcome: One row of controls, with no section heading. Production (Hire) is already in the labeled lines.
+ * Expected outcome: One row of controls, with no section heading. A count that does not fit paints the shortage sentence above the row and does not place the order. Changing the type or the count clears that sentence.
  * Exceptions: None.
  */
 function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
   const raise = view.raise;
   if (!raise) return;
+  const shortage = document.createElement('div');
   const section = document.createElement('div');
   section.className = 'build-queue-section';
   const row = document.createElement('div');
@@ -265,18 +320,28 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
     choice.textContent = formatHireOptionLabel(option);
     typeSelect.appendChild(choice);
   }
+  const countInput = createBuildCountInput(hireCountTooltipText, '1');
   syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
   typeSelect.addEventListener('change', () => {
     syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
+    shortage.replaceChildren();
   });
-  const countInput = createBuildCountInput(hireCountTooltipText, '1');
   countInput.addEventListener('input', () => {
     const raw = sanitizeBuildCountInputText(countInput.value);
     if (countInput.value !== raw) countInput.value = raw;
+    shortage.replaceChildren();
   });
   const button = hireButton();
   button.addEventListener('click', () => {
-    const count = parseInt(sanitizeBuildCountInputText(countInput.value), 10);
+    const count = selectedHireCount(countInput.value);
+    const option = raise.options.find((row) => row.unitType === typeSelect.value);
+    if (count == null || !option) return;
+    const label = hireShortageLabel(view.funds.credits, option.fee * count, option.unitCost * count, raise.capacityLeft);
+    if (label) {
+      shortage.replaceChildren();
+      appendShortage(shortage, label);
+      return;
+    }
     void submitHire(panel, h3Index, deps, () => window.gameApi!.placeHireOrder({
       kind: 'raise',
       h3Index,
@@ -286,7 +351,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
   });
   row.append(typeSelect, countInput, button);
   section.appendChild(row);
-  panel.appendChild(section);
+  panel.append(shortage, section);
 }
 
 /**
@@ -324,12 +389,13 @@ function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, d
  *
  * Purpose: The player can remove an order before Ready.
  * When to use: When the view lists at least one.
- * Expected outcome: One row per order.
+ * Expected outcome: One 0.5em gap above the heading, then one row per order, then a 0.5em gap after each row. The gap above is skipped when the panel already ends with one.
  * Exceptions: None.
  */
 function appendOrders(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
+  if (!endsWithSpacer(panel)) panel.appendChild(spacer());
   const section = document.createElement('div');
-  section.className = 'build-queue-section';
+  section.className = 'build-queue-section hire-orders';
   section.appendChild(head(PENDING_HIRE_SECTION_TITLE));
   for (const order of view.pendingOrders) {
     const row = document.createElement('div');
@@ -345,7 +411,7 @@ function appendOrders(panel: HTMLElement, h3Index: string, view: HexHireView, de
       void submitHire(panel, h3Index, deps, () => window.gameApi!.removeHireOrder({ orderId: order.orderId }));
     });
     row.append(label, button);
-    section.appendChild(row);
+    section.append(row, spacer());
   }
   panel.appendChild(section);
 }

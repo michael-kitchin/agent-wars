@@ -93,6 +93,15 @@ export interface HireOrderRow {
    * Exceptions: None.
    */
   readonly createdTurn: number;
+  /**
+   * Credits taken from the treasury when this order was stored.
+   *
+   * Contract: 0 for an order stored before fees were reserved. Otherwise the fee for the whole count.
+   * When to use: Refunding a remove, and deciding whether the end of the turn charges again.
+   * Expected outcome: A non-negative integer. A reserved order is not charged a second time.
+   * Exceptions: None.
+   */
+  readonly reservedCredits: number;
 }
 
 /**
@@ -191,6 +200,38 @@ export function addTreasuryCredits(ops: BasicDbOps, seatId: SeatId, amount: numb
 }
 
 /**
+ * Subtracts a fee from a seat's treasury when the balance can cover it.
+ *
+ * Purpose: A hire order takes its fee when the row is stored.
+ * When to use: After the other hire checks have passed, and only for a fee above 0.
+ * Expected outcome: True when the balance dropped by `amount`. False when `amount` is not a positive integer or the balance is below it. The stored balance is never negative.
+ * Exceptions: Propagates SQLite errors from the write.
+ */
+export function spendTreasuryCredits(ops: BasicDbOps, seatId: SeatId, amount: number): boolean {
+  logDebug('gameDb spendTreasuryCredits', { seatId, amount });
+  if (!Number.isInteger(amount) || amount <= 0) return false;
+  const balance = getTreasuryCredits(ops, seatId);
+  if (balance < amount) return false;
+  setTreasuryCredits(ops, seatId, balance - amount);
+  return true;
+}
+
+/**
+ * Adds the reserved-credits column to a match created before that column existed.
+ *
+ * Purpose: An existing match keeps its user version, so the column is added in place.
+ * When to use: After the database handle is open, including a fresh database whose DDL already has the column.
+ * Expected outcome: The column exists. A second call does nothing. The user version is unchanged.
+ * Exceptions: Propagates SQLite errors from the alter.
+ */
+export function ensureHireOrderReservedCreditsColumn(ops: BasicDbOps): void {
+  logDebug('gameDb ensureHireOrderReservedCreditsColumn');
+  const columns = ops.getAll<{ name: string } & Record<string, unknown>>('PRAGMA table_info(res_s_hire_orders)');
+  if (columns.some((column) => column.name === 'reserved_credits')) return;
+  ops.run('ALTER TABLE res_s_hire_orders ADD COLUMN reserved_credits INTEGER NOT NULL DEFAULT 0');
+}
+
+/**
  * Lists one seat's hire orders, oldest id first.
  *
  * Purpose: The hire panel and fee total see only that seat's orders.
@@ -201,7 +242,7 @@ export function addTreasuryCredits(ops: BasicDbOps, seatId: SeatId, amount: numb
 export function listHireOrdersForSeat(ops: BasicDbOps, seatId: SeatId): HireOrderRow[] {
   logTrace('gameDb listHireOrdersForSeat', { seatId });
   const rows = ops.getAll<HireOrderSqlRow & Record<string, unknown>>(
-    `SELECT id, player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn
+    `SELECT id, player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn, reserved_credits
      FROM res_s_hire_orders WHERE player_id = ? ORDER BY id`,
     [seatId]
   );
@@ -219,7 +260,7 @@ export function listHireOrdersForSeat(ops: BasicDbOps, seatId: SeatId): HireOrde
 export function listAllHireOrders(ops: BasicDbOps): HireOrderRow[] {
   logTrace('gameDb listAllHireOrders', {});
   const rows = ops.getAll<HireOrderSqlRow & Record<string, unknown>>(
-    `SELECT id, player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn
+    `SELECT id, player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn, reserved_credits
      FROM res_s_hire_orders ORDER BY id`
   );
   return mapHireOrderRows(rows);
@@ -228,9 +269,9 @@ export function listAllHireOrders(ops: BasicDbOps): HireOrderRow[] {
 /**
  * Inserts one hire order and returns its id.
  *
- * Purpose: Planning stores the order without charging the treasury.
- * When to use: After the hire checks have accepted the request.
- * Expected outcome: The new row id.
+ * Purpose: Planning stores the order and the credits already taken for it.
+ * When to use: After the hire checks have accepted the request and any fee has been spent.
+ * Expected outcome: The new row id. `reservedCredits` is the amount to refund if the order does not fill.
  * Exceptions: SQLite throws when the kind, count, or unit-id check fails.
  */
 export function insertHireOrder(ops: BasicDbOps, row: Omit<HireOrderRow, 'id'>): number {
@@ -242,12 +283,23 @@ export function insertHireOrder(ops: BasicDbOps, row: Omit<HireOrderRow, 'id'>):
     unitCount: row.unitCount,
     neutralUnitId: row.neutralUnitId,
     createdTurn: row.createdTurn,
+    reservedCredits: row.reservedCredits,
   });
+  assertNonNegativeInteger(row.reservedCredits, 'reservedCredits');
   ops.run(
     `INSERT INTO res_s_hire_orders (
-       player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn
-     ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [row.playerId, row.kind, row.h3Index, row.unitType, row.unitCount, row.neutralUnitId, row.createdTurn]
+       player_id, kind, h3_index, unit_type, unit_count, neutral_unit_id, created_turn, reserved_credits
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.playerId,
+      row.kind,
+      row.h3Index,
+      row.unitType,
+      row.unitCount,
+      row.neutralUnitId,
+      row.createdTurn,
+      row.reservedCredits,
+    ]
   );
   const inserted = ops.getOne<{ id: number }>('SELECT last_insert_rowid() AS id');
   return inserted?.id ?? 0;
@@ -315,6 +367,7 @@ type HireOrderSqlRow = {
   readonly unit_count: number;
   readonly neutral_unit_id: string | null;
   readonly created_turn: number;
+  readonly reserved_credits: number;
 };
 
 /**
@@ -376,7 +429,25 @@ function mapHireOrderRow(row: HireOrderSqlRow): HireOrderRow | null {
     unitCount: row.unit_count,
     neutralUnitId: row.neutral_unit_id,
     createdTurn: row.created_turn,
+    reservedCredits: reservedCreditsOf(row),
   };
+}
+
+/**
+ * Reads the reserved fee from a hire-order row.
+ *
+ * Purpose: An older row, or a row whose stored value is not a count of credits, reserves nothing.
+ * When to use: While mapping a hire-order row.
+ * Expected outcome: The stored non-negative integer, or 0.
+ * Exceptions: None. A bad value is logged.
+ */
+function reservedCreditsOf(row: HireOrderSqlRow): number {
+  if (Number.isInteger(row.reserved_credits) && row.reserved_credits >= 0) return row.reserved_credits;
+  logError('gameDb mercenaryState: hire order reserved credits reset to 0', {
+    id: row.id,
+    reservedCredits: row.reserved_credits,
+  });
+  return 0;
 }
 
 /**

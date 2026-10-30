@@ -46,8 +46,8 @@ export function mercenaryUpkeepForUnit(
 /**
  * The fee one hire order will charge if it fills.
  *
- * Purpose: The warning adds pending fees to upkeep before the end of the turn collects them.
- * When to use: For each of the seat's hire orders.
+ * Purpose: The hire queue and the per-order tool row price the order. The treasury tip uses `reservedCredits` instead.
+ * When to use: For each of the seat's hire orders when a label or a tool row needs the priced fee.
  * Expected outcome: A raise is one turn of upkeep times the count. A rehire is two turns of the named unit's upkeep.
  * Exceptions: None. A missing rehire target is logged and returns 0.
  */
@@ -73,7 +73,7 @@ export function hireOrderFee(ops: BasicDbOps, order: HireOrderRow): number {
  *
  * Purpose: One read for the snapshot and any later caller that should not rebuild the figures.
  * When to use: When attaching `mercenaryEconomy`, and when a tool asks what the seat can spend.
- * Expected outcome: The live treasury and the sums of current mercenaries and current orders.
+ * Expected outcome: The live treasury, current mercenary upkeep, and the credits already reserved for current orders.
  * Exceptions: Propagates SQLite errors. A bad unit or order contributes 0, as the helpers log.
  */
 export function readMercenaryFunds(ops: BasicDbOps, seatId: SeatId): MercenaryFunds {
@@ -81,7 +81,7 @@ export function readMercenaryFunds(ops: BasicDbOps, seatId: SeatId): MercenaryFu
   const units = listMercenaryUnitsForSeat(ops, seatId);
   const orders = listHireOrdersForSeat(ops, seatId);
   const upkeepPerTurn = units.reduce((sum, unit) => sum + mercenaryUpkeepForUnit(ops, unit), 0);
-  const pendingHireFees = orders.reduce((sum, order) => sum + hireOrderFee(ops, order), 0);
+  const pendingHireFees = orders.reduce((sum, order) => sum + order.reservedCredits, 0);
   return {
     credits: getTreasuryCredits(ops, seatId),
     upkeepPerTurn,

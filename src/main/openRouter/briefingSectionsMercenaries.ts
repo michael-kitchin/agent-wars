@@ -57,7 +57,7 @@ export function buildMercenariesBriefingBlock(
   const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', options.productionEnabled ? buildMercenaryRule() : buildMercenaryUpkeepRule()];
   if (options.productionEnabled) lines.push('', MERCENARY_ENVELOPE_ROWS_SENTENCE);
   lines.push('', formatMercenaryFundsLine(economy));
-  if (economy.credits < economy.upkeepPerTurn + economy.pendingHireFees) lines.push(MERCENARY_FUNDS_WARNING);
+  if (economy.credits < economy.upkeepPerTurn) lines.push(MERCENARY_FUNDS_WARNING);
   if (mercenaries.length > 0) {
     lines.push('', 'Your mercenaries', '', mercenaryTable(mercenaries, format));
   }

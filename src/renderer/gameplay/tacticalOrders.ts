@@ -114,20 +114,26 @@ export function replacePendingMissileLaunchesForSelected(selectedIds: string[], 
 }
 
 /**
- * Defines the `replacePendingFerryOrdersForSelected` function shape (export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void).
-
- * Purpose: Supports maintainability by documenting why `replacePendingFerryOrdersForSelected` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Queues a ferry for each selected air unit that is not already based at the destination.
+ *
+ * Purpose: A group double-click means "everyone else rebase here." A unit already on that hex is not given a no-op order, and any earlier ferry for it is dropped.
+ * When to use: After `validateGroupFerryTarget` succeeds for the selection.
+ * Expected outcome: Moving units replace their pending ferry. Units already at `destinationH3Index` lose any pending ferry and are not re-queued. Other units' ferries stay.
  * Exceptions: None.
  */
 export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
+  const alreadyBased = new Set(
+    selectedIds.filter((unitId) =>
+      S.gameState?.units.some((unit) => unit.id === unitId && unit.h3Index === destinationH3Index)
+    )
+  );
+  const movingIds = selectedIds.filter((unitId) => !alreadyBased.has(unitId));
   replacePendingOrdersForSelected(
-    () => S.pendingFerryOrders,
+    () => S.pendingFerryOrders.filter((row) => !alreadyBased.has(row.unitId)),
     (next) => {
       S.pendingFerryOrders = next;
     },
-    selectedIds,
+    movingIds,
     (unitId) => ({ unitId, destinationH3Index })
   );
 }
