@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { unitCostFor } from '../shared/gameRules';
 import {
+  HIRE_ALLOCATED_CREDITS,
   HIRE_REASON_NOT_PLANNING,
   HIRE_SHORT_CREDITS,
   HIRE_SHORT_PRODUCTION,
@@ -264,7 +265,7 @@ test('a raise the balance cannot pay is refused and changes nothing', () => {
     assert.equal(listAllHireOrders().length, 0);
     const view = readHexHireView(h3, HUMAN_SEAT_ID);
     assert.equal(view?.raise, null);
-    assert.equal(view?.raiseShortage, HIRE_SHORT_CREDITS);
+    assert.equal(view?.raiseShortage, HIRE_ALLOCATED_CREDITS);
     assert.equal(view?.hireAvailable, true);
     assert.equal(view?.unavailableReason, null);
     assert.equal(view?.raiseBlockedReason, null);

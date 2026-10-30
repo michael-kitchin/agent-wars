@@ -13,6 +13,9 @@ import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
 import { formatCompactHireCost, formatCompactRaiseCost, formatProductionCapacityAmount } from './economySymbols';
 import { unitCostFor } from './gameRules';
 import {
+  HIRE_ALLOCATED_BOTH,
+  HIRE_ALLOCATED_CREDITS,
+  HIRE_ALLOCATED_PRODUCTION,
   HIRE_SHORT_BOTH,
   HIRE_SHORT_CREDITS,
   HIRE_SHORT_PRODUCTION,
@@ -112,11 +115,11 @@ test('the raise row is offered only when one unit fits both limits', () => {
   const infantry = { unitCost: 20, fee: 3 };
   const armor = { unitCost: 40, fee: 5 };
   assert.equal(oneUnitRaiseShortage([infantry], 20, 3), null);
-  assert.equal(oneUnitRaiseShortage([infantry], 0, 3), HIRE_SHORT_PRODUCTION);
-  assert.equal(oneUnitRaiseShortage([infantry], 20, 0), HIRE_SHORT_CREDITS);
-  assert.equal(oneUnitRaiseShortage([infantry], 0, 0), HIRE_SHORT_BOTH);
+  assert.equal(oneUnitRaiseShortage([infantry], 0, 3), HIRE_ALLOCATED_PRODUCTION);
+  assert.equal(oneUnitRaiseShortage([infantry], 20, 0), HIRE_ALLOCATED_CREDITS);
+  assert.equal(oneUnitRaiseShortage([infantry], 0, 0), HIRE_ALLOCATED_BOTH);
   assert.equal(oneUnitRaiseShortage([infantry, armor], 20, 3), null);
-  assert.equal(oneUnitRaiseShortage([infantry, armor], 20, 0), HIRE_SHORT_CREDITS);
-  assert.equal(oneUnitRaiseShortage([{ unitCost: 20, fee: 5 }, { unitCost: 40, fee: 3 }], 20, 3), HIRE_SHORT_BOTH);
+  assert.equal(oneUnitRaiseShortage([infantry, armor], 20, 0), HIRE_ALLOCATED_CREDITS);
+  assert.equal(oneUnitRaiseShortage([{ unitCost: 20, fee: 5 }, { unitCost: 40, fee: 3 }], 20, 3), HIRE_ALLOCATED_BOTH);
   assert.equal(oneUnitRaiseShortage([], 0, 0), null);
 });

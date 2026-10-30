@@ -277,7 +277,7 @@
     return `${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
   }
   function formatMercenaryTooltipValue(upkeep) {
-    return `upkeep ${formatCreditsAmount(String(upkeep))} per turn`;
+    return `${formatCreditsAmount(String(upkeep))} / turn`;
   }
   function capitalizeUnitType(unitType) {
     return unitType.charAt(0).toUpperCase() + unitType.slice(1);
@@ -16424,20 +16424,18 @@
   }
 
   // src/renderer/rendering/mercenaryBadgeDrawing.ts
-  var MERCENARY_BADGE_TEXT = "$";
+  var MERCENARY_BADGE_TEXT = CREDITS_SYMBOL;
   var MERCENARY_BADGE_FONT = "bold 11px system-ui, sans-serif";
-  var MERCENARY_BADGE_Y_OFFSET_RATIO = 0.6;
   function drawMercenaryBadge(ctx, x, y) {
-    const badgeY = y + UNIT_RADIUS * MERCENARY_BADGE_Y_OFFSET_RATIO;
     ctx.save();
     ctx.font = MERCENARY_BADGE_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
-    ctx.strokeText(MERCENARY_BADGE_TEXT, x, badgeY);
+    ctx.strokeText(MERCENARY_BADGE_TEXT, x, y);
     ctx.fillStyle = "#000";
-    ctx.fillText(MERCENARY_BADGE_TEXT, x, badgeY);
+    ctx.fillText(MERCENARY_BADGE_TEXT, x, y);
     ctx.restore();
   }
 
@@ -41329,7 +41327,10 @@ ${bonuses}`;
       if (!explored) continue;
       if (!isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx)) {
         const hireRow = hireEntryRowForHex(hx.h3Index, hexCenterPx(hx.h3Index), map.getSize(), hireHexes);
-        if (hireRow) rows.push(hireRow);
+        if (hireRow) {
+          const hireSharesTheHex = visibleUnitHexes.has(hx.h3Index) || hasVisibleStrategicInfrastructureGlyphs4(hx.h3Index, tacticalOn, visibleUnitHexes);
+          rows.push(hireSharesTheHex ? { ...hireRow, top: Math.round(computeStrategicOverlayTextY(hx.h3Index, map, L, true)) } : hireRow);
+        }
         continue;
       }
       const capacityPerTurn = getUrbanProductionCapacityForHex2(hx.h3Index);

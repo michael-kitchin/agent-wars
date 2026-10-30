@@ -67,6 +67,15 @@ export const HIRE_SHORT_PRODUCTION = 'Not enough production capacity.';
 /** Shown when the selected raise fits neither the balance nor the capacity left. */
 export const HIRE_SHORT_BOTH = 'Not enough credits or production capacity.';
 
+/** Shown when no raise type fits one unit because every fee is above the balance. */
+export const HIRE_ALLOCATED_CREDITS = 'All credits allocated.';
+
+/** Shown when no raise type fits one unit because every production cost is above the capacity left. */
+export const HIRE_ALLOCATED_PRODUCTION = 'All production capacity allocated.';
+
+/** Shown when no raise type fits one unit, and the failure is not credits alone or production alone. */
+export const HIRE_ALLOCATED_BOTH = 'All credits and production capacity allocated.';
+
 /** Shown when the hire view could not be loaded. */
 export const HIRE_VIEW_FAILED = 'Hiring information could not be loaded.';
 
@@ -124,7 +133,7 @@ export const HIRE_ORDER_INVALID_PAYLOAD = 'Invalid hire order.';
 /** Toast when a hire IPC call fails without its own reason. */
 export const HIRE_ORDER_UPDATE_FAILED = 'Failed to update hire orders.';
 
-/** Unit-tooltip label for the mercenary line. */
+/** Bold label on the mercenary upkeep line. */
 export const MERCENARY_TOOLTIP_LABEL = 'Mercenary';
 
 /**
@@ -325,8 +334,8 @@ export function formatRaiseCapacityValue(left: number): string {
 /**
  * The Hire-tab sentence for a raise the balance or the remaining capacity cannot cover.
  *
- * Purpose: Names the shortage for one fee and one production cost. The Hire tab shows it when no type fits one unit, and again when a Hire click rejects the typed count.
- * When to use: With the present balance, the selected fee, the selected production cost, and the capacity still left. The Hire click uses the typed count. A one-unit offer uses this for a single unit.
+ * Purpose: Names the shortage for one fee and one production cost. A Hire click and a server refusal show this return. `oneUnitRaiseShortage` uses it only to decide whether any offer fits one unit, and shows the allocated sentences instead.
+ * When to use: With the present balance, the selected fee, the selected production cost, and the capacity still left. The Hire click uses the typed count.
  * Expected outcome: One of the three shortage sentences, or null when a fee of 0 is not a credit shortage, a production cost of 0 is not a capacity shortage, and an equal balance or equal capacity is enough.
  * Exceptions: None.
  */
@@ -360,9 +369,9 @@ export interface OneUnitRaiseOffer {
 /**
  * The sentence for a hex where no raise type fits one unit.
  *
- * Purpose: The Hire tab shows the raise row only when one unit fits both remaining production and the balance.
- * When to use: With every raise option on the hex, the capacity still left, and the present balance. Do not use it to replace an occupied, fortified, or no-capacity sentence.
- * Expected outcome: Null when the list is empty or some offer fits one unit, so the row can be shown. Otherwise one shortage sentence, which is the whole explanation and the row stays hidden.
+ * Purpose: The Hire tab shows the raise row only when one unit fits both remaining production and the balance. This sentence is the red line while those controls are hidden.
+ * When to use: With every raise option on the hex, the capacity still left, and the present balance. Do not use it for a Hire click, and do not use it to replace an occupied, fortified, or no-capacity sentence.
+ * Expected outcome: Null when the list is empty or some offer fits one unit, so the row can be shown. Otherwise `HIRE_ALLOCATED_CREDITS` when some offer fits capacity and none fit the balance, `HIRE_ALLOCATED_PRODUCTION` when some offer fits the balance and none fit capacity, or `HIRE_ALLOCATED_BOTH` when none fits both, including when one offer fits capacity and another fits the balance.
  * Exceptions: None.
  */
 export function oneUnitRaiseShortage(
@@ -376,9 +385,9 @@ export function oneUnitRaiseShortage(
   }
   const capacityFits = offers.some((offer) => offer.unitCost <= capacityLeft);
   const creditsFit = offers.some((offer) => !(offer.fee > 0 && offer.fee > balance));
-  if (capacityFits && !creditsFit) return HIRE_SHORT_CREDITS;
-  if (!capacityFits && creditsFit) return HIRE_SHORT_PRODUCTION;
-  return HIRE_SHORT_BOTH;
+  if (capacityFits && !creditsFit) return HIRE_ALLOCATED_CREDITS;
+  if (!capacityFits && creditsFit) return HIRE_ALLOCATED_PRODUCTION;
+  return HIRE_ALLOCATED_BOTH;
 }
 
 /**
@@ -425,15 +434,15 @@ export function formatHireOrderLabel(order: {
 }
 
 /**
- * Value for the Mercenary tooltip line.
+ * Upkeep line for a mercenary the player can see.
  *
- * Purpose: Anyone who can see the unit can see what it costs to keep.
- * When to use: After the date-of-birth line, when the unit is a mercenary.
- * Expected outcome: `upkeep`, the credits symbol, the amount, and `per turn`.
+ * Purpose: Anyone who can see the unit can see what it costs to keep. The caller adds the Mercenary label.
+ * When to use: After the date-of-birth line, beside `MERCENARY_TOOLTIP_LABEL`, when the unit is a mercenary.
+ * Expected outcome: The credits symbol, the amount, and ` / turn`. An upkeep of 0 is `¤0 / turn`.
  * Exceptions: None.
  */
 export function formatMercenaryTooltipValue(upkeep: number): string {
-  return `upkeep ${formatCreditsAmount(String(upkeep))} per turn`;
+  return `${formatCreditsAmount(String(upkeep))} / turn`;
 }
 
 /**

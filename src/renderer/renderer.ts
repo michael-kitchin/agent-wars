@@ -338,7 +338,14 @@ function syncBuildEntryButton(): void {
     if (!explored) continue;
     if (!isStrategicHexHumanUrbanProduction(S.gameState, hx)) {
       const hireRow = hireEntryRowForHex(hx.h3Index, hexCenterPx(hx.h3Index), map.getSize(), hireHexes);
-      if (hireRow) rows.push(hireRow);
+      if (hireRow) {
+        // Drop to the build button's lower band when units or an airport or seaport glyph already occupy the hex. Holding T does not move an empty hire hex.
+        const hireSharesTheHex = visibleUnitHexes.has(hx.h3Index)
+          || hasVisibleStrategicInfrastructureGlyphs(hx.h3Index, tacticalOn, visibleUnitHexes);
+        rows.push(hireSharesTheHex
+          ? { ...hireRow, top: Math.round(computeStrategicOverlayTextY(hx.h3Index, map, L, true)) }
+          : hireRow);
+      }
       continue;
     }
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);

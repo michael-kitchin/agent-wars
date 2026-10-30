@@ -119,7 +119,7 @@ When this guide and the running app disagree, the app wins until this file is up
 - **Strategic status icons (live):** Outside a battle and outside battle-detail zoom, status icons sit above each world hex. Weather shows while the Weather tab is on, in either view. Turning Tech on, or holding T, adds the tech icon. One icon is centered; a hex with both shows them side by side, tech on the left, 2 px apart. The files are the same tech and weather SVGs as the hex tooltip. Behavior is in [ux/map-surface.md](ux/map-surface.md).
 - **Unit state:** Selection, movement-in-progress, and pending orders should be obvious (e.g., outline, halo, or icon badge). Strength or health (e.g., bars or numeric) should be readable at default zoom without cluttering the map.
 - **Stacking:** When multiple units occupy one hex, show stack count and/or a compact summary (e.g., icon + number). Detail on click or in the unit panel.
-- **Mercenary badge:** A token that still contains a mercenary draws `$` (`MERCENARY_BADGE_TEXT`) low and centered, in bold 11 px, with a 2 px white stroke and a black fill (`drawMercenaryBadge`).
+- **Mercenary badge:** A token that still contains a mercenary draws `CREDITS_SYMBOL` (`MERCENARY_BADGE_TEXT`) at the token center, in bold 11 px, with a 2 px white stroke and a black fill (`drawMercenaryBadge`).
 
 ### 2.3 Top Bar
 

@@ -198,7 +198,7 @@ test('the Tech row names Basic or Advanced, and a missing tier stays None', () =
  *
  * Purpose: The flag tooltip is how a player sees what a mercenary costs.
  * When to use: After changing the identity lines.
- * Expected outcome: The Mercenary line is after DOB.
+ * Expected outcome: Bold `Mercenary:` and the upkeep amount follow DOB.
  * Exceptions: AssertionError when the line is missing or out of order.
  */
 test('a mercenary identity adds the Mercenary line after the date of birth', () => {
@@ -208,8 +208,9 @@ test('a mercenary identity adds the Mercenary line after the date of birth', () 
     identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryUpkeep: 3 },
   });
   const dob = html.indexOf('<strong>DOB:</strong>');
-  const mercenary = html.indexOf(`<strong>Mercenary:</strong> upkeep ${CREDITS_SYMBOL}3 per turn`);
+  const mercenary = html.indexOf(`<strong>Mercenary:</strong> ${CREDITS_SYMBOL}3 / turn`);
   assert.ok(dob >= 0 && mercenary > dob);
+  assert.equal(html.includes('upkeep'), false);
 });
 
 /**

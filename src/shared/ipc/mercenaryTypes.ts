@@ -357,7 +357,7 @@ export interface HexHireView {
   /**
    * Why no raise type fits one unit.
    *
-   * Contract: One of the three shortage sentences when the hex has raise options, raising is not otherwise blocked, and `oneUnitRaiseShortage` is non-null. Otherwise null.
+   * Contract: `HIRE_ALLOCATED_CREDITS`, `HIRE_ALLOCATED_PRODUCTION`, or `HIRE_ALLOCATED_BOTH` when the hex has raise options, raising is not otherwise blocked, and `oneUnitRaiseShortage` is non-null. Otherwise null. A Hire click uses the shortage sentences instead.
    * When to use: The Hire tab when the raise row is hidden.
    * Expected outcome: The sentence to show with no raise controls, or null.
    * Exceptions: None.

@@ -61,9 +61,9 @@ export interface HireEntryRow {
   /**
    * Vertical center in container pixels.
    *
-   * Contract: Rounded. Hire markers are not pushed down for infrastructure.
+   * Contract: Rounded. This helper returns the hex center. The caller replaces it when the hex has visible units or a visible airport or seaport glyph.
    * When to use: The button's `top`.
-   * Expected outcome: The hex center.
+   * Expected outcome: The hex center from this helper.
    * Exceptions: None.
    */
   readonly top: number;

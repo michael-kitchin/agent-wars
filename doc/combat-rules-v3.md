@@ -71,7 +71,7 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 
 Each seat has one treasury (`res_s_treasury`), starting at 0. It is never negative. Neutral has none. Only that seat's snapshot includes `mercenaryEconomy`. A knockout deletes the row.
 
-Credits hire mercenaries. A mercenary is a seat-owned unit with `is_mercenary` set. Neutral is never a mercenary, and a missile is never one. Anyone who can see the unit can see the flag. The token draws a `$` (`MERCENARY_BADGE_TEXT`). Birth-hex control does not change because a mercenary was raised there.
+Credits hire mercenaries. A mercenary is a seat-owned unit with `is_mercenary` set. Neutral is never a mercenary, and a missile is never one. Anyone who can see the unit can see the flag. The token draws `CREDITS_SYMBOL` (`MERCENARY_BADGE_TEXT`) at the token center. Birth-hex control does not change because a mercenary was raised there.
 
 Fees and upkeep come from `mercenaryReferenceCost` on `GLOBAL_GAME_MAP`, then `mercenaryUpkeepFor`: `ceil(reference × mercenaryTechMultiplier ÷ MERCENARY_UPKEEP_DIVISOR)`. The divisor is 8. The multiplier is `MERCENARY_ADVANCED_TECH_MULTIPLIER` (2) only when the tech bonus is on and the birth hex is advanced; otherwise it is 1. The same numbers apply on every map: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. A raise fee is one turn of that upkeep. A rehire fee is `MERCENARY_REHIRE_FEE_MULTIPLIER` (2) times upkeep. The fee is that unit's upkeep for the turn it is hired, so it pays no second upkeep the same turn.
 

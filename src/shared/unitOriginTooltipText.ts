@@ -41,8 +41,8 @@ export interface UnitOriginTooltipIdentity {
    * Upkeep of this unit when it is a mercenary.
    *
    * Contract: Set only for a mercenary of a hireable type.
-   * When to use: The line after the date of birth.
-   * Expected outcome: Credits per turn, or absent.
+   * When to use: The Mercenary line after the date of birth.
+   * Expected outcome: The upkeep amount, or absent.
    * Exceptions: None.
    */
   readonly mercenaryUpkeep?: number;
@@ -170,7 +170,7 @@ export function formationTurnForUnit(unitId: string, formedTurnById: ReadonlyMap
  *
  * Purpose: Those lines sit above the Bonuses block and are omitted when the caller has nothing to say.
  * When to use: `formatUnitOriginTooltipHtml` when an identity was passed.
- * Expected outcome: Zero, one, or two HTML lines. The name is preceded by the birth flag.
+ * Expected outcome: Zero, one, two, or three HTML lines. The name is preceded by the birth flag. A mercenary adds a third line whose label is bold `Mercenary:` and whose value is the upkeep amount.
  * Exceptions: None.
  */
 function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity | undefined): string[] {
@@ -198,7 +198,7 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
  *
  * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. An identity adds the name and formation date above that block.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Unit:` and `DOB:` come first, then a blank line. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Unit:` and `DOB:` come first. A mercenary adds bold `Mercenary:` and the upkeep amount after that date. A blank line follows the identity block. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {

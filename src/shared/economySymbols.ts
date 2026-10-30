@@ -20,8 +20,8 @@ export const PRODUCTION_CAPACITY_SYMBOL = '\u2692\uFE0E';
 /**
  * Generic currency sign for treasury credits.
  *
- * Purpose: Balances, upkeep, and hire fees share one mark. Real-money readouts and the mercenary token do not use it.
- * When to use: Through `formatCreditsAmount` and `formatCompactHireCost`. Do not paste the glyph at a call site.
+ * Purpose: Balances, upkeep, hire fees, and the mercenary token share one mark. Real-money readouts do not use it.
+ * When to use: Amounts go through `formatCreditsAmount` and `formatCompactHireCost`. The mercenary token uses this constant directly. Do not paste the glyph at a call site.
  * Expected outcome: U+00A4.
  * Exceptions: None.
  */
