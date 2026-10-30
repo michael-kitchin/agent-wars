@@ -1,7 +1,7 @@
 /**
  * Rules and sentences for the missile unit type.
  *
- * Purpose: One place for the missile token, the survival face, the cost multiplier, and the sentences
+ * Purpose: One place for the missile token, the cost multiplier, and the sentences
  * the player and the model see. Map range stays on `missileRangeHexes` because it depends on the loaded map.
  * When to use: Any check or message that is about missiles and does not need the active map.
  * Expected outcome: Callers share one literal and one sentence instead of inlining them.
@@ -29,16 +29,6 @@ export const MISSILE_UNIT_TYPE = 'missile' as const;
 export function isMissileUnitType(unitType: string): boolean {
   return unitType === MISSILE_UNIT_TYPE;
 }
-
-/**
- * The only d20 face on which one infrastructure flag survives a missile.
- *
- * Purpose: A launch always hits, and each set flag is destroyed unless this face comes up.
- * When to use: Missile resolution, and nowhere else.
- * Expected outcome: `20`.
- * Exceptions: None.
- */
-export const MISSILE_INFRASTRUCTURE_SURVIVAL_FACE = 20;
 
 /**
  * How many times the map's infantry cost a missile costs.

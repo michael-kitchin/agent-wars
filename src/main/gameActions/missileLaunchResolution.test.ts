@@ -1,7 +1,7 @@
 /**
  * Missile launch resolution: flag rolls, spent missiles, and rejected launches.
  *
- * Purpose: A face of 1 clears every flag and based air. A face of 20 spends the missile and changes nothing else.
+ * Purpose: A face of 1, and a face equal to getAttack('air'), clear every unfortified flag and based air. A face one above getAttack('air'), and a face of 20, spend the missile and leave the target.
  * When to use: After changing `resolveMissileLaunchPhase`.
  * Expected outcome: The cases below. An out-of-range target uses `missileRangeHexes() + 1`.
  * Exceptions: None. Each case opens its own temporary match.
@@ -10,6 +10,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
+import { getAttack } from '../combatConstants';
+import { COMBAT_DIE_SIDES } from '../combatDice';
 import { missileRangeHexes } from '../../shared/gameRules';
 import { HUMAN_SEAT_ID, aiSeatIdForIndex } from '../../shared/seatIds';
 import { dbGetAll, dbGetOne, dbRun, getMapHexSet, listTacticalFeatureOverridesForGame, setTacticalCellFortified } from '../gameDb';
@@ -55,6 +57,18 @@ function placeMissileAndAir(launch: string, target: string): void {
     `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES ('a2-a1', ?, 'air', ?, 1)`,
     [aiSeatIdForIndex(1), target]
   );
+}
+
+/**
+ * Turns one die face into the uniform draw the combat die roller expects.
+ *
+ * Purpose: A boundary case needs every flag in the hex to roll the same face.
+ * When to use: The air-attack hit test and the face-above-it miss test.
+ * Expected outcome: The combat die roller returns `face`.
+ * Exceptions: None. `face` is from 1 through `COMBAT_DIE_SIDES`.
+ */
+function uniformFace(face: number): () => number {
+  return () => (face - 0.5) / COMBAT_DIE_SIDES;
 }
 
 test('a launch that rolls 1 clears every flag and the based air', () => {
@@ -200,5 +214,82 @@ test('a fortified cell that rolls 20 keeps the fortification and the city', () =
     assert.equal(after?.isFortified, true);
     assert.equal(result.launches[0]?.fortificationsDestroyed, 0);
     assert.equal(result.launches[0]?.fortificationsBefore, 1);
+  });
+});
+
+test('a launch that rolls the air attack clears unfortified flags, strips one fortification, and destroys based air', () => {
+  withSeatedTempGameDb('aw-missile-launch-air-attack-', { fogOfWarEnabled: false }, () => {
+    const { target, launch } = urbanAirportTarget();
+    const cell = listTacticalFeatureOverridesForGame().find(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isAirport && !row.isSeaport && !row.isRubble
+    );
+    assert.ok(cell, 'expected an intact city cell that is not an airport or a seaport');
+    const airportLeft = listTacticalFeatureOverridesForGame().some(
+      (row) => row.parentH3Index === target && row.isAirport && row.h3Index !== cell.h3Index
+    );
+    assert.equal(airportLeft, true);
+    setTacticalCellFortified(cell.h3Index, true);
+    const unfortifiedUrban = listTacticalFeatureOverridesForGame().filter(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isFortified
+    ).length;
+    placeMissileAndAir(launch, target);
+    const tally = new Map<string, number>();
+    const result = resolveMissileLaunchPhase(
+      [{ unitId: 'h1-m1', targetH3Index: target }],
+      uniformFace(getAttack('air')),
+      tally
+    );
+    const after = new Map(
+      listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === target).map((row) => [row.h3Index, row])
+    );
+    const fortified = after.get(cell.h3Index);
+    assert.ok(fortified);
+    assert.equal(fortified.isUrban, true);
+    assert.equal(fortified.isFortified, false);
+    assert.equal(fortified.isRubble, false);
+    for (const [h3Index, row] of after) {
+      if (h3Index === cell.h3Index) continue;
+      if (!row.isRubble && !row.isUrban && !row.isAirport && !row.isSeaport) continue;
+      assert.equal(row.isUrban, false);
+      assert.equal(row.isAirport, false);
+      assert.equal(row.isSeaport, false);
+      assert.equal(row.isRubble, true);
+    }
+    assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['a2-a1']), undefined);
+    assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['h1-m1']), undefined);
+    const record = result.launches[0];
+    assert.equal(record?.fortificationsBefore, 1);
+    assert.equal(record?.fortificationsDestroyed, 1);
+    assert.equal(record?.urbanBefore, unfortifiedUrban);
+    assert.equal(tally.get(target), 1);
+    assert.equal(result.removedUnits.some((unit) => unit.id === 'a2-a1'), true);
+  });
+});
+
+test('a launch that rolls one above the air attack spends the missile and leaves the target', () => {
+  withSeatedTempGameDb('aw-missile-launch-above-air-attack-', { fogOfWarEnabled: false }, () => {
+    const missFace = getAttack('air') + 1;
+    assert.ok(missFace <= COMBAT_DIE_SIDES);
+    const { target, launch } = urbanAirportTarget();
+    const cell = listTacticalFeatureOverridesForGame().find(
+      (row) => row.parentH3Index === target && row.isUrban && !row.isRubble
+    );
+    assert.ok(cell, 'expected an intact city cell');
+    setTacticalCellFortified(cell.h3Index, true);
+    placeMissileAndAir(launch, target);
+    const before = listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === target);
+    const result = resolveMissileLaunchPhase(
+      [{ unitId: 'h1-m1', targetH3Index: target }],
+      uniformFace(missFace)
+    );
+    const after = listTacticalFeatureOverridesForGame().filter((row) => row.parentH3Index === target);
+    assert.deepEqual(after, before);
+    assert.ok(dbGetOne('SELECT id FROM units WHERE id = ?', ['a2-a1']));
+    assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['h1-m1']), undefined);
+    assert.equal(result.launches[0]?.fortificationsDestroyed, 0);
+    assert.equal(result.launches[0]?.urbanDestroyed, 0);
+    assert.equal(result.launches[0]?.airportsDestroyed, 0);
+    assert.equal(result.launches[0]?.seaportsDestroyed, 0);
+    assert.equal(result.removedUnits.length, 0);
   });
 });

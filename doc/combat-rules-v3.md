@@ -126,7 +126,7 @@ A raise or a rehire is placed during planning and reserves its fee from the trea
 
 ### 3.6 Missile
 
-- **Strengths:** A missile does not roll to hit. Each flagged city, airport, and seaport cell in the target hex rolls its own d20 and is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). A fortified cell is the exception: it rolls once, a 20 leaves it, and any other face removes only the fortification. The cell stays a city, airport, or seaport, and it is not counted among the cells destroyed. Based air at that hex is destroyed when any airport cell is destroyed. Other units in the hex are unharmed. Launch range is `missileRangeHexes()`: 12 hexes on the global map.
+- **Strengths:** A missile does not roll to hit. Each flagged city, airport, and seaport cell in the target hex rolls its own d20 and is destroyed when the face is at or below `getAttack('air')` (10). A higher face leaves that flag. A fortified cell is the exception: it rolls once, a face at or below `getAttack('air')` removes only the fortification, and a higher face leaves it. The cell stays a city, airport, or seaport, and it is not counted among the cells destroyed. Based air at that hex is destroyed when any airport cell is destroyed. Other units in the hex are unharmed. Launch range is `missileRangeHexes()`: 12 hexes on the global map.
 - **Weaknesses:** Move 0 and vision 0. It never rolls, and `compareCasualtyOrder` removes it last. It launches once and is then deleted. That deletion is not a combat loss. It cannot launch during a battle, and its only standing order is `hold_fire`.
 - **Role:** One long-range strike against infrastructure.
 
@@ -502,7 +502,7 @@ The values in §8 are the printed values. With an origin bonus on (§4.9), a qua
 
 ### 8.6 Missile strikes
 
-A missile does not roll to hit. Every flagged city, airport, and seaport cell in the target hex rolls its own d20. The cell is destroyed unless the face is `MISSILE_INFRASTRUCTURE_SURVIVAL_FACE` (20). A fortified cell rolls once: 20 leaves it, and any other face clears `is_fortified` only. That cell is not added to the city, airport, or seaport counts in the strike sentence. Other units in the hex are unharmed. If any airport cell is destroyed, every air unit based at that hex is destroyed. Destroyed cells become rubble, and build queues are pruned the same way an air strike prunes them (`pruneBuildQueueForInfrastructureState`). Stripping a fortification does not prune the queue by itself.
+A missile does not roll to hit. Every flagged city, airport, and seaport cell in the target hex rolls its own d20. The cell is destroyed when the face is at or below `getAttack('air')` (10). A higher face leaves that flag. A fortified cell rolls once: a face at or below `getAttack('air')` clears `is_fortified` only, and a higher face leaves it. That cell is not added to the city, airport, or seaport counts in the strike sentence. Other units in the hex are unharmed. If any airport cell is destroyed, every air unit based at that hex is destroyed. Destroyed cells become rubble, and build queues are pruned the same way an air strike prunes them (`pruneBuildQueueForInfrastructureState`). Stripping a fortification does not prune the queue by itself.
 
 The range is the loaded map's `missileRangeHexes()`: 12 on the global map, and `missile_range_hexes` from the regional manifest otherwise. Cost is ten times that map's infantry cost (`missile_cost`).
 

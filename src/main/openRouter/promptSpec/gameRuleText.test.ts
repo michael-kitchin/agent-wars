@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CASUALTY_PRIORITY_ORDER, getMovementBudget } from '../../combatConstants';
+import { CASUALTY_PRIORITY_ORDER, getAttack, getMovementBudget } from '../../combatConstants';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { AIR_STRIKE_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from '../../../shared/tacticalRanges';
 import {
@@ -442,7 +442,11 @@ test('the missile rule appears only when the roster has a missile', () => {
   const strategic = buildCombatRulesParagraph(gates({ hasMissileUnits: true }));
   assert.match(strategic, /missile launches, then air strikes/);
   assert.match(strategic, /within \d+ hexes/);
-  assert.match(strategic, /its own d20 roll is a 20/);
+  assert.match(
+    strategic,
+    new RegExp(`its own d20 roll is at or below the air unit's attack of ${getAttack('air')}`)
+  );
+  assert.equal(strategic.includes('roll is a 20'), false);
   const tactical = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasMissileUnits: true }));
   assert.match(tactical, /Missile sub-units never move or fire/);
   assert.equal(tactical.includes('missileLaunches'), false);

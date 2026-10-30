@@ -158,7 +158,7 @@ export interface MissileLaunchRecord {
    *
    * Contract: The cell keeps its city, airport, and seaport flags.
    * When to use: The strike line.
-   * Expected outcome: Zero when every fortified cell rolls a 20.
+   * Expected outcome: Zero when every fortified cell rolls above getAttack('air').
    * Exceptions: None.
    */
   readonly fortificationsDestroyed: number;

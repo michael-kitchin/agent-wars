@@ -1,7 +1,7 @@
 /**
  * Resolves strategic missile launches before air strikes and ranged fire.
  *
- * Purpose: Each launch rolls one d20 per set urban, airport, and seaport flag. A face below 20 clears that flag.
+ * Purpose: Each launch rolls one d20 per set urban, airport, and seaport flag. A face at or below getAttack('air') clears that flag.
  * A spent missile is deleted and is not a removed unit, so it never reaches loss reports or destroyed-unit callbacks.
  * When to use: Once per Ready, after the combat-resolution log and before any later phase reads units.
  * Expected outcome: Accepted launches spend their missiles. Rejected launches leave the missile in place.
@@ -10,8 +10,8 @@
 
 import type { MissileLaunchOrder, MissileLaunchRecord } from '../../shared/ipc/missileTypes';
 import type { InfrastructureDestroyedEvent } from '../../shared/ipc/readyTypes';
-import { MISSILE_INFRASTRUCTURE_SURVIVAL_FACE } from '../../shared/missileRules';
 import { recordFortificationLoss, type FortificationLossTally } from '../fortificationCombat';
+import { getAttack } from '../combatConstants';
 import { createCombatDieRoller } from '../combatDice';
 import type { CombatUnit } from '../combatUnitTypes';
 import { dbGetOne, dbRun, getHexController, listTacticalFeatureOverridesForGame, updateTacticalFeatureOverrideRow } from '../gameDb';
@@ -125,7 +125,7 @@ interface FlagCounts {
   /**
    * Urban flags cleared by this launch.
    *
-   * Contract: Incremented only when an urban roll is below 20.
+   * Contract: Incremented only when an urban roll is at or below getAttack('air').
    * When to use: The launch record and the urban event.
    * Expected outcome: Zero when every urban roll survives.
    * Exceptions: None.
@@ -143,7 +143,8 @@ interface FlagCounts {
   /**
    * Airport flags cleared by this launch.
    *
-   * Contract: Based air is removed only when this is above zero.
+   * Contract: Incremented only when an airport roll is at or below getAttack('air').
+   * Based air is removed only when this is above zero.
    * When to use: The launch record and the airport event.
    * Expected outcome: Zero when every airport roll survives.
    * Exceptions: None.
@@ -161,7 +162,7 @@ interface FlagCounts {
   /**
    * Seaport flags cleared by this launch.
    *
-   * Contract: Incremented only when a seaport roll is below 20.
+   * Contract: Incremented only when a seaport roll is at or below getAttack('air').
    * When to use: The launch record and the seaport event.
    * Expected outcome: Zero when every seaport roll survives.
    * Exceptions: None.
@@ -181,7 +182,7 @@ interface FlagCounts {
    *
    * Contract: The city, airport, and seaport flags on that cell stay.
    * When to use: The launch record and the turn tally.
-   * Expected outcome: Zero when every fortified cell rolls a 20.
+   * Expected outcome: Zero when every fortified cell rolls above getAttack('air').
    * Exceptions: None.
    */
   fortificationsDestroyed: number;
@@ -210,12 +211,13 @@ function loadLaunchOrder(order: MissileLaunchOrder): LoadedLaunch | null {
 /**
  * Rolls every set flag in the target hex and clears the ones that do not survive.
  *
- * Purpose: Each urban, airport, and seaport flag rolls its own d20. Only 20 survives.
+ * Purpose: Each urban, airport, and seaport flag rolls its own d20 against hitThreshold, which is getAttack('air') from the caller.
+ * A face at or below that number destroys the flag. A fortified cell rolls once against the same number and loses only its fortification.
  * When to use: After a launch has passed validation.
  * Expected outcome: Updated override rows, and the before and destroyed counts for the record.
  * Exceptions: None. An empty cell rolls nothing.
  */
-function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCounts {
+function rollTargetFlags(targetH3Index: string, rollDie: () => number, hitThreshold: number): FlagCounts {
   const counts: FlagCounts = {
     urbanBefore: 0,
     urbanDestroyed: 0,
@@ -230,7 +232,7 @@ function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCoun
   for (const row of rows) {
     if (row.isFortified) {
       counts.fortificationsBefore += 1;
-      if (rollDie() < MISSILE_INFRASTRUCTURE_SURVIVAL_FACE) {
+      if (rollDie() <= hitThreshold) {
         updateTacticalFeatureOverrideRow(row.h3Index, { isFortified: false });
         counts.fortificationsDestroyed += 1;
       }
@@ -242,7 +244,7 @@ function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCoun
     let destroyedOnRow = false;
     if (row.isUrban) {
       counts.urbanBefore += 1;
-      if (rollDie() < MISSILE_INFRASTRUCTURE_SURVIVAL_FACE) {
+      if (rollDie() <= hitThreshold) {
         isUrban = false;
         counts.urbanDestroyed += 1;
         destroyedOnRow = true;
@@ -250,7 +252,7 @@ function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCoun
     }
     if (row.isAirport) {
       counts.airportsBefore += 1;
-      if (rollDie() < MISSILE_INFRASTRUCTURE_SURVIVAL_FACE) {
+      if (rollDie() <= hitThreshold) {
         isAirport = false;
         counts.airportsDestroyed += 1;
         destroyedOnRow = true;
@@ -258,7 +260,7 @@ function rollTargetFlags(targetH3Index: string, rollDie: () => number): FlagCoun
     }
     if (row.isSeaport) {
       counts.seaportsBefore += 1;
-      if (rollDie() < MISSILE_INFRASTRUCTURE_SURVIVAL_FACE) {
+      if (rollDie() <= hitThreshold) {
         isSeaport = false;
         counts.seaportsDestroyed += 1;
         destroyedOnRow = true;
@@ -300,7 +302,7 @@ function spendMissile(unitId: string): void {
 /**
  * Resolves every launch for this Ready.
  *
- * Purpose: Draws infrastructure dice from the shared `next` stream, then removes spent missiles before later phases.
+ * Purpose: Draws infrastructure dice from the shared `next` stream against the printed air attack, `getAttack('air')`, with no weather, origin, tech, or cover, then removes spent missiles before later phases.
  * When to use: Immediately after the `ready: combat resolution` log.
  * Expected outcome: Records for spent missiles, removed based air, and infrastructure events. Invalid orders are skipped.
  * Exceptions: Propagates database errors.
@@ -310,7 +312,8 @@ export function resolveMissileLaunchPhase(
   next: () => number,
   fortificationTally?: FortificationLossTally
 ): MissileLaunchPhaseResult {
-  logDebug('missileLaunchResolution resolveMissileLaunchPhase', { orderCount: orders.length });
+  const hitThreshold = getAttack('air');
+  logDebug('missileLaunchResolution resolveMissileLaunchPhase', { orderCount: orders.length, hitThreshold });
   const loaded = orders
     .map(loadLaunchOrder)
     .filter((row): row is LoadedLaunch => row !== null)
@@ -335,7 +338,7 @@ export function resolveMissileLaunchPhase(
     }
     const target = launch.order.targetH3Index;
     const controller = getHexController(target);
-    const counts = rollTargetFlags(target, rollDie);
+    const counts = rollTargetFlags(target, rollDie, hitThreshold);
     recordFortificationLoss(fortificationTally, target, counts.fortificationsDestroyed);
     const destroyedAir = counts.airportsDestroyed > 0 ? destroyBasedAirUnitsAtHex(target) : [];
     const destroyedAirUnitIds = destroyedAir.map((row) => row.id);

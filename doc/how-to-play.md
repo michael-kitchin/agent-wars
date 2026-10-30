@@ -10,21 +10,64 @@ I'm a geographer by training, so Agent Wars focuses more on geospatial features 
 
 ## Winning and Losing
 
-A side is knocked out when any of these is true:
+Agent Wars is a last-side-standing game, more-or-less. There's an optional turn limit, and a couple of edge cases where a city count decides the match (or nobody wins at all). This is the player's version of the rules, and the full version is in [region-vs-region.md](region-vs-region.md).
+
+### Knockouts
+
+At the end of each turn, a side is knocked out when any of these is true:
 
 - Another side holds its home.
 - It holds no city hex anywhere.
 - Its own home has no cities left.
 
-On a global map, holding a home means holding every hex of it. On a regional map, it means holding home hexes with at least 75% of that home's original urban cells. Bombing doesn't lower that target, and a home that started with no urban cells needs every hex. A knocked-out side's land and units become neutral. Losing every unit isn't a knockout, and a side with no units left can still build.
+What counts as holding a home depends on the map:
 
-The last side still in the match wins. Deathmatch, the default on either map, has no turn limit. Most city hexes at turn limit also ends the match after the limit you picked, and the remaining side holding the most city hexes wins. That count also settles a turn when every side would be knocked out at once: none of them is, and the match ends. When several sides tie for the most city hexes, no side wins.
+| Map | Holding a home means |
+| --- | --- |
+| Global | Holding every hex of it |
+| Regional | Holding home hexes with at least 75% of that home's original urban cells. Bombing doesn't lower that target. |
+| Regional, for a home that started with no urban cells | Holding every hex of it |
 
-The result screen lists every side. When you played and one side won, its header gives your place, such as "You placed 2nd of 4." In an Observe only match, it names the winner. When several sides share first place, it says "No side won."
+A knocked-out side's land and units become neutral. Losing every unit isn't a knockout by itself, though, and a side with no units left can still build.
 
-If you're knocked out and the match goes on, a dialog says who knocked you out and your place. End game ranks the sides still in the match and opens the result screen. Watch the rest keeps the match going: you see every side with no fog, and the next turn starts on its own once every commander is ready. To look through one side's fog instead, pick that side from View as in the top bar. To start each turn yourself, clear "Start the next turn when every commander is ready" above Ready. A match you start with Observe only works the same way, except that the checkbox starts cleared.
+### How a Match Ends
 
-Details are in [region-vs-region.md](region-vs-region.md).
+| Rule | The match ends when | Winner |
+| --- | --- | --- |
+| Deathmatch (the default, on either map) | One side is left | That side |
+| Most city hexes at turn limit | One side is left, or the turn limit you picked (20, 30, 40, or 50) has passed | The last side, or the remaining side holding the most city hexes |
+
+Two edge cases apply under either rule:
+
+- **Everyone out at once:** when every remaining side would be knocked out on the same turn, none of them is. The match ends there, and the side holding the most city hexes wins.
+- **Ties:** when several sides tie for the most city hexes, no side wins.
+
+### The Result Screen
+
+The result screen lists every side, and its header depends on how the match went:
+
+| When | The header says |
+| --- | --- |
+| You played, and one side won | Your place, such as "You placed 2nd of 4." |
+| You started with Observe only, and one side won | The winner, such as "Japan wins." |
+| Several sides share first place | "No side won." |
+
+### If You're Knocked Out
+
+Getting knocked out doesn't stop the other commanders. When the match goes on without you, a dialog says who knocked you out and where you placed, and gives you two choices:
+
+- **End game** ranks the sides still in the match and opens the result screen.
+- **Watch the rest** keeps the match going. You see every side with no fog, and the next turn starts on its own once every commander is ready.
+
+While you watch, these controls change what you see and when turns start:
+
+| To | Do this |
+| --- | --- |
+| Look through one side's fog | Pick that side from View as, in the top bar. |
+| See every side again, with no fog | Pick "All sides, no fog" from View as. |
+| Start each turn yourself | Clear "Start the next turn when every commander is ready", above Ready. |
+
+A match you start with Observe only works the same way, except that the checkbox starts cleared (so the next turn waits until you check it, or click Ready yourself).
 
 ## Starting a Game
 
@@ -194,7 +237,7 @@ A fortification soaks a hit that would have removed one of the holder's units. Y
 
 - **Hits:** A hit on the holder's units removes a fortification instead, until none remain. The hex can't change hands while any fortification remains.
 - **Siege:** After melee, a fortified hex is besieged when it had no melee this turn and holds units of exactly one side other than its controller. Each of those units rolls its attack once, and each hit strips one fortification. When two or more other sides share the hex, there's no siege.
-- **Strikes and missiles:** An air strike or a missile on a fortified city, airport, or seaport cell removes the fortification and leaves the cell. An explored enemy hex with no units is a legal ranged target when it still has a fortification. There's no return fire.
+- **Strikes and missiles:** A hit by an air strike, or a missile roll of 10 or less, on a fortified city, airport, or seaport cell removes the fortification and leaves the cell. An explored enemy hex with no units is a legal ranged target when it still has a fortification. There's no return fire.
 - **Spending:** A queue can spend on a hex you fortified, the same as on a hex that holds one of your units.
 - **Battles:** The controller's other units start on fortified city cells, one each, and nobody starts on a cell the other side fortified. You can't march onto a cell the other side fortified. Hovering it says **Blocked: Fortified**.
 - **On the map:** Ticks run along the hex's edges, one to four per edge, by the fortified share. The Fortified row of the legend draws the full pattern. See [ux/terrain-legend.md](ux/terrain-legend.md#information-displayed).
@@ -263,7 +306,7 @@ A missile is built at an Advanced city. On the world map it launches once, at an
 3. Double-click any explored hex in range, including the missile's own hex.
 
 - **When it fires:** Launches go first in the turn. A spent missile isn't counted as a combat loss. A queued or hover line is crimson, dotted, and partly transparent, the same as a valid movement preview. During playback the flight uses that side's map color and doesn't return.
-- **What a hit does:** Every city, airport, and seaport cell rolls a d20 and is destroyed unless it rolls 20. A fortified cell loses only its fortification. Based air dies when an airport cell is destroyed. Other units are unharmed.
+- **What a hit does:** Every city, airport, and seaport cell rolls a d20 and is destroyed on a roll of 10 or less, the same chance as an air strike before cover and bonuses. A higher roll leaves the cell. A fortified cell rolls once and, on a roll of 10 or less, loses only its fortification. Based air dies when an airport cell is destroyed. Other units are unharmed.
 - **What it can't do:** It has no launch in a battle, never moves, sees nothing, is hit last, and never rolls. The reticle is greyed out in a battle, with "Missiles cannot fire or launch during a battle." A selection that mixes missiles with other types is greyed out, with "A launch needs a selection of missiles only." Range is in [Units at a Glance](#units-at-a-glance).
 
 ## Sealift
