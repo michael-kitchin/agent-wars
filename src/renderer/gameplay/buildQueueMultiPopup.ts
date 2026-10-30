@@ -18,7 +18,7 @@ import {
 } from '../chrome/controlTooltipText';
 import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
 import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
-import { buildPopupCloseTooltipText, multiHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
+import { multiHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
 import {
   buildQueueTemplateFromSnapshot,
   countEligibleBuildHexes,
@@ -30,7 +30,7 @@ import {
   unionAvailableBuildUnitTypes,
   type BuildQueueTemplateRow,
 } from './buildQueueMultiSelect';
-import { sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { createBuildCountInput, createBuildPopupCloseRow, readSanitizedBuildCount } from './buildQueuePopupFormatting';
 
 /**
  * Result of writing the shared build-queue template to selected hexes.
@@ -246,16 +246,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       loadedCount: snapshots.length,
     });
     deps.mount.innerHTML = '';
-    const closeRow = document.createElement('div');
-    closeRow.className = 'build-popup-close-row';
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'unit-select build-close-btn';
-    closeBtn.textContent = '×';
-    closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
-    closeBtn.addEventListener('click', deps.hideBuildPopup);
-    closeRow.appendChild(closeBtn);
-    deps.mount.appendChild(closeRow);
+    deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
     const errorLine = document.createElement('div');
     errorLine.className = 'build-no-urban';
     errorLine.textContent = 'Failed to load build queues for the selected hexes.';
@@ -265,16 +256,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   }
 
   deps.mount.innerHTML = '';
-  const closeRow = document.createElement('div');
-  closeRow.className = 'build-popup-close-row';
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'unit-select build-close-btn';
-  closeBtn.textContent = '×';
-  closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
-  closeBtn.addEventListener('click', deps.hideBuildPopup);
-  closeRow.appendChild(closeBtn);
-  deps.mount.appendChild(closeRow);
+  deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
 
   const section = document.createElement('div');
   section.className = 'build-queue-section';
@@ -357,23 +339,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
     row.appendChild(typeSelect);
 
-    const countInput = document.createElement('input');
-    countInput.setAttribute('data-control-tooltip', multiBuildCountTooltipText);
-    countInput.type = 'text';
-    countInput.className = 'build-count-input';
-    countInput.maxLength = 2;
-    countInput.inputMode = 'numeric';
-    countInput.value = String(entry.count);
-    const readCurrentCount = (): number => {
-      const normalized = sanitizeBuildCountInputText(countInput.value);
-      if (countInput.value !== normalized) countInput.value = normalized;
-      return parseInt(normalized, 10);
-    };
-    countInput.addEventListener('keydown', (event) => {
-      const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
-      if (allowed.includes(event.key) || /^\d$/.test(event.key)) return;
-      event.preventDefault();
-    });
+    const countInput = createBuildCountInput(multiBuildCountTooltipText, String(entry.count));
     row.appendChild(countInput);
 
     typeSelect.addEventListener('change', async () => {
@@ -388,7 +354,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       updated[entryIndex] = {
         rowKey,
         unitType: typeSelect.value as BuildQueueItemType,
-        count: readCurrentCount(),
+        count: readSanitizedBuildCount(countInput),
       };
       await commitEditedTemplate(deps, updated);
     });
@@ -403,7 +369,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       updated[entryIndex] = {
         rowKey,
         unitType: typeSelect.value as BuildQueueItemType,
-        count: readCurrentCount(),
+        count: readSanitizedBuildCount(countInput),
       };
       await commitEditedTemplate(deps, updated);
     });

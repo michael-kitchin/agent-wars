@@ -275,6 +275,39 @@ function stripLeadingBullet(line: string): string {
 }
 
 /**
+ * Splits toast sentences by an owner id.
+ *
+ * Purpose: Missile and fortification lines share one loop. The caller decides which owner ids get a section.
+ * When to use: `splitMissileStrikeLines` and `splitFortificationReportLines`.
+ * Expected outcome: `byOwner` keeps input order for accepted owners. `updates` keeps the rest. A blank line is dropped. Undefined input is an empty split.
+ * Exceptions: None.
+ */
+function splitToastLinesByOwner<T extends { readonly line: string }>(
+  lines: readonly T[] | undefined,
+  ownerIdOf: (entry: T) => string | null,
+  ownsSection: (ownerId: string) => boolean
+): {
+  readonly byOwner: ReadonlyMap<string, readonly string[]>;
+  readonly updates: readonly string[];
+} {
+  const byOwner = new Map<string, string[]>();
+  const updates: string[] = [];
+  for (const entry of lines ?? []) {
+    const line = entry.line.trim();
+    if (line.length === 0) continue;
+    const ownerId = ownerIdOf(entry);
+    if (ownerId !== null && ownsSection(ownerId)) {
+      const existing = byOwner.get(ownerId);
+      if (existing) existing.push(line);
+      else byOwner.set(ownerId, [line]);
+    } else {
+      updates.push(line);
+    }
+  }
+  return { byOwner, updates };
+}
+
+/**
  * Splits missile sentences by who controlled the target.
  *
  * Purpose: A seat's damage belongs in that side's loss section. A neutral or uncontrolled hex stays in Updates.
@@ -286,21 +319,7 @@ function splitMissileStrikeLines(lines: readonly MissileStrikeToastLine[] | unde
   readonly byOwner: ReadonlyMap<string, readonly string[]>;
   readonly updates: readonly string[];
 } {
-  const byOwner = new Map<string, string[]>();
-  const updates: string[] = [];
-  for (const entry of lines ?? []) {
-    const line = entry.line.trim();
-    if (line.length === 0) continue;
-    const controllerId = entry.controllerId;
-    if (controllerId !== null && isSeatId(controllerId)) {
-      const existing = byOwner.get(controllerId);
-      if (existing) existing.push(line);
-      else byOwner.set(controllerId, [line]);
-    } else {
-      updates.push(line);
-    }
-  }
-  return { byOwner, updates };
+  return splitToastLinesByOwner(lines, (entry) => entry.controllerId, (ownerId) => isSeatId(ownerId));
 }
 
 /**
@@ -315,21 +334,11 @@ function splitFortificationReportLines(lines: readonly FortificationToastLine[] 
   readonly byOwner: ReadonlyMap<string, readonly string[]>;
   readonly updates: readonly string[];
 } {
-  const byOwner = new Map<string, string[]>();
-  const updates: string[] = [];
-  for (const entry of lines ?? []) {
-    const line = entry.line.trim();
-    if (line.length === 0) continue;
-    const ownerId = entry.ownerId;
-    if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
-      const existing = byOwner.get(ownerId);
-      if (existing) existing.push(line);
-      else byOwner.set(ownerId, [line]);
-    } else {
-      updates.push(line);
-    }
-  }
-  return { byOwner, updates };
+  return splitToastLinesByOwner(
+    lines,
+    (entry) => entry.ownerId,
+    (ownerId) => isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID
+  );
 }
 
 /**

@@ -56,6 +56,40 @@ import {
 } from '../openRouter/tacticalCallbackSubscriptionLifecycle';
 
 /**
+ * Returns the first user-facing march failure, or null when every order is legal.
+ *
+ * Purpose: Human and opponent march validation share one walk. The caller supplies the outcome function and the log.
+ * When to use: `opponentTacticalMarchValidationFailure` and `humanTacticalMarchValidationFailure`.
+ * Expected outcome: Empty orders yield null. The first illegal order is logged with its reason and returned as the block message.
+ * Exceptions: None. Invalid hex indexes may still propagate from the outcome function.
+ */
+function firstTacticalMarchValidationFailure(args: {
+  readonly cur: TacticalBattleSnapshot;
+  readonly orders: readonly { readonly unitId: string; readonly toH3Index: string }[];
+  readonly computeOutcome: typeof tacticalComputeHumanMovementOrderOutcome;
+  readonly logFailure: typeof tacticalLogQuery;
+  readonly logLabel: string;
+}): string | null {
+  if (args.orders.length === 0) return null;
+  const tacticalSet = new Set(args.cur.tacticalChildH3Indexes);
+  const sub = [...args.cur.subUnits];
+  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  for (const o of args.orders) {
+    const outcome = args.computeOutcome({ byId, sub, order: o, tacticalSet, battle: args.cur });
+    if (!outcome.ok) {
+      args.logFailure(args.logLabel, {
+        reason: outcome.reason,
+        ...outcome.context,
+        unitId: o.unitId,
+        toH3Index: o.toH3Index,
+      });
+      return humanTacticalMarchBlockMessage(outcome.reason);
+    }
+  }
+  return null;
+}
+
+/**
  * Returns a user-facing validation error when any opponent tactical march order is illegal on the current snapshot, or null when all pass.
  *
  * Purpose: Mirrors `humanTacticalMarchValidationFailure` for opponent sub-units so Ready commits reject stale or tampered buffered AI marches before combat phases run.
@@ -67,23 +101,13 @@ function opponentTacticalMarchValidationFailure(
   cur: TacticalBattleSnapshot,
   orders: readonly { unitId: string; toH3Index: string }[]
 ): string | null {
-  if (orders.length === 0) return null;
-  const tacticalSet = new Set(cur.tacticalChildH3Indexes);
-  const sub = [...cur.subUnits];
-  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
-  for (const o of orders) {
-    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle: cur });
-    if (!outcome.ok) {
-      tacticalLogQuery('opponentTacticalMarchValidationFailure', {
-        reason: outcome.reason,
-        ...outcome.context,
-        unitId: o.unitId,
-        toH3Index: o.toH3Index,
-      });
-      return humanTacticalMarchBlockMessage(outcome.reason);
-    }
-  }
-  return null;
+  return firstTacticalMarchValidationFailure({
+    cur,
+    orders,
+    computeOutcome: tacticalComputeMovementOrderOutcome,
+    logFailure: tacticalLogQuery,
+    logLabel: 'opponentTacticalMarchValidationFailure',
+  });
 }
 
 /**
@@ -357,23 +381,13 @@ function humanTacticalMarchValidationFailure(
   cur: TacticalBattleSnapshot,
   orders: readonly { unitId: string; toH3Index: string }[]
 ): string | null {
-  if (orders.length === 0) return null;
-  const tacticalSet = new Set(cur.tacticalChildH3Indexes);
-  const sub = [...cur.subUnits];
-  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
-  for (const o of orders) {
-    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle: cur });
-    if (!outcome.ok) {
-      tacticalLogMutate('humanTacticalMarchValidationFailure', {
-        reason: outcome.reason,
-        ...outcome.context,
-        unitId: o.unitId,
-        toH3Index: o.toH3Index,
-      });
-      return humanTacticalMarchBlockMessage(outcome.reason);
-    }
-  }
-  return null;
+  return firstTacticalMarchValidationFailure({
+    cur,
+    orders,
+    computeOutcome: tacticalComputeHumanMovementOrderOutcome,
+    logFailure: tacticalLogMutate,
+    logLabel: 'humanTacticalMarchValidationFailure',
+  });
 }
 
 /**

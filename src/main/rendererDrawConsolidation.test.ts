@@ -236,7 +236,7 @@ function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
     drawMovingUnitsFn.includes('if (group.count > 1) {') &&
       drawMovingUnitsFn.includes('p.x + STACK_OFFSET_X') &&
       drawMovingUnitsFn.includes('p.y + STACK_OFFSET_Y') &&
-      drawMovingUnitsFn.includes('ctx.fillText(String(group.count), badgeX, badgeY);'),
+      drawMovingUnitsFn.includes('drawStackCountBadge(ctx, group.count, p.x, p.y);'),
     'drawMovingUnits should render grouped movement as stacked markers with a count badge'
   );
 }
@@ -320,9 +320,9 @@ function testMaintainabilityConsolidationSeams(): void {
   const multiPopupSource = fs.readFileSync(multiPopupPath, 'utf8');
   assert.ok(
     multiPopupSource.includes("from './buildQueuePopupFormatting'") &&
-      multiPopupSource.includes('sanitizeBuildCountInputText') &&
+      multiPopupSource.includes('readSanitizedBuildCount') &&
       !multiPopupSource.includes('function sanitizeCount'),
-    'multi build popup should reuse sanitizeBuildCountInputText from formatting leaf'
+    'multi build popup should reuse readSanitizedBuildCount from formatting leaf'
   );
 
   const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');

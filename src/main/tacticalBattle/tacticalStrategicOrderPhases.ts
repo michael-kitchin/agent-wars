@@ -15,6 +15,7 @@ import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../sh
 import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { syncEmbarkedLandToNavalHex } from './tacticalEmbarkedCargoSync';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
 import { createTacticalFortificationHooks } from './tacticalFortificationSoak';
 import {
@@ -199,15 +200,6 @@ export function applyTacticalEmbarkPhaseOnBattle(
 ): TacticalBattleSnapshot {
   if (!embarkOrders?.length) return battle;
   let sub = battle.subUnits.map((u) => ({ ...u }));
-  const syncCargoToNavalHex = (): void => {
-    const idTo = new Map(sub.map((u) => [u.id, u] as const));
-    sub = sub.map((u) => {
-      const e = u.embarkedOnSubUnitId;
-      if (!e) return u;
-      const n = idTo.get(e);
-      return n && n.unitType === 'naval' ? { ...u, h3Index: n.h3Index } : u;
-    });
-  };
   for (const e of embarkOrders) {
     const li = tacticalFindSubUnitIndexById(sub, e.unitId);
     if (li < 0) continue;
@@ -215,7 +207,7 @@ export function applyTacticalEmbarkPhaseOnBattle(
     if (land.player !== player) continue;
     sub[li] = { ...land, embarkedOnSubUnitId: e.navalUnitId };
   }
-  syncCargoToNavalHex();
+  sub = syncEmbarkedLandToNavalHex(sub);
   tacticalLogMutate('applyTacticalEmbarkPhaseOnBattle', { battleId: battle.battleId, player, count: embarkOrders.length });
   return { ...battle, subUnits: sub };
 }
@@ -305,6 +297,44 @@ export type TacticalAirRangedPhaseAccum = {
  * Whether tactical air+ranged resolution filters orders to one player or merges both like strategic Ready.
  */
 export type TacticalAirRangedResolutionScope = 'singlePlayer' | 'mergedHumanThenOpponent';
+
+/**
+ * Rubbles one tactical hex and records the infrastructure event when the cell changes.
+ *
+ * Purpose: The kill loop and the infrastructure-only loop share the enclosing-hex guard, the strike check, and the event row.
+ * When to use: After the caller has skipped hexes already recorded in its own set.
+ * Expected outcome: Returns true only when the cell changed, and then the event is already on `events`.
+ * Exceptions: Database errors from the rubble write propagate.
+ */
+function recordTacticalRangedRubble(args: {
+  readonly workBattle: TacticalBattleSnapshot;
+  readonly hex: string;
+  readonly tacticalRows: ReadonlyArray<{
+    h3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>;
+  readonly events: InfrastructureDestroyedEvent[];
+}): boolean {
+  if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(args.workBattle, args.hex)) return false;
+  if (!tacticalHasStrikeableInfrastructure(args.workBattle, args.hex, args.tacticalRows)) return false;
+  const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(args.hex, args.tacticalRows);
+  const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
+    args.hex,
+    args.workBattle.enclosingStrategicH3Index,
+    tacticalRangedRubbleApplyOptsForHex(args.workBattle, args.hex)
+  );
+  if (!changed) return false;
+  args.events.push({
+    h3Index: args.workBattle.enclosingStrategicH3Index,
+    targetType,
+    changedRubbleCount: 1,
+    destroyedAirUnitsCount,
+  });
+  return true;
+}
 
 /**
  * Applies tactical air strikes (units + infrastructure in one sorted pass) then ranged combat via `runRangedPhase`.
@@ -600,23 +630,16 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const rubbledFromCombat = new Set<string>();
     for (const hex of defenderHexesWithKill) {
       if (!footprint.has(hex) || rubbledFromCombat.has(hex)) continue;
-      if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(workBattle, hex)) continue;
-      if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
-      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
-      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
-        hex,
-        workBattle.enclosingStrategicH3Index,
-        tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
-      );
-      if (changed) {
+      if (
+        recordTacticalRangedRubble({
+          workBattle,
+          hex,
+          tacticalRows: tacticalRowsForBattle,
+          events: infrastructureDestroyedEvents,
+        })
+      ) {
         rubbledFromCombat.add(hex);
         rangedTerrainMutated = true;
-        infrastructureDestroyedEvents.push({
-          h3Index: workBattle.enclosingStrategicH3Index,
-          targetType,
-          changedRubbleCount: 1,
-          destroyedAirUnitsCount,
-        });
       }
     }
   }
@@ -654,23 +677,16 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       if (!rollCombatDieAgainst(rollDie, infraShotThreshold, infraShotContext, rangedDiceLog.sink)) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
-      if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(workBattle, hex)) continue;
-      if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
-      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
-      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
-        hex,
-        workBattle.enclosingStrategicH3Index,
-        tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
-      );
-      if (changed) {
+      if (
+        recordTacticalRangedRubble({
+          workBattle,
+          hex,
+          tacticalRows: tacticalRowsForBattle,
+          events: infrastructureDestroyedEvents,
+        })
+      ) {
         rubbledInfraHexes.add(hex);
         rangedTerrainMutated = true;
-        infrastructureDestroyedEvents.push({
-          h3Index: workBattle.enclosingStrategicH3Index,
-          targetType,
-          changedRubbleCount: 1,
-          destroyedAirUnitsCount,
-        });
       }
     }
   }
@@ -741,15 +757,6 @@ export function applyTacticalFerryPhaseOnBattle(
   let sub = battle.subUnits.map((u) => ({ ...u }));
   const removedUnits: RemovedUnitSnapshot[] = [];
   const toDestroy = new Set<string>();
-  const syncCargoToNavalHex = (): void => {
-    const idTo = new Map(sub.map((u) => [u.id, u] as const));
-    sub = sub.map((u) => {
-      const e = u.embarkedOnSubUnitId;
-      if (!e) return u;
-      const n = idTo.get(e);
-      return n && n.unitType === 'naval' ? { ...u, h3Index: n.h3Index } : u;
-    });
-  };
   for (const f of ferryOrders) {
     const fi = tacticalFindSubUnitIndexById(sub, f.unitId);
     if (fi < 0) continue;
@@ -777,7 +784,7 @@ export function applyTacticalFerryPhaseOnBattle(
       syncStrategicUnitsDbWhenTacticalParentsEliminated(subsBefore, sub);
     }
   }
-  syncCargoToNavalHex();
+  sub = syncEmbarkedLandToNavalHex(sub);
   tacticalLogMutate('applyTacticalFerryPhaseOnBattle', {
     battleId: battle.battleId,
     player,
@@ -797,15 +804,5 @@ export function applyTacticalFerryPhaseOnBattle(
  */
 export function tacticalBattleWithSyncedEmbarkCargo(battle: TacticalBattleSnapshot): TacticalBattleSnapshot {
   const sub = battle.subUnits.map((u) => ({ ...u }));
-  const idToUnit = new Map(sub.map((u) => [u.id, u] as const));
-  for (let i = 0; i < sub.length; i++) {
-    const u = sub[i]!;
-    const embark = u.embarkedOnSubUnitId;
-    if (!embark) continue;
-    const naval = idToUnit.get(embark);
-    if (naval && naval.unitType === 'naval') {
-      sub[i] = { ...u, h3Index: naval.h3Index };
-    }
-  }
-  return { ...battle, subUnits: sub };
+  return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
 }

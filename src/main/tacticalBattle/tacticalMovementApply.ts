@@ -3,6 +3,7 @@
  */
 
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { syncEmbarkedLandToNavalHex } from './tacticalEmbarkedCargoSync';
 import { tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalComputeHumanMovementOrderOutcome,
@@ -50,17 +51,7 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
       ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
     };
   }
-  const idToUnit = new Map(sub.map((u) => [u.id, u] as const));
-  for (let i = 0; i < sub.length; i++) {
-    const u = sub[i]!;
-    const embark = u.embarkedOnSubUnitId;
-    if (!embark) continue;
-    const naval = idToUnit.get(embark);
-    if (naval && naval.unitType === 'naval') {
-      sub[i] = { ...u, h3Index: naval.h3Index };
-    }
-  }
-  return { ...battle, subUnits: sub };
+  return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
 }
 
 /**
@@ -96,15 +87,5 @@ export function projectTacticalSnapshotAfterHumanMovementOrders(
     const applied = outcome.appliedToH3Index;
     sub[idx] = { ...u, h3Index: applied };
   }
-  const idToUnit = new Map(sub.map((u) => [u.id, u] as const));
-  for (let i = 0; i < sub.length; i++) {
-    const u = sub[i]!;
-    const embark = u.embarkedOnSubUnitId;
-    if (!embark) continue;
-    const naval = idToUnit.get(embark);
-    if (naval && naval.unitType === 'naval') {
-      sub[i] = { ...u, h3Index: naval.h3Index };
-    }
-  }
-  return { ...battle, subUnits: sub };
+  return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
 }

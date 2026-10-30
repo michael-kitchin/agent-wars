@@ -146,6 +146,31 @@ export function strokeSupportOrderLines(
 }
 
 /**
+ * Builds origin-to-target segments for one pending support order list and strokes them.
+ *
+ * Purpose: Ranged, air-strike, and missile planning lines share the same unit lookup.
+ * When to use: From those three drawers after they have chosen the stroke mode.
+ * Expected outcome: No stroke when the list or the hex list is empty. Missing units are skipped.
+ * Exceptions: None.
+ */
+function drawPendingSupportOrderLines(
+  ctx: CanvasRenderingContext2D,
+  mode: 'ranged' | 'airStrike' | 'missile',
+  orders: readonly { readonly unitId: string; readonly targetH3Index: string }[],
+  units: readonly PendingOrderLineUnit[],
+  hexList: readonly string[] | undefined
+): void {
+  if (orders.length === 0 || !hexList) return;
+  const segments: SupportOrderLineSegment[] = [];
+  for (const order of orders) {
+    const unit = units.find((row) => row.id === order.unitId);
+    if (!unit) continue;
+    segments.push({ fromH3Index: unit.h3Index, toH3Index: order.targetH3Index });
+  }
+  strokeSupportOrderLines(ctx, mode, segments);
+}
+
+/**
  * Defines the `drawRangedAttackLines` function shape (export function drawRangedAttackLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, ranged: RangedAttackOrder[], uni).
 
  * Purpose: Supports maintainability by documenting why `drawRangedAttackLines` exists.
@@ -163,14 +188,7 @@ export function drawRangedAttackLines(
 ): void {
   void canvasWidth;
   void canvasHeight;
-  if (ranged.length === 0 || !hexList) return;
-  const segments: SupportOrderLineSegment[] = [];
-  for (const r of ranged) {
-    const unit = units.find((u) => u.id === r.unitId);
-    if (!unit) continue;
-    segments.push({ fromH3Index: unit.h3Index, toH3Index: r.targetH3Index });
-  }
-  strokeSupportOrderLines(ctx, 'ranged', segments);
+  drawPendingSupportOrderLines(ctx, 'ranged', ranged, units, hexList);
 }
 
 /**
@@ -220,14 +238,7 @@ export function drawAirStrikeLines(
   units: readonly PendingOrderLineUnit[],
   hexList: string[] | undefined
 ): void {
-  if (airStrikes.length === 0 || !hexList) return;
-  const segments: SupportOrderLineSegment[] = [];
-  for (const strike of airStrikes) {
-    const unit = units.find((u) => u.id === strike.unitId);
-    if (!unit) continue;
-    segments.push({ fromH3Index: unit.h3Index, toH3Index: strike.targetH3Index });
-  }
-  strokeSupportOrderLines(ctx, 'airStrike', segments);
+  drawPendingSupportOrderLines(ctx, 'airStrike', airStrikes, units, hexList);
 }
 
 /**
@@ -244,14 +255,7 @@ export function drawMissileLaunchLines(
   units: readonly PendingOrderLineUnit[],
   hexList: string[] | undefined
 ): void {
-  if (launches.length === 0 || !hexList) return;
-  const segments: SupportOrderLineSegment[] = [];
-  for (const launch of launches) {
-    const unit = units.find((row) => row.id === launch.unitId);
-    if (!unit) continue;
-    segments.push({ fromH3Index: unit.h3Index, toH3Index: launch.targetH3Index });
-  }
-  strokeSupportOrderLines(ctx, 'missile', segments);
+  drawPendingSupportOrderLines(ctx, 'missile', launches, units, hexList);
 }
 
 /**

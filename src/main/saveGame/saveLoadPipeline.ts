@@ -15,6 +15,7 @@ import { replaceGameDatabaseWithStagedFile, DATABASE_REPLACE_ROLLBACK_FAILED_MES
 import { dbGetOne } from '../gameDb';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
+import { deleteSqliteFileSet } from './sqliteFileSet';
 import { getActiveTacticalBattleSnapshot } from '../tacticalBattle/tacticalBattleSession';
 import { rememberCurrentAutoSaveTurnKey } from './autoSave';
 import { stageSaveFileForLoad } from './loadStaging';
@@ -316,12 +317,8 @@ function failedLoad(message: string): LoadGameResult {
  * Exceptions: None.
  */
 function deleteQuietly(filePath: string): void {
-  for (const suffix of ['-wal', '-shm', '']) {
-    const target = `${filePath}${suffix}`;
-    try {
-      if (fs.existsSync(target)) fs.rmSync(target);
-    } catch (err) {
-      logError('saveLoadPipeline failed to delete the load staging file', { filePath: target, err });
-    }
-  }
+  deleteSqliteFileSet(filePath, {
+    quiet: true,
+    failureLogMessage: 'saveLoadPipeline failed to delete the load staging file',
+  });
 }

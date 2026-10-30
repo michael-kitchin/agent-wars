@@ -2,10 +2,15 @@
  * Sealift stack UI state derived from the active tactical snapshot (sub-unit ids) instead of strategic `units` rows.
  */
 
-import type { SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
+import type { SealiftLandUnitOption, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { emptySealiftStackState } from '../../shared/sealiftStackState';
-import { buildSealiftSlotsByNavalId, normalizeSealiftSlots } from '../gameActions/sealiftSlotAssignment';
+import {
+  buildSealiftNavalRows,
+  buildSealiftSlotsByNavalId,
+  buildSealiftStackState,
+  normalizeSealiftSlots,
+} from '../gameActions/sealiftSlotAssignment';
 import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../gameActions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
@@ -65,30 +70,19 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
   normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   const contextMode = getSealiftStackContextModeForHex(h3Index);
   const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
-  const navalRows: SealiftNavalRow[] = navalIds.map((navalUnitId) => {
-    const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
-    const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';
-    const slot1Armor = !!slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor';
-    return {
-      navalUnitId,
-      slot1UnitId: slots.slot1UnitId,
-      slot2UnitId: slots.slot2UnitId,
-      slot2Disabled: controlsDisabled || slot1Armor,
-      controlsDisabled,
-      debarkSlot1Enabled: debarkAllowed && !!slots.slot1UnitId,
-      debarkSlot2Enabled: debarkAllowed && !!slots.slot2UnitId,
-    };
-  });
-  const hasEmbarkedUnitsInStack = assignments.length > 0;
-  const hasMixedStack = navalIds.length > 0 && landOptions.length > 0;
-  return {
-    h3Index,
-    showSealiftSection: hasMixedStack || hasEmbarkedUnitsInStack,
+  const navalRows = buildSealiftNavalRows({
+    navalIds,
+    slotsByNavalId,
+    landTypeById,
     contextMode,
-    controlsDisabled: contextMode === 'water' || contextMode === 'coastal_no_port',
-    hasEmbarkedUnitsInStack,
-    debarkAllowedAtHex: debarkAllowed,
+    debarkAllowed,
+  });
+  return buildSealiftStackState({
+    h3Index,
+    contextMode,
     navalRows,
     landOptions,
-  };
+    hasEmbarkedUnitsInStack: assignments.length > 0,
+    debarkAllowedAtHex: debarkAllowed,
+  });
 }

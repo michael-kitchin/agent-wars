@@ -116,6 +116,36 @@ validPhase: string;
 }
 
 /**
+ * Keeps order rows that pass validation and counts the rows that do not.
+ *
+ * Purpose: Strategic submit drops an invalid row and continues. Five order kinds share that loop.
+ * When to use: After the duplicate check for one order kind inside `executeSubmitOrders`.
+ * Expected outcome: `kept` is the accepted rows in input order. `droppedCount` is how many failed. Each failure is logged with the row's unit id and reason.
+ * Exceptions: None. The validator's false result supplies the reason.
+ */
+function keepValidOrderRows<T extends { readonly unitId: string }>(
+  rows: readonly T[],
+  orderKind: string,
+  validate: (row: T) => { valid: true } | { valid: false; reason: string }
+): { readonly kept: T[]; readonly droppedCount: number } {
+  const kept: T[] = [];
+  let droppedCount = 0;
+  for (const row of rows) {
+    const result = validate(row);
+    if (!result.valid) {
+      droppedCount += 1;
+      logOrderPlanSanitizeDrop(ORDER_PLAN_SANITIZE_CONTEXT.strategicSubmit, orderKind, {
+        unitId: row.unitId,
+        reason: result.reason,
+      });
+      continue;
+    }
+    kept.push(row);
+  }
+  return { kept, droppedCount };
+}
+
+/**
  * Defines the `executeSubmitOrders` function shape (export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult).
 
  * Purpose: Persists human strategic pending orders for the current planning phase after validation.
@@ -157,96 +187,69 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
     if (movementDupReason) {
       return { success: false, reason: movementDupReason };
     }
-    const keptMovements: typeof orders = [];
-    for (const order of orders) {
-      const result = deps.validateOrder(order.unitId, order.toH3Index);
-      if (!result.valid) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'movement', { unitId: order.unitId, reason: result.reason });
-        continue;
-      }
-      keptMovements.push(order);
-    }
+    const movementPass = keepValidOrderRows(orders, 'movement', (order) =>
+      deps.validateOrder(order.unitId, order.toH3Index)
+    );
+    droppedInvalidRows += movementPass.droppedCount;
+    const keptMovements = movementPass.kept;
 
     const rangedDupReason = strategicRangedDuplicateReason(ranged, deps.displayLabelForUnit);
     if (rangedDupReason) {
       return { success: false, reason: rangedDupReason };
     }
-    const keptRanged: typeof ranged = [];
-    for (const r of ranged) {
-      const result = deps.validateRangedAttack(r.unitId, r.targetH3Index, {
+    const rangedPass = keepValidOrderRows(ranged, 'ranged', (r) =>
+      deps.validateRangedAttack(r.unitId, r.targetH3Index, {
         allowedPlayer: HUMAN_SEAT_ID,
         displayLabelForUnit: deps.displayLabelForUnit,
-      });
-      if (!result.valid) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'ranged', { unitId: r.unitId, reason: result.reason });
-        continue;
-      }
-      keptRanged.push(r);
-    }
+      })
+    );
+    droppedInvalidRows += rangedPass.droppedCount;
+    const keptRanged = rangedPass.kept;
 
     const airDupReason = strategicAirStrikeDuplicateReason(airStrikes, deps.displayLabelForUnit);
     if (airDupReason) {
       return { success: false, reason: airDupReason };
     }
-    const keptAirStrikes: typeof airStrikes = [];
-    for (const s of airStrikes) {
-      const result = validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, {
+    const airPass = keepValidOrderRows(airStrikes, 'airStrike', (s) =>
+      validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, {
         allowedPlayer: deps.humanPlayerId,
         displayLabelForUnit: deps.displayLabelForUnit,
-      });
-      if (!result.valid) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'airStrike', { unitId: s.unitId, reason: result.reason });
-        continue;
-      }
-      keptAirStrikes.push(s);
-    }
+      })
+    );
+    droppedInvalidRows += airPass.droppedCount;
+    const keptAirStrikes = airPass.kept;
     const strikeUnitIds = new Set(keptAirStrikes.map((s) => s.unitId));
 
     const ferryDupReason = strategicFerryDuplicateReason(ferryOrders, deps.displayLabelForUnit);
     if (ferryDupReason) {
       return { success: false, reason: ferryDupReason };
     }
-    const keptFerry: typeof ferryOrders = [];
-    for (const f of ferryOrders) {
+    const ferryPass = keepValidOrderRows(ferryOrders, 'ferry', (f) => {
       if (strikeUnitIds.has(f.unitId)) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', {
-          unitId: f.unitId,
+        return {
+          valid: false as const,
           reason: `Air unit ${deps.displayLabelForUnit(f.unitId)} cannot strike and ferry in the same turn`,
-        });
-        continue;
+        };
       }
-      const result = validateFerryOrder(f.unitId, f.destinationH3Index, {
+      return validateFerryOrder(f.unitId, f.destinationH3Index, {
         allowedPlayer: deps.humanPlayerId,
         displayLabelForUnit: deps.displayLabelForUnit,
       });
-      if (!result.valid) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', { unitId: f.unitId, reason: result.reason });
-        continue;
-      }
-      keptFerry.push(f);
-    }
+    });
+    droppedInvalidRows += ferryPass.droppedCount;
+    const keptFerry = ferryPass.kept;
 
     const missileLaunches = payload.missileLaunches ?? [];
     const missileDupReason = strategicMissileLaunchDuplicateReason(missileLaunches, deps.displayLabelForUnit);
     if (missileDupReason) return { success: false, reason: missileDupReason };
-    const keptMissileLaunches: typeof missileLaunches = [];
-    for (const row of missileLaunches) {
-      const result = validateMissileLaunchOrder(row.unitId, row.targetH3Index, {
+    const missilePass = keepValidOrderRows(missileLaunches, 'missileLaunch', (row) =>
+      validateMissileLaunchOrder(row.unitId, row.targetH3Index, {
         allowedPlayer: deps.humanPlayerId,
         displayLabelForUnit: deps.displayLabelForUnit,
-      });
-      if (!result.valid) {
-        droppedInvalidRows += 1;
-        logOrderPlanSanitizeDrop(sanitizeCtx, 'missileLaunch', { unitId: row.unitId, reason: result.reason });
-        continue;
-      }
-      keptMissileLaunches.push(row);
-    }
+      })
+    );
+    droppedInvalidRows += missilePass.droppedCount;
+    const keptMissileLaunches = missilePass.kept;
 
     if (droppedInvalidRows > 0) {
       logOrderPlanSanitizeSummary(sanitizeCtx, droppedInvalidRows, {

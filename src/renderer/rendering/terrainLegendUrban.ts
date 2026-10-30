@@ -7,6 +7,8 @@
  * Exceptions: None.
  */
 
+import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
+
 /**
  * Opaque Urban chips, one per map style.
  *
@@ -43,21 +45,8 @@ export function urbanSwatchColor(styleId: string): string {
  * Exceptions: None.
  */
 export function appendUrbanLegendRow(container: HTMLElement, color: string): void {
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '6px';
-  row.style.marginBottom = '2px';
   const swatch = document.createElement('span');
-  swatch.style.display = 'inline-block';
-  swatch.style.width = '18px';
-  swatch.style.height = '12px';
-  swatch.style.border = '1px solid #d5deea';
-  swatch.style.borderRadius = '2px';
+  applyLegendSwatchChrome(swatch);
   swatch.style.background = color;
-  row.appendChild(swatch);
-  const label = document.createElement('span');
-  label.textContent = 'Urban';
-  row.appendChild(label);
-  container.appendChild(row);
+  appendLegendRow(container, swatch, 'Urban');
 }

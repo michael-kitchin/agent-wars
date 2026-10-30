@@ -69,6 +69,7 @@ None.
 - `src/renderer/map/mapChromeLayout.ts`
 - `src/shared/mapChromePlacement.ts`
 - `src/renderer/rendering/terrainVisualStyles.ts`
+- `src/renderer/rendering/terrainLegendRow.ts` (shared legend row layout and swatch chrome)
 - `src/renderer/rendering/terrainLegendUrban.ts`
 - `src/renderer/rendering/terrainLegendRubble.ts`
 - `src/renderer/rendering/terrainLegendFortified.ts` (`appendFortifiedLegendRow`)

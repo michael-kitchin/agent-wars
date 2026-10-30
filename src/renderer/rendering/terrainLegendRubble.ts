@@ -8,6 +8,7 @@
  */
 
 import { rubbleSwatchBackgroundImage } from '../../shared/terrainSwatchHtml';
+import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
 import { urbanSwatchColor } from './terrainLegendUrban';
 
 /**
@@ -34,21 +35,8 @@ export function applyRubbleSwatchPaint(element: HTMLElement, styleId: string): v
  * Exceptions: None.
  */
 export function appendRubbleLegendRow(container: HTMLElement, styleId: string): void {
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '6px';
-  row.style.marginBottom = '2px';
   const swatch = document.createElement('span');
-  swatch.style.display = 'inline-block';
-  swatch.style.width = '18px';
-  swatch.style.height = '12px';
-  swatch.style.border = '1px solid #d5deea';
-  swatch.style.borderRadius = '2px';
+  applyLegendSwatchChrome(swatch);
   applyRubbleSwatchPaint(swatch, styleId);
-  row.appendChild(swatch);
-  const label = document.createElement('span');
-  label.textContent = 'Rubble';
-  row.appendChild(label);
-  container.appendChild(row);
+  appendLegendRow(container, swatch, 'Rubble');
 }

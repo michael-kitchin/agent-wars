@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  buildSealiftNavalRows,
   buildSealiftSlotsByNavalId,
+  buildSealiftStackState,
   normalizeSealiftSlots,
   type SealiftSlotPair,
 } from './sealiftSlotAssignment';
@@ -59,4 +61,46 @@ test('normalizeSealiftSlots moves armor from slot 2 to slot 1', () => {
   ]);
   normalizeSealiftSlots(['n1'], slotsByNavalId, landTypeById);
   assert.deepEqual(slotsByNavalId.get('n1'), { slot1UnitId: 'arm-a', slot2UnitId: null });
+});
+
+test('buildSealiftNavalRows disables slot 2 when slot 1 holds armor', () => {
+  const rows = buildSealiftNavalRows({
+    navalIds: ['n1'],
+    slotsByNavalId: new Map([['n1', { slot1UnitId: 'arm-a', slot2UnitId: null }]]),
+    landTypeById: new Map([['arm-a', 'armor']]),
+    contextMode: 'coastal_port',
+    debarkAllowed: true,
+  });
+  assert.equal(rows[0]?.slot2Disabled, true);
+  assert.equal(rows[0]?.controlsDisabled, false);
+  assert.equal(rows[0]?.debarkSlot1Enabled, true);
+  assert.equal(rows[0]?.debarkSlot2Enabled, false);
+});
+
+test('buildSealiftNavalRows disables controls and debark on open water', () => {
+  const rows = buildSealiftNavalRows({
+    navalIds: ['n1'],
+    slotsByNavalId: new Map([['n1', { slot1UnitId: 'inf-a', slot2UnitId: 'inf-b' }]]),
+    landTypeById: new Map<string, 'infantry' | 'armor'>([
+      ['inf-a', 'infantry'],
+      ['inf-b', 'infantry'],
+    ]),
+    contextMode: 'water',
+    debarkAllowed: false,
+  });
+  assert.equal(rows[0]?.controlsDisabled, true);
+  assert.equal(rows[0]?.debarkSlot1Enabled, false);
+  assert.equal(rows[0]?.debarkSlot2Enabled, false);
+});
+
+test('buildSealiftStackState shows the section when cargo is embarked and no naval rows remain', () => {
+  const state = buildSealiftStackState({
+    h3Index: 'hex',
+    contextMode: 'coastal_port',
+    navalRows: [],
+    landOptions: [],
+    hasEmbarkedUnitsInStack: true,
+    debarkAllowedAtHex: true,
+  });
+  assert.equal(state.showSealiftSection, true);
 });

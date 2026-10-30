@@ -39,9 +39,8 @@ import {
 } from '../chrome/hireTooltipText';
 import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
 import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
-import { buildPopupCloseTooltipText } from '../../shared/popupControlTooltipText';
 import type { BuildHirePopupDeps } from './buildHirePopup';
-import { escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { createBuildCountInput, createBuildPopupCloseRow, escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
 
 /**
  * The hire view and the hex's naming caption.
@@ -113,7 +112,7 @@ export function renderHirePanel(
   deps: BuildHirePopupDeps
 ): void {
   panel.innerHTML = '';
-  panel.appendChild(closeRow(deps));
+  panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
   appendCaption(panel, h3Index, data.caption);
   const view = data.view;
   if (!view) {
@@ -129,27 +128,6 @@ export function renderHirePanel(
   if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
   panel.appendChild(note(HIRE_ARRIVAL_NOTE));
   if (!panel.hidden) placeOpenBuildPopup();
-}
-
-/**
- * The close button row.
- *
- * Purpose: Hire uses the same close control as Build.
- * When to use: The first child of the panel.
- * Expected outcome: A button that hides the popup and shows the close tip.
- * Exceptions: None.
- */
-function closeRow(deps: BuildHirePopupDeps): HTMLDivElement {
-  const row = document.createElement('div');
-  row.className = 'build-popup-close-row';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'unit-select build-close-btn';
-  button.textContent = '×';
-  button.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
-  button.addEventListener('click', () => deps.hideBuildPopup());
-  row.appendChild(button);
-  return row;
 }
 
 /**
@@ -247,19 +225,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
   typeSelect.addEventListener('change', () => {
     syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
   });
-  const countInput = document.createElement('input');
-  countInput.type = 'text';
-  countInput.className = 'build-count-input';
-  countInput.maxLength = 2;
-  countInput.inputMode = 'numeric';
-  countInput.value = '1';
-  countInput.setAttribute('data-control-tooltip', hireCountTooltipText);
-  countInput.addEventListener('keydown', (event) => {
-    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
-    if (allowed.includes(event.key)) return;
-    if (/^\d$/.test(event.key)) return;
-    event.preventDefault();
-  });
+  const countInput = createBuildCountInput(hireCountTooltipText, '1');
   countInput.addEventListener('input', () => {
     const raw = sanitizeBuildCountInputText(countInput.value);
     if (countInput.value !== raw) countInput.value = raw;

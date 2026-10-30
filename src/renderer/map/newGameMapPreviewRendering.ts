@@ -21,6 +21,7 @@ import {
   getHomeRegionOwnershipLineWidth,
   getMapZoomStrokeScale,
 } from '../rendering/terrainRendering';
+import { drawClosedPolygonPath } from '../rendering/polygonOutline';
 import { fillHexTerrain, getActiveHexStrokeStyle } from '../rendering/terrainVisualStyles';
 
 /**
@@ -177,13 +178,7 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
     if (pts.length === 0) continue;
     if (previewHexIsDrawn(payload.gameMapId, orders.length > 0 ? { kind: 'shared' } : null, inspectionHeld)) {
       const drawClosedPath = (): void => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const point = pts[i]!;
-          if (i === 0) ctx.moveTo(point.x, point.y);
-          else ctx.lineTo(point.x, point.y);
-        }
-        ctx.closePath();
+        drawClosedPolygonPath(ctx, pts);
       };
       fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
       if (orders.length === 0) {

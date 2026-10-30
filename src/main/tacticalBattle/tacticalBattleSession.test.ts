@@ -2,7 +2,8 @@
  * Tests for tactical main-process session helpers. Run with: node dist/main/tacticalBattle/tacticalBattleSession.test.js
  */
 
-import { type SeatId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dbGetOne } from '../gameDb';
@@ -14,6 +15,7 @@ import {
   getActiveTacticalBattleSnapshot,
   isTacticalBattleActive,
   startTacticalBattleForEnclosingHex,
+  validateHumanTacticalMarchOrders,
 } from './tacticalBattleSession';
 import {
   tacticalDbFixtureRegisterDefaultAfterEach,
@@ -192,4 +194,34 @@ test('non-voluntary teardown path does not apply bailout elimination', () => {
     const stillThere = dbGetOne<{ id: string }>('SELECT id FROM units WHERE id = ?', [picked.parentUnitId]);
     assert.ok(stillThere?.id, 'expected non-voluntary teardown to leave strategic parents untouched');
   });
+});
+
+test('validateHumanTacticalMarchOrders reports the first illegal order', () => {
+  const snapshot = {
+    battleId: 'march-validation',
+    tacticalTurnNumber: 1,
+    tacticalChildH3Indexes: ['inside'],
+    subUnits: [
+      { id: 'own', player: HUMAN_SEAT_ID },
+      { id: 'other', player: 'opponent' },
+    ],
+  } as unknown as TacticalBattleSnapshot;
+  setActiveTacticalBattleSnapshotRef(snapshot);
+  try {
+    assert.deepEqual(validateHumanTacticalMarchOrders([{ unitId: 'missing', toH3Index: 'inside' }]), {
+      success: false,
+      reason: 'One or more selected units are not part of this tactical battle.',
+    });
+    assert.deepEqual(validateHumanTacticalMarchOrders([{ unitId: 'other', toH3Index: 'inside' }]), {
+      success: false,
+      reason: 'Only your tactical sub-units can receive march orders here.',
+    });
+    assert.deepEqual(validateHumanTacticalMarchOrders([{ unitId: 'own', toH3Index: 'outside' }]), {
+      success: false,
+      reason: 'That destination lies outside the tactical battle footprint.',
+    });
+    assert.deepEqual(validateHumanTacticalMarchOrders([]), { success: true });
+  } finally {
+    setActiveTacticalBattleSnapshotRef(null);
+  }
 });

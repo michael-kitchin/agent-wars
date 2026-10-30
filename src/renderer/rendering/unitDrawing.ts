@@ -289,6 +289,27 @@ export function drawOneUnitMarker(
 }
 
 /**
+ * Draws the numeric badge for a stack of two or more units.
+ *
+ * Purpose: The standing unit layer and the moving-unit layer use the same outlined count.
+ * When to use: After the markers for that stack are drawn, at the stack's anchor point.
+ * Expected outcome: A white-outlined black count, offset from `x` and `y` by `COUNT_BADGE_OFFSET`.
+ * Exceptions: None.
+ */
+export function drawStackCountBadge(ctx: CanvasRenderingContext2D, count: number, x: number, y: number): void {
+  const badgeX = x + COUNT_BADGE_OFFSET;
+  const badgeY = y - COUNT_BADGE_OFFSET;
+  ctx.font = 'bold 13px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeText(String(count), badgeX, badgeY);
+  ctx.fillStyle = '#000';
+  ctx.fillText(String(count), badgeX, badgeY);
+}
+
+/**
  * Draws one marker per hex for the given units, with a second offset marker and a count badge for a stack.
  *
  * Purpose: Units are drawn on the canvas, one token per hex, in both theaters.
@@ -347,16 +368,7 @@ export function drawUnits(
   }
   for (const { x, y, count } of tokens) {
     if (count < 2) continue;
-    const badgeX = x + COUNT_BADGE_OFFSET;
-    const badgeY = y - COUNT_BADGE_OFFSET;
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.strokeText(String(count), badgeX, badgeY);
-    ctx.fillStyle = '#000';
-    ctx.fillText(String(count), badgeX, badgeY);
+    drawStackCountBadge(ctx, count, x, y);
   }
   for (const token of tokens) {
     if (!token.units.some((unit) => unit.isMercenary === true)) continue;

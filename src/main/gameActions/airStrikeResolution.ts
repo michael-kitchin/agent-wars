@@ -197,6 +197,36 @@ export type ApplyInfrastructureDestructionOptions = {
 };
 
 /**
+ * Applies one random tactical-feature rubble pick and the shared follow-up.
+ *
+ * Purpose: Urban, airport, and seaport strikes share the random cell pick, fortification tally, and queue prune.
+ * When to use: After the caller has confirmed that feature still exists on the strategic hex.
+ * Expected outcome: `result` records rubble and stripped forts; an airport strike that rubbles a cell also destroys based air units.
+ * Exceptions: None. Database errors propagate.
+ */
+function rubbleRandomFeatureCells(args: {
+  readonly h3Index: string;
+  readonly feature: 'urban' | 'airport' | 'seaport';
+  readonly count: number;
+  readonly next: () => number;
+  readonly result: {
+    destroyedAirUnits: ReturnType<typeof destroyBasedAirUnitsAtHex>;
+    changedRubbleCount: number;
+    fortificationsStrippedCount: number;
+  };
+}): void {
+  const picked = replaceRandomTacticalFeaturesWithRubble(args.h3Index, args.feature, args.count, args.next);
+  args.result.changedRubbleCount = picked.rubbled;
+  args.result.fortificationsStrippedCount = picked.fortificationsStripped;
+  if (args.result.changedRubbleCount > 0) {
+    if (args.feature === 'airport') {
+      args.result.destroyedAirUnits = destroyBasedAirUnitsAtHex(args.h3Index);
+    }
+    pruneBuildQueueForInfrastructureState(args.h3Index);
+  }
+}
+
+/**
  * Defines the `applyInfrastructureDestructionEffects` function shape (function applyInfrastructureDestructionEffects( h3Index: string, targetType: AirStrikeTargetType, next: () => number, options?: ApplyInfrastructureDestructionOptions ): { destroyedAirUnits: Array<...>; changedRubbleCount: number }).
 
  * Purpose: Supports maintainability by documenting why `applyInfrastructureDestructionEffects` exists.
@@ -265,33 +295,17 @@ export function applyInfrastructureDestructionEffects(
     }
     const destroyCount = Math.min(strategicUrbanCellsDestroyedPerHit(), current.urbanHexCount);
     if (destroyCount <= 0) return finish();
-    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'urban', destroyCount, next);
-    result.changedRubbleCount = picked.rubbled;
-    result.fortificationsStrippedCount = picked.fortificationsStripped;
-    if (result.changedRubbleCount > 0) {
-      pruneBuildQueueForInfrastructureState(h3Index);
-    }
+    rubbleRandomFeatureCells({ h3Index, feature: 'urban', count: destroyCount, next, result });
     return finish();
   }
   if (targetType === 'airport') {
     if (current.airportCount <= 0) return finish();
-    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'airport', 1, next);
-    result.changedRubbleCount = picked.rubbled;
-    result.fortificationsStrippedCount = picked.fortificationsStripped;
-    if (result.changedRubbleCount > 0) {
-      result.destroyedAirUnits = destroyBasedAirUnitsAtHex(h3Index);
-      pruneBuildQueueForInfrastructureState(h3Index);
-    }
+    rubbleRandomFeatureCells({ h3Index, feature: 'airport', count: 1, next, result });
     return finish();
   }
   if (targetType === 'seaport') {
     if (current.seaportCount <= 0) return finish();
-    const picked = replaceRandomTacticalFeaturesWithRubble(h3Index, 'seaport', 1, next);
-    result.changedRubbleCount = picked.rubbled;
-    result.fortificationsStrippedCount = picked.fortificationsStripped;
-    if (result.changedRubbleCount > 0) {
-      pruneBuildQueueForInfrastructureState(h3Index);
-    }
+    rubbleRandomFeatureCells({ h3Index, feature: 'seaport', count: 1, next, result });
   }
   return finish();
 }

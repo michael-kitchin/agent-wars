@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import {
   strategicAirStrikeDuplicateReason,
   strategicFerryDuplicateReason,
+  strategicMissileLaunchDuplicateReason,
   strategicMovementDuplicateReason,
   strategicRangedDuplicateReason,
 } from './orderPlanSanitize';
@@ -39,6 +40,10 @@ function testStrategicDuplicateHelpersUniqueRowsReturnNull(): void {
   assert.strictEqual(strategicRangedDuplicateReason([{ unitId: 'a' }], label), null);
   assert.strictEqual(strategicAirStrikeDuplicateReason([{ unitId: 'x' }, { unitId: 'y' }], label), null);
   assert.strictEqual(strategicFerryDuplicateReason([{ unitId: 'f1' }], label), null);
+  assert.strictEqual(
+    strategicMissileLaunchDuplicateReason([{ unitId: 'm' }, { unitId: 'n' }], label),
+    null
+  );
 }
 
 /**
@@ -65,6 +70,10 @@ function testStrategicDuplicateHelpersDetectRepeatedUnitId(): void {
   assert.strictEqual(
     strategicFerryDuplicateReason([{ unitId: 'f' }, { unitId: 'f' }], label),
     'Duplicate ferry order for U:f'
+  );
+  assert.strictEqual(
+    strategicMissileLaunchDuplicateReason([{ unitId: 'm' }, { unitId: 'm' }], label),
+    'Duplicate missile launch for U:m.'
   );
 }
 

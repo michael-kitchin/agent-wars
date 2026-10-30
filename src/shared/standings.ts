@@ -8,6 +8,7 @@
  */
 
 import { formatCommanderSummary } from './commanderSummary';
+import { formatPlaceOrdinal } from './placeOrdinal';
 import { paletteForOwner } from './seatPalette';
 import type { SeatId } from './seatIds';
 import { HUMAN_SEAT_KIND, type Doctrine, type DoctrineChoice, type SeatKind } from './seatRoster';
@@ -388,7 +389,7 @@ function headingFor(seats: readonly StandingsSeatInput[], first: readonly Standi
   if (first.length !== 1) return 'No side won.';
   const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
   if (!human) return `${first[0]!.homeRegion} wins.`;
-  return `You placed ${ordinal(human.place ?? seats.length)} of ${seats.length}.`;
+  return `You placed ${formatPlaceOrdinal(human.place ?? seats.length)} of ${seats.length}.`;
 }
 
 /**
@@ -540,25 +541,6 @@ function cityHexPhrase(count: number): string {
  */
 function consultationPhrase(count: number): string {
   return count === 1 ? '1 consultation' : `${count} consultations`;
-}
-
-/**
- * An English ordinal for a place.
- *
- * Purpose: The heading says "1st" and "2nd".
- * When to use: `headingFor`.
- * Expected outcome: 1st, 2nd, 3rd, 4th, and the same pattern afterward. 11, 12, and 13 use "th".
- * Exceptions: None.
- */
-function ordinal(place: number): string {
-  const mod100 = place % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
-  switch (place % 10) {
-    case 1: return `${place}st`;
-    case 2: return `${place}nd`;
-    case 3: return `${place}rd`;
-    default: return `${place}th`;
-  }
 }
 
 /**

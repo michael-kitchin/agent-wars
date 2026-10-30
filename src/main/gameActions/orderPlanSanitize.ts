@@ -58,6 +58,27 @@ export function logOrderPlanSanitizeSummary(
 }
 
 /**
+ * Returns the first duplicate-unit reason in a row list.
+ *
+ * Purpose: Movement, ranged, air, ferry, and missile lists share one scan. The caller supplies the sentence.
+ * When to use: The five strategic duplicate-reason exports.
+ * Expected outcome: Null when every `unitId` is unique. Otherwise the caller's sentence for the first repeated unit. The label function runs only for that repeat.
+ * Exceptions: None.
+ */
+function firstDuplicateUnitReason(
+  rows: readonly { readonly unitId: string }[],
+  displayLabelForUnit: (unitId: string) => string,
+  reasonFor: (unitLabel: string) => string
+): string | null {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (seen.has(row.unitId)) return reasonFor(displayLabelForUnit(row.unitId));
+    seen.add(row.unitId);
+  }
+  return null;
+}
+
+/**
  * Returns a human-readable reason when the same strategic unit id appears twice in a movement order list.
  *
  * Purpose: Duplicate rows remain a hard error (user mistake), not a silent drop.
@@ -69,14 +90,7 @@ export function strategicMovementDuplicateReason(
   orders: readonly { unitId: string }[],
   displayLabelForUnit: (unitId: string) => string
 ): string | null {
-  const seen = new Set<string>();
-  for (const order of orders) {
-    if (seen.has(order.unitId)) {
-      return `Duplicate order for ${displayLabelForUnit(order.unitId)}`;
-    }
-    seen.add(order.unitId);
-  }
-  return null;
+  return firstDuplicateUnitReason(orders, displayLabelForUnit, (label) => `Duplicate order for ${label}`);
 }
 
 /**
@@ -91,14 +105,7 @@ export function strategicRangedDuplicateReason(
   rows: readonly { unitId: string }[],
   displayLabelForUnit: (unitId: string) => string
 ): string | null {
-  const seen = new Set<string>();
-  for (const r of rows) {
-    if (seen.has(r.unitId)) {
-      return `Duplicate ranged order for ${displayLabelForUnit(r.unitId)}`;
-    }
-    seen.add(r.unitId);
-  }
-  return null;
+  return firstDuplicateUnitReason(rows, displayLabelForUnit, (label) => `Duplicate ranged order for ${label}`);
 }
 
 /**
@@ -113,14 +120,7 @@ export function strategicAirStrikeDuplicateReason(
   rows: readonly { unitId: string }[],
   displayLabelForUnit: (unitId: string) => string
 ): string | null {
-  const seen = new Set<string>();
-  for (const s of rows) {
-    if (seen.has(s.unitId)) {
-      return `Duplicate strike order for ${displayLabelForUnit(s.unitId)}`;
-    }
-    seen.add(s.unitId);
-  }
-  return null;
+  return firstDuplicateUnitReason(rows, displayLabelForUnit, (label) => `Duplicate strike order for ${label}`);
 }
 
 /**
@@ -135,14 +135,7 @@ export function strategicFerryDuplicateReason(
   rows: readonly { unitId: string }[],
   displayLabelForUnit: (unitId: string) => string
 ): string | null {
-  const seen = new Set<string>();
-  for (const f of rows) {
-    if (seen.has(f.unitId)) {
-      return `Duplicate ferry order for ${displayLabelForUnit(f.unitId)}`;
-    }
-    seen.add(f.unitId);
-  }
-  return null;
+  return firstDuplicateUnitReason(rows, displayLabelForUnit, (label) => `Duplicate ferry order for ${label}`);
 }
 
 /**
@@ -157,10 +150,5 @@ export function strategicMissileLaunchDuplicateReason(
   rows: readonly { unitId: string }[],
   displayLabelForUnit: (unitId: string) => string
 ): string | null {
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (seen.has(row.unitId)) return missileLaunchDuplicateReason(displayLabelForUnit(row.unitId));
-    seen.add(row.unitId);
-  }
-  return null;
+  return firstDuplicateUnitReason(rows, displayLabelForUnit, missileLaunchDuplicateReason);
 }

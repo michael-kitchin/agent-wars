@@ -9,6 +9,7 @@ import {
   type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
+import { drawClosedPolygonPath } from './polygonOutline';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { drawFortifiedCellTicks } from './fortificationTickDrawing';
@@ -168,13 +169,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
         (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains')
     );
     const drawClosedPath = (): void => {
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i]!;
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
+      drawClosedPolygonPath(ctx, pts);
     };
     const explored = exploredHexes.has(hx.h3Index);
     if (explored && !deps.isMapInspectionModeHeld()) {
@@ -286,13 +281,7 @@ export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: Te
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
       if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = (): void => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i]!;
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
+        drawClosedPolygonPath(ctx, pts);
       };
       if (!deps.isMapInspectionModeHeld()) {
         fillHexTerrain(ctx, terrainKind, drawClosedPath, {

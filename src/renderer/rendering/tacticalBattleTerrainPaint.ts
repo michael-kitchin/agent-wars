@@ -13,6 +13,7 @@ import { rendererSharedState as S } from '../core/state';
 import { projectHexBoundaryToContainerPoints, shouldDrawTacticalChildHexInViewport } from '../map/terrainView';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { drawFortifiedCellTicks, fortificationTickColor } from './fortificationTickDrawing';
+import { drawClosedPolygonPath } from './polygonOutline';
 import { fillHexTerrain } from './terrainVisualStyles';
 
 /**
@@ -56,13 +57,7 @@ export function paintBattleFootprintTerrain(
     const pts = projectHexBoundaryToContainerPoints(child, map, leaflet);
     if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
     const drawClosedPath = (): void => {
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i]!;
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
+      drawClosedPolygonPath(ctx, pts);
     };
     if (!deps.isMapInspectionModeHeld()) {
       fillHexTerrain(ctx, terrainKind, drawClosedPath, {

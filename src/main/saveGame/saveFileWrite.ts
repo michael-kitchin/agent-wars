@@ -15,6 +15,7 @@ import { dbGetOne, isDbReady } from '../gameDb';
 import { getDbHandle } from '../gameDb/dbConnection';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
+import { deleteSqliteFileSet } from './sqliteFileSet';
 import {
   SAVE_APPLICATION_ID,
   SAVE_APP_VERSION_CONFIG_KEY,
@@ -186,18 +187,6 @@ function replaceTargetWithPartial(partialPath: string, targetPath: string): void
 }
 
 /**
- * Deletes a file when it is present.
- *
- * Purpose: A leftover staging or aside file must not block the next rename.
- * When to use: Before creating a staging file or an aside file.
- * Expected outcome: The path is absent.
- * Exceptions: Throws when the delete fails.
- */
-function deleteIfPresent(filePath: string): void {
-  if (fs.existsSync(filePath)) fs.rmSync(filePath);
-}
-
-/**
  * Deletes a temporary file and logs a failure without hiding the save error.
  *
  * Purpose: Cleanup runs after a failed save and must not replace that failure.
@@ -222,9 +211,5 @@ function deleteQuietly(filePath: string): void {
  * Exceptions: Throws when `quiet` is false and a delete fails. A quiet delete logs the failure and does not throw.
  */
 function deleteStagingSet(filePath: string, quiet: boolean): void {
-  for (const suffix of ['-wal', '-shm', '']) {
-    const target = `${filePath}${suffix}`;
-    if (quiet) deleteQuietly(target);
-    else deleteIfPresent(target);
-  }
+  deleteSqliteFileSet(filePath, { quiet, failureLogMessage: 'saveFileWrite failed to delete a temporary file' });
 }

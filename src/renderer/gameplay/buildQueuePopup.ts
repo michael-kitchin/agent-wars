@@ -16,7 +16,14 @@ import {
   appendKeepBuildingCheckbox,
   canArmKeepBuilding,
 } from './buildQueueKeepBuilding';
-import { createBuildPausedNote, escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import {
+  createBuildCountInput,
+  createBuildPausedNote,
+  createBuildPopupCloseRow,
+  escapeBuildPopupHtml,
+  readSanitizedBuildCount,
+  sanitizeBuildCountInputText,
+} from './buildQueuePopupFormatting';
 import { renderBuildOrHirePopupIntoMount, type BuildHirePopupDeps } from './buildHirePopup';
 import { isHumanBuildEntryHexIndex } from './productionOverlayHelpers';
 import {
@@ -27,7 +34,7 @@ import {
 } from '../chrome/controlTooltipText';
 import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
 import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
-import { buildPopupCloseTooltipText, singleHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
+import { singleHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
@@ -323,16 +330,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     if (requestSeq !== S.buildPopupRequestSeq || !snapshot || S.buildPopupHexH3 !== h3Index) return;
 
     mount.innerHTML = '';
-    const closeRow = document.createElement('div');
-    closeRow.className = 'build-popup-close-row';
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'unit-select build-close-btn';
-    closeBtn.textContent = '×';
-    closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
-    closeBtn.addEventListener('click', () => hideBuildPopup());
-    closeRow.appendChild(closeBtn);
-    mount.appendChild(closeRow);
+    mount.appendChild(createBuildPopupCloseRow(hideBuildPopup));
 
     const section = document.createElement('div');
     section.className = 'build-queue-section';
@@ -452,18 +450,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       }
       typeSelect.value = entry.unitType;
       syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
-      const countInput = document.createElement('input');
-      countInput.setAttribute('data-control-tooltip', buildCountTooltipText);
-      countInput.type = 'text';
-      countInput.className = 'build-count-input';
-      countInput.maxLength = 2;
-      countInput.inputMode = 'numeric';
-      countInput.value = String(entry.count);
-      const readCurrentCount = (): number => {
-        const raw = sanitizeBuildCountInputText(countInput.value);
-        if (countInput.value !== raw) countInput.value = raw;
-        return parseInt(raw, 10);
-      };
+      const countInput = createBuildCountInput(buildCountTooltipText, String(entry.count));
       /**
        * Submits a type or count edit for this build-queue row.
        *
@@ -476,7 +463,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
         const submittedUnitType = typeSelect.value as BuildQueueItemType;
-        const submittedCount = readCurrentCount();
+        const submittedCount = readSanitizedBuildCount(countInput);
         const submittedCountText = countInput.value;
         const success = await runBuildQueueMutation({
           mutate: () =>
@@ -511,12 +498,6 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       });
       row.appendChild(typeSelect);
 
-      countInput.addEventListener('keydown', (event) => {
-        const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
-        if (allowed.includes(event.key)) return;
-        if (/^\d$/.test(event.key)) return;
-        event.preventDefault();
-      });
       countInput.addEventListener('input', async () => {
         await submitBuildQueueEntryEdit('Failed to update build count.');
       });

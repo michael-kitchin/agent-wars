@@ -6,6 +6,7 @@ import { NEUTRAL_PALETTE } from '../../shared/seatPalette';
 import { isNeutralOwnerId } from '../../shared/seatIds';
 import { MULTI_PLAYER_FILL, MULTI_PLAYER_STROKE, OWNERSHIP_BORDER_ALPHA } from '../core/constants';
 import { paletteForCurrentOwner } from './ownerColors';
+import { drawClosedPolygonPath } from './polygonOutline';
 
 /**
  * Maps current hex control to the outer solid ownership border color.
@@ -89,23 +90,14 @@ export function drawOutlinedHomeRegionOwnershipBorders(
   ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
   const outerColor = args.outerColor ?? resolveControllerBorderColor(args.controllerPlayerId);
   const innerColor = args.innerColor ?? resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
-  const drawClosedPath = (points: readonly { x: number; y: number }[]): void => {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i]!;
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-  };
-  drawClosedPath(pts);
+  drawClosedPolygonPath(ctx, pts);
   ctx.strokeStyle = outerColor;
   ctx.lineWidth = args.ownershipLineWidth;
   ctx.setLineDash([]);
   ctx.stroke();
   const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
   const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
-  drawClosedPath(innerPts);
+  drawClosedPolygonPath(ctx, innerPts);
   ctx.strokeStyle = innerColor;
   ctx.lineWidth = innerLineWidth;
   ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);

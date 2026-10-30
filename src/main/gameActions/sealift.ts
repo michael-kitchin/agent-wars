@@ -1,4 +1,4 @@
-import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
+import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
@@ -8,7 +8,9 @@ import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import {
+  buildSealiftNavalRows,
   buildSealiftSlotsByNavalId,
+  buildSealiftStackState,
   normalizeSealiftSlots,
   type SealiftSlotPair,
 } from './sealiftSlotAssignment';
@@ -368,38 +370,6 @@ function writeAssignmentsForHex(
 }
 
 /**
- * Defines the `buildNavalRows` function shape (function buildNavalRows( contextMode: SealiftContextMode, navalIds: string[], slotsByNavalId: Map<string, SealiftSlots>, landTypeById: Map<string, ').
-
- * Purpose: Supports maintainability by documenting why `buildNavalRows` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildNavalRows(
-  contextMode: SealiftContextMode,
-  h3Index: string,
-  navalIds: string[],
-  slotsByNavalId: Map<string, SealiftSlots>,
-  landTypeById: Map<string, 'infantry' | 'armor'>
-): SealiftNavalRow[] {
-  const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';
-  const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
-  return navalIds.map((navalUnitId) => {
-    const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
-    const slot1Armor = !!slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor';
-    return {
-      navalUnitId,
-      slot1UnitId: slots.slot1UnitId,
-      slot2UnitId: slots.slot2UnitId,
-      slot2Disabled: controlsDisabled || slot1Armor,
-      controlsDisabled,
-      debarkSlot1Enabled: debarkAllowed && !!slots.slot1UnitId,
-      debarkSlot2Enabled: debarkAllowed && !!slots.slot2UnitId,
-    };
-  });
-}
-
-/**
  * Defines the `readSealiftStackState` function shape (export function readSealiftStackState(h3Index: string): SealiftStackState).
 
  * Purpose: Supports maintainability by documenting why `readSealiftStackState` exists.
@@ -416,20 +386,23 @@ export function readSealiftStackState(h3Index: string): SealiftStackState {
   const assignments = loadAssignmentsAtHex(h3Index);
   const slotsByNavalId = buildSealiftSlotsByNavalId(navalIds, assignments);
   normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
-  const navalRows = buildNavalRows(contextMode, h3Index, navalIds, slotsByNavalId, landTypeById);
-  const hasEmbarkedUnitsInStack = assignments.length > 0;
-  const hasMixedStack = navalIds.length > 0 && landOptions.length > 0;
-  const debarkAllowedAtHex = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
-  return {
-    h3Index,
-    showSealiftSection: hasMixedStack || hasEmbarkedUnitsInStack,
+  const navalRows = buildSealiftNavalRows({
+    navalIds,
+    slotsByNavalId,
+    landTypeById,
     contextMode,
-    controlsDisabled: contextMode === 'water' || contextMode === 'coastal_no_port',
-    hasEmbarkedUnitsInStack,
-    debarkAllowedAtHex,
+    debarkAllowed: canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID),
+  });
+  const hasEmbarkedUnitsInStack = assignments.length > 0;
+  const debarkAllowedAtHex = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
+  return buildSealiftStackState({
+    h3Index,
+    contextMode,
     navalRows,
     landOptions,
-  };
+    hasEmbarkedUnitsInStack,
+    debarkAllowedAtHex,
+  });
 }
 
 /**

@@ -117,6 +117,47 @@ function dbBackedStateSnapshot(): {
 }
 
 /**
+ * Projects one snapshot unit into the combat-phase row.
+ *
+ * Purpose: Air, ranged, and melee all read the same five fields.
+ * When to use: At each combat-unit list built from `listUnitsForSnapshot`.
+ * Expected outcome: A `CombatUnit` with the unit's id, owner, type, hex, and display order.
+ * Exceptions: None.
+ */
+function toCombatUnit(unit: {
+  readonly id: string;
+  readonly player: string;
+  readonly unitType: CombatUnit['unitType'];
+  readonly h3Index: string;
+  readonly displayOrder?: CombatUnit['displayOrder'];
+}): CombatUnit {
+  return {
+    id: unit.id,
+    player: unit.player,
+    unitType: unit.unitType,
+    h3Index: unit.h3Index,
+    displayOrder: unit.displayOrder,
+  };
+}
+
+/**
+ * Drops embarked infantry and armor that are still on water.
+ *
+ * Purpose: Ranged fire and post-move melee both ignore land units riding naval transports at sea.
+ * When to use: Immediately before projecting those lists to `CombatUnit`.
+ * Expected outcome: Non-land rows pass through. Land rows stay only when they are not embarked on water.
+ * Exceptions: None.
+ */
+function withoutEmbarkedLandOnWater<T extends { readonly id: string; readonly unitType: string }>(
+  units: readonly T[]
+): T[] {
+  return units.filter((u) => {
+    if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+    return !isEmbarkedLandUnitOnWater(u.id);
+  });
+}
+
+/**
  * Executes air strike, ranged, merged movement, ferry resolution, then melee pause or finalize.
  *
  * Purpose: Owns the heavy `ready` pipeline while `gameActions.ready` keeps guards and planning-phase checks.
@@ -135,13 +176,7 @@ export function executeReadyStrategicTurn(
   const hexList = getOrderedHexList();
   prepareNeutralTransportsForTurn(buildLatLngCoordinateMap(hexList));
   const unitsBeforeMove = listUnitsForSnapshot();
-  const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map((u) => ({
-    id: u.id,
-    player: u.player,
-    unitType: u.unitType,
-    h3Index: u.h3Index,
-    displayOrder: u.displayOrder,
-  }));
+  const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map(toCombatUnit);
   const unitOwnerById = new Map(unitsBeforeMove.map((unit) => [unit.id, unit.player]));
   const ordersForOwners = new Map<OwnerId, ReturnType<typeof keepOrdersOfOwnedUnits>>();
   for (const [owner, orders] of ordersByOwner) {
@@ -265,18 +300,7 @@ export function executeReadyStrategicTurn(
     airStrikeResult.removedUnits
   );
   const rangedInputUnits = withTechHitBonus(withOriginHitBonus(
-    listedForWeather
-      .filter((u) => {
-        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-        return !isEmbarkedLandUnitOnWater(u.id);
-      })
-      .map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index,
-        displayOrder: u.displayOrder,
-      })),
+    withoutEmbarkedLandOnWater(listedForWeather).map(toCombatUnit),
     originHitBonusAt
   ).map((unit) => {
     const source = listedForWeather.find((candidate) => candidate.id === unit.id);
@@ -426,19 +450,7 @@ export function executeReadyStrategicTurn(
   const unitsAfterMove = listUnitsForSnapshot();
   const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
   const combatUnitsAfter: CombatUnit[] = withTechHitBonus(withOriginHitBonus(
-    unitsAfterMove
-      .filter((u) => !rangedRemovedSet.has(u.id))
-      .filter((u) => {
-        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-        return !isEmbarkedLandUnitOnWater(u.id);
-      })
-      .map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index,
-        displayOrder: u.displayOrder,
-      })),
+    withoutEmbarkedLandOnWater(unitsAfterMove.filter((u) => !rangedRemovedSet.has(u.id))).map(toCombatUnit),
     originHitBonusAt
   ), techHitBonusAt);
 

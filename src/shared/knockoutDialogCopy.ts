@@ -1,11 +1,13 @@
 /**
  * Sentences for the dialog shown when the human seat is knocked out and the match goes on.
  *
- * Purpose: The dialog and the standings heading share a place sentence without sharing a module.
+ * Purpose: The dialog and the standings heading take the place ordinal from `formatPlaceOrdinal`.
  * When to use: After Ready, when a knockout names the human seat and the match is not over.
  * Expected outcome: A title, a lead sentence, and a place sentence.
  * Exceptions: None. This module does not import the main-process logger.
  */
+
+import { formatPlaceOrdinal } from './placeOrdinal';
 
 /**
  * Copy for the knocked-out dialog.
@@ -134,7 +136,7 @@ export function formatHumanKnockoutDialog(input: HumanKnockoutDialogInput): Huma
   return {
     title: "You're out",
     lead: outByName ? `${outByName} knocked you out on turn ${input.turnNumber}.` : reasonLead(input),
-    placeLine: `You placed ${ordinal(input.place)} of ${input.seatCount}.`,
+    placeLine: `You placed ${formatPlaceOrdinal(input.place)} of ${input.seatCount}.`,
   };
 }
 
@@ -163,21 +165,3 @@ function reasonLead(input: HumanKnockoutDialogInput): string {
   return sentences.join(' ') || 'You are out of the match.';
 }
 
-/**
- * An English ordinal for a place.
- *
- * Purpose: The dialog says "2nd" and "3rd".
- * When to use: `formatHumanKnockoutDialog`.
- * Expected outcome: 1st, 2nd, 3rd, 4th, and the same pattern afterward. 11, 12, and 13 use "th".
- * Exceptions: None.
- */
-function ordinal(place: number): string {
-  const mod100 = place % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
-  switch (place % 10) {
-    case 1: return `${place}st`;
-    case 2: return `${place}nd`;
-    case 3: return `${place}rd`;
-    default: return `${place}th`;
-  }
-}

@@ -13,6 +13,7 @@ import { SEAT_PALETTES } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { drawFortificationTicks } from './fortificationTickDrawing';
 import { paletteForCurrentOwner } from './ownerColors';
+import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
 
 /**
  * Appends the Fortified legend row.
@@ -23,19 +24,10 @@ import { paletteForCurrentOwner } from './ownerColors';
  * Exceptions: None.
  */
 export function appendFortifiedLegendRow(container: HTMLElement): void {
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '6px';
-  row.style.marginBottom = '2px';
   const swatch = document.createElement('canvas');
   swatch.width = 18;
   swatch.height = 12;
-  swatch.style.display = 'inline-block';
-  swatch.style.width = '18px';
-  swatch.style.height = '12px';
-  swatch.style.border = '1px solid #d5deea';
-  swatch.style.borderRadius = '2px';
+  applyLegendSwatchChrome(swatch);
   const ctx = swatch.getContext('2d');
   if (ctx) {
     const points = [];
@@ -52,9 +44,5 @@ export function appendFortifiedLegendRow(container: HTMLElement): void {
       lineWidthPx: 1,
     });
   }
-  row.appendChild(swatch);
-  const label = document.createElement('span');
-  label.textContent = FORTIFIED_LEGEND_LABEL;
-  row.appendChild(label);
-  container.appendChild(row);
+  appendLegendRow(container, swatch, FORTIFIED_LEGEND_LABEL);
 }

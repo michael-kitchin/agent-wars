@@ -4,13 +4,14 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { syncEmbarkedLandToNavalHex } from './tacticalEmbarkedCargoSync';
 
 /**
  * Returns a snapshot copy whose unit rows reflect applied march orders and embarked-cargo hex sync.
  *
  * Contract: Only updates `units[].h3Index`; opponent embarked cargo auto-debarks when moving independently.
  * When to use: After movement orders pass validation in tactical AI flow, before ranged/air/ferry/embark checks.
- * Expected outcome: Carriers move first by list order; remaining cargo with `embarkedOnSubUnitId` snaps to carrier cells.
+ * Expected outcome: Ordered units move in one pass. Opponent cargo that marches on its own clears `embarkedOnSubUnitId`. Cargo that stays embarked takes its carrier's hex from that same pass.
  * Exceptions: None.
  */
 export function applyMovementOrdersToPlanState(
@@ -32,14 +33,5 @@ export function applyMovementOrdersToPlanState(
     }
     return { ...u, h3Index: to };
   });
-  const byId = new Map(units.map((u) => [u.id, u] as const));
-  for (const u of units) {
-    const embark = u.embarkedOnSubUnitId;
-    if (!embark) continue;
-    const naval = byId.get(embark);
-    if (naval && naval.unitType === 'naval') {
-      byId.set(u.id, { ...u, h3Index: naval.h3Index });
-    }
-  }
-  return { ...state, units: [...byId.values()] };
+  return { ...state, units: syncEmbarkedLandToNavalHex(units) };
 }

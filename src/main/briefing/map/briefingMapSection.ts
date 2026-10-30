@@ -112,6 +112,45 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   );
 }
 
+/**
+ * Reads fog, discovery, and the two occupancy counts for one briefing map.
+ *
+ * Purpose: The strategic and tactical ASCII maps count the same seats the same way.
+ * When to use: At the start of each hex-state builder, before that map's own loop.
+ * Expected outcome: `ownUnitsByH3` counts the briefing seat. `otherUnitsByH3` counts every other seat, including neutral.
+ * Exceptions: None.
+ */
+function readBriefingMapOccupancy(state: GameStateSnapshot): {
+  readonly ownSeat: ReturnType<typeof briefingOwnSeatId>;
+  readonly fog: boolean;
+  readonly discovered: Set<string>;
+  readonly ownUnitsByH3: Map<string, number>;
+  readonly otherUnitsByH3: Map<string, number>;
+} {
+  const discovered = new Set<string>([...(state.visibleHexes ?? []), ...(state.exploredHexes ?? [])]);
+  const fog = state.fogOfWarEnabled === true;
+  const ownSeat = briefingOwnSeatId(state);
+  const ownUnitsByH3 = new Map<string, number>();
+  const otherUnitsByH3 = new Map<string, number>();
+  for (const u of state.units) {
+    if (u.player === ownSeat) ownUnitsByH3.set(u.h3Index, (ownUnitsByH3.get(u.h3Index) ?? 0) + 1);
+    else otherUnitsByH3.set(u.h3Index, (otherUnitsByH3.get(u.h3Index) ?? 0) + 1);
+  }
+  return { ownSeat, fog, discovered, ownUnitsByH3, otherUnitsByH3 };
+}
+
+/**
+ * Classifies a briefing terrain string as land or water.
+ *
+ * Purpose: Both ASCII maps use the same three water kinds.
+ * When to use: Once per hex while building cell state.
+ * Expected outcome: Ocean, water, and arctic ocean are water. Every other string, including a missing-row default, is land.
+ * Exceptions: None.
+ */
+function briefingMapTerrainBand(rawTerrain: string): 'land' | 'water' {
+  return rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
+}
+
 function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: string[]): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const controlByH3 = new Map((state.strategicControl ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
@@ -125,22 +164,15 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
       },
     ])
   );
-  const discovered = new Set<string>([...(state.visibleHexes ?? []), ...(state.exploredHexes ?? [])]);
-  const fog = state.fogOfWarEnabled === true;
-
-  const humanUnitsByH3 = new Map<string, number>();
-  const aiUnitsByH3 = new Map<string, number>();
-  const ownSeat = briefingOwnSeatId(state);
-  for (const u of state.units) {
-    if (u.player === ownSeat) aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
-    else humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
-  }
+  const occupancy = readBriefingMapOccupancy(state);
+  const { fog, discovered } = occupancy;
+  const aiUnitsByH3 = occupancy.ownUnitsByH3;
+  const humanUnitsByH3 = occupancy.otherUnitsByH3;
 
   const out = new Map<string, HexMapCellState>();
   for (const h3 of mapHexes) {
     const rawTerrain = terrainByH3.get(h3) ?? 'land';
-    const terrain: 'land' | 'water' =
-      rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
+    const terrain = briefingMapTerrainBand(rawTerrain);
     const isDiscovered = !fog || discovered.has(h3);
     const infra = infraByH3.get(h3) ?? { urban: 0, airports: 0, seaports: 0 };
     const controller = controlByH3.get(h3) ?? null;
@@ -246,23 +278,17 @@ function buildTacticalHexGameStateMap(
   mapHexes: string[]
 ): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
-  const discovered = new Set<string>([...(state.visibleHexes ?? []), ...(state.exploredHexes ?? [])]);
-  const fog = state.fogOfWarEnabled === true;
-  const humanUnitsByH3 = new Map<string, number>();
-  const aiUnitsByH3 = new Map<string, number>();
-  const ownSeat = briefingOwnSeatId(state);
-  for (const u of state.units) {
-    if (u.player === ownSeat) aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
-    else humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
-  }
+  const occupancy = readBriefingMapOccupancy(state);
+  const { fog, discovered, ownSeat } = occupancy;
+  const aiUnitsByH3 = occupancy.ownUnitsByH3;
+  const humanUnitsByH3 = occupancy.otherUnitsByH3;
   const enclosingController =
     (state.strategicControl ?? []).find((r) => r.h3Index === battle.enclosingStrategicH3Index)?.controllerPlayerId ?? null;
   const controlledByAI = enclosingController === briefingOwnSeatId(state);
   const out = new Map<string, HexMapCellState>();
   for (const h3 of mapHexes) {
     const rawTerrain = terrainByH3.get(h3) ?? 'land';
-    const terrain: 'land' | 'water' =
-      rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
+    const terrain = briefingMapTerrainBand(rawTerrain);
     const isDiscovered = !fog || discovered.has(h3);
     const visible = !fog || discovered.has(h3);
     const rubble = !!battle.tacticalIsRubbleByH3?.[h3];

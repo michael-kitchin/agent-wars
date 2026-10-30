@@ -1,4 +1,5 @@
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
+import { buildPopupCloseTooltipText } from '../../shared/popupControlTooltipText';
 import { BUILD_PAUSED_NOTE } from '../../shared/productionBuildability';
 
 /**
@@ -28,6 +29,66 @@ export function sanitizeBuildCountInputText(raw: string): string {
  */
 export function escapeBuildPopupHtml(text: string): string {
   return escapeHtmlText(text);
+}
+
+/**
+ * Builds the close row shared by the build and hire popups.
+ *
+ * Purpose: Every popup uses the same close button, tip, and row class.
+ * When to use: As the first child of a build, multi-hex, or hire panel.
+ * Expected outcome: A row whose button calls `onClose` and shows the close tip.
+ * Exceptions: None.
+ */
+export function createBuildPopupCloseRow(onClose: () => void): HTMLDivElement {
+  const closeRow = document.createElement('div');
+  closeRow.className = 'build-popup-close-row';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'unit-select build-close-btn';
+  closeBtn.textContent = '×';
+  closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
+  closeBtn.addEventListener('click', () => onClose());
+  closeRow.appendChild(closeBtn);
+  return closeRow;
+}
+
+/**
+ * Builds a two-digit count field with the shared key filter.
+ *
+ * Purpose: Build and hire counts reject the same non-digit keys.
+ * When to use: On a queue row or the raise-unit row. Callers add their own input and click listeners.
+ * Expected outcome: A text input showing `initialValue`, limited to two characters, that allows editing keys and digits.
+ * Exceptions: None.
+ */
+export function createBuildCountInput(tooltipText: string, initialValue: string): HTMLInputElement {
+  const countInput = document.createElement('input');
+  countInput.setAttribute('data-control-tooltip', tooltipText);
+  countInput.type = 'text';
+  countInput.className = 'build-count-input';
+  countInput.maxLength = 2;
+  countInput.inputMode = 'numeric';
+  countInput.value = initialValue;
+  countInput.addEventListener('keydown', (event) => {
+    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'];
+    if (allowed.includes(event.key)) return;
+    if (/^\d$/.test(event.key)) return;
+    event.preventDefault();
+  });
+  return countInput;
+}
+
+/**
+ * Reads a count field after writing the sanitized text back into it.
+ *
+ * Purpose: Queue edits persist the clamped one-to-99 value the player sees.
+ * When to use: When a build-queue type or count change is submitted.
+ * Expected outcome: The input shows the sanitized text, and the return value is that text parsed as a base-10 integer.
+ * Exceptions: None.
+ */
+export function readSanitizedBuildCount(input: HTMLInputElement): number {
+  const raw = sanitizeBuildCountInputText(input.value);
+  if (input.value !== raw) input.value = raw;
+  return parseInt(raw, 10);
 }
 
 /**

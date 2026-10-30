@@ -83,6 +83,7 @@ None.
 - `src/renderer/chrome/placeAnchoredPopup.ts` (`placeOpenBuildPopup`)
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
 - `src/shared/popupControlTooltipText.ts`
+- `src/renderer/gameplay/buildQueuePopupFormatting.ts`
 - `src/renderer/gameplay/buildQueueMultiSelect.ts`
 - `src/renderer/gameplay/buildQueuePopup.ts`
 - `src/renderer/gameplay/buildQueueKeepBuilding.ts`

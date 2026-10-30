@@ -8,7 +8,7 @@ import { cellToParent } from 'h3-js';
 import { test } from 'node:test';
 import { GLOBAL_GAME_MAP, withGameMap } from '../../shared/activeGameMap';
 import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
-import { dbGetOne } from '../gameDb';
+import { dbGetOne, insertTacticalFeatureOverrideRubbleRow, updateTacticalFeatureOverrideRow } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { tacticalCell } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { applyTacticalRangedRubbleToCell } from './tacticalRangedInfrastructureRubble';
@@ -50,6 +50,36 @@ test('applyTacticalRangedRubbleToRes4Cell does not insert a row for a margin cel
         [margin]
       );
       assert.equal(row, undefined);
+    });
+  });
+});
+
+test('applyTacticalRangedRubbleToCell updates a facility row, a non-facility row, and leaves rubble unchanged', () => {
+  const child = tacticalCell(56, 66);
+  const parent = cellToParent(child, 1);
+  withTempGameDb('tactical-rubble-facility', () => {
+    insertTacticalFeatureOverrideRubbleRow({ h3Index: child, parentH3Index: parent, terrainKind: 'plains' });
+    updateTacticalFeatureOverrideRow(child, { isRubble: false, isUrban: true });
+    const facilityResult = applyTacticalRangedRubbleToCell(child, parent);
+    assert.equal(facilityResult.changed, true);
+    assert.equal(facilityResult.destroyedAirUnitsCount, 0);
+    const facilityRow = dbGetOne<{ isRubble: number; isUrban: number }>(
+      'SELECT is_rubble AS isRubble, is_urban AS isUrban FROM res_t_feature_overrides WHERE h3_index = ?',
+      [child]
+    );
+    assert.equal(facilityRow?.isRubble, 1);
+    assert.equal(facilityRow?.isUrban, 0);
+  });
+  withTempGameDb('tactical-rubble-plain', () => {
+    insertTacticalFeatureOverrideRubbleRow({ h3Index: child, parentH3Index: parent, terrainKind: 'plains' });
+    updateTacticalFeatureOverrideRow(child, { isRubble: false });
+    assert.equal(applyTacticalRangedRubbleToCell(child, parent).changed, true);
+  });
+  withTempGameDb('tactical-rubble-already', () => {
+    insertTacticalFeatureOverrideRubbleRow({ h3Index: child, parentH3Index: parent, terrainKind: 'plains' });
+    assert.deepEqual(applyTacticalRangedRubbleToCell(child, parent), {
+      changed: false,
+      destroyedAirUnitsCount: 0,
     });
   });
 });

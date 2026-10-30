@@ -6,6 +6,7 @@ import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
 import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
 import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
+import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
 import { appendUrbanLegendRow, urbanSwatchColor } from './terrainLegendUrban';
 import { appendFortifiedLegendRow } from './terrainLegendFortified';
 import { appendRubbleLegendRow, applyRubbleSwatchPaint } from './terrainLegendRubble';
@@ -855,25 +856,10 @@ export function renderTerrainLegend(
   container.appendChild(styleSelect);
 
   for (const kind of TERRAIN_LEGEND_ORDER) {
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '6px';
-    row.style.marginBottom = '2px';
-
     const sw = document.createElement('span');
-    sw.style.display = 'inline-block';
-    sw.style.width = '18px';
-    sw.style.height = '12px';
-    sw.style.border = '1px solid #d5deea';
-    sw.style.borderRadius = '2px';
+    applyLegendSwatchChrome(sw);
     sw.style.background = terrainSwatchColor(kind);
-    row.appendChild(sw);
-
-    const lab = document.createElement('span');
-    lab.textContent = formatTerrainKindLabel(kind);
-    row.appendChild(lab);
-    container.appendChild(row);
+    appendLegendRow(container, sw, formatTerrainKindLabel(kind));
   }
   appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
   appendRubbleLegendRow(container, getActiveTerrainStyleId());

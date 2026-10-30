@@ -31,6 +31,32 @@ export type TacticalRangedRubbleApplyOptions = {
 };
 
 /**
+ * Writes one existing tactical override to rubble and runs the shared cleanup.
+ *
+ * Purpose: Facility rows and other non-rubble rows share the same flag clear, air-unit removal, and queue prune.
+ * When to use: After the caller has decided the row exists and is not already rubble.
+ * Expected outcome: Facility flags are cleared, rubble is set, and the caller's completion message is logged with the air-unit count.
+ * Exceptions: Database errors propagate to the caller.
+ */
+function rubbleExistingTacticalRow(
+  tacticalH3Index: string,
+  strategicParentH3Index: string,
+  hadAirport: boolean,
+  completionLogMessage: string
+): { readonly changed: true; readonly destroyedAirUnitsCount: number } {
+  updateTacticalFeatureOverrideRow(tacticalH3Index, {
+    isRubble: true,
+    isUrban: false,
+    isAirport: false,
+    isSeaport: false,
+  });
+  const destroyedAirUnitsCount = hadAirport ? destroyBasedAirUnitsAtHex(strategicParentH3Index).length : 0;
+  pruneBuildQueueForInfrastructureState(strategicParentH3Index);
+  logDebug(completionLogMessage, { tacticalH3Index, destroyedAirUnitsCount });
+  return { changed: true, destroyedAirUnitsCount };
+}
+
+/**
  * Converts one tactical cell with urban, airport, seaport, or transport-only strikeable infrastructure into rubble and syncs dependent game state.
  *
  * Purpose: Single DB write path for tactical ranged (and related) infrastructure collapse on one footprint cell, including INSERT for road/rail-only targets.
@@ -70,23 +96,12 @@ export function applyTacticalRangedRubbleToCell(
       !rowForCell.isRubble &&
       (rowForCell.isUrban || rowForCell.isAirport || rowForCell.isSeaport)
     ) {
-      const hadAirport = rowForCell.isAirport;
-      updateTacticalFeatureOverrideRow(tacticalH3Index, {
-        isRubble: true,
-        isUrban: false,
-        isAirport: false,
-        isSeaport: false,
-      });
-      let destroyedAirUnitsCount = 0;
-      if (hadAirport) {
-        destroyedAirUnitsCount = destroyBasedAirUnitsAtHex(strategicParentH3Index).length;
-      }
-      pruneBuildQueueForInfrastructureState(strategicParentH3Index);
-      logDebug('tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: facility update complete', {
+      return rubbleExistingTacticalRow(
         tacticalH3Index,
-        destroyedAirUnitsCount,
-      });
-      return { changed: true, destroyedAirUnitsCount };
+        strategicParentH3Index,
+        rowForCell.isAirport,
+        'tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: facility update complete'
+      );
     }
     if (rowForCell) {
       if (rowForCell.isRubble) {
@@ -95,23 +110,12 @@ export function applyTacticalRangedRubbleToCell(
         });
         return { changed: false, destroyedAirUnitsCount: 0 };
       }
-      const hadAirport = rowForCell.isAirport;
-      updateTacticalFeatureOverrideRow(tacticalH3Index, {
-        isRubble: true,
-        isUrban: false,
-        isAirport: false,
-        isSeaport: false,
-      });
-      let destroyedAirUnitsCount = 0;
-      if (hadAirport) {
-        destroyedAirUnitsCount = destroyBasedAirUnitsAtHex(strategicParentH3Index).length;
-      }
-      pruneBuildQueueForInfrastructureState(strategicParentH3Index);
-      logDebug('tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: non-facility row rubbled', {
+      return rubbleExistingTacticalRow(
         tacticalH3Index,
-        destroyedAirUnitsCount,
-      });
-      return { changed: true, destroyedAirUnitsCount };
+        strategicParentH3Index,
+        rowForCell.isAirport,
+        'tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: non-facility row rubbled'
+      );
     }
     if (
       opts?.insertStrikeableTransportCorridor &&

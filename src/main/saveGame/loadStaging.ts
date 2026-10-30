@@ -13,6 +13,7 @@ import Database from 'better-sqlite3';
 import { dbGetAll, isDbReady } from '../gameDb';
 import { MACHINE_LOCAL_CONFIG_KEYS } from '../gameDb/machineLocalConfigKeys';
 import { logDebug, logError } from '../logger';
+import { deleteSqliteFileSet } from './sqliteFileSet';
 import {
   LOAD_FAILED_MESSAGE,
   SAVE_APP_VERSION_CONFIG_KEY,
@@ -129,13 +130,5 @@ export function stageSaveFileForLoad(
  * Exceptions: Throws when `quiet` is false and a delete fails. A quiet delete logs the failure and does not throw.
  */
 function deleteStagingFiles(filePath: string, quiet: boolean): void {
-  for (const suffix of ['-wal', '-shm', '']) {
-    const target = `${filePath}${suffix}`;
-    try {
-      if (fs.existsSync(target)) fs.rmSync(target);
-    } catch (err) {
-      if (!quiet) throw err;
-      logError('loadStaging failed to delete the staging file', { filePath: target, err });
-    }
-  }
+  deleteSqliteFileSet(filePath, { quiet, failureLogMessage: 'loadStaging failed to delete the staging file' });
 }

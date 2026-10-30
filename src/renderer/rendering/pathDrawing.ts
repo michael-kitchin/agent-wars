@@ -3,7 +3,6 @@ import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGr
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { isMissileUnitType } from '../../shared/missileRules';
 import {
-  COUNT_BADGE_OFFSET,
   ORDER_LINE_WIDTH,
   STACK_OFFSET_X,
   STACK_OFFSET_Y,
@@ -19,7 +18,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
 import type { ResolutionPlaybackMove } from '../core/types';
 import { latLngAlongPolylineByArcFraction } from '../../shared/pathPolylineInterp.js';
-import { drawOneUnitMarker } from './unitDrawing';
+import { drawOneUnitMarker, drawStackCountBadge } from './unitDrawing';
 import {
   ORDER_LINE_LATER_DASH,
   ORDER_LINE_SOLID,
@@ -297,16 +296,7 @@ export function drawMovingUnits(
     drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff', move.player);
     if (group.count > 1) {
       drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, '#fff', move.player);
-      const badgeX = p.x + COUNT_BADGE_OFFSET;
-      const badgeY = p.y - COUNT_BADGE_OFFSET;
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeText(String(group.count), badgeX, badgeY);
-      ctx.fillStyle = '#000';
-      ctx.fillText(String(group.count), badgeX, badgeY);
+      drawStackCountBadge(ctx, group.count, p.x, p.y);
     }
   }
 }

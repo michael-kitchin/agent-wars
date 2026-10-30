@@ -8,10 +8,11 @@
  */
 
 import { BUILD_TAB_LABEL, HIRE_TAB_LABEL, HIRE_VIEW_FAILED } from '../../shared/mercenaryRules';
-import { buildPopupCloseTooltipText, buildTabTooltipText, hireTabTooltipText } from '../../shared/popupControlTooltipText';
+import { buildTabTooltipText, hireTabTooltipText } from '../../shared/popupControlTooltipText';
 import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
 import { rendererSharedState as S } from '../core/state';
 import { isHumanBuildEntryHexIndex } from './productionOverlayHelpers';
+import { createBuildPopupCloseRow } from './buildQueuePopupFormatting';
 import { fetchHirePanelData, renderHirePanel } from './hirePanel';
 
 /**
@@ -177,17 +178,8 @@ function tabButton(label: string): HTMLButtonElement {
  * Exceptions: None.
  */
 function renderHireFailure(panel: HTMLElement, deps: BuildHirePopupDeps): void {
-  const closeRow = document.createElement('div');
-  closeRow.className = 'build-popup-close-row';
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'unit-select build-close-btn';
-  closeBtn.textContent = '×';
-  closeBtn.setAttribute('data-control-tooltip', buildPopupCloseTooltipText);
-  closeBtn.addEventListener('click', () => deps.hideBuildPopup());
-  closeRow.appendChild(closeBtn);
   const note = document.createElement('div');
   note.className = 'build-no-urban';
   note.textContent = HIRE_VIEW_FAILED;
-  panel.append(closeRow, note);
+  panel.append(createBuildPopupCloseRow(deps.hideBuildPopup), note);
 }

@@ -16331,14 +16331,14 @@
     const playerIndex = Number.parseInt(playerIndexDigits, 10);
     const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
     if (!unitType) return null;
-    const ordinal3 = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal3)) return null;
+    const ordinal = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal)) return null;
     if (playerLetter === "h") {
       if (playerIndex !== 1) return null;
-      return { player: HUMAN_SEAT_ID, unitType, ordinal: ordinal3 };
+      return { player: HUMAN_SEAT_ID, unitType, ordinal };
     }
     if (playerIndex < 1 || playerIndex > 4) return null;
-    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal: ordinal3 };
+    return { player: aiSeatIdForIndex(playerIndex), unitType, ordinal };
   }
   function parseTacticalSubUnitId(unitId) {
     const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
@@ -17306,6 +17306,18 @@
     if (!drewIcon) ctx.fillText(label, x, y);
     ctx.restore();
   }
+  function drawStackCountBadge(ctx, count, x, y) {
+    const badgeX = x + COUNT_BADGE_OFFSET;
+    const badgeY = y - COUNT_BADGE_OFFSET;
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.strokeText(String(count), badgeX, badgeY);
+    ctx.fillStyle = "#000";
+    ctx.fillText(String(count), badgeX, badgeY);
+  }
   function drawUnits(ctx, units, movingUnitIds) {
     const byHex = /* @__PURE__ */ new Map();
     for (const u of units) {
@@ -17345,16 +17357,7 @@
     }
     for (const { x, y, count } of tokens) {
       if (count < 2) continue;
-      const badgeX = x + COUNT_BADGE_OFFSET;
-      const badgeY = y - COUNT_BADGE_OFFSET;
-      ctx.font = "bold 13px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
-      ctx.strokeText(String(count), badgeX, badgeY);
-      ctx.fillStyle = "#000";
-      ctx.fillText(String(count), badgeX, badgeY);
+      drawStackCountBadge(ctx, count, x, y);
     }
     for (const token of tokens) {
       if (!token.units.some((unit) => unit.isMercenary === true)) continue;
@@ -19740,9 +19743,9 @@
   function parseSeedUnitIdParts(unitId) {
     const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
     if (!match) return null;
-    const ordinal3 = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal3) || ordinal3 <= 0) return null;
-    return { unitType: match[2], ordinal: ordinal3 };
+    const ordinal = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    return { unitType: match[2], ordinal };
   }
   function productionSpawnSequenceFromUnitId(unitId) {
     const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
@@ -19798,8 +19801,8 @@
       const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
       const noun = getUnitDisplayNoun(unitType);
       for (const unit of withPersisted) {
-        const ordinal3 = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal3, locale);
+        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
       let fallbackOrdinal = withPersisted.reduce(
@@ -24795,6 +24798,27 @@ ${bonuses}`;
     }, HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS);
   }
 
+  // src/renderer/rendering/terrainLegendRow.ts
+  function applyLegendSwatchChrome(el) {
+    el.style.display = "inline-block";
+    el.style.width = "18px";
+    el.style.height = "12px";
+    el.style.border = "1px solid #d5deea";
+    el.style.borderRadius = "2px";
+  }
+  function appendLegendRow(container, swatch, labelText) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.marginBottom = "2px";
+    const label = document.createElement("span");
+    label.textContent = labelText;
+    row.appendChild(swatch);
+    row.appendChild(label);
+    container.appendChild(row);
+  }
+
   // src/renderer/rendering/terrainLegendUrban.ts
   var URBAN_SWATCH_COLOR = Object.freeze({
     default: "#827060",
@@ -24806,23 +24830,10 @@ ${bonuses}`;
     return URBAN_SWATCH_COLOR[styleId] ?? URBAN_SWATCH_COLOR.default;
   }
   function appendUrbanLegendRow(container, color) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "6px";
-    row.style.marginBottom = "2px";
     const swatch = document.createElement("span");
-    swatch.style.display = "inline-block";
-    swatch.style.width = "18px";
-    swatch.style.height = "12px";
-    swatch.style.border = "1px solid #d5deea";
-    swatch.style.borderRadius = "2px";
+    applyLegendSwatchChrome(swatch);
     swatch.style.background = color;
-    row.appendChild(swatch);
-    const label = document.createElement("span");
-    label.textContent = "Urban";
-    row.appendChild(label);
-    container.appendChild(row);
+    appendLegendRow(container, swatch, "Urban");
   }
 
   // src/shared/fortificationTickGeometry.ts
@@ -24966,6 +24977,17 @@ ${bonuses}`;
     return { x, y };
   }
 
+  // src/renderer/rendering/polygonOutline.ts
+  function drawClosedPolygonPath(ctx, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+
   // src/renderer/rendering/homeRegionBorderDrawing.ts
   function resolveControllerBorderColor(controllerPlayerId) {
     if (controllerPlayerId != null && isNeutralOwnerId(controllerPlayerId)) return NEUTRAL_PALETTE.heldHexOutline;
@@ -25001,23 +25023,14 @@ ${bonuses}`;
     ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
     const outerColor = args.outerColor ?? resolveControllerBorderColor(args.controllerPlayerId);
     const innerColor = args.innerColor ?? resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
-    const drawClosedPath = (points) => {
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i++) {
-        const p = points[i];
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-    };
-    drawClosedPath(pts);
+    drawClosedPolygonPath(ctx, pts);
     ctx.strokeStyle = outerColor;
     ctx.lineWidth = args.ownershipLineWidth;
     ctx.setLineDash([]);
     ctx.stroke();
     const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
     const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
-    drawClosedPath(innerPts);
+    drawClosedPolygonPath(ctx, innerPts);
     ctx.strokeStyle = innerColor;
     ctx.lineWidth = innerLineWidth;
     ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
@@ -25177,19 +25190,10 @@ ${bonuses}`;
 
   // src/renderer/rendering/terrainLegendFortified.ts
   function appendFortifiedLegendRow(container) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "6px";
-    row.style.marginBottom = "2px";
     const swatch = document.createElement("canvas");
     swatch.width = 18;
     swatch.height = 12;
-    swatch.style.display = "inline-block";
-    swatch.style.width = "18px";
-    swatch.style.height = "12px";
-    swatch.style.border = "1px solid #d5deea";
-    swatch.style.borderRadius = "2px";
+    applyLegendSwatchChrome(swatch);
     const ctx = swatch.getContext("2d");
     if (ctx) {
       const points = [];
@@ -25206,11 +25210,7 @@ ${bonuses}`;
         lineWidthPx: 1
       });
     }
-    row.appendChild(swatch);
-    const label = document.createElement("span");
-    label.textContent = FORTIFIED_LEGEND_LABEL;
-    row.appendChild(label);
-    container.appendChild(row);
+    appendLegendRow(container, swatch, FORTIFIED_LEGEND_LABEL);
   }
 
   // src/renderer/rendering/terrainLegendRubble.ts
@@ -25221,23 +25221,10 @@ ${bonuses}`;
     element.style.backgroundRepeat = "repeat";
   }
   function appendRubbleLegendRow(container, styleId) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "6px";
-    row.style.marginBottom = "2px";
     const swatch = document.createElement("span");
-    swatch.style.display = "inline-block";
-    swatch.style.width = "18px";
-    swatch.style.height = "12px";
-    swatch.style.border = "1px solid #d5deea";
-    swatch.style.borderRadius = "2px";
+    applyLegendSwatchChrome(swatch);
     applyRubbleSwatchPaint(swatch, styleId);
-    row.appendChild(swatch);
-    const label = document.createElement("span");
-    label.textContent = "Rubble";
-    row.appendChild(label);
-    container.appendChild(row);
+    appendLegendRow(container, swatch, "Rubble");
   }
 
   // src/renderer/rendering/terrainVisualStyles.ts
@@ -25630,23 +25617,10 @@ ${bonuses}`;
     });
     container.appendChild(styleSelect);
     for (const kind of TERRAIN_LEGEND_ORDER) {
-      const row = document.createElement("div");
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.gap = "6px";
-      row.style.marginBottom = "2px";
       const sw = document.createElement("span");
-      sw.style.display = "inline-block";
-      sw.style.width = "18px";
-      sw.style.height = "12px";
-      sw.style.border = "1px solid #d5deea";
-      sw.style.borderRadius = "2px";
+      applyLegendSwatchChrome(sw);
       sw.style.background = terrainSwatchColor(kind);
-      row.appendChild(sw);
-      const lab = document.createElement("span");
-      lab.textContent = formatTerrainKindLabel(kind);
-      row.appendChild(lab);
-      container.appendChild(row);
+      appendLegendRow(container, sw, formatTerrainKindLabel(kind));
     }
     appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
     appendRubbleLegendRow(container, getActiveTerrainStyleId());
@@ -27885,13 +27859,7 @@ ${bonuses}`;
       const pts = projectHexBoundaryToContainerPoints(child, map, leaflet);
       if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = () => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
+        drawClosedPolygonPath(ctx, pts);
       };
       if (!deps.isMapInspectionModeHeld()) {
         fillHexTerrain(ctx, terrainKind, drawClosedPath, {
@@ -27966,13 +27934,7 @@ ${bonuses}`;
         hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains")
       );
       const drawClosedPath = () => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
+        drawClosedPolygonPath(ctx, pts);
       };
       const explored = exploredHexes.has(hx.h3Index);
       if (explored && !deps.isMapInspectionModeHeld()) {
@@ -28066,13 +28028,7 @@ ${bonuses}`;
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
         if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
         const drawClosedPath = () => {
-          ctx.beginPath();
-          for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
+          drawClosedPolygonPath(ctx, pts);
         };
         if (!deps.isMapInspectionModeHeld()) {
           fillHexTerrain(ctx, terrainKind, drawClosedPath, {
@@ -28271,13 +28227,7 @@ ${bonuses}`;
       if (pts.length === 0) continue;
       if (previewHexIsDrawn(payload.gameMapId, orders.length > 0 ? { kind: "shared" } : null, inspectionHeld)) {
         const drawClosedPath = () => {
-          ctx.beginPath();
-          for (let i = 0; i < pts.length; i++) {
-            const point = pts[i];
-            if (i === 0) ctx.moveTo(point.x, point.y);
-            else ctx.lineTo(point.x, point.y);
-          }
-          ctx.closePath();
+          drawClosedPolygonPath(ctx, pts);
         };
         fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
         if (orders.length === 0) {
@@ -28952,6 +28902,22 @@ ${bonuses}`;
     return wrap;
   }
 
+  // src/shared/placeOrdinal.ts
+  function formatPlaceOrdinal(place) {
+    const mod100 = place % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
+    switch (place % 10) {
+      case 1:
+        return `${place}st`;
+      case 2:
+        return `${place}nd`;
+      case 3:
+        return `${place}rd`;
+      default:
+        return `${place}th`;
+    }
+  }
+
   // src/shared/standings.ts
   var TOTAL_LABEL = "Model cost this match";
   function buildStandings(input) {
@@ -28971,7 +28937,7 @@ ${bonuses}`;
     if (first.length !== 1) return "No side won.";
     const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
     if (!human) return `${first[0].homeRegion} wins.`;
-    return `You placed ${ordinal(human.place ?? seats.length)} of ${seats.length}.`;
+    return `You placed ${formatPlaceOrdinal(human.place ?? seats.length)} of ${seats.length}.`;
   }
   function resultLine(input, first) {
     const shared = input.gameEndReason === "turn_limit" || input.gameEndReason === "mutual_elimination";
@@ -29038,20 +29004,6 @@ ${bonuses}`;
   }
   function consultationPhrase(count) {
     return count === 1 ? "1 consultation" : `${count} consultations`;
-  }
-  function ordinal(place) {
-    const mod100 = place % 100;
-    if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
-    switch (place % 10) {
-      case 1:
-        return `${place}st`;
-      case 2:
-        return `${place}nd`;
-      case 3:
-        return `${place}rd`;
-      default:
-        return `${place}th`;
-    }
   }
   function formatMatchCost(dollars) {
     const cents = Math.round((Number.isFinite(dollars) ? dollars : 0) * 100);
@@ -33583,16 +33535,7 @@ ${bonuses}`;
       drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff", move.player);
       if (group.count > 1) {
         drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, "#fff", move.player);
-        const badgeX = p.x + COUNT_BADGE_OFFSET;
-        const badgeY = p.y - COUNT_BADGE_OFFSET;
-        ctx.font = "bold 13px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.strokeText(String(group.count), badgeX, badgeY);
-        ctx.fillStyle = "#000";
-        ctx.fillText(String(group.count), badgeX, badgeY);
+        drawStackCountBadge(ctx, group.count, p.x, p.y);
       }
     }
   }
@@ -33665,17 +33608,20 @@ ${bonuses}`;
     }
     ctx.restore();
   }
+  function drawPendingSupportOrderLines(ctx, mode, orders, units, hexList) {
+    if (orders.length === 0 || !hexList) return;
+    const segments = [];
+    for (const order of orders) {
+      const unit = units.find((row) => row.id === order.unitId);
+      if (!unit) continue;
+      segments.push({ fromH3Index: unit.h3Index, toH3Index: order.targetH3Index });
+    }
+    strokeSupportOrderLines(ctx, mode, segments);
+  }
   function drawRangedAttackLines(ctx, canvasWidth, canvasHeight, ranged, units, hexList) {
     void canvasWidth;
     void canvasHeight;
-    if (ranged.length === 0 || !hexList) return;
-    const segments = [];
-    for (const r of ranged) {
-      const unit = units.find((u) => u.id === r.unitId);
-      if (!unit) continue;
-      segments.push({ fromH3Index: unit.h3Index, toH3Index: r.targetH3Index });
-    }
-    strokeSupportOrderLines(ctx, "ranged", segments);
+    drawPendingSupportOrderLines(ctx, "ranged", ranged, units, hexList);
   }
   function drawRangedResolutionShotLines(ctx, lines, hexList, visibleHexes) {
     if (lines.length === 0 || !hexList) return;
@@ -33697,24 +33643,10 @@ ${bonuses}`;
     }
   }
   function drawAirStrikeLines(ctx, airStrikes, units, hexList) {
-    if (airStrikes.length === 0 || !hexList) return;
-    const segments = [];
-    for (const strike of airStrikes) {
-      const unit = units.find((u) => u.id === strike.unitId);
-      if (!unit) continue;
-      segments.push({ fromH3Index: unit.h3Index, toH3Index: strike.targetH3Index });
-    }
-    strokeSupportOrderLines(ctx, "airStrike", segments);
+    drawPendingSupportOrderLines(ctx, "airStrike", airStrikes, units, hexList);
   }
   function drawMissileLaunchLines(ctx, launches, units, hexList) {
-    if (launches.length === 0 || !hexList) return;
-    const segments = [];
-    for (const launch of launches) {
-      const unit = units.find((row) => row.id === launch.unitId);
-      if (!unit) continue;
-      segments.push({ fromH3Index: unit.h3Index, toH3Index: launch.targetH3Index });
-    }
-    strokeSupportOrderLines(ctx, "missile", segments);
+    drawPendingSupportOrderLines(ctx, "missile", launches, units, hexList);
   }
   function drawPendingFerryLines(ctx, ferryOrders, units, hexList) {
     if (ferryOrders.length === 0 || !hexList) return;
@@ -33896,17 +33828,6 @@ ${bonuses}`;
     } catch {
       return [];
     }
-  }
-
-  // src/renderer/rendering/polygonOutline.ts
-  function drawClosedPolygonPath(ctx, points) {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
   }
 
   // src/renderer/rendering/rangePerimeterOverlay.ts
@@ -35247,31 +35168,14 @@ ${bonuses}`;
   function stripLeadingBullet(line) {
     return line.replace(/^\u2022\s*/, "");
   }
-  function splitMissileStrikeLines(lines) {
+  function splitToastLinesByOwner(lines, ownerIdOf, ownsSection) {
     const byOwner = /* @__PURE__ */ new Map();
     const updates = [];
     for (const entry of lines ?? []) {
       const line = entry.line.trim();
       if (line.length === 0) continue;
-      const controllerId = entry.controllerId;
-      if (controllerId !== null && isSeatId(controllerId)) {
-        const existing = byOwner.get(controllerId);
-        if (existing) existing.push(line);
-        else byOwner.set(controllerId, [line]);
-      } else {
-        updates.push(line);
-      }
-    }
-    return { byOwner, updates };
-  }
-  function splitFortificationReportLines(lines) {
-    const byOwner = /* @__PURE__ */ new Map();
-    const updates = [];
-    for (const entry of lines ?? []) {
-      const line = entry.line.trim();
-      if (line.length === 0) continue;
-      const ownerId = entry.ownerId;
-      if (ownerId !== null && (isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID)) {
+      const ownerId = ownerIdOf(entry);
+      if (ownerId !== null && ownsSection(ownerId)) {
         const existing = byOwner.get(ownerId);
         if (existing) existing.push(line);
         else byOwner.set(ownerId, [line]);
@@ -35280,6 +35184,16 @@ ${bonuses}`;
       }
     }
     return { byOwner, updates };
+  }
+  function splitMissileStrikeLines(lines) {
+    return splitToastLinesByOwner(lines, (entry) => entry.controllerId, (ownerId) => isSeatId(ownerId));
+  }
+  function splitFortificationReportLines(lines) {
+    return splitToastLinesByOwner(
+      lines,
+      (entry) => entry.ownerId,
+      (ownerId) => isSeatId(ownerId) || ownerId === NEUTRAL_OWNER_ID
+    );
   }
   function mergeStrikeLines(missileLines, fortificationLines) {
     const merged = /* @__PURE__ */ new Map();
@@ -35344,6 +35258,39 @@ ${bonuses}`;
   }
   function escapeBuildPopupHtml(text) {
     return escapeHtmlText(text);
+  }
+  function createBuildPopupCloseRow(onClose) {
+    const closeRow = document.createElement("div");
+    closeRow.className = "build-popup-close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select build-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
+    closeBtn.addEventListener("click", () => onClose());
+    closeRow.appendChild(closeBtn);
+    return closeRow;
+  }
+  function createBuildCountInput(tooltipText, initialValue) {
+    const countInput = document.createElement("input");
+    countInput.setAttribute("data-control-tooltip", tooltipText);
+    countInput.type = "text";
+    countInput.className = "build-count-input";
+    countInput.maxLength = 2;
+    countInput.inputMode = "numeric";
+    countInput.value = initialValue;
+    countInput.addEventListener("keydown", (event) => {
+      const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
+      if (allowed.includes(event.key)) return;
+      if (/^\d$/.test(event.key)) return;
+      event.preventDefault();
+    });
+    return countInput;
+  }
+  function readSanitizedBuildCount(input) {
+    const raw = sanitizeBuildCountInputText(input.value);
+    if (input.value !== raw) input.value = raw;
+    return parseInt(raw, 10);
   }
   function createBuildPausedNote() {
     const note2 = document.createElement("div");
@@ -35533,16 +35480,7 @@ ${bonuses}`;
         loadedCount: snapshots.length
       });
       deps.mount.innerHTML = "";
-      const closeRow3 = document.createElement("div");
-      closeRow3.className = "build-popup-close-row";
-      const closeBtn2 = document.createElement("button");
-      closeBtn2.type = "button";
-      closeBtn2.className = "unit-select build-close-btn";
-      closeBtn2.textContent = "\xD7";
-      closeBtn2.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-      closeBtn2.addEventListener("click", deps.hideBuildPopup);
-      closeRow3.appendChild(closeBtn2);
-      deps.mount.appendChild(closeRow3);
+      deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
       const errorLine = document.createElement("div");
       errorLine.className = "build-no-urban";
       errorLine.textContent = "Failed to load build queues for the selected hexes.";
@@ -35551,16 +35489,7 @@ ${bonuses}`;
       return;
     }
     deps.mount.innerHTML = "";
-    const closeRow2 = document.createElement("div");
-    closeRow2.className = "build-popup-close-row";
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "unit-select build-close-btn";
-    closeBtn.textContent = "\xD7";
-    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-    closeBtn.addEventListener("click", deps.hideBuildPopup);
-    closeRow2.appendChild(closeBtn);
-    deps.mount.appendChild(closeRow2);
+    deps.mount.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
     const section = document.createElement("div");
     section.className = "build-queue-section";
     const descriptionLine = document.createElement("div");
@@ -35637,23 +35566,7 @@ ${bonuses}`;
       typeSelect.value = entry.unitType;
       syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
       row.appendChild(typeSelect);
-      const countInput = document.createElement("input");
-      countInput.setAttribute("data-control-tooltip", multiBuildCountTooltipText);
-      countInput.type = "text";
-      countInput.className = "build-count-input";
-      countInput.maxLength = 2;
-      countInput.inputMode = "numeric";
-      countInput.value = String(entry.count);
-      const readCurrentCount = () => {
-        const normalized = sanitizeBuildCountInputText(countInput.value);
-        if (countInput.value !== normalized) countInput.value = normalized;
-        return parseInt(normalized, 10);
-      };
-      countInput.addEventListener("keydown", (event) => {
-        const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
-        if (allowed.includes(event.key) || /^\d$/.test(event.key)) return;
-        event.preventDefault();
-      });
+      const countInput = createBuildCountInput(multiBuildCountTooltipText, String(entry.count));
       row.appendChild(countInput);
       typeSelect.addEventListener("change", async () => {
         syncQueueItemSelectTooltip(typeSelect, multiBuildTypeTooltipText);
@@ -35667,7 +35580,7 @@ ${bonuses}`;
         updated[entryIndex] = {
           rowKey,
           unitType: typeSelect.value,
-          count: readCurrentCount()
+          count: readSanitizedBuildCount(countInput)
         };
         await commitEditedTemplate(deps, updated);
       });
@@ -35682,7 +35595,7 @@ ${bonuses}`;
         updated[entryIndex] = {
           rowKey,
           unitType: typeSelect.value,
-          count: readCurrentCount()
+          count: readSanitizedBuildCount(countInput)
         };
         await commitEditedTemplate(deps, updated);
       });
@@ -35740,7 +35653,7 @@ ${bonuses}`;
   }
   function renderHirePanel(panel, h3Index, data, deps) {
     panel.innerHTML = "";
-    panel.appendChild(closeRow(deps));
+    panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
     appendCaption(panel, h3Index, data.caption);
     const view = data.view;
     if (!view) {
@@ -35756,18 +35669,6 @@ ${bonuses}`;
     if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
     panel.appendChild(note(HIRE_ARRIVAL_NOTE));
     if (!panel.hidden) placeOpenBuildPopup();
-  }
-  function closeRow(deps) {
-    const row = document.createElement("div");
-    row.className = "build-popup-close-row";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "unit-select build-close-btn";
-    button.textContent = "\xD7";
-    button.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-    button.addEventListener("click", () => deps.hideBuildPopup());
-    row.appendChild(button);
-    return row;
   }
   function appendCaption(panel, h3Index, caption) {
     const strategicCode = getStrategicHexCode(h3Index);
@@ -35820,19 +35721,7 @@ ${bonuses}`;
     typeSelect.addEventListener("change", () => {
       syncQueueItemSelectTooltip(typeSelect, hireTypeTooltipText);
     });
-    const countInput = document.createElement("input");
-    countInput.type = "text";
-    countInput.className = "build-count-input";
-    countInput.maxLength = 2;
-    countInput.inputMode = "numeric";
-    countInput.value = "1";
-    countInput.setAttribute("data-control-tooltip", hireCountTooltipText);
-    countInput.addEventListener("keydown", (event) => {
-      const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
-      if (allowed.includes(event.key)) return;
-      if (/^\d$/.test(event.key)) return;
-      event.preventDefault();
-    });
+    const countInput = createBuildCountInput(hireCountTooltipText, "1");
     countInput.addEventListener("input", () => {
       const raw = sanitizeBuildCountInputText(countInput.value);
       if (countInput.value !== raw) countInput.value = raw;
@@ -36016,19 +35905,10 @@ ${bonuses}`;
     return button;
   }
   function renderHireFailure(panel, deps) {
-    const closeRow2 = document.createElement("div");
-    closeRow2.className = "build-popup-close-row";
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "unit-select build-close-btn";
-    closeBtn.textContent = "\xD7";
-    closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-    closeBtn.addEventListener("click", () => deps.hideBuildPopup());
-    closeRow2.appendChild(closeBtn);
     const note2 = document.createElement("div");
     note2.className = "build-no-urban";
     note2.textContent = HIRE_VIEW_FAILED;
-    panel.append(closeRow2, note2);
+    panel.append(createBuildPopupCloseRow(deps.hideBuildPopup), note2);
   }
 
   // src/renderer/gameplay/buildQueuePopup.ts
@@ -36137,16 +36017,7 @@ ${bonuses}`;
       }
       if (requestSeq !== rendererSharedState.buildPopupRequestSeq || !snapshot2 || rendererSharedState.buildPopupHexH3 !== h3Index) return;
       mount.innerHTML = "";
-      const closeRow2 = document.createElement("div");
-      closeRow2.className = "build-popup-close-row";
-      const closeBtn = document.createElement("button");
-      closeBtn.type = "button";
-      closeBtn.className = "unit-select build-close-btn";
-      closeBtn.textContent = "\xD7";
-      closeBtn.setAttribute("data-control-tooltip", buildPopupCloseTooltipText);
-      closeBtn.addEventListener("click", () => hideBuildPopup3());
-      closeRow2.appendChild(closeBtn);
-      mount.appendChild(closeRow2);
+      mount.appendChild(createBuildPopupCloseRow(hideBuildPopup3));
       const section = document.createElement("div");
       section.className = "build-queue-section";
       const strategicCode = getStrategicHexCode(h3Index);
@@ -36259,23 +36130,12 @@ ${bonuses}`;
         }
         typeSelect.value = entry.unitType;
         syncQueueItemSelectTooltip(typeSelect, buildTypeTooltipText);
-        const countInput = document.createElement("input");
-        countInput.setAttribute("data-control-tooltip", buildCountTooltipText);
-        countInput.type = "text";
-        countInput.className = "build-count-input";
-        countInput.maxLength = 2;
-        countInput.inputMode = "numeric";
-        countInput.value = String(entry.count);
-        const readCurrentCount = () => {
-          const raw = sanitizeBuildCountInputText(countInput.value);
-          if (countInput.value !== raw) countInput.value = raw;
-          return parseInt(raw, 10);
-        };
+        const countInput = createBuildCountInput(buildCountTooltipText, String(entry.count));
         async function submitBuildQueueEntryEdit(failureMessage) {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
           const submittedUnitType = typeSelect.value;
-          const submittedCount = readCurrentCount();
+          const submittedCount = readSanitizedBuildCount(countInput);
           const submittedCountText = countInput.value;
           const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
@@ -36306,12 +36166,6 @@ ${bonuses}`;
           await submitBuildQueueEntryEdit("Failed to update build queue entry.");
         });
         row.appendChild(typeSelect);
-        countInput.addEventListener("keydown", (event) => {
-          const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
-          if (allowed.includes(event.key)) return;
-          if (/^\d$/.test(event.key)) return;
-          event.preventDefault();
-        });
         countInput.addEventListener("input", async () => {
           await submitBuildQueueEntryEdit("Failed to update build count.");
         });
@@ -37550,7 +37404,7 @@ ${bonuses}`;
     return {
       title: "You're out",
       lead: outByName ? `${outByName} knocked you out on turn ${input.turnNumber}.` : reasonLead(input),
-      placeLine: `You placed ${ordinal2(input.place)} of ${input.seatCount}.`
+      placeLine: `You placed ${formatPlaceOrdinal(input.place)} of ${input.seatCount}.`
     };
   }
   function reasonLead(input) {
@@ -37566,20 +37420,6 @@ ${bonuses}`;
       else sentences.push("Your home has no cities left.");
     }
     return sentences.join(" ") || "You are out of the match.";
-  }
-  function ordinal2(place) {
-    const mod100 = place % 100;
-    if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
-    switch (place % 10) {
-      case 1:
-        return `${place}st`;
-      case 2:
-        return `${place}nd`;
-      case 3:
-        return `${place}rd`;
-      default:
-        return `${place}th`;
-    }
   }
 
   // src/renderer/gameplay/knockoutDialog.ts
