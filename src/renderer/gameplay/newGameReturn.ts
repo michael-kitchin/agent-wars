@@ -14,6 +14,7 @@ import { rendererSharedState as S } from '../core/state';
 import { forgetMainMapCameraForReturn, returnMainMapCamera, saveMainMapCameraForReturn } from '../map/mainMapCameraReturn';
 import { invalidateLeafletMapSizes } from '../map/worldLeafletMap';
 import { newGameOverlayIsOpen } from './newGameDialogCollapse';
+import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
 
 /**
  * Whether a live match is waiting under the new-game screen.
@@ -140,6 +141,7 @@ export interface NewGameCloseDeps {
 export function closeNewGameOverlayToMatch(deps: NewGameCloseDeps): void {
   if (!matchWaiting || !newGameOverlayIsOpen()) return;
   matchWaiting = false;
+  closeNewGameOptionsPopover();
   syncCloseControl();
   document.getElementById('game-over-overlay')?.classList.add('hidden');
   dismissStaleControlTooltip();

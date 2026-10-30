@@ -120,6 +120,7 @@ async function startScenarioMatch(page) {
   await setSideHome(page, 'Opponent 1', SCENARIO.aiRegion);
   await page.selectOption('#new-game-start-month', SCENARIO.startMonth);
   await page.selectOption('#new-game-size-select', SCENARIO.gameSize);
+  await page.click('#new-game-options-btn');
   await page.selectOption('#new-game-victory-select', SCENARIO.victoryRule);
   await page.selectOption('#new-game-turn-limit-select', SCENARIO.turnLimit);
   await page.waitForTimeout(SETTLE_MS.click);

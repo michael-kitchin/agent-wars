@@ -29,6 +29,7 @@ import { prepareNewGameMapPanel, readNewGameMapChoice, registerNewGameMapControl
 import { bindNewGameSides, loadCommanderKeyMemory, newGameHasAnyModel, readNewGameSeatsStart, refreshNewGameSides } from './newGameSidesUi';
 import { confirmStartWithNoModels } from './startConfirmDialog';
 import { closeCommanderPopover } from '../openRouter/commanderPopover';
+import { closeNewGameOptionsPopover, wireNewGameOptionsPopover } from './newGameOptionsPopover';
 import { showNewGameBanner } from './newGameBanner';
 import { hideGameOverStandings } from './gameOverStandings';
 import { clearObserveAfterKnockout } from './observeIntent';
@@ -307,6 +308,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   registerNewGameMapControls();
   bindNewGameSides();
   registerGameSizeSelect();
+  wireNewGameOptionsPopover();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
     if (!window.gameApi?.newGame) return;
@@ -317,6 +319,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
     }
     if (!newGameHasAnyModel()) {
       closeCommanderPopover();
+      closeNewGameOptionsPopover();
       const startAnyway = await confirmStartWithNoModels();
       if (!startAnyway) return;
     }

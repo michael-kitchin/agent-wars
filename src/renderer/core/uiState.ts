@@ -8,6 +8,7 @@ import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gamepl
 import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
+import { closeNewGameOptionsPopover } from '../gameplay/newGameOptionsPopover';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, newGameOverlayIsOpen, scrollNewGameDialogToTop, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
@@ -152,6 +153,7 @@ export function updateGameOverUI(
   const standings = document.getElementById('game-over-standings');
   const standingsWereHidden = !(standings instanceof HTMLElement) || standings.hidden;
   if (!showOverlay) {
+    closeNewGameOptionsPopover();
     hideGameOverStandings();
     overlay?.classList.add('hidden');
     setMainUIControlsEnabled(true);
@@ -162,6 +164,7 @@ export function updateGameOverUI(
   overlay?.classList.remove('hidden');
   resetNewGameOptionControls();
   if (wasHidden) {
+    closeNewGameOptionsPopover();
     closeGameMenu();
     expandNewGameDialog();
     placeNewGameDialogAtInset();

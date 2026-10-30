@@ -202,7 +202,8 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 }
 
 /* ---------- Sections ---------- */
-/* Map, Forces, and Rules, each under a small title and a divider. Controls are 30 px tall, the same as a randomize
+/* Map, Sides, and Forces, each under a small title and a divider. Victory and Rules use the same section
+   inside Game Options. Controls are 30 px tall, the same as a randomize
    square, so every row lines up. */
 .new-game-section {
   padding: 14px 18px 16px;
@@ -295,7 +296,7 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   border: 1px solid var(--chrome-border);
   border-radius: 2px;
   font-size: 12.5px;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 .new-game-side-commander:hover {
@@ -470,13 +471,58 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   display: none;
 }
 .new-game-size-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 16px;
+  gap: 8px 6px;
   margin: 0 0 12px;
 }
+.new-game-size-row label {
+  white-space: nowrap;
+}
 .new-game-size-row select {
-  width: max-content;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.new-game-options-btn {
+  width: 100%;
+  height: 28px;
+  margin-top: 12px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+  text-align: center;
+  cursor: pointer;
+}
+.new-game-options-btn:hover {
+  border-color: var(--chrome-accent-edge);
+}
+.new-game-options-popover {
+  position: fixed;
+  z-index: 7060;
+  width: 400px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  background: var(--chrome-bg, #1b2838);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.new-game-options-popover[hidden] {
+  display: none;
+}
+.new-game-options-popover .new-game-section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--chrome-divider);
+}
+.new-game-options-popover .new-game-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 /* One row of the five unit types: the map glyph on a gray disk, the cap for the game size, and the price.
    The row stays on one line inside the 432 px panel, including a three-digit price, rather than widening the panel. */
@@ -525,9 +571,9 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 }
 
 /* ---------- Rules ---------- */
-/* One grid of label and dropdown pairs: Origin and Tech, then Terrain and Weather, then the starting month across the
-   last three columns. Each label column is as wide as its longest label and the two dropdown columns share what is
-   left, so every dropdown in a column starts at the same edge however the system font measures the labels. */
+/* One grid of label and dropdown pairs: Origin and Tech, then Terrain and Weather. Each label column is as wide as
+   its longest label and the two dropdown columns share what is left, so every dropdown in a column starts at the
+   same edge however the system font measures the labels. Starting month is on the Forces row. */
 .new-game-rules {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
@@ -544,15 +590,6 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-rules > select {
   width: 100%;
   min-width: 0;
-}
-.new-game-month-controls {
-  grid-column: 2 / -1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.new-game-month-controls select {
-  width: max-content;
 }
 .new-game-checks {
   grid-column: 1 / -1;

@@ -370,7 +370,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       productionCapacity > 0
         ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn`
         : '(none)';
-    pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
+    pointsLine.innerHTML = `<strong>Production (Build):</strong> ${productionDetail}`;
     section.appendChild(pointsLine);
     const productionQueueSpacer = document.createElement('div');
     productionQueueSpacer.style.height = '0.5em';

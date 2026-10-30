@@ -50,6 +50,7 @@ const CONSOLE_COLLAPSED_WIDTH = 56;
  */
 const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
+  newGameOptions: 'new-game-options',
   newGameMenu: 'new-game-menu',
   newGameHidden: 'new-game-hidden',
   newGameMoved: 'new-game-moved',
@@ -153,10 +154,13 @@ const BATTLE_SCENES = Object.freeze([
  *
  * Purpose: A scene added to `SCENES` is covered by the match checks without editing them.
  * When to use: The `scenes` list of a check that applies while a match is on screen.
- * Expected outcome: Derived from `SCENES` and `NEW_GAME_SCENES`.
+ * Expected outcome: Derived from `SCENES` and `NEW_GAME_SCENES`. Game Options is left out: that scene is the setup
+ *   panel with the popover open, and it has its own check.
  * Exceptions: None.
  */
-const MATCH_SCENES = Object.freeze(Object.values(SCENES).filter((scene) => !NEW_GAME_SCENES.includes(scene)));
+const MATCH_SCENES = Object.freeze(
+  Object.values(SCENES).filter((scene) => !NEW_GAME_SCENES.includes(scene) && scene !== SCENES.newGameOptions)
+);
 
 /**
  * How long to let the page settle, in milliseconds.
@@ -210,9 +214,9 @@ function fmt(b) {
  * Purpose: The checks compare the bar's second line, the reticle, and the border with the rules in
  *   `src/shared/selectionBarText.ts`, `src/renderer/gameplay/tacticalOrders.ts`, and `static/selectionChrome.css`.
  * When to use: The selection bar checks.
- * Expected outcome: The move, ferry, and targeting hints; the reticle's accessible name for each attack; and the ranged
- *   amber and strike purple as computed colors. While an attack is aimed, the panel's border and the pressed reticle's
- *   face both take that attack's color.
+ * Expected outcome: The move, ferry, and targeting hints; the reticle's accessible name for each attack; and the planning
+ *   crimson as a computed color. While an attack is aimed, the panel's border and the pressed reticle's face both take
+ *   that crimson (`--order-missile`).
  * Exceptions: None.
  */
 const SELECTION_BAR = Object.freeze({
@@ -221,8 +225,7 @@ const SELECTION_BAR = Object.freeze({
   targetingHint: 'Double-click a target in range',
   rangedName: 'Ranged attack',
   strikeName: 'Air strike',
-  rangedBorder: 'rgb(160, 96, 32)',
-  strikeBorder: 'rgb(122, 61, 181)',
+  aimBorder: 'rgb(185, 28, 28)',
 });
 
 /**

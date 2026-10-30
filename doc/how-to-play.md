@@ -88,7 +88,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 |                                       | Ranged fire                            | Air strike                                       |
 | ------------------------------------- | -------------------------------------- | ------------------------------------------------ |
 | What to select                        | Units that can all fire                | Only air units                                   |
-| Color of the reticle and panel border | Amber                                  | Purple                                           |
+| Color of the reticle and panel border | Crimson (`--order-missile`)            | Crimson (`--order-missile`)                      |
 | Target type list                      | None                                   | A list to the reticle's left picks the target type. |
 | Reach on the strategic map            | Infantry none, armor 1 hex, naval 2    | 3 hexes from the base airport                    |
 | Reach in a battle                     | Each unit's range after terrain limits | The whole battlefield                            |

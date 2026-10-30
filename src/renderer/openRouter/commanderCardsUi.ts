@@ -8,7 +8,7 @@
  */
 
 import { commanderCardPresentation } from '../../shared/commanderCardState';
-import { formatCommanderSummary } from '../../shared/commanderSummary';
+import { formatCommanderButtonLabel } from '../../shared/commanderSummary';
 import type { CommanderStatus } from '../../shared/commanderStatus';
 import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
@@ -181,14 +181,14 @@ function statusOf(seat: SeatSnapshot): CommanderStatus {
 /**
  * The summary button's sentence.
  *
- * Purpose: The button shows the same sentence the new-game rows use.
+ * Purpose: The button shows the same label the new-game rows use.
  * When to use: `cardElement`.
- * Expected outcome: "No model · standing orders only" when the seat has no model.
+ * Expected outcome: "Select Model." when the seat has no model. Otherwise the model, the effort, and the doctrine.
  * Exceptions: None.
  */
 function summaryText(seat: SeatSnapshot): string {
   const commander = seat.commander;
-  return formatCommanderSummary({
+  return formatCommanderButtonLabel({
     modelLabel: modelLabel(commander?.modelId ?? null),
     reasoningEffort: commander?.reasoningEffort ?? null,
     doctrineChoice: commander?.doctrineChoice ?? 'balanced',

@@ -122,17 +122,6 @@
         <div id="new-game-side-rows"></div>
         <span class="control-tooltip-host new-game-add-side-host" data-control-tooltip="Add a side on the next free home."><button type="button" id="new-game-add-side-btn" class="new-game-add-side"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>Add another opponent</button></span>
       </section>
-      <section class="new-game-section" aria-labelledby="new-game-section-victory">
-        <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>
-        <div class="new-game-rows">
-          <label for="new-game-victory-select">Rule</label>
-          <select id="new-game-victory-select" data-control-tooltip="Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins."></select>
-        </div>
-        <div id="new-game-turn-limit-row" class="new-game-rows">
-          <label for="new-game-turn-limit-select">Turn limit</label>
-          <select id="new-game-turn-limit-select" data-control-tooltip="How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit."></select>
-        </div>
-      </section>
       <section class="new-game-section" aria-labelledby="new-game-section-forces">
         <div class="new-game-section-head">
           <h2 id="new-game-section-forces" class="new-game-section-title">Forces</h2>
@@ -145,6 +134,22 @@
             <option value="medium">Medium</option>
             <option value="large">Large</option>
           </select>
+          <label for="new-game-start-month">Starting month</label>
+          <select id="new-game-start-month" data-control-tooltip="Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.">
+            <option value="1" selected>January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+          <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
         </div>
         <ul class="new-game-units" aria-live="polite">
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/infantry.svg" alt="Infantry" /></span><span id="new-game-size-cap-infantry" class="new-game-unit-cap">12</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-infantry" class="new-game-unit-cost">$20</span></li>
@@ -153,57 +158,7 @@
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">6</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/missile.svg" alt="Missile" /></span><span id="new-game-size-cap-missile" class="new-game-unit-cap">2</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-missile" class="new-game-unit-cost">$200</span></li>
         </ul>
-      </section>
-      <section class="new-game-section" aria-labelledby="new-game-section-rules">
-        <h2 id="new-game-section-rules" class="new-game-section-title">Rules</h2>
-        <div class="new-game-rules">
-          <label for="new-game-origin-bonus-select">Origin bonus</label>
-          <select id="new-game-origin-bonus-select" data-control-tooltip="Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.">
-            <option value="off">Off</option>
-            <option value="low" selected>Default</option>
-            <option value="high">High</option>
-          </select>
-          <label for="new-game-tech-bonus-select">Tech bonus</label>
-          <select id="new-game-tech-bonus-select" data-control-tooltip="Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.">
-            <option value="off">Off</option>
-            <option value="low" selected>Default</option>
-            <option value="high">High</option>
-          </select>
-          <label for="new-game-terrain-bonus-select">Terrain bonus</label>
-          <select id="new-game-terrain-bonus-select" data-control-tooltip="In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.">
-            <option value="off">Off</option>
-            <option value="low" selected>Default</option>
-            <option value="high">High</option>
-          </select>
-          <label for="new-game-weather-bonus-select">Weather bonus</label>
-          <select id="new-game-weather-bonus-select" data-control-tooltip="Choose Off to ignore weather. Default and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.">
-            <option value="off">Off</option>
-            <option value="low" selected>Default</option>
-            <option value="high">High</option>
-          </select>
-          <label for="new-game-start-month">Starting month</label>
-          <div class="new-game-month-controls">
-            <select id="new-game-start-month" data-control-tooltip="Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.">
-              <option value="1" selected>January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
-            </select>
-            <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
-          </div>
-        </div>
-        <div class="new-game-checks">
-          <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
-          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, and planning stays off." /> Auto-start AI</label>
-        </div>
+        <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Victory rule, turn limit, bonuses, fog of war, and Auto-start AI.">Game Options.</button>
       </section>
     </div>
     <div id="new-game-panel-footer" class="new-game-panel-footer">
@@ -427,6 +382,56 @@
     </div>
   </aside>
   </div><!-- #app-body -->
+  <div id="new-game-options-popover" class="new-game-options-popover" role="dialog" aria-label="Game Options" hidden>
+    <div class="commander-popover-header">
+      <h3>Game Options</h3>
+      <button type="button" class="commander-popover-close" aria-label="Close">×</button>
+    </div>
+    <section class="new-game-section" aria-labelledby="new-game-section-victory">
+      <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>
+      <div class="new-game-rows">
+        <label for="new-game-victory-select">Rule</label>
+        <select id="new-game-victory-select" data-control-tooltip="Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins."></select>
+      </div>
+      <div id="new-game-turn-limit-row" class="new-game-rows">
+        <label for="new-game-turn-limit-select">Turn limit</label>
+        <select id="new-game-turn-limit-select" data-control-tooltip="How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit."></select>
+      </div>
+    </section>
+    <section class="new-game-section" aria-labelledby="new-game-section-rules">
+      <h2 id="new-game-section-rules" class="new-game-section-title">Rules</h2>
+      <div class="new-game-rules">
+        <label for="new-game-origin-bonus-select">Origin bonus</label>
+        <select id="new-game-origin-bonus-select" data-control-tooltip="Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.">
+          <option value="off">Off</option>
+          <option value="low" selected>Default</option>
+          <option value="high">High</option>
+        </select>
+        <label for="new-game-tech-bonus-select">Tech bonus</label>
+        <select id="new-game-tech-bonus-select" data-control-tooltip="Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.">
+          <option value="off">Off</option>
+          <option value="low" selected>Default</option>
+          <option value="high">High</option>
+        </select>
+        <label for="new-game-terrain-bonus-select">Terrain bonus</label>
+        <select id="new-game-terrain-bonus-select" data-control-tooltip="In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.">
+          <option value="off">Off</option>
+          <option value="low" selected>Default</option>
+          <option value="high">High</option>
+        </select>
+        <label for="new-game-weather-bonus-select">Weather bonus</label>
+        <select id="new-game-weather-bonus-select" data-control-tooltip="Choose Off to ignore weather. Default and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.">
+          <option value="off">Off</option>
+          <option value="low" selected>Default</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+      <div class="new-game-checks">
+        <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
+        <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, and planning stays off." /> Auto-start AI</label>
+      </div>
+    </section>
+  </div>
   <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
   <div id="control-tooltip" class="hex-tooltip control-tooltip hidden" aria-hidden="true"></div>
   <div id="unit-origin-tooltip" class="hex-tooltip unit-origin-tooltip hidden" aria-hidden="true"></div>

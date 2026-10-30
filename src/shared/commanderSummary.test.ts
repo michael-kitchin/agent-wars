@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatCommanderSummary } from './commanderSummary';
+import { formatCommanderButtonLabel, formatCommanderSummary } from './commanderSummary';
 
 test('a commander summary names the model, the effort, and the doctrine', () => {
   assert.equal(
@@ -31,5 +31,16 @@ test('a commander summary names the model, the effort, and the doctrine', () => 
       revealedDoctrine: 'cautious',
     }),
     'Claude Haiku 5.5 · Low · Random, drew Cautious'
+  );
+});
+
+test('the commander button invites a model choice when none is set', () => {
+  assert.equal(
+    formatCommanderButtonLabel({ modelLabel: null, reasoningEffort: 'low', doctrineChoice: 'balanced' }),
+    'Select Model.'
+  );
+  assert.equal(
+    formatCommanderButtonLabel({ modelLabel: 'Nova Lite 1.0', reasoningEffort: null, doctrineChoice: 'cautious' }),
+    'Nova Lite 1.0 · Cautious'
   );
 });

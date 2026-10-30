@@ -204,7 +204,13 @@ async function runFirstSession(app, page, report, outDir) {
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.newGameStartup);
-  // The game menu works on the new-game screen, with New game disabled there.
+  await page.click('#new-game-options-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.newGameOptions);
+  await page.click('#new-game-options-btn');
+  await parkPointer(page);
+  // The game menu works on the new-game screen, with New game disabled there. Game Options is closed before Escape.
   await page.click('#game-menu-btn');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);

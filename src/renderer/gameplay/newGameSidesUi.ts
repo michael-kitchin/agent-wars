@@ -6,7 +6,7 @@ import {
   prefillFirstAiApiKey,
   previousAiRowIndex,
 } from '../../shared/commanderSetupCopy';
-import { formatCommanderSummary } from '../../shared/commanderSummary';
+import { formatCommanderButtonLabel } from '../../shared/commanderSummary';
 import { modelNameFromOptionLabel } from '../../shared/commanderPlanningStatus';
 import {
   addRowBlockedReason,
@@ -28,6 +28,7 @@ import {
 } from '../../shared/newGameSides';
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
+import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
 import { bindNewGameVictory, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
@@ -157,9 +158,9 @@ function defaultCommander(): NewGameCommanderInput {
 /**
  * The words on a row's commander button until the commander popover exists.
  *
- * Purpose: The button names the model, or says there is none.
+ * Purpose: The button invites a model choice, or names the model that is set.
  * When to use: Rendering an AI row.
- * Expected outcome: "No model", or the model name without its provider suffix.
+ * Expected outcome: "Select Model." when no model is set. Otherwise the model name, the effort when one is set, and the doctrine.
  * Exceptions: None.
  */
 function commanderButtonLabel(commander: NewGameCommanderInput | null): string {
@@ -168,7 +169,7 @@ function commanderButtonLabel(commander: NewGameCommanderInput | null): string {
     ? [...(modelSelect?.options ?? [])].find((entry) => entry.value === commander.modelId)
     : undefined;
   const modelLabel = commander?.modelId ? modelNameFromOptionLabel(option?.textContent ?? commander.modelId) : null;
-  return formatCommanderSummary({
+  return formatCommanderButtonLabel({
     modelLabel,
     reasoningEffort: commander?.reasoningEffort ?? null,
     doctrineChoice: commander?.doctrineChoice ?? 'balanced',
@@ -393,6 +394,7 @@ function openRowCommander(index: number, button: HTMLButtonElement): void {
   }
   const row = sidesState.rows[index];
   if (!row || row.kind !== AI_SEAT_KIND) return;
+  closeNewGameOptionsPopover();
   const label = rowLabel(sidesState, index);
   const buttonState = copyButtonState(sidesState, index, rememberedCommanders.hasPreviousMatch);
   openCommanderPopover({

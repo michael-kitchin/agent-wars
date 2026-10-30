@@ -382,8 +382,9 @@ export const OWNERSHIP_BORDER_ALPHA = 0.75;
 /**
  * Stroke color for a ranged shot line during resolution playback.
  *
- * Purpose: Playback still tells ground fire from an air strike. Planned ranged arrows use `RANGE_PERIMETER_MISSILE_COLOR`.
- * When to use: The resolution appearance of `strokeSupportOrderLines` for a ranged shot. The aim chrome uses the same hex as `--order-ranged`.
+ * Purpose: Playback still tells ground fire from an air strike. Planned ranged arrows and the selection panel's aim
+ *   chrome use `RANGE_PERIMETER_MISSILE_COLOR`.
+ * When to use: The resolution appearance of `strokeSupportOrderLines` for a ranged shot.
  * Expected outcome: Burnt orange shot lines during the ranged window.
  * Exceptions: None.
  */
@@ -392,8 +393,9 @@ export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
 /**
  * Stroke color for an air-strike shot line during resolution playback.
  *
- * Purpose: Playback still tells an air strike from ground fire. Planned strike arrows use `RANGE_PERIMETER_MISSILE_COLOR`.
- * When to use: The resolution appearance of `strokeSupportOrderLines` for an air-strike shot. The aim chrome uses the same hex as `--order-strike`.
+ * Purpose: Playback still tells an air strike from ground fire. Planned strike arrows and the selection panel's aim
+ *   chrome use `RANGE_PERIMETER_MISSILE_COLOR`.
+ * When to use: The resolution appearance of `strokeSupportOrderLines` for an air-strike shot.
  * Expected outcome: Violet shot lines during the ranged window.
  * Exceptions: None.
  */
@@ -403,7 +405,9 @@ export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
  * Stroke color for planned attack arrows and for the reach outline.
  *
  * Purpose: Ranged fire, air strikes, and missile launches share one color while they are being planned. Dash tells them apart.
- * When to use: Planned and hover attack arrows, and the ranged and air-strike reach outlines. A missile launch played back uses the launching seat's map color instead. Missiles have no reach outline.
+ * When to use: Planned and hover attack arrows, the ranged and air-strike reach outlines, and the selection panel's
+ *   border and pressed reticle (`--order-missile`). A missile launch played back uses the launching seat's map color
+ *   instead. Missiles have no reach outline.
  * Expected outcome: Crimson `#B91C1C`, the same value as `--order-missile`.
  * Exceptions: None.
  */

@@ -1,6 +1,6 @@
 /**
  * Checks of the new-game screen for the UI smoke run: the top bar while the new-game overlay is open, the game menu
- * there, the setup panel floating over the map with its Map, Forces, and Rules sections, and the map under it.
+ * there, the setup panel floating over the map with its Map, Sides, and Forces sections, and the map under it.
  *
  * Purpose: Keeps the new-game screen's checks apart from the frame, console, scenario, map chrome, and battle checks,
  *   so each table stays readable.
@@ -67,7 +67,7 @@ const UNIT_ICONS = Object.freeze(['Infantry', 'Armor', 'Naval', 'Air', 'Missile'
  * The four bonus dropdowns, in reading order: Origin and Tech on the first row, Terrain and Weather on the second.
  *
  * Purpose: The Rules section lays them out in two columns.
- * When to use: The rules check.
+ * When to use: The Game Options check.
  * Expected outcome: Matches the ids in `static/index.html`.
  * Exceptions: None.
  */
@@ -334,12 +334,12 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-sections',
     scenes: PANEL_SCENES,
-    needs: ['#new-game-section-map', '#new-game-section-forces', '#new-game-section-rules'],
+    needs: ['#new-game-section-map', '#new-game-section-sides', '#new-game-section-forces'],
     run: (p, el) => {
-      const titles = ['#new-game-section-map', '#new-game-section-forces', '#new-game-section-rules'].map(el);
+      const titles = ['#new-game-section-map', '#new-game-section-sides', '#new-game-section-forces'].map(el);
       const text = titles.map((title) => title.text).join(', ');
-      if (text !== 'Map, Forces, Rules') return `the section titles read "${text}", expected "Map, Forces, Rules"`;
-      return titles[0].y < titles[1].y && titles[1].y < titles[2].y ? null : 'the sections are not in the order Map, Forces, Rules';
+      if (text !== 'Map, Sides, Forces') return `the section titles read "${text}", expected "Map, Sides, Forces"`;
+      return titles[0].y < titles[1].y && titles[1].y < titles[2].y ? null : 'the sections are not in the order Map, Sides, Forces';
     },
   },
   {
@@ -441,25 +441,53 @@ const NEW_GAME_CHECKS = Object.freeze([
     needs: ['.new-game-unit', '.new-game-unit:first-child', '.new-game-unit:last-child', ...UNIT_ICONS],
     run: (p, el) => {
       const texts = el('.new-game-unit').allTexts;
-      const bad = texts.filter((text) => !/^\d+·\$\d+$/.test(text));
-      if (texts.length !== 5 || bad.length > 0) return `the unit row reads "${texts.join(' | ')}", expected five "cap·$price" entries`;
+      const bad = texts.filter((text) => !/^\d+·\u2692\uFE0E\d+$/.test(text));
+      if (texts.length !== 5 || bad.length > 0) return `the unit row reads "${texts.join(' | ')}", expected five cap and production-price entries`;
       return near(el('.new-game-unit:first-child').y, el('.new-game-unit:last-child').y) ? null : 'the five unit types are not on one row';
     },
   },
   {
-    name: 'new-game-rules',
+    name: 'new-game-forces-row',
     scenes: PANEL_SCENES,
-    needs: [...BONUS_SELECTS, '#new-game-start-month', '#new-game-start-month-randomize', '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-size-select', '#new-game-start-month', '#new-game-start-month-randomize'],
     run: (p, el) => {
+      const size = el('#new-game-size-select');
+      const month = el('#new-game-start-month');
+      if (!near(size.y, month.y) || !near(size.w, month.w) || !(month.x > size.x)) {
+        return `Game size ${fmt(size)} and Starting month ${fmt(month)} are not equal selects on one row`;
+      }
+      const button = el('#new-game-start-month-randomize');
+      return near(button.w, 30) && near(button.h, month.h) && near(month.x + month.w, button.x - 6)
+        ? null
+        : `the month randomize button is at ${fmt(button)}, expected 30 px wide, the month's height, 6 px to its right`;
+    },
+  },
+  {
+    name: 'new-game-options-button',
+    scenes: PANEL_SCENES,
+    needs: ['#new-game-options-btn', '.new-game-units', '#new-game-section-victory'],
+    run: (p, el) => {
+      const button = el('#new-game-options-btn');
+      if (!button.shown) return 'Game Options is hidden';
+      if (button.text !== 'Game Options.') return `the options button reads "${button.text}"`;
+      if (!(button.y > el('.new-game-units').y)) return 'Game Options is not under the unit row';
+      return el('#new-game-section-victory').shown ? 'Victory is shown on the setup panel' : null;
+    },
+  },
+  {
+    name: 'new-game-options-popover',
+    scenes: [SCENES.newGameOptions],
+    needs: ['#new-game-options-popover', '#new-game-victory-select', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    run: (p, el) => {
+      if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
+      const victory = el('#new-game-victory-select');
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
+      if (!(victory.y < origin.y)) return 'Victory is not above the bonuses';
       if (!near(origin.y, tech.y) || !near(terrain.y, weather.y) || terrain.y <= origin.y) return 'the bonuses are not two rows of two';
       if (!near(origin.x, terrain.x) || !near(tech.x, weather.x) || tech.x <= origin.x) return 'the bonuses are not two columns';
-      const month = el('#new-game-start-month');
-      if (!near(month.x, origin.x) || month.y <= terrain.y) return `the starting month ${fmt(month)} should sit under the bonuses, on the first column's edge`;
       const fog = el('#new-game-fog-checkbox');
-      if (!(fog.shown && fog.y > month.y)) return 'Fog of war is not under the starting month';
       const autoStart = el('#new-game-auto-start-checkbox');
-      return autoStart.shown && near(autoStart.y, fog.y) && autoStart.x > fog.x
+      return fog.shown && autoStart.shown && near(autoStart.y, fog.y) && autoStart.x > fog.x
         ? null
         : `Auto-start AI is at ${fmt(autoStart)}, expected right of Fog of war ${fmt(fog)} on the same line`;
     },

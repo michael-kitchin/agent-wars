@@ -10,9 +10,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
-import { formatCompactHireCost, formatCompactRaiseCost } from './economySymbols';
+import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
 import { unitCostFor } from './gameRules';
-import { formatHireOptionLabel, formatHireOrderLabel, mercenaryHireFee, mercenaryUpkeepFor, raiseCapacityForHex } from './mercenaryRules';
+import {
+  RAISE_CAPACITY_LABEL,
+  formatHireCreditsValue,
+  formatHireEntryLabel,
+  formatHireOptionLabel,
+  formatHireOrderLabel,
+  mercenaryHireFee,
+  mercenaryUpkeepFor,
+  raiseCapacityForHex,
+} from './mercenaryRules';
 import { getPlayerUnitCountsByType } from './unitCountsByType';
 
 const regionalProfile = {
@@ -62,7 +71,7 @@ test('a raise order uses the active map production cost and one turn of upkeep',
     displayName: null,
     fee: 6,
   });
-  assert.equal(label, `Raise 2 Infantry (${formatCompactRaiseCost(unitCostFor('infantry'), 3, 3)})`);
+  assert.equal(label, `2 Infantry (${formatCompactRaiseCost(unitCostFor('infantry'), 3, 3)})`);
 });
 
 test('a rehire order shows the extra above one turn', () => {
@@ -73,5 +82,22 @@ test('a rehire order shows the extra above one turn', () => {
     displayName: '4th Infantry',
     fee: 6,
   });
-  assert.equal(label, `Rehire 4th Infantry (${formatCompactHireCost(6, 3)})`);
+  assert.equal(label, `4th Infantry (${formatCompactHireCost(6, 3)})`);
+});
+
+test('a hire marker shows the production figure alone', () => {
+  const figure = formatProductionCapacityAmount('12');
+  assert.equal(formatHireEntryLabel(figure), figure);
+});
+
+test('hire credits show the balance and upkeep, including zero upkeep', () => {
+  assert.equal(
+    formatHireCreditsValue(85, 5),
+    `${formatCreditsAmount('85')} + ${formatCreditsAmount('5')} / turn`
+  );
+  assert.equal(
+    formatHireCreditsValue(85, 0),
+    `${formatCreditsAmount('85')} + ${formatCreditsAmount('0')} / turn`
+  );
+  assert.equal(RAISE_CAPACITY_LABEL, 'Production (Hire)');
 });

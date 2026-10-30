@@ -352,7 +352,7 @@ const CONSOLE_CHECKS = Object.freeze([
       const chip = el('#selection-panel-units .selection-panel-order > span').text;
       const row = el('#pending-orders-list .console-order-detail').text;
       if (chip !== row) return `the order chip reads "${chip}" but the Orders row reads "${row}"`;
-      if (el('#selection-panel').borderColor === SELECTION_BAR.strikeBorder) return 'the panel has the strike border while nothing is aimed';
+      if (el('#selection-panel').borderColor === SELECTION_BAR.aimBorder) return 'the panel has the aim border while nothing is aimed';
       const ranged = el('#ranged-attack-btn');
       if (el('#selection-panel-action-note').shown) return `a reason shows for an armor unit: "${el('#selection-panel-action-note').text}"`;
       return reticleProblem(ranged, { name: SELECTION_BAR.rangedName, enabled: true, pressed: false });
@@ -395,8 +395,8 @@ const CONSOLE_CHECKS = Object.freeze([
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
       const border = el('#selection-panel').borderColor;
-      if (border !== SELECTION_BAR.rangedBorder) return `the panel's border is ${border}, expected the ranged amber ${SELECTION_BAR.rangedBorder}`;
-      return ranged.background === SELECTION_BAR.rangedBorder ? null : `the pressed reticle's face is ${ranged.background}, expected the ranged amber ${SELECTION_BAR.rangedBorder}`;
+      if (border !== SELECTION_BAR.aimBorder) return `the panel's border is ${border}, expected the planning crimson ${SELECTION_BAR.aimBorder}`;
+      return ranged.background === SELECTION_BAR.aimBorder ? null : `the pressed reticle's face is ${ranged.background}, expected the planning crimson ${SELECTION_BAR.aimBorder}`;
     },
   },
   {
@@ -422,8 +422,8 @@ const CONSOLE_CHECKS = Object.freeze([
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
       const border = el('#selection-panel').borderColor;
-      if (border !== SELECTION_BAR.strikeBorder) return `the panel's border is ${border}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
-      return strike.background === SELECTION_BAR.strikeBorder ? null : `the pressed reticle's face is ${strike.background}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
+      if (border !== SELECTION_BAR.aimBorder) return `the panel's border is ${border}, expected the planning crimson ${SELECTION_BAR.aimBorder}`;
+      return strike.background === SELECTION_BAR.aimBorder ? null : `the pressed reticle's face is ${strike.background}, expected the planning crimson ${SELECTION_BAR.aimBorder}`;
     },
   },
   {
@@ -442,7 +442,7 @@ const CONSOLE_CHECKS = Object.freeze([
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.ferryHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.ferryHint}"`;
       const border = el('#selection-panel').borderColor;
-      return border === SELECTION_BAR.strikeBorder ? 'the panel keeps the strike border after the reticle stopped aiming' : null;
+      return border === SELECTION_BAR.aimBorder ? 'the panel keeps the aim border after the reticle stopped aiming' : null;
     },
   },
   {

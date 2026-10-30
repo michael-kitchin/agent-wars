@@ -51,21 +51,54 @@ export interface CommanderSummaryInput {
 }
 
 /**
+ * Standings sentence for a commander that has no model.
+ *
+ * Purpose: A finished match still says the side is on standing orders. The popover button uses another label.
+ * When to use: The no-model return of `formatCommanderSummary`, and the comparison in `formatCommanderButtonLabel`.
+ * Expected outcome: "No model · standing orders only".
+ * Exceptions: None.
+ */
+const NO_MODEL_SUMMARY = 'No model · standing orders only';
+
+/**
+ * Label on the button that opens the commander popover when no model is set.
+ *
+ * Purpose: The row and the commander card ask the player to pick a model.
+ * When to use: `formatCommanderButtonLabel` only.
+ * Expected outcome: "Select Model."
+ * Exceptions: None.
+ */
+const NO_MODEL_BUTTON_LABEL = 'Select Model.';
+
+/**
  * One sentence for a commander's model, effort, and doctrine.
  *
- * Purpose: The row button and later commander cards use the same wording.
- * When to use: Whenever a commander is shown as one line.
+ * Purpose: Standings use this sentence. The popover button uses it once a model is set.
+ * When to use: Standings, and `formatCommanderButtonLabel`.
  * Expected outcome: "No model · standing orders only" when no model is set. Otherwise the model name, the effort when one is set, and the doctrine. Random names a revealed draw.
  * Exceptions: None.
  */
 export function formatCommanderSummary(input: CommanderSummaryInput): string {
   const modelName = displayModelName(input.modelLabel);
-  if (!modelName) return 'No model · standing orders only';
+  if (!modelName) return NO_MODEL_SUMMARY;
   const parts = [modelName];
   const effort = input.reasoningEffort?.trim();
   if (effort) parts.push(capitalizeReasoningEffortName(effort));
   parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
   return parts.join(' · ');
+}
+
+/**
+ * The label on the button that opens a commander popover.
+ *
+ * Purpose: A side with no model shows an invitation. A side with a model shows the same sentence as standings.
+ * When to use: The new-game commander button and the commander-card summary button.
+ * Expected outcome: "Select Model." when no model is set. Otherwise `formatCommanderSummary`.
+ * Exceptions: None.
+ */
+export function formatCommanderButtonLabel(input: CommanderSummaryInput): string {
+  const summary = formatCommanderSummary(input);
+  return summary === NO_MODEL_SUMMARY ? NO_MODEL_BUTTON_LABEL : summary;
 }
 
 /**

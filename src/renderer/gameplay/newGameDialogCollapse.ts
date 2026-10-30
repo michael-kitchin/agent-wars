@@ -15,6 +15,7 @@
  */
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
 import { keepNewGameDialogOnMap } from './newGameDialogMove';
+import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
 
 /**
  * Accessible name and tip while the choices are showing.
@@ -204,9 +205,9 @@ export function expandNewGameDialog(): void {
  * Purpose: The expand control's single action.
  * When to use: On a click on `#new-game-dialog-collapse`, which also covers Enter and Space.
  * Expected outcome: The choice flips at once. Expanding puts Start in the footer, shows the choices, and grows the
- *   panel to its content, held inside the map. Collapsing drops focus from the choices and shrinks the panel to the
- *   header bar; Start moves into that bar, and the message hides, when the panel settles. A click during a slide
- *   starts from the panel's current height. The map keeps the pointer either way.
+ *   panel to its content, held inside the map. Collapsing closes Game Options, drops focus from the choices, and
+ *   shrinks the panel to the header bar; Start moves into that bar, and the message hides, when the panel settles.
+ *   A click during a slide starts from the panel's current height. The map keeps the pointer either way.
  * Exceptions: None. Missing elements leave the panel unchanged.
  */
 export function toggleNewGameDialogCollapsed(): void {
@@ -225,6 +226,7 @@ export function toggleNewGameDialogCollapsed(): void {
     slideTo(panel, from, to);
     return;
   }
+  closeNewGameOptionsPopover();
   const active = document.activeElement;
   if (active instanceof HTMLElement && panel.contains(active) && !header.contains(active)) active.blur();
   setPanelState(panel, 'collapsing');

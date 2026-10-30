@@ -9,7 +9,7 @@
     return `${CREDITS_SYMBOL}${formattedNumber}`;
   }
   function formatCompactHireCost(fee, upkeep) {
-    const perTurn = `${CREDITS_SYMBOL}${upkeep}/t`;
+    const perTurn = `${CREDITS_SYMBOL}${upkeep} / turn`;
     const extra = fee - upkeep;
     if (extra > 0) return `${CREDITS_SYMBOL}${extra} + ${perTurn}`;
     return perTurn;
@@ -188,11 +188,9 @@
   var HIRE_TAB_LABEL = "Hire";
   var HIRE_BUTTON_LABEL = "Hire";
   var REHIRE_SECTION_TITLE = "Neutral units";
-  var PENDING_HIRE_SECTION_TITLE = "Orders this turn";
+  var PENDING_HIRE_SECTION_TITLE = "Hire Queue";
   var CREDITS_LINE_LABEL = "Credits";
-  var UPKEEP_LINE_LABEL = "Upkeep";
-  var HIRE_FEES_LINE_LABEL = "Hire orders";
-  var RAISE_CAPACITY_LABEL = "Capacity";
+  var RAISE_CAPACITY_LABEL = "Production (Hire)";
   var HIRE_FUNDS_WARNING = "Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.";
   var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
   var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
@@ -244,7 +242,7 @@
     return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn, and this turn's hire orders cost ${hireOrders}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
   }
   function formatHireEntryLabel(productionText) {
-    return `${productionText} \xB7 Hire`;
+    return productionText;
   }
   function formatHireEntryAriaLabel(h3Index) {
     return `Open hiring for ${h3Index}`;
@@ -254,6 +252,9 @@
     const perTurnText = formatProductionCapacityAmount(String(perTurn));
     return `${leftText} of ${perTurnText} this turn`;
   }
+  function formatHireCreditsValue(credits, upkeepPerTurn) {
+    return `${formatCreditsAmount(String(credits))} + ${formatCreditsAmount(String(upkeepPerTurn))} / turn`;
+  }
   function formatHireOptionLabel(option2) {
     const price = formatCompactRaiseCost(option2.unitCost, option2.fee, option2.upkeep);
     return `${capitalizeUnitType(option2.unitType)} (${price})`;
@@ -262,11 +263,11 @@
     if (order.kind === "rehire") {
       const name = order.displayName ?? capitalizeUnitType(order.unitType);
       const upkeep = Math.trunc(order.fee / MERCENARY_REHIRE_FEE_MULTIPLIER);
-      return `Rehire ${name} (${formatCompactHireCost(order.fee, upkeep)})`;
+      return `${name} (${formatCompactHireCost(order.fee, upkeep)})`;
     }
     const perUnitFee = Math.trunc(order.fee / order.count);
     const price = formatCompactRaiseCost(unitCostFor(order.unitType), perUnitFee, perUnitFee);
-    return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
+    return `${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
   }
   function formatMercenaryTooltipValue(upkeep) {
     return `upkeep ${formatCreditsAmount(String(upkeep))} per turn`;
@@ -20451,13 +20452,13 @@
     return baseline;
   }
   function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
-    const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
+    const anchor3 = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
     const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
     let budget;
     if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
-      if (tacticalCellIsUrbanOrRubble(battle, anchor2)) {
+      if (tacticalCellIsUrbanOrRubble(battle, anchor3)) {
         budget = Math.max(0, 1);
-      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) {
+      } else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor3)) {
         const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
         budget = Math.max(0, inf);
       } else {
@@ -21602,438 +21603,15 @@ ${bonuses}`;
     window.addEventListener("resize", () => keepNewGameDialogOnMap());
   }
 
-  // src/renderer/gameplay/newGameDialogCollapse.ts
-  var EXPANDED_LABEL = "Hide the new game choices";
-  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
-  var COLLAPSED_LABEL = "Show the new game choices";
-  var COLLAPSED_TOOLTIP = "Show the new game choices.";
-  var expanded = true;
-  var slide = null;
-  function newGameOverlayIsOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
-  }
-  function dialogParts() {
-    const panel = document.getElementById("game-over-overlay");
-    const header = document.getElementById("new-game-panel-header");
-    const button = document.getElementById("new-game-dialog-collapse");
-    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
-    return { panel, header, button };
-  }
-  function syncCollapseControl(button) {
-    button.setAttribute("aria-expanded", String(expanded));
-    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
-    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
-  }
-  function placeStartButton(state) {
-    const button = document.getElementById("new-game-btn");
-    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
-    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
-    if (state === "compact") {
-      const close = document.getElementById("new-game-dialog-close");
-      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
-      return;
-    }
-    parent.appendChild(button);
-  }
-  function setPanelState(panel, state) {
-    placeStartButton(state);
-    panel.dataset.state = state;
-    applyPendingNewGameScroll();
-  }
-  function settle(panel) {
-    slide?.cancel();
-    slide = null;
-    setPanelState(panel, expanded ? "expanded" : "compact");
-  }
-  function slideTo(panel, from, to) {
-    slide = startPanelHeightSlide(panel, from, to, (finished) => {
-      if (slide === finished) settle(panel);
-    });
-    if (!slide) settle(panel);
-  }
-  function expandNewGameDialog() {
-    const parts = dialogParts();
-    if (!parts) return;
-    expanded = true;
-    syncCollapseControl(parts.button);
-    settle(parts.panel);
-  }
-  function toggleNewGameDialogCollapsed() {
-    const parts = dialogParts();
-    if (!parts) return;
-    const { panel, header, button } = parts;
-    const from = panel.getBoundingClientRect().height;
-    slide?.cancel();
-    slide = null;
-    expanded = !expanded;
-    syncCollapseControl(button);
-    if (expanded) {
-      setPanelState(panel, "expanding");
-      const to = panel.getBoundingClientRect().height;
-      keepNewGameDialogOnMap(to);
-      slideTo(panel, from, to);
-      return;
-    }
-    const active2 = document.activeElement;
-    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
-    setPanelState(panel, "collapsing");
-    const borders = panel.offsetHeight - panel.clientHeight;
-    slideTo(panel, from, header.offsetHeight + borders);
-  }
-  var scrollToTopWhenShown = false;
-  function applyPendingNewGameScroll() {
-    if (!scrollToTopWhenShown) return;
-    const body = document.getElementById("game-over-dialog");
-    if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
-    body.scrollTop = 0;
-    scrollToTopWhenShown = false;
-  }
-  function scrollNewGameDialogToTop() {
-    const body = document.getElementById("game-over-dialog");
-    if (!(body instanceof HTMLElement)) return;
-    scrollToTopWhenShown = true;
-    applyPendingNewGameScroll();
-  }
-  function syncNewGameDialogMapPointer() {
-    const overlay = document.getElementById("game-over-overlay");
-    const map = document.getElementById("main-map");
-    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
-    if (overlay.classList.contains("hidden")) return;
-    map.style.pointerEvents = "auto";
-  }
-
-  // src/renderer/gameplay/newGameReturn.ts
-  var matchWaiting = false;
-  function syncCloseControl() {
-    const close = document.getElementById("new-game-dialog-close");
-    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
-  }
-  function isMatchWaitingUnderNewGame() {
-    return matchWaiting;
-  }
-  function holdMatchUnderNewGame() {
-    matchWaiting = true;
-    saveMainMapCameraForReturn();
-    syncCloseControl();
-  }
-  function forgetMatchUnderNewGame() {
-    matchWaiting = false;
-    forgetMainMapCameraForReturn();
-    syncCloseControl();
-  }
-  function closeNewGameOverlayToMatch(deps) {
-    if (!matchWaiting || !newGameOverlayIsOpen()) return;
-    matchWaiting = false;
-    syncCloseControl();
-    document.getElementById("game-over-overlay")?.classList.add("hidden");
-    dismissStaleControlTooltip();
-    deps.setMainUIControlsEnabled(true);
-    invalidateLeafletMapSizes();
-    returnMainMapCamera();
-    deps.updateReadyButtonState();
-    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
-    deps.resizeAndRedraw();
-  }
-
-  // src/renderer/openRouter/commanderPoolClient.ts
-  var POLL_MS = 1e3;
-  var snapshot = { statuses: [], dispatches: [] };
-  var pollTimer = null;
-  var showToast = null;
-  var fileMessage = null;
-  var onPoolChanged = null;
-  var poolListeners = /* @__PURE__ */ new Set();
-  function notifyPoolChanged() {
-    onPoolChanged?.();
-    for (const listener of poolListeners) listener();
-  }
-  function bindCommanderPoolScreen(deps) {
-    showToast = deps.showCommanderMessages;
-    fileMessage = deps.fileCommanderMessage;
-    onPoolChanged = deps.updateReadyButtonState;
-  }
-  function anyCommanderIsPlanning() {
-    return snapshot.statuses.some((row) => row.status === "planning");
-  }
-  var commanderStartDepth = 0;
-  function commanderStartIsSettling() {
-    return commanderStartDepth > 0;
-  }
-  function longestPlanningElapsedMs() {
-    let longest = 0;
-    for (const row of snapshot.statuses) {
-      if (row.status !== "planning" || row.planningElapsedMs == null) continue;
-      if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
-    }
-    return longest;
-  }
-  function commanderSeatCostUsd() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    return seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
-  }
-  async function startCommanderPlanningIfAllowed() {
-    commanderStartDepth += 1;
-    try {
-      if (!rendererSharedState.runButtonOn) return;
-      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
-      if (isNewGameOverlayOpen()) return;
-      if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
-      if (!window.gameApi?.startCommanderPlanning) return;
-      const tactical = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning;
-      if (rendererSharedState.gameState?.phase !== "planning" && !tactical) return;
-      const mode = tactical ? "tactical" : "strategic";
-      const matchEpoch = currentRendererMatchEpoch();
-      try {
-        const next = await window.gameApi.startCommanderPlanning({ mode });
-        if (!poolReplyIsCurrent(matchEpoch)) return;
-        snapshot = next;
-      } catch (err) {
-        console.error("startCommanderPlanning failed", err);
-      }
-      if (!poolReplyIsCurrent(matchEpoch)) return;
-      syncCommanderPoolPolling();
-      notifyPoolChanged();
-    } finally {
-      commanderStartDepth -= 1;
-      notifyPoolChanged();
-    }
-  }
-  async function stopCommanderPlanningFromScreen(reason) {
-    try {
-      await window.gameApi?.stopCommanderPlanning?.(reason);
-      await readCommanderPoolAndApply(true);
-    } catch (err) {
-      console.error("stopCommanderPlanning failed", reason, err);
-    }
-  }
-  function messageLines(dispatches) {
-    const kept = [];
-    for (const dispatch of dispatches) {
-      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
-      fileMessage?.(dispatch);
-      kept.push(dispatch);
-    }
-    return kept;
-  }
-  async function readCommanderPoolAndApply(drain, showMessages = true) {
-    if (!window.gameApi?.readCommanderPool) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    const wasPlanning = anyCommanderIsPlanning();
-    try {
-      const next = await window.gameApi.readCommanderPool(drain);
-      if (!poolReplyIsCurrent(matchEpoch)) return;
-      snapshot = next;
-      const consultFinished = wasPlanning && !anyCommanderIsPlanning();
-      if (drain && (next.dispatches.length > 0 || consultFinished)) {
-        messageLines(next.dispatches);
-        if (showMessages) showToast?.(next.dispatches, next.statuses);
-        await refreshSeatCosts();
-      }
-    } catch (err) {
-      console.error("readCommanderPool failed", err);
-    }
-    if (!poolReplyIsCurrent(matchEpoch)) return;
-    notifyPoolChanged();
-    syncCommanderPoolPolling();
-  }
-  function commanderPoolStatuses() {
-    return snapshot.statuses;
-  }
-  function subscribeCommanderPool(listener) {
-    poolListeners.add(listener);
-  }
-  function syncCommanderPoolPolling() {
-    if (!shouldPoll()) {
-      if (pollTimer !== null) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      return;
-    }
-    if (pollTimer !== null) return;
-    pollTimer = setInterval(() => {
-      void readCommanderPoolAndApply(true);
-    }, POLL_MS);
-  }
-  function shouldPoll() {
-    if (!rendererSharedState.runButtonOn || rendererSharedState.gameState?.gameOver) return false;
-    if (rendererSharedState.gameState?.phase === "planning") return true;
-    if (rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning) return true;
-    if (anyCommanderIsPlanning()) return true;
-    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
-  }
-  async function refreshCommanderSeatCosts() {
-    await refreshSeatCosts();
-  }
-  async function refreshSeatCosts() {
-    if (!window.gameApi?.getGameState || !rendererSharedState.gameState) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    try {
-      const next = await fetchMatchSnapshot();
-      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats) return;
-      rendererSharedState.gameState.seats = next.seats;
-    } catch (err) {
-      console.error("commander pool cost refresh failed", err);
-    }
-  }
-  function poolReplyIsCurrent(matchEpoch) {
-    return rendererMatchEpochCurrent(matchEpoch) || isMatchWaitingUnderNewGame();
-  }
-
-  // src/renderer/openRouter/aiPlanningState.ts
-  function isDeferredResolutionPlaybackConsultPending() {
-    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
-  }
-  function isDeferredResolutionConsultRunning() {
-    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
-  }
-  function isWaitingForPrecomputedAiOrders() {
-    return anyCommanderIsPlanning();
-  }
-
-  // src/shared/commanderCardState.ts
-  function formatCommanderClock(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
-  }
-  function commanderCardPresentation(input) {
-    if (input.status === "out" || input.outTurn !== null) {
-      const turn = input.outTurn ?? input.timedOutTurn;
-      return {
-        chip: turn === null ? "Out" : `Out, turn ${turn}`,
-        detail: null,
-        dimmed: true,
-        summaryDisabled: true
-      };
-    }
-    if (input.status === "planning") {
-      return { chip: `Planning ${formatCommanderClock(input.planningElapsedMs)}`, detail: null, dimmed: false, summaryDisabled: false };
-    }
-    if (input.status === "timed_out") {
-      const waited = formatCommanderClock(input.planningElapsedMs || AI_CONSULTATION_WALL_CLOCK_MS);
-      const cap = formatCommanderClock(AI_CONSULTATION_WALL_CLOCK_MS);
-      const turn = input.timedOutTurn ?? 0;
-      return {
-        chip: "Timed out",
-        detail: `No reply in ${waited} of ${cap} on turn ${turn}. Its standing orders ran instead.`,
-        dimmed: false,
-        summaryDisabled: false
-      };
-    }
-    if (input.status === "no_model") {
-      return { chip: "Standing orders", detail: null, dimmed: false, summaryDisabled: false };
-    }
-    return { chip: "Ready", detail: null, dimmed: false, summaryDisabled: false };
-  }
-
-  // src/shared/doctrineDescriptions.ts
-  var DOCTRINE_CHOICE_LABELS = {
-    aggressive: "Aggressive",
-    balanced: "Balanced",
-    cautious: "Cautious",
-    random: "Random"
-  };
-  var DOCTRINE_CHOICE_DESCRIPTIONS = {
-    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
-    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
-    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
-    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
-  };
-
-  // src/shared/commanderPlanningStatus.ts
-  var NO_MODEL_LABEL = "No model";
-  function commanderPlanningStatus(runOn, planning) {
-    if (!runOn) return "off";
-    return planning ? "planning" : "on";
-  }
-  function planningToggleLabel(planningOn) {
-    return planningOn ? "Stop" : "Start";
-  }
-  function commanderPlanningSentence(runOn, commanderCount) {
-    return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
-  }
-  function commanderFooterLabel(counts) {
-    if (counts.status === "off") return "Commanders off";
-    if (counts.status !== "planning") return "Commanders ready";
-    const progress = `${counts.ready} of ${counts.active} ready`;
-    return counts.observing ? `Planning \xB7 ${progress}` : `Commanders planning \xB7 ${progress}`;
-  }
-  function modelNameFromOptionLabel(optionLabel2) {
-    const bracket = optionLabel2.indexOf(" [");
-    const name = (bracket >= 0 ? optionLabel2.slice(0, bracket) : optionLabel2).trim();
-    return name || NO_MODEL_LABEL;
-  }
-
-  // src/shared/openRouterReasoningEffort.ts
-  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
-    "max",
-    "xhigh",
-    "high",
-    "medium",
-    "low",
-    "minimal",
-    "none"
-  ]);
-  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
-    ["none", "None"],
-    ["minimal", "Min"],
-    ["low", "Low"],
-    ["medium", "Med"],
-    ["high", "High"],
-    ["xhigh", "Xhigh"],
-    ["max", "Max"]
-  ]);
-  function capitalizeReasoningEffortName(effort) {
-    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
-  }
-  function abbreviateReasoningEffort(effort) {
-    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
-  }
-  function sortReasoningEffortsAscending(efforts) {
-    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
-    return [...efforts].sort((a, b) => rank(b) - rank(a));
-  }
-  function listSelectableReasoningEfforts(model) {
-    const reasoning = model?.reasoning;
-    if (!reasoning || reasoning.supported_efforts === void 0) return [];
-    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
-    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
-  }
-  function resolveDefaultReasoningEffort(model) {
-    const defaultEffort = model?.reasoning?.default_effort;
-    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
-  }
-  function resolveRequestedReasoningEffort(model, persistedEffort) {
-    const trimmed = persistedEffort.trim();
-    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
-  }
-  function isReasoningEffortSelectable(model) {
-    return listSelectableReasoningEfforts(model).length >= 2;
-  }
-
-  // src/shared/commanderSummary.ts
-  function formatCommanderSummary(input) {
-    const modelName = displayModelName(input.modelLabel);
-    if (!modelName) return "No model \xB7 standing orders only";
-    const parts = [modelName];
-    const effort = input.reasoningEffort?.trim();
-    if (effort) parts.push(capitalizeReasoningEffortName(effort));
-    parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
-    return parts.join(" \xB7 ");
-  }
-  function displayModelName(modelLabel2) {
-    if (!modelLabel2?.trim()) return "";
-    const withoutSuffix = modelNameFromOptionLabel(modelLabel2);
-    if (withoutSuffix === NO_MODEL_LABEL) return "";
-    const colon = withoutSuffix.indexOf(": ");
-    return (colon >= 0 ? withoutSuffix.slice(colon + 2) : withoutSuffix).trim();
-  }
-  function doctrineSegment(choice, revealed) {
-    if (choice === "random" && revealed) return `Random, drew ${DOCTRINE_CHOICE_LABELS[revealed]}`;
-    return DOCTRINE_CHOICE_LABELS[choice];
+  // src/shared/popoverPlacement.ts
+  function placeBelowAnchor(anchor3, popover3, viewport) {
+    const gap = 6;
+    const margin = 8;
+    const left = Math.max(margin, Math.min(anchor3.left, viewport.width - popover3.width - margin));
+    let top = anchor3.bottom + gap;
+    if (top + popover3.height > viewport.height - margin) top = anchor3.top - popover3.height - gap;
+    if (top < margin) top = margin;
+    return { top, left };
   }
 
   // src/shared/newGameSides.ts
@@ -22177,15 +21755,65 @@ ${bonuses}`;
     return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
   }
 
-  // src/shared/popoverPlacement.ts
-  function placeBelowAnchor(anchor2, popover2, viewport) {
-    const gap = 6;
-    const margin = 8;
-    const left = Math.max(margin, Math.min(anchor2.left, viewport.width - popover2.width - margin));
-    let top = anchor2.bottom + gap;
-    if (top + popover2.height > viewport.height - margin) top = anchor2.top - popover2.height - gap;
-    if (top < margin) top = margin;
-    return { top, left };
+  // src/shared/doctrineDescriptions.ts
+  var DOCTRINE_CHOICE_LABELS = {
+    aggressive: "Aggressive",
+    balanced: "Balanced",
+    cautious: "Cautious",
+    random: "Random"
+  };
+  var DOCTRINE_CHOICE_DESCRIPTIONS = {
+    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
+    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
+    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
+    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
+  };
+
+  // src/shared/openRouterReasoningEffort.ts
+  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "minimal",
+    "none"
+  ]);
+  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
+    ["none", "None"],
+    ["minimal", "Min"],
+    ["low", "Low"],
+    ["medium", "Med"],
+    ["high", "High"],
+    ["xhigh", "Xhigh"],
+    ["max", "Max"]
+  ]);
+  function capitalizeReasoningEffortName(effort) {
+    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
+  }
+  function abbreviateReasoningEffort(effort) {
+    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
+  }
+  function sortReasoningEffortsAscending(efforts) {
+    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
+    return [...efforts].sort((a, b) => rank(b) - rank(a));
+  }
+  function listSelectableReasoningEfforts(model) {
+    const reasoning = model?.reasoning;
+    if (!reasoning || reasoning.supported_efforts === void 0) return [];
+    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
+    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
+  }
+  function resolveDefaultReasoningEffort(model) {
+    const defaultEffort = model?.reasoning?.default_effort;
+    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
+  }
+  function resolveRequestedReasoningEffort(model, persistedEffort) {
+    const trimmed = persistedEffort.trim();
+    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
+  }
+  function isReasoningEffortSelectable(model) {
+    return listSelectableReasoningEfforts(model).length >= 2;
   }
 
   // src/renderer/chrome/controlTooltipText.ts
@@ -22615,6 +22243,459 @@ ${bonuses}`;
     popover.style.left = `${placed.left}px`;
   }
 
+  // src/renderer/gameplay/newGameOptionsPopover.ts
+  var popover2 = null;
+  var anchor2 = null;
+  var detachListeners2 = null;
+  function newGameOptionsPopoverIsOpen() {
+    return popover2 != null && !popover2.hidden;
+  }
+  function closeNewGameOptionsPopover() {
+    detachListeners2?.();
+    detachListeners2 = null;
+    if (popover2) popover2.hidden = true;
+    popover2 = null;
+    anchor2 = null;
+  }
+  function toggleNewGameOptionsPopover(button) {
+    if (newGameOptionsPopoverIsOpen()) {
+      closeNewGameOptionsPopover();
+      return;
+    }
+    const root = document.getElementById("new-game-options-popover");
+    if (!(root instanceof HTMLElement)) return;
+    closeCommanderPopover();
+    popover2 = root;
+    anchor2 = button;
+    root.hidden = false;
+    placeNewGameOptionsPopover();
+    const onKey = (event) => {
+      if (event.key === "Escape") closeNewGameOptionsPopover();
+    };
+    const onPointer = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (popover2?.contains(target) || anchor2?.contains(target)) return;
+      closeNewGameOptionsPopover();
+    };
+    const onMove = () => placeNewGameOptionsPopover();
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    detachListeners2 = () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }
+  function wireNewGameOptionsPopover() {
+    const button = document.getElementById("new-game-options-btn");
+    if (button instanceof HTMLButtonElement) {
+      button.addEventListener("click", () => toggleNewGameOptionsPopover(button));
+    }
+    document.querySelector("#new-game-options-popover .commander-popover-close")?.addEventListener("click", () => {
+      closeNewGameOptionsPopover();
+    });
+    document.getElementById("new-game-panel-grip")?.addEventListener("pointerdown", () => {
+      closeNewGameOptionsPopover();
+    });
+  }
+  function placeNewGameOptionsPopover() {
+    if (!popover2 || popover2.hidden || !anchor2) return;
+    const rect = anchor2.getBoundingClientRect();
+    const box = popover2.getBoundingClientRect();
+    const placed = placeBelowAnchor(
+      { top: rect.top, bottom: rect.bottom, left: rect.left },
+      { width: box.width, height: box.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    popover2.style.top = `${placed.top}px`;
+    popover2.style.left = `${placed.left}px`;
+  }
+
+  // src/renderer/gameplay/newGameDialogCollapse.ts
+  var EXPANDED_LABEL = "Hide the new game choices";
+  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
+  var COLLAPSED_LABEL = "Show the new game choices";
+  var COLLAPSED_TOOLTIP = "Show the new game choices.";
+  var expanded = true;
+  var slide = null;
+  function newGameOverlayIsOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+  function dialogParts() {
+    const panel = document.getElementById("game-over-overlay");
+    const header = document.getElementById("new-game-panel-header");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
+    return { panel, header, button };
+  }
+  function syncCollapseControl(button) {
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
+    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
+  }
+  function placeStartButton(state) {
+    const button = document.getElementById("new-game-btn");
+    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
+    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
+    if (state === "compact") {
+      const close = document.getElementById("new-game-dialog-close");
+      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
+      return;
+    }
+    parent.appendChild(button);
+  }
+  function setPanelState(panel, state) {
+    placeStartButton(state);
+    panel.dataset.state = state;
+    applyPendingNewGameScroll();
+  }
+  function settle(panel) {
+    slide?.cancel();
+    slide = null;
+    setPanelState(panel, expanded ? "expanded" : "compact");
+  }
+  function slideTo(panel, from, to) {
+    slide = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide === finished) settle(panel);
+    });
+    if (!slide) settle(panel);
+  }
+  function expandNewGameDialog() {
+    const parts = dialogParts();
+    if (!parts) return;
+    expanded = true;
+    syncCollapseControl(parts.button);
+    settle(parts.panel);
+  }
+  function toggleNewGameDialogCollapsed() {
+    const parts = dialogParts();
+    if (!parts) return;
+    const { panel, header, button } = parts;
+    const from = panel.getBoundingClientRect().height;
+    slide?.cancel();
+    slide = null;
+    expanded = !expanded;
+    syncCollapseControl(button);
+    if (expanded) {
+      setPanelState(panel, "expanding");
+      const to = panel.getBoundingClientRect().height;
+      keepNewGameDialogOnMap(to);
+      slideTo(panel, from, to);
+      return;
+    }
+    closeNewGameOptionsPopover();
+    const active2 = document.activeElement;
+    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
+    setPanelState(panel, "collapsing");
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slideTo(panel, from, header.offsetHeight + borders);
+  }
+  var scrollToTopWhenShown = false;
+  function applyPendingNewGameScroll() {
+    if (!scrollToTopWhenShown) return;
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement) || body.getClientRects().length === 0) return;
+    body.scrollTop = 0;
+    scrollToTopWhenShown = false;
+  }
+  function scrollNewGameDialogToTop() {
+    const body = document.getElementById("game-over-dialog");
+    if (!(body instanceof HTMLElement)) return;
+    scrollToTopWhenShown = true;
+    applyPendingNewGameScroll();
+  }
+  function syncNewGameDialogMapPointer() {
+    const overlay = document.getElementById("game-over-overlay");
+    const map = document.getElementById("main-map");
+    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
+    if (overlay.classList.contains("hidden")) return;
+    map.style.pointerEvents = "auto";
+  }
+
+  // src/renderer/gameplay/newGameReturn.ts
+  var matchWaiting = false;
+  function syncCloseControl() {
+    const close = document.getElementById("new-game-dialog-close");
+    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
+  }
+  function isMatchWaitingUnderNewGame() {
+    return matchWaiting;
+  }
+  function holdMatchUnderNewGame() {
+    matchWaiting = true;
+    saveMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function forgetMatchUnderNewGame() {
+    matchWaiting = false;
+    forgetMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function closeNewGameOverlayToMatch(deps) {
+    if (!matchWaiting || !newGameOverlayIsOpen()) return;
+    matchWaiting = false;
+    closeNewGameOptionsPopover();
+    syncCloseControl();
+    document.getElementById("game-over-overlay")?.classList.add("hidden");
+    dismissStaleControlTooltip();
+    deps.setMainUIControlsEnabled(true);
+    invalidateLeafletMapSizes();
+    returnMainMapCamera();
+    deps.updateReadyButtonState();
+    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    deps.resizeAndRedraw();
+  }
+
+  // src/renderer/openRouter/commanderPoolClient.ts
+  var POLL_MS = 1e3;
+  var snapshot = { statuses: [], dispatches: [] };
+  var pollTimer = null;
+  var showToast = null;
+  var fileMessage = null;
+  var onPoolChanged = null;
+  var poolListeners = /* @__PURE__ */ new Set();
+  function notifyPoolChanged() {
+    onPoolChanged?.();
+    for (const listener of poolListeners) listener();
+  }
+  function bindCommanderPoolScreen(deps) {
+    showToast = deps.showCommanderMessages;
+    fileMessage = deps.fileCommanderMessage;
+    onPoolChanged = deps.updateReadyButtonState;
+  }
+  function anyCommanderIsPlanning() {
+    return snapshot.statuses.some((row) => row.status === "planning");
+  }
+  var commanderStartDepth = 0;
+  function commanderStartIsSettling() {
+    return commanderStartDepth > 0;
+  }
+  function longestPlanningElapsedMs() {
+    let longest = 0;
+    for (const row of snapshot.statuses) {
+      if (row.status !== "planning" || row.planningElapsedMs == null) continue;
+      if (row.planningElapsedMs > longest) longest = row.planningElapsedMs;
+    }
+    return longest;
+  }
+  function commanderSeatCostUsd() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    return seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
+  }
+  async function startCommanderPlanningIfAllowed() {
+    commanderStartDepth += 1;
+    try {
+      if (!rendererSharedState.runButtonOn) return;
+      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+      if (isNewGameOverlayOpen()) return;
+      if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
+      if (!window.gameApi?.startCommanderPlanning) return;
+      const tactical = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning;
+      if (rendererSharedState.gameState?.phase !== "planning" && !tactical) return;
+      const mode = tactical ? "tactical" : "strategic";
+      const matchEpoch = currentRendererMatchEpoch();
+      try {
+        const next = await window.gameApi.startCommanderPlanning({ mode });
+        if (!poolReplyIsCurrent(matchEpoch)) return;
+        snapshot = next;
+      } catch (err) {
+        console.error("startCommanderPlanning failed", err);
+      }
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      syncCommanderPoolPolling();
+      notifyPoolChanged();
+    } finally {
+      commanderStartDepth -= 1;
+      notifyPoolChanged();
+    }
+  }
+  async function stopCommanderPlanningFromScreen(reason) {
+    try {
+      await window.gameApi?.stopCommanderPlanning?.(reason);
+      await readCommanderPoolAndApply(true);
+    } catch (err) {
+      console.error("stopCommanderPlanning failed", reason, err);
+    }
+  }
+  function messageLines(dispatches) {
+    const kept = [];
+    for (const dispatch of dispatches) {
+      if (!commanderDispatchHasProse(dispatch.message, dispatch.strategy)) continue;
+      fileMessage?.(dispatch);
+      kept.push(dispatch);
+    }
+    return kept;
+  }
+  async function readCommanderPoolAndApply(drain, showMessages = true) {
+    if (!window.gameApi?.readCommanderPool) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    const wasPlanning = anyCommanderIsPlanning();
+    try {
+      const next = await window.gameApi.readCommanderPool(drain);
+      if (!poolReplyIsCurrent(matchEpoch)) return;
+      snapshot = next;
+      const consultFinished = wasPlanning && !anyCommanderIsPlanning();
+      if (drain && (next.dispatches.length > 0 || consultFinished)) {
+        messageLines(next.dispatches);
+        if (showMessages) showToast?.(next.dispatches, next.statuses);
+        await refreshSeatCosts();
+      }
+    } catch (err) {
+      console.error("readCommanderPool failed", err);
+    }
+    if (!poolReplyIsCurrent(matchEpoch)) return;
+    notifyPoolChanged();
+    syncCommanderPoolPolling();
+  }
+  function commanderPoolStatuses() {
+    return snapshot.statuses;
+  }
+  function subscribeCommanderPool(listener) {
+    poolListeners.add(listener);
+  }
+  function syncCommanderPoolPolling() {
+    if (!shouldPoll()) {
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      return;
+    }
+    if (pollTimer !== null) return;
+    pollTimer = setInterval(() => {
+      void readCommanderPoolAndApply(true);
+    }, POLL_MS);
+  }
+  function shouldPoll() {
+    if (!rendererSharedState.runButtonOn || rendererSharedState.gameState?.gameOver) return false;
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    if (rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.tacticalPhasePlanning) return true;
+    if (anyCommanderIsPlanning()) return true;
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  async function refreshCommanderSeatCosts() {
+    await refreshSeatCosts();
+  }
+  async function refreshSeatCosts() {
+    if (!window.gameApi?.getGameState || !rendererSharedState.gameState) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    try {
+      const next = await fetchMatchSnapshot();
+      if (!poolReplyIsCurrent(matchEpoch) || !rendererSharedState.gameState || !next?.seats) return;
+      rendererSharedState.gameState.seats = next.seats;
+    } catch (err) {
+      console.error("commander pool cost refresh failed", err);
+    }
+  }
+  function poolReplyIsCurrent(matchEpoch) {
+    return rendererMatchEpochCurrent(matchEpoch) || isMatchWaitingUnderNewGame();
+  }
+
+  // src/renderer/openRouter/aiPlanningState.ts
+  function isDeferredResolutionPlaybackConsultPending() {
+    return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
+  }
+  function isDeferredResolutionConsultRunning() {
+    return isDeferredResolutionPlaybackConsultPending() && rendererSharedState.deferredResolutionConsultNotifySent;
+  }
+  function isWaitingForPrecomputedAiOrders() {
+    return anyCommanderIsPlanning();
+  }
+
+  // src/shared/commanderCardState.ts
+  function formatCommanderClock(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1e3));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+  function commanderCardPresentation(input) {
+    if (input.status === "out" || input.outTurn !== null) {
+      const turn = input.outTurn ?? input.timedOutTurn;
+      return {
+        chip: turn === null ? "Out" : `Out, turn ${turn}`,
+        detail: null,
+        dimmed: true,
+        summaryDisabled: true
+      };
+    }
+    if (input.status === "planning") {
+      return { chip: `Planning ${formatCommanderClock(input.planningElapsedMs)}`, detail: null, dimmed: false, summaryDisabled: false };
+    }
+    if (input.status === "timed_out") {
+      const waited = formatCommanderClock(input.planningElapsedMs || AI_CONSULTATION_WALL_CLOCK_MS);
+      const cap = formatCommanderClock(AI_CONSULTATION_WALL_CLOCK_MS);
+      const turn = input.timedOutTurn ?? 0;
+      return {
+        chip: "Timed out",
+        detail: `No reply in ${waited} of ${cap} on turn ${turn}. Its standing orders ran instead.`,
+        dimmed: false,
+        summaryDisabled: false
+      };
+    }
+    if (input.status === "no_model") {
+      return { chip: "Standing orders", detail: null, dimmed: false, summaryDisabled: false };
+    }
+    return { chip: "Ready", detail: null, dimmed: false, summaryDisabled: false };
+  }
+
+  // src/shared/commanderPlanningStatus.ts
+  var NO_MODEL_LABEL = "No model";
+  function commanderPlanningStatus(runOn, planning) {
+    if (!runOn) return "off";
+    return planning ? "planning" : "on";
+  }
+  function planningToggleLabel(planningOn) {
+    return planningOn ? "Stop" : "Start";
+  }
+  function commanderPlanningSentence(runOn, commanderCount) {
+    return runOn ? `Planning is on for all ${commanderCount} commanders.` : "Planning is off.";
+  }
+  function commanderFooterLabel(counts) {
+    if (counts.status === "off") return "Commanders off";
+    if (counts.status !== "planning") return "Commanders ready";
+    const progress = `${counts.ready} of ${counts.active} ready`;
+    return counts.observing ? `Planning \xB7 ${progress}` : `Commanders planning \xB7 ${progress}`;
+  }
+  function modelNameFromOptionLabel(optionLabel2) {
+    const bracket = optionLabel2.indexOf(" [");
+    const name = (bracket >= 0 ? optionLabel2.slice(0, bracket) : optionLabel2).trim();
+    return name || NO_MODEL_LABEL;
+  }
+
+  // src/shared/commanderSummary.ts
+  var NO_MODEL_SUMMARY = "No model \xB7 standing orders only";
+  var NO_MODEL_BUTTON_LABEL = "Select Model.";
+  function formatCommanderSummary(input) {
+    const modelName = displayModelName(input.modelLabel);
+    if (!modelName) return NO_MODEL_SUMMARY;
+    const parts = [modelName];
+    const effort = input.reasoningEffort?.trim();
+    if (effort) parts.push(capitalizeReasoningEffortName(effort));
+    parts.push(doctrineSegment(input.doctrineChoice, input.revealedDoctrine));
+    return parts.join(" \xB7 ");
+  }
+  function formatCommanderButtonLabel(input) {
+    const summary = formatCommanderSummary(input);
+    return summary === NO_MODEL_SUMMARY ? NO_MODEL_BUTTON_LABEL : summary;
+  }
+  function displayModelName(modelLabel2) {
+    if (!modelLabel2?.trim()) return "";
+    const withoutSuffix = modelNameFromOptionLabel(modelLabel2);
+    if (withoutSuffix === NO_MODEL_LABEL) return "";
+    const colon = withoutSuffix.indexOf(": ");
+    return (colon >= 0 ? withoutSuffix.slice(colon + 2) : withoutSuffix).trim();
+  }
+  function doctrineSegment(choice, revealed) {
+    if (choice === "random" && revealed) return `Random, drew ${DOCTRINE_CHOICE_LABELS[revealed]}`;
+    return DOCTRINE_CHOICE_LABELS[choice];
+  }
+
   // src/renderer/openRouter/openRouterRunToggle.ts
   function setPlanningTogglePressed(button, planningOn) {
     button.setAttribute("aria-pressed", planningOn ? "true" : "false");
@@ -22718,7 +22799,7 @@ ${bonuses}`;
   }
   function summaryText(seat) {
     const commander = seat.commander;
-    return formatCommanderSummary({
+    return formatCommanderButtonLabel({
       modelLabel: modelLabel(commander?.modelId ?? null),
       reasoningEffort: commander?.reasoningEffort ?? null,
       doctrineChoice: commander?.doctrineChoice ?? "balanced",
@@ -22732,7 +22813,7 @@ ${bonuses}`;
     const optionRow = [...select.options].find((row) => row.value === modelId);
     return optionRow?.textContent?.trim() || modelId;
   }
-  async function openSeatCommander(seat, anchor2) {
+  async function openSeatCommander(seat, anchor3) {
     if (!seat.commander || !isAiSeatId(seat.seatId) || seat.outTurn !== null) return;
     const seatId = seat.seatId;
     let includeKey = false;
@@ -22746,7 +22827,7 @@ ${bonuses}`;
     } catch (err) {
       console.error("getSeatApiKey failed", seatId, err);
     }
-    if (!anchor2.isConnected) return;
+    if (!anchor3.isConnected) return;
     const commander = {
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
@@ -22754,7 +22835,7 @@ ${bonuses}`;
       ...includeKey ? { apiKey } : {}
     };
     openCommanderPopover({
-      anchor: anchor2,
+      anchor: anchor3,
       title: `${seat.homeRegion} commander`,
       commander,
       copyButton: null,
@@ -22771,7 +22852,7 @@ ${bonuses}`;
         void saveCommander(seatId, next);
       }
     });
-    anchor2.setAttribute("aria-expanded", "true");
+    anchor3.setAttribute("aria-expanded", "true");
   }
   async function saveCommander(seatId, commander) {
     try {
@@ -26131,10 +26212,10 @@ ${bonuses}`;
     const baseLine = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
     const eff = effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, battle.subUnits, moveType);
     if (eff < baseLine) {
-      const anchor2 = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
-      if (battle.tacticalIsRubbleByH3?.[anchor2]) push("Rubble");
-      else if (battle.tacticalIsUrbanByH3?.[anchor2]) push("Urban");
-      else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor2)) push("Forest");
+      const anchor3 = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
+      if (battle.tacticalIsRubbleByH3?.[anchor3]) push("Rubble");
+      else if (battle.tacticalIsUrbanByH3?.[anchor3]) push("Urban");
+      else if (subUnit.unitType === "armor" && tacticalCellIsForestClass(battle, anchor3)) push("Forest");
       const terrainOnly = effectiveTacticalMovementPointBudgetForMarchLeg(
         { ...battle, weatherBonusEnabled: false },
         subUnit,
@@ -26222,13 +26303,13 @@ ${bonuses}`;
     if (unitType !== "infantry" && unitType !== "armor") return null;
     const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
     if (!u) return null;
-    const anchor2 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+    const anchor3 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
     const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor2);
+    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor3);
     if (eff >= baseline) return null;
-    if (battle.tacticalIsRubbleByH3?.[anchor2]) return "Rubble";
-    if (battle.tacticalIsUrbanByH3?.[anchor2]) return "Urban";
-    if (tacticalCellIsForestClass(battle, anchor2)) return "Forest";
+    if (battle.tacticalIsRubbleByH3?.[anchor3]) return "Rubble";
+    if (battle.tacticalIsUrbanByH3?.[anchor3]) return "Urban";
+    if (tacticalCellIsForestClass(battle, anchor3)) return "Forest";
     return null;
   }
   function collectTacticalRangedSlowTerrainLabels(battle, previewUnitIds) {
@@ -28705,7 +28786,7 @@ ${bonuses}`;
     const modelSelect = document.getElementById("openrouter-model");
     const option2 = commander?.modelId ? [...modelSelect?.options ?? []].find((entry) => entry.value === commander.modelId) : void 0;
     const modelLabel2 = commander?.modelId ? modelNameFromOptionLabel(option2?.textContent ?? commander.modelId) : null;
-    return formatCommanderSummary({
+    return formatCommanderButtonLabel({
       modelLabel: modelLabel2,
       reasoningEffort: commander?.reasoningEffort ?? null,
       doctrineChoice: commander?.doctrineChoice ?? "balanced"
@@ -28844,6 +28925,7 @@ ${bonuses}`;
     }
     const row = sidesState.rows[index];
     if (!row || row.kind !== AI_SEAT_KIND) return;
+    closeNewGameOptionsPopover();
     const label = rowLabel(sidesState, index);
     const buttonState = copyButtonState(sidesState, index, rememberedCommanders.hasPreviousMatch);
     openCommanderPopover({
@@ -30721,6 +30803,7 @@ ${bonuses}`;
     const standings = document.getElementById("game-over-standings");
     const standingsWereHidden = !(standings instanceof HTMLElement) || standings.hidden;
     if (!showOverlay) {
+      closeNewGameOptionsPopover();
       hideGameOverStandings();
       overlay?.classList.add("hidden");
       setMainUIControlsEnabled(true);
@@ -30730,6 +30813,7 @@ ${bonuses}`;
     overlay?.classList.remove("hidden");
     resetNewGameOptionControls();
     if (wasHidden) {
+      closeNewGameOptionsPopover();
       closeGameMenu();
       expandNewGameDialog();
       placeNewGameDialogAtInset();
@@ -31548,11 +31632,11 @@ ${bonuses}`;
   function buildTacticalRangedRangeSet(battle, subUnits, footprint2) {
     const out = /* @__PURE__ */ new Set();
     for (const u of subUnits) {
-      const anchor2 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
-      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor2);
+      const anchor3 = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor3);
       if (range < 1) continue;
       try {
-        for (const h of gridDisk(anchor2, range)) {
+        for (const h of gridDisk(anchor3, range)) {
           if (footprint2.has(h)) out.add(h);
         }
       } catch {
@@ -34840,6 +34924,7 @@ ${bonuses}`;
     registerNewGameMapControls();
     bindNewGameSides();
     registerGameSizeSelect();
+    wireNewGameOptionsPopover();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
       if (!window.gameApi?.newGame) return;
@@ -34850,6 +34935,7 @@ ${bonuses}`;
       }
       if (!newGameHasAnyModel()) {
         closeCommanderPopover();
+        closeNewGameOptionsPopover();
         const startAnyway = await confirmStartWithNoModels();
         if (!startAnyway) return;
       }
@@ -35729,15 +35815,11 @@ ${bonuses}`;
   }
   function appendFunds(panel, view) {
     const funds = view.funds;
-    appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatCreditsAmount(String(funds.credits)));
-    appendLabeledAmount(panel, UPKEEP_LINE_LABEL, `${formatCreditsAmount(String(funds.upkeepPerTurn))} / turn`);
-    if (funds.pendingHireFees > 0) {
-      appendLabeledAmount(panel, HIRE_FEES_LINE_LABEL, formatCreditsAmount(String(funds.pendingHireFees)));
-    }
     const raise = view.raise;
     if (raise) {
       appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
     }
+    appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatHireCreditsValue(funds.credits, funds.upkeepPerTurn));
   }
   function appendLabeledAmount(panel, label, value) {
     panel.append(fundLine(label, value), spacer());
@@ -36108,7 +36190,7 @@ ${bonuses}`;
       const pointsLine = document.createElement("div");
       const productionCapacity = snapshot2.urbanHexCount;
       const productionDetail = productionCapacity > 0 ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn` : "(none)";
-      pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
+      pointsLine.innerHTML = `<strong>Production (Build):</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
       const productionQueueSpacer = document.createElement("div");
       productionQueueSpacer.style.height = "0.5em";
@@ -39646,8 +39728,8 @@ ${bonuses}`;
   var showTimer = null;
   var lastPointer = { x: 0, y: 0 };
   var anchorWatch = null;
-  function anchorStillVisible(anchor2) {
-    return anchor2.isConnected && anchor2.getClientRects().length > 0;
+  function anchorStillVisible(anchor3) {
+    return anchor3.isConnected && anchor3.getClientRects().length > 0;
   }
   function stopAnchorWatch() {
     if (anchorWatch === null) return;
@@ -39692,8 +39774,8 @@ ${bonuses}`;
   }
   function showForActiveAnchor() {
     showTimer = null;
-    const anchor2 = activeAnchor;
-    const text = anchor2 && anchorStillVisible(anchor2) ? anchor2.dataset.unitOriginTooltip : void 0;
+    const anchor3 = activeAnchor;
+    const text = anchor3 && anchorStillVisible(anchor3) ? anchor3.dataset.unitOriginTooltip : void 0;
     const el = getTooltipEl2();
     if (!text || !el) {
       hideUnitOriginTooltip();
@@ -39706,9 +39788,9 @@ ${bonuses}`;
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
   }
-  function beginHover(anchor2) {
+  function beginHover(anchor3) {
     hideUnitOriginTooltip();
-    activeAnchor = anchor2;
+    activeAnchor = anchor3;
     showTimer = setTimeout(showForActiveAnchor, HEX_DETAILS_TOOLTIP_DELAY_MS);
     watchAnchor();
   }
@@ -39754,8 +39836,8 @@ ${bonuses}`;
     installed2 = true;
     document.addEventListener("pointerover", (event) => {
       trackPointer(event);
-      const anchor2 = findAnchor(event.target);
-      if (anchor2 && anchor2 !== activeAnchor) beginHover(anchor2);
+      const anchor3 = findAnchor(event.target);
+      if (anchor3 && anchor3 !== activeAnchor) beginHover(anchor3);
     });
     document.addEventListener("pointerout", (event) => {
       if (!activeAnchor || findAnchor(event.target) !== activeAnchor) return;

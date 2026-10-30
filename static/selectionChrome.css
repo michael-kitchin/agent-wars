@@ -25,13 +25,9 @@
 body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   display: none;
 }
-/* While the player aims, the border takes the color of the order being aimed. */
-.selection-panel[data-aim="ranged"] {
-  border-color: var(--order-ranged);
-}
-.selection-panel[data-aim="strike"] {
-  border-color: var(--order-strike);
-}
+/* While the player aims a ranged attack, an air strike, or a missile launch, the border takes the planning crimson. */
+.selection-panel[data-aim="ranged"],
+.selection-panel[data-aim="strike"],
 .selection-panel[data-aim="launch"] {
   border-color: var(--order-missile);
 }
@@ -239,18 +235,18 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   background: var(--chrome-bg-raised);
 }
 
-/* ---------- Ranged and Strike ---------- */
-/* The reticle that aims a ranged attack or an air strike, and while a strike is aimed, the target list to its left. The
-   reason a greyed-out reticle cannot be used sits in the details under the unit rows. */
+/* ---------- Ranged, strike, and launch ---------- */
+/* The reticle that aims a ranged attack, an air strike, or a missile launch, and while a strike is aimed, the target
+   list to its left. The reason a greyed-out reticle cannot be used sits in the details under the unit rows. */
 .selection-panel-actions {
   flex: none;
   display: flex;
   align-items: center;
   gap: 0.35rem;
 }
-/* One square button for both kinds of attack, at the target list's height. Its colors come from the shared button rules
-   until the player aims: then it reads as pressed in the color of the order being aimed, the same color as the panel's
-   border (selectionBar.ts sets data-aim, and tacticalOrders.ts sets aria-pressed). */
+/* One square button for a ranged attack, an air strike, or a missile launch, at the target list's height. Its colors
+   come from the shared button rules until the player aims: then it reads as pressed in the planning crimson, the same
+   color as the panel's border (selectionBar.ts sets data-aim, and tacticalOrders.ts sets aria-pressed). */
 .selection-panel-reticle {
   width: 1.75rem;
   height: 1.75rem;
@@ -259,14 +255,8 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   align-items: center;
   justify-content: center;
 }
-.selection-panel[data-aim="ranged"] .selection-panel-reticle[aria-pressed="true"] {
-  background: var(--order-ranged);
-  border-color: var(--order-ranged);
-}
-.selection-panel[data-aim="strike"] .selection-panel-reticle[aria-pressed="true"] {
-  background: var(--order-strike);
-  border-color: var(--order-strike);
-}
+.selection-panel[data-aim="ranged"] .selection-panel-reticle[aria-pressed="true"],
+.selection-panel[data-aim="strike"] .selection-panel-reticle[aria-pressed="true"],
 .selection-panel[data-aim="launch"] .selection-panel-reticle[aria-pressed="true"] {
   background: var(--order-missile);
   border-color: var(--order-missile);

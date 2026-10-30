@@ -235,7 +235,7 @@ aside#sidebar.tactical-strategic-suppress {
   padding: 0.35rem 0.5rem;
   min-width: 0;
   width: fit-content;
-  max-width: 200px;
+  max-width: 150px;
   background: var(--chrome-bg);
   color: var(--chrome-text);
   color-scheme: dark;
@@ -545,7 +545,11 @@ aside#sidebar.tactical-strategic-suppress {
 .melee-intercept-table tr {
   border-bottom: 1px solid var(--chrome-border);
 }
-.build-popup.build-popup-wide { max-width: 280px; }
+.build-popup.build-popup-wide { max-width: 210px; }
+.hire-panel .build-queue-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .build-popup-tab-bar {
   display: flex;
   flex-wrap: nowrap;

@@ -66,9 +66,7 @@
   --minimap-width: 280px;
   /* The new-game setup panel's width. The panel floats over the map's top-left corner while the new-game overlay is open. */
   --new-game-panel-width: 432px;
-  /* The ranged, air-strike, and missile order colors the map draws (RANGE_PERIMETER_RANGED_COLOR, RANGE_PERIMETER_AIR_STRIKE_COLOR, RANGE_PERIMETER_MISSILE_COLOR). */
-  --order-ranged: #a06020;
-  --order-strike: #7a3db5;
+  /* Planning crimson for the selection panel while a ranged attack, an air strike, or a missile launch is aimed. Same value as RANGE_PERIMETER_MISSILE_COLOR. Playback shot colors stay in the renderer constants. */
   --order-missile: #B91C1C;
   /* Marks what the player has selected, in lists and on the map. */
   --selection-mark: #f2c14e;

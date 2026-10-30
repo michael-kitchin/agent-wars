@@ -43,9 +43,9 @@ export interface HireEntryRow {
   /**
    * Button text.
    *
-   * Contract: The production figure and `Hire`.
+   * Contract: The production figure, with no hire suffix.
    * When to use: The button body.
-   * Expected outcome: The production figure, then ` · Hire`.
+   * Expected outcome: The production figure alone.
    * Exceptions: None.
    */
   readonly label: string;

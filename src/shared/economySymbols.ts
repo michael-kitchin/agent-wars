@@ -56,11 +56,11 @@ export function formatCreditsAmount(formattedNumber: string): string {
  *
  * Purpose: The raise menu, the rehire row, and a pending order share one spelling.
  * When to use: With the one-time fee and the later per-turn upkeep. The fee may equal the upkeep or exceed it.
- * Expected outcome: `¤3/t` when the fee is not above the upkeep. `¤3 + ¤3/t` when the fee is 6 and the upkeep is 3. The one-time number is `fee - upkeep`, not the full fee. No parentheses and no thousands separators.
+ * Expected outcome: `¤3 / turn` when the fee is not above the upkeep. `¤3 + ¤3 / turn` when the fee is 6 and the upkeep is 3. The one-time number is `fee - upkeep`, not the full fee. No parentheses and no thousands separators.
  * Exceptions: None. A negative extra is omitted rather than shown.
  */
 export function formatCompactHireCost(fee: number, upkeep: number): string {
-  const perTurn = `${CREDITS_SYMBOL}${upkeep}/t`;
+  const perTurn = `${CREDITS_SYMBOL}${upkeep} / turn`;
   const extra = fee - upkeep;
   if (extra > 0) return `${CREDITS_SYMBOL}${extra} + ${perTurn}`;
   return perTurn;
@@ -71,7 +71,7 @@ export function formatCompactHireCost(fee: number, upkeep: number): string {
  *
  * Purpose: A raise spends production points as well as credits.
  * When to use: With the unit's production cost, its one-time fee, and its later upkeep.
- * Expected outcome: The production symbol, the unit cost, ` + `, then `formatCompactHireCost`. For 20, 3, and 3 that is `⚒20 + ¤3/t`.
+ * Expected outcome: The production symbol, the unit cost, ` + `, then `formatCompactHireCost`. For 20, 3, and 3 that is `⚒20 + ¤3 / turn`.
  * Exceptions: None.
  */
 export function formatCompactRaiseCost(unitCost: number, fee: number, upkeep: number): string {

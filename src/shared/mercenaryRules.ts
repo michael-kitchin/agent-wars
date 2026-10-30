@@ -53,19 +53,13 @@ export const HIRE_BUTTON_LABEL = 'Hire';
 export const REHIRE_SECTION_TITLE = 'Neutral units';
 
 /** Hire-panel heading for orders placed this turn. */
-export const PENDING_HIRE_SECTION_TITLE = 'Orders this turn';
+export const PENDING_HIRE_SECTION_TITLE = 'Hire Queue';
 
 /** Label beside the treasury balance in the hire panel. */
 export const CREDITS_LINE_LABEL = 'Credits';
 
-/** Label beside mercenary upkeep in the hire panel. */
-export const UPKEEP_LINE_LABEL = 'Upkeep';
-
-/** Label beside this turn's hire fees in the hire panel. */
-export const HIRE_FEES_LINE_LABEL = 'Hire orders';
-
-/** Label beside remaining raise capacity. */
-export const RAISE_CAPACITY_LABEL = 'Capacity';
+/** Label beside remaining raise capacity in the hire panel. */
+export const RAISE_CAPACITY_LABEL = 'Production (Hire)';
 
 /** Warning when the treasury cannot cover upkeep plus hire fees. */
 export const HIRE_FUNDS_WARNING =
@@ -293,13 +287,13 @@ export function formatCreditsTooltip(funds: {
 /**
  * Label on a Hire marker.
  *
- * Purpose: The marker replaces the canvas production label, so it carries that figure.
+ * Purpose: The marker replaces the canvas production label, so it carries that figure and no hire suffix.
  * When to use: With the hex's production text, which already includes the production symbol.
- * Expected outcome: That text, then ` · Hire`.
+ * Expected outcome: That text unchanged. The marker module does not format the figure itself.
  * Exceptions: None.
  */
 export function formatHireEntryLabel(productionText: string): string {
-  return `${productionText} \u00b7 Hire`;
+  return productionText;
 }
 
 /**
@@ -329,11 +323,23 @@ export function formatRaiseCapacityValue(left: number, perTurn: number): string 
 }
 
 /**
+ * Value beside the Credits label in the hire panel.
+ *
+ * Purpose: The balance and this turn's mercenary upkeep share one line.
+ * When to use: With the seat's credits and `upkeepPerTurn`, including when upkeep is 0.
+ * Expected outcome: The credits symbol, the balance, ` + `, the symbol, the upkeep, and ` / turn`. No thousands separators.
+ * Exceptions: None.
+ */
+export function formatHireCreditsValue(credits: number, upkeepPerTurn: number): string {
+  return `${formatCreditsAmount(String(credits))} + ${formatCreditsAmount(String(upkeepPerTurn))} / turn`;
+}
+
+/**
  * Label for one raise option.
  *
  * Purpose: The type select shows the production cost and the credit price.
  * When to use: One option in the raise select.
- * Expected outcome: `Infantry (⚒20 + ¤3/t)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
+ * Expected outcome: `Infantry (⚒20 + ¤3 / turn)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
  * Exceptions: None.
  */
 export function formatHireOptionLabel(option: {
@@ -351,7 +357,7 @@ export function formatHireOptionLabel(option: {
  *
  * Purpose: The hire panel lists what will be filled at the end of the turn.
  * When to use: One row per order on this hex.
- * Expected outcome: A raise names the count, the type, and the compact price. A rehire names the unit and the compact price. The one-time credit amount is only the extra above one turn.
+ * Expected outcome: A raise names the count, the type, and the compact price. A rehire names the unit and the compact price. Neither row starts with Raise or Rehire. The one-time credit amount is only the extra above one turn.
  * Exceptions: None. A count below 1 still uses integer division and does not throw.
  */
 export function formatHireOrderLabel(order: {
@@ -364,11 +370,11 @@ export function formatHireOrderLabel(order: {
   if (order.kind === 'rehire') {
     const name = order.displayName ?? capitalizeUnitType(order.unitType);
     const upkeep = Math.trunc(order.fee / MERCENARY_REHIRE_FEE_MULTIPLIER);
-    return `Rehire ${name} (${formatCompactHireCost(order.fee, upkeep)})`;
+    return `${name} (${formatCompactHireCost(order.fee, upkeep)})`;
   }
   const perUnitFee = Math.trunc(order.fee / order.count);
   const price = formatCompactRaiseCost(unitCostFor(order.unitType), perUnitFee, perUnitFee);
-  return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
+  return `${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
 }
 
 /**

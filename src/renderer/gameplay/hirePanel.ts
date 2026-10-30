@@ -7,7 +7,7 @@
  * Exceptions: A failed read is logged and shown as an empty view. A rejected order is a toast.
  */
 
-import { formatCompactHireCost, formatCreditsAmount } from '../../shared/economySymbols';
+import { formatCompactHireCost } from '../../shared/economySymbols';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { HexHireView, HireMutationResult } from '../../shared/ipc/mercenaryTypes';
@@ -17,14 +17,13 @@ import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureG
 import {
   CREDITS_LINE_LABEL,
   HIRE_BUTTON_LABEL,
-  HIRE_FEES_LINE_LABEL,
   HIRE_FUNDS_WARNING,
   HIRE_ORDER_UPDATE_FAILED,
   HIRE_VIEW_FAILED,
   PENDING_HIRE_SECTION_TITLE,
   RAISE_CAPACITY_LABEL,
   REHIRE_SECTION_TITLE,
-  UPKEEP_LINE_LABEL,
+  formatHireCreditsValue,
   formatHireOptionLabel,
   formatHireOrderLabel,
   formatRaiseCapacityValue,
@@ -172,30 +171,26 @@ function appendTechLine(panel: HTMLElement, h3Index: string): void {
 }
 
 /**
- * Credits, upkeep, fees, and remaining raise capacity.
+ * Remaining raise capacity, then the treasury balance with per-turn upkeep.
  *
  * Purpose: These labeled amounts sit together, with the same gap the build panel uses between its lines.
  * When to use: When a view was loaded.
- * Expected outcome: Credits and upkeep always. Hire orders when pending fees are above 0. Capacity when raising is available. A spacer follows each shown line.
+ * Expected outcome: Production (Hire) when raising is available, then Credits as the balance plus per-turn upkeep. A spacer follows each shown line.
  * Exceptions: None.
  */
 function appendFunds(panel: HTMLElement, view: HexHireView): void {
   const funds = view.funds;
-  appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatCreditsAmount(String(funds.credits)));
-  appendLabeledAmount(panel, UPKEEP_LINE_LABEL, `${formatCreditsAmount(String(funds.upkeepPerTurn))} / turn`);
-  if (funds.pendingHireFees > 0) {
-    appendLabeledAmount(panel, HIRE_FEES_LINE_LABEL, formatCreditsAmount(String(funds.pendingHireFees)));
-  }
   const raise = view.raise;
   if (raise) {
     appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
   }
+  appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatHireCreditsValue(funds.credits, funds.upkeepPerTurn));
 }
 
 /**
  * One labeled amount and the spacer under it.
  *
- * Purpose: Credits, upkeep, fees, and capacity share the build panel's gap.
+ * Purpose: Production (Hire) and Credits share the build panel's gap.
  * When to use: From `appendFunds`.
  * Expected outcome: A strong label, the value, and a 0.5em spacer.
  * Exceptions: None.
@@ -222,7 +217,7 @@ function spacer(): HTMLDivElement {
  * One labeled fund line.
  *
  * Purpose: The label is a named constant, not a new literal.
- * When to use: Credits, upkeep, fees, and capacity.
+ * When to use: Production (Hire) and Credits.
  * Expected outcome: A line whose strong text is the label.
  * Exceptions: None.
  */
@@ -252,7 +247,7 @@ function note(text: string, className = 'build-no-urban'): HTMLDivElement {
  *
  * Purpose: The player picks a type and a count, then stores the order.
  * When to use: When `view.raise` is set.
- * Expected outcome: One row of controls, with no section heading. Capacity is already in the labeled lines.
+ * Expected outcome: One row of controls, with no section heading. Production (Hire) is already in the labeled lines.
  * Exceptions: None.
  */
 function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {

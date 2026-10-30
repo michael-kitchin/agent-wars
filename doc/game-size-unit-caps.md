@@ -16,7 +16,7 @@ A fortification is not one of these types. It has no cap (`FORTIFICATION_QUEUE_I
 
 ## Selection
 
-The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large), in the Forces section, between the Map section's home or side choices and the Rules section's bonuses. The dropdown sits on the same line as its label, to the right of that label, and is only as wide as its longest item. Under it, one row of the five unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
+The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large), in the Forces section, on the same line as Starting month. The two dropdowns are the same width. Under them, one row of the five unit types shows each type's map glyph drawn dark on a gray disk, the selected size's cap in bold, and that map's price. The layout is in [new-game-dialog.md](ux/new-game-dialog.md).
 
 The dropdown keeps its last value for the session. A process restart returns to Small.
 
