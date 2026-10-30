@@ -72,8 +72,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
-- Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and this turn's hire fees.
-- Hire marker, hire count, Hire, and remove: `hireEntryTooltipText`, `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
+- Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and this turn's hire fees. The balance, the upkeep, and this turn's hire fees start with `¤` (`CREDITS_SYMBOL`). The sentence that names `CREDITS_PER_ITEM` still says credits.
+- Hire marker: `Hire Units` (`hireEntryTooltipText`). Hire count, Hire, and remove: `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
 - Hire type, when the list has no value: `hireTypeTooltipText`. When a type is selected, `queueItemTooltipText` for that type.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes. Hidden while observing.
 - Enemy homes readout: Hexes of every active enemy home that you hold, out of all of those hexes. A knocked-out side's home is left out. Hidden while observing, and hidden in a match that ends on a turn limit.
@@ -104,7 +104,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders: Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
 - Production: Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
 - Terrain style: Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.
-- Build marker: Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.
+- Build marker: `Build Units`, or `Build/Hire Units` when the hex is in the human hire set (`buildEntryTooltipTextFor` in `src/renderer/chrome/controlTooltipText.ts`).
 - Tactical entry marker: Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.
 - Single-hex add: Add a queue row. It starts as the first unit type this hex can build.
 - Single-hex type, when the list has no value: Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored (`buildTypeTooltipText`). When a value is selected, `queueItemTooltipText` for that item.
@@ -190,7 +190,8 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`)
+- `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
 - `src/renderer/chrome/syncQueueItemSelectTooltip.ts` (`syncQueueItemSelectTooltip`)

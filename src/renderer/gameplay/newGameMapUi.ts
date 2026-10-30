@@ -227,7 +227,7 @@ function onRegionalRegionChanged(): void {
  *
  * Purpose: The unit row and the Advanced line sit outside the tabs, so both follow the selection.
  * When to use: A tab change and a regional region change while Regional is selected.
- * Expected outcome: Each unit type's price reads like `$20`, from the global catalog on Global and the region's catalog on Regional. The Advanced line beside the Forces title uses that same map's threshold, or is cleared when that map is missing.
+ * Expected outcome: Each unit type's price reads like `⚒20`, from the global catalog on Global and the region's catalog on Regional. The Advanced line beside the Forces title uses that same map's threshold, or is cleared when that map is missing.
  * Exceptions: None.
  */
 function applyVisibleCosts(): void {
@@ -262,7 +262,7 @@ function setAdvancedTechLine(text: string): void {
  *
  * Purpose: The four prices share one format.
  * When to use: `applyVisibleCosts`.
- * Expected outcome: The element's text is the price, such as `$20`.
+ * Expected outcome: The element's text is the price, such as `⚒20`.
  * Exceptions: None.
  */
 function setCost(id: string, cost: number): void {

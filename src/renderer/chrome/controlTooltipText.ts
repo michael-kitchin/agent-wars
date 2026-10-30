@@ -409,13 +409,16 @@ export const terrainStyleTooltipText =
   'Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.';
 
 /**
- * Purpose: Says how click and Shift-click differ, and when the click does nothing.
- * When to use: Each build-entry button.
- * Expected outcome: The control tip shows this sentence.
+ * Tip for a build-entry button.
+ *
+ * Purpose: The tip names whether that hex can also hire.
+ * When to use: Each build-entry button, with true when the hex is in the human hire set.
+ * Expected outcome: `Build/Hire Units` when `canHire` is true. `Build Units` otherwise.
  * Exceptions: None.
  */
-export const buildEntryTooltipText =
-  "Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.";
+export function buildEntryTooltipTextFor(canHire: boolean): string {
+  return canHire ? 'Build/Hire Units' : 'Build Units';
+}
 
 /**
  * Purpose: Says the click starts or resumes a battle and when it does nothing.

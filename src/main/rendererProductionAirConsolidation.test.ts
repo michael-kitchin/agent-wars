@@ -63,8 +63,8 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assertMatches(
     drawProductionFn,
-    /:\s*`\$\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}`;/,
-    'drawStrategicProductionOverlays should show unexplored labels in $N format'
+    /formatProductionCapacityAmount\(Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\)/,
+    'drawStrategicProductionOverlays should show unexplored labels with the production symbol'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&

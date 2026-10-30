@@ -3,6 +3,7 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
+import { formatProductionCapacityAmount } from '../shared/economySymbols';
 import { hireEntryHexesForHuman } from '../shared/hireEntryHexes';
 import { hireEntryButtonHtml, hireEntryRowForHex } from './gameplay/hireEntryMarkers';
 import {
@@ -74,7 +75,7 @@ import type {
 } from '../shared/ipcTypes';
 
 import {
-  buildEntryTooltipText,
+  buildEntryTooltipTextFor,
 } from './chrome/controlTooltipText';
 import {
   showMapToast,
@@ -279,7 +280,7 @@ function hasVisibleStrategicInfrastructureGlyphs(
  *
  * Purpose: Keeps the DOM markers that open the build popup aligned with the map after every redraw.
  * When to use: After each scene draw, beside the tactical entry marker sync.
- * Expected outcome: One button per eligible hex, rebuilt only when labels, positions, or the build selection change.
+ * Expected outcome: One button per eligible hex, rebuilt only when labels, positions, the build selection, or whether the hex is in the human hire set change.
  *   The layer hides when the zoom is too far out, at battle-detail zoom (which also closes the build popup), and while
  *   resolution playback paints dice chips, which the buttons would otherwise cover. Playback redraws every frame, so
  *   the markers return as the chips fade.
@@ -367,14 +368,14 @@ function syncBuildEntryButton(): void {
   }
   rows.sort((a, b) => a.h3.localeCompare(b.h3));
   const layerKey = rows
-    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}`)
+    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}|${hireHexes.has(r.h3) ? 1 : 0}`)
     .join(';');
   if (layerKey !== S.lastBuildEntryLayerKey) {
     const html = rows
       .map((r) =>
         r.kind === 'hire'
           ? hireEntryButtonHtml(r)
-          : `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
+          : `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipTextFor(hireHexes.has(r.h3))}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
       )
       .join('');
     layer.innerHTML = html;
@@ -408,7 +409,7 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
  * Purpose: The player's own production always shows; holding T or turning Production on shows it on every hex.
  * When to use: Once per strategic frame, from the scene pass.
  * Expected outcome: No labels at battle-detail zoom or without a map. Otherwise a label on each explored hex the human
- *   controls, and on every hex while production detail is shown, unexplored ones as plain `$N`. A hex whose build
+ *   controls, and on every hex while production detail is shown, unexplored ones as the production symbol and the count. A hex whose build
  *   button shows gets no canvas label. A label moves to the lower band while T is held or when its hex has
  *   infrastructure or units.
  * Exceptions: None.
@@ -455,7 +456,7 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
             overlayContext.unitCountsByPlayer
           )
         : formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, controller)
-      : `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
+      : formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString());
     const hasClickableBuildEntryForHex =
       explored && isStrategicHexHumanUrbanProduction(S.gameState, hx) && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {

@@ -14,8 +14,8 @@ Opens in Strategic planning when two or more build hexes are selected. It stays 
 
 - The selected hex codes.
 - Tech, under the hex codes, when the tech bonus is on and at least one selected hex's original urban count can produce units. Each tier appears once, Basic then Advanced, with the same small icon and word as the [single-hex popup](build-popup.md). A hex that produces no units adds nothing. The line is omitted when the tech bonus is off or no selected hex produces units. The rules are in [combat rules §4.9](../combat-rules-v3.md).
-- Production per turn for the selected hexes added together, under Tech when that line is shown and under the hex codes when it is not.
-- A combined queue summary: cost and turns for the template as applied to those hexes.
+- Production per turn for the selected hexes added together, marked with `PRODUCTION_CAPACITY_SYMBOL`, under Tech when that line is shown and under the hex codes when it is not.
+- A combined queue summary: cost, marked with `PRODUCTION_CAPACITY_SYMBOL`, and turns for the template as applied to those hexes.
 - The title "Build Queue".
 - One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes. The types are infantry, armor, naval, air, and missile, Fortification while a selected hex still has an intact city cell, and Credits (`CREDITS_QUEUE_ITEM`) while a selected hex has urban production. A hex that does not meet the missile urban gate (`buildMinimumUrbanCells`) skips a missile row. A hex with no intact city cell skips a fortification row. A hex whose city cells are all already fortified still takes the row, and that queue pauses when it is spent. A hex with no urban production skips a credits row. Credits has no cap. It costs `creditsItemCost()` and adds `CREDITS_PER_ITEM` (20) on every map.
 - A Keep building checkbox. It shows as checked only when every selected hex has Keep building on. It can be changed only when every selected hex can arm it.
@@ -90,3 +90,4 @@ None.
 - `src/main/productionRules.ts` (`getAvailableBuildQueueItemTypes`)
 - `src/shared/fortificationRules.ts` (`FORTIFICATION_QUEUE_ITEM`)
 - `src/shared/creditsRules.ts` (`CREDITS_QUEUE_ITEM`, `creditsItemCost`, `CREDITS_PER_ITEM`)
+- `src/shared/economySymbols.ts` (`PRODUCTION_CAPACITY_SYMBOL`)

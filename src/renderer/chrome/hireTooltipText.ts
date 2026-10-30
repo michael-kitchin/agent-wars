@@ -12,11 +12,10 @@
  *
  * Purpose: The marker opens hiring and does not join a multi-hex build selection.
  * When to use: Each hire-entry button.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows `Hire Units`.
  * Exceptions: None.
  */
-export const hireEntryTooltipText =
-  'Click to hire on this hex. Shift-click does not add it to a group of build queues, and the click does nothing during playback.';
+export const hireEntryTooltipText = 'Hire Units';
 
 /**
  * Tip for the raise type select.

@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { formatProductionCapacityAmount } from '../../shared/economySymbols';
 import { FORTIFIED_CELL_VARIANT_LABEL, FORTIFIED_TOOLTIP_LABEL, formatFortifiedTooltipValue } from '../../shared/fortificationRules';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
@@ -241,7 +242,7 @@ function formatTerrainTooltipHtml(
     state.urbanHexCount == null
       ? null
       : state.urbanHexCount > 0 && !neutralBorder
-        ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
+        ? `<strong>Production:</strong> ${formatProductionCapacityAmount(state.urbanHexCount.toLocaleString())} / turn`
         : `<strong>Production:</strong> (none)`;
   const fortifiedCount = state.fortifiedCount ?? 0;
   const fortifiedLine =

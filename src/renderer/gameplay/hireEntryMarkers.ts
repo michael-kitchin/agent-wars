@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { formatProductionCapacityAmount } from '../../shared/economySymbols';
 import { formatHireEntryAriaLabel, formatHireEntryLabel } from '../../shared/mercenaryRules';
 import { getUrbanProductionCapacityForHex } from './productionOverlayHelpers';
 import { hireEntryTooltipText } from '../chrome/hireTooltipText';
@@ -44,7 +45,7 @@ export interface HireEntryRow {
    *
    * Contract: The production figure and `Hire`.
    * When to use: The button body.
-   * Expected outcome: `$N · Hire`.
+   * Expected outcome: The production figure, then ` · Hire`.
    * Exceptions: None.
    */
   readonly label: string;
@@ -127,7 +128,7 @@ export function hireEntryRowForHex(
 ): HireEntryRow | null {
   if (!hireHexes.has(h3Index)) return null;
   if (!isPointInMapView(center, mapSize, HIRE_ENTRY_VIEW_MARGIN_PX)) return null;
-  const capacityText = `$${getUrbanProductionCapacityForHex(h3Index).toLocaleString()}`;
+  const capacityText = formatProductionCapacityAmount(getUrbanProductionCapacityForHex(h3Index).toLocaleString());
   return {
     h3: h3Index,
     label: formatHireEntryLabel(capacityText),

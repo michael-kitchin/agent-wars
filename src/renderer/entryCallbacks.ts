@@ -11,7 +11,7 @@ import { formatUnitNameForViewer, viewerSeatIdForRoster } from '../shared/sideLa
 import { unitIdOwnerFromId } from '../shared/unitIds';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../shared/unitDisplayNames';
 
-import { TOOLTIP_OFFSET_PX } from './core/constants';
+import { placeAnchoredPopupElement } from './chrome/placeAnchoredPopup';
 import { runButtonTooltipText } from './chrome/controlTooltipText';
 import { appendOpenRouterLog, showMapToast, updateOpenRouterCostLabel, updateOpenRouterToolCountLabels, updateReadyButtonState } from './openRouter/openRouterUiHelpers';
 import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './map/mapHelpers';
@@ -394,9 +394,8 @@ export async function showTerrainTooltip(
   if (!el) return;
   el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
   paintTerrainSwatches(el);
-  el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');
+  placeAnchoredPopupElement(el, clientX, clientY);
   el.setAttribute('aria-hidden', 'false');
   el.setAttribute('role', 'tooltip');
 }

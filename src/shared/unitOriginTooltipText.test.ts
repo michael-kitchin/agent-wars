@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { latLngToCell } from 'h3-js';
+import { CREDITS_SYMBOL } from './economySymbols';
 import { formatStrategicUnitId, formatTacticalSubUnitId } from './unitIds';
 import { formationTurnForUnit, formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from './unitOriginTooltipText';
 import type { UnitOriginTooltipBonuses } from './unitOriginTooltipText';
@@ -207,7 +208,7 @@ test('a mercenary identity adds the Mercenary line after the date of birth', () 
     identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryUpkeep: 3 },
   });
   const dob = html.indexOf('<strong>DOB:</strong>');
-  const mercenary = html.indexOf('<strong>Mercenary:</strong> upkeep 3 credits per turn');
+  const mercenary = html.indexOf(`<strong>Mercenary:</strong> upkeep ${CREDITS_SYMBOL}3 per turn`);
   assert.ok(dob >= 0 && mercenary > dob);
 });
 

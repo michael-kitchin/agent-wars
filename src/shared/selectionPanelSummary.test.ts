@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { PRODUCTION_CAPACITY_SYMBOL } from './economySymbols';
 import { buildSelectionPanelChips, summarizeSelectionPanel, type SelectionPanelUnitInput } from './selectionPanelSummary';
 
 /**
@@ -49,7 +50,7 @@ test('buildSelectionPanelChips lists the known facts in order', () => {
   assert.deepEqual(chips.map((chip) => chip.kind), ['terrain', 'weather', 'tech', 'production', 'home']);
   assert.match(chips[0].html, /Wetlands$/);
   assert.match(chips[2].html, /Advanced$/);
-  assert.equal(chips[3].html, '$1,094/turn');
+  assert.equal(chips[3].html, `${PRODUCTION_CAPACITY_SYMBOL}1,094/turn`);
   assert.equal(chips[4].html, 'Home');
 });
 

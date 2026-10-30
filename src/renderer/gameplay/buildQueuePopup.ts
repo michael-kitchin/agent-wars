@@ -35,6 +35,7 @@ import {
 import { placeOpenBuildPopup } from '../chrome/placeAnchoredPopup';
 import { syncQueueItemSelectTooltip } from '../chrome/syncQueueItemSelectTooltip';
 import { singleHexQueueRemoveTooltipText } from '../../shared/popupControlTooltipText';
+import { formatProductionCapacityAmount } from '../../shared/economySymbols';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
@@ -367,7 +368,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     const productionCapacity = snapshot.urbanHexCount;
     const productionDetail =
       productionCapacity > 0
-        ? `$${productionCapacity.toLocaleString()} / turn`
+        ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn`
         : '(none)';
     pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
     section.appendChild(pointsLine);
@@ -386,7 +387,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       );
       const queueTurnsDisplay = queueTurns === null ? '?' : queueTurns.toLocaleString();
       const turnLabel = queueTurns === 1 ? 'turn' : 'turns';
-      queueSummaryLine.innerHTML = `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${queueTurnsDisplay} ${turnLabel}`;
+      queueSummaryLine.innerHTML = `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${queueTurnsDisplay} ${turnLabel}`;
     }
     section.appendChild(queueSummaryLine);
     const productionSpacer = document.createElement('div');

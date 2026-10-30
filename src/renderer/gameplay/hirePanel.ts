@@ -3,10 +3,12 @@
  *
  * Purpose: The panel is a child of the popup mount, whether or not a Build tab is beside it.
  * When to use: From the build-or-hire wrapper, and again after a hire button succeeds.
- * Expected outcome: Funds, the raise and rehire sections, and the orders already placed.
+ * Expected outcome: The hex caption, the tech line, the labeled amounts, the raise controls, the rehire rows, and the orders already placed.
  * Exceptions: A failed read is logged and shown as an empty view. A rejected order is a toast.
  */
 
+import { formatCompactHireCost, formatCreditsAmount } from '../../shared/economySymbols';
+import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { HexHireView, HireMutationResult } from '../../shared/ipc/mercenaryTypes';
 import type { HireableUnitType } from '../../shared/mercenaryRules';
@@ -14,7 +16,6 @@ import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import {
   CREDITS_LINE_LABEL,
-  HIRE_ARRIVAL_NOTE,
   HIRE_BUTTON_LABEL,
   HIRE_FEES_LINE_LABEL,
   HIRE_FUNDS_WARNING,
@@ -22,13 +23,13 @@ import {
   HIRE_VIEW_FAILED,
   PENDING_HIRE_SECTION_TITLE,
   RAISE_CAPACITY_LABEL,
-  RAISE_SECTION_TITLE,
   REHIRE_SECTION_TITLE,
   UPKEEP_LINE_LABEL,
   formatHireOptionLabel,
   formatHireOrderLabel,
   formatRaiseCapacityValue,
 } from '../../shared/mercenaryRules';
+import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 import { setUnitNameContent } from '../core/unitOriginFlags';
 import { rendererSharedState as S } from '../core/state';
 import {
@@ -114,6 +115,7 @@ export function renderHirePanel(
   panel.innerHTML = '';
   panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
   appendCaption(panel, h3Index, data.caption);
+  appendTechLine(panel, h3Index);
   const view = data.view;
   if (!view) {
     panel.appendChild(note(HIRE_VIEW_FAILED));
@@ -121,12 +123,14 @@ export function renderHirePanel(
     return;
   }
   appendFunds(panel, view);
+  if (view.funds.credits < view.funds.upkeepPerTurn + view.funds.pendingHireFees) {
+    panel.appendChild(note(HIRE_FUNDS_WARNING, 'hire-funds-warning'));
+  }
   if (!view.hireAvailable && view.unavailableReason) panel.appendChild(note(view.unavailableReason));
   if (view.raise) appendRaise(panel, h3Index, view, deps);
   else if (view.raiseBlockedReason) panel.appendChild(note(view.raiseBlockedReason));
   if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
   if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
-  panel.appendChild(note(HIRE_ARRIVAL_NOTE));
   if (!panel.hidden) placeOpenBuildPopup();
 }
 
@@ -145,32 +149,80 @@ function appendCaption(panel: HTMLElement, h3Index: string, caption: HexNamingCa
   if (!text) return;
   const line = document.createElement('div');
   line.innerHTML = text;
-  const spacer = document.createElement('div');
-  spacer.style.height = '0.5em';
-  panel.append(line, spacer);
+  panel.append(line, spacer());
 }
 
 /**
- * Credits, upkeep, fees, and the short-credits warning.
+ * The same tech line the build panel shows.
  *
- * Purpose: The panel uses the same labels as the top bar.
+ * Purpose: Hiring on a city uses that city's production tier.
+ * When to use: After the caption, before the labeled amounts.
+ * Expected outcome: A Tech line and a spacer when the match has a tech bonus and the hex can produce. Nothing otherwise.
+ * Exceptions: None.
+ */
+function appendTechLine(panel: HTMLElement, h3Index: string): void {
+  const techLineHtml = formatProducedUnitTechLineHtml({
+    techBonusEnabled: S.gameState?.techBonusEnabled === true,
+    baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index),
+  });
+  if (!techLineHtml) return;
+  const techLine = document.createElement('div');
+  techLine.innerHTML = techLineHtml;
+  panel.append(techLine, spacer());
+}
+
+/**
+ * Credits, upkeep, fees, and remaining raise capacity.
+ *
+ * Purpose: These labeled amounts sit together, with the same gap the build panel uses between its lines.
  * When to use: When a view was loaded.
- * Expected outcome: Three lines, the fee line only when fees are above 0, and the warning when credits are short.
+ * Expected outcome: Credits and upkeep always. Hire orders when pending fees are above 0. Capacity when raising is available. A spacer follows each shown line.
  * Exceptions: None.
  */
 function appendFunds(panel: HTMLElement, view: HexHireView): void {
   const funds = view.funds;
-  panel.appendChild(fundLine(CREDITS_LINE_LABEL, String(funds.credits)));
-  panel.appendChild(fundLine(UPKEEP_LINE_LABEL, `${funds.upkeepPerTurn} / turn`));
-  if (funds.pendingHireFees > 0) panel.appendChild(fundLine(HIRE_FEES_LINE_LABEL, String(funds.pendingHireFees)));
-  if (funds.credits < funds.upkeepPerTurn + funds.pendingHireFees) panel.appendChild(note(HIRE_FUNDS_WARNING, 'hire-funds-warning'));
+  appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatCreditsAmount(String(funds.credits)));
+  appendLabeledAmount(panel, UPKEEP_LINE_LABEL, `${formatCreditsAmount(String(funds.upkeepPerTurn))} / turn`);
+  if (funds.pendingHireFees > 0) {
+    appendLabeledAmount(panel, HIRE_FEES_LINE_LABEL, formatCreditsAmount(String(funds.pendingHireFees)));
+  }
+  const raise = view.raise;
+  if (raise) {
+    appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
+  }
+}
+
+/**
+ * One labeled amount and the spacer under it.
+ *
+ * Purpose: Credits, upkeep, fees, and capacity share the build panel's gap.
+ * When to use: From `appendFunds`.
+ * Expected outcome: A strong label, the value, and a 0.5em spacer.
+ * Exceptions: None.
+ */
+function appendLabeledAmount(panel: HTMLElement, label: string, value: string): void {
+  panel.append(fundLine(label, value), spacer());
+}
+
+/**
+ * The empty gap the build panel puts between its information lines.
+ *
+ * Purpose: Hire information uses the same 0.5em gap.
+ * When to use: After a caption, a tech line, or a labeled amount.
+ * Expected outcome: A div whose height is 0.5em.
+ * Exceptions: None.
+ */
+function spacer(): HTMLDivElement {
+  const gap = document.createElement('div');
+  gap.style.height = '0.5em';
+  return gap;
 }
 
 /**
  * One labeled fund line.
  *
  * Purpose: The label is a named constant, not a new literal.
- * When to use: Credits, upkeep, and fees.
+ * When to use: Credits, upkeep, fees, and capacity.
  * Expected outcome: A line whose strong text is the label.
  * Exceptions: None.
  */
@@ -183,7 +235,7 @@ function fundLine(label: string, value: string): HTMLDivElement {
 /**
  * A sentence in the build popup's note class, or the funds warning class.
  *
- * Purpose: Blocked reasons, the arrival note, and the funds warning share one element.
+ * Purpose: Blocked reasons and the funds warning share one element.
  * When to use: Any sentence that is not a control.
  * Expected outcome: A div with the given class.
  * Exceptions: None.
@@ -200,7 +252,7 @@ function note(text: string, className = 'build-no-urban'): HTMLDivElement {
  *
  * Purpose: The player picks a type and a count, then stores the order.
  * When to use: When `view.raise` is set.
- * Expected outcome: A head, the capacity line, and one row of controls.
+ * Expected outcome: One row of controls, with no section heading. Capacity is already in the labeled lines.
  * Exceptions: None.
  */
 function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
@@ -208,9 +260,6 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
   if (!raise) return;
   const section = document.createElement('div');
   section.className = 'build-queue-section';
-  section.appendChild(head(RAISE_SECTION_TITLE));
-  const capacity = document.createElement('div');
-  capacity.innerHTML = `<strong>${RAISE_CAPACITY_LABEL}:</strong> ${escapeBuildPopupHtml(formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn))}`;
   const row = document.createElement('div');
   row.className = 'build-queue-row';
   const typeSelect = document.createElement('select');
@@ -241,7 +290,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
     }));
   });
   row.append(typeSelect, countInput, button);
-  section.append(capacity, row);
+  section.appendChild(row);
   panel.appendChild(section);
 }
 
@@ -250,7 +299,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
  *
  * Purpose: Each visible candidate can be rehired.
  * When to use: When the view lists at least one.
- * Expected outcome: One row per unit, with its name, fee, and a Hire button.
+ * Expected outcome: One row per unit, with its name, compact credit price, and a Hire button.
  * Exceptions: None.
  */
 function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
@@ -264,7 +313,7 @@ function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, d
     label.className = 'unit-label';
     setUnitNameContent(label, unit.unitId, unit.displayName);
     const fee = document.createElement('span');
-    fee.textContent = String(unit.fee);
+    fee.textContent = `(${formatCompactHireCost(unit.fee, unit.upkeep)})`;
     const button = hireButton();
     button.addEventListener('click', () => {
       void submitHire(panel, h3Index, deps, () => window.gameApi!.placeHireOrder({ kind: 'rehire', unitId: unit.unitId }));
@@ -309,7 +358,7 @@ function appendOrders(panel: HTMLElement, h3Index: string, view: HexHireView, de
 /**
  * A section title.
  *
- * Purpose: Raise, Neutral units, and orders use the build panel's heading classes.
+ * Purpose: Neutral units and orders use the build panel's heading classes.
  * When to use: The start of those sections.
  * Expected outcome: A head whose text is the title.
  * Exceptions: None.

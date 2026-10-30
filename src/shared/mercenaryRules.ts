@@ -9,6 +9,8 @@
 
 import { GLOBAL_GAME_MAP } from './activeGameMap';
 import { CREDITS_PER_ITEM } from './creditsRules';
+import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
+import { unitCostFor } from './gameRules';
 import type { TechLevel } from './techBonusTypes';
 
 /** Divisor that turns a global unit price into one turn of upkeep, before rounding up. */
@@ -47,9 +49,6 @@ export const HIRE_TAB_LABEL = 'Hire';
 /** Button label for a raise or a rehire. */
 export const HIRE_BUTTON_LABEL = 'Hire';
 
-/** Hire-panel heading for new units. */
-export const RAISE_SECTION_TITLE = 'Raise';
-
 /** Hire-panel heading for Neutral units that can be rehired. */
 export const REHIRE_SECTION_TITLE = 'Neutral units';
 
@@ -71,10 +70,6 @@ export const RAISE_CAPACITY_LABEL = 'Capacity';
 /** Warning when the treasury cannot cover upkeep plus hire fees. */
 export const HIRE_FUNDS_WARNING =
   'Your credits do not cover upkeep plus these hire orders. Credits from this turn\'s production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.';
-
-/** Note that hired units cannot take orders until the next turn. */
-export const HIRE_ARRIVAL_NOTE =
-  'Hired units arrive at the end of this turn and take orders next turn. Upkeep is due every turn after that.';
 
 /** Shown when the hire view could not be loaded. */
 export const HIRE_VIEW_FAILED = 'Hiring information could not be loaded.';
@@ -267,11 +262,11 @@ export function formatHireOrdersUnfilledLine(count: number): string {
  *
  * Purpose: The readout shows upkeep beside the balance when the seat has mercenaries to pay.
  * When to use: The credits stat. Pass 0 when upkeep is 0.
- * Expected outcome: An empty string, or a minus sign, the upkeep, and `/turn`.
+ * Expected outcome: An empty string, or a minus sign, the credits symbol, the upkeep, and `/turn`.
  * Exceptions: None.
  */
 export function formatCreditsUpkeepSuffix(upkeep: number): string {
-  return upkeep === 0 ? '' : `\u2212${upkeep}/turn`;
+  return upkeep === 0 ? '' : `\u2212${formatCreditsAmount(String(upkeep))}/turn`;
 }
 
 /**
@@ -289,15 +284,18 @@ export function formatCreditsTooltip(funds: {
   readonly mercenaryCount: number;
 }): string {
   const mercenaryWord = funds.mercenaryCount === 1 ? 'mercenary' : 'mercenaries';
-  return `Credits pay for mercenaries. You hold ${funds.credits}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${funds.upkeepPerTurn} per turn, and this turn's hire orders cost ${funds.pendingHireFees}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
+  const balance = formatCreditsAmount(String(funds.credits));
+  const upkeep = formatCreditsAmount(String(funds.upkeepPerTurn));
+  const hireOrders = formatCreditsAmount(String(funds.pendingHireFees));
+  return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn, and this turn's hire orders cost ${hireOrders}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
 }
 
 /**
  * Label on a Hire marker.
  *
  * Purpose: The marker replaces the canvas production label, so it carries that figure.
- * When to use: With the hex's `$N` production text.
- * Expected outcome: `$N · Hire`.
+ * When to use: With the hex's production text, which already includes the production symbol.
+ * Expected outcome: That text, then ` · Hire`.
  * Exceptions: None.
  */
 export function formatHireEntryLabel(productionText: string): string {
@@ -321,19 +319,21 @@ export function formatHireEntryAriaLabel(h3Index: string): string {
  *
  * Purpose: The hire panel shows production points still available this turn.
  * When to use: With capacity left and the hex's capacity for the turn.
- * Expected outcome: `$left of $perTurn this turn`.
+ * Expected outcome: The production symbol, the amount left, ` of `, the symbol again, and `N this turn`.
  * Exceptions: None.
  */
 export function formatRaiseCapacityValue(left: number, perTurn: number): string {
-  return `$${left} of $${perTurn} this turn`;
+  const leftText = formatProductionCapacityAmount(String(left));
+  const perTurnText = formatProductionCapacityAmount(String(perTurn));
+  return `${leftText} of ${perTurnText} this turn`;
 }
 
 /**
  * Label for one raise option.
  *
- * Purpose: The type select shows the production cost, the fee, and later upkeep.
+ * Purpose: The type select shows the production cost and the credit price.
  * When to use: One option in the raise select.
- * Expected outcome: `Infantry (capacity $20, fee 3, upkeep 3)` and the same shape for the other types.
+ * Expected outcome: `Infantry (⚒20 + ¤3/t)` when the fee equals upkeep. An extra one-time amount appears only when the fee is higher.
  * Exceptions: None.
  */
 export function formatHireOptionLabel(option: {
@@ -342,7 +342,8 @@ export function formatHireOptionLabel(option: {
   readonly fee: number;
   readonly upkeep: number;
 }): string {
-  return `${capitalizeUnitType(option.unitType)} (capacity $${option.unitCost}, fee ${option.fee}, upkeep ${option.upkeep})`;
+  const price = formatCompactRaiseCost(option.unitCost, option.fee, option.upkeep);
+  return `${capitalizeUnitType(option.unitType)} (${price})`;
 }
 
 /**
@@ -350,8 +351,8 @@ export function formatHireOptionLabel(option: {
  *
  * Purpose: The hire panel lists what will be filled at the end of the turn.
  * When to use: One row per order on this hex.
- * Expected outcome: A raise names the count and type. A rehire names the unit.
- * Exceptions: None.
+ * Expected outcome: A raise names the count, the type, and the compact price. A rehire names the unit and the compact price. The one-time credit amount is only the extra above one turn.
+ * Exceptions: None. A count below 1 still uses integer division and does not throw.
  */
 export function formatHireOrderLabel(order: {
   readonly kind: HireKind;
@@ -361,9 +362,13 @@ export function formatHireOrderLabel(order: {
   readonly fee: number;
 }): string {
   if (order.kind === 'rehire') {
-    return `Rehire ${order.displayName ?? capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
+    const name = order.displayName ?? capitalizeUnitType(order.unitType);
+    const upkeep = Math.trunc(order.fee / MERCENARY_REHIRE_FEE_MULTIPLIER);
+    return `Rehire ${name} (${formatCompactHireCost(order.fee, upkeep)})`;
   }
-  return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
+  const perUnitFee = Math.trunc(order.fee / order.count);
+  const price = formatCompactRaiseCost(unitCostFor(order.unitType), perUnitFee, perUnitFee);
+  return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
 }
 
 /**
@@ -371,11 +376,11 @@ export function formatHireOrderLabel(order: {
  *
  * Purpose: Anyone who can see the unit can see what it costs to keep.
  * When to use: After the date-of-birth line, when the unit is a mercenary.
- * Expected outcome: `upkeep N credits per turn`.
+ * Expected outcome: `upkeep`, the credits symbol, the amount, and `per turn`.
  * Exceptions: None.
  */
 export function formatMercenaryTooltipValue(upkeep: number): string {
-  return `upkeep ${upkeep} credits per turn`;
+  return `upkeep ${formatCreditsAmount(String(upkeep))} per turn`;
 }
 
 /**

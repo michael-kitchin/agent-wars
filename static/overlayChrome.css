@@ -180,6 +180,17 @@ button :is(.side-number-flag, .country-flag) {
 .build-entry-btn.has-capacity {
   font-weight: 700;
 }
+/* A hire-only hex swaps the shared button face and border so it reads apart from a build hex. */
+.build-entry-btn.hire-entry-btn {
+  background: var(--button-border);
+  border-color: var(--button-bg);
+  color: var(--button-bg);
+}
+.build-entry-btn.hire-entry-btn:hover {
+  background: var(--button-bg);
+  border-color: var(--button-border);
+  color: var(--button-text);
+}
 .build-entry-btn.hidden { display: none; }
 .tactical-entry-layer {
   position: absolute;

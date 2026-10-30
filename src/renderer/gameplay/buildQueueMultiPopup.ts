@@ -1,3 +1,4 @@
+import { formatProductionCapacityAmount } from '../../shared/economySymbols';
 import { formatSelectedHexTechLineHtml } from '../../shared/featureIconHtml';
 import { ALL_BUILD_QUEUE_ITEM_TYPES, type BuildQueueItemType, type HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
@@ -184,7 +185,7 @@ async function commitEditedTemplate(
  *
  * Purpose: Keeps multi-queue summary math and grammar separate from DOM construction.
  * When to use: After loading all selected hex snapshots.
- * Expected outcome: Queue `$` is the displayed template total; turns remain min–max per-hex ETA.
+ * Expected outcome: Queue cost is the displayed template total; turns remain min–max per-hex ETA.
  * Exceptions: Unknown completion estimates render as `?`.
  */
 function formatMultiQueueSummary(snapshots: HexBuildQueueSnapshot[]): string {
@@ -199,13 +200,13 @@ function formatMultiQueueSummary(snapshots: HexBuildQueueSnapshot[]): string {
   );
   const numericTurns = turns.filter((turn): turn is number => turn !== null);
   if (numericTurns.length !== turns.length) {
-    return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ? turns`;
+    return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ? turns`;
   }
   const minimum = Math.min(...numericTurns);
   const maximum = Math.max(...numericTurns);
   const turnsDisplay = minimum === maximum ? String(minimum) : `${minimum}–${maximum}`;
   const turnLabel = minimum === 1 && maximum === 1 ? 'turn' : 'turns';
-  return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${turnsDisplay} ${turnLabel}`;
+  return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${turnsDisplay} ${turnLabel}`;
 }
 
 /**
@@ -282,7 +283,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
 
   const totalProduction = snapshots.reduce((sum, snapshot) => sum + snapshot.urbanHexCount, 0);
   const pointsLine = document.createElement('div');
-  pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
+  pointsLine.innerHTML = `<strong>Production:</strong> ${formatProductionCapacityAmount(totalProduction.toLocaleString())} / turn`;
   section.appendChild(pointsLine);
   const productionQueueSpacer = document.createElement('div');
   productionQueueSpacer.style.height = '0.5em';

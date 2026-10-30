@@ -2,6 +2,7 @@
  * Shared production overlay math for strategic canvas labels and build-entry gating (capacity, queues, deployment caps).
  */
 
+import { formatProductionCapacityAmount } from '../../shared/economySymbols';
 import { isSeatId, type SeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { isBuildUnitType, type BuildUnitType, type GameStateSnapshot } from '../../shared/ipcTypes';
 import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
@@ -212,7 +213,7 @@ export function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean
 }
 
 /**
- * Formats `$N / …t` production label text using queue head, stored points, and per-type caps.
+ * Formats production label text using queue head, stored points, and per-type caps.
  */
 export function formatProductionQueueAwareLabel(
   state: GameStateSnapshot,
@@ -221,7 +222,7 @@ export function formatProductionQueueAwareLabel(
   controller: string | null,
   unitCountsByPlayer?: UnitCountsByPlayer
 ): string {
-  const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
+  const capacityText = formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString());
   const queue = getBuildQueueSummaryForHex(state, h3Index);
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
@@ -256,7 +257,9 @@ export function formatProductionLabelForHumanControllerOnly(
   capacityPerTurn: number,
   controller: string | null
 ): string {
-  if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
+  if (controller !== HUMAN_SEAT_ID) {
+    return `${formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString())} / ?t`;
+  }
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
 }
 

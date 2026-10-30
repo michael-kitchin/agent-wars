@@ -36,7 +36,7 @@ The setup screen lists two to four sides. Each side needs its own home. Observe 
 | Map edges                               | None                                                           | A few maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units. |
 | Winning by control                      | Hold every hex of the enemy home region.                       | Hold enemy-home hexes with at least 75% of that home's original urban cells. Bombing doesn't change the target. A home that started with none is won by holding every hex. |
 
-The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: $N+ hexes` line.
+The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: ⚒N+ hexes` line.
 
 ## Playing a turn
 
@@ -153,9 +153,9 @@ A city, airport, or seaport shoots back at those odds whether or not the strike 
 
 ## Building units
 
-*Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and the presence of airports or seaports.*
+*Zoom in until the production capacity (⚒) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and the presence of airports or seaports.*
 
-![Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and the presence of airports or seaports.](media/unit-building.png)
+![Zoom in until the production capacity (⚒) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and the presence of airports or seaports.](media/unit-building.png)
 
 - **Income:** each strategic hex earns one production point per turn for each intact urban cell in it.
 - **Idle hexes save nothing:** points build up only in hexes you control that have a queue or **Keep building** on.
@@ -181,7 +181,7 @@ A hex needs the urban cells in this table, and anything named under **Also needs
 
 ## Credits and mercenaries
 
-Each side has a treasury, starting at 0. It never goes below 0. Neutral has none. Only you see yours. The top bar shows it after Production, and turns short when the balance will not cover this turn's upkeep plus hire fees.
+Each side has a treasury, starting at 0. It never goes below 0. Neutral has none. Only you see yours. The top bar shows it after Production as `¤N`, and turns short when the balance will not cover this turn's upkeep plus hire fees. When upkeep is above 0, the suffix is `−¤N/turn`.
 
 A Credits queue item costs `creditsItemCost()` production points, the active map's infantry price, and adds `CREDITS_PER_ITEM` (20) credits on every map. Fees and upkeep come from the global reference prices (`mercenaryReferenceCost`), so they are the same on every map: infantry 3 credits per turn (5 in an Advanced city), armor 5 (10), naval 13 (25), air 8 (15). Raising costs one turn of that upkeep. Rehiring costs two. That fee is the unit's upkeep for the turn it arrives, so it is not charged again the same turn.
 

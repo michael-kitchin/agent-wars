@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { PRODUCTION_CAPACITY_SYMBOL } from './economySymbols';
 import {
   formatAdvancedTechLine,
   formatUnitCostLabel,
@@ -8,9 +9,9 @@ import {
 } from './gameMapList';
 
 test('cost text for the global and western europe columns', () => {
-  assert.equal(formatUnitCostLabel(20), '$20');
-  assert.equal(formatUnitCostLabel(65), '$65');
-  assert.equal(formatAdvancedTechLine(60), 'Advanced tech: $60+ hexes');
+  assert.equal(formatUnitCostLabel(20), `${PRODUCTION_CAPACITY_SYMBOL}20`);
+  assert.equal(formatUnitCostLabel(65), `${PRODUCTION_CAPACITY_SYMBOL}65`);
+  assert.equal(formatAdvancedTechLine(60), `Advanced tech: ${PRODUCTION_CAPACITY_SYMBOL}60+ hexes`);
 });
 
 test('side randomization never returns two equal indexes when two or more exist', () => {

@@ -6,6 +6,7 @@
  * Expected outcome: Plain data and HTML strings; nothing touches the page.
  * Exceptions: None.
  */
+import { formatProductionCapacityAmount } from './economySymbols';
 import { escapeHtmlText } from './htmlTextFormatting';
 import { formatTechTierHtml } from './featureIconHtml';
 import type { TechLevel } from './techBonusTypes';
@@ -220,7 +221,7 @@ export interface SelectionPanelChipInput {
    *
    * Contract: Null or zero shows no chip.
    * When to use: World hexes with urban cells, off the neutral border.
-   * Expected outcome: A chip such as `$94/turn`.
+   * Expected outcome: A chip such as the production symbol followed by `94/turn`.
    * Exceptions: None.
    */
   readonly productionPerTurn: number | null;
@@ -278,7 +279,10 @@ export function buildSelectionPanelChips(input: SelectionPanelChipInput): Select
   if (input.weather) chips.push({ kind: 'weather', html: formatWeatherIconHtml(input.weather) });
   if (input.techLevel) chips.push({ kind: 'tech', html: formatTechTierHtml(input.techLevel) });
   if (input.productionPerTurn != null && input.productionPerTurn > 0) {
-    chips.push({ kind: 'production', html: escapeHtmlText(`$${input.productionPerTurn.toLocaleString('en-US')}/turn`) });
+    chips.push({
+      kind: 'production',
+      html: escapeHtmlText(`${formatProductionCapacityAmount(input.productionPerTurn.toLocaleString('en-US'))}/turn`),
+    });
   }
   if (input.homeChip) {
     chips.push({ kind: input.homeChip.kind, html: escapeHtmlText(input.homeChip.text) });

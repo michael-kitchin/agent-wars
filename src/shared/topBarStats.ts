@@ -1,5 +1,6 @@
 import { isNeutralBorderHex } from './h3Resolutions';
 import type { MercenaryEconomySnapshot, MercenaryFunds } from './ipc/mercenaryTypes';
+import { formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
 import { formatCreditsUpkeepSuffix } from './mercenaryRules';
 import { getMaxUnitsPerType, parseGameSize } from './gameSize';
 import { countControlledHexesInRegion } from './homeRegionRules';
@@ -408,11 +409,11 @@ function citiesReadout(
  */
 export interface TopBarStatParts {
   /**
-   * Production value, such as "+530".
+   * Production value, such as "+⚒1,530".
    *
-   * Contract: Always starts with "+".
+   * Contract: Always starts with "+", then `PRODUCTION_CAPACITY_SYMBOL`.
    * When to use: `#topbar-stat-production`.
-   * Expected outcome: Grouped with commas past 999.
+   * Expected outcome: The plus, the production symbol, and the count grouped with commas past 999.
    * Exceptions: None.
    */
   readonly production: string;
@@ -489,20 +490,20 @@ export interface TopBarStatParts {
    */
   readonly citiesTooltip: string;
   /**
-   * The credits balance, such as "20".
+   * The credits balance, such as "¤120".
    *
-   * Contract: Empty when the view has no economy.
+   * Contract: Empty when the view has no economy. Otherwise starts with `CREDITS_SYMBOL`.
    * When to use: `#topbar-stat-credits`.
-   * Expected outcome: A grouped whole number, or `''`.
+   * Expected outcome: The credits symbol and a grouped whole number, or `''`.
    * Exceptions: None.
    */
   readonly credits: string;
   /**
-   * The upkeep suffix, such as "−3/turn".
+   * The upkeep suffix, such as "−¤3/turn".
    *
    * Contract: Empty when upkeep is 0 or the view has no economy.
    * When to use: `#topbar-stat-credits-suffix`.
-   * Expected outcome: A minus sign, the upkeep, and `/turn`, or `''`.
+   * Expected outcome: A minus sign, `CREDITS_SYMBOL`, the upkeep, and `/turn`, or `''`.
    * Exceptions: None.
    */
   readonly creditsSuffix: string;
@@ -525,12 +526,12 @@ function formatCount(value: number): string {
  *
  * Purpose: Keeps the number format in one place.
  * When to use: After `computeTopBarStats`.
- * Expected outcome: For example production "+530", forces "10" and "/34", homes "12" and "/15".
+ * Expected outcome: For example production "+⚒1,530", credits "¤120" or empty, forces "10" and "/34", homes "12" and "/15".
  * Exceptions: None.
  */
 export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {
   return {
-    production: `+${formatCount(stats.productionPerTurn)}`,
+    production: `+${formatProductionCapacityAmount(formatCount(stats.productionPerTurn))}`,
     forces: formatCount(stats.unitsFielded),
     forcesCap: `/${formatCount(stats.unitCap)}`,
     humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : '—',
@@ -539,7 +540,7 @@ export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {
     enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : '',
     cities: stats.cities?.summary ?? '',
     citiesTooltip: stats.cities?.tooltip ?? '',
-    credits: stats.credits ? formatCount(stats.credits.credits) : '',
+    credits: stats.credits ? formatCreditsAmount(formatCount(stats.credits.credits)) : '',
     creditsSuffix: stats.credits ? formatCreditsUpkeepSuffix(stats.credits.upkeepPerTurn) : '',
   };
 }

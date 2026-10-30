@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { aiSeatIdForIndex, HUMAN_SEAT_ID } from './seatIds';
+import { PRODUCTION_CAPACITY_SYMBOL } from './economySymbols';
 import { computeTopBarStats, formatForcesBreakdown, formatTopBarStatParts, type TopBarStatsInput } from './topBarStats';
 
 const notNeutral = (): boolean => false;
@@ -68,7 +69,7 @@ test('computeTopBarStats treats missing lists as empty', () => {
 test('formatTopBarStatParts and formatForcesBreakdown format the readouts', () => {
   const stats = computeTopBarStats({ ...input, strategicInfrastructure: [{ h3Index: 'a', urbanHexCount: 1530 }] }, notNeutral);
   assert.deepEqual(formatTopBarStatParts(stats), {
-    production: '+1,530',
+    production: `+${PRODUCTION_CAPACITY_SYMBOL}1,530`,
     forces: '4',
     forcesCap: '/36',
     humanHome: '2',

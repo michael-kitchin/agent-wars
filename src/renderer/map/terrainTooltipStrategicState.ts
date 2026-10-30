@@ -298,7 +298,7 @@ function countUrbanTacticalHexesInStrategicHex(parentH3: string): number {
  * Returns the human-visible urban production capacity for a strategic hex (urban tactical child count).
  *
  * Purpose: Shared capacity value for tooltip production lines and map production overlays.
- * When to use: Any UI that shows `$N / turn` style production for a strategic hex.
+ * When to use: Any UI that shows production per turn for a strategic hex.
  * Expected outcome: Non-negative integer count of urban tactical children under the hex.
  * Exceptions: None.
  */

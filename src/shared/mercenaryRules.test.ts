@@ -1,8 +1,8 @@
 /**
- * Mercenary upkeep stays on the global prices when a regional map changes production prices.
+ * Mercenary prices and the hire-panel labels.
  *
- * Purpose: A credit is worth the same on every map, so fees and upkeep must not follow the active infantry price.
- * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, or `raiseCapacityForHex`.
+ * Purpose: Upkeep stays on the global prices, and the hire menu shows the compact price.
+ * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, or `formatHireOrderLabel`.
  * Expected outcome: The cases below.
  * Exceptions: None.
  */
@@ -10,7 +10,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
-import { mercenaryHireFee, mercenaryUpkeepFor, raiseCapacityForHex } from './mercenaryRules';
+import { formatCompactHireCost, formatCompactRaiseCost } from './economySymbols';
+import { unitCostFor } from './gameRules';
+import { formatHireOptionLabel, formatHireOrderLabel, mercenaryHireFee, mercenaryUpkeepFor, raiseCapacityForHex } from './mercenaryRules';
 import { getPlayerUnitCountsByType } from './unitCountsByType';
 
 const regionalProfile = {
@@ -45,4 +47,31 @@ test('mercenaries do not count toward unit caps', () => {
     'human'
   );
   assert.equal(counts.infantry, 1);
+});
+
+test('a raise option shows production and one turn when the fee equals upkeep', () => {
+  const label = formatHireOptionLabel({ unitType: 'infantry', unitCost: 20, fee: 3, upkeep: 3 });
+  assert.equal(label, `Infantry (${formatCompactRaiseCost(20, 3, 3)})`);
+});
+
+test('a raise order uses the active map production cost and one turn of upkeep', () => {
+  const label = formatHireOrderLabel({
+    kind: 'raise',
+    unitType: 'infantry',
+    count: 2,
+    displayName: null,
+    fee: 6,
+  });
+  assert.equal(label, `Raise 2 Infantry (${formatCompactRaiseCost(unitCostFor('infantry'), 3, 3)})`);
+});
+
+test('a rehire order shows the extra above one turn', () => {
+  const label = formatHireOrderLabel({
+    kind: 'rehire',
+    unitType: 'infantry',
+    count: 1,
+    displayName: '4th Infantry',
+    fee: 6,
+  });
+  assert.equal(label, `Rehire 4th Infantry (${formatCompactHireCost(6, 3)})`);
 });

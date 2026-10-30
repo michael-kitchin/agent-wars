@@ -1,3 +1,4 @@
+import { formatProductionCapacityAmount } from './economySymbols';
 import type { GameMapId } from './gameMapTypes';
 
 /**
@@ -146,11 +147,11 @@ export interface GameMapListEntry {
  *
  * Purpose: Cost labels share one spelling.
  * When to use: After each unit type's cap on the start screen, for the selected tab and region.
- * Expected outcome: The price with a dollar sign, such as `$20`.
+ * Expected outcome: The production symbol and the price, such as the symbol followed by `20`. No thousands separator.
  * Exceptions: None.
  */
 export function formatUnitCostLabel(cost: number): string {
-  return `$${cost}`;
+  return formatProductionCapacityAmount(String(cost));
 }
 
 /**
@@ -158,11 +159,11 @@ export function formatUnitCostLabel(cost: number): string {
  *
  * Purpose: The start dialog states how many urban cells Advanced requires on the map that is showing.
  * When to use: Beside the Forces title on the start screen, for the Global map or the selected region.
- * Expected outcome: `Advanced tech: $60+ hexes` when the threshold is 60.
+ * Expected outcome: `Advanced tech: `, the production symbol, and `60+ hexes` when the threshold is 60.
  * Exceptions: None.
  */
 export function formatAdvancedTechLine(advancedMinUrbanCells: number): string {
-  return `Advanced tech: $${advancedMinUrbanCells}+ hexes`;
+  return `Advanced tech: ${formatProductionCapacityAmount(String(advancedMinUrbanCells))}+ hexes`;
 }
 
 /**

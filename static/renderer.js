@@ -1,4 +1,23 @@
 (() => {
+  // src/shared/economySymbols.ts
+  var PRODUCTION_CAPACITY_SYMBOL = "\u2692\uFE0E";
+  var CREDITS_SYMBOL = "\xA4";
+  function formatProductionCapacityAmount(formattedNumber) {
+    return `${PRODUCTION_CAPACITY_SYMBOL}${formattedNumber}`;
+  }
+  function formatCreditsAmount(formattedNumber) {
+    return `${CREDITS_SYMBOL}${formattedNumber}`;
+  }
+  function formatCompactHireCost(fee, upkeep) {
+    const perTurn = `${CREDITS_SYMBOL}${upkeep}/t`;
+    const extra = fee - upkeep;
+    if (extra > 0) return `${CREDITS_SYMBOL}${extra} + ${perTurn}`;
+    return perTurn;
+  }
+  function formatCompactRaiseCost(unitCost, fee, upkeep) {
+    return `${PRODUCTION_CAPACITY_SYMBOL}${unitCost} + ${formatCompactHireCost(fee, upkeep)}`;
+  }
+
   // src/shared/seatIds.ts
   var HUMAN_SEAT_ID = "human";
   var AI_SEAT_IDS = ["opponent", "opponent2", "opponent3", "opponent4"];
@@ -91,103 +110,6 @@
     return count === 1 ? "1 credit added to the treasury." : `${count} credits added to the treasury.`;
   }
 
-  // src/shared/mercenaryRules.ts
-  var MERCENARY_UPKEEP_DIVISOR = 8;
-  var MERCENARY_ADVANCED_TECH_MULTIPLIER = 2;
-  var HIREABLE_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
-  var BUILD_TAB_LABEL = "Build";
-  var HIRE_TAB_LABEL = "Hire";
-  var HIRE_BUTTON_LABEL = "Hire";
-  var RAISE_SECTION_TITLE = "Raise";
-  var REHIRE_SECTION_TITLE = "Neutral units";
-  var PENDING_HIRE_SECTION_TITLE = "Orders this turn";
-  var CREDITS_LINE_LABEL = "Credits";
-  var UPKEEP_LINE_LABEL = "Upkeep";
-  var HIRE_FEES_LINE_LABEL = "Hire orders";
-  var RAISE_CAPACITY_LABEL = "Capacity";
-  var HIRE_FUNDS_WARNING = "Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.";
-  var HIRE_ARRIVAL_NOTE = "Hired units arrive at the end of this turn and take orders next turn. Upkeep is due every turn after that.";
-  var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
-  var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
-  var MERCENARY_TOOLTIP_LABEL = "Mercenary";
-  function isHireableUnitType(value) {
-    return typeof value === "string" && HIREABLE_UNIT_TYPES.includes(value);
-  }
-  function mercenaryTechMultiplier(techLevel) {
-    return techLevel === "advanced" ? MERCENARY_ADVANCED_TECH_MULTIPLIER : 1;
-  }
-  function mercenaryReferenceCost(unitType) {
-    switch (unitType) {
-      case "infantry":
-        return GLOBAL_GAME_MAP.rules.infantryCost;
-      case "armor":
-        return GLOBAL_GAME_MAP.rules.armorCost;
-      case "naval":
-        return GLOBAL_GAME_MAP.rules.navalCost;
-      case "air":
-        return GLOBAL_GAME_MAP.rules.airCost;
-      default: {
-        const unexpected = unitType;
-        return unexpected;
-      }
-    }
-  }
-  function mercenaryUpkeepFor(unitType, techLevel) {
-    return Math.ceil(
-      mercenaryReferenceCost(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR
-    );
-  }
-  function formatMercenariesHiredLine(count) {
-    return count === 1 ? "1 mercenary hired." : `${count} mercenaries hired.`;
-  }
-  function formatUnitsDesertedLine(count) {
-    return count === 1 ? "1 unit deserted for lack of pay." : `${count} units deserted for lack of pay.`;
-  }
-  function formatHireOrdersUnfilledLine(count) {
-    return count === 1 ? "1 hire order could not be filled, so it was not charged." : `${count} hire orders could not be filled, so they were not charged.`;
-  }
-  function formatCreditsUpkeepSuffix(upkeep) {
-    return upkeep === 0 ? "" : `\u2212${upkeep}/turn`;
-  }
-  function formatCreditsTooltip(funds) {
-    const mercenaryWord = funds.mercenaryCount === 1 ? "mercenary" : "mercenaries";
-    return `Credits pay for mercenaries. You hold ${funds.credits}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${funds.upkeepPerTurn} per turn, and this turn's hire orders cost ${funds.pendingHireFees}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
-  }
-  function formatHireEntryLabel(productionText) {
-    return `${productionText} \xB7 Hire`;
-  }
-  function formatHireEntryAriaLabel(h3Index) {
-    return `Open hiring for ${h3Index}`;
-  }
-  function formatRaiseCapacityValue(left, perTurn) {
-    return `$${left} of $${perTurn} this turn`;
-  }
-  function formatHireOptionLabel(option2) {
-    return `${capitalizeUnitType(option2.unitType)} (capacity $${option2.unitCost}, fee ${option2.fee}, upkeep ${option2.upkeep})`;
-  }
-  function formatHireOrderLabel(order) {
-    if (order.kind === "rehire") {
-      return `Rehire ${order.displayName ?? capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
-    }
-    return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (fee ${order.fee})`;
-  }
-  function formatMercenaryTooltipValue(upkeep) {
-    return `upkeep ${upkeep} credits per turn`;
-  }
-  function capitalizeUnitType(unitType) {
-    return unitType.charAt(0).toUpperCase() + unitType.slice(1);
-  }
-
-  // src/shared/ipc/productionTypes.ts
-  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air", "missile"];
-  function isBuildUnitType(value) {
-    return typeof value === "string" && ALL_BUILD_UNIT_TYPES.includes(value);
-  }
-  var ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, "fortification", "credits"];
-  function isBuildQueueItemType(value) {
-    return typeof value === "string" && ALL_BUILD_QUEUE_ITEM_TYPES.includes(value);
-  }
-
   // src/shared/fortificationRules.ts
   var FORTIFICATION_QUEUE_ITEM = "fortification";
   var FORTIFICATION_COST_INFANTRY_MULTIPLIER = 1;
@@ -255,6 +177,112 @@
     if (itemType === FORTIFICATION_QUEUE_ITEM) return fortificationCostPerCell();
     if (itemType === CREDITS_QUEUE_ITEM) return creditsItemCost();
     return unitCostFor(itemType);
+  }
+
+  // src/shared/mercenaryRules.ts
+  var MERCENARY_UPKEEP_DIVISOR = 8;
+  var MERCENARY_ADVANCED_TECH_MULTIPLIER = 2;
+  var MERCENARY_REHIRE_FEE_MULTIPLIER = 2;
+  var HIREABLE_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
+  var BUILD_TAB_LABEL = "Build";
+  var HIRE_TAB_LABEL = "Hire";
+  var HIRE_BUTTON_LABEL = "Hire";
+  var REHIRE_SECTION_TITLE = "Neutral units";
+  var PENDING_HIRE_SECTION_TITLE = "Orders this turn";
+  var CREDITS_LINE_LABEL = "Credits";
+  var UPKEEP_LINE_LABEL = "Upkeep";
+  var HIRE_FEES_LINE_LABEL = "Hire orders";
+  var RAISE_CAPACITY_LABEL = "Capacity";
+  var HIRE_FUNDS_WARNING = "Your credits do not cover upkeep plus these hire orders. Credits from this turn's production arrive first. Random mercenaries desert only if upkeep cannot be paid, and hire orders the rest cannot pay are not filled.";
+  var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
+  var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
+  var MERCENARY_TOOLTIP_LABEL = "Mercenary";
+  function isHireableUnitType(value) {
+    return typeof value === "string" && HIREABLE_UNIT_TYPES.includes(value);
+  }
+  function mercenaryTechMultiplier(techLevel) {
+    return techLevel === "advanced" ? MERCENARY_ADVANCED_TECH_MULTIPLIER : 1;
+  }
+  function mercenaryReferenceCost(unitType) {
+    switch (unitType) {
+      case "infantry":
+        return GLOBAL_GAME_MAP.rules.infantryCost;
+      case "armor":
+        return GLOBAL_GAME_MAP.rules.armorCost;
+      case "naval":
+        return GLOBAL_GAME_MAP.rules.navalCost;
+      case "air":
+        return GLOBAL_GAME_MAP.rules.airCost;
+      default: {
+        const unexpected = unitType;
+        return unexpected;
+      }
+    }
+  }
+  function mercenaryUpkeepFor(unitType, techLevel) {
+    return Math.ceil(
+      mercenaryReferenceCost(unitType) * mercenaryTechMultiplier(techLevel) / MERCENARY_UPKEEP_DIVISOR
+    );
+  }
+  function formatMercenariesHiredLine(count) {
+    return count === 1 ? "1 mercenary hired." : `${count} mercenaries hired.`;
+  }
+  function formatUnitsDesertedLine(count) {
+    return count === 1 ? "1 unit deserted for lack of pay." : `${count} units deserted for lack of pay.`;
+  }
+  function formatHireOrdersUnfilledLine(count) {
+    return count === 1 ? "1 hire order could not be filled, so it was not charged." : `${count} hire orders could not be filled, so they were not charged.`;
+  }
+  function formatCreditsUpkeepSuffix(upkeep) {
+    return upkeep === 0 ? "" : `\u2212${formatCreditsAmount(String(upkeep))}/turn`;
+  }
+  function formatCreditsTooltip(funds) {
+    const mercenaryWord = funds.mercenaryCount === 1 ? "mercenary" : "mercenaries";
+    const balance = formatCreditsAmount(String(funds.credits));
+    const upkeep = formatCreditsAmount(String(funds.upkeepPerTurn));
+    const hireOrders = formatCreditsAmount(String(funds.pendingHireFees));
+    return `Credits pay for mercenaries. You hold ${balance}. Upkeep for your ${funds.mercenaryCount} ${mercenaryWord} is ${upkeep} per turn, and this turn's hire orders cost ${hireOrders}. Credits from this turn's production arrive before upkeep is paid. If credits run short, random mercenaries desert. A Credits build item turns one infantry's price in production into ${CREDITS_PER_ITEM} credits.`;
+  }
+  function formatHireEntryLabel(productionText) {
+    return `${productionText} \xB7 Hire`;
+  }
+  function formatHireEntryAriaLabel(h3Index) {
+    return `Open hiring for ${h3Index}`;
+  }
+  function formatRaiseCapacityValue(left, perTurn) {
+    const leftText = formatProductionCapacityAmount(String(left));
+    const perTurnText = formatProductionCapacityAmount(String(perTurn));
+    return `${leftText} of ${perTurnText} this turn`;
+  }
+  function formatHireOptionLabel(option2) {
+    const price = formatCompactRaiseCost(option2.unitCost, option2.fee, option2.upkeep);
+    return `${capitalizeUnitType(option2.unitType)} (${price})`;
+  }
+  function formatHireOrderLabel(order) {
+    if (order.kind === "rehire") {
+      const name = order.displayName ?? capitalizeUnitType(order.unitType);
+      const upkeep = Math.trunc(order.fee / MERCENARY_REHIRE_FEE_MULTIPLIER);
+      return `Rehire ${name} (${formatCompactHireCost(order.fee, upkeep)})`;
+    }
+    const perUnitFee = Math.trunc(order.fee / order.count);
+    const price = formatCompactRaiseCost(unitCostFor(order.unitType), perUnitFee, perUnitFee);
+    return `Raise ${order.count} ${capitalizeUnitType(order.unitType)} (${price})`;
+  }
+  function formatMercenaryTooltipValue(upkeep) {
+    return `upkeep ${formatCreditsAmount(String(upkeep))} per turn`;
+  }
+  function capitalizeUnitType(unitType) {
+    return unitType.charAt(0).toUpperCase() + unitType.slice(1);
+  }
+
+  // src/shared/ipc/productionTypes.ts
+  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air", "missile"];
+  function isBuildUnitType(value) {
+    return typeof value === "string" && ALL_BUILD_UNIT_TYPES.includes(value);
+  }
+  var ALL_BUILD_QUEUE_ITEM_TYPES = [...ALL_BUILD_UNIT_TYPES, "fortification", "credits"];
+  function isBuildQueueItemType(value) {
+    return typeof value === "string" && ALL_BUILD_QUEUE_ITEM_TYPES.includes(value);
   }
 
   // src/shared/productionConfig.ts
@@ -22218,7 +22246,9 @@ ${bonuses}`;
     }
   }
   var terrainStyleTooltipText = "Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.";
-  var buildEntryTooltipText = "Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.";
+  function buildEntryTooltipTextFor(canHire) {
+    return canHire ? "Build/Hire Units" : "Build Units";
+  }
   var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
   var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
   var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
@@ -23887,7 +23917,7 @@ ${bonuses}`;
     );
     const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
     const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
-    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> ${formatProductionCapacityAmount(state.urbanHexCount.toLocaleString())} / turn` : `<strong>Production:</strong> (none)`;
     const fortifiedCount = state.fortifiedCount ?? 0;
     const fortifiedLine = fortifiedCount > 0 ? `<strong>${FORTIFIED_TOOLTIP_LABEL}:</strong> ${formatFortifiedTooltipValue(fortifiedCount, state.intactCityCells ?? fortifiedCount)}` : null;
     const resolution = namingTarget?.resolution;
@@ -24447,7 +24477,7 @@ ${bonuses}`;
     return state.fogOfWarEnabled === false;
   }
   function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
-    const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
+    const capacityText = formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString());
     const queue = getBuildQueueSummaryForHex(state, h3Index);
     const queuedUnits = queue?.queuedUnits ?? 0;
     if (queuedUnits <= 0) return capacityText;
@@ -24472,7 +24502,9 @@ ${bonuses}`;
     return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
-    if (controller !== HUMAN_SEAT_ID) return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
+    if (controller !== HUMAN_SEAT_ID) {
+      return `${formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString())} / ?t`;
+    }
     return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
   }
   function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
@@ -24499,7 +24531,7 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/hireTooltipText.ts
-  var hireEntryTooltipText = "Click to hire on this hex. Shift-click does not add it to a group of build queues, and the click does nothing during playback.";
+  var hireEntryTooltipText = "Hire Units";
   var hireTypeTooltipText = "Choose the unit type this order raises.";
   var hireCountTooltipText = "How many of that type to raise, from 1 to 99.";
   var hireSubmitTooltipText = "Place this hire order. It is charged at the end of the turn if it can be filled.";
@@ -24513,7 +24545,7 @@ ${bonuses}`;
   function hireEntryRowForHex(h3Index, center, mapSize, hireHexes) {
     if (!hireHexes.has(h3Index)) return null;
     if (!isPointInMapView(center, mapSize, HIRE_ENTRY_VIEW_MARGIN_PX)) return null;
-    const capacityText = `$${getUrbanProductionCapacityForHex2(h3Index).toLocaleString()}`;
+    const capacityText = formatProductionCapacityAmount(getUrbanProductionCapacityForHex2(h3Index).toLocaleString());
     return {
       h3: h3Index,
       label: formatHireEntryLabel(capacityText),
@@ -27429,10 +27461,10 @@ ${bonuses}`;
 
   // src/shared/gameMapList.ts
   function formatUnitCostLabel(cost) {
-    return `$${cost}`;
+    return formatProductionCapacityAmount(String(cost));
   }
   function formatAdvancedTechLine(advancedMinUrbanCells) {
-    return `Advanced tech: $${advancedMinUrbanCells}+ hexes`;
+    return `Advanced tech: ${formatProductionCapacityAmount(String(advancedMinUrbanCells))}+ hexes`;
   }
 
   // src/renderer/chrome/selectTabPanel.ts
@@ -29427,7 +29459,7 @@ ${bonuses}`;
   }
   function formatTopBarStatParts(stats) {
     return {
-      production: `+${formatCount(stats.productionPerTurn)}`,
+      production: `+${formatProductionCapacityAmount(formatCount(stats.productionPerTurn))}`,
       forces: formatCount(stats.unitsFielded),
       forcesCap: `/${formatCount(stats.unitCap)}`,
       humanHome: stats.yourHome ? formatCount(stats.yourHome.held) : "\u2014",
@@ -29436,7 +29468,7 @@ ${bonuses}`;
       enemyHomeTotal: stats.enemyHomes ? `/${formatCount(stats.enemyHomes.total)}` : "",
       cities: stats.cities?.summary ?? "",
       citiesTooltip: stats.cities?.tooltip ?? "",
-      credits: stats.credits ? formatCount(stats.credits.credits) : "",
+      credits: stats.credits ? formatCreditsAmount(formatCount(stats.credits.credits)) : "",
       creditsSuffix: stats.credits ? formatCreditsUpkeepSuffix(stats.credits.upkeepPerTurn) : ""
     };
   }
@@ -30279,7 +30311,10 @@ ${bonuses}`;
     if (input.weather) chips.push({ kind: "weather", html: formatWeatherIconHtml(input.weather) });
     if (input.techLevel) chips.push({ kind: "tech", html: formatTechTierHtml(input.techLevel) });
     if (input.productionPerTurn != null && input.productionPerTurn > 0) {
-      chips.push({ kind: "production", html: escapeHtmlText(`$${input.productionPerTurn.toLocaleString("en-US")}/turn`) });
+      chips.push({
+        kind: "production",
+        html: escapeHtmlText(`${formatProductionCapacityAmount(input.productionPerTurn.toLocaleString("en-US"))}/turn`)
+      });
     }
     if (input.homeChip) {
       chips.push({ kind: input.homeChip.kind, html: escapeHtmlText(input.homeChip.text) });
@@ -35455,13 +35490,13 @@ ${bonuses}`;
     );
     const numericTurns = turns.filter((turn) => turn !== null);
     if (numericTurns.length !== turns.length) {
-      return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ? turns`;
+      return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ? turns`;
     }
     const minimum = Math.min(...numericTurns);
     const maximum = Math.max(...numericTurns);
     const turnsDisplay = minimum === maximum ? String(minimum) : `${minimum}\u2013${maximum}`;
     const turnLabel = minimum === 1 && maximum === 1 ? "turn" : "turns";
-    return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${turnsDisplay} ${turnLabel}`;
+    return `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${turnsDisplay} ${turnLabel}`;
   }
   function buildQueueEditBlockedByPlayback() {
     return resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation);
@@ -35512,7 +35547,7 @@ ${bonuses}`;
     }
     const totalProduction = snapshots.reduce((sum, snapshot2) => sum + snapshot2.urbanHexCount, 0);
     const pointsLine = document.createElement("div");
-    pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
+    pointsLine.innerHTML = `<strong>Production:</strong> ${formatProductionCapacityAmount(totalProduction.toLocaleString())} / turn`;
     section.appendChild(pointsLine);
     const productionQueueSpacer = document.createElement("div");
     productionQueueSpacer.style.height = "0.5em";
@@ -35655,6 +35690,7 @@ ${bonuses}`;
     panel.innerHTML = "";
     panel.appendChild(createBuildPopupCloseRow(deps.hideBuildPopup));
     appendCaption(panel, h3Index, data.caption);
+    appendTechLine(panel, h3Index);
     const view = data.view;
     if (!view) {
       panel.appendChild(note(HIRE_VIEW_FAILED));
@@ -35662,12 +35698,14 @@ ${bonuses}`;
       return;
     }
     appendFunds(panel, view);
+    if (view.funds.credits < view.funds.upkeepPerTurn + view.funds.pendingHireFees) {
+      panel.appendChild(note(HIRE_FUNDS_WARNING, "hire-funds-warning"));
+    }
     if (!view.hireAvailable && view.unavailableReason) panel.appendChild(note(view.unavailableReason));
     if (view.raise) appendRaise(panel, h3Index, view, deps);
     else if (view.raiseBlockedReason) panel.appendChild(note(view.raiseBlockedReason));
     if (view.rehireUnits.length > 0) appendRehires(panel, h3Index, view, deps);
     if (view.pendingOrders.length > 0) appendOrders(panel, h3Index, view, deps);
-    panel.appendChild(note(HIRE_ARRIVAL_NOTE));
     if (!panel.hidden) placeOpenBuildPopup();
   }
   function appendCaption(panel, h3Index, caption) {
@@ -35677,16 +35715,37 @@ ${bonuses}`;
     if (!text) return;
     const line = document.createElement("div");
     line.innerHTML = text;
-    const spacer = document.createElement("div");
-    spacer.style.height = "0.5em";
-    panel.append(line, spacer);
+    panel.append(line, spacer());
+  }
+  function appendTechLine(panel, h3Index) {
+    const techLineHtml = formatProducedUnitTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index)
+    });
+    if (!techLineHtml) return;
+    const techLine = document.createElement("div");
+    techLine.innerHTML = techLineHtml;
+    panel.append(techLine, spacer());
   }
   function appendFunds(panel, view) {
     const funds = view.funds;
-    panel.appendChild(fundLine(CREDITS_LINE_LABEL, String(funds.credits)));
-    panel.appendChild(fundLine(UPKEEP_LINE_LABEL, `${funds.upkeepPerTurn} / turn`));
-    if (funds.pendingHireFees > 0) panel.appendChild(fundLine(HIRE_FEES_LINE_LABEL, String(funds.pendingHireFees)));
-    if (funds.credits < funds.upkeepPerTurn + funds.pendingHireFees) panel.appendChild(note(HIRE_FUNDS_WARNING, "hire-funds-warning"));
+    appendLabeledAmount(panel, CREDITS_LINE_LABEL, formatCreditsAmount(String(funds.credits)));
+    appendLabeledAmount(panel, UPKEEP_LINE_LABEL, `${formatCreditsAmount(String(funds.upkeepPerTurn))} / turn`);
+    if (funds.pendingHireFees > 0) {
+      appendLabeledAmount(panel, HIRE_FEES_LINE_LABEL, formatCreditsAmount(String(funds.pendingHireFees)));
+    }
+    const raise = view.raise;
+    if (raise) {
+      appendLabeledAmount(panel, RAISE_CAPACITY_LABEL, formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn));
+    }
+  }
+  function appendLabeledAmount(panel, label, value) {
+    panel.append(fundLine(label, value), spacer());
+  }
+  function spacer() {
+    const gap = document.createElement("div");
+    gap.style.height = "0.5em";
+    return gap;
   }
   function fundLine(label, value) {
     const line = document.createElement("div");
@@ -35704,9 +35763,6 @@ ${bonuses}`;
     if (!raise) return;
     const section = document.createElement("div");
     section.className = "build-queue-section";
-    section.appendChild(head(RAISE_SECTION_TITLE));
-    const capacity = document.createElement("div");
-    capacity.innerHTML = `<strong>${RAISE_CAPACITY_LABEL}:</strong> ${escapeBuildPopupHtml(formatRaiseCapacityValue(raise.capacityLeft, raise.capacityPerTurn))}`;
     const row = document.createElement("div");
     row.className = "build-queue-row";
     const typeSelect = document.createElement("select");
@@ -35737,7 +35793,7 @@ ${bonuses}`;
       }));
     });
     row.append(typeSelect, countInput, button);
-    section.append(capacity, row);
+    section.appendChild(row);
     panel.appendChild(section);
   }
   function appendRehires(panel, h3Index, view, deps) {
@@ -35751,7 +35807,7 @@ ${bonuses}`;
       label.className = "unit-label";
       setUnitNameContent(label, unit.unitId, unit.displayName);
       const fee = document.createElement("span");
-      fee.textContent = String(unit.fee);
+      fee.textContent = `(${formatCompactHireCost(unit.fee, unit.upkeep)})`;
       const button = hireButton();
       button.addEventListener("click", () => {
         void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({ kind: "rehire", unitId: unit.unitId }));
@@ -36051,7 +36107,7 @@ ${bonuses}`;
       }
       const pointsLine = document.createElement("div");
       const productionCapacity = snapshot2.urbanHexCount;
-      const productionDetail = productionCapacity > 0 ? `$${productionCapacity.toLocaleString()} / turn` : "(none)";
+      const productionDetail = productionCapacity > 0 ? `${formatProductionCapacityAmount(productionCapacity.toLocaleString())} / turn` : "(none)";
       pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
       const productionQueueSpacer = document.createElement("div");
@@ -36069,7 +36125,7 @@ ${bonuses}`;
         );
         const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
         const turnLabel = queueTurns === 1 ? "turn" : "turns";
-        queueSummaryLine.innerHTML = `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${queueTurnsDisplay} ${turnLabel}`;
+        queueSummaryLine.innerHTML = `<strong>Queue:</strong> ${formatProductionCapacityAmount(queueTotalCost.toLocaleString())} / ${queueTurnsDisplay} ${turnLabel}`;
       }
       section.appendChild(queueSummaryLine);
       const productionSpacer = document.createElement("div");
@@ -38071,9 +38127,8 @@ ${bonuses}`;
     if (!el) return;
     el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
     paintTerrainSwatches(el);
-    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
+    placeAnchoredPopupElement(el, clientX, clientY);
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
   }
@@ -41178,10 +41233,10 @@ ${bonuses}`;
       return;
     }
     rows.sort((a, b) => a.h3.localeCompare(b.h3));
-    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}`).join(";");
+    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}|${r.kind}|${hireHexes.has(r.h3) ? 1 : 0}`).join(";");
     if (layerKey !== rendererSharedState.lastBuildEntryLayerKey) {
       const html = rows.map(
-        (r) => r.kind === "hire" ? hireEntryButtonHtml(r) : `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
+        (r) => r.kind === "hire" ? hireEntryButtonHtml(r) : `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipTextFor(hireHexes.has(r.h3))}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
       ).join("");
       layer.innerHTML = html;
       rendererSharedState.lastBuildEntryLayerKey = layerKey;
@@ -41233,7 +41288,7 @@ ${bonuses}`;
         capacityPerTurn,
         controller,
         overlayContext.unitCountsByPlayer
-      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
+      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : formatProductionCapacityAmount(Math.max(0, capacityPerTurn).toLocaleString());
       const hasClickableBuildEntryForHex = explored && isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx) && shouldShowBuildEntryZoom();
       if (hasClickableBuildEntryForHex) {
         continue;
