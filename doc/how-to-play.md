@@ -1,7 +1,5 @@
 # How to Play
 
-> **Note:** The pictures of battles, sealift, unit tooltips, and messages are still from before the v2.6.0 and v2.8.0 facelifts.
-
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up each opponent's OpenRouter key are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, both sides create combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once players are ready, the game executes their orders and determines the outcomes (think: "Axis & Allies" meets "Diplomacy", with a software referee).
