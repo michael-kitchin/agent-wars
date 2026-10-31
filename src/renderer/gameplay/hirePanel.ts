@@ -359,7 +359,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
  *
  * Purpose: Each visible candidate can be rehired.
  * When to use: When the view lists at least one.
- * Expected outcome: One row per unit. The label is the origin flag and `formatHireOrderLabel` for a rehire, the same phrase the Hire Queue uses. A Hire button follows.
+ * Expected outcome: One row per unit. The label is the origin flag and `formatHireOrderLabel` for a rehire, the same phrase and flag the Hire Queue uses for that unit. A Hire button follows.
  * Exceptions: None.
  */
 function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
@@ -393,7 +393,7 @@ function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, d
  *
  * Purpose: The player can remove an order before Ready.
  * When to use: When the view lists at least one.
- * Expected outcome: One 0.5em gap above the heading, then one row per order, then a 0.5em gap after each row. The gap above is skipped when the panel already ends with one.
+ * Expected outcome: One 0.5em gap above the heading, then one row per order, then a 0.5em gap after each row. The gap above is skipped when the panel already ends with one. A rehire row starts with that unit's origin flag. A raise row is text only.
  * Exceptions: None.
  */
 function appendOrders(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
@@ -405,7 +405,13 @@ function appendOrders(panel: HTMLElement, h3Index: string, view: HexHireView, de
     const row = document.createElement('div');
     row.className = 'build-queue-row';
     const label = document.createElement('span');
-    label.textContent = formatHireOrderLabel(order);
+    const text = formatHireOrderLabel(order);
+    if (order.kind === 'rehire' && order.unitId) {
+      label.className = 'unit-label';
+      setUnitNameContent(label, order.unitId, text);
+    } else {
+      label.textContent = text;
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'unit-select';

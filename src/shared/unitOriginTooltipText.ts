@@ -42,7 +42,7 @@ export interface UnitOriginTooltipIdentity {
    *
    * Contract: Already formatted. Absent when the unit is not a mercenary and is not offered for rehire.
    * When to use: The Mercenary line after the date of birth.
-   * Expected outcome: `¤N/turn`, another side's short name, or `For Hire.`
+   * Expected outcome: `¤N/turn`, another side's short name, or `For Hire`
    * Exceptions: None.
    */
   readonly mercenaryValue?: string;

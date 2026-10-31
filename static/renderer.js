@@ -200,7 +200,7 @@
   var RAISE_REASON_CAPACITY_USED = "Your orders here already use this turn's raise capacity.";
   var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
   var MERCENARY_TOOLTIP_LABEL = "Mercenary";
-  var MERCENARY_TOOLTIP_FOR_HIRE = "For Hire.";
+  var MERCENARY_TOOLTIP_FOR_HIRE = "For Hire";
   function isHireableUnitType(value) {
     return typeof value === "string" && HIREABLE_UNIT_TYPES.includes(value);
   }
@@ -36167,7 +36167,13 @@ ${bonuses}`;
       const row = document.createElement("div");
       row.className = "build-queue-row";
       const label = document.createElement("span");
-      label.textContent = formatHireOrderLabel(order);
+      const text = formatHireOrderLabel(order);
+      if (order.kind === "rehire" && order.unitId) {
+        label.className = "unit-label";
+        setUnitNameContent(label, order.unitId, text);
+      } else {
+        label.textContent = text;
+      }
       const button = document.createElement("button");
       button.type = "button";
       button.className = "unit-select";

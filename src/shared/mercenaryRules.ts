@@ -142,10 +142,10 @@ export const MERCENARY_TOOLTIP_LABEL = 'Mercenary';
  *
  * Purpose: The tooltip says the unit is available without showing another side's name or an upkeep.
  * When to use: `mercenaryTooltipValue` for a Neutral unit `neutralUnitOfferedForRehire` accepts.
- * Expected outcome: The words For Hire, including the period.
+ * Expected outcome: The words For Hire, with no period.
  * Exceptions: None.
  */
-export const MERCENARY_TOOLTIP_FOR_HIRE = 'For Hire.';
+export const MERCENARY_TOOLTIP_FOR_HIRE = 'For Hire';
 
 /**
  * Reports whether a value is a unit type that can be hired.
@@ -499,7 +499,7 @@ export function neutralUnitOfferedForRehire(input: {
  *
  * Purpose: The same line names the current player's cost, another side, or a unit that can be rehired.
  * When to use: When building a live unit's flag tooltip. Pass `forHire` from `neutralUnitOfferedForRehire`.
- * Expected outcome: `¤N/turn` for the viewer's mercenary. The owner's short name for another side's mercenary. `For Hire.` for a Neutral unit that can be rehired. Null when the unit is not one of those, and when another side's short name is blank.
+ * Expected outcome: `¤N/turn` for the viewer's mercenary. The owner's short name for another side's mercenary. `For Hire` for a Neutral unit that can be rehired. Null when the unit is not one of those, and when another side's short name is blank.
  * Exceptions: None.
  */
 export function mercenaryTooltipValue(input: {

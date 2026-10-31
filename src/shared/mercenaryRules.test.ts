@@ -133,6 +133,7 @@ test('a mercenary tooltip names the viewer\'s cost, another side, or a unit that
     upkeep: 5,
     ownerShortName: 'N. America',
   }), 'N. America');
+  assert.equal(MERCENARY_TOOLTIP_FOR_HIRE, 'For Hire');
   assert.equal(mercenaryTooltipValue({
     ownerId: NEUTRAL_OWNER_ID,
     viewerSeatId: HUMAN_SEAT_ID,
