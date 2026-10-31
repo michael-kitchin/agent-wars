@@ -105,13 +105,42 @@ function testPerimeterDashAndCapStayVisibleAtStrategicWidth(): void {
 }
 
 /**
- * Verifies the range perimeter still advances dashes each animation frame.
+ * Verifies playback attacks use the planning crimson stroke, and an air unit's flight home stays a movement line.
  *
- * Purpose: Locks flowing perimeter dashes as a required behavior, not an accidental omission.
- * When to use: Regression guard when changing `drawRangePerimeterOverlay` or RAF scheduling.
- * Expected outcome: Overlay sets `lineDashOffset` from `RANGE_PERIMETER_FLOW_PX_PER_SEC`, and `drawGameScene` still starts the RAF loop.
+ * Purpose: Resolution used to draw amber and purple shots, and seat-colored air and missile flights. Those attacks now share the queued-order stroke.
+ * When to use: Regression guard after restyling resolution attack lines.
+ * Expected outcome: Outbound air and missile flights go through `drawResolutionOutboundAttackLines`. Return flights still use `drawResolutionMoveLines`. The old playback colors are gone.
  * Exceptions: None.
  */
+function testResolutionAttackLinesMatchPlanningStroke(): void {
+  const orderDrawing = readRenderer(path.join('rendering', 'orderDrawing.ts'));
+  const gameScene = readRenderer(path.join('rendering', 'gameScene.ts'));
+  const constants = readRenderer(path.join('core', 'constants.ts'));
+
+  assert.ok(
+    !constants.includes('RANGE_PERIMETER_RANGED_COLOR') && !constants.includes('RANGE_PERIMETER_AIR_STRIKE_COLOR'),
+    'playback should not keep separate ranged and air-strike colors'
+  );
+  assert.ok(
+    orderDrawing.includes('strokeColor: RANGE_PERIMETER_MISSILE_COLOR') &&
+      orderDrawing.includes('ctx.globalAlpha = MOVEMENT_HOVER_VALID_ALPHA') &&
+      orderDrawing.includes("strokeSupportOrderLines(ctx, 'airStrike', air)") &&
+      orderDrawing.includes("strokeSupportOrderLines(ctx, 'missile', missiles)") &&
+      /strokeSupportOrderLines\(\r?\n\s+ctx,\r?\n\s+mode,/.test(orderDrawing),
+    'playback attacks should use the crimson planning stroke: solid ranged, dashed air, dotted missile'
+  );
+  assert.equal(
+    (gameScene.match(/drawResolutionOutboundAttackLines\(/g) ?? []).length,
+    2,
+    'tactical and strategic playback should each draw outbound attacks with the planning stroke'
+  );
+  assert.equal(
+    (gameScene.match(/drawResolutionMoveLines\(ctx, width, height, airStrikeReturnPlaybackMoves/g) ?? []).length,
+    2,
+    'an air unit flying home should stay a movement line in both theaters'
+  );
+}
+
 function testRangePerimeterDashAnimationRemainsWired(): void {
   const overlay = readRenderer(path.join('rendering', 'rangePerimeterOverlay.ts'));
   const renderer = readRenderer(path.join('rendering', 'gameScene.ts'));
@@ -142,6 +171,7 @@ function run(): void {
   const tests = [
     { name: 'support overlay stroke widths follow tactical vs strategic map layer', fn: testSupportOverlayStrokeWidthsByMapLayer },
     { name: 'perimeter dash and cap stay visible at strategic width', fn: testPerimeterDashAndCapStayVisibleAtStrategicWidth },
+    { name: 'resolution attack lines match the planning stroke', fn: testResolutionAttackLinesMatchPlanningStroke },
     { name: 'range perimeter dash animation remains wired', fn: testRangePerimeterDashAnimationRemainsWired },
   ];
   for (const t of tests) {

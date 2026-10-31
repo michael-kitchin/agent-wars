@@ -380,34 +380,12 @@ export const MULTI_PLAYER_GLYPH_FILTER = 'brightness(0.133)';
 export const OWNERSHIP_BORDER_ALPHA = 0.75;
 
 /**
- * Stroke color for a ranged shot line during resolution playback.
+ * Stroke color for attack arrows and for the reach outline.
  *
- * Purpose: Playback still tells ground fire from an air strike. Planned ranged arrows and the selection panel's aim
- *   chrome use `RANGE_PERIMETER_MISSILE_COLOR`.
- * When to use: The resolution appearance of `strokeSupportOrderLines` for a ranged shot.
- * Expected outcome: Burnt orange shot lines during the ranged window.
- * Exceptions: None.
- */
-export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
-
-/**
- * Stroke color for an air-strike shot line during resolution playback.
- *
- * Purpose: Playback still tells an air strike from ground fire. Planned strike arrows and the selection panel's aim
- *   chrome use `RANGE_PERIMETER_MISSILE_COLOR`.
- * When to use: The resolution appearance of `strokeSupportOrderLines` for an air-strike shot.
- * Expected outcome: Violet shot lines during the ranged window.
- * Exceptions: None.
- */
-export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
-
-/**
- * Stroke color for planned attack arrows and for the reach outline.
- *
- * Purpose: Ranged fire, air strikes, and missile launches share one color while they are being planned. Dash tells them apart.
- * When to use: Planned and hover attack arrows, the ranged and air-strike reach outlines, and the selection panel's
- *   border and pressed reticle (`--order-missile`). A missile launch played back uses the launching seat's map color
- *   instead. Missiles have no reach outline.
+ * Purpose: Ranged fire, air strikes, and missile launches share one color. Dash tells them apart. Playback of those
+ *   attacks uses the same color. An air unit's flight home stays the moving seat's map color. Missiles have no reach outline.
+ * When to use: Queued, hover, and playback attack arrows, the ranged and air-strike reach outlines, and the selection
+ *   panel's border and pressed reticle (`--order-missile`).
  * Expected outcome: Crimson `#B91C1C`, the same value as `--order-missile`.
  * Exceptions: None.
  */
@@ -464,10 +442,10 @@ export const RANGE_SUPPORT_CONNECTOR_LINE_CAP = 'round';
 export const RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
 
 /**
- * Opacity for the animated reach outline and for shot lines during resolution playback.
+ * Opacity for the animated reach outline.
  *
- * Purpose: The outline and the playback shots stay at the opacity they had before planned arrows moved to `MOVEMENT_HOVER_VALID_ALPHA`.
- * When to use: `drawRangePerimeterOverlay`, and `strokeSupportOrderLines` when the appearance is resolution.
+ * Purpose: The outline stays at the opacity it had before attack arrows moved to `MOVEMENT_HOVER_VALID_ALPHA`.
+ * When to use: `drawRangePerimeterOverlay`.
  * Expected outcome: `globalAlpha = 0.75`.
  * Exceptions: None.
  */
@@ -476,8 +454,8 @@ export const RANGE_PERIMETER_ALPHA = 0.75;
 /**
  * Opacity of a valid movement hover and of a planned attack arrow.
  *
- * Purpose: Planned ranged, air-strike, and missile arrows match a valid movement preview. Dash is the only difference among those arrows.
- * When to use: The valid branch of `drawHoverRoutePreview`, and `strokeSupportOrderLines` when the appearance is plan.
+ * Purpose: Ranged, air-strike, and missile arrows match a valid movement preview, including when those attacks are played back. Dash is the only difference among those arrows. An air unit's flight home is a movement line and does not use this.
+ * When to use: The valid branch of `drawHoverRoutePreview`, and `strokeSupportOrderLines`.
  * Expected outcome: `globalAlpha = 0.55`. An invalid movement hover stays at 0.75 and does not use this.
  * Exceptions: None.
  */

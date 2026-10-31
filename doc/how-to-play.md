@@ -259,7 +259,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 
 - **Greyed reticle:** a selection that mixes air with other types greys out the reticle. So does infantry on the strategic map, though infantry can fire in battles.
 - **The outline:** a crimson dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly. Ranged fire and air strikes use the same outline.
-- **Hovering a valid target:** a crimson arrow runs from each selected unit to the target. A ranged arrow is solid, and an air-strike arrow is dashed. Both are partly transparent, the same as a valid movement preview. A queued attack keeps that line.
+- **Hovering a valid target:** a crimson arrow runs from each selected unit to the target. A ranged arrow is solid, and an air-strike arrow is dashed. Both are partly transparent, the same as a valid movement preview. A queued attack keeps that line. When the turn plays, the shot uses that same arrow.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming. An explored enemy hex with no units is a legal ranged target while it still has a [fortification](#fortifications), and it doesn't fire back.
 - **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
@@ -272,7 +272,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 
 ![Select an air unit or stack, click the reticle, and pick a target type from the list beside it. Then double-click a hex to order the strike.](media/air-strike.png)
 
-- **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
+- **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn. During the turn, the line to the target is the same dashed crimson arrow as the order. The line home uses that side's map color.
 - **One action a turn:** strike or ferry, not both.
 - **Odds:** a strike hits on 10 or less (50%), before cover and bonuses.
 - **Target types:** the list beside the reticle offers four, and keeps your last choice. The picture shows Production, with the dashed strike line on an enemy city.
@@ -304,7 +304,7 @@ A missile is built at an Advanced city. On the world map it launches once, at an
 2. Click the reticle. There's no target-type list and no reach outline.
 3. Double-click any explored hex in range, including the missile's own hex.
 
-- **When it fires:** Launches go first in the turn. A spent missile isn't counted as a combat loss. A queued or hover line is crimson, dotted, and partly transparent, the same as a valid movement preview. During playback the flight uses that side's map color and doesn't return.
+- **When it fires:** Launches go first in the turn. A spent missile isn't counted as a combat loss. A queued, hover, or playback line is crimson, dotted, and partly transparent, the same as a valid movement preview. The missile doesn't return.
 - **What a hit does:** Every city, airport, and seaport cell rolls a d20 and is destroyed on a roll of 10 or less, the same chance as an air strike before cover and bonuses. A higher roll leaves the cell. A fortified cell rolls once and, on a roll of 10 or less, loses only its fortification. Based air dies when an airport cell is destroyed. Other units are unharmed.
 - **What it can't do:** It has no launch in a battle, never moves, sees nothing, is hit last, and never rolls. The reticle is greyed out in a battle, with "Missiles cannot fire or launch during a battle." A selection that mixes missiles with other types is greyed out, with "A launch needs a selection of missiles only." Range is in [Units at a Glance](#units-at-a-glance).
 

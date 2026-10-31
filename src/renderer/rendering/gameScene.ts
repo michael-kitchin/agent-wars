@@ -33,6 +33,7 @@ import { drawInspectionStatusIcons } from './inspectionStatusIcons';
 import {
   buildResolutionPlaybackMoves,
   drawRangedResolutionShotLines,
+  drawResolutionOutboundAttackLines,
 } from './orderDrawing';
 import { drawPendingMarchesHoverAndSupportOrderStack } from './orderOverlayStages';
 import {
@@ -508,7 +509,7 @@ function drawGameScene(
     }
     if (anim && playbackPhase) {
       if (playbackPhase.inAirStrikeOutbound) {
-        drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+        drawResolutionOutboundAttackLines(ctx, airStrikeOutboundPlaybackMoves, hexList);
       }
       if (playbackPhase.inAirStrikeReturn) {
         drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
@@ -587,7 +588,7 @@ function drawGameScene(
   }
   if (anim && playbackPhase) {
     if (playbackPhase.inAirStrikeOutbound) {
-      drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+      drawResolutionOutboundAttackLines(ctx, airStrikeOutboundPlaybackMoves, hexList);
     }
     if (playbackPhase.inAirStrikeReturn) {
       drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });

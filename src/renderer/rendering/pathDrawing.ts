@@ -180,7 +180,8 @@ export function drawTacticalPendingMarchPlanLines(
  *   When it has an arrowhead, the tip is the path's last hex center. A move with no path runs straight: to the
  *   destination's center when it has no arrowhead, or to an arrowhead whose tip stops a unit radius short when it has
  *   one. The opponent's moves have an arrowhead. The player's have one only when `includeArrowForHuman` is set, which
- *   is an air-strike flight.
+ *   is an air unit's flight home. The flight to the target, and a missile launch, are drawn by
+ *   `drawResolutionOutboundAttackLines`. A missile passed here still uses a continuous run, in the mover's color.
  * Exceptions: None. Draws nothing without moves, a hex list, or a positive opacity.
  */
 export function drawResolutionMoveLines(

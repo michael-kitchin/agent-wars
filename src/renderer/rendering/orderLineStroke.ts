@@ -24,7 +24,7 @@ export const ORDER_LINE_LATER_DASH: readonly number[] = [6, 4];
  * The dash pattern for a planned missile launch, in CSS pixels.
  *
  * Purpose: A launch stays crimson with the other planned attacks, and the dot pattern is what tells it from a solid ranged arrow and a dashed air strike.
- * When to use: As the `dash` of a planned or hover missile arrow. The connector cap is round, so each mark reads as a dot.
+ * When to use: As the `dash` of a planned, hover, or playback missile arrow. The connector cap is round, so each mark reads as a dot.
  * Expected outcome: 2 px drawn, 6 px skipped.
  * Exceptions: None.
  */

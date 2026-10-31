@@ -14996,8 +14996,6 @@
   var MULTI_PLAYER_STROKE = "#222222";
   var MULTI_PLAYER_GLYPH_FILTER = "brightness(0.133)";
   var OWNERSHIP_BORDER_ALPHA = 0.75;
-  var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
-  var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
   var RANGE_PERIMETER_MISSILE_COLOR = "#B91C1C";
   var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
   var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
@@ -33919,29 +33917,27 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/orderDrawing.ts
-  function planConnectorDash(mode, lineWidth2) {
+  function attackConnectorDash(mode, lineWidth2) {
     if (mode === "ranged") return ORDER_LINE_SOLID;
     if (mode === "missile") return ATTACK_LINE_DOT_DASH;
     return buildRangeOverlayDashArray(lineWidth2, "connector", "airStrike");
   }
-  function rangePerimeterStaticLineStyle(mode, kind = "connector", appearance = "plan") {
+  function rangePerimeterStaticLineStyle(mode, kind = "connector") {
     const lineWidth2 = getCurrentRangeOverlayLineWidth(kind);
-    const planningColor = kind === "perimeter" || appearance === "plan";
-    const strokeColor = planningColor ? RANGE_PERIMETER_MISSILE_COLOR : mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : mode === "missile" ? RANGE_PERIMETER_MISSILE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
-    const dash = kind === "perimeter" || appearance === "resolution" ? buildRangeOverlayDashArray(lineWidth2, kind, mode) : planConnectorDash(mode, lineWidth2);
+    const dash = kind === "perimeter" ? buildRangeOverlayDashArray(lineWidth2, kind, mode) : attackConnectorDash(mode, lineWidth2);
     return {
       lineWidth: lineWidth2,
-      strokeColor,
+      strokeColor: RANGE_PERIMETER_MISSILE_COLOR,
       dash,
       lineCap: getRangeOverlayLineCap(kind)
     };
   }
-  function strokeSupportOrderLines(ctx, mode, segments, appearance = "plan") {
+  function strokeSupportOrderLines(ctx, mode, segments) {
     if (segments.length === 0) return;
-    const style = rangePerimeterStaticLineStyle(mode, "connector", appearance);
+    const style = rangePerimeterStaticLineStyle(mode, "connector");
     const lineStyle = { color: style.strokeColor, width: style.lineWidth, cap: style.lineCap };
     ctx.save();
-    ctx.globalAlpha = appearance === "plan" ? MOVEMENT_HOVER_VALID_ALPHA : RANGE_PERIMETER_ALPHA;
+    ctx.globalAlpha = MOVEMENT_HOVER_VALID_ALPHA;
     for (const segment of segments) {
       if (segment.fromH3Index === segment.toH3Index) continue;
       const from = hexCenterPx(segment.fromH3Index);
@@ -33983,10 +33979,21 @@ ${bonuses}`;
       strokeSupportOrderLines(
         ctx,
         mode,
-        group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index })),
-        "resolution"
+        group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index }))
       );
     }
+  }
+  function drawResolutionOutboundAttackLines(ctx, moves, hexList) {
+    if (moves.length === 0 || !hexList) return;
+    const air = [];
+    const missiles = [];
+    for (const move of moves) {
+      const segment = { fromH3Index: move.fromH3Index, toH3Index: move.toH3Index };
+      if (isMissileUnitType(move.unitType)) missiles.push(segment);
+      else air.push(segment);
+    }
+    strokeSupportOrderLines(ctx, "airStrike", air);
+    strokeSupportOrderLines(ctx, "missile", missiles);
   }
   function drawAirStrikeLines(ctx, airStrikes, units, hexList) {
     drawPendingSupportOrderLines(ctx, "airStrike", airStrikes, units, hexList);
@@ -34774,7 +34781,7 @@ ${bonuses}`;
       }
       if (anim2 && playbackPhase2) {
         if (playbackPhase2.inAirStrikeOutbound) {
-          drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves2, hexList2, 1, { includeArrowForHuman: true });
+          drawResolutionOutboundAttackLines(ctx, airStrikeOutboundPlaybackMoves2, hexList2);
         }
         if (playbackPhase2.inAirStrikeReturn) {
           drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves2, hexList2, 1, { includeArrowForHuman: true });
@@ -34853,7 +34860,7 @@ ${bonuses}`;
     }
     if (anim && playbackPhase) {
       if (playbackPhase.inAirStrikeOutbound) {
-        drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+        drawResolutionOutboundAttackLines(ctx, airStrikeOutboundPlaybackMoves, hexList);
       }
       if (playbackPhase.inAirStrikeReturn) {
         drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });

@@ -14,9 +14,9 @@ Runs in Resolution playback after strategic Ready or a tactical Ready commit, wh
 
 The player sees the following stages, skipping any stage the resolution does not have:
 
-- Missile launches fly to the target on a continuous line in the launching side's map color and do not return. The missile is already gone. Infrastructure and based air lost to the launch are part of that strike.
-- Air units move out, air combat, air casualties, then air units return.
-- Ranged combat, then ranged casualties.
+- Missile launches fly to the target on a continuous dotted crimson line, the same stroke as a queued launch, and do not return. The missile is already gone. Infrastructure and based air lost to the launch are part of that strike.
+- Air units move out on the dashed crimson air-strike arrow, then air combat, air casualties, then air units return on a movement line in that side's map color.
+- Ranged combat draws the solid crimson arrow for ground fire and the dashed crimson arrow for an air unit's return fire, then ranged casualties.
 - Melee lightning and dice include a siege hex that holds only one side. The siege rolls are melee dice.
 - Movement.
 - Melee combat, then melee casualties.

@@ -5,14 +5,8 @@ import {
   filterShotLinesByVisibleEndpoints,
   resolutionShotLineStyle,
 } from '../../shared/rangedResolutionShotLines';
-import {
-  MOVEMENT_HOVER_VALID_ALPHA,
-  RANGE_PERIMETER_AIR_STRIKE_COLOR,
-  RANGE_PERIMETER_ALPHA,
-  RANGE_PERIMETER_MISSILE_COLOR,
-  RANGE_PERIMETER_RANGED_COLOR,
-  UNIT_RADIUS,
-} from '../core/constants';
+import { isMissileUnitType } from '../../shared/missileRules';
+import { MOVEMENT_HOVER_VALID_ALPHA, RANGE_PERIMETER_MISSILE_COLOR, UNIT_RADIUS } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { drawHumanMarchStyleRouteSegments } from './pathDrawing';
 import { ATTACK_LINE_DOT_DASH, ORDER_LINE_SOLID, drawOrderLine, straightOrderLineShape } from './orderLineStroke';
@@ -35,24 +29,14 @@ import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 export type PendingOrderLineUnit = { id: string; h3Index: string };
 
 /**
- * Whether an attack arrow is being planned or played back.
+ * Dash for an attack arrow.
  *
- * Purpose: Planning shares one crimson color. Playback keeps the older ranged and air-strike colors.
- * When to use: `rangePerimeterStaticLineStyle` and `strokeSupportOrderLines`.
- * Expected outcome: `'plan'` for queued and hover arrows. `'resolution'` for shot lines during the ranged window.
- * Exceptions: None.
- */
-export type AttackLineAppearance = 'plan' | 'resolution';
-
-/**
- * Dash for a planned attack arrow.
- *
- * Purpose: Color and transparency are shared. The dash is what tells ranged fire, an air strike, and a launch apart.
- * When to use: `rangePerimeterStaticLineStyle` when the appearance is plan and the kind is a connector.
+ * Purpose: Color and transparency are shared. The dash is what tells ranged fire, an air strike, and a launch apart, while planning and during playback.
+ * When to use: `rangePerimeterStaticLineStyle` when the kind is a connector.
  * Expected outcome: Ranged is solid. An air strike keeps the equal solid-and-gap connector dash. A launch is `ATTACK_LINE_DOT_DASH`.
  * Exceptions: None.
  */
-function planConnectorDash(mode: 'ranged' | 'airStrike' | 'missile', lineWidth: number): readonly number[] {
+function attackConnectorDash(mode: 'ranged' | 'airStrike' | 'missile', lineWidth: number): readonly number[] {
   if (mode === 'ranged') return ORDER_LINE_SOLID;
   if (mode === 'missile') return ATTACK_LINE_DOT_DASH;
   return buildRangeOverlayDashArray(lineWidth, 'connector', 'airStrike');
@@ -61,15 +45,14 @@ function planConnectorDash(mode: 'ranged' | 'airStrike' | 'missile', lineWidth: 
 /**
  * Returns the static stroke style for a reach outline or an attack arrow.
  *
- * Purpose: The outline keeps its animated dash and takes the missile color. A planned arrow is that same color, with a dash from `planConnectorDash`. A playback shot keeps its mode color and the equal solid-and-gap dash.
+ * Purpose: The outline keeps its animated dash. An attack arrow, queued, hovered, or played back, uses the missile crimson and a dash from `attackConnectorDash`.
  * When to use: `drawRangePerimeterOverlay` with kind `'perimeter'`. `strokeSupportOrderLines` with kind `'connector'`.
- * Expected outcome: Tactical width is `ORDER_LINE_WIDTH`. A strategic outline is 2× the home border and a connector is 1.5×. Outline dashes scale to 2× line width with butt caps. Connector caps stay round.
+ * Expected outcome: Tactical width is `ORDER_LINE_WIDTH`. A strategic outline is 2× the home border and a connector is 1.5×. Outline dashes scale to 2× line width with butt caps. Connector caps stay round. The stroke color is always `RANGE_PERIMETER_MISSILE_COLOR`.
  * Exceptions: None.
  */
 export function rangePerimeterStaticLineStyle(
   mode: 'ranged' | 'airStrike' | 'missile',
-  kind: RangeOverlayStrokeKind = 'connector',
-  appearance: AttackLineAppearance = 'plan'
+  kind: RangeOverlayStrokeKind = 'connector'
 ): {
   lineWidth: number;
   dash: readonly number[];
@@ -77,21 +60,11 @@ export function rangePerimeterStaticLineStyle(
   lineCap: 'butt' | 'round';
 } {
   const lineWidth = getCurrentRangeOverlayLineWidth(kind);
-  const planningColor = kind === 'perimeter' || appearance === 'plan';
-  const strokeColor = planningColor
-    ? RANGE_PERIMETER_MISSILE_COLOR
-    : mode === 'airStrike'
-      ? RANGE_PERIMETER_AIR_STRIKE_COLOR
-      : mode === 'missile'
-        ? RANGE_PERIMETER_MISSILE_COLOR
-        : RANGE_PERIMETER_RANGED_COLOR;
   const dash =
-    kind === 'perimeter' || appearance === 'resolution'
-      ? buildRangeOverlayDashArray(lineWidth, kind, mode)
-      : planConnectorDash(mode, lineWidth);
+    kind === 'perimeter' ? buildRangeOverlayDashArray(lineWidth, kind, mode) : attackConnectorDash(mode, lineWidth);
   return {
     lineWidth,
-    strokeColor,
+    strokeColor: RANGE_PERIMETER_MISSILE_COLOR,
     dash,
     lineCap: getRangeOverlayLineCap(kind),
   };
@@ -110,28 +83,25 @@ type SupportOrderLineSegment = { fromH3Index: string; toH3Index: string };
 /**
  * Strokes attack arrows for planning and for resolution playback.
  *
- * Purpose: One path draws the casing and the arrowhead. Planning and playback differ in color, dash, and opacity.
- * When to use: From `drawRangedAttackLines`, `drawAirStrikeLines`, `drawMissileLaunchLines`, the hover preview, and
- *   `drawRangedResolutionShotLines`.
+ * Purpose: One path draws the casing and the arrowhead. Queued orders, hover previews, and playback attacks share it.
+ * When to use: From `drawRangedAttackLines`, `drawAirStrikeLines`, `drawMissileLaunchLines`, the hover preview,
+ *   `drawRangedResolutionShotLines`, and `drawResolutionOutboundAttackLines`.
  * Expected outcome: Each unequal endpoint pair runs from the origin's center toward the target and ends in the movement
- *   arrowhead, whose tip stops a unit radius short of the target's center. A planned arrow is crimson at
- *   `MOVEMENT_HOVER_VALID_ALPHA`: solid for ranged, dashed for an air strike, dotted for a launch. A playback shot stays
- *   at `RANGE_PERIMETER_ALPHA`, amber or purple, with the equal solid-and-gap dash. A launch stays one continuous arrow.
- *   A missile flight during playback is drawn by `drawResolutionMoveLines`, in the launching seat's map color.
- *   Equal endpoints are skipped.
+ *   arrowhead, whose tip stops a unit radius short of the target's center. The arrow is crimson at
+ *   `MOVEMENT_HOVER_VALID_ALPHA`: solid for ranged, dashed for an air strike, dotted for a launch. A launch stays one
+ *   continuous arrow. Equal endpoints are skipped. An air unit's flight home is not drawn here.
  * Exceptions: None.
  */
 export function strokeSupportOrderLines(
   ctx: CanvasRenderingContext2D,
   mode: 'ranged' | 'airStrike' | 'missile',
-  segments: readonly SupportOrderLineSegment[],
-  appearance: AttackLineAppearance = 'plan'
+  segments: readonly SupportOrderLineSegment[]
 ): void {
   if (segments.length === 0) return;
-  const style = rangePerimeterStaticLineStyle(mode, 'connector', appearance);
+  const style = rangePerimeterStaticLineStyle(mode, 'connector');
   const lineStyle = { color: style.strokeColor, width: style.lineWidth, cap: style.lineCap };
   ctx.save();
-  ctx.globalAlpha = appearance === 'plan' ? MOVEMENT_HOVER_VALID_ALPHA : RANGE_PERIMETER_ALPHA;
+  ctx.globalAlpha = MOVEMENT_HOVER_VALID_ALPHA;
   for (const segment of segments) {
     if (segment.fromH3Index === segment.toH3Index) continue;
     const from = hexCenterPx(segment.fromH3Index);
@@ -192,11 +162,12 @@ export function drawRangedAttackLines(
 }
 
 /**
- * Draws resolution-phase shot lines (direct fire + return fire) using planned ranged or air-strike strokes.
+ * Draws resolution-phase shot lines (direct fire + return fire) with the planning attack stroke.
  *
  * Purpose: Shows attacker-to-target connectors during the ranged lightning window only.
  * When to use: `drawGameScene` when `inRangedLightning` and anim carries `rangedResolutionShotLines`.
- * Expected outcome: Ground edges stay amber and air-only return-fire edges stay purple, both dashed at `RANGE_PERIMETER_ALPHA`. Fog may clip endpoints.
+ * Expected outcome: Ground fire is a solid crimson arrow and air-only return fire is a dashed crimson arrow, both at
+ *   `MOVEMENT_HOVER_VALID_ALPHA`. Fog may clip endpoints.
  * Exceptions: None.
  */
 export function drawRangedResolutionShotLines(
@@ -218,10 +189,35 @@ export function drawRangedResolutionShotLines(
     strokeSupportOrderLines(
       ctx,
       mode,
-      group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index })),
-      'resolution'
+      group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index }))
     );
   }
+}
+
+/**
+ * Draws the outbound air-strike and missile flights for one resolution playback frame.
+ *
+ * Purpose: Those flights are attacks, so they use the same crimson arrows as the queued orders. The flight home does not.
+ * When to use: `drawGameScene` while `inAirStrikeOutbound`, with `airStrikeOutboundMoves`. Missiles are in that list and do not return.
+ * Expected outcome: Each air unit draws a dashed crimson arrow to its target. Each missile draws a dotted crimson arrow, continuous
+ *   so a long flight is not dropped. Both use `MOVEMENT_HOVER_VALID_ALPHA`. Nothing is drawn without moves or a hex list.
+ * Exceptions: None.
+ */
+export function drawResolutionOutboundAttackLines(
+  ctx: CanvasRenderingContext2D,
+  moves: readonly ResolutionPlaybackMove[],
+  hexList: readonly string[] | undefined
+): void {
+  if (moves.length === 0 || !hexList) return;
+  const air: SupportOrderLineSegment[] = [];
+  const missiles: SupportOrderLineSegment[] = [];
+  for (const move of moves) {
+    const segment = { fromH3Index: move.fromH3Index, toH3Index: move.toH3Index };
+    if (isMissileUnitType(move.unitType)) missiles.push(segment);
+    else air.push(segment);
+  }
+  strokeSupportOrderLines(ctx, 'airStrike', air);
+  strokeSupportOrderLines(ctx, 'missile', missiles);
 }
 
 /**
