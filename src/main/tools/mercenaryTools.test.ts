@@ -19,6 +19,7 @@ import {
   getSeatRoster,
   refreshFogOfWarIntelFromCurrentState,
   setStrategicInfrastructureForHex,
+  setTreasuryCredits,
 } from '../gameDb';
 import { listHireOrdersForSeat } from '../gameDb/mercenaryStateAccess';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -29,6 +30,7 @@ const SEAT: AiSeatId = 'opponent';
 test('a raise on an empty home city is stored, cancelled, and visible to a query', () => {
   withTempGameDb('aw-merc-tools-', () => {
     const hex = emptyHomeHex();
+    setTreasuryCredits(SEAT, 1000);
     const helpers = coordHelpers(getGameState());
     const raised = executeMercenaryTools(SEAT, 'hire_mercenaries', {
       action: 'raise',

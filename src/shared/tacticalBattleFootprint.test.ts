@@ -4,7 +4,7 @@ import { getPentagons, gridDisk, gridDistance } from 'h3-js';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
 import { strategicCellAt, strategicParentOf, tacticalChildrenOf } from './h3Resolutions';
 import { setLoadedStrategicFootprint } from './loadedStrategicFootprint';
-import { tacticalBattleFootprint, tacticalBattleHexCode } from './tacticalBattleFootprint';
+import { battleCellTerrainKind, tacticalBattleFootprint, tacticalBattleHexCode } from './tacticalBattleFootprint';
 
 const GLOBAL_FIXTURE = '81263ffffffffff';
 
@@ -126,6 +126,29 @@ test('a regional edge keeps only margin cells whose strategic hex is on the map'
       setLoadedStrategicFootprint(null);
     }
   });
+});
+
+test('a battle cell keeps its captured kind unless that cell has a feature override', () => {
+  assert.equal(
+    battleCellTerrainKind({ frozenKind: 'coastal', liveKind: 'water', cellHasFeatureOverride: false }),
+    'coastal'
+  );
+  assert.equal(
+    battleCellTerrainKind({ frozenKind: 'coastal', liveKind: 'water', cellHasFeatureOverride: true }),
+    'water'
+  );
+  assert.equal(
+    battleCellTerrainKind({ frozenKind: undefined, liveKind: 'water', cellHasFeatureOverride: false }),
+    'water'
+  );
+  assert.equal(
+    battleCellTerrainKind({ frozenKind: '  ', liveKind: 'water', cellHasFeatureOverride: false }),
+    'water'
+  );
+  assert.equal(
+    battleCellTerrainKind({ frozenKind: undefined, liveKind: '  ', cellHasFeatureOverride: false }),
+    undefined
+  );
 });
 
 test('a resolution 1 pentagon footprint is non-empty', () => {

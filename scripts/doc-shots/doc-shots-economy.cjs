@@ -66,6 +66,18 @@ const MAX_BUILD_ZOOM_NOTCHES = 6;
 const FORT_ZOOM_RETRIES = 4;
 
 /**
+ * How far the ranged target shot zooms in from the stored zoom.
+ *
+ * Purpose: An armor fires only one hex, so at the stored zoom its attack line is hidden under the two tokens. Unit
+ *   tokens keep their size as the map zooms, so larger hexes leave the line visible between them. This passes the
+ *   build marker zoom, so a marker can show on the armor's hex, but a one-hex line at this zoom is long enough to read.
+ * When to use: Only by the ranged target shot.
+ * Expected outcome: 1.5 zoom levels.
+ * Exceptions: None.
+ */
+const RANGED_TARGET_ZOOM_STEP = 1.5;
+
+/**
  * How far the missile shot zooms in from the stored zoom.
  *
  * Purpose: Unit tokens keep their size as the map zooms, so larger hexes leave more of the launch line between them.
@@ -176,17 +188,21 @@ async function chooseBuildPopupTab(page, label) {
 /**
  * Takes the ranged attack shot that hovers the enemy beside the armor.
  *
- * Purpose: The guide's second ranged attack step.
- * When to use: At the stored zoom, first in this session.
- * Expected outcome: `ranged-attack-2.png`, with aiming stopped afterwards.
+ * Purpose: The guide's second ranged attack step: the attack line from the armor to the hovered enemy.
+ * When to use: First in this session.
+ * Expected outcome: `ranged-attack-2.png`, with aiming stopped afterwards. The map zooms in by `RANGED_TARGET_ZOOM_STEP`,
+ *   places the attack line just above the selection panel, and returns to the stored zoom.
  * Exceptions: None; a failure is a `SKIP`.
  */
-async function writeRangedTargetShot(page, report, edit) {
+async function writeRangedTargetShot(page, report, edit, storedZoom) {
   await runShot(report, 'ranged-attack-2.png', async () => {
-    await panMapToHex(page, edit.armorHex);
-    await selectUnitInItsHex(page, { id: edit.armorId, h3Index: edit.armorHex });
-    await page.click('#ranged-attack-btn');
+    let aiming = false;
     try {
+      await panMapToHex(page, edit.armorHex);
+      await setMapZoom(page, storedZoom + RANGED_TARGET_ZOOM_STEP);
+      await selectUnitInItsHex(page, { id: edit.armorId, h3Index: edit.armorHex });
+      await page.click('#ranged-attack-btn');
+      aiming = true;
       await panMidpointTo(page, edit.armorHex, edit.enemyHex, await pointAbove(page, '#selection-panel', LINE_RISE_PX));
       const armor = await hexClientPoint(page, edit.armorHex);
       const enemy = await hexClientPoint(page, edit.enemyHex);
@@ -194,7 +210,8 @@ async function writeRangedTargetShot(page, report, edit) {
       await page.waitForTimeout(SETTLE_MS.tip);
       return await page.screenshot({ clip: await clipAround(page, { selectors: ['#selection-panel'], points: [armor, enemy], pad: 60, viewport: MATCH_VIEWPORT }) });
     } finally {
-      await page.click('#ranged-attack-btn');
+      if (aiming) await page.click('#ranged-attack-btn');
+      await setMapZoom(page, storedZoom);
     }
   });
   await resetMap(page);
@@ -399,7 +416,7 @@ async function writeEconomyShots(page, report, edit) {
     for (const fileName of ECONOMY_SHOTS) skipShot(report, fileName, err.message);
     return;
   }
-  await writeRangedTargetShot(page, report, edit);
+  await writeRangedTargetShot(page, report, edit, storedZoom);
   await writeBuildShot(page, report, edit, storedZoom);
   await writeMissileShot(page, report, edit, storedZoom);
   await writeFortificationShot(page, report, edit, storedZoom);

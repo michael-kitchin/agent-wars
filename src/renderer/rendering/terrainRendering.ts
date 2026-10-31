@@ -1,4 +1,5 @@
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { strategicMapFillTerrainKind } from '../../shared/landTraversalStrategic';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { strategicOverlayBandOffsetPx } from '../../shared/inspectionStatusIconLine';
 import {
@@ -163,11 +164,10 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
-    const kind = deps.getStrategicDominantTerrainKind(
-      hx.h3Index,
+    const storedKind =
       hx.terrainKind ??
-        (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains')
-    );
+      (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains');
+    const kind = strategicMapFillTerrainKind(storedKind, deps.getStrategicDominantTerrainKind(hx.h3Index, storedKind));
     const drawClosedPath = (): void => {
       drawClosedPolygonPath(ctx, pts);
     };

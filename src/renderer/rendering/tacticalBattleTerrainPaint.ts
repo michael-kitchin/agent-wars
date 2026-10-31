@@ -3,11 +3,11 @@
  *
  * Purpose: Keeps battle-cell drawing out of the strategic terrain pass so a margin cell can paint while its geometric parent is off screen.
  * When to use: From `drawTacticalTerrainHexes` while a battle snapshot is set.
- * Expected outcome: Each on-screen footprint cell uses its tactical kind, then a loaded geometric parent's kind, then the enclosing hex's kind.
+ * Expected outcome: Each on-screen footprint cell uses the kind captured on the battle, then a live tactical row, then a loaded geometric parent's kind, then the enclosing hex's kind.
  * Exceptions: None. Does not write `tacticalChildrenByParent`.
  */
 
-import { tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
+import { battleCellTerrainKind, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { projectHexBoundaryToContainerPoints, shouldDrawTacticalChildHexInViewport } from '../map/terrainView';
@@ -21,7 +21,7 @@ import { fillHexTerrain } from './terrainVisualStyles';
  *
  * Purpose: The strategic parent polygon can be off screen while a margin cell is on screen, so this path does not use the parent viewport test.
  * When to use: `drawTacticalTerrainHexes` while a battle snapshot is set.
- * Expected outcome: Each on-screen footprint cell is filled and stroked. Inspection mode strokes only.
+ * Expected outcome: Each on-screen footprint cell is filled and stroked from the kind the battle captured. A cell the battle did not record uses the live tactical row. Inspection mode strokes only.
  * Exceptions: None. Does not write `tacticalChildrenByParent`.
  */
 export function paintBattleFootprintTerrain(
@@ -36,8 +36,12 @@ export function paintBattleFootprintTerrain(
 ): void {
   const tacticalKindByH3 = new Map<string, string>();
   for (const cell of tactical.tacticalChildH3Indexes) {
-    const kind = S.tacticalTerrainOverridesByH3.get(cell)?.terrainKind;
-    if (kind && kind.trim().length > 0) tacticalKindByH3.set(cell, kind);
+    const kind = battleCellTerrainKind({
+      frozenKind: tactical.tacticalTerrainKindByH3?.[cell],
+      liveKind: S.tacticalTerrainOverridesByH3.get(cell)?.terrainKind,
+      cellHasFeatureOverride: false,
+    });
+    if (kind) tacticalKindByH3.set(cell, kind);
   }
   const loadedStrategicKindByH3 = new Map<string, string>();
   for (const hex of S.gameState?.hexes ?? []) {

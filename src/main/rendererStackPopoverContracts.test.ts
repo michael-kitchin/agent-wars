@@ -63,9 +63,8 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   );
   assert.ok(
     setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
-      applyVisibilityFn.includes(
-        'btn.textContent = S.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;'
-      ) &&
+      applyVisibilityFn.includes('const selected = S.selectedUnitIds.includes(unitId);') &&
+      applyVisibilityFn.includes('btn.textContent = selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;') &&
       applyVisibilityFn.includes(
         'btn.style.visibility = nonSelectableUnitIds.has(unitId) ? \'hidden\' : \'visible\';'
       ) &&

@@ -151,6 +151,26 @@ export function tacticalBattleHexCode(
 }
 
 /**
+ * Chooses the terrain kind a battle cell keeps.
+ *
+ * Purpose: The kind captured when the battle started stays in force, so a terrain row loaded later cannot turn that cell into water under a unit already standing there. A feature-override row is a change made in this match, so that cell follows the live kind.
+ * When to use: Battle painting, the battle-cell tooltip, and the terrain refresh after infrastructure damage.
+ * Expected outcome: The live kind when the cell has a feature override and that kind is non-blank. Otherwise the captured kind when it is non-blank. Otherwise the live kind. Undefined when both are blank or missing.
+ * Exceptions: None.
+ */
+export function battleCellTerrainKind(args: {
+  readonly frozenKind: string | undefined;
+  readonly liveKind: string | undefined;
+  readonly cellHasFeatureOverride: boolean;
+}): string | undefined {
+  const live = args.liveKind?.trim() ?? '';
+  if (args.cellHasFeatureOverride && live.length > 0) return live;
+  const frozen = args.frozenKind?.trim() ?? '';
+  if (frozen.length > 0) return frozen;
+  return live.length > 0 ? live : undefined;
+}
+
+/**
  * Terrain kind for each playable cell.
  *
  * Purpose: A margin cell keeps its own tactical kind. A missing row uses the geometric parent's kind when that hex is loaded, then the enclosing hex's kind.

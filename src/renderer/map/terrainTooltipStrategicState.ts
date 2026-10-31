@@ -8,7 +8,7 @@
  */
 
 import { strategicParentOf, tacticalCellAt, tacticalChildrenOf } from '../../shared/h3Resolutions';
-import { tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
+import { battleCellTerrainKind, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 import { isHexExploredByPlayer } from '../core/selection';
@@ -217,15 +217,17 @@ function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): bool
  *
  * Purpose: A margin cell keeps its own terrain kind. Airport and seaport words come from the snapshot, which only flags the enclosing hex's children.
  * When to use: `terrainStateForPointer` when the sampled cell is in `tacticalChildH3Indexes`.
- * Expected outcome: Terrain kind follows the tactical row, then a loaded geometric parent, then the enclosing hex. Control and weather stay on that enclosing hex in the HTML formatter.
+ * Expected outcome: Terrain kind follows the kind captured on the battle, then the live tactical row, then a loaded geometric parent, then the enclosing hex. Control and weather stay on that enclosing hex in the HTML formatter.
  * Exceptions: None.
  */
 function battleTerrainTooltipState(detailH3: string, battle: TacticalBattleSnapshot): TerrainTooltipState {
-  const override = S.tacticalTerrainOverridesByH3.get(detailH3);
   const tacticalKindByH3 = new Map<string, string>();
-  if (override?.terrainKind && override.terrainKind.trim().length > 0) {
-    tacticalKindByH3.set(detailH3, override.terrainKind);
-  }
+  const kind = battleCellTerrainKind({
+    frozenKind: battle.tacticalTerrainKindByH3?.[detailH3],
+    liveKind: S.tacticalTerrainOverridesByH3.get(detailH3)?.terrainKind,
+    cellHasFeatureOverride: false,
+  });
+  if (kind) tacticalKindByH3.set(detailH3, kind);
   const loadedStrategicKindByH3 = new Map<string, string>();
   for (const hex of S.gameState?.hexes ?? []) {
     if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);

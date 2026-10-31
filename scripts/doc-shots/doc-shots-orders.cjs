@@ -71,6 +71,17 @@ const ORDER_ZOOM_STEP = 0.5;
 const AIR_STRIKE_ZOOM_STEP = 0.4;
 
 /**
+ * How much further the reticle shot zooms in past the order zoom.
+ *
+ * Purpose: The guide shows the reticle shot beside the second ranged attack shot. Together with `ORDER_ZOOM_STEP`
+ *   this matches that shot's zoom, so the two pictures show hexes at the same size.
+ * When to use: Only by the first ranged attack shot.
+ * Expected outcome: 1.0 zoom levels.
+ * Exceptions: None.
+ */
+const RANGED_RETICLE_ZOOM_STEP = 1.0;
+
+/**
  * Clears whatever the previous shot left open, so the next one starts from an empty map centered on the stack.
  *
  * Purpose: While units are selected, a click on another hex plans an order instead of selecting. The order shots pan
@@ -321,7 +332,9 @@ async function writeMovementShots(page, report) {
  *   the strike line to a hovered enemy when one is in range.
  * When to use: Once, after the stack shots.
  * Expected outcome: `ranged-attack-1.png` and `air-strike.png`, with aiming stopped, the target list back on Enemy
- *   Units, and the order zoom restored afterwards. The air strike shot zooms in by `AIR_STRIKE_ZOOM_STEP`.
+ *   Units, and the order zoom restored afterwards. The reticle shot zooms in by `RANGED_RETICLE_ZOOM_STEP` and places
+ *   the armor where the second ranged attack shot places its line, just above the selection panel. The air strike
+ *   shot zooms in by `AIR_STRIKE_ZOOM_STEP`.
  * Exceptions: None; a failed shot is a `SKIP`.
  */
 async function writeAimingShots(page, report) {
@@ -329,12 +342,20 @@ async function writeAimingShots(page, report) {
     await startGesture(page);
     const unit = loneHumanUnits((await readGameState(page)).units, 'armor')[0];
     if (!unit) throw new Error('the scenario has no lone armor');
-    await selectUnitInItsHex(page, unit);
-    const point = await hexClientPoint(page, unit.h3Index);
-    await page.hover('#ranged-attack-btn');
-    await page.waitForTimeout(SETTLE_MS.tip);
-    await page.waitForSelector('#control-tooltip:not(.hidden)', { timeout: 8000 });
-    return page.screenshot({ clip: await clipAround(page, { selectors: ['#selection-panel', '#control-tooltip'], points: [point], pad: 24, viewport: MATCH_VIEWPORT }) });
+    const orderZoom = await readMapZoom(page);
+    try {
+      await setMapZoom(page, orderZoom + RANGED_RETICLE_ZOOM_STEP);
+      await panMapToHex(page, unit.h3Index);
+      await selectUnitInItsHex(page, unit);
+      await panMidpointTo(page, unit.h3Index, unit.h3Index, await pointAbove(page, '#selection-panel', LINE_RISE_PX));
+      const point = await hexClientPoint(page, unit.h3Index);
+      await page.hover('#ranged-attack-btn');
+      await page.waitForTimeout(SETTLE_MS.tip);
+      await page.waitForSelector('#control-tooltip:not(.hidden)', { timeout: 8000 });
+      return await page.screenshot({ clip: await clipAround(page, { selectors: ['#selection-panel', '#control-tooltip'], points: [point], pad: 60, viewport: MATCH_VIEWPORT }) });
+    } finally {
+      await setMapZoom(page, orderZoom);
+    }
   });
   await runShot(report, 'air-strike.png', async () => {
     await startGesture(page);

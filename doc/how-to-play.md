@@ -393,6 +393,7 @@ In a battle, cell terrain changes how a unit moves and how far it can fire. An i
 
 - **Terrain-bonus step:** with the terrain bonus on, armor born on mountains, wetlands, or arctic terrain can enter one such cell it's otherwise barred from. A naval unit born on wetlands can do the same into wetlands. It stops there for that beat.
 - **Shooting infrastructure:** ranged fire can target a city, airport, seaport, road, or rail cell on the battle hex itself. A hit turns that cell to rubble for good. A fortified cell loses the fortification instead and stays what it was. The first hit on the controller's units standing on a fortified cell also removes the fortification instead, and the unit survives.
+- **Open water:** sea stays water, including inside a coastal hex. Infantry and armor can't enter it. Ships can. A battle that is already open keeps the terrain it started with.
 - **Blocked cells:** you can't march onto a cell the other side [fortified](#fortifications). Hovering it says **Blocked: Fortified**. A cell whose fortification is removed during a beat stays blocked until the next beat. You can leave a cell you fortified. A fortified cell in the outer rings blocks movement and is never hit.
 - **Collateral damage:** a ranged kill on one of those cells rubbles it too.
 - **Rubble counts:** rubbled urban cells lower the hex's production after the battle. A rubbled airport can take the air units based there with it.

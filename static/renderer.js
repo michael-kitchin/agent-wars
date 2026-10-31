@@ -14860,6 +14860,13 @@
   function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
     return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
   }
+  function battleCellTerrainKind(args) {
+    const live = args.liveKind?.trim() ?? "";
+    if (args.cellHasFeatureOverride && live.length > 0) return live;
+    const frozen = args.frozenKind?.trim() ?? "";
+    if (frozen.length > 0) return frozen;
+    return live.length > 0 ? live : void 0;
+  }
   function tacticalBattleTerrainKindByCell(args) {
     const kinds = {};
     for (const cell of args.cells) {
@@ -24140,11 +24147,13 @@ ${bonuses}`;
     return mask.some((v) => v === true);
   }
   function battleTerrainTooltipState(detailH3, battle) {
-    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
     const tacticalKindByH3 = /* @__PURE__ */ new Map();
-    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
-      tacticalKindByH3.set(detailH3, override.terrainKind);
-    }
+    const kind = battleCellTerrainKind({
+      frozenKind: battle.tacticalTerrainKindByH3?.[detailH3],
+      liveKind: rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3)?.terrainKind,
+      cellHasFeatureOverride: false
+    });
+    if (kind) tacticalKindByH3.set(detailH3, kind);
     const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
     for (const hex of rendererSharedState.gameState?.hexes ?? []) {
       if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
@@ -26333,6 +26342,9 @@ ${bonuses}`;
   }
 
   // src/shared/landTraversalStrategic.ts
+  function strategicMapFillTerrainKind(storedKind, childDominantKind) {
+    return storedKind === "coastal" ? "coastal" : childDominantKind;
+  }
   var LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON = "Land units must move to a hex that overlaps a continent or large island.";
 
   // src/shared/marchInvalidReasons.ts
@@ -27956,8 +27968,12 @@ ${bonuses}`;
   function paintBattleFootprintTerrain(ctx, deps, tactical, map, leaflet, viewportWidth, viewportHeight, stroke) {
     const tacticalKindByH3 = /* @__PURE__ */ new Map();
     for (const cell of tactical.tacticalChildH3Indexes) {
-      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(cell)?.terrainKind;
-      if (kind && kind.trim().length > 0) tacticalKindByH3.set(cell, kind);
+      const kind = battleCellTerrainKind({
+        frozenKind: tactical.tacticalTerrainKindByH3?.[cell],
+        liveKind: rendererSharedState.tacticalTerrainOverridesByH3.get(cell)?.terrainKind,
+        cellHasFeatureOverride: false
+      });
+      if (kind) tacticalKindByH3.set(cell, kind);
     }
     const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
     for (const hex of rendererSharedState.gameState?.hexes ?? []) {
@@ -28047,10 +28063,8 @@ ${bonuses}`;
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      const kind = deps.getStrategicDominantTerrainKind(
-        hx.h3Index,
-        hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains")
-      );
+      const storedKind = hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains");
+      const kind = strategicMapFillTerrainKind(storedKind, deps.getStrategicDominantTerrainKind(hx.h3Index, storedKind));
       const drawClosedPath = () => {
         drawClosedPolygonPath(ctx, pts);
       };

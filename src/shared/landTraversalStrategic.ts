@@ -125,6 +125,18 @@ export function storedStrategicTerrainKind(
 }
 
 /**
+ * Chooses the kind painted on a strategic hex polygon.
+ *
+ * Purpose: Seeding can store a water-dominant hex as coastal, so the child majority can be water while the stored kind is coastal. The polygon follows the stored kind in that case.
+ * When to use: Strategic map fill only. Tactical cells keep their own classified kind.
+ * Expected outcome: `coastal` when the stored kind is coastal. Otherwise the child-majority kind, which already matches every other stored kind.
+ * Exceptions: None.
+ */
+export function strategicMapFillTerrainKind(storedKind: string, childDominantKind: string): string {
+  return storedKind === 'coastal' ? 'coastal' : childDominantKind;
+}
+
+/**
  * Defines whether a land unit may traverse a single ring-1 step between two strategic hexes.
 
  * Purpose: Single source of truth for land-mass edge legality (continent/island overlap plus water cap).

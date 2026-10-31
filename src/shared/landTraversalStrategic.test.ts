@@ -8,6 +8,7 @@ import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   storedStrategicTerrainKind,
+  strategicMapFillTerrainKind,
   STRATEGIC_LAND_MAX_WATER_PCT,
   type StrategicLandMassRecord,
 } from './landTraversalStrategic';
@@ -258,6 +259,20 @@ function testStoredStrategicTerrainKind(): void {
 }
 
 /**
+ * The strategic polygon stays coastal when seeding relabeled a water-dominant hex.
+ *
+ * Purpose: Child-majority fill would paint that hex as water after open-water cells keep their own rows.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: Coastal stored kind wins over a water majority. Plains and water pass the child majority through.
+ * Exceptions: None.
+ */
+function testStrategicMapFillTerrainKind(): void {
+  assert.strictEqual(strategicMapFillTerrainKind('coastal', 'water'), 'coastal');
+  assert.strictEqual(strategicMapFillTerrainKind('plains', 'plains'), 'plains');
+  assert.strictEqual(strategicMapFillTerrainKind('water', 'water'), 'water');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -267,6 +282,7 @@ function testStoredStrategicTerrainKind(): void {
  */
 function run(): void {
   testStoredStrategicTerrainKind();
+  testStrategicMapFillTerrainKind();
   testSameContinentLowWater();
   testSameContinentHighWaterBlocked();
   testDifferentContinentBlocked();

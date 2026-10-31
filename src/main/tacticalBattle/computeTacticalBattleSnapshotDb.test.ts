@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CombatUnit } from '../combatUnitTypes';
 import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../gameActions/meleeInterceptCandidates';
-import { dbGetOne, dbRun, isDbReady, listFortifiableCellsForHex, listUnitsForSnapshot, setHexController, setTacticalCellFortified } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, isDbReady, listFortifiableCellsForHex, listUnitsForSnapshot, setHexController, setTacticalCellFortified } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
@@ -26,6 +26,7 @@ import {
 import { getTacticalSealiftStackStateForHex } from './tacticalSealiftStackState';
 import {
   tacticalDbFixtureRegisterDefaultAfterEach,
+  tacticalDbFixtureColocateHumanOpponentUnits,
   tacticalDbFixtureSetStrategicPlanningPhase,
   tacticalDbFixtureWithTempDbContestedPlanning,
 } from './testSupport/tacticalDbFixture';
@@ -105,14 +106,40 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
   });
 });
 
+/**
+ * A strategic hex whose core has two intact city cells.
+ *
+ * Purpose: Fortified placement does not depend on the first seeded unit standing in a large city.
+ * When to use: The defender-placement test.
+ * Expected outcome: The hex and two fortifiable core cells, or null when the loaded map has no such hex.
+ * Exceptions: None.
+ */
+function strategicHexWithTwoFortifiableCoreCells(): { h3Index: string; cells: string[] } | null {
+  const parents = dbGetAll<{ h3Index: string }>(
+    `SELECT parent_h3_index AS h3Index
+     FROM res_t_feature_overrides
+     WHERE is_urban = 1 AND is_rubble = 0 AND is_fortified = 0
+     GROUP BY parent_h3_index
+     HAVING COUNT(*) >= 2
+     ORDER BY parent_h3_index ASC`
+  );
+  for (const parent of parents) {
+    const core = new Set(tacticalBattleFootprint(parent.h3Index).coreChildH3Indexes);
+    const cells = listFortifiableCellsForHex(parent.h3Index).filter((cell) => core.has(cell)).slice(0, 2);
+    if (cells.length >= 2) return { h3Index: parent.h3Index, cells };
+  }
+  return null;
+}
+
 test('defenders occupy fortified core cells and attackers do not', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-fort-place-', ({ targetStrategicH3 }) => {
-    setHexController(targetStrategicH3, HUMAN_SEAT_ID);
-    const core = new Set(tacticalBattleFootprint(targetStrategicH3).coreChildH3Indexes);
-    const fortified = listFortifiableCellsForHex(targetStrategicH3).filter((cell) => core.has(cell)).slice(0, 2);
-    assert.ok(fortified.length >= 2, 'contested hex needs two fortifiable core cells');
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-fort-place-', ({ humanId, opponentId }) => {
+    const place = strategicHexWithTwoFortifiableCoreCells();
+    assert.ok(place, 'loaded map needs a hex with two fortifiable core cells');
+    tacticalDbFixtureColocateHumanOpponentUnits(place.h3Index, humanId, opponentId);
+    setHexController(place.h3Index, HUMAN_SEAT_ID);
+    const fortified = place.cells;
     for (const cell of fortified) setTacticalCellFortified(cell, true);
-    const result = computeTacticalBattleSnapshot(targetStrategicH3, 'fortified-placement');
+    const result = computeTacticalBattleSnapshot(place.h3Index, 'fortified-placement');
     assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
     const placed = result.snapshot!.subUnits;
     for (const cell of fortified) {

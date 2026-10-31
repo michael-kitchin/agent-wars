@@ -82,7 +82,7 @@ function gridSteps(from: string, to: string): number | null {
  *
  * Purpose: The landing search needs turns, not only grid distance.
  * When to use: The `sailingTurns` callback.
- * Expected outcome: The route's turn count, or null when there is no route.
+ * Expected outcome: The route's turn count, or null when there is no route. A route whose length is zero did not reach `toH3`; that candidate is not a landing.
  * Exceptions: None. A pathfinding error is null.
  */
 function sailingTurns(
@@ -95,7 +95,7 @@ function sailingTurns(
   const destination = latLngByH3.get(toH3);
   if (!destination) return null;
   const result = executePlanRouteWithSession(shipId, destination, { avoidEnemies }, session);
-  if (result.status !== 'ok' || result.reachable === false) return null;
+  if (result.status !== 'ok' || result.reachable === false || result.hexDistance === 0) return null;
   return result.turnsRequired;
 }
 

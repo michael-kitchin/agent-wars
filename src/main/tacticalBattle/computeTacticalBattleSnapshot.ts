@@ -39,7 +39,7 @@ import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tactica
 import { loadedStrategicTerrainKindByH3 } from '../gameDb/mapHexRead';
 import { isStrategicCell } from '../../shared/h3Resolutions';
 import { HUMAN_SEAT_ID, isOwnerId } from '../../shared/seatIds';
-import { tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
+import { battleCellTerrainKind, tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
 import { buildTacticalFortificationOwnerRecord } from './tacticalFortificationOwners';
 import {
   fortifiedCellsForOwner,
@@ -88,7 +88,7 @@ export function tacticalSubUnitCountForStrategicUnitType(unitType: string): numb
  * Purpose: Snapshot `tacticalTerrainKindByH3` / `tacticalIsSeaportByH3` / `tacticalIsAirportByH3` are frozen at battle start; tactical air infrastructure strikes
  * mutate `res_t_feature_overrides` and `res_s_infrastructure`, so march planners and the renderer must see rubble and removed ports without exiting tactical mode.
  * When to use: After `applyInfrastructureDestructionEffects` succeeds during human tactical support projection.
- * Expected outcome: Footprint cells match `getTacticalTerrainOverridesForRendererFromGame` and `listTacticalFeatureOverridesForGame`; stale seaport and airport keys are dropped when no facility rows remain. Airport and seaport flags stay on the core cells.
+ * Expected outcome: A cell with a feature-override row takes the live kind. Every other cell keeps the kind captured on the battle, then a live tactical row. Stale seaport and airport keys are dropped when no facility rows remain. Airport and seaport flags stay on the core cells.
  * Exceptions: None. A missing tactical row uses a loaded geometric parent, then the enclosing hex's kind.
  */
 export function refreshTacticalBattleTerrainFromGameDb(battle: TacticalBattleSnapshot): TacticalBattleSnapshot {
@@ -99,10 +99,20 @@ export function refreshTacticalBattleTerrainFromGameDb(battle: TacticalBattleSna
   const readSet = new Set(battle.tacticalChildH3Indexes);
   const facilitySet = new Set(battle.coreChildH3Indexes ?? battle.tacticalChildH3Indexes);
   const tacticalRows = getTacticalTerrainOverridesForRendererFromGame();
-  const tacticalKindByH3 = new Map<string, string>();
+  const featureRows = listTacticalFeatureOverridesForGame();
+  const featureOverrideH3 = new Set(featureRows.map((row) => row.h3Index));
+  const liveKindByH3 = new Map<string, string>();
   for (const row of tacticalRows) {
-    if (!readSet.has(row.h3Index)) continue;
-    tacticalKindByH3.set(row.h3Index, row.terrainKind);
+    if (readSet.has(row.h3Index)) liveKindByH3.set(row.h3Index, row.terrainKind);
+  }
+  const tacticalKindByH3 = new Map<string, string>();
+  for (const cell of battle.tacticalChildH3Indexes) {
+    const kind = battleCellTerrainKind({
+      frozenKind: battle.tacticalTerrainKindByH3?.[cell],
+      liveKind: liveKindByH3.get(cell),
+      cellHasFeatureOverride: featureOverrideH3.has(cell),
+    });
+    if (kind) tacticalKindByH3.set(cell, kind);
   }
   const enclosingKind = battle.strategicHexTerrainKind ?? 'plains';
   const tacticalTerrainKindByH3 = tacticalBattleTerrainKindByCell({
@@ -113,7 +123,7 @@ export function refreshTacticalBattleTerrainFromGameDb(battle: TacticalBattleSna
   });
   const tacticalIsSeaportByH3: Record<string, boolean> = {};
   const tacticalIsAirportByH3: Record<string, boolean> = {};
-  for (const row of listTacticalFeatureOverridesForGame()) {
+  for (const row of featureRows) {
     if (!facilitySet.has(row.h3Index)) continue;
     if (row.isSeaport) tacticalIsSeaportByH3[row.h3Index] = true;
     if (row.isAirport) tacticalIsAirportByH3[row.h3Index] = true;

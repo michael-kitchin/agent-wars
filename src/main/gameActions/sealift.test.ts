@@ -66,11 +66,12 @@ function insertUnit(id: string, player: SeatId, unitType: string, h3Index: strin
 
  * Purpose: Supports maintainability by documenting why `setHexTerrain` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: `terrain` and `terrain_kind` both match the requested bucket. Land uses kind `plains`; a later statement can replace that kind.
  * Exceptions: None.
  */
 function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): void {
-  dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', [terrain, h3Index]);
+  const terrainKind = terrain === 'water' ? 'water' : terrain === 'coastal' ? 'coastal' : 'plains';
+  dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', [terrain, terrainKind, h3Index]);
 }
 
 /**
@@ -242,6 +243,7 @@ function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void {
     const coastalNoPortHex = pickHex(3);
     setHexTerrain(waterHex, 'water');
     setHexTerrain(coastalNoPortHex, 'coastal');
+    dbRun('UPDATE res_s_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [waterHex]);
     dbRun('UPDATE res_s_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [coastalNoPortHex]);
 
     insertUnit('opponent-naval-water', 'opponent', 'naval', waterHex);

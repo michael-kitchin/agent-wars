@@ -46,7 +46,7 @@ How to regenerate the pack is in [scripts/weather_pipeline/README.md](../scripts
 
 `strategicH3Resolution()` and `tacticalH3Resolution()` in `src/shared/h3Resolutions.ts` return the active map's values. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` stay 1 and 4. The tracked global JSON files keep the names `terrain_res1_*` and `terrain_res4_*`.
 
-Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells under one strategic hex). Terrain kinds on a tactical cell can differ from the parent (coastal, forest, mountain, urban flags, rubble).
+Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells under one strategic hex). Terrain kinds on a tactical cell can differ from the parent (coastal, forest, mountain, urban flags, rubble). A row is stored when the cell's kind differs from the parent's stored `terrain_kind`, and for every urban cell. A cell with no row reads as that stored kind.
 
 ## What this is not
 

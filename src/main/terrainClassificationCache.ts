@@ -43,6 +43,11 @@ import {
 } from './terrainLandMassLoad';
 import type { StrategicLandMassRecord } from '../shared/landTraversalStrategic';
 import { ensureWeatherPackLoaded } from './weather/weatherPackLoad';
+import {
+  buildStoredStrategicKindByH3,
+  buildTacticalOverrideRows,
+  type TacticalClassifiedCell,
+} from './terrainTacticalOverrideRows';
 import { reduceTacticalCityOverlayLabelsByH3 } from './terrainTacticalCityOverlayReduce';
 import { loadTerrainTacticalRoadRailSidesBundled } from './terrainRoadRailSidesLoad';
 import { loadTerrainTacticalRoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
@@ -83,15 +88,15 @@ export interface TerrainClassificationSnapshot {
    * Exceptions: None.
    */
 strategicKindByH3: ReadonlyMap<string, PipelineTerrainKind>;
-    /**
-   * Specifies the contract for the `tacticalOverrideRows` member (tacticalOverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;).
-
-   * Contract: Describes stable behavior for callers of `tacticalOverrideRows` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+  /**
+   * Tactical cells that must not inherit their parent's stored kind.
+   *
+   * Contract: A cell with no row is read as the parent's stored `terrain_kind`. Seeding can store a water-dominant hex as coastal, so an open-water child of that hex has a row here.
+   * When to use: Renderer overrides, battle terrain, and any lookup that falls back to the parent kind.
+   * Expected outcome: A row when the classified kind differs from the parent's stored kind, and a row for every urban cell. `terrainKind` is the classified kind.
    * Exceptions: None.
    */
-tacticalOverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
+  readonly tacticalOverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
   /**
    * Precomputed naming caption per strategic hex.
    * Contract: Hexes without naming rows are absent; identical captions share one object.
@@ -292,7 +297,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     isAirport: boolean;
     isSeaport: boolean;
   }> = [];
-  const tacticalClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
+  const tacticalClassifiedRows: TacticalClassifiedCell[] = [];
   const urbanHexCountByStrategicH3 = new Map<string, number>();
   const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
   for (const row of tacticalEnv.records as HexMetadataRecordTactical[]) {
@@ -344,19 +349,16 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     strategicKindByH3.set(row.h3_index, dominantKind ?? (strategicFallbackKindByH3.get(row.h3_index) ?? nodata));
   }
 
-  const tacticalOverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
-  for (const row of tacticalClassifiedRows) {
-    const { h3Index, parentH3, childKind, isUrban } = row;
-    const parentKind = strategicKindByH3.get(parentH3);
-    if (parentKind === undefined) {
-      const msg = `terrain metadata: res4 child ${h3Index} parent ${parentH3} missing from res1 map`;
-      logError('terrainClassificationCache buildSnapshot: orphan res4 row', new Error(msg));
-      throw new Error(msg);
-    }
-    if (childKind !== parentKind || isUrban) {
-      tacticalOverrideRows.push({ h3Index, terrainKind: childKind, isUrban });
-    }
-  }
+  const landMassEnv = loadTerrainStrategicLandMassBundled();
+  const strategicLandMassByH3 = buildStrategicLandMassByH3(landMassEnv);
+  const expectedStrategicHexes = strategicEnv.records.map((row) => row.h3_index);
+  assertLandMassMatchesHexList(strategicLandMassByH3, expectedStrategicHexes);
+  const storedStrategicKindByH3 = buildStoredStrategicKindByH3(strategicKindByH3, strategicLandMassByH3);
+  const tacticalOverrideRows = buildTacticalOverrideRows(tacticalClassifiedRows, storedStrategicKindByH3);
+  const storedCoastalRelabelCount = [...strategicKindByH3].reduce(
+    (count, [h3, classifiedKind]) => count + (storedStrategicKindByH3.get(h3) !== classifiedKind ? 1 : 0),
+    0
+  );
   const namingCaptionsStrategicByH3 = buildNamingCaptionsByH3(namingStrategicEnv.records, namingCaptionForStrategicRecord);
   const namingCaptionsTacticalByH3 = buildNamingCaptionsByH3(
     namingTacticalEnv.records as TerrainNamingRecordTactical[],
@@ -379,16 +381,13 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     continentNamesStrategicByH3.set(row.h3_index, names);
   }
 
-  const landMassEnv = loadTerrainStrategicLandMassBundled();
   ensureWeatherPackLoaded();
-  const strategicLandMassByH3 = buildStrategicLandMassByH3(landMassEnv);
-  const expectedStrategicHexes = strategicEnv.records.map((row) => row.h3_index);
-  assertLandMassMatchesHexList(strategicLandMassByH3, expectedStrategicHexes);
 
   logDebug('terrainClassificationCache buildSnapshot: done', {
     strategicCount: strategicKindByH3.size,
     tacticalRecords: tacticalEnv.records.length,
     tacticalOverrideCount: tacticalOverrideRows.length,
+    storedCoastalRelabelCount,
     strategicMajorAirportHexes: strategicMajorAirports.length,
     strategicMajorSeaportHexes: strategicMajorSeaports.length,
     tacticalMajorAirportHexes: tacticalMajorAirports.length,
