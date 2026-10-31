@@ -63,7 +63,7 @@ Exhausting the tool-round cap records a successful-but-empty consult and warns o
 
 Tactical envelopes omit `assign_order`, `missileLaunches`, memory writes, and production. Sub-units are ordered with `explicit_move`, `ranged_attack`, embark/disembark, `transport_move`.
 
-A strategic consult applies `memoryUpdates` through `executeMemory` in `applyParsedMemoryUpdates` after order validation when memory tools are enabled. A rejected row is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the memory group is off is one drop reason and is not stored.
+A strategic consult applies `memoryUpdates` through `executeMemory` in `applyParsedMemoryUpdates` after order validation when memory tools are enabled. A valid persistent write at capacity is stored, and the oldest persistent note for that seat is deleted. A stored write at capacity, and any other rejected row, is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the memory group is off is one drop reason and is not stored.
 
 ## Coordinates
 

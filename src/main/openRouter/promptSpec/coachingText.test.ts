@@ -103,7 +103,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /replace blocked queues/i);
   assert.match(text, /more than one home region/i);
   assert.match(text, /Do not persist enemy positions/i);
-  assert.match(text, /persistent slots are unused/i);
+  assert.match(text, /replaces the oldest persistent note/i);
   assert.match(text, /replaces the entire subscription list/i);
   assert.match(text, /Omit the array or send \[\]/i);
   assert.match(text, /consulted when a subscribed event fires/i);

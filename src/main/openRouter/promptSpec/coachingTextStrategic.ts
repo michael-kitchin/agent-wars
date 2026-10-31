@@ -277,11 +277,11 @@ const SHARED_HOME_BULLET =
  *
  * Purpose: Enemy positions are supplied fresh each turn; persisting them wastes slots and goes stale.
  * When to use: When memory tools are enabled.
- * Expected outcome: Short persistent note of objectives; do not persist enemy positions or rosters.
+ * Expected outcome: A short persistent note every strategic turn. A new key at capacity replaces the oldest persistent note. Enemy positions and rosters stay out of memory.
  * Exceptions: None.
  */
 const MEMORY_BULLET =
-  '- Write a short persistent note naming this turn\'s objectives and the units assigned to them. Always include a memoryUpdates write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
+  '- Write a short persistent note naming this turn\'s objectives and the units assigned to them. Include that memoryUpdates write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
 
 /**
  * Callbacks replace the whole subscription list.

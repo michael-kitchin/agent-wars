@@ -225,11 +225,11 @@ function expireAndProcessRecurring(playerId: string, currentTurn: number): void 
 }
 
 /**
- * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, currentTurn: number): string).
-
- * Purpose: Supports maintainability by documenting why `getInjectionText` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Briefing text for one seat's memory.
+ *
+ * Purpose: The strategic prompt shows the persistent notes and the rule for a full persistent tier.
+ * When to use: From the strategic order injection when memory tools are on.
+ * Expected outcome: The persistent and reminder tables, then the slot counts. The next line says a new persistent key replaces the oldest persistent note when all persistent slots are full, including when slots remain.
  * Exceptions: None.
  */
 export function getInjectionText(playerId: string, currentTurn: number): string {
@@ -299,6 +299,9 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
   lines.push(
     `Persistent: ${persistentCount} of ${PERSISTENT_LIMIT} slots used. Stored: ${storedCount} of ${STORED_LIMIT} slots used.`
   );
+  lines.push(
+    `A new persistent key replaces the oldest persistent note when all ${PERSISTENT_LIMIT} persistent slots are full.`
+  );
   if (storedNotTriggeredSummary) {
     lines.push(storedNotTriggeredSummary);
   }
@@ -329,12 +332,31 @@ function countByTier(playerId: string): { persistent: number; stored: number } {
 }
 
 /**
- * Defines the `write` function shape (function write( playerId: string, key: string, content: string, tier: 'persistent' | 'stored', options: WriteOptions | undefined, currentTurn:).
-
- * Purpose: Supports maintainability by documenting why `write` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Deletes the oldest persistent note for one seat.
+ *
+ * Purpose: A new persistent note can be stored when that tier is already full.
+ * When to use: From `write`, after content and key validation, and only when the persistent destination is full.
+ * Expected outcome: The deleted key, or null when that seat has no persistent row. The row is the smallest `created_turn`, then the ascending key.
  * Exceptions: None.
+ */
+function evictOldestPersistentMemory(playerId: string): string | null {
+  const row = dbGetOne<{ key: string }>(
+    `SELECT key FROM ai_memory WHERE player_id = ? AND tier = 'persistent' ORDER BY created_turn ASC, key ASC LIMIT 1`,
+    [playerId]
+  );
+  if (!row) return null;
+  dbRun('DELETE FROM ai_memory WHERE player_id = ? AND key = ?', [playerId, row.key]);
+  logDebug('memory evictOldestPersistentMemory', { playerId, key: row.key });
+  return row.key;
+}
+
+/**
+ * Stores one memory row for a seat.
+ *
+ * Purpose: Envelope writes land here, and a full persistent tier must still accept a valid new key.
+ * When to use: From `executeMemory` for a memory write, after the caller has chosen the seat and turn.
+ * Expected outcome: A valid persistent write at capacity deletes the oldest persistent note for that seat and then stores the write. `replacedKey` names that deleted key. A stored write at capacity returns the stored-full error and deletes nothing. Empty content, overlong content, and an illegal key return before any delete.
+ * Exceptions: None. Failures return `status: 'error'` rather than throwing.
  */
 function write(
   playerId: string,
@@ -343,7 +365,7 @@ function write(
   tier: 'persistent' | 'stored',
   options: WriteOptions | undefined,
   currentTurn: number
-): { status: string; error?: string; key?: string; tier?: string; action?: string; persistentCount?: number; persistentLimit?: number; storedCount?: number; storedLimit?: number } {
+): { status: string; error?: string; key?: string; tier?: string; action?: string; replacedKey?: string; persistentCount?: number; persistentLimit?: number; storedCount?: number; storedLimit?: number } {
   logDebug('memory write', { playerId, key, tier, currentTurn });
 
   if (content.length === 0) {
@@ -358,32 +380,54 @@ function write(
 
   const existing = dbGetOne<MemoryRow>('SELECT * FROM ai_memory WHERE player_id = ? AND key = ?', [playerId, key]);
   const counts = countByTier(playerId);
+  let replacedKey: string | undefined;
+  const persistentFullError = {
+    status: 'error' as const,
+    error: 'Persistent memory full (5/5). Delete a persistent memory or use tier \'stored\' instead.',
+  };
+  const storedFullError = {
+    status: 'error' as const,
+    error: 'Stored memory full (15/15). Delete a stored memory or promote an important one to \'persistent\' tier.',
+  };
+
+  /**
+   * Frees one persistent slot when that tier is full.
+   *
+   * Purpose: Both the new-key path and the promotion path share the same delete-then-continue rule.
+   * When to use: Only after the persistent count is already at the limit.
+   * Expected outcome: Undefined when a row was deleted and the caller should continue. The persistent-full error when no row existed to delete.
+   * Exceptions: None.
+   */
+  const releasePersistentSlot = (): { status: 'error'; error: string } | undefined => {
+    const evicted = evictOldestPersistentMemory(playerId);
+    if (evicted == null) return persistentFullError;
+    replacedKey = evicted;
+    return undefined;
+  };
 
   if (existing) {
     if (existing.tier !== tier) {
       const destCount = tier === 'persistent' ? counts.persistent : counts.stored;
       const limit = tier === 'persistent' ? PERSISTENT_LIMIT : STORED_LIMIT;
       if (destCount >= limit) {
-        return {
-          status: 'error',
-          error:
-            tier === 'persistent'
-              ? 'Persistent memory full (5/5). Delete a persistent memory or use tier \'stored\' instead.'
-              : 'Stored memory full (15/15). Delete a stored memory or promote an important one to \'persistent\' tier.',
-        };
+        if (tier === 'persistent') {
+          const blocked = releasePersistentSlot();
+          if (blocked) return blocked;
+        } else {
+          return storedFullError;
+        }
       }
     }
   } else {
     const limit = tier === 'persistent' ? PERSISTENT_LIMIT : STORED_LIMIT;
     const count = tier === 'persistent' ? counts.persistent : counts.stored;
     if (count >= limit) {
-      return {
-        status: 'error',
-        error:
-          tier === 'persistent'
-            ? 'Persistent memory full (5/5). Delete a persistent memory or use tier \'stored\' instead.'
-            : 'Stored memory full (15/15). Delete a stored memory or promote an important one to \'persistent\' tier.',
-      };
+      if (tier === 'persistent') {
+        const blocked = releasePersistentSlot();
+        if (blocked) return blocked;
+      } else {
+        return storedFullError;
+      }
     }
   }
 
@@ -408,6 +452,7 @@ function write(
       key,
       tier,
       action: 'updated',
+      replacedKey,
       persistentCount: after.persistent,
       persistentLimit: PERSISTENT_LIMIT,
       storedCount: after.stored,
@@ -426,6 +471,7 @@ function write(
     key,
     tier,
     action: 'created',
+    replacedKey,
     persistentCount: after.persistent,
     persistentLimit: PERSISTENT_LIMIT,
     storedCount: after.stored,

@@ -4,8 +4,9 @@
  * Purpose: Keeps `requestOrdersFlow` under the file-size limit. The last row for a unit still wins. An earlier discarded
  * row, and a rejected memory row, are drop reasons.
  * When to use: After `parseOrdersResponse` (and optional repair) returns a non-null parse.
- * Expected outcome: A success result with validated movement, fire, air, ferry, and embark rows. Strategic memory
- * rows are applied in the same pass. A rejected memory row is a drop reason and does not fail the consultation.
+ * Expected outcome: A success result with validated movement, fire, air, ferry, and embark rows. A shortened tactical
+ * step is left out when the sub-unit can already shoot from its current cell, unless that step enters an enemy cell.
+ * Strategic memory rows are applied in the same pass. A rejected memory row is a drop reason and does not fail the consultation.
  * Exceptions: None; invalid rows are dropped with reasons rather than thrown.
  */
 
@@ -28,6 +29,7 @@ import {
   validateTacticalOpponentEmbarkOrder,
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
+import { holdsShooterOnClampedMove } from '../tacticalBattle/tacticalClampedMoveGuards';
 import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
@@ -229,8 +231,9 @@ export interface ApplyParsedRequestOrdersArgs {
  * Purpose: The apply block is large enough that leaving it in the orchestrator would breach the size limit.
  * When to use: Once per consultation after a successful parse.
  * Expected outcome: Validated movement, fire, air, ferry, and embark rows. The last row for a unit wins, and each
- * discarded earlier row is a drop reason. Strategic memory rows are applied when memory tools are on. A rejected
- * memory row does not fail the consultation.
+ * discarded earlier row is a drop reason. A tactical explicit move shortened to the first reachable leg is omitted
+ * when the sub-unit can already shoot, unless that step enters an enemy cell. A move that reaches the ordered cell
+ * is kept. Strategic memory rows are applied when memory tools are on. A rejected memory row does not fail the consultation.
  * Exceptions: None. Invalid rows are dropped with reasons rather than thrown.
  */
 export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): RequestOrdersResult {
@@ -384,6 +387,16 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         continue;
       }
       if (appliedTo !== order.toH3Index) {
+        if (holdsShooterOnClampedMove({
+          battle: tacticalBattle,
+          subUnitId: order.unitId,
+          orderedH3: order.toH3Index,
+          appliedH3: appliedTo,
+        })) {
+          dropReasons.push(`Tactical march ${aiOrderUnitLabel(order.unitId)}: held on its firing cell`);
+          seenUnits.add(order.unitId);
+          continue;
+        }
         dropReasons.push(
           `Tactical march ${aiOrderUnitLabel(order.unitId)}: clamped explicit_move destination to first leg this beat (${order.toH3Index} → ${appliedTo})`
         );

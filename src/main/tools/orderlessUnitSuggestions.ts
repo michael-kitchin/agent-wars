@@ -70,8 +70,8 @@ export interface OrderlessMissionActionSignals {
    * Units with an air-strike row this turn.
    *
    * Contract: Names units whose Best Options row includes an air-strike label.
-   * When to use: The debug log for this collection. An orderless air unit is told to defend whether or not it is in this set.
-   * Expected outcome: A unit absent from the set still receives a defend suggestion when it is air and orderless.
+   * When to use: Attention Flags, and the defend-suggestion input. An orderless air unit is told to defend whether or not it is in this set.
+   * Expected outcome: A unit absent from the set still receives a defend suggestion when it is air and orderless. Attention Flags still names a unit in the set when that unit already has a standing order.
    * Exceptions: None.
    */
   airStrikeUnitIds: ReadonlySet<string>;
@@ -151,7 +151,7 @@ export interface OrderlessActionNeededSets {
  * once here keeps those surfaces from drifting and keeps the search off the per-unit path.
  * When to use: Once from strategic `getInjectionText` and once from strategic `formatBriefing`, for the ids that have
  * no standing order. Do not call it from `needsAction`.
- * Expected outcome: The suggestion map plus the one-step move ids. Every requested air unit appears in the map as
+ * Expected outcome: The suggestion map, the one-step move ids, and `airStrikeUnitIds` for every unit on an air-strike row, including units that already have a standing order. Every requested air unit appears in the map as
  * defend on its current hex. An empty id list still scans rows, so a move id for a unit that was not requested can still be returned.
  * Exceptions: Throws when Best Options row collection throws, or when a blind land march cannot load the terrain cache.
  * A unit that cannot be scored is simply absent from the suggestion map.
@@ -162,7 +162,8 @@ export function collectOrderlessMissionContext(args: {
   orderlessUnitIds: readonly string[];
   latLngByH3?: ReadonlyMap<string, [number, number]>;
   thisPeriodMoveByUnitId?: ReadonlyMap<string, string>;
-}): { suggestions: ReadonlyMap<string, OrderlessMissionSuggestion> } & OrderlessActionNeededSets {
+}): { suggestions: ReadonlyMap<string, OrderlessMissionSuggestion> } &
+  OrderlessActionNeededSets & { airStrikeUnitIds: ReadonlySet<string> } {
   const latLngByH3 = args.latLngByH3 ?? latLngForState(args.state);
   const signals = orderlessMissionSignalsFromActionRows(
     collectAggregatedPossibleActionRows({
@@ -185,12 +186,41 @@ export function collectOrderlessMissionContext(args: {
     orderlessCount: args.orderlessUnitIds.length,
     suggestedCount: suggestions.size,
     oneStepMoveCount: signals.oneStepMoveUnitIds.size,
+    airStrikeCount: signals.airStrikeUnitIds.size,
   });
   return {
     suggestions,
     suggestedUnitIds: new Set(suggestions.keys()),
     oneStepMoveUnitIds: signals.oneStepMoveUnitIds,
+    airStrikeUnitIds: signals.airStrikeUnitIds,
   };
+}
+
+/**
+ * Names every unit with a Best Options air-strike row this turn.
+ *
+ * Purpose: A strategic briefing with no standing-order section still has to mark those air units.
+ * When to use: From `formatBriefing` when `collectOrderlessMissionContext` did not run. Do not call it when that context is already in hand.
+ * Expected outcome: The unit ids whose Best Options action labels include an air strike. Infrastructure targets are included. The set is not limited to units without a standing order.
+ * Exceptions: Throws when Best Options row collection throws.
+ */
+export function collectBestOptionsAirStrikeUnitIds(
+  state: GameStateSnapshot,
+  latLngByH3: ReadonlyMap<string, [number, number]>
+): ReadonlySet<string> {
+  const signals = orderlessMissionSignalsFromActionRows(
+    collectAggregatedPossibleActionRows({
+      state,
+      latLngByH3: new Map(latLngByH3),
+      formatLatLng: (ll) => formatLatLng(ll, LATLNG_DECIMAL_PLACES),
+      forThisTurnOptionsTable: true,
+    })
+  );
+  logDebug('orderlessUnitSuggestions collectBestOptionsAirStrikeUnitIds', {
+    turnNumber: state.turnNumber,
+    airStrikeCount: signals.airStrikeUnitIds.size,
+  });
+  return signals.airStrikeUnitIds;
 }
 
 /**

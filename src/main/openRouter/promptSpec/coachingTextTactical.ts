@@ -103,11 +103,11 @@ const STANDING_ORDERS_INERT_BULLET =
  *
  * Purpose: Ordering a far cell advances the sub-unit rather than failing, but does not teleport it.
  * When to use: Always in tactical coaching.
- * Expected outcome: Mentions clamping to the first reachable leg, the one-point urban or rubble budget, and the shared land enter-cost rule.
+ * Expected outcome: Mentions clamping to the first reachable leg, the hold when that shortened step would leave a cell the sub-unit can already shoot from, the one-point urban or rubble budget, and the shared land enter-cost rule.
  * Exceptions: None.
  */
 const REACH_BULLET =
-  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat. " +
+  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat. " +
   tacticalLandEnterCostRule();
 
 /**

@@ -280,7 +280,8 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.doesNotMatch(tactical, /unless that cell holds a friendly/i);
   assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
   assert.match(tactical, /clamped to the first reachable leg/);
-  assert.doesNotMatch(tactical, /\bdropped\b/);
+  assert.doesNotMatch(tactical, /dropped, not shortened to the first step/);
+  assert.match(tactical, /the move is dropped and the sub-unit stays there/);
 });
 
 test('buildRangedReachRule distinguishes infantry melee from tactical infantry reach', () => {

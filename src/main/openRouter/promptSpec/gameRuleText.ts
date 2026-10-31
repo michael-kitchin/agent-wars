@@ -426,7 +426,7 @@ export function tacticalLandEnterCostRule(): string {
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget` are clear-weather counts. A lower number applies only when the weather sentence states one for a unit that lacks that weather. An over-budget strategic explicit move is dropped. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell. A tactical destination past the beat budget is clamped to the first reachable leg.
+ * Expected outcome: Strategic cell counts from `getMovementBudget` are clear-weather counts. A lower number applies only when the weather sentence states one for a unit that lacks that weather. An over-budget strategic explicit move is dropped. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell. A tactical destination past the beat budget is clamped to the first reachable leg. That shortened step is dropped when the sub-unit can already shoot, unless it enters an enemy cell.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
@@ -439,7 +439,8 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
       'Armor in forest is penalised to the infantry baseline. ' +
       `${tacticalLandEnterCostRule()} ` +
       'A non-air unit always retains at least one point. ' +
-      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
+      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. " +
+      'When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.'
     );
   }
   return (

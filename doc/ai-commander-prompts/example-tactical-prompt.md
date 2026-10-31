@@ -56,7 +56,7 @@ Entering an intact road cell costs 1/2 point and an intact rail cell costs 1/3 p
 
 Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. A non-air unit always retains at least one point.
 
-A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead.
+A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.
 
 Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 
@@ -236,7 +236,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
   Each sub-unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same sub-unit.
 
   Never copy a Target Hex from a row that does not list that sub-unit; if that sub-unit has no row, call plan_route or leave it idle. Call plan_route only for a destination the table does not list for that sub-unit.
-- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected.
+- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.
 
   Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat.
 

@@ -8,6 +8,7 @@ import { strategicCellAt, tacticalCellAt } from '../shared/h3Resolutions';
 import { isMissileUnitType } from '../shared/missileRules';
 
 import type { GameStateSnapshot } from './gameDb';
+import { armedUnitsBulletText } from './briefing/briefingArmedUnits';
 import { briefingOwnSeatId } from './briefing/briefingPerspective';
 import { buildRecentTurnNotesSection } from './briefing/recentTurnNotesSection';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
@@ -32,6 +33,7 @@ import { getMovementBudgetForUnit } from './pathfinding';
 import { formatBriefingWeatherCell } from '../shared/weatherBonusRules';
 import { marchStepRecedesFromEnemy } from './tools/standingMarchReceding';
 import {
+  collectBestOptionsAirStrikeUnitIds,
   collectOrderlessMissionContext,
   orderlessMissionAttentionText,
   orderlessUnitNeedsMission,
@@ -360,90 +362,54 @@ function standingMarchRecedesFromNearestEnemy(assessment: UnitAssessmentResult):
 }
 
 /**
- * True when a strategic armor or naval unit's only in-range fight is same-hex contact.
+ * Empty air-strike set for callers that have no Best Options rows.
  *
- * Purpose: Those units stay on the armed-units bullet, and a ranged_attack order is not their listed fight.
- * When to use: Partitioning the ids already chosen for the armed-units bullet.
- * Expected outcome: True only for strategic armor or naval whose every non-none attack row is melee. False when the assessment is missing, the mode is tactical, the unit is another type, or any in-range row is not melee.
+ * Purpose: Tactical briefings and the strategic narrative omit infrastructure strikes.
+ * When to use: The default argument on Action needed, quiet, and attention assembly.
+ * Expected outcome: One shared empty set. Callers that pass their own set do not use it.
  * Exceptions: None.
  */
-function isSameHexContactOnly(
-  assessment: UnitAssessmentResult | undefined,
-  coordinateMode: 'strategic' | 'tactical'
-): boolean {
-  if (!assessment || coordinateMode !== 'strategic') return false;
-  const unitType = assessment.result.unit?.type;
-  if (unitType !== 'armor' && unitType !== 'naval') return false;
-  const rows = (assessment.result.canAttackThisTurn ?? []) as Array<{ attackType?: unknown }>;
-  const attacks = rows.filter((row) => typeof row.attackType === 'string' && row.attackType !== 'none');
-  return attacks.length > 0 && attacks.every((row) => row.attackType === 'melee');
-}
+const EMPTY_AIR_STRIKE_ROW_UNIT_IDS: ReadonlySet<string> = new Set();
 
 /**
- * Writes the single armed-units bullet.
+ * True when Best Options lists an air strike for this air unit.
  *
- * Purpose: Same-hex armor and naval stay on the list, and the sentence must not tell them to order a ranged_attack.
- * When to use: After the armed-unit ids are sliced to `ATTENTION_ARMED_UNITS_LISTED`.
- * Expected outcome: One sentence. The shot clause tells the model to copy a listed Best Options row and not invent a target. The contact clause names
- * strategic armor and naval whose only in-range row is melee and tells the model to stay for that melee. The overflow
- * suffix counts the combined remainder.
+ * Purpose: An infrastructure strike does not create an enemy-unit attack row, and a standing defend order must not hide it.
+ * When to use: Action needed, the quiet suffix, and the armed-units list.
+ * Expected outcome: True only for unit type air whose id is in the set. Infantry and missiles stay false.
  * Exceptions: None.
  */
-function armedUnitsBulletText(args: {
-  listedIds: readonly string[];
-  overflow: number;
-  assessmentsById: ReadonlyMap<string, UnitAssessmentResult>;
-  coordinateMode: 'strategic' | 'tactical';
-  period: 'beat' | 'turn';
-  hasAirShooter: boolean;
-}): string {
-  const shotIds: string[] = [];
-  const contactIds: string[] = [];
-  for (const id of args.listedIds) {
-    if (isSameHexContactOnly(args.assessmentsById.get(id), args.coordinateMode)) {
-      contactIds.push(id);
-    } else {
-      shotIds.push(id);
-    }
-  }
-  const count = args.listedIds.length + args.overflow;
-  const overflowText = args.overflow > 0 ? `, and ${args.overflow} more marked Action needed = yes` : '';
-  const attackKinds = args.hasAirShooter ? 'a Best Options ranged or air-strike row' : 'a Best Options ranged row';
-  const clauses: string[] = [];
-  if (shotIds.length > 0) {
-    clauses.push(`copy ${attackKinds} for each and do not invent a target: ${shotIds.join(', ')}`);
-  }
-  if (contactIds.length > 0) {
-    clauses.push(
-      `do not order a ranged_attack for ${contactIds.join(', ')}, they are already in contact, and melee resolves if they stay`
-    );
-  }
-  return `${count} unit(s) have a legal attack this ${args.period} — ${clauses.join('; ')}${overflowText}.`;
+function hasListedAirStrike(assessment: UnitAssessmentResult, airStrikeRowUnitIds: ReadonlySet<string>): boolean {
+  const listed = assessment.result.unit?.type === 'air' && airStrikeRowUnitIds.has(assessment.unitId);
+  logTrace('briefingFormatter hasListedAirStrike', { unitId: assessment.unitId, listed });
+  return listed;
 }
 
 /**
  * Marks units that deserve Attention Flags / Action needed = yes.
  *
  * Purpose: Triage Unit Status and Attention Flags without flooding on distant low threats, while never letting a
- * standing order hide a shot or a this-turn close the model should be choosing itself. Idle air holding on
- * defend is left off this flag; coaching still tells the model to ferry those units.
+ * standing order hide a shot or a this-turn close the model should be choosing itself. An air unit with a Best
+ * Options air-strike row is on the flag, including infrastructure and including a healthy defend order. An air unit
+ * with no strike row and no other reason stays off, and ferry coaching does not mark it.
  * When to use: Unit Status rows and Attention Flags assembly.
- * Expected outcome: Always true when the unit has a legal attack, can close this turn under a moderate/critical
- * threat, or is on a standing march that recedes from the nearest enemy under a moderate/critical threat.
- * Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also missing/warning
- * standing orders.
+ * Expected outcome: Always true when the unit has a legal attack, a listed air strike, can close this turn under a
+ * moderate/critical threat, or is on a standing march that recedes from the nearest enemy under a moderate/critical
+ * threat. Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also
+ * missing/warning standing orders. The strategic narrative passes the empty air-strike set.
  * Exceptions: None.
  */
 function needsAction(
   assessment: UnitAssessmentResult,
   standingOrdersActive: boolean,
-  useGridHopBudget: boolean
+  useGridHopBudget: boolean,
+  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS
 ): boolean {
   if (isMissileUnitType(String(assessment.result.unit?.type ?? ''))) return false;
   // A shot the model could take is always worth surfacing. Auto-fire is a backstop for a turn the model skips,
   // never a reason to tell it a unit needs nothing, or it loses the chance to pick a better target than the
   // nearest one.
-  if (hasLegalAttackThisTurn(assessment)) return true;
+  if (hasLegalAttackThisTurn(assessment) || hasListedAirStrike(assessment, airStrikeRowUnitIds)) return true;
   // A this-turn close is the other action the engine cannot choose a destination for. A healthy march to a
   // rear hex must not mark the unit as needing nothing while Best Options lists move/melee onto the enemy.
   if (canCloseThisTurn(assessment, useGridHopBudget) && hasActionableThreat(assessment)) return true;
@@ -457,17 +423,22 @@ function needsAction(
 }
 
 /**
- * Defines the `isQuiet` function shape (function isQuiet(assessment: UnitAssessmentResult): boolean).
+ * True when a healthy standing order should mark Action needed as quiet.
  *
  * Purpose: Softens Action needed for units with a healthy standing order and only low threats.
  * When to use: Strategic Unit Status rows when Orders tools are enabled.
- * Expected outcome: false when standing orders are inactive, the unit has a legal attack, the march recedes from
- * the nearest enemy, or threats are non-low / order missing/warning.
+ * Expected outcome: false when standing orders are inactive, the unit has a legal attack, Best Options lists an air
+ * strike for an air unit, the march recedes from the nearest enemy, or threats are non-low / order missing/warning.
+ * A healthy defend order does not make an air unit with a listed strike quiet.
  * Exceptions: None.
  */
-function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
+function isQuiet(
+  assessment: UnitAssessmentResult,
+  standingOrdersActive: boolean,
+  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS
+): boolean {
   if (!standingOrdersActive) return false;
-  if (hasLegalAttackThisTurn(assessment)) return false;
+  if (hasLegalAttackThisTurn(assessment) || hasListedAirStrike(assessment, airStrikeRowUnitIds)) return false;
   if (standingMarchRecedesFromNearestEnemy(assessment)) return false;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   const threats = assessment.result.threats ?? [];
@@ -485,6 +456,7 @@ function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
  *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
+ *   An air unit in `airStrikeRowUnitIds` is Action needed yes and is not quiet, including a healthy defend order. Callers that omit the set keep the previous cells.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
 export function buildUnitStatusTable(
@@ -512,7 +484,17 @@ export function buildUnitStatusTable(
    * Expected outcome: An orderless unit in either set reads Action needed yes. A unit with a standing order does not.
    * Exceptions: None.
    */
-  orderlessAction?: OrderlessActionNeededSets
+  orderlessAction?: OrderlessActionNeededSets,
+  /**
+   * Air units with a Best Options air-strike row.
+   *
+   * Contract: Optional. Missing means infrastructure strikes do not mark Action needed. Strategic `formatBriefing`
+   * passes the set from the same row collection as the orderless table. Tactical briefings omit it.
+   * When to use: After that set is known.
+   * Expected outcome: An air unit in the set reads Action needed yes and is not quiet, including a healthy defend order.
+   * Exceptions: None.
+   */
+  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS
 ): string {
   logDebug('briefingFormatter buildUnitStatusTable', {
     unitCount: unitAssessments.length,
@@ -548,13 +530,13 @@ export function buildUnitStatusTable(
             ? 'moderate'
             : 'low';
     const action =
-      needsAction(a, standingOrdersActive, ctx.mode === 'strategic') ||
+      needsAction(a, standingOrdersActive, ctx.mode === 'strategic', airStrikeRowUnitIds) ||
       missionActionNeeded(a, standingOrdersActive, ctx.mode === 'strategic', orderlessAction)
         ? 'yes'
         : 'no';
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
-      ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
+      ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive, airStrikeRowUnitIds) ? `${action} (quiet)` : action;
     const techLevel = a.result.unit?.techLevel;
     const bonusCell = showBonus
       ? ` ${formatBonusTableCellWithTech({
@@ -604,11 +586,11 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
 }
 
 /**
- * Defines the `buildAttentionFlags` function shape (function buildAttentionFlags().
+ * Attention Flags bullets for one briefing.
  *
  * Purpose: Short triage bullets for units that need attention this consultation.
  * When to use: Strategic and tactical Commander briefings after assessments.
- * Expected outcome: Up to five bullets, threats first, then the attack bullet, then the orderless-mission bullet, or `None.`. Tactical mode and inactive standing orders omit standing-order language and the mission bullet.
+ * Expected outcome: Up to five bullets, threats first, then the attack bullet, then the orderless-mission bullet, or `None.`. Tactical mode and inactive standing orders omit standing-order language and the mission bullet. An air unit in the air-strike set is named on the armed-units bullet. Tactical calls that omit the set are unchanged.
  * Exceptions: None.
  */
 export function buildAttentionFlags(
@@ -630,7 +612,16 @@ export function buildAttentionFlags(
    * Expected outcome: At most five lines. The mission sentence does not replace a critical threat or the attack bullet.
    * Exceptions: None.
    */
-  orderlessAction?: OrderlessActionNeededSets
+  orderlessAction?: OrderlessActionNeededSets,
+  /**
+   * Air units with a Best Options air-strike row.
+   *
+   * Contract: Optional. Missing leaves the armed-units bullet on enemy-unit shots only.
+   * When to use: The strategic briefing after the set is collected. Tactical briefings omit it.
+   * Expected outcome: An air unit in the set is named on the armed-units bullet, and the clause says air-strike.
+   * Exceptions: None.
+   */
+  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS
 ): string {
   logDebug('briefingFormatter buildAttentionFlags', {
     unitCount: unitAssessments.length,
@@ -651,10 +642,12 @@ export function buildAttentionFlags(
   const armedUnitRefs: string[] = [];
   const soActive = coordinateMode === 'tactical' ? false : standingOrdersActive;
   for (const a of unitAssessments) {
-    if (!needsAction(a, soActive, coordinateMode === 'strategic')) continue;
+    if (!needsAction(a, soActive, coordinateMode === 'strategic', airStrikeRowUnitIds)) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
-    if (hasOrderableShotThisTurn(a, coordinateMode)) armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
+    if (hasOrderableShotThisTurn(a, coordinateMode) || hasListedAirStrike(a, airStrikeRowUnitIds)) {
+      armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
+    }
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {
@@ -707,10 +700,8 @@ export function buildAttentionFlags(
     const listed = armedUnitRefs.slice(0, ATTENTION_ARMED_UNITS_LISTED);
     const overflow = armedUnitRefs.length - listed.length;
     const period = coordinateMode === 'tactical' ? 'beat' : 'turn';
-    const hasAirShooter = unitAssessments.some(
-      (row) => row.result.unit?.type === 'air' && hasOrderableShotThisTurn(row, coordinateMode)
-    );
     const assessmentsById = new Map(unitAssessments.map((row) => [formatUnitDisplayRef(row.unitId), row]));
+    const hasAirShooter = armedUnitRefs.some((id) => assessmentsById.get(id)?.result.unit?.type === 'air');
     candidates.push({
       rank: 4,
       text: armedUnitsBulletText({
@@ -881,17 +872,28 @@ export function formatBriefing(
         latLngByH3,
       })
     : undefined;
+  const airStrikeRowUnitIds =
+    orderlessAction?.airStrikeUnitIds ?? collectBestOptionsAirStrikeUnitIds(state, latLngByH3);
   sections.push(
     buildUnitStatusTable(
       precomputed.unitAssessments,
       coordCtx,
       standingOrdersActive,
       originBonusSettingsFromSnapshot(state),
-      orderlessAction
+      orderlessAction,
+      airStrikeRowUnitIds
     )
   );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
-  sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive, orderlessAction));
+  sections.push(
+    buildAttentionFlags(
+      precomputed.unitAssessments,
+      'strategic',
+      standingOrdersActive,
+      orderlessAction,
+      airStrikeRowUnitIds
+    )
+  );
   const operational = buildStrategicOperationalMapSectionMarkdown({
     state,
     latLngByH3,

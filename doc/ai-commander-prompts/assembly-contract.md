@@ -132,7 +132,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, dests are intact airport cells in the footprint; strike-or-ferry exclusivity still applies. |
 | `missileLaunches` | array | present when the opponent has a missile and the consult is strategic | One launch per missile. Each entry uses `unitId` or `unitIds` and `targetHexCode`. A battle consult does not offer the field. |
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
-| `memoryUpdates` | array | present when memory tools are enabled | Write or delete. A write requires `content` and `tier`. A strategic consult applies the rows through `executeMemory` when memory tools are enabled; a rejected row is a drop reason. A battle consult does not apply them. A list sent while the group is off is not stored. |
+| `memoryUpdates` | array | present when memory tools are enabled | Write or delete. A write requires `content` and `tier`. A strategic consult applies the rows through `executeMemory` when memory tools are enabled. A valid persistent write at capacity deletes the oldest persistent note for that seat and then stores the write. A stored write at capacity, and any invalid row, is a drop reason. A battle consult does not apply them. A list sent while the group is off is not stored. |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
 
 Envelope-wide rules the prompt must state:

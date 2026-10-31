@@ -45,7 +45,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | Heading | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
 | `# Commander's Briefing` | `formatBriefing` | always when a briefing is supplied | n/a |
-| (narrative, no heading) | `buildStrategicNarrative` | always | never empty; capped at 5 sentences. Own count 0 omits the scout clause and adds the still-in-match sentence |
+| (narrative, no heading) | `buildStrategicNarrative` | always | never empty; capped at 5 sentences. Own count 0 omits the scout clause and adds the still-in-match sentence. When standing orders are active, the critical count calls `needsAction` without the air-strike set |
 | `## Unit Status and Threats` | `formatBriefing` | always | header plus `(No AI units)` |
 | (omniscient hop line) | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE` | fog off and a strategic cell | omitted |
 | (fog intel-staleness + path-distance lines) | `buildIntelStalenessRule` then `FOG_PATH_DISTANCE_BRIEFING_LINE` | fog on, on the strategic map | omitted when fog is off or in battle |
@@ -75,7 +75,7 @@ Table columns as coded:
 - Units Without Standing Orders: `Unit ID` | `Unit Type` | `Suggested Destination`.
 - Active Callbacks: `Event` | `Details` (parameters, not just the event name).
 
-Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. Same-hex armor and naval are told not to order a ranged_attack, that they are already in contact, and that melee resolves if they stay. The shot clause tells the model to copy a Best Options ranged row for each and not invent a target, and names a ranged or air-strike row when an air shooter is listed. In a battle it includes only a ranged attack or an air strike.
+Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units sentence is `armedUnitsBulletText` in `src/main/briefing/briefingArmedUnits.ts`. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. A Best Options air-strike row counts, including a strike whose target is infrastructure and including an air unit that already has a standing defend order. Same-hex armor and naval are told not to order a ranged_attack, that they are already in contact, and that melee resolves if they stay. The shot clause tells the model to copy a Best Options ranged row for each and not invent a target, and names a ranged or air-strike row when an air shooter is listed. In a battle it includes only a ranged attack or an air strike already expressed as `canAttackThisTurn`.
 
 Production status interpolates `buildProductionIncomeRule` and `buildProductionCostRulesLine` (costs and prerequisites from engine tables).
 

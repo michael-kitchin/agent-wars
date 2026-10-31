@@ -299,6 +299,7 @@ Production progress/spawn resolves after Ready, after combat and control resolut
 | — | — | — | — |
 
 Persistent: 0 of 5 slots used. Stored: 0 of 15 slots used.
+A new persistent key replaces the oldest persistent note when all 5 persistent slots are full.
 
 Use memory_read to retrieve stored memories by key or tag. To add, update, or remove memories, use "memoryUpdates" in your final JSON (write/delete actions); there are no memory_write or memory_delete tools.
 
@@ -475,7 +476,7 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
   A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up.
 
   When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.
-- Write a short persistent note naming this turn's objectives and the units assigned to them. Always include a memoryUpdates write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
+- Write a short persistent note naming this turn's objectives and the units assigned to them. Include that memoryUpdates write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
