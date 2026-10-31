@@ -189,16 +189,18 @@
   var BUILD_TAB_LABEL = "Build";
   var HIRE_TAB_LABEL = "Hire";
   var HIRE_BUTTON_LABEL = "Hire";
-  var REHIRE_SECTION_TITLE = "Neutral units";
+  var REHIRE_SECTION_TITLE = "Neutral Units";
   var PENDING_HIRE_SECTION_TITLE = "Hire Queue";
   var RAISE_CAPACITY_LABEL = "Production (Hire)";
   var HIRE_SHORT_CREDITS = "Not enough credits.";
   var HIRE_SHORT_PRODUCTION = "Not enough production capacity.";
   var HIRE_SHORT_BOTH = "Not enough credits or production capacity.";
   var HIRE_VIEW_FAILED = "Hiring information could not be loaded.";
+  var RAISE_REASON_OCCUPIED = "Mercenaries can be raised only where no other side has units.";
   var RAISE_REASON_CAPACITY_USED = "Your orders here already use this turn's raise capacity.";
   var HIRE_ORDER_UPDATE_FAILED = "Failed to update hire orders.";
   var MERCENARY_TOOLTIP_LABEL = "Mercenary";
+  var MERCENARY_TOOLTIP_FOR_HIRE = "For Hire.";
   function isHireableUnitType(value) {
     return typeof value === "string" && HIREABLE_UNIT_TYPES.includes(value);
   }
@@ -278,6 +280,19 @@
   }
   function formatMercenaryTooltipValue(upkeep) {
     return `${formatCreditsAmount(String(upkeep))}/turn`;
+  }
+  function neutralUnitOfferedForRehire(input) {
+    return isNeutralOwnerId(input.ownerId) && isHireableUnitType(input.unitType) && !input.embarked && !input.carryingCargo && !input.fortifiedByAnotherSide;
+  }
+  function mercenaryTooltipValue(input) {
+    const ownsIt = input.viewerSeatId != null && input.ownerId === input.viewerSeatId;
+    if (input.isMercenary && ownsIt && input.upkeep != null) return formatMercenaryTooltipValue(input.upkeep);
+    if (input.isMercenary && !ownsIt && !isNeutralOwnerId(input.ownerId)) {
+      const name = input.ownerShortName?.trim() ?? "";
+      return name.length > 0 ? name : null;
+    }
+    if (input.forHire) return MERCENARY_TOOLTIP_FOR_HIRE;
+    return null;
   }
   function capitalizeUnitType(unitType) {
     return unitType.charAt(0).toUpperCase() + unitType.slice(1);
@@ -20599,8 +20614,9 @@
     }
     const formedLabel = identity.formedLabel?.trim() ?? "";
     if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
-    if (identity.mercenaryUpkeep != null) {
-      lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(formatMercenaryTooltipValue(identity.mercenaryUpkeep))}`);
+    const mercenaryValue = identity.mercenaryValue?.trim() ?? "";
+    if (mercenaryValue.length > 0) {
+      lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(mercenaryValue)}`);
     }
     return lines;
   }
@@ -20639,6 +20655,60 @@ ${body}`;
 ${bonuses}`;
   }
 
+  // src/shared/sideLabels.ts
+  function homeSeatIdsAtHex(h3Index, lists) {
+    const bySeat = lists.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
+  }
+  function viewerSeatIdForRoster(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
+  }
+  function abbreviatedSideName(seat) {
+    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+  }
+  function controllerSideLabel(controllerId, seats) {
+    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === controllerId);
+    return seat ? abbreviatedSideName(seat) : controllerId;
+  }
+  function homesInOrder(homeSeatIds, seats) {
+    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
+  }
+  function formatHexControlLabel(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    const controllerName = controllerSideLabel(args.controllerId, args.seats);
+    if (homes.length === 0) return controllerName;
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => abbreviatedSideName(seat));
+      return `${controllerName} (${names.join(" & ")} homes)`;
+    }
+    const home = homes[0];
+    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
+    return `${controllerName} (${abbreviatedSideName(home)} home)`;
+  }
+  function formatUnitNameForViewer(args) {
+    if (isNeutralOwnerId(args.ownerId)) return args.baseName;
+    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
+    if (args.seats.length === 2) return args.baseName;
+    const seat = args.seats.find((row) => row.seatId === args.ownerId);
+    if (!seat) return args.baseName;
+    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
+  }
+  function formatHomeChip(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
+      return { kind: "home", text: "Home" };
+    }
+    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => shortSideName(seat.homeRegion));
+      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
+    }
+    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
+    return null;
+  }
+
   // src/renderer/core/unitOriginFlags.ts
   var unitOriginById = /* @__PURE__ */ new Map();
   var formedTurnById = /* @__PURE__ */ new Map();
@@ -20675,19 +20745,61 @@ ${bonuses}`;
     return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? "global"));
   }
   function tooltipIdentityFor(unitId) {
-    const mercenaryUpkeep = mercenaryUpkeepForLiveUnit(unitId);
+    const mercenaryValue = mercenaryValueForLiveUnit(unitId);
     return {
       displayName: rendererSharedState.unitDisplayNameById.get(unitId) ?? "",
       formedLabel: formedLabelFor(unitId),
-      ...mercenaryUpkeep != null ? { mercenaryUpkeep } : {}
+      ...mercenaryValue != null ? { mercenaryValue } : {}
     };
   }
-  function mercenaryUpkeepForLiveUnit(unitId) {
-    const battle = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit2) => unit2.id === unitId);
-    const strategic = rendererSharedState.gameState?.units.find((unit2) => unit2.id === unitId);
-    const unit = battle ?? strategic;
-    if (!unit || unit.isMercenary !== true || !isHireableUnitType(unit.unitType)) return null;
-    return mercenaryUpkeepFor(unit.unitType, unit.techLevel);
+  function mercenaryTooltipViewerSeatId() {
+    return findHumanSeat(rendererSharedState.gameState?.seats ?? [])?.seatId ?? null;
+  }
+  function mercenaryOwnerShortName(ownerId) {
+    const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === ownerId);
+    return seat ? abbreviatedSideName(seat) : null;
+  }
+  function hexFortifiedByAnotherSide(h3Index, viewerSeatId2) {
+    const infra = rendererSharedState.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3Index);
+    if ((infra?.fortifiedCount ?? 0) <= 0) return false;
+    if (viewerSeatId2 == null) return true;
+    const controller = rendererSharedState.gameState?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
+    return controller !== viewerSeatId2;
+  }
+  function shipIsCarryingCargo(unitId) {
+    return (rendererSharedState.gameState?.units ?? []).some((unit) => unit.embarkedOnNavalUnitId === unitId);
+  }
+  function tooltipUnitFacts(unitId) {
+    const battle = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+    const strategicId = parseTacticalSubUnitId(unitId)?.parentUnitId ?? unitId;
+    const strategic = rendererSharedState.gameState?.units.find((unit) => unit.id === strategicId) ?? null;
+    if (battle) return { shown: battle, placed: strategic };
+    if (!strategic) return null;
+    return { shown: strategic, placed: strategic };
+  }
+  function mercenaryValueForLiveUnit(unitId) {
+    const facts = tooltipUnitFacts(unitId);
+    if (!facts) return null;
+    const viewerSeatId2 = mercenaryTooltipViewerSeatId();
+    const shown = facts.shown;
+    const isMercenary = shown.isMercenary === true && isHireableUnitType(shown.unitType);
+    const upkeep = isMercenary ? mercenaryUpkeepFor(shown.unitType, shown.techLevel) : null;
+    const placed = facts.placed;
+    const forHire = placed != null && neutralUnitOfferedForRehire({
+      ownerId: placed.player,
+      unitType: placed.unitType,
+      embarked: (placed.embarkedOnNavalUnitId ?? "").length > 0,
+      carryingCargo: shipIsCarryingCargo(placed.id),
+      fortifiedByAnotherSide: hexFortifiedByAnotherSide(placed.h3Index, viewerSeatId2)
+    });
+    return mercenaryTooltipValue({
+      ownerId: shown.player,
+      viewerSeatId: viewerSeatId2,
+      isMercenary,
+      forHire,
+      upkeep,
+      ownerShortName: mercenaryOwnerShortName(shown.player)
+    });
   }
   function selectedBonusOptions() {
     const state = rendererSharedState.gameState;
@@ -23520,60 +23632,6 @@ ${bonuses}`;
     const total = uniqueRegionHexes.length;
     const pct = computeRoundedPercentage(controlled, total);
     return { controlled, total, pct };
-  }
-
-  // src/shared/sideLabels.ts
-  function homeSeatIdsAtHex(h3Index, lists) {
-    const bySeat = lists.homeRegionHexesBySeat;
-    if (!bySeat) return [];
-    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
-  }
-  function viewerSeatIdForRoster(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
-  }
-  function abbreviatedSideName(seat) {
-    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
-  }
-  function controllerSideLabel(controllerId, seats) {
-    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
-    const seat = seats.find((row) => row.seatId === controllerId);
-    return seat ? abbreviatedSideName(seat) : controllerId;
-  }
-  function homesInOrder(homeSeatIds, seats) {
-    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
-  }
-  function formatHexControlLabel(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    const controllerName = controllerSideLabel(args.controllerId, args.seats);
-    if (homes.length === 0) return controllerName;
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => abbreviatedSideName(seat));
-      return `${controllerName} (${names.join(" & ")} homes)`;
-    }
-    const home = homes[0];
-    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
-    return `${controllerName} (${abbreviatedSideName(home)} home)`;
-  }
-  function formatUnitNameForViewer(args) {
-    if (isNeutralOwnerId(args.ownerId)) return `Neutral \xB7 ${args.baseName}`;
-    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
-    if (args.seats.length === 2) return args.baseName;
-    const seat = args.seats.find((row) => row.seatId === args.ownerId);
-    if (!seat) return args.baseName;
-    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
-  }
-  function formatHomeChip(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
-      return { kind: "home", text: "Home" };
-    }
-    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => shortSideName(seat.homeRegion));
-      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
-    }
-    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
-    return null;
   }
 
   // src/shared/statusIconHtml.ts
@@ -30402,7 +30460,9 @@ ${bonuses}`;
         unitId: unit.id,
         unitType: unit.unitType,
         h3Index: unit.h3Index,
-        inPanelHex: unit.h3Index === panelHex
+        inPanelHex: unit.h3Index === panelHex,
+        player: unit.player,
+        isMercenary: unit.isMercenary === true
       }))
     };
   }
@@ -30461,6 +30521,130 @@ ${bonuses}`;
         unitTypes: selectedUnitTypes()
       });
     }
+  }
+
+  // src/shared/mercenaryDismiss.ts
+  var DISMISS_MERCENARY_LABEL = "Dismiss";
+  var DISMISS_MERCENARY_CANCEL_LABEL = "Cancel";
+  var DISMISS_MERCENARY_CONFIRM_LABEL = "Confirm";
+  var DISMISS_MERCENARY_FAILED = "Failed to dismiss that mercenary.";
+  var DISMISS_MERCENARY_TOOLTIP = "Fire this mercenary. It becomes Neutral now.";
+  var DISMISS_MERCENARY_CANCEL_TOOLTIP = "Keep this mercenary.";
+  var DISMISS_MERCENARY_CONFIRM_TOOLTIP = "Fire this mercenary now. You can rehire it for the next turn.";
+  function mercenaryDismissShown(input) {
+    return input.strategicPlanning && !input.playbackRunning && input.player === HUMAN_SEAT_ID && input.isMercenary;
+  }
+
+  // src/shared/draftsWithoutUnits.ts
+  function draftsWithoutUnits(drafts, unitIds) {
+    if (unitIds.length === 0) return [...drafts];
+    const drop = new Set(unitIds);
+    return drafts.filter((draft) => !drop.has(draft.unitId));
+  }
+
+  // src/renderer/gameplay/selectionPanelDismiss.ts
+  var dismissArmedUnitIds = /* @__PURE__ */ new Set();
+  var dismissInFlightUnitIds = /* @__PURE__ */ new Set();
+  function forgetDismissArmedExcept(unitIds) {
+    const keep = new Set(unitIds);
+    for (const unitId of dismissArmedUnitIds) {
+      if (!keep.has(unitId)) dismissArmedUnitIds.delete(unitId);
+    }
+  }
+  function selectionRowDismissShown(row) {
+    return mercenaryDismissShown({
+      strategicPlanning: rendererSharedState.tacticalBattleSnapshot == null && rendererSharedState.gameState?.phase === "planning",
+      playbackRunning: resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation),
+      player: row.player,
+      isMercenary: row.isMercenary
+    });
+  }
+  function dismissButton(label, tooltip, unitName, disabled, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "selection-panel-order selection-panel-dismiss";
+    button.textContent = label;
+    button.setAttribute("aria-label", `${label} ${unitName}`);
+    button.setAttribute("data-control-tooltip", tooltip);
+    button.disabled = disabled;
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onClick();
+    });
+    return button;
+  }
+  function armMercenaryDismiss(unitId, deps) {
+    dismissArmedUnitIds.add(unitId);
+    deps.redrawSelectionPanel();
+  }
+  function cancelMercenaryDismiss(unitId, deps) {
+    if (dismissInFlightUnitIds.has(unitId)) return;
+    dismissArmedUnitIds.delete(unitId);
+    deps.redrawSelectionPanel();
+  }
+  function clearDismissedUnitDrafts(unitIds) {
+    rendererSharedState.pendingRangedAttacks = draftsWithoutUnits(rendererSharedState.pendingRangedAttacks, unitIds);
+    rendererSharedState.pendingAirStrikes = draftsWithoutUnits(rendererSharedState.pendingAirStrikes, unitIds);
+    rendererSharedState.pendingMissileLaunches = draftsWithoutUnits(rendererSharedState.pendingMissileLaunches, unitIds);
+    rendererSharedState.pendingFerryOrders = draftsWithoutUnits(rendererSharedState.pendingFerryOrders, unitIds);
+    rendererSharedState.pendingEmbarkOrders = draftsWithoutUnits(rendererSharedState.pendingEmbarkOrders, unitIds);
+    rendererSharedState.hoverRoutePreview = null;
+    rendererSharedState.rangedModeActive = false;
+    rendererSharedState.airStrikeModeActive = false;
+    rendererSharedState.missileLaunchModeActive = false;
+  }
+  async function confirmMercenaryDismiss(unitId, deps) {
+    if (dismissInFlightUnitIds.has(unitId)) return;
+    dismissInFlightUnitIds.add(unitId);
+    deps.redrawSelectionPanel();
+    try {
+      const dismiss = window.gameApi?.dismissMercenary;
+      if (!dismiss) {
+        throw new Error("dismissMercenary is unavailable");
+      }
+      const result = await dismiss({ unitId });
+      if (!result.success) {
+        dismissInFlightUnitIds.delete(unitId);
+        deps.showMapToast(result.reason, { isError: true });
+        deps.redrawSelectionPanel();
+        return;
+      }
+      clearDismissedUnitDrafts(result.unitIds);
+      await deps.reloadAfterDismiss();
+      removeUnitsFromSelection([...result.unitIds]);
+      dismissArmedUnitIds.delete(unitId);
+      dismissInFlightUnitIds.delete(unitId);
+      deps.redrawMap();
+      deps.redrawSelectionPanel();
+    } catch {
+      dismissInFlightUnitIds.delete(unitId);
+      deps.showMapToast(DISMISS_MERCENARY_FAILED, { isError: true });
+      deps.redrawSelectionPanel();
+    }
+  }
+  function createMercenaryDismissCell(row, unitName, deps) {
+    const slot = document.createElement("span");
+    slot.className = "selection-panel-dismiss-slot";
+    if (!selectionRowDismissShown(row)) return slot;
+    const unitId = row.unitId;
+    const inFlight = dismissInFlightUnitIds.has(unitId);
+    if (dismissArmedUnitIds.has(unitId) || inFlight) {
+      slot.append(
+        dismissButton(DISMISS_MERCENARY_CANCEL_LABEL, DISMISS_MERCENARY_CANCEL_TOOLTIP, unitName, inFlight, () => {
+          cancelMercenaryDismiss(unitId, deps);
+        }),
+        dismissButton(DISMISS_MERCENARY_CONFIRM_LABEL, DISMISS_MERCENARY_CONFIRM_TOOLTIP, unitName, inFlight, () => {
+          void confirmMercenaryDismiss(unitId, deps);
+        })
+      );
+      return slot;
+    }
+    slot.append(
+      dismissButton(DISMISS_MERCENARY_LABEL, DISMISS_MERCENARY_TOOLTIP, unitName, false, () => {
+        armMercenaryDismiss(unitId, deps);
+      })
+    );
+    return slot;
   }
 
   // src/shared/selectionPanelSize.ts
@@ -30598,6 +30782,7 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/selectionPanel.ts
+  var selectionPanelDeps = null;
   var captionRequestSeq2 = 0;
   function renderSelectionPanelSummaryLine(summary, battle, deps) {
     const line = document.getElementById("sidebar-selected-unit");
@@ -30693,7 +30878,7 @@ ${bonuses}`;
     chip.append(detail, cancel);
     return chip;
   }
-  function createUnitRow(row, battle, deps) {
+  function createUnitRow(row, battle, deps, dismissColumn) {
     const item = document.createElement("li");
     item.className = "selection-panel-unit";
     item.dataset.unitId = row.unitId;
@@ -30710,8 +30895,10 @@ ${bonuses}`;
       const where = document.createElement("span");
       where.className = "selection-panel-unit-hex";
       where.textContent = `(${orderTargetHexCode(row.h3Index, battle) ?? "?"})`;
-      item.append(where);
+      if (dismissColumn) name.append(where);
+      else item.append(where);
     }
+    if (dismissColumn) item.append(createMercenaryDismissCell(row, unitName, deps));
     item.append(createOrderChip(row.unitId, unitName));
     return item;
   }
@@ -30719,6 +30906,8 @@ ${bonuses}`;
     const hex = rendererSharedState.selectedHexIndex;
     panel.hidden = hex == null;
     if (!hex) {
+      document.getElementById("selection-panel-units")?.classList.remove("selection-panel-units-dismiss");
+      forgetDismissArmedExcept([]);
       settleSelectionPanelSlide();
       return;
     }
@@ -30730,11 +30919,16 @@ ${bonuses}`;
     }
     renderSelectionPanelCaption(hex, null);
     renderSelectionPanelChips(hex, null);
-    document.getElementById("selection-panel-units")?.replaceChildren();
+    const list = document.getElementById("selection-panel-units");
+    list?.classList.remove("selection-panel-units-dismiss");
+    list?.replaceChildren();
+    forgetDismissArmedExcept([]);
     const hint = document.getElementById("selection-panel-hint");
     if (hint) hint.textContent = "";
   }
-  function renderSelectionPanel(deps) {
+  function renderSelectionPanel() {
+    const deps = selectionPanelDeps;
+    if (!deps) return;
     const panel = document.getElementById("selection-panel");
     if (!panel) return;
     if (observeModeControls(rendererSharedState.gameState?.seats ?? []).hexOnlySelection) {
@@ -30746,26 +30940,34 @@ ${bonuses}`;
     const summary = summarizeSelectionPanel(rendererSharedState.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
     panel.hidden = summary === null;
     if (!summary) {
+      const list2 = document.getElementById("selection-panel-units");
+      list2?.classList.remove("selection-panel-units-dismiss");
+      forgetDismissArmedExcept([]);
       settleSelectionPanelSlide();
       return;
     }
     renderSelectionPanelSummaryLine(summary, battle, deps);
     renderSelectionPanelCaption(summary.panelHex, battle);
     renderSelectionPanelChips(summary.panelHex, battle);
+    const dismissUnitIds = summary.rows.filter((row) => selectionRowDismissShown(row)).map((row) => row.unitId);
+    const dismissColumn = dismissUnitIds.length > 0;
     const list = document.getElementById("selection-panel-units");
-    list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps)));
+    list?.classList.toggle("selection-panel-units-dismiss", dismissColumn);
+    list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps, dismissColumn)));
+    forgetDismissArmedExcept(dismissUnitIds);
     renderSelectionBarState();
   }
   function wireSelectionPanel(deps) {
-    onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+    selectionPanelDeps = deps;
+    onQueuedOrdersChanged(() => renderSelectionPanel());
     wireSelectionPanelExpand();
     wireSelectionPanelResize();
   }
 
   // src/renderer/core/uiState.ts
-  function updateSidebar(formatUnitDisplayName3) {
+  function updateSidebar() {
     syncSidebarOrderRowSelection();
-    renderSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName3 });
+    renderSelectionPanel();
   }
   function updateGameStateSidebar(state) {
     renderTopBarStatus(state);
@@ -35863,7 +36065,7 @@ ${bonuses}`;
     return line;
   }
   function visibleBlockedReason(text) {
-    if (!text || text === RAISE_REASON_CAPACITY_USED) return null;
+    if (!text || text === RAISE_REASON_CAPACITY_USED || text === RAISE_REASON_OCCUPIED) return null;
     return text;
   }
   function note(text, className = "build-no-urban") {
@@ -35940,14 +36142,18 @@ ${bonuses}`;
       row.className = "build-queue-row";
       const label = document.createElement("span");
       label.className = "unit-label";
-      setUnitNameContent(label, unit.unitId, unit.displayName);
-      const fee = document.createElement("span");
-      fee.textContent = `(${formatCompactHireCost(unit.fee, unit.upkeep)})`;
+      setUnitNameContent(label, unit.unitId, formatHireOrderLabel({
+        kind: "rehire",
+        unitType: unit.unitType,
+        count: 1,
+        displayName: unit.displayName,
+        fee: unit.fee
+      }));
       const button = hireButton();
       button.addEventListener("click", () => {
         void submitHire(panel, h3Index, deps, () => window.gameApi.placeHireOrder({ kind: "rehire", unitId: unit.unitId }));
       });
-      row.append(label, fee, button);
+      row.append(label, button);
       section.appendChild(row);
     }
     panel.appendChild(section);
@@ -38033,6 +38239,21 @@ ${bonuses}`;
       "refreshGameStateAfterSealiftChange failed:"
     );
   }
+  async function refreshGameStateAfterMercenaryDismiss(deps) {
+    await refreshGameStateFromMain(
+      deps,
+      {
+        refreshStandingOrders: true,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: true,
+        redraw: true
+      },
+      "refreshGameStateAfterMercenaryDismiss failed:"
+    );
+  }
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
     installRendererGameMap(nextState);
     syncMapExtentToSnapshot(nextState);
@@ -38440,7 +38661,7 @@ ${bonuses}`;
     });
   }
   function updateSidebar2() {
-    return updateSidebar(formatUnitDisplayName2);
+    updateSidebar();
   }
   function updateGameOverUI2(state) {
     const visibilityChanged = updateGameOverUI(state, updateReadyButtonState);
@@ -39588,6 +39809,10 @@ ${bonuses}`;
   }
   async function refreshGameStateAfterSealiftChange3(options = {}) {
     return refreshGameStateAfterSealiftChange2({ applyGameStateSnapshot: applyGameStateSnapshot2 }, options);
+  }
+  async function reloadAfterMercenaryDismiss() {
+    await refreshGameStateAfterMercenaryDismiss({ applyGameStateSnapshot: applyGameStateSnapshot2 });
+    refreshStackCalloutIfOpen();
   }
   function detailHitAtClientPixel(clientX, clientY, mapHexSet) {
     if (!rendererSharedState.gameState || !shouldRenderTacticalHexes()) return null;
@@ -41547,7 +41772,13 @@ ${bonuses}`;
       }),
       pressReady: () => handleReadyButtonClick(createReadyHandlerDeps())
     });
-    wireSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName2 });
+    wireSelectionPanel({
+      formatUnitDisplayName: formatUnitDisplayName2,
+      showMapToast,
+      reloadAfterDismiss: reloadAfterMercenaryDismiss,
+      redrawMap: redraw,
+      redrawSelectionPanel: renderSelectionPanel
+    });
     wireGameMenu();
     wireSaveLoadMenu();
     wireInitCore({

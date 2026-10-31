@@ -7,7 +7,6 @@
  * Exceptions: A failed read is logged and shown as an empty view. A rejected order is a toast.
  */
 
-import { formatCompactHireCost } from '../../shared/economySymbols';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { HexHireView, HireMutationResult } from '../../shared/ipc/mercenaryTypes';
@@ -20,6 +19,7 @@ import {
   PENDING_HIRE_SECTION_TITLE,
   RAISE_CAPACITY_LABEL,
   RAISE_REASON_CAPACITY_USED,
+  RAISE_REASON_OCCUPIED,
   REHIRE_SECTION_TITLE,
   formatHireOptionLabel,
   formatHireOrderLabel,
@@ -243,13 +243,13 @@ function fundLine(label: string, value: string): HTMLDivElement {
 /**
  * A blocked sentence the Hire tab still shows.
  *
- * Purpose: The capacity-used sentence is replaced by the shortage label.
+ * Purpose: The capacity-used sentence is replaced by the shortage label, and the occupied sentence is not a Hire-tab label.
  * When to use: Before appending `unavailableReason` or `raiseBlockedReason`.
- * Expected outcome: The sentence, or null when it is missing or it is the capacity-used sentence.
+ * Expected outcome: The sentence, or null when it is missing, the capacity-used sentence, or the occupied sentence.
  * Exceptions: None.
  */
 function visibleBlockedReason(text: string | null): string | null {
-  if (!text || text === RAISE_REASON_CAPACITY_USED) return null;
+  if (!text || text === RAISE_REASON_CAPACITY_USED || text === RAISE_REASON_OCCUPIED) return null;
   return text;
 }
 
@@ -359,7 +359,7 @@ function appendRaise(panel: HTMLElement, h3Index: string, view: HexHireView, dep
  *
  * Purpose: Each visible candidate can be rehired.
  * When to use: When the view lists at least one.
- * Expected outcome: One row per unit, with its name, compact credit price, and a Hire button.
+ * Expected outcome: One row per unit. The label is the origin flag and `formatHireOrderLabel` for a rehire, the same phrase the Hire Queue uses. A Hire button follows.
  * Exceptions: None.
  */
 function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, deps: BuildHirePopupDeps): void {
@@ -371,14 +371,18 @@ function appendRehires(panel: HTMLElement, h3Index: string, view: HexHireView, d
     row.className = 'build-queue-row';
     const label = document.createElement('span');
     label.className = 'unit-label';
-    setUnitNameContent(label, unit.unitId, unit.displayName);
-    const fee = document.createElement('span');
-    fee.textContent = `(${formatCompactHireCost(unit.fee, unit.upkeep)})`;
+    setUnitNameContent(label, unit.unitId, formatHireOrderLabel({
+      kind: 'rehire',
+      unitType: unit.unitType,
+      count: 1,
+      displayName: unit.displayName,
+      fee: unit.fee,
+    }));
     const button = hireButton();
     button.addEventListener('click', () => {
       void submitHire(panel, h3Index, deps, () => window.gameApi!.placeHireOrder({ kind: 'rehire', unitId: unit.unitId }));
     });
-    row.append(label, fee, button);
+    row.append(label, button);
     section.appendChild(row);
   }
   panel.appendChild(section);

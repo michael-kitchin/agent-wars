@@ -16,6 +16,7 @@ import type {
   SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
+import type { DismissMercenaryResult } from '../mercenaryDismiss';
 import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
@@ -500,6 +501,15 @@ getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapsho
    * Exceptions: None.
    */
   removeHireOrder: (payload: { orderId: number }) => Promise<HireMutationResult>;
+  /**
+   * Turns one human mercenary Neutral immediately.
+   *
+   * Contract: Cargo of a loaded ship is included. The treasury balance is not written.
+   * When to use: Confirm on a mercenary row in the selection panel.
+   * Expected outcome: The converted unit ids, or a reason. An unreadable payload is a reason.
+   * Exceptions: None.
+   */
+  dismissMercenary: (payload: { unitId: string }) => Promise<DismissMercenaryResult>;
     /**
    * Specifies the contract for the `addHexBuildQueueEntry` member (addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;).
 

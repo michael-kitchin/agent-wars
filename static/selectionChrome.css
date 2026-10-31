@@ -234,6 +234,53 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 .selection-panel-order-cancel:hover {
   background: var(--chrome-bg-raised);
 }
+/* A selection that includes a dismissable mercenary shares one column template, so every Dismiss lines up at the right
+   edge of the widest name. A regular row leaves that column blank. The order chip stays in the last column.
+   Dismiss buttons clear the order chip's margin-left: auto, or a short Dismiss would sit at the right of a wider
+   Cancel and Confirm pair instead of on that shared left edge. */
+.selection-panel-units-dismiss {
+  display: grid;
+  grid-template-columns: auto max-content max-content minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+}
+.selection-panel-units-dismiss .selection-panel-unit {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+.selection-panel-units-dismiss .selection-panel-unit-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
+}
+.selection-panel-units-dismiss .selection-panel-unit > .selection-panel-order {
+  grid-column: 5;
+}
+.selection-panel-dismiss-slot {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.selection-panel-dismiss {
+  margin-left: 0;
+  min-height: 24px;
+  padding: 0 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  box-sizing: border-box;
+  color: var(--chrome-text);
+}
+.selection-panel-dismiss:hover:not(:disabled) {
+  background: var(--chrome-bg-raised);
+}
 
 /* ---------- Ranged, strike, and launch ---------- */
 /* The reticle that aims a ranged attack, an air strike, or a missile launch, and while a strike is aimed, the target

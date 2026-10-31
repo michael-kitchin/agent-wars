@@ -8,7 +8,7 @@ import { weatherTagsInDisplayOrder } from './weatherBonusRules';
 import { formatWeatherIconHtml } from './weatherIcons';
 import { formatTechTierHtml } from './featureIconHtml';
 import type { TechLevel } from './techBonusTypes';
-import { formatMercenaryTooltipValue, MERCENARY_TOOLTIP_LABEL } from './mercenaryRules';
+import { MERCENARY_TOOLTIP_LABEL } from './mercenaryRules';
 
 /**
  * Name and formation date shown above the Bonuses block.
@@ -38,14 +38,14 @@ export interface UnitOriginTooltipIdentity {
    */
   readonly formedLabel: string | null;
   /**
-   * Upkeep of this unit when it is a mercenary.
+   * Text after `Mercenary:` when this unit's tooltip has that line.
    *
-   * Contract: Set only for a mercenary of a hireable type.
+   * Contract: Already formatted. Absent when the unit is not a mercenary and is not offered for rehire.
    * When to use: The Mercenary line after the date of birth.
-   * Expected outcome: The upkeep amount, or absent.
+   * Expected outcome: `¤N/turn`, another side's short name, or `For Hire.`
    * Exceptions: None.
    */
-  readonly mercenaryUpkeep?: number;
+  readonly mercenaryValue?: string;
 }
 
 /**
@@ -170,7 +170,7 @@ export function formationTurnForUnit(unitId: string, formedTurnById: ReadonlyMap
  *
  * Purpose: Those lines sit above the Bonuses block and are omitted when the caller has nothing to say.
  * When to use: `formatUnitOriginTooltipHtml` when an identity was passed.
- * Expected outcome: Zero, one, two, or three HTML lines. The name is preceded by the birth flag. A mercenary adds a third line whose label is bold `Mercenary:` and whose value is the upkeep amount.
+ * Expected outcome: Zero, one, two, or three HTML lines. The name is preceded by the birth flag. A mercenary, or a Neutral unit offered for rehire, adds a third line whose label is bold `Mercenary:` and whose value is `mercenaryValue`.
  * Exceptions: None.
  */
 function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity | undefined): string[] {
@@ -187,8 +187,9 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
   }
   const formedLabel = identity.formedLabel?.trim() ?? '';
   if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
-  if (identity.mercenaryUpkeep != null) {
-    lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(formatMercenaryTooltipValue(identity.mercenaryUpkeep))}`);
+  const mercenaryValue = identity.mercenaryValue?.trim() ?? '';
+  if (mercenaryValue.length > 0) {
+    lines.push(`<strong>${MERCENARY_TOOLTIP_LABEL}:</strong> ${escapeHtmlText(mercenaryValue)}`);
   }
   return lines;
 }
@@ -198,7 +199,7 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
  *
  * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. An identity adds the name and formation date above that block.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Unit:` and `DOB:` come first. A mercenary adds bold `Mercenary:` and the upkeep amount after that date. A blank line follows the identity block. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Unit:` and `DOB:` come first. A mercenary, or a Neutral unit offered for rehire, adds bold `Mercenary:` and the supplied `mercenaryValue` after that date. A blank value adds no line. A blank line follows the identity block. A missing identity leaves the Bonuses block alone. This function prints the identity it was given and does not read the hex where the unit stands.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {

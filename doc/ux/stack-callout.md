@@ -12,9 +12,9 @@ Opens in Strategic planning and Tactical planning after a plain click on a unit 
 
 ## Information Displayed
 
-- One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name, preceded by the unit's origin flag for both human and enemy units. In a match of three or more seats, a unit that is not the viewer's reads "{short side name} · {name}" (`formatUnitNameForViewer` in `src/shared/sideLabels.ts`). A two-seat match keeps the plain name. A Neutral unit reads "Neutral · {name}". On the global map the flag is the national flag of the birth country. On a regional map it is the subdivision flag when that origin's ISO 3166-2 code has a file, and otherwise the national flag of the origin's country. A battle unit shows the flag of the strategic unit it came from. A unit whose origin has no flag file shows a gray placeholder flag, and a unit with no recorded origin shows no flag.
+- One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name, preceded by the unit's origin flag for both human and enemy units. In a match of three or more seats, a unit that is not the viewer's reads "{short side name} · {name}" (`formatUnitNameForViewer` in `src/shared/sideLabels.ts`). A two-seat match keeps the plain name. A Neutral unit uses that same plain name. On the global map the flag is the national flag of the birth country. On a regional map it is the subdivision flag when that origin's ISO 3166-2 code has a file, and otherwise the national flag of the origin's country. A battle unit shows the flag of the strategic unit it came from. A unit whose origin has no flag file shows a gray placeholder flag, and a unit with no recorded origin shows no flag.
 - Hovering a unit flag, or the map token of a hex that holds one stationary unit, shows a tooltip one second after the pointer arrives. Moving on that flag or token does not start the wait again. The token hover does not open this list and does not select the unit. That tooltip hides when the pointer leaves the token. A token whose unit has no recorded origin keeps the hex tooltip. A stack token does not show that tooltip; the list still opens from a click. The flag tooltip appears on every surface that shows a unit flag, including loss toasts. The label beside the flag is unchanged, including a selected-unit count or a pending order. The tooltip hides when that flag is no longer visible.
-  - The tooltip starts with `Unit:` and the same flag and display name shown beside the flag, then `DOB:` and the date that strategic unit was formed. A mercenary adds bold `Mercenary:` (`MERCENARY_TOOLTIP_LABEL`) and `formatMercenaryTooltipValue` (`¤N/turn`, `CREDITS_SYMBOL`) after that date. A missing name omits the Unit line, and a missing formation turn omits the DOB line. When either line is present, a blank line follows.
+  - The tooltip starts with `Unit:` and the same flag and display name shown beside the flag, then `DOB:` and the date that strategic unit was formed. After those lines, `mercenaryTooltipValue` may add bold `Mercenary:` (`MERCENARY_TOOLTIP_LABEL`). The current player's mercenary, the human seat from `findHumanSeat`, shows `formatMercenaryTooltipValue` (`¤N/turn`, `CREDITS_SYMBOL`). Another side's mercenary shows that side's short name (`abbreviatedSideName`), such as `N. America`. A Neutral unit shows `For Hire.` (`MERCENARY_TOOLTIP_FOR_HIRE`) when `neutralUnitOfferedForRehire` accepts it: a hireable type, not aboard a ship, not carrying cargo, and not in a hex another side has fortified. A loss-toast flag has no Mercenary line. A missing name omits the Unit line, and a missing formation turn omits the DOB line. When any identity line is present, a blank line follows.
   - A global date reads `November, Year 3`, and a regional date reads `November 22nd, Year 1`. Opening units are formed on turn 1. A unit built when the turn resolves is formed on the following turn. A battle unit uses its parent unit's formation date.
   - The next line is `Bonuses:`. Origin, Terrain, and Weather lines follow, in that order, for each option selected for the match that this unit was born with. A Tech line follows Weather when the match tech bonus is on and the unit's tech tier is known, with that tier's icon and the word Basic or Advanced; it is omitted when the tier is missing or the tech bonus is off ([combat rules §4.9](../combat-rules-v3.md)). A selected option the unit does not have is omitted. When no bonus option is selected, or the unit has none of the selected bonuses, the block is `Bonuses:` and then `None`, with no category lines. The bonus lines do not change when the unit moves, and they do not say whether a bonus is active on the hex where it stands now.
   - Origin shows the birth area's flag and the place label. A country-level origin shows the country once. A subdivision shows the brief area name, then the country, as in Colorado, United States of America. That country is the English name of the origin's country code, not the birth cell's country. When that name is missing, the line is the brief area name alone. A unit with no birth area omits the line.
@@ -46,6 +46,7 @@ Enemy rows have no selection toggle.
 ### Other
 
 - Opening the callout closes the build popup and the hex tooltip.
+- A confirmed dismiss refreshes an open list (`reloadAfterMercenaryDismiss`). A unit that became Neutral uses that plain name and has no select toggle. See [selection-panel.md](selection-panel.md).
 - A double-click that plans an order cancels a scheduled callout. A double-click that does not plan an order still lets the scheduled callout open.
 
 ## States
@@ -86,6 +87,7 @@ None.
 
 - `static/index.html` (`#stack-callout`, `#stack-callout-list`, `#unit-origin-tooltip`)
 - `src/renderer/map/stackCallout.ts`
+- `src/renderer/wiredEntryCallbacks.ts` (`reloadAfterMercenaryDismiss`)
 - `src/shared/anchoredPopupPlacement.ts` (`placeAnchoredPopup`)
 - `src/renderer/chrome/placeAnchoredPopup.ts` (`placeOpenStackCallout`)
 - `src/shared/popupControlTooltipText.ts`
@@ -99,10 +101,12 @@ None.
 - `src/shared/singleUnitHoverCallout.ts`
 - `src/renderer/map/initCore.ts`
 - `src/renderer/core/unitOriginFlags.ts`
+- `src/shared/seatRoster.ts` (`findHumanSeat`)
+- `src/shared/sideLabels.ts` (`abbreviatedSideName`)
 - `src/renderer/core/unitOriginTooltip.ts`
 - `src/renderer/rendering/canvasPreviewPolicy.ts`
 - `src/shared/unitOriginTooltipText.ts`
-- `src/shared/mercenaryRules.ts` (`MERCENARY_TOOLTIP_LABEL`, `formatMercenaryTooltipValue`)
+- `src/shared/mercenaryRules.ts` (`MERCENARY_TOOLTIP_LABEL`, `MERCENARY_TOOLTIP_FOR_HIRE`, `formatMercenaryTooltipValue`, `mercenaryTooltipValue`, `neutralUnitOfferedForRehire`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/shared/terrainSwatchHtml.ts`
 - `src/shared/weatherIcons.ts`

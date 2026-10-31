@@ -142,7 +142,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
   );
 });
 
-test('unit names stay plain in a two-seat match, and gain a side or Neutral in a larger one', () => {
+test('unit names stay plain for the viewer, for Neutral, and in a two-seat match', () => {
   assert.equal(
     formatUnitNameForViewer({
       baseName: 'XI Armored',
@@ -177,7 +177,7 @@ test('unit names stay plain in a two-seat match, and gain a side or Neutral in a
       viewerSeatId: HUMAN_SEAT_ID,
       seats: twoSeats,
     }),
-    'Neutral · II Infantry'
+    'II Infantry'
   );
   assert.equal(
     formatUnitNameForViewer({

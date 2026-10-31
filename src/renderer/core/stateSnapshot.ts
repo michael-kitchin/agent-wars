@@ -268,6 +268,30 @@ export async function refreshGameStateAfterSealiftChange(
 }
 
 /**
+ * Reloads strategic state after a mercenary becomes Neutral.
+ *
+ * Purpose: The treasury readout, the token, standing orders, an open Hire tab, and the selection must match the board.
+ * When to use: After a successful dismiss, from `reloadAfterMercenaryDismiss`.
+ * Expected outcome: The snapshot is applied with standing orders, the sidebar, the selection, the Hire tab, and a redraw.
+ * Exceptions: A failed reload logs `refreshGameStateAfterMercenaryDismiss failed:` and is not rethrown.
+ */
+export async function refreshGameStateAfterMercenaryDismiss(deps: RefreshBuildQueueDeps): Promise<void> {
+  await refreshGameStateFromMain(
+    deps,
+    {
+      refreshStandingOrders: true,
+      updateGameStateSidebarUi: true,
+      updateSelectionUi: true,
+      updateGameOverUi: false,
+      updateReadyButton: false,
+      refreshBuildPopup: true,
+      redraw: true,
+    },
+    'refreshGameStateAfterMercenaryDismiss failed:'
+  );
+}
+
+/**
  * Defines the `applyGameStateSnapshot` function shape (export async function applyGameStateSnapshot( deps: ApplySnapshotDeps, nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean;).
 
  * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.

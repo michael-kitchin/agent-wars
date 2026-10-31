@@ -31,9 +31,9 @@ import { renderSelectionBarState } from '../gameplay/selectionBar';
  *   selected units are highlighted.
  * Exceptions: None.
  */
-export function updateSidebar(formatUnitDisplayName: (unitId: string) => string): void {
+export function updateSidebar(): void {
   syncSidebarOrderRowSelection();
-  renderSelectionPanel({ formatUnitDisplayName });
+  renderSelectionPanel();
 }
 
 /**

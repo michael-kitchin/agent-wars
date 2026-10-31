@@ -1,26 +1,28 @@
 /**
  * IPC for the human hire panel.
  *
- * Purpose: The renderer reads one hex and places or removes one order without spending credits.
+ * Purpose: The renderer reads one hex, places or removes one hire order, and dismisses one mercenary.
  * When to use: `registerIpcHandlers`, next to the missile handler.
- * Expected outcome: The three hire channels call the human seat's hire actions. A payload that cannot be read is rejected.
+ * Expected outcome: The hire channels and the dismiss channel call the human seat's actions. A payload that cannot be read is rejected.
  * Exceptions: None. A rejected order returns a reason instead of throwing.
  */
 
 import type { IpcMain } from 'electron';
+import { DISMISS_REASON_INVALID } from '../../shared/mercenaryDismiss';
 import { HIRE_ORDER_INVALID_PAYLOAD } from '../../shared/mercenaryRules';
 import { IPC_GAME } from '../../shared/ipc/channels';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { executeDismissMercenary } from '../gameActions/dismissMercenary';
 import { executePlaceHireOrder, executeRemoveHireOrder, readHexHireView } from '../gameActions/hireOrders';
-import { parseHireOrderPayload, parseHireOrderRemovalPayload } from '../ipcPayloadGuards';
+import { parseDismissMercenaryPayload, parseHireOrderPayload, parseHireOrderRemovalPayload } from '../ipcPayloadGuards';
 import { logDebug } from '../logger';
 
 /**
- * Registers the three hire channels.
+ * Registers the hire channels and the dismiss channel.
  *
  * Purpose: Keeps the handler body out of the main process entry file.
  * When to use: Once, from `registerIpcHandlers`.
- * Expected outcome: Each channel returns the hire action's result, or the invalid-payload result.
+ * Expected outcome: Each channel returns its action's result, or the invalid-payload result.
  * Exceptions: None.
  */
 export function registerMercenaryIpcHandler(ipcMain: IpcMain): void {
@@ -45,6 +47,14 @@ export function registerMercenaryIpcHandler(ipcMain: IpcMain): void {
       return { success: false, reason: HIRE_ORDER_INVALID_PAYLOAD };
     }
     return executeRemoveHireOrder(HUMAN_SEAT_ID, removal.orderId);
+  });
+  ipcMain.handle(IPC_GAME.dismissMercenary, (_event, payload: unknown) => {
+    const request = parseDismissMercenaryPayload(payload);
+    if (!request) {
+      logDebug('mercenaryIpcHandler rejected an unreadable dismiss');
+      return { success: false, reason: DISMISS_REASON_INVALID };
+    }
+    return executeDismissMercenary(HUMAN_SEAT_ID, request.unitId);
   });
 }
 

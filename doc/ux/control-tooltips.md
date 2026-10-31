@@ -63,6 +63,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
 - Selection panel expand control, while the panel is expanded: Hide the details. The bar stays.
+- Dismiss, on a mercenary in the selection panel: `DISMISS_MERCENARY_TOOLTIP`. Fire this mercenary. It becomes Neutral now.
+- Cancel, on that armed row: `DISMISS_MERCENARY_CANCEL_TOOLTIP`. Keep this mercenary.
+- Confirm, on that armed row: `DISMISS_MERCENARY_CONFIRM_TOOLTIP`. Fire this mercenary now. You can rehire it for the next turn.
 - Map-mode tabs toggle, while the tabs are hidden: Show the map-mode buttons under the overview.
 - Map-mode tabs toggle, while the tabs show: Hide the map-mode buttons. Hiding them also closes the terrain legend.
 - Weather map mode: Show or hide each hex's weather icon on the world map, while the weather bonus is on.
@@ -198,6 +201,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/renderer/chrome/syncQueueItemSelectTooltip.ts` (`syncQueueItemSelectTooltip`)
 - `src/shared/popupControlTooltipText.ts`
 - `src/shared/mercenaryRules.ts` (`formatCreditsTooltip`, `formatMercenaryTooltipValue`)
+- `src/shared/mercenaryDismiss.ts` (`DISMISS_MERCENARY_TOOLTIP`, `DISMISS_MERCENARY_CANCEL_TOOLTIP`, `DISMISS_MERCENARY_CONFIRM_TOOLTIP`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
 - `src/renderer/chrome/frameTooltipText.ts`

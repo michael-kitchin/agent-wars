@@ -5,6 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
+import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from '../shared/ipc/saveLoadTypes';
 import type { AiSeatId } from '../shared/seatIds';
@@ -100,6 +101,7 @@ const IPC_GAME = {
   getHexHireView: 'game:getHexHireView',
   placeHireOrder: 'game:placeHireOrder',
   removeHireOrder: 'game:removeHireOrder',
+  dismissMercenary: 'game:dismissMercenary',
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
@@ -622,6 +624,16 @@ getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot 
    */
   removeHireOrder: (payload: { orderId: number }): Promise<HireMutationResult> =>
     ipcRenderer.invoke(IPC_GAME.removeHireOrder, payload),
+  /**
+   * Turns one human mercenary Neutral.
+   *
+   * Purpose: Confirm on a selection-panel mercenary row.
+   * When to use: After the player confirms Dismiss.
+   * Expected outcome: The converted unit ids, or a reason.
+   * Exceptions: None.
+   */
+  dismissMercenary: (payload: { unitId: string }): Promise<DismissMercenaryResult> =>
+    ipcRenderer.invoke(IPC_GAME.dismissMercenary, payload),
     /**
    * Documents the object literal property `addHexBuildQueueEntry` (addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> => ipcRenderer.invoke().
 

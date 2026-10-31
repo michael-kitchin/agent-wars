@@ -28,6 +28,11 @@ import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { unitIconPathForUnitType } from '../rendering/unitDrawing';
 import { onQueuedOrdersChanged, queuedOrderForUnit } from './queuedOrderRows';
 import { renderSelectionBarState } from './selectionBar';
+import {
+  createMercenaryDismissCell,
+  forgetDismissArmedExcept,
+  selectionRowDismissShown,
+} from './selectionPanelDismiss';
 import { settleSelectionPanelSlide, wireSelectionPanelExpand } from './selectionPanelExpand';
 import { wireSelectionPanelResize } from './selectionPanelResize';
 
@@ -35,8 +40,8 @@ import { wireSelectionPanelResize } from './selectionPanelResize';
  * Renderer callbacks the panel needs.
  *
  * Purpose: Keeps the panel free of a dependency on the renderer entry module.
- * When to use: Pass to `renderSelectionPanel` and `wireSelectionPanel`.
- * Expected outcome: Names come from the shared display-name lookup.
+ * When to use: Pass once to `wireSelectionPanel`.
+ * Expected outcome: Names, the dismiss toast, the snapshot reload, a map redraw, and a panel redraw.
  * Exceptions: None.
  */
 export interface SelectionPanelDeps {
@@ -49,7 +54,53 @@ export interface SelectionPanelDeps {
    * Exceptions: None.
    */
   readonly formatUnitDisplayName: (unitId: string) => string;
+  /**
+   * Shows a short message on the map.
+   *
+   * Contract: `isError` styles a dismiss refusal.
+   * When to use: A refused or thrown dismiss.
+   * Expected outcome: The sentence stays up the way other map toasts do.
+   * Exceptions: None.
+   */
+  readonly showMapToast: (message: string, options?: { readonly isError?: boolean }) => void;
+  /**
+   * Reloads the match after a dismiss that already succeeded.
+   *
+   * Contract: Resolves after the snapshot is applied, or after a logged failure.
+   * When to use: From the dismiss confirm path only.
+   * Expected outcome: The treasury, the tokens, an open Hire tab, and an open stack list match the board.
+   * Exceptions: None. A failed reload does not reject.
+   */
+  readonly reloadAfterDismiss: () => Promise<void>;
+  /**
+   * Paints the map after a successful dismiss updates the selection.
+   *
+   * Contract: The same map paint the snapshot uses, run again after the selected hex moves or clears.
+   * When to use: From the dismiss confirm path, after `removeUnitsFromSelection`.
+   * Expected outcome: The highlighted hex matches the selection that remains.
+   * Exceptions: None.
+   */
+  readonly redrawMap: () => void;
+  /**
+   * Draws the selection panel again from the stored deps.
+   *
+   * Contract: Calls `renderSelectionPanel`.
+   * When to use: After the dismiss buttons change which row is armed or in flight.
+   * Expected outcome: The panel matches the current selection and armed rows.
+   * Exceptions: None.
+   */
+  readonly redrawSelectionPanel: () => void;
 }
+
+/**
+ * Deps from the one `wireSelectionPanel` call.
+ *
+ * Purpose: Later redraws, including the sidebar, must not pass a new deps object.
+ * When to use: `renderSelectionPanel`. Null until the panel is wired.
+ * Expected outcome: The wiring callbacks, or null when a redraw arrives first.
+ * Exceptions: None.
+ */
+let selectionPanelDeps: SelectionPanelDeps | null = null;
 
 /**
  * Counts caption lookups, so a slow lookup cannot overwrite a newer caption.
@@ -226,10 +277,16 @@ function createOrderChip(unitId: string, unitName: string): HTMLElement {
  *
  * Purpose: Lists each selected unit with its order.
  * When to use: From `renderSelectionPanel`, once per row.
- * Expected outcome: An unattached list item.
+ * Expected outcome: An unattached list item. When `dismissColumn` is set, the hex code sits in the name cell and a
+ *   dismiss cell follows it. Otherwise the row stays the type token, the name, the hex code when it differs, and the order chip.
  * Exceptions: None.
  */
-function createUnitRow(row: SelectionPanelRow, battle: TacticalBattleSnapshot | null, deps: SelectionPanelDeps): HTMLLIElement {
+function createUnitRow(
+  row: SelectionPanelRow,
+  battle: TacticalBattleSnapshot | null,
+  deps: SelectionPanelDeps,
+  dismissColumn: boolean
+): HTMLLIElement {
   const item = document.createElement('li');
   item.className = 'selection-panel-unit';
   item.dataset.unitId = row.unitId;
@@ -246,22 +303,14 @@ function createUnitRow(row: SelectionPanelRow, battle: TacticalBattleSnapshot | 
     const where = document.createElement('span');
     where.className = 'selection-panel-unit-hex';
     where.textContent = `(${orderTargetHexCode(row.h3Index, battle) ?? '?'})`;
-    item.append(where);
+    if (dismissColumn) name.append(where);
+    else item.append(where);
   }
+  if (dismissColumn) item.append(createMercenaryDismissCell(row, unitName, deps));
   item.append(createOrderChip(row.unitId, unitName));
   return item;
 }
 
-/**
- * Redraws the selection panel from the current selection, units, and orders.
- *
- * Purpose: The panel follows every selection change on the map, in the stack callout, and in the Orders tab.
- * When to use: From `updateSidebar` after any selection change or snapshot, and whenever the queued orders change.
- * Expected outcome: Hidden when no selected unit exists, with any slide between its states settled. Otherwise the bar's
- *   first line, the caption, the chips, and one row per selected unit describe the first selected unit's hex, and the
- *   bar's hint and border follow targeting and playback. During a battle the panel describes battle cells.
- * Exceptions: None; missing elements are skipped.
- */
 /**
  * Shows the clicked hex without its units.
  *
@@ -275,6 +324,8 @@ function renderObservedHexPanel(panel: HTMLElement): void {
   const hex = S.selectedHexIndex;
   panel.hidden = hex == null;
   if (!hex) {
+    document.getElementById('selection-panel-units')?.classList.remove('selection-panel-units-dismiss');
+    forgetDismissArmedExcept([]);
     settleSelectionPanelSlide();
     return;
   }
@@ -286,12 +337,28 @@ function renderObservedHexPanel(panel: HTMLElement): void {
   }
   renderSelectionPanelCaption(hex, null);
   renderSelectionPanelChips(hex, null);
-  document.getElementById('selection-panel-units')?.replaceChildren();
+  const list = document.getElementById('selection-panel-units');
+  list?.classList.remove('selection-panel-units-dismiss');
+  list?.replaceChildren();
+  forgetDismissArmedExcept([]);
   const hint = document.getElementById('selection-panel-hint');
   if (hint) hint.textContent = '';
 }
 
-export function renderSelectionPanel(deps: SelectionPanelDeps): void {
+/**
+ * Redraws the selection panel from the current selection, units, and orders.
+ *
+ * Purpose: The panel follows every selection change on the map, in the stack callout, and in the Orders tab.
+ * When to use: From `updateSidebar` after any selection change or snapshot, and whenever the queued orders change.
+ * Expected outcome: Hidden when no selected unit exists, with any slide between its states settled. Otherwise the bar's
+ *   first line, the caption, the chips, and one row per selected unit describe the first selected unit's hex, and the
+ *   bar's hint and border follow targeting and playback. A selection that includes a dismissable mercenary aligns a
+ *   dismiss column. During a battle the panel describes battle cells. A call before `wireSelectionPanel` changes nothing.
+ * Exceptions: None; missing elements are skipped.
+ */
+export function renderSelectionPanel(): void {
+  const deps = selectionPanelDeps;
+  if (!deps) return;
   const panel = document.getElementById('selection-panel');
   if (!panel) return;
   if (observeModeControls(S.gameState?.seats ?? []).hexOnlySelection) {
@@ -303,14 +370,21 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
   const summary = summarizeSelectionPanel(S.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
   panel.hidden = summary === null;
   if (!summary) {
+    const list = document.getElementById('selection-panel-units');
+    list?.classList.remove('selection-panel-units-dismiss');
+    forgetDismissArmedExcept([]);
     settleSelectionPanelSlide();
     return;
   }
   renderSelectionPanelSummaryLine(summary, battle, deps);
   renderSelectionPanelCaption(summary.panelHex, battle);
   renderSelectionPanelChips(summary.panelHex, battle);
+  const dismissUnitIds = summary.rows.filter((row) => selectionRowDismissShown(row)).map((row) => row.unitId);
+  const dismissColumn = dismissUnitIds.length > 0;
   const list = document.getElementById('selection-panel-units');
-  list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps)));
+  list?.classList.toggle('selection-panel-units-dismiss', dismissColumn);
+  list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps, dismissColumn)));
+  forgetDismissArmedExcept(dismissUnitIds);
   renderSelectionBarState();
 }
 
@@ -324,7 +398,8 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
  * Exceptions: None.
  */
 export function wireSelectionPanel(deps: SelectionPanelDeps): void {
-  onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+  selectionPanelDeps = deps;
+  onQueuedOrdersChanged(() => renderSelectionPanel());
   wireSelectionPanelExpand();
   wireSelectionPanelResize();
 }

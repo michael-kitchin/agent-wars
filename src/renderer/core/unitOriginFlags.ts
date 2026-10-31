@@ -9,7 +9,9 @@ import type { UnitOriginTooltipBonuses, UnitOriginTooltipIdentity } from '../../
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import type { TechLevel } from '../../shared/techBonusTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
-import { isHireableUnitType, mercenaryUpkeepFor } from '../../shared/mercenaryRules';
+import { isHireableUnitType, mercenaryTooltipValue, mercenaryUpkeepFor, neutralUnitOfferedForRehire } from '../../shared/mercenaryRules';
+import { findHumanSeat } from '../../shared/seatRoster';
+import { abbreviatedSideName } from '../../shared/sideLabels';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -131,32 +133,122 @@ function formedLabelFor(unitId: string): string | null {
  *
  * Purpose: The Unit line must be the display name, not a label that also carries a selection count.
  * When to use: Live flags and the one-unit map token.
- * Expected outcome: The lookup name, which may be empty, and the formation label, which may be null.
+ * Expected outcome: The lookup name, which may be empty, the formation label, which may be null, and the Mercenary value when this unit has one.
  * Exceptions: None.
  */
 function tooltipIdentityFor(unitId: string): UnitOriginTooltipIdentity {
-  const mercenaryUpkeep = mercenaryUpkeepForLiveUnit(unitId);
+  const mercenaryValue = mercenaryValueForLiveUnit(unitId);
   return {
     displayName: S.unitDisplayNameById.get(unitId) ?? '',
     formedLabel: formedLabelFor(unitId),
-    ...(mercenaryUpkeep != null ? { mercenaryUpkeep } : {}),
+    ...(mercenaryValue != null ? { mercenaryValue } : {}),
   };
 }
 
 /**
- * Upkeep of a live mercenary, from the battle or the strategic map.
+ * The seat the Mercenary line treats as the current player.
  *
- * Purpose: The flag tooltip shows the cost only for a mercenary the player can see.
- * When to use: `tooltipIdentityFor`.
- * Expected outcome: The upkeep, or null when the unit is not a hireable mercenary.
+ * Purpose: Upkeep is shown only for that seat's mercenaries.
+ * When to use: `mercenaryValueForLiveUnit`.
+ * Expected outcome: The human seat from `findHumanSeat`. Null when the match has no human seat.
  * Exceptions: None.
  */
-function mercenaryUpkeepForLiveUnit(unitId: string): number | null {
+function mercenaryTooltipViewerSeatId(): string | null {
+  return findHumanSeat(S.gameState?.seats ?? [])?.seatId ?? null;
+}
+
+/**
+ * Short name of the seat that owns a unit.
+ *
+ * Purpose: Another side's mercenary tooltip uses the same abbreviation as the top bar.
+ * When to use: `mercenaryValueForLiveUnit` when the owner is not the viewer.
+ * Expected outcome: `abbreviatedSideName` of that seat. Null when the owner is not a seat.
+ * Exceptions: None.
+ */
+function mercenaryOwnerShortName(ownerId: string): string | null {
+  const seat = S.gameState?.seats?.find((row) => row.seatId === ownerId);
+  return seat ? abbreviatedSideName(seat) : null;
+}
+
+/**
+ * Whether another side's fortifications block rehire on this strategic hex.
+ *
+ * Purpose: The For Hire line follows the Hire tab's fortification rule.
+ * When to use: `mercenaryValueForLiveUnit` for a Neutral unit.
+ * Expected outcome: True when the hex has fortifications and the viewer does not control it. A match with no human seat treats any fortification as another side's.
+ * Exceptions: None.
+ */
+function hexFortifiedByAnotherSide(h3Index: string, viewerSeatId: string | null): boolean {
+  const infra = S.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3Index);
+  if ((infra?.fortifiedCount ?? 0) <= 0) return false;
+  if (viewerSeatId == null) return true;
+  const controller = S.gameState?.strategicControl?.find((row) => row.h3Index === h3Index)?.controllerPlayerId ?? null;
+  return controller !== viewerSeatId;
+}
+
+/**
+ * Whether a ship still has cargo assigned.
+ *
+ * Purpose: A loaded Neutral ship is not offered for rehire.
+ * When to use: `mercenaryValueForLiveUnit` with the strategic unit id.
+ * Expected outcome: True when any live unit lists this id as its carrier.
+ * Exceptions: None.
+ */
+function shipIsCarryingCargo(unitId: string): boolean {
+  return (S.gameState?.units ?? []).some((unit) => unit.embarkedOnNavalUnitId === unitId);
+}
+
+/**
+ * The unit the tooltip describes, and its strategic row when this id is a battle sub-unit.
+ *
+ * Purpose: Upkeep and ownership come from the unit on screen. Rehire uses the strategic ship, cargo, and hex.
+ * When to use: `mercenaryValueForLiveUnit`.
+ * Expected outcome: The battle sub-unit when one exists, otherwise the strategic unit. Null when neither snapshot has the id.
+ * Exceptions: None.
+ */
+function tooltipUnitFacts(unitId: string): {
+  readonly shown: { readonly player: string; readonly unitType: string; readonly techLevel?: TechLevel; readonly isMercenary?: boolean };
+  readonly placed: { readonly id: string; readonly player: string; readonly unitType: string; readonly h3Index: string; readonly embarkedOnNavalUnitId?: string | null } | null;
+} | null {
   const battle = S.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
-  const strategic = S.gameState?.units.find((unit) => unit.id === unitId);
-  const unit = battle ?? strategic;
-  if (!unit || unit.isMercenary !== true || !isHireableUnitType(unit.unitType)) return null;
-  return mercenaryUpkeepFor(unit.unitType, unit.techLevel);
+  const strategicId = parseTacticalSubUnitId(unitId)?.parentUnitId ?? unitId;
+  const strategic = S.gameState?.units.find((unit) => unit.id === strategicId) ?? null;
+  if (battle) return { shown: battle, placed: strategic };
+  if (!strategic) return null;
+  return { shown: strategic, placed: strategic };
+}
+
+/**
+ * The Mercenary line for a unit that is still on the map.
+ *
+ * Purpose: The current player's mercenary keeps its upkeep. Another side's mercenary names that side. A Neutral unit `neutralUnitOfferedForRehire` accepts says it is for hire.
+ * When to use: `tooltipIdentityFor`.
+ * Expected outcome: The formatted value, or null when this unit has no Mercenary line.
+ * Exceptions: None.
+ */
+function mercenaryValueForLiveUnit(unitId: string): string | null {
+  const facts = tooltipUnitFacts(unitId);
+  if (!facts) return null;
+  const viewerSeatId = mercenaryTooltipViewerSeatId();
+  const shown = facts.shown;
+  const isMercenary = shown.isMercenary === true && isHireableUnitType(shown.unitType);
+  const upkeep = isMercenary ? mercenaryUpkeepFor(shown.unitType, shown.techLevel) : null;
+  const placed = facts.placed;
+  const forHire = placed != null && neutralUnitOfferedForRehire({
+    ownerId: placed.player,
+    unitType: placed.unitType,
+    embarked: (placed.embarkedOnNavalUnitId ?? '').length > 0,
+    carryingCargo: shipIsCarryingCargo(placed.id),
+    fortifiedByAnotherSide: hexFortifiedByAnotherSide(placed.h3Index, viewerSeatId),
+  });
+  return mercenaryTooltipValue({
+    ownerId: shown.player,
+    viewerSeatId,
+    isMercenary,
+    forHire,
+    upkeep,
+    ownerShortName: mercenaryOwnerShortName(shown.player),
+  });
 }
 
 /**

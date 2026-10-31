@@ -758,15 +758,15 @@ export async function buildMeleeInterceptHexPopupHtmlForStrategic(h3Index: strin
 }
 
 /**
- * Defines the `updateSidebar` function shape (function updateSidebar(): void).
-
- * Purpose: Supports maintainability by documenting why `updateSidebar` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Refreshes the selection panel and the order-row highlight.
+ *
+ * Purpose: Callers in this module use one name. The display-name lookup is the one stored when the panel was wired.
+ * When to use: After a selection change or a snapshot that can change which units are selected.
+ * Expected outcome: The panel describes the current selection, or hides when none are selected.
+ * Exceptions: None. A panel that has not been wired yet leaves the previous drawing in place.
  */
 export function updateSidebar(): void {
-  return updateSidebarFromModule(formatUnitDisplayName);
+  updateSidebarFromModule();
 }
 
 /**

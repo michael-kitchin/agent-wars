@@ -34,7 +34,7 @@ Strategic movement rows include standing movement and ferries. Tactical movement
 
 ### Other
 
-- The lists refresh when a draft is added, cancelled, committed, stashed, or restored.
+- The lists refresh when a draft is added, cancelled, committed, stashed, or restored. A confirmed dismiss removes the rows for every unit that became Neutral, including a standing march and any cargo converted with a mercenary ship. Other rows stay. See [order-lifecycle.md](order-lifecycle.md).
 - The row highlight follows every selection change, including one made on the map.
 - The console header's subtitle and the Orders tab's count follow the lists. See [console.md](console.md).
 - The [selection panel](selection-panel.md) shows each selected unit's order with the same words, read from these lists.

@@ -196,21 +196,27 @@ test('the Tech row names Basic or Advanced, and a missing tier stays None', () =
 /**
  * Checks that a mercenary's upkeep follows the date of birth.
  *
- * Purpose: The flag tooltip is how a player sees what a mercenary costs.
+ * Purpose: The formatter prints the Mercenary value it was given and drops a blank one.
  * When to use: After changing the identity lines.
- * Expected outcome: Bold `Mercenary:` and the upkeep amount follow DOB.
+ * Expected outcome: Bold `Mercenary:` and the supplied value follow DOB. A blank value adds no line.
  * Exceptions: AssertionError when the line is missing or out of order.
  */
 test('a mercenary identity adds the Mercenary line after the date of birth', () => {
   const html = formatUnitOriginTooltipHtml({
     origin,
     bonuses: NONE,
-    identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryUpkeep: 3 },
+    identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryValue: `${CREDITS_SYMBOL}3/turn` },
   });
   const dob = html.indexOf('<strong>DOB:</strong>');
   const mercenary = html.indexOf(`<strong>Mercenary:</strong> ${CREDITS_SYMBOL}3/turn`);
   assert.ok(dob >= 0 && mercenary > dob);
   assert.equal(html.includes('upkeep'), false);
+  const blank = formatUnitOriginTooltipHtml({
+    origin,
+    bonuses: NONE,
+    identity: { displayName: '4th Infantry', formedLabel: 'November, Year 1', mercenaryValue: '   ' },
+  });
+  assert.equal(blank.includes('Mercenary'), false);
 });
 
 /**

@@ -378,6 +378,21 @@ export function parseHireOrderPayload(payload: unknown): HireOrderRequest | null
 }
 
 /**
+ * Accepts a unit id to dismiss.
+ *
+ * Purpose: A missing or empty id is not a dismiss.
+ * When to use: `game:dismissMercenary`.
+ * Expected outcome: The unit id, or null.
+ * Exceptions: None.
+ */
+export function parseDismissMercenaryPayload(payload: unknown): { unitId: string } | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const unitId = (payload as { unitId?: unknown }).unitId;
+  if (typeof unitId !== 'string' || unitId.length === 0) return null;
+  return { unitId };
+}
+
+/**
  * Accepts a hire-order id to remove.
  *
  * Purpose: A missing or non-positive id is not a removal.

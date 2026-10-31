@@ -8,6 +8,7 @@
  */
 
 import { GLOBAL_GAME_MAP } from './activeGameMap';
+import { isNeutralOwnerId } from './seatIds';
 import { CREDITS_PER_ITEM } from './creditsRules';
 import { formatCompactHireCost, formatCompactRaiseCost, formatCreditsAmount, formatProductionCapacityAmount } from './economySymbols';
 import { unitCostFor } from './gameRules';
@@ -50,7 +51,7 @@ export const HIRE_TAB_LABEL = 'Hire';
 export const HIRE_BUTTON_LABEL = 'Hire';
 
 /** Hire-panel heading for Neutral units that can be rehired. */
-export const REHIRE_SECTION_TITLE = 'Neutral units';
+export const REHIRE_SECTION_TITLE = 'Neutral Units';
 
 /** Hire-panel heading for orders placed this turn. */
 export const PENDING_HIRE_SECTION_TITLE = 'Hire Queue';
@@ -133,8 +134,18 @@ export const HIRE_ORDER_INVALID_PAYLOAD = 'Invalid hire order.';
 /** Toast when a hire IPC call fails without its own reason. */
 export const HIRE_ORDER_UPDATE_FAILED = 'Failed to update hire orders.';
 
-/** Bold label on the mercenary upkeep line. */
+/** Bold label on the mercenary line in a unit tooltip. */
 export const MERCENARY_TOOLTIP_LABEL = 'Mercenary';
+
+/**
+ * Value after `Mercenary:` when a Neutral unit can be rehired.
+ *
+ * Purpose: The tooltip says the unit is available without showing another side's name or an upkeep.
+ * When to use: `mercenaryTooltipValue` for a Neutral unit `neutralUnitOfferedForRehire` accepts.
+ * Expected outcome: The words For Hire, including the period.
+ * Exceptions: None.
+ */
+export const MERCENARY_TOOLTIP_FOR_HIRE = 'For Hire.';
 
 /**
  * Reports whether a value is a unit type that can be hired.
@@ -450,15 +461,63 @@ export function formatHireOrderLabel(order: {
 }
 
 /**
- * Upkeep line for a mercenary the player can see.
+ * Upkeep shown for a mercenary the current player owns.
  *
- * Purpose: Anyone who can see the unit can see what it costs to keep. The caller adds the Mercenary label.
- * When to use: After the date-of-birth line, beside `MERCENARY_TOOLTIP_LABEL`, when the unit is a mercenary.
+ * Purpose: That player's own tooltip keeps the cost. Another side's tooltip uses the short name instead.
+ * When to use: `mercenaryTooltipValue` when the owner is the viewer.
  * Expected outcome: The credits symbol, the amount, and `/turn`, with no space before the slash. An upkeep of 0 is `¤0/turn`.
  * Exceptions: None.
  */
 export function formatMercenaryTooltipValue(upkeep: number): string {
   return `${formatCreditsAmount(String(upkeep))}/turn`;
+}
+
+/**
+ * Whether a Neutral unit is one the Hire tab can offer the viewer.
+ *
+ * Purpose: The For Hire tooltip follows the same unit limits as a rehire row.
+ * When to use: Before `mercenaryTooltipValue`, with facts already read from the snapshot.
+ * Expected outcome: True for a Neutral hireable type that is not aboard a ship, is not carrying cargo, and is not in a hex another side has fortified.
+ * Exceptions: None.
+ */
+export function neutralUnitOfferedForRehire(input: {
+  readonly ownerId: string;
+  readonly unitType: string;
+  readonly embarked: boolean;
+  readonly carryingCargo: boolean;
+  readonly fortifiedByAnotherSide: boolean;
+}): boolean {
+  return isNeutralOwnerId(input.ownerId)
+    && isHireableUnitType(input.unitType)
+    && !input.embarked
+    && !input.carryingCargo
+    && !input.fortifiedByAnotherSide;
+}
+
+/**
+ * The text after `Mercenary:` on a unit tooltip.
+ *
+ * Purpose: The same line names the current player's cost, another side, or a unit that can be rehired.
+ * When to use: When building a live unit's flag tooltip. Pass `forHire` from `neutralUnitOfferedForRehire`.
+ * Expected outcome: `¤N/turn` for the viewer's mercenary. The owner's short name for another side's mercenary. `For Hire.` for a Neutral unit that can be rehired. Null when the unit is not one of those, and when another side's short name is blank.
+ * Exceptions: None.
+ */
+export function mercenaryTooltipValue(input: {
+  readonly ownerId: string;
+  readonly viewerSeatId: string | null;
+  readonly isMercenary: boolean;
+  readonly forHire: boolean;
+  readonly upkeep: number | null;
+  readonly ownerShortName: string | null;
+}): string | null {
+  const ownsIt = input.viewerSeatId != null && input.ownerId === input.viewerSeatId;
+  if (input.isMercenary && ownsIt && input.upkeep != null) return formatMercenaryTooltipValue(input.upkeep);
+  if (input.isMercenary && !ownsIt && !isNeutralOwnerId(input.ownerId)) {
+    const name = input.ownerShortName?.trim() ?? '';
+    return name.length > 0 ? name : null;
+  }
+  if (input.forHire) return MERCENARY_TOOLTIP_FOR_HIRE;
+  return null;
 }
 
 /**

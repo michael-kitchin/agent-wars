@@ -218,6 +218,7 @@ The top bar is the only place credits show, and the Hire tab has no credits line
 - **The fee:** The fee comes out of the treasury when you place the order, and a hire you can't pay for is refused. Removing the order returns the fee. Orders fill at the end of the turn, and any count that doesn't fill is refunded. Prices are on the mercenary row of [Units at a Glance](#units-at-a-glance).
 - **Where:** You can raise on an explored hex outside other sides' home regions when the hex holds no units but yours and no fortifications but yours. Capacity is twice the hex's city cells, in production points, measured against that map's unit prices. You can rehire a Neutral unit you can see, except one aboard a ship, one carrying cargo, or one in a hex another side has fortified. Missiles are never hired. There's no hiring in a battle.
 - **On the map:** A mercenary token shows `¤` at its center.
+- **Dismiss:** Dismiss on your mercenary in the expanded selection panel asks you to confirm, then makes it Neutral immediately. This turn's upkeep no longer includes that unit. The hire fee is not returned. Hiring it back uses rehire and waits until the turn ends. A loaded ship takes its cargo and can't be rehired while loaded. A mercenary aboard a ship can't be dismissed.
 - **Desertion:** If upkeep at Ready is more than the treasury holds, random mercenaries desert to Neutral. A mercenary aboard a ship that isn't a mercenary doesn't desert, and its upkeep is forgiven. A mercenary ship that deserts takes its whole cargo with it.
 - **Buying credits:** A Credits queue item costs that map's infantry price and adds ¤20 on every map.
 
@@ -474,7 +475,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **Playback blocks orders:** while a turn plays back, you can pan, zoom, and read tooltips, but not give orders.
 - **A queue can pause:** outside your home, a queue spends only on a hex that holds one of your units or fortifications. Elsewhere it keeps its points and its rows, and the map label shows ∞t.
 - **Unpaid mercenaries desert:** if the treasury cannot cover upkeep, some mercenaries become Neutral. An order the hex cannot fill returns any fee that was reserved for it.
-- **A shared hex fights:** a deserter left beside your units, or a Neutral unit you rehire into a hex that already holds another side, fights at the next resolution.
+- **A shared hex fights:** a deserter or a mercenary you dismiss left beside your units, or a Neutral unit you rehire into a hex that already holds another side, fights at the next resolution.
 - **Reading the turn report:** After Ready, the map toast and the Reports tab give each side a section when that side lost a visible unit, lost hexes, controlled a hex hit by a missile launch you can see, or owned a hex whose fortifications fell. **Updates** lists city cells you fortified, credits added, mercenaries hired, units that deserted, hire orders that were not filled ("1 hire order could not be filled, so it was not charged."), and hexes where building paused. A named unit is the unit name, without the short side prefix, and keeps its origin flag. The layout of those lines is in [ux/reports-tab.md](ux/reports-tab.md) and [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md).
 
 ## Where Messages Appear

@@ -34,6 +34,24 @@ test('summarizeSelectionPanel marks a unit selected in another hex and leaves ou
   assert.deepEqual(summary.rows.map((row) => [row.unitId, row.inPanelHex]), [['h1-t1', true], ['h1-a1', false]]);
 });
 
+test('summarizeSelectionPanel copies the mercenary flag and the owner', () => {
+  const mercenary: SelectionPanelUnitInput = {
+    id: 'h1-m1',
+    unitType: 'infantry',
+    h3Index: 'hexA',
+    player: 'human',
+    isMercenary: true,
+  };
+  const summary = summarizeSelectionPanel(['h1-m1', 'h1-t1'], [mercenary, ...UNITS], () => true);
+  assert.ok(summary);
+  const hired = summary.rows.find((row) => row.unitId === 'h1-m1');
+  const regular = summary.rows.find((row) => row.unitId === 'h1-t1');
+  assert.equal(hired?.isMercenary, true);
+  assert.equal(hired?.player, 'human');
+  assert.equal(regular?.isMercenary, false);
+  assert.equal(regular?.player, 'human');
+});
+
 test('summarizeSelectionPanel returns null when no selected id matches a unit', () => {
   assert.equal(summarizeSelectionPanel([], UNITS, () => true), null);
   assert.equal(summarizeSelectionPanel(['gone'], UNITS, () => true), null);

@@ -39,6 +39,7 @@ import {
   getUnitAtHex,
   isStackCalloutTargetInsideDialog,
   refreshGameStateAfterSealiftChange,
+  reloadAfterMercenaryDismiss,
   detailHitAtClientPixel,
   drawTacticalTerrainHexes,
   drawTacticalCityOverlayPass,
@@ -197,7 +198,7 @@ import {
   isPendingMovementOrderForDisplay,
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
-import { wireSelectionPanel } from './gameplay/selectionPanel';
+import { renderSelectionPanel, wireSelectionPanel } from './gameplay/selectionPanel';
 import { HUMAN_SEAT_ID } from '../shared/seatIds';
 
 /**
@@ -662,7 +663,13 @@ function init(): void {
     }),
     pressReady: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
   });
-  wireSelectionPanel({ formatUnitDisplayName });
+  wireSelectionPanel({
+    formatUnitDisplayName,
+    showMapToast,
+    reloadAfterDismiss: reloadAfterMercenaryDismiss,
+    redrawMap: redraw,
+    redrawSelectionPanel: renderSelectionPanel,
+  });
   wireGameMenu();
   wireSaveLoadMenu();
   // Contract anchors retained after extraction:

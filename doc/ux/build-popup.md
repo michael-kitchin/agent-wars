@@ -23,9 +23,9 @@ Build markers appear in Strategic planning on explored hexes where the player ca
   - The raise controls are a type list, a count, and a Hire button, with no Raise heading. They appear only when one type fits at count 1 on both remaining production and the balance (`oneUnitRaiseShortage` returns null), and the list contains only those types.
   - When no type fits, the panel shows `raiseShortage` in place of those controls: `All credits allocated.` when some type fits the capacity left and none fit the balance, `All production capacity allocated.` when some type fits the balance and none fit the capacity left, and `All credits and production capacity allocated.` when none fits both (`oneUnitRaiseShortage`). The sentence `Your orders here already use this turn's raise capacity.` is not shown.
   - When a type fits at count 1, no shortage sentence shows until Hire is clicked with a type and count that `hireShortageLabel` rejects. That click shows `Not enough credits.`, `Not enough production capacity.`, or `Not enough credits or production capacity.`, and does not add the order. Changing the type or the count clears that sentence.
-  - Neutral units that can be rehired follow, then this turn's orders, each with its heading. The orders heading is `Hire Queue`, with a 0.5em gap above it and after each order row. A pending raise is the count, the type, and the price. A pending rehire is the unit name and the price.
+  - Neutral units that can be rehired follow, under `Neutral Units` (`REHIRE_SECTION_TITLE`), then this turn's orders, each with its heading. The orders heading is `Hire Queue`, with a 0.5em gap above it and after each order row. A pending raise is the count, the type, and the price. A pending rehire is the unit name and the price in one phrase. A Neutral unit row uses that same phrase (`formatHireOrderLabel` in `src/shared/mercenaryRules.ts`), after the origin flag.
   - A raise price is `(⚒N + ¤M/turn)` when the fee equals one turn of upkeep. A rehire price is `(¤E + ¤M/turn)`, where E is only the amount above that one turn.
-  - A blocked hex shows any other reason. When the hire view cannot be loaded, the panel shows `HIRE_VIEW_FAILED` ("Hiring information could not be loaded.") and a close control.
+  - A blocked hex shows any other reason. The sentence `Mercenaries can be raised only where no other side has units.` (`RAISE_REASON_OCCUPIED`) is not shown. A refused raise still returns that reason. When the hire view cannot be loaded, the panel shows `HIRE_VIEW_FAILED` ("Hiring information could not be loaded.") and a close control.
 - A Keep building checkbox when the queue can arm it.
 - When the hex cannot build, the reason, or "This hex cannot build units."
 - A hex the player does not control shows the production summary and no queue editor.
@@ -52,7 +52,7 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 
 ### Other
 
-- None.
+- A confirmed dismiss refreshes an open Hire tab (`refreshGameStateAfterMercenaryDismiss`). A unit that became Neutral is offered for rehire when the existing rehire rules allow it, and that order still fills at the end of the turn. A loaded ship and a unit aboard a ship are not offered. See [selection-panel.md](selection-panel.md).
 
 ## States
 
@@ -107,3 +107,4 @@ None.
 - `src/shared/economySymbols.ts` (`PRODUCTION_CAPACITY_SYMBOL`, `CREDITS_SYMBOL`, `formatCompactHireCost`, `formatCompactRaiseCost`)
 - `src/renderer/gameplay/hireEntryMarkers.ts`
 - `src/main/ipc/mercenaryIpcHandler.ts` (`getHexHireView`, `placeHireOrder`, `removeHireOrder`)
+- `src/renderer/core/stateSnapshot.ts` (`refreshGameStateAfterMercenaryDismiss`)

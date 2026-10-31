@@ -6,6 +6,7 @@ import { strategicParentOf, tacticalCellAt } from '../shared/h3Resolutions';
 
 import {
   hideStackCallout,
+  refreshStackCalloutIfOpen,
 } from './map/stackCallout';
 import {
   mergeTacticalSubUnitsForMarchPlayback,
@@ -122,6 +123,7 @@ import {
 } from './rendering/tacticalCityOverlays';
 
 import {
+  refreshGameStateAfterMercenaryDismiss as refreshGameStateAfterMercenaryDismissFromModule,
   refreshGameStateAfterSealiftChange as refreshGameStateAfterSealiftChangeFromModule,
   updateClientStaleEnemyIntel,
 } from './core/stateSnapshot';
@@ -203,6 +205,19 @@ export function isStackCalloutTargetInsideDialog(target: EventTarget | null): bo
  */
 export async function refreshGameStateAfterSealiftChange(options: { refreshStandingOrders?: boolean } = {}): Promise<void> {
   return refreshGameStateAfterSealiftChangeFromModule({ applyGameStateSnapshot }, options);
+}
+
+/**
+ * Reloads the match after a mercenary was dismissed, then refreshes an open stack list.
+ *
+ * Purpose: The snapshot updates the treasury and the tokens. The stack list otherwise keeps the previous owner.
+ * When to use: The selection panel's confirm path, after the dismiss call has already succeeded.
+ * Expected outcome: The applied snapshot matches the board, and an open stack callout shows the new owner.
+ * Exceptions: None. A failed snapshot reload is logged inside the helper and does not reject.
+ */
+export async function reloadAfterMercenaryDismiss(): Promise<void> {
+  await refreshGameStateAfterMercenaryDismissFromModule({ applyGameStateSnapshot });
+  refreshStackCalloutIfOpen();
 }
 
 /**

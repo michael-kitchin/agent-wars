@@ -40,6 +40,8 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 
 A hire order is a raise or a rehire placed during planning (`placeHireOrder`). It can be removed until Ready (`removeHireOrder`). The fee is reserved when the order is stored and refunded when it is removed. A raise that does not fit the capacity still left or the balance is refused and leaves the treasury unchanged. At the end of the turn `resolveMercenariesAtEndOfTurn` fills it or drops it. A reserved count that does not fill is refunded. An order stored with no reserved credits is still charged only for what fills. The human cannot place or remove one during a tactical battle. See [build-popup.md](build-popup.md) and [combat-rules-v3.md](../combat-rules-v3.md) §2.1.
 
+A confirmed dismiss (`executeDismissMercenary`) drops that unit's queued drafts and its standing order immediately, and does the same for cargo converted with a mercenary ship. Other units' queued orders stay. The Neutral unit receives `defend` from `convertUnitsToNeutral`.
+
 ## Lifecycle
 
 - Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, air strikes, and missile launches are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
@@ -71,7 +73,7 @@ A hire order is a raise or a rehire placed during planning (`placeHireOrder`). I
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged, Strike, or Launch target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
+- A rejected Ranged, Strike, or Launch target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, entering a battle, or a confirmed dismiss. The close control clears targeting the same way right-click does, and queued orders stay queued. A confirmed dismiss turns targeting off and drops queued orders only for the units that became Neutral. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
 - Every queued order that Ready will submit is visible in one of the four order groups.
 - Sealift assignment is never a pending order.
@@ -98,4 +100,7 @@ None.
 - `src/renderer/tactical/tacticalEmbarkSealiftMerge.ts`
 - `src/renderer/map/stackCallout.ts`
 - `src/renderer/map/stackCalloutSealift.ts`
+- `src/main/gameActions/dismissMercenary.ts` (`executeDismissMercenary`)
+- `src/main/gameActions/unitOwnershipTransfer.ts` (`convertUnitsToNeutral`)
+- `src/shared/draftsWithoutUnits.ts` (`draftsWithoutUnits`)
 - `src/shared/mapPlanningGesture.ts`

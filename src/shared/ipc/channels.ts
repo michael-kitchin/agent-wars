@@ -43,6 +43,7 @@ export const IPC_GAME = {
   getHexHireView: 'game:getHexHireView',
   placeHireOrder: 'game:placeHireOrder',
   removeHireOrder: 'game:removeHireOrder',
+  dismissMercenary: 'game:dismissMercenary',
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',

@@ -62,12 +62,12 @@ export function viewerSeatIdForRoster(seats: readonly Pick<SeatSnapshot, 'seatId
 /**
  * Short name of one seat on the control line.
  *
- * Purpose: Hex descriptions use the same cut as the top-bar chips.
- * When to use: The controller and each home inside `formatHexControlLabel`.
+ * Purpose: Hex descriptions and another side's mercenary tooltip use the same cut as the top-bar chips.
+ * When to use: Hex control text, and a mercenary tooltip that names another side.
  * Expected outcome: `shortSideName` of the home. A blank or whitespace home returns the seat id.
  * Exceptions: None.
  */
-function abbreviatedSideName(seat: SideLabelSeat): string {
+export function abbreviatedSideName(seat: SideLabelSeat): string {
   return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
 }
 
@@ -135,8 +135,8 @@ export function formatHexControlLabel(args: {
  *
  * Purpose: A third side needs a short name on units that are not the viewer's. A two-sided match does not.
  * When to use: Stack rows, hover names, kill labels, and the selection panel.
- * Expected outcome: `baseName` for the viewer's units and for every seat in a two-seat match.
- *   "Neutral · {baseName}" for Neutral. "{short name} · {baseName}" otherwise.
+ * Expected outcome: `baseName` for the viewer's units, for Neutral, and for every seat in a two-seat match.
+ *   "{short name} · {baseName}" for another seat when the match has three or more seats.
  * Exceptions: None.
  */
 export function formatUnitNameForViewer(args: {
@@ -145,7 +145,7 @@ export function formatUnitNameForViewer(args: {
   readonly viewerSeatId: string | null;
   readonly seats: readonly SideLabelSeat[];
 }): string {
-  if (isNeutralOwnerId(args.ownerId)) return `Neutral · ${args.baseName}`;
+  if (isNeutralOwnerId(args.ownerId)) return args.baseName;
   if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
   if (args.seats.length === 2) return args.baseName;
   const seat = args.seats.find((row) => row.seatId === args.ownerId);

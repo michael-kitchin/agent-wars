@@ -2,7 +2,7 @@
  * Mercenary prices and the hire-panel labels.
  *
  * Purpose: Upkeep stays on the global prices, and the hire menu shows the compact price.
- * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, `formatHireOrderLabel`, `formatCreditsUpkeepSuffix`, `hireShortageLabel`, or `oneUnitRaiseShortage`.
+ * When to use: After changing `mercenaryUpkeepFor`, `mercenaryHireFee`, `raiseCapacityForHex`, `formatHireOptionLabel`, `formatHireOrderLabel`, `formatCreditsUpkeepSuffix`, `hireShortageLabel`, `oneUnitRaiseShortage`, or `mercenaryTooltipValue`.
  * Expected outcome: The cases below.
  * Exceptions: None.
  */
@@ -27,10 +27,14 @@ import {
   formatHireOptionLabel,
   formatHireOrderLabel,
   formatCreditsUpkeepSuffix,
+  MERCENARY_TOOLTIP_FOR_HIRE,
   mercenaryHireFee,
+  mercenaryTooltipValue,
   mercenaryUpkeepFor,
+  neutralUnitOfferedForRehire,
   raiseCapacityForHex,
 } from './mercenaryRules';
+import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
 import { getPlayerUnitCountsByType } from './unitCountsByType';
 
 const regionalProfile = {
@@ -97,6 +101,70 @@ test('a rehire order shows the extra above one turn', () => {
 test('a hire marker shows the production figure alone', () => {
   const figure = formatProductionCapacityAmount('12');
   assert.equal(formatHireEntryLabel(figure), figure);
+});
+
+test('a mercenary tooltip names the viewer\'s cost, another side, or a unit that can be rehired', () => {
+  const offered = {
+    ownerId: NEUTRAL_OWNER_ID,
+    unitType: 'infantry',
+    embarked: false,
+    carryingCargo: false,
+    fortifiedByAnotherSide: false,
+  };
+  assert.equal(neutralUnitOfferedForRehire(offered), true);
+  assert.equal(neutralUnitOfferedForRehire({ ...offered, embarked: true }), false);
+  assert.equal(neutralUnitOfferedForRehire({ ...offered, carryingCargo: true }), false);
+  assert.equal(neutralUnitOfferedForRehire({ ...offered, fortifiedByAnotherSide: true }), false);
+  assert.equal(neutralUnitOfferedForRehire({ ...offered, unitType: 'missile' }), false);
+  assert.equal(neutralUnitOfferedForRehire({ ...offered, ownerId: HUMAN_SEAT_ID }), false);
+  assert.equal(mercenaryTooltipValue({
+    ownerId: HUMAN_SEAT_ID,
+    viewerSeatId: HUMAN_SEAT_ID,
+    isMercenary: true,
+    forHire: false,
+    upkeep: 5,
+    ownerShortName: null,
+  }), `${formatCreditsAmount('5')}/turn`);
+  assert.equal(mercenaryTooltipValue({
+    ownerId: 'opponent',
+    viewerSeatId: HUMAN_SEAT_ID,
+    isMercenary: true,
+    forHire: false,
+    upkeep: 5,
+    ownerShortName: 'N. America',
+  }), 'N. America');
+  assert.equal(mercenaryTooltipValue({
+    ownerId: NEUTRAL_OWNER_ID,
+    viewerSeatId: HUMAN_SEAT_ID,
+    isMercenary: false,
+    forHire: true,
+    upkeep: null,
+    ownerShortName: null,
+  }), MERCENARY_TOOLTIP_FOR_HIRE);
+  assert.equal(mercenaryTooltipValue({
+    ownerId: 'opponent',
+    viewerSeatId: HUMAN_SEAT_ID,
+    isMercenary: false,
+    forHire: false,
+    upkeep: null,
+    ownerShortName: 'N. America',
+  }), null);
+  assert.equal(mercenaryTooltipValue({
+    ownerId: 'opponent',
+    viewerSeatId: null,
+    isMercenary: true,
+    forHire: false,
+    upkeep: 5,
+    ownerShortName: 'N. America',
+  }), 'N. America');
+  assert.equal(mercenaryTooltipValue({
+    ownerId: 'opponent',
+    viewerSeatId: HUMAN_SEAT_ID,
+    isMercenary: true,
+    forHire: true,
+    upkeep: 5,
+    ownerShortName: '   ',
+  }), null);
 });
 
 test('the credits suffix joins upkeep with a spaced plus', () => {

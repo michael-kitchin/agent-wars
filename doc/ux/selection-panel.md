@@ -28,13 +28,13 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
     - The tech tier of units built there, Basic or Advanced with its icon, while the tech bonus is on and the hex can produce units. Not shown in a battle.
     - The production the hex adds each turn, such as "⚒94/turn" (`PRODUCTION_CAPACITY_SYMBOL`), when it has urban cells and is not on the neutral border. Not shown in a battle.
     - "Home" in the viewer's home. "{short name} home" in another seat's home, for example "W. Turkey home". "Neutral" on Neutral land that is not a home. Not shown in a battle. The words come from `formatHomeChip` in `src/shared/sideLabels.ts`.
-  - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md).
+  - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md). During strategic planning, while playback is not running, a human mercenary has Dismiss after the name (`mercenaryDismissShown`). Dismiss switches that row to Cancel and Confirm. Cancel changes nothing. Confirm dismisses immediately, and the unit becomes Neutral. There is no success toast. A refusal uses the map toast. The dismiss column's left edge is the right edge of the widest name cell, and a hex code stays in that name cell. A regular row in that selection leaves the dismiss column blank. The order chip stays at the right edge. A selection with no such mercenary keeps the row described above.
   - The reason a greyed-out reticle cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).
 - While Ranged, Strike, or Launch targeting is on, the panel's border and the pressed reticle's face are the planning crimson (`--order-missile` in `static/shellChrome.css`, `#B91C1C`, the same value as `RANGE_PERIMETER_MISSILE_COLOR`, from `data-aim` on `#selection-panel`). Launch targeting draws no reach outline.
 - A resize grip at the top-right corner, shown only while the panel is expanded. It sits over the close control's top-right corner, clear of the ×, so a press there resizes the panel and does not clear the selection.
 - The panel opens 440 px wide, 12 px in from the map's left and bottom edges, and is never wider than the map minus 24 px; both states share that width. Compact, it is the bar's height. Expanded, its height fits the bar and the details, up to half the map's height; past that the unit rows scroll. When the panel is shorter than the bar, the caption, the chips, and one row, the details scroll as a whole. Where it overlaps the terrain legend, the map scale, the zoom buttons, or the minimap panel, it draws above them. Where it meets the update toast, the toast draws above the panel, so a wide toast on a narrow map can cover the close control. A click there hits the toast. See [notifications-and-feedback.md](notifications-and-feedback.md).
-- Control tips for the expand control, the close control, the grip, and the reticle are in [control-tooltips.md](control-tooltips.md).
+- Control tips for the expand control, the close control, the grip, the reticle, and Dismiss, Cancel, and Confirm are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 
@@ -43,6 +43,9 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
 - When the player clicks the expand control, the panel switches between compact and expanded. Its bottom-left corner stays put, so expanding slides the bar up as the details open under it, and collapsing slides it back down, over 150 ms. When the system asks for reduced motion, the change is immediate. A click during a slide sends the panel back the other way from where it is.
 - When the player clicks the close control, the selection clears exactly as a right-click on the map clears it. Queued orders stay. See [selection-model.md](selection-model.md).
 - When the player clicks an order's cancel control, that order is cancelled exactly as its Orders tab row's cancel control does.
+- When the player clicks Dismiss, that row shows Cancel and Confirm. Several rows may show that pair at once. A later redraw keeps it for rows that are still the player's mercenaries.
+- When the player clicks Cancel, the row returns to Dismiss. The unit, its orders, and the treasury stay as they were.
+- When the player clicks Confirm, `executeDismissMercenary` runs immediately. Cancel and Confirm on that row stay disabled until the call finishes. That mercenary becomes Neutral, and every unit in a loaded mercenary ship's cargo becomes Neutral with it. Those units leave the selection. An empty selection clears the selected hex. When other units stay selected, the selected hex becomes the first remaining unit's hex, and the map follows. Their queued drafts and standing orders are dropped. Other selected units keep their queued orders. Hover preview and Ranged, Strike, and Launch targeting turn off. The hire fee is not returned. A refusal leaves the row on Cancel and Confirm and toasts the reason.
 - When the player drags the grip, which shows only while the panel is expanded, the panel resizes. Its bottom-left corner stays put. The width stays from 400 to 640 px and the height from 140 px to the map's height minus 24 px (`clampSelectionPanelSize` in `src/shared/selectionPanelSize.ts`). A dragged width applies to both states. A dragged height applies while the panel is expanded and replaces the half-the-map limit.
 - Clicks on a unit row do nothing else.
 
@@ -72,6 +75,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
 - The panel never shows while nothing is selected.
 - An order shown in the panel always reads the same as its row on the Orders tab.
 - The panel's close control never cancels a queued order.
+- Dismiss never shows in a tactical battle, during playback, on a regular unit, or on another side's unit.
 
 ## Strategic and Tactical Differences
 
@@ -102,6 +106,9 @@ None.
 - `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#air-strike-target-type`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
 - `static/selectionChrome.css`
 - `src/renderer/gameplay/selectionPanel.ts`
+- `src/renderer/gameplay/selectionPanelDismiss.ts`
+- `src/shared/mercenaryDismiss.ts` (`mercenaryDismissShown`)
+- `src/main/gameActions/dismissMercenary.ts` (`executeDismissMercenary`)
 - `src/renderer/gameplay/selectionBar.ts`
 - `src/renderer/gameplay/selectionPanelExpand.ts`
 - `src/renderer/chrome/panelSlideHelpers.ts` (`startPanelHeightSlide`: the 150 ms height slide and the reduced-motion rule)

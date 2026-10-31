@@ -60,6 +60,15 @@ export interface SelectionPanelUnitInput {
    * Exceptions: None.
    */
   readonly player: string;
+  /**
+   * Whether the unit is a mercenary.
+   *
+   * Contract: Omitted or false for a regular unit. Battle sub-units may omit it.
+   * When to use: The dismiss control. A missing value counts as false.
+   * Expected outcome: True only when the snapshot set the mercenary flag.
+   * Exceptions: None.
+   */
+  readonly isMercenary?: boolean;
 }
 
 /**
@@ -107,6 +116,24 @@ export interface SelectionPanelRow {
    * Exceptions: None.
    */
   readonly inPanelHex: boolean;
+  /**
+   * Which side owns the unit.
+   *
+   * Contract: Copied from the unit.
+   * When to use: Deciding whether the row may show Dismiss.
+   * Expected outcome: `human` for the player's units.
+   * Exceptions: None.
+   */
+  readonly player: string;
+  /**
+   * Whether the unit is a mercenary.
+   *
+   * Contract: True only when the unit's flag is set. A missing input flag is false.
+   * When to use: Deciding whether the row may show Dismiss.
+   * Expected outcome: False for a regular unit.
+   * Exceptions: None.
+   */
+  readonly isMercenary: boolean;
 }
 
 /**
@@ -176,6 +203,8 @@ export function summarizeSelectionPanel(
       unitType: unit.unitType,
       h3Index: unit.h3Index,
       inPanelHex: unit.h3Index === panelHex,
+      player: unit.player,
+      isMercenary: unit.isMercenary === true,
     })),
   };
 }
