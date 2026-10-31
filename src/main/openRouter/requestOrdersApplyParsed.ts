@@ -586,6 +586,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     missileLaunches: outMissile.length > 0 ? outMissile : undefined,
     strategy: parsed.strategy,
     message: parsed.message,
+    ...(parsed.exitBattle ? { exitBattle: true } : {}),
     dropped: dropReasons.length,
     dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
     toolInvocationCounts,

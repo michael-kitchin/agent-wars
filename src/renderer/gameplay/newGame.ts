@@ -334,6 +334,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         seats: seatsStart.seats,
         turnLimit: seatsStart.turnLimit,
         victoryRule: seatsStart.victoryRule,
+        aiOnlyBattles: seatsStart.aiOnlyBattles,
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -409,7 +410,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): boolean {
-  if (S.tacticalAnnihilationOutcomeDialog != null) return false;
+  if (S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null) return false;
   if (S.readyRequestInFlight) return false;
   const overlay = document.getElementById('game-over-overlay');
   const newGameBtn = document.getElementById('new-game-btn');

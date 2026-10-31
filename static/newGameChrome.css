@@ -457,8 +457,29 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   color: var(--chrome-muted);
   border: 1px dashed var(--chrome-border);
 }
-#new-game-turn-limit-row {
+.new-game-victory-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+}
+.new-game-victory-line + .new-game-victory-line {
   margin-top: 8px;
+}
+.new-game-victory-field {
+  display: grid;
+  grid-template-columns: 10em minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.new-game-victory-field label {
+  white-space: nowrap;
+}
+.new-game-victory-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* ---------- Forces ---------- */

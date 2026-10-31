@@ -318,3 +318,16 @@ Gate: `state.techBonusEnabled` with its level (`techBonusLevel`, read through `t
 | system | The combat paragraph adds `buildTechBonusRule` after the origin bonus sentence and before the weather sentence. The Unit Status Bonus column appears when any row has an origin reason or a `techLevel`. An Advanced row appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High. A Basic row with no origin bonus reads `—`. |
 | tools | Names, descriptions, and schemas unchanged. `assess_unit` adds `techLevel` (`basic` or `advanced`). `estimate_combat` reports effective values and `techBonus` (`{ attack: 2, defense: 0 }` at Low, `{ attack: 2, defense: 2 }` at High). The field is omitted when both points are 0. Assumed units never qualify. |
 | empty-state | The unit tooltip omits Tech when the tech bonus is off or the unit has no stamped tier. |
+
+## 11. AI-only battle
+
+Gate: the active battle has `leadPartyId`. A human-versus-AI battle and every strategic consult leave this off.
+
+| Surface | Contract |
+| --- | --- |
+| system | The contract and the example include `exitBattle` after `orders` and before the air tails. The repair example sets it to false. |
+| user | The quoted field list includes `exitBattle` in that same place. |
+| tools | unchanged |
+| envelope | `exitBattle` is a required boolean. Missing or non-boolean parses as false and does not drop the orders on that beat. |
+| coaching | One bullet: set `exitBattle` to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. Orders in this reply still resolve for this beat. |
+| empty-state | unchanged |

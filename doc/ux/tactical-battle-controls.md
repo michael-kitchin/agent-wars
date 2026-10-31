@@ -13,7 +13,7 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 ## Information Displayed
 
 - A button with an exit icon and the label "Exit Battle", in the battle header, while a battle is active and annihilation is not showing. It uses the shared button colors, and the dimmed teal while it is disabled.
-- The annihilation dialog: "You win!", "You lose.", or "All units destroyed.", plus an Exit Battle button.
+- The annihilation dialog: "You win!", "You lose.", or "All units destroyed.", plus an Exit Battle button. An AI-only result uses the same overlay. Its button reads Ok. The sentences are "{home name} wins the battle.", "All units destroyed.", "The commanders left the battle.", "The battle ended with no orders left to carry out.", and, for the header control, "The battle was left." A missing home name uses the seat id. Ok returns to the world map and does not press Ready. Escape does not close it. While the observe checkbox is on, the header control leaves immediately and then starts the next strategic turn, and a finished beat does the same without the dialog.
 - Control tips for both Exit Battle buttons are in [control-tooltips.md](control-tooltips.md).
 - A cell fortified by the other side cannot be entered. Hovering it says "Blocked: Fortified". The controller's units start on fortified core cells, one each, after missiles. The first hit on those units removes the ticks at the end of the beat and the unit stays. A fortified cell in the outer rings blocks movement and is never hit.
 
@@ -21,8 +21,8 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 
 ### Mouse
 
-- When the player clicks Exit Battle and it is enabled, the battle ends, stashed strategic drafts return, and Strategic planning resumes. Ready then runs, as described in [modes-and-transitions.md](modes-and-transitions.md). A failed exit shows an error toast and stays in the battle.
-- When the player clicks Exit Battle on the annihilation dialog, the dialog closes and the battle ends the same way, including the Ready that follows.
+- When the player clicks Exit Battle and it is enabled, a human battle ends, stashed strategic drafts return, and Strategic planning resumes. Ready then runs, as described in [modes-and-transitions.md](modes-and-transitions.md). On an AI-only battle with the observe checkbox off, the click opens Ok with "The battle was left." and stays in the battle until Ok. With the checkbox on, the battle ends immediately and the next strategic turn starts. A failed exit shows an error toast and stays in the battle.
+- When the player clicks Exit Battle on a human annihilation dialog, the dialog closes and the battle ends the same way, including the Ready that follows. Ok on an AI-only result closes the overlay and does not press Ready.
 
 ### Keyboard
 
@@ -30,7 +30,7 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 
 ### Other
 
-- When a beat leaves at least one side with no units, the annihilation dialog opens, map and panel input turn off, the in-battle Exit Battle control hides, and Ready disables.
+- When a human beat leaves at least one side with no units, the annihilation dialog opens, map and panel input turn off, the in-battle Exit Battle control hides, and Ready disables. An AI-only beat that ends while the observe checkbox is off opens the same overlay with Ok, including an idle ending and a commander exit. While that checkbox is on, the battle leaves without the overlay.
 - Leaving the battle cancels in-flight opponent planning for that battle, including a post-beat consult that has not finished. Exit Battle stays enabled during a model call. It is still disabled while a beat is resolving or playing back, and hidden while the annihilation dialog is open. A strategic consult from the world-map turn keeps running.
 
 ## States
@@ -42,15 +42,15 @@ Exit Battle sits in the battle header, the top bar's form during a battle, besid
 
 ## Invariants
 
-- The annihilation dialog never closes itself. The player must press Exit Battle, unless a new match or a strategic reconciliation tears the battle down.
+- The annihilation dialog never closes itself. The player presses Exit Battle on a human result, or Ok on an AI-only result, unless a new match or a strategic reconciliation tears the battle down.
 - A failed exit never restores strategic drafts and never clears the battle.
-- A successful exit always continues into Ready. Leaving a battle resumes the strategic turn; it is not a return to open planning.
+- A human exit continues into Ready, so that strategic turn resumes. An AI-only Ok returns to strategic planning and does not press Ready. While the observe checkbox is on, an ended AI-only battle leaves without the dialog and starts the next strategic turn.
 - Exit Battle is never shown together with the annihilation dialog.
 - Exit Battle never leaves the battle while a beat is resolving or playing back.
 
 ## Strategic and Tactical Differences
 
-These controls exist only in a tactical battle. During a strategic Resolution playback they are hidden. During a tactical Resolution playback, Exit Battle stays shown and is disabled until the playback ends. After a successful exit the player is in Strategic planning, with strategic drafts restored except for units that no longer exist, and Ready runs. See the state carried across transitions in [modes-and-transitions.md](modes-and-transitions.md).
+These controls exist only in a tactical battle. During a strategic Resolution playback they are hidden. During a tactical Resolution playback, Exit Battle stays shown and is disabled until the playback ends. After a human exit the player is in Strategic planning, with strategic drafts restored except for units that no longer exist, and Ready runs. An AI-only Ok does not press Ready. See the state carried across transitions in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Related Documents
 

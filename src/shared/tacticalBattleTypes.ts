@@ -157,6 +157,33 @@ export interface TacticalBattleSnapshot {
    */
   opposingPartyId?: OwnerId;
   /**
+   * The AI seat that occupies the first slice of an AI-only battle.
+   *
+   * Contract: Absent on a human battle. Set only when both owners are AI seats. It is the seat with the lower `seatOrder`.
+   * When to use: Consulting both commanders, the force bar, and the exit flag.
+   * Expected outcome: An AI seat id, or absent.
+   * Exceptions: None.
+   */
+  leadPartyId?: OwnerId;
+  /**
+   * How many completed beats in a row applied no AI order.
+   *
+   * Contract: Absent or 0 means the streak has not started. A beat that applies an order sets it back to 0.
+   * When to use: Ending an AI-only battle after three idle beats.
+   * Expected outcome: A non-negative count. A loaded snapshot that lacks it is treated as 0.
+   * Exceptions: None.
+   */
+  idleBeatStreak?: number;
+  /**
+   * Why an AI-only battle stopped, once the beat that decided it has been stored.
+   *
+   * Contract: Absent while the battle continues. `elimination` is one side left, `mutual` is both gone, `idle` is three beats with no applied order, and `exit` is both commanders leaving after five beats.
+   * When to use: After playback, to choose the result sentence. The header Exit Battle control does not read this field.
+   * Expected outcome: One of the four reasons, or absent.
+   * Exceptions: None.
+   */
+  aiOnlyEndReason?: 'elimination' | 'mutual' | 'idle' | 'exit';
+  /**
    * Strategic strategic hex enclosing this tactical battle.
    *
    * Contract: Must be the strategic cell that was contested when the battle started.

@@ -25,6 +25,20 @@ export function tacticalOpponentPlanPayloadHasAnyOrders(
 }
 
 /**
+ * True when a stored tactical draft already decided this beat.
+ *
+ * Purpose: A reply that only sets `exitBattle` has no order rows, and it is still the commander's decision to leave. Replacing it would ask again and drop that decision.
+ * When to use: Before launching another tactical consult for the same battle, and before a post-beat prefetch.
+ * Expected outcome: True when any order list is non-empty or `exitBattle` is true. False for a missing or all-empty plan.
+ * Exceptions: None.
+ */
+export function tacticalDraftAlreadyDecided(
+  plan: TacticalOpponentPlanPayload | null | undefined
+): boolean {
+  return tacticalOpponentPlanPayloadHasAnyOrders(plan) || plan?.exitBattle === true;
+}
+
+/**
  * Builds a buffered tactical opponent plan from a successful `requestOrders` / `requestOrdersFlow` payload.
  *
  * Purpose: `requestOrdersFlow` returns strategic-shaped `orders` arrays; tactical IPC and post-beat consultation need the
@@ -41,6 +55,7 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
   airStrikes?: readonly AirStrikeOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
+  exitBattle?: boolean;
 }): TacticalOpponentPlanPayload {
   return {
     movementOrders: [...raw.orders],
@@ -48,6 +63,7 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
     airStrikes: [...(raw.airStrikes ?? [])],
     ferryOrders: [...(raw.ferryOrders ?? [])],
     embarkOrders: [...(raw.embarkOrders ?? [])],
+    ...(raw.exitBattle === true ? { exitBattle: true } : {}),
   };
 }
 
@@ -56,14 +72,14 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
  *
  * Purpose: A non-empty plan is already stored for the next beat. An empty plan means that beat has no orders yet.
  * When to use: After a tactical commit returns post-beat consultation fields.
- * Expected outcome: A non-empty plan returns `startBackgroundPrefetch` false. A missing or empty plan returns a null
+ * Expected outcome: A plan with an order or `exitBattle` returns `startBackgroundPrefetch` false. A missing or all-empty plan returns a null
  * draft and `startBackgroundPrefetch` true so the screen can start another battle consult.
  * Exceptions: None.
  */
 export function nextTacticalOpponentDraftAfterPostBeatPlan(
   tacticalOpponentPlan: TacticalOpponentPlanPayload | null | undefined
 ): { draft: TacticalOpponentPlanPayload | null; startBackgroundPrefetch: boolean } {
-  if (tacticalOpponentPlan != null && tacticalOpponentPlanPayloadHasAnyOrders(tacticalOpponentPlan)) {
+  if (tacticalOpponentPlan != null && tacticalDraftAlreadyDecided(tacticalOpponentPlan)) {
     return { draft: tacticalOpponentPlan, startBackgroundPrefetch: false };
   }
   return { draft: null, startBackgroundPrefetch: true };

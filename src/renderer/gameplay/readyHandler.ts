@@ -103,7 +103,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
   if (S.readyRequestInFlight) return;
-  if (S.tacticalAnnihilationOutcomeDialog != null) return;
+  if (S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null) return;
   if (isDeferredResolutionPlaybackConsultPending()) {
     deps.updateReadyButtonState();
     return;
@@ -198,12 +198,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         refreshBuildPopup: false,
         redraw: false,
       });
-      const outcome: MeleeInterceptModalOutcome = readTacticalBattlesInterceptPromptEnabled()
-        ? await deps.openMeleeInterceptModal({
-            candidates: readyResult.meleeInterceptCandidates ?? [],
-            buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
-          })
-        : { decision: 'ignore' };
+      const outcome: MeleeInterceptModalOutcome = readyResult.aiOnlyBattleH3Index && S.autoAdvance
+        ? { decision: 'fight', selectedH3Index: readyResult.aiOnlyBattleH3Index }
+        : readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled()
+          ? await deps.openMeleeInterceptModal({
+              candidates: readyResult.meleeInterceptCandidates ?? [],
+              buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+              preselectH3Index: readyResult.aiOnlyBattleH3Index,
+            })
+          : { decision: 'ignore' };
       const resolveResult = await window.gameApi.resolveMeleeIntercept({
         meleeDecisionToken: readyResult.meleeDecisionToken ?? '',
         decision: outcome.decision,

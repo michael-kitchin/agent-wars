@@ -80,6 +80,14 @@ test('a finished strategic consult starts the battle opponent plan it had been h
   );
 });
 
+test('an AI-only battle that has already ended does not start another consult', () => {
+  const client = readRendererSource('openRouter', 'commanderPoolClient.ts');
+  assert.match(
+    extractBalancedBlockAfter(client, 'export async function startCommanderPlanningIfAllowed'),
+    /if \(S\.tacticalBattleSnapshot\?\.aiOnlyEndReason != null\) return;/
+  );
+});
+
 test('Ready waits while a commander is planning', () => {
   const waiting = readRendererSource('openRouter', 'aiPlanningState.ts');
   assert.match(

@@ -161,14 +161,18 @@ function tacticalBaselineCountForParentOnHumanVoluntaryBailout(
  * Applies strategic-parent elimination for human voluntary tactical bailout using strict-less-than-half survival threshold.
  *
  * Purpose: Ensures tactical bailout outcomes remove weakened strategic parents before automatic strategic continuation.
- * When to use: Human voluntary exit path only, after transport baseline restoration and before active tactical snapshot clear.
+ * When to use: Human voluntary exit, and the two-party exit when the caller has already decided both parties remain. `partiesRemain` false skips the pass. Omitted uses the human roster check.
  * Expected outcome: Deletes strategic parents where `survivors * 2 < baseline`.
  * Exceptions: None; caller handles and logs unexpected failures.
  */
-function applyHumanVoluntaryBailoutStrategicParentElimination(snapshot: TacticalBattleSnapshot): void {
+function applyHumanVoluntaryBailoutStrategicParentElimination(
+  snapshot: TacticalBattleSnapshot,
+  partiesRemain?: boolean,
+): void {
   const hasHuman = snapshot.subUnits.some((u) => u.player === HUMAN_SEAT_ID);
   const hasOpponent = snapshot.subUnits.some((u) => u.player !== HUMAN_SEAT_ID);
-  if (!hasHuman || !hasOpponent) {
+  const remain = partiesRemain ?? (hasHuman && hasOpponent);
+  if (!remain) {
     tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination skipped annihilation-state roster', {
       battleId: snapshot.battleId,
       hasHuman,
@@ -217,17 +221,22 @@ function applyHumanVoluntaryBailoutStrategicParentElimination(snapshot: Tactical
  * Expected outcome: Tactical session snapshot clears in both modes; voluntary mode may additionally delete strategic parent units.
  * Exceptions: Bailout elimination errors are logged and suppressed so teardown always completes.
  */
-function endTacticalBattleSessionCore(applyHumanVoluntaryBailoutResolution: boolean): void {
+function endTacticalBattleSessionCore(mode: 'none' | 'human' | 'twoParty'): void {
   tacticalLogMutate('endTacticalBattleSessionCore', {
     hadBattle: !!getActiveTacticalBattleSnapshotRef(),
-    applyHumanVoluntaryBailoutResolution,
+    mode,
   });
   const snap = getActiveTacticalBattleSnapshotRef();
   const parentIds = snap ? [...new Set(snap.subUnits.map((u) => u.parentUnitId))] : null;
   restoreTacticalTransportBaselineForParentUnitIds(parentIds);
-  if (snap && applyHumanVoluntaryBailoutResolution) {
+  if (snap && mode !== 'none') {
     try {
-      applyHumanVoluntaryBailoutStrategicParentElimination(snap);
+      const lead = snap.leadPartyId;
+      const opposing = snap.opposingPartyId;
+      const twoPartyRemain = lead != null && opposing != null
+        && snap.subUnits.some((unit) => unit.player === lead)
+        && snap.subUnits.some((unit) => unit.player === opposing);
+      applyHumanVoluntaryBailoutStrategicParentElimination(snap, mode === 'twoParty' ? twoPartyRemain : undefined);
     } catch (err) {
       tacticalLogError('endTacticalBattleSessionCore bailout elimination failed', {
         battleId: snap.battleId,
@@ -320,7 +329,7 @@ export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: st
  */
 export function endTacticalBattleSession(): void {
   tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
-  endTacticalBattleSessionCore(false);
+  endTacticalBattleSessionCore('none');
 }
 
 /**
@@ -335,7 +344,39 @@ export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): void {
   tacticalLogMutate('endTacticalBattleSessionForHumanVoluntaryExitBailout', {
     hadBattle: !!getActiveTacticalBattleSnapshotRef(),
   });
-  endTacticalBattleSessionCore(true);
+  endTacticalBattleSessionCore('human');
+}
+
+/**
+ * Clears an AI-only battle and applies the less-than-half pass only while both parties remain.
+ *
+ * Purpose: Idle, commander exit, and the header Exit Battle control use the same threshold as a human Exit Battle.
+ * When to use: `game:endTacticalBattle` when the active snapshot has `leadPartyId`.
+ * Expected outcome: A parent under half is removed when both parties still have a sub-unit. A party that is already gone removes nothing more. The session clears either way.
+ * Exceptions: Elimination failures are logged and suppressed so teardown still completes.
+ */
+export function endTacticalBattleSessionForTwoPartyVoluntaryExit(): void {
+  tacticalLogMutate('endTacticalBattleSessionForTwoPartyVoluntaryExit', {
+    hadBattle: !!getActiveTacticalBattleSnapshotRef(),
+  });
+  endTacticalBattleSessionCore('twoParty');
+}
+
+/**
+ * Stores the snapshot after an AI-only beat without ending the session.
+ *
+ * Purpose: Playback still needs the snapshot, including an end reason.
+ * When to use: The AI-only beat after it has set the streak, the reason, and the next turn number.
+ * Expected outcome: `getActiveTacticalBattleSnapshot` returns `snapshot`.
+ * Exceptions: None. A missing database skips the durable write and keeps the memory copy.
+ */
+export function commitAiOnlyTacticalBeatSnapshot(snapshot: TacticalBattleSnapshot): void {
+  tacticalLogMutate('commitAiOnlyTacticalBeatSnapshot', {
+    battleId: snapshot.battleId,
+    tacticalTurnNumber: snapshot.tacticalTurnNumber,
+    aiOnlyEndReason: snapshot.aiOnlyEndReason ?? null,
+  });
+  commitActiveTacticalBattle(snapshot);
 }
 
 /**

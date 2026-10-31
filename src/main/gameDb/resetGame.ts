@@ -13,6 +13,7 @@ import { replaceSeatRoster } from './seatRosterStore';
 import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolution';
 import { createSeededRng } from '../seededRng';
 import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
+import { aiOnlyBattlesForRequest, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
@@ -189,6 +190,15 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly victoryRule?: VictoryRule;
+  /**
+   * Requested AI-only battle choice.
+   *
+   * Contract: Omitted or unknown stores Balanced. A known mode is stored as itself.
+   * When to use: The new-game dialog's AI-Only Battles control, only when Start succeeds.
+   * Expected outcome: Stored as `ai_only_battles`.
+   * Exceptions: None.
+   */
+  readonly aiOnlyBattles?: AiOnlyBattleMode;
   /**
    * Match seed to store instead of a random one.
    *
@@ -390,11 +400,13 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     tech: parseBonusLevel(options?.techBonusLevel, 'off'),
   });
   clearAttackMixOnNewGame();
+  const aiOnlyBattles = aiOnlyBattlesForRequest(options?.aiOnlyBattles);
   logDebug('gameDb resetGameForNewMatch', {
     fogOfWarEnabled,
     gameSize,
     ...originBonusSettings,
     gameMapId: options?.gameMapId ?? null,
+    aiOnlyBattles,
   });
   if (!deps.hasDb()) return;
   const mapId = requireGameMapId(options?.gameMapId);
@@ -426,6 +438,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   } else {
     run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['turn_limit', String(victory.turnLimit)]);
   }
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['ai_only_battles', aiOnlyBattles]);
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
   persistRegionVsRegionScenarioId({ run });

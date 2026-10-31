@@ -19,6 +19,63 @@ export type BattleForceCounts = {
 };
 
 /**
+ * Both parties' sub-unit counts, and the left party's share of the two.
+ *
+ * Purpose: An AI-only force bar shows the lead party on the left and the other party on the right.
+ * When to use: Returned by `countTwoPartyForces`.
+ * Expected outcome: Whole counts, and a left share from 0 to 1.
+ * Exceptions: None.
+ */
+export type TwoPartyForceCounts = {
+  /**
+   * Sub-units of the left party.
+   *
+   * Contract: Only `leftOwnerId` is counted.
+   * When to use: The left side of the force bar.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  readonly left: number;
+  /**
+   * Sub-units of the right party.
+   *
+   * Contract: Only `rightOwnerId` is counted.
+   * When to use: The right side of the force bar.
+   * Expected outcome: A non-negative count.
+   * Exceptions: None.
+   */
+  readonly right: number;
+  /**
+   * The left party's share of both counts.
+   *
+   * Contract: Left over left plus right, or 0.5 when both counts are zero.
+   * When to use: Drawing the left part of the bar.
+   * Expected outcome: A number from 0 to 1.
+   * Exceptions: None.
+   */
+  readonly leftShare: number;
+};
+
+/**
+ * Counts two named parties and the left party's share.
+ *
+ * Purpose: An AI-only battle has no human seat, so the force bar cannot use `countBattleForces`.
+ * When to use: When the snapshot has `leadPartyId`. Pass that id as the left owner.
+ * Expected outcome: The two counts. Any other owner is not counted. `leftShare` is 0.5 when both counts are zero.
+ * Exceptions: None.
+ */
+export function countTwoPartyForces(
+  subUnits: readonly { readonly player: string }[],
+  leftOwnerId: string,
+  rightOwnerId: string
+): TwoPartyForceCounts {
+  const left = subUnits.filter((sub) => sub.player === leftOwnerId).length;
+  const right = subUnits.filter((sub) => sub.player === rightOwnerId).length;
+  const total = left + right;
+  return { left, right, leftShare: total > 0 ? left / total : 0.5 };
+}
+
+/**
  * Counts each side's sub-units in a battle and works out the player's share.
  *
  * Purpose: The player sees at a glance how the two sides compare in the fight.

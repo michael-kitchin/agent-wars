@@ -134,6 +134,15 @@ tacticalPhasePlanning: true,
    * Exceptions: None; keep `null` whenever no tactical snapshot exists.
    */
 tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null,
+  /**
+   * The sentence on the Ok dialog after an AI-only battle.
+   *
+   * Purpose: That dialog reuses the annihilation overlay without using the human win/loss kind.
+   * When to use: Set when the result or the header Exit Battle control opens the dialog. Cleared when Ok finishes or the overlay closes.
+   * Expected outcome: Ready, New game, and commander start stay blocked while this is set. Null means the dialog is not that result.
+   * Exceptions: None.
+   */
+  aiOnlyBattleResultSentence: null as string | null,
     /**
    * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
 

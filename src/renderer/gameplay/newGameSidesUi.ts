@@ -29,7 +29,7 @@ import {
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
-import { bindNewGameVictory, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
+import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
 import { regionalHomeOptions, selectedNewGameTab, setNewGameHomesChangedListener } from './newGameMapUi';
@@ -243,13 +243,14 @@ export function bindNewGameSides(): void {
  *
  * Purpose: The click handler stays free of row markup.
  * When to use: The Start click.
- * Expected outcome: `blocked` is set when the rows cannot start. Otherwise `seats` follows the rows, and the rule and limit come from the Victory section.
+ * Expected outcome: `blocked` is set when the rows cannot start. Otherwise `seats` follows the rows, and the rule, limit, and AI-only battle choice come from the Victory section.
  * Exceptions: None.
  */
 export function readNewGameSeatsStart(): {
   readonly seats: readonly NewGameSeatInput[];
   readonly turnLimit: number;
   readonly victoryRule: ReturnType<typeof readNewGameVictory>['victoryRule'];
+  readonly aiOnlyBattles: ReturnType<typeof readNewGameAiOnlyBattles>;
   readonly blocked: string | null;
 } {
   const blocked = startBlockedReason(sidesState);
@@ -258,6 +259,7 @@ export function readNewGameSeatsStart(): {
     seats: sidesState && !blocked ? buildSeatsPayload(sidesState) : [],
     turnLimit: victory.turnLimit,
     victoryRule: victory.victoryRule,
+    aiOnlyBattles: readNewGameAiOnlyBattles(),
     blocked,
   };
 }

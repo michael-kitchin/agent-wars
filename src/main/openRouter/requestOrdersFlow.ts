@@ -311,7 +311,15 @@ export async function requestOrdersFlow(
     });
     return failRequest('Operational map is required for AI prompting and was not generated.');
   }
-  const systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride, coordinateContext);
+  const includeExitBattle = tacticalBattle?.leadPartyId != null;
+  const systemPrompt = buildSystemPromptForTools(
+    planState,
+    coordMap,
+    enabledToolNames,
+    briefingOverride,
+    coordinateContext,
+    includeExitBattle,
+  );
   const hasBriefing = briefingOverride != null && briefingOverride.length > 0;
   const userMessage = getInitialUserMessage(
     flags,
@@ -321,6 +329,7 @@ export async function requestOrdersFlow(
       hasAirUnits: opponentUnits.some((u) => u.unitType === 'air'),
       hasMissileUnits: !tacticalBattle && opponentUnits.some((u) => isMissileUnitType(u.unitType)),
       hasBestOptionsTable: hasBriefing && briefingOverride.includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN),
+      includeExitBattle,
     }
   );
 
@@ -390,6 +399,7 @@ export async function requestOrdersFlow(
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
+    includeExitBattle,
   };
   /**
    * Optional request parameters shared by every tool-loop round and the repair call.

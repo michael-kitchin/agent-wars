@@ -3,7 +3,7 @@
  *
  * Purpose: Battle consultations must not carry strategic win, production, or memory advice.
  * When to use: Only via `buildCoachingBullets` / `buildContextCoaching`.
- * Expected outcome: Eleven-plus required items, gated on air, naval, and the options table.
+ * Expected outcome: Eleven-plus required items, gated on air, naval, the options table, and the AI-only exit flag.
  * Exceptions: None.
  */
 
@@ -60,6 +60,7 @@ export function buildTacticalCoachingBullets(gates: CoachingGates): readonly str
   bullets.push(CALLBACK_BULLET);
   bullets.push(UNCONSULTED_BEAT_BULLET);
   bullets.push(MESSAGE_DISCIPLINE_BULLET);
+  if (gates.includeExitBattle === true) bullets.push(EXIT_BATTLE_BULLET);
   return bullets;
 }
 
@@ -164,4 +165,15 @@ const CALLBACK_BULLET =
  */
 const UNCONSULTED_BEAT_BULLET =
   '- The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.';
+
+/**
+ * Tells an AI-only commander when to leave the battle.
+ *
+ * Purpose: The beat still resolves this reply's orders. The flag only asks to end the battle afterward.
+ * When to use: `buildTacticalCoachingBullets` when `includeExitBattle` is true.
+ * Expected outcome: The locked sentence, including that a missing or false flag stays in the battle.
+ * Exceptions: None.
+ */
+const EXIT_BATTLE_BULLET =
+  '- Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. Orders in this reply still resolve for this beat.';
 

@@ -24,6 +24,7 @@ const STRATEGIC_ALL_ON: EnvelopeGates = {
   includeMemoryUpdates: true,
   includeProductionOrders: true,
   includeStandingOrderActions: true,
+  includeExitBattle: false,
 };
 
 /**
@@ -40,6 +41,7 @@ const TACTICAL: EnvelopeGates = {
   includeMemoryUpdates: true,
   includeProductionOrders: true,
   includeStandingOrderActions: false,
+  includeExitBattle: false,
 };
 
 /**
@@ -480,6 +482,7 @@ function run(): void {
   testTaughtExamplesFitSchema();
   testTaughtCallbackParametersFitSchema();
   testMissileLaunchesSchemaFollowsTheFlag();
+  testExitBattleSchemaFollowsTheGate();
   testProductionOrderEnumIncludesFortification();
   console.log('envelopeJsonSchema.test.ts passed');
 }
@@ -505,6 +508,29 @@ function testMissileLaunchesSchemaFollowsTheFlag(): void {
     'properties'
   );
   assert.ok(!('missileLaunches' in tactical));
+}
+
+/**
+ * Verifies `exitBattle` is required only for an AI-only tactical schema.
+ *
+ * Purpose: A human battle and a strategic turn must not ask the model for the flag.
+ * When to use: After the envelope field list changes.
+ * Expected outcome: The property sits after `orders`, is boolean, and is required only when the gate is on.
+ * Exceptions: None.
+ */
+function testExitBattleSchemaFollowsTheGate(): void {
+  const human = envelopeSchema(TACTICAL);
+  const humanProperties = asRecord(human.properties, 'properties');
+  assert.ok(!('exitBattle' in humanProperties));
+  assert.ok(!(human.required as string[]).includes('exitBattle'));
+  const strategic = envelopeSchema(STRATEGIC_ALL_ON);
+  assert.ok(!('exitBattle' in asRecord(strategic.properties, 'properties')));
+  const aiOnly = envelopeSchema({ ...TACTICAL, includeExitBattle: true });
+  const properties = asRecord(aiOnly.properties, 'properties');
+  const names = Object.keys(properties);
+  assert.equal(names[names.indexOf('orders') + 1], 'exitBattle');
+  assert.equal(asRecord(properties.exitBattle, 'exitBattle').type, 'boolean');
+  assert.ok((aiOnly.required as string[]).includes('exitBattle'));
 }
 
 /**

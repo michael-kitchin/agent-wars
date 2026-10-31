@@ -77,6 +77,15 @@ export interface RequestOrdersResult {
    */
   missileLaunches?: MissileLaunchOrder[];
   /**
+   * Whether the commander asked to leave an AI-only battle.
+   *
+   * Contract: True only when the envelope boolean was true. Omitted means false.
+   * When to use: Wrapping a tactical plan after a successful consult.
+   * Expected outcome: Absent on a strategic consult and on a human-versus-AI battle.
+   * Exceptions: None.
+   */
+  exitBattle?: boolean;
+  /**
    * Optional embark orders assigning land units to naval transports.
    *
    * Contract: Satisfies `EmbarkOrder` invariants for the active snapshot.

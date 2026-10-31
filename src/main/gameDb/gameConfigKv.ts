@@ -3,6 +3,7 @@
  */
 
 import type { BuildUnitType } from '../productionRules';
+import { aiOnlyBattlesFromStored, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import {
   DEFAULT_TURN_LIMIT,
   GAME_END_REASONS,
@@ -154,6 +155,23 @@ export function readVictorySettings(ops: GameConfigKvDbOps): VictorySettings {
   const turnLimit = (TURN_LIMIT_OPTIONS as readonly number[]).includes(parsed) ? parsed : DEFAULT_TURN_LIMIT;
   logTrace('gameConfigKv readVictorySettings result', { rule, turnLimit });
   return { rule, turnLimit };
+}
+
+/**
+ * Reads the AI-only battle choice stored for the current match.
+ *
+ * Purpose: An observed match uses this to decide whether one battle is offered. An old save has no row.
+ * When to use: `getGameStateSnapshot` and the ready pipeline.
+ * Expected outcome: The stored mode. A missing row or an unknown string is `none`.
+ * Exceptions: None.
+ */
+export function readAiOnlyBattles(ops: GameConfigKvDbOps): AiOnlyBattleMode {
+  logTrace('gameConfigKv readAiOnlyBattles');
+  if (ops.hasDb && !ops.hasDb()) return 'none';
+  const raw = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'ai_only_battles'")?.value;
+  const mode = aiOnlyBattlesFromStored(raw);
+  logTrace('gameConfigKv readAiOnlyBattles result', { mode });
+  return mode;
 }
 
 /**

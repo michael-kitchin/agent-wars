@@ -7,6 +7,7 @@ import type { TechLevel } from '../techBonusTypes';
 import type { WeatherState } from '../weatherBonusTypes';
 import type { GameMapProfile } from '../gameMapTypes';
 import type { SeatSnapshot } from '../seatRoster';
+import type { AiOnlyBattleMode } from '../aiOnlyBattles';
 import type { GameEndReason, VictorySettings } from '../victoryRules';
 import type { MercenaryEconomySnapshot } from './mercenaryTypes';
 
@@ -388,6 +389,15 @@ homeRegionHexesBySeat?: Readonly<Record<string, readonly string[]>>;
    * Exceptions: Absent on an empty snapshot built before a match exists.
    */
 victory?: VictorySettings;
+    /**
+   * Which AI-only battle this match may offer while observing.
+   *
+   * Contract: Beside `victory`, not inside it. A missing stored row reads as `none`.
+   * When to use: The ready pipeline while no human seat is still playing.
+   * Expected outcome: One of balanced, unbalanced, random, or none.
+   * Exceptions: Absent only on a snapshot built before this field existed. Readers treat that as none.
+   */
+aiOnlyBattles?: AiOnlyBattleMode;
     /**
    * Why the match ended.
    *

@@ -22,7 +22,7 @@ import { readSeatHasApiKey } from './seatApiKeyFlags';
 import { activeSeats, toSeatSnapshot } from '../../shared/seatRoster';
 import type { SeatId } from '../../shared/seatIds';
 import { readPersistedGameSize } from './gameSizeConfig';
-import { readGameEndReason, readVictorySettings } from './gameConfigKv';
+import { readAiOnlyBattles, readGameEndReason, readVictorySettings } from './gameConfigKv';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { formatGameDateForTurn, gameCalendarKindForMap, parseStartMonth } from '../../shared/gameCalendar';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
@@ -328,6 +328,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     winner,
     gameSize: readPersistedGameSize(ops),
     victory: readVictorySettings(ops),
+    aiOnlyBattles: readAiOnlyBattles(ops),
     ...(gameEndReason ? { gameEndReason } : {}),
     ...originFlags,
     startMonth,

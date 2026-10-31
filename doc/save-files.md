@@ -29,6 +29,8 @@ The `seats` table stays in the file. That includes each seat's `model_id`, `reas
 
 A new machine-local row has to be added to `MACHINE_LOCAL_CONFIG_KEYS` in the same change, or saves will carry it.
 
+The match row `ai_only_battles` stays in the file. It is not one of those six keys. A missing row reads as None (`aiOnlyBattlesFromStored`).
+
 ## Version
 
 `EXPECTED_USER_VERSION` in `src/main/gameDb.ts` is **26**. The match file includes `res_s_treasury` and `res_s_hire_orders` with the rest of the match tables. A save is loaded only when its SQLite `user_version` equals that number. There is no versioned migration. `res_s_hire_orders.reserved_credits` is added on open when the column is missing (`ensureHireOrderReservedCreditsColumn`). That addition does not change `EXPECTED_USER_VERSION`. Bump the version when `getFullDdl` changes in any other way. That bump makes every earlier save unloadable, and it also makes the on-disk match database from the previous schema fail validation on the next launch.

@@ -80,7 +80,8 @@ export function buildSystemPromptForTools(
   },
   enabledToolNames?: string[],
   briefingOverride?: string,
-  coordinateContext: CoordinateContext = { mode: 'strategic' }
+  coordinateContext: CoordinateContext = { mode: 'strategic' },
+  includeExitBattle = false,
 ): string {
   logDebug('openRouter buildSystemPromptForTools', {
     turnNumber: state.turnNumber,
@@ -89,6 +90,7 @@ export function buildSystemPromptForTools(
     hasBriefingOverride: Boolean(briefingOverride?.length),
     coordinateMode: coordinateContext.mode,
     battleId: coordinateContext.battleId ?? null,
+    includeExitBattle,
   });
   const { latLngByH3, format, resolveToH3 } = coordMap;
   const formatLatLng = (ll: [number, number]) => formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
@@ -148,6 +150,7 @@ export function buildSystemPromptForTools(
     seatCount,
     turnLimitVictory: state.victory?.rule === 'most_city_hexes_at_turn_limit',
     doctrine: doctrineForPrompt(state),
+    includeExitBattle,
   };
   const toolPromptLines = filtered.map((m) => {
     let line = m.promptLine;
@@ -312,6 +315,7 @@ ${contextCoaching}
     includeMissileActions: hasMissile && coordinateContext.mode !== 'tactical',
     includeNavalActions: hasNaval,
     includeStandingOrderActions: standingOrdersIssuable,
+    includeExitBattle,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
@@ -323,6 +327,7 @@ ${contextCoaching}
     includeAirActions: hasAir,
     includeMissileActions: hasMissile && coordinateContext.mode !== 'tactical',
     includeStandingOrderActions: standingOrdersIssuable,
+    includeExitBattle,
     coordinateMode: coordinateContext.mode,
   });
   const scoutingDirective =

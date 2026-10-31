@@ -541,7 +541,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **Unit hit points:** Instead of one hit = one unit lost.
 - **Infrastructure rebuilding:** If permanent destruction proves too punishing.
 - **Turn replay.** Save and load are shipped. See [save-files.md](save-files.md).
-- **AI-initiated tactical bail-out** as a distinct order (not implemented; only the human can voluntarily exit).
+- **AI-initiated tactical bail-out as a distinct order.** An AI-only battle uses the `exitBattle` flag in §12.8. A human battle has no model bail-out. The header control remains the player's.
 
 ---
 
@@ -574,9 +574,13 @@ Two entry paths:
 
 The AI opponent does not choose whether to enter. If the human declines, standard strategic resolution applies.
 
-A battle starts only when the hex holds the human and exactly one other owner. That owner may be another seat or Neutral. `opposingPartyId` on the battle snapshot is that owner. Neutral sub-units hold their cells and fire through the tempo sweep. A hex with three or more owners is not a battle, and a match with no human seat does not pause for one.
+A battle starts in one of two shapes. The hex holds the human and exactly one other owner. That owner may be another seat or Neutral. `opposingPartyId` on the battle snapshot is that owner, and `leadPartyId` is omitted. Neutral sub-units hold their cells and fire through the tempo sweep. The other shape is a hex that holds exactly two AI seats. `leadPartyId` is the seat with the lower `seatOrder`, and `localeCompare` of the seat ids breaks a tie (`tacticalBattlePartiesForOwners`). `opposingPartyId` is the other seat. A hex with three or more owners is not a battle. An AI seat and Neutral are not a battle.
 
 Both sides must be able to place at least one sub-unit or the battle does not start.
+
+While a human seat is still playing, Ready does not offer an AI-only battle. Offer tactical battles still decides whether that human sees the list. While nobody is playing, Offer tactical battles is ignored. That is the ready pipeline's existing `observing` case: `human == null`, or the human seat is not active. The stored `ai_only_battles` row decides (`readAiOnlyBattles`). Start writes that row from the Game Options choice through `aiOnlyBattlesForRequest`: an omitted or unknown value is `balanced` (`DEFAULT_AI_ONLY_BATTLES`). A missing or unknown row on a match that is already running is `none` (`aiOnlyBattlesFromStored`, `STORED_AI_ONLY_BATTLES_WHEN_MISSING`). Changing the select does not rewrite a running match.
+
+None offers no battle. Otherwise `buildAiOnlyBattleOffer` keeps a hex whose two parties are both active AI seats (`isAiSeatId` and `isSeatActive`) and that can place a sub-unit on each side. `selectAiOnlyBattle` picks one hex. Balanced picks the pair whose tactical sub-unit ratio is nearest 1. Unbalanced picks the ratio farthest from 1. The ratio is the smaller count divided by the larger, using `tacticalSubUnitCountForOwner` and the §12.2 table. A tie uses the smaller absolute gap, then the lower hex id (`localeCompare`). Random hashes the stored `game_seed`, the strategic turn, and those hex ids sorted by `localeCompare`. The hash is FNV-1a with the same offset and prime as `tacticalSubUnitLayoutSeed32`. The beat's combat dice stay a separate draw. Every other contested hex resolves on the world map.
 
 ### 12.2 Unit multiplication
 
@@ -659,7 +663,7 @@ Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignm
 
 The tactical game uses **WEGO** simultaneous resolution — the same model as the strategic game. Each beat:
 
-1. **Planning:** Both sides issue movement, ranged, air strike, ferry, and sealift orders. The LLM is consulted at most once per beat under event-driven policy. `tacticalTurnNumber` increments each beat.
+1. **Planning:** Both sides issue movement, ranged, air strike, ferry, and sealift orders. The LLM is consulted at most once per beat under event-driven policy. An AI-only battle consults each of its two commanders at most once. `tacticalTurnNumber` increments each beat.
 2. **Embark.**
 3. **Air strike phase.**
 4. **Ranged phase.**
@@ -670,6 +674,8 @@ The tactical game uses **WEGO** simultaneous resolution — the same model as th
 9. Casualties removed. Next beat, or battle end.
 
 There is no production step in a beat.
+
+An AI-only beat uses that same order (`applyAiOnlyTacticalBeat`). The opposing seat embarks before air. The lead seat moves, embarks, and ferries in the human seat's place. Each order is applied as that seat's own id.
 
 ### 12.7 Visibility
 
@@ -682,10 +688,14 @@ A tactical battle ends in one of these ways:
 1. **Annihilation:** One side has zero remaining sub-units. The UI shows an annihilation result. Remaining strategic parents on the winning side are not run through the less-than-half pass (the bail-out eliminator skips when one side is already gone).
 2. **Human voluntary exit:** The player clicks Exit Battle in the battle header. Remaining sub-units on **both** sides are mapped back using the **strict less-than-half** rule in §12.9. There is **no** extra dice-with-modifiers fight on exit. The LLM has no separate bail-out action.
 3. **Failed start:** If placement cannot put at least one sub-unit on each side, the battle never begins.
+4. **No orders:** In an AI-only battle, `idleBeatStreak` of 3 ends the battle. A beat is idle when neither seat kept a legal movement order or a ranged, air, ferry, or embark row naming that seat. The count is taken before the phases run. Any kept row resets the streak to 0. A missing streak loads as 0. Idle does not wait for five beats. Both sides map back with the §12.9 rule.
+5. **Commander exit:** In an AI-only battle, the battle ends when both commanders set `exitBattle` and `tacticalTurnNumber` is at least 6. The number starts at 1 and increments at the end of the beat, so five completed beats leave it at 6. Flags on a beat that ends at 5 do not end the battle. One flag on the beat that ends at 6 does not. Orders on that beat still resolve. Both sides map back with the §12.9 rule. The header Exit Battle control is a separate path: `endTacticalBattleSessionForTwoPartyVoluntaryExit`. It does not set `aiOnlyEndReason`.
+
+`applyAiOnlyTacticalBeat` checks these in order after the beat resolves: a wiped side, then the idle streak, then the flags. One party remaining is elimination. Both gone is mutual. A wipe wins even when both flags are also set. Elimination and mutual do not run the §12.9 pass. The session stays up until the result is left, so the snapshot still carries `aiOnlyEndReason`.
 
 ### 12.9 Mapping sub-units back to strategic units
 
-After a **human voluntary exit**, each strategic parent is destroyed when `survivors * 2 < baseline`, where baseline is the count placed at battle start (or the theoretical multiplication count on legacy snapshots). **Exact half survives.** Fewer than half is destroyed.
+After a **human voluntary exit**, and after an AI-only leave that still has a sub-unit on both the lead seat and the other seat, each strategic parent is destroyed when `survivors * 2 < baseline`, where baseline is the count placed at battle start (or the theoretical multiplication count on legacy snapshots). **Exact half survives.** Fewer than half is destroyed. The two-party pass is `endTacticalBattleSessionForTwoPartyVoluntaryExit`. It covers the header control, the idle ending, and the commander-exit ending. It skips when either party already has no sub-unit.
 
 Strategic units remain binary — alive or dead. There are no partial-strength units.
 
@@ -693,7 +703,7 @@ On annihilation, the empty side's parents are already gone with their last sub-u
 
 ### 12.10 LLM play at the tactical level
 
-When the AI plays a tactical battle, the LLM receives a tactical briefing: full visibility, res4 operational map, unit status, Best Options for this beat, and the same WEGO order envelope minus strategic-only tails (no `assign_order`, production, or memory writes). Standing orders do not move sub-units. See [ai-commander-prompts/tactical-prompt.md](ai-commander-prompts/tactical-prompt.md).
+When the AI plays a tactical battle, the LLM receives a tactical briefing: full visibility, res4 operational map, unit status, Best Options for this beat, and the same WEGO order envelope minus strategic-only tails (no `assign_order`, production, or memory writes). Standing orders do not move sub-units. Each commander in an AI-only battle is consulted at most once per beat, the lead seat first, then the other. A reply that sets `exitBattle` and carries no orders stays stored (`tacticalDraftAlreadyDecided`). Once `aiOnlyEndReason` is set, no further consult starts for that battle. See [ai-commander-prompts/tactical-prompt.md](ai-commander-prompts/tactical-prompt.md).
 
 ---
 

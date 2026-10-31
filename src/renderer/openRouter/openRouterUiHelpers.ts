@@ -40,7 +40,7 @@ export function updateReadyButtonState(): void {
   const gameOver = S.gameState?.gameOver ?? false;
   const deferredConsult = isDeferredResolutionPlaybackConsultPending();
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
-  const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
+  const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null;
   readyBtn.disabled =
     gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
   const deferredClock = S.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;

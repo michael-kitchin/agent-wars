@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { AI_ONLY_BATTLE_MODES, DEFAULT_AI_ONLY_BATTLES, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import {
   DEFAULT_TURN_LIMIT,
   DEFAULT_VICTORY_RULE,
@@ -90,6 +91,20 @@ export function renderNewGameVictory(): void {
 }
 
 /**
+ * The AI-only battle choice Start should send.
+ *
+ * Purpose: The select is the only place the player sets this. A missing control still starts Balanced.
+ * When to use: `readNewGameSeatsStart`.
+ * Expected outcome: One of the four modes. Anything else is Balanced.
+ * Exceptions: None.
+ */
+export function readNewGameAiOnlyBattles(): AiOnlyBattleMode {
+  const select = document.getElementById('new-game-ai-only-battles-select');
+  const value = select instanceof HTMLSelectElement ? select.value : '';
+  return (AI_ONLY_BATTLE_MODES as readonly string[]).includes(value) ? (value as AiOnlyBattleMode) : DEFAULT_AI_ONLY_BATTLES;
+}
+
+/**
  * The rule and limit Start should send.
  *
  * Purpose: Deathmatch still sends the remembered number. The main process ignores it.
@@ -113,13 +128,15 @@ export function readNewGameVictory(): { readonly victoryRule: VictoryRule; reado
  *
  * Purpose: Opening the overlay starts from the default rule.
  * When to use: `refreshNewGameSides({ reset: true })` only.
- * Expected outcome: The Rule select is Deathmatch and the turn-limit select is Unlimited.
+ * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, and AI-Only Battles is Balanced.
  * Exceptions: None.
  */
 export function resetNewGameVictory(): void {
   rememberedTurnLimit = DEFAULT_TURN_LIMIT;
   const victory = document.getElementById('new-game-victory-select');
   if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
+  const aiOnly = document.getElementById('new-game-ai-only-battles-select');
+  if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
   renderNewGameVictory();
 }
 

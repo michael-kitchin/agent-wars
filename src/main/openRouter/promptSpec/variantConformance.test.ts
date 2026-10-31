@@ -66,6 +66,7 @@ function strategicCoaching(overrides: Partial<CoachingGates> = {}): CoachingGate
     homeRegionsOverlap: true,
     hasObservedEnemy: true,
     includeScenarioWinPaths: true,
+    includeExitBattle: false,
     ...overrides,
   };
 }
@@ -86,6 +87,7 @@ function strategicEnvelope(overrides: Partial<EnvelopeGates> = {}): EnvelopeGate
     includeMemoryUpdates: true,
     includeProductionOrders: true,
     includeStandingOrderActions: true,
+    includeExitBattle: false,
     ...overrides,
   };
 }

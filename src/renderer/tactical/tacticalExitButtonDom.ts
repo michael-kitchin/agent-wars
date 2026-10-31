@@ -20,7 +20,7 @@ import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 export function syncTacticalExitButtonElementVisibility(): void {
   const exitBtn = document.getElementById('tactical-exit-btn') as HTMLButtonElement | null;
   const active = !!S.tacticalBattleSnapshot;
-  const annihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
+  const annihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null;
   const playbackDisablesExit = S.tacticalBattleSnapshot != null && S.resolutionMoveAnimation != null;
   const disabled = !S.tacticalPhasePlanning || playbackDisablesExit;
   if (exitBtn) {

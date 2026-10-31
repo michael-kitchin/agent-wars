@@ -8,6 +8,8 @@
  */
 
 import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getSeatRoster, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
+import { readAiOnlyBattles } from '../gameDb/gameConfigKv';
+import { buildAiOnlyBattleOffer } from './aiOnlyBattleOffer';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from '../combatResolution';
 import { logDebug, logError } from '../logger';
@@ -462,21 +464,41 @@ export function executeReadyStrategicTurn(
   ), techHitBonusAt);
 
   const rawMeleeHexes = listMeleeCandidateHexes(combatUnitsAfter, hexList);
-  const human = findHumanSeat(getSeatRoster());
+  const roster = getSeatRoster();
+  const human = findHumanSeat(roster);
   const observing = human == null || !isSeatActive(human);
-  const visibleHexes = observing ? new Set<string>() : new Set(getGameStateForPlayer(HUMAN_SEAT_ID).visibleHexes ?? []);
-  const seenHexes = observing ? [] : rawMeleeHexes.filter((hex) => visibleHexes.has(hex));
-  const partySeats = getSeatRoster().map((seat) => ({ seatId: seat.seatId, seatOrder: seat.seatOrder }));
-  let meleeInterceptCandidates = buildMeleeInterceptCandidateRows(seenHexes, combatUnitsAfter, partySeats);
-  const placeable = new Set(filterMeleeCandidateHexesWithTacticalEntry(
-    meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index),
-    { allowDuringStrategicResolution: true }
-  ));
-  meleeInterceptCandidates = meleeInterceptCandidates.map((row) =>
-    row.tacticalEligible && !placeable.has(row.h3Index) ? { ...row, tacticalEligible: false } : row
-  );
-  const candidateHexes = meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index);
-  if (!observing && candidateHexes.length > 0) {
+  const partySeats = roster.map((seat) => ({ seatId: seat.seatId, seatOrder: seat.seatOrder }));
+  const aiOnlyMode = observing ? readAiOnlyBattles({ getOne: dbGetOne, run: dbRun }) : 'none';
+  let aiOnlyChosen: string | null = null;
+  let meleeInterceptCandidates;
+  let candidateHexes: string[];
+  if (observing && aiOnlyMode !== 'none') {
+    const offered = buildAiOnlyBattleOffer({
+      hexes: rawMeleeHexes,
+      units: combatUnitsAfter,
+      partySeats,
+      roster,
+      mode: aiOnlyMode,
+      seed: getGameSeed(),
+      turnNumber,
+    });
+    meleeInterceptCandidates = offered.candidates;
+    aiOnlyChosen = offered.chosenH3Index;
+    candidateHexes = aiOnlyChosen ? [aiOnlyChosen] : [];
+  } else {
+    const visibleHexes = observing ? new Set<string>() : new Set(getGameStateForPlayer(HUMAN_SEAT_ID).visibleHexes ?? []);
+    const seenHexes = observing ? [] : rawMeleeHexes.filter((hex) => visibleHexes.has(hex));
+    meleeInterceptCandidates = buildMeleeInterceptCandidateRows(seenHexes, combatUnitsAfter, partySeats);
+    const placeable = new Set(filterMeleeCandidateHexesWithTacticalEntry(
+      meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index),
+      { allowDuringStrategicResolution: true }
+    ));
+    meleeInterceptCandidates = meleeInterceptCandidates.map((row) =>
+      row.tacticalEligible && !placeable.has(row.h3Index) ? { ...row, tacticalEligible: false } : row
+    );
+    candidateHexes = meleeInterceptCandidates.filter((row) => row.tacticalEligible).map((row) => row.h3Index);
+  }
+  if ((!observing && candidateHexes.length > 0) || aiOnlyChosen) {
     const decisionToken = newMeleeDecisionToken();
     const snapshot: MeleeInterceptReadyPauseSnapshot = {
       decisionToken,
@@ -509,12 +531,15 @@ export function executeReadyStrategicTurn(
       turnNumber,
       candidateHexCount: candidateHexes.length,
       rngInvocationsBeforeMelee,
+      aiOnlyMode,
+      aiOnlyChosen,
     });
     return {
       success: true,
       awaitingMeleeDecision: true,
       meleeDecisionToken: decisionToken,
       meleeInterceptCandidates,
+      ...(aiOnlyChosen ? { aiOnlyBattleH3Index: aiOnlyChosen } : {}),
     };
   }
 

@@ -39,6 +39,15 @@ candidates: MeleeCandidateRow[];
    * Exceptions: IPC failures may yield a short fallback string without throwing.
    */
 buildHexPopupHtml: (h3Index: string) => Promise<string>;
+  /**
+   * The hex to check and scroll into view when the dialog opens.
+   *
+   * Contract: Omitted leaves every radio unchecked and Fight disabled.
+   * When to use: An observed match whose stored choice is not None.
+   * Expected outcome: That row is selected, scrolled into view, and Fight is enabled.
+   * Exceptions: None. An unknown hex leaves the dialog unselected.
+   */
+  readonly preselectH3Index?: string;
 }
 
 /**
@@ -118,9 +127,13 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       colgroup.appendChild(col);
     }
     table.appendChild(colgroup);
+    const leadRow = eligible.find((row) => !row.parties.some((party) => party.ownerId === HUMAN_SEAT_ID));
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['', 'Hex', 'Yours', 'Enemy']) {
+    const partyHeaders = leadRow
+      ? [partyName(leadRow.parties[0]?.ownerId ?? ''), partyName(leadRow.parties[1]?.ownerId ?? '')]
+      : ['Yours', 'Enemy'];
+    for (const label of ['', 'Hex', ...partyHeaders]) {
       const th = document.createElement('th');
       th.textContent = label;
       hr.appendChild(th);
@@ -226,13 +239,17 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       tr.appendChild(tdHex);
 
       const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
-      const enemy = row.parties.find((party) => party.ownerId !== HUMAN_SEAT_ID);
+      const others = row.parties.filter((party) => party.ownerId !== HUMAN_SEAT_ID);
       const tdHuman = document.createElement('td');
-      tdHuman.textContent = human?.unitSummary || '—';
-      tr.appendChild(tdHuman);
-
       const tdAi = document.createElement('td');
-      tdAi.append(enemy ? enemyCell(enemy.ownerId, enemy.unitSummary) : document.createTextNode('—'));
+      if (human) {
+        tdHuman.textContent = human.unitSummary || '—';
+        tdAi.append(others[0] ? enemyCell(others[0].ownerId, others[0].unitSummary) : document.createTextNode('—'));
+      } else {
+        tdHuman.append(others[0] ? enemyCell(others[0].ownerId, others[0].unitSummary) : document.createTextNode('—'));
+        tdAi.append(others[1] ? enemyCell(others[1].ownerId, others[1].unitSummary) : document.createTextNode('—'));
+      }
+      tr.appendChild(tdHuman);
       tr.appendChild(tdAi);
 
       tbody.appendChild(tr);
@@ -246,7 +263,16 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     }
     document.body.appendChild(overlay);
     detachFrame = attachFrameToVisibleMap(frame);
-    radios[0]?.focus();
+    const preselected = args.preselectH3Index
+      ? radios.find((radio) => radio.value === args.preselectH3Index)
+      : undefined;
+    if (preselected) {
+      preselected.checked = true;
+      selectedH3 = preselected.value;
+      fightBtn.disabled = false;
+      preselected.closest('tr')?.scrollIntoView({ block: 'nearest' });
+    }
+    (preselected ?? radios[0])?.focus();
   });
 }
 

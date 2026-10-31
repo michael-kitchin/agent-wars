@@ -31,7 +31,7 @@ import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '..
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
+import { getTacticalAnnihilationOutcome, getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import {
   computePostResolutionConsultTriggers,
   enemyHadStrategicResolutionObservableActions,
@@ -501,6 +501,15 @@ export async function afterTacticalBeatResolution(
   deps: AfterTacticalBeatResolutionDeps,
   requestedSeatId: AiSeatId
 ): Promise<AfterTacticalBeatResolutionResult> {
+  if (tacticalBattle.leadPartyId != null && tacticalBattle.aiOnlyEndReason != null) {
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_ai_only_end',
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+      aiOnlyEndReason: tacticalBattle.aiOnlyEndReason,
+    });
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+  }
   if (!deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
       reason: 'skip_no_model_or_key',
@@ -511,7 +520,10 @@ export async function afterTacticalBeatResolution(
     });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false, absenceReason: 'consult_failed' };
   }
-  if (getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null) {
+  const rosterEnded = tacticalBattle.leadPartyId != null && tacticalBattle.opposingPartyId != null
+    ? getTwoPartyAnnihilationOutcome(tacticalBattle.subUnits, tacticalBattle.leadPartyId, tacticalBattle.opposingPartyId) !== null
+    : getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null;
+  if (rosterEnded) {
     logDebug('afterTacticalBeatResolution: skip tactical LLM', {
       reason: 'skip_annihilation_roster',
       turnNumber: state.turnNumber,

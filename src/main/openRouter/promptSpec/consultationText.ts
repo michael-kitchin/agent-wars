@@ -117,6 +117,15 @@ export interface OpeningMessageGates {
    * Exceptions: None.
    */
   readonly hasBestOptionsTable: boolean;
+  /**
+   * Whether this tactical opening may name `exitBattle`.
+   *
+   * Contract: Omitted means false. True only for a battle between two AI seats.
+   * When to use: The same flag as the system prompt.
+   * Expected outcome: The quoted field list includes `exitBattle` only when this is true.
+   * Exceptions: None.
+   */
+  readonly includeExitBattle?: boolean;
 }
 
 /**
@@ -136,6 +145,7 @@ function envelopeGatesFromOpening(gates: OpeningMessageGates): EnvelopeGates {
     includeMemoryUpdates: gates.memoryEnabled && !tactical,
     includeProductionOrders: gates.productionEnabled && !tactical,
     includeStandingOrderActions: gates.ordersEnabled && !tactical,
+    includeExitBattle: gates.includeExitBattle === true,
   };
 }
 

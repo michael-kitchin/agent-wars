@@ -1,4 +1,5 @@
 import { cellToLatLng } from 'h3-js';
+import { tacticalSubUnitCountForStrategicUnitType as sharedTacticalSubUnitCountForStrategicUnitType } from '../../shared/tacticalSubUnitCounts';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { missilePlacementCellOrder, missilePlacementPassable } from './tacticalMissilePlacement';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -10,6 +11,7 @@ import {
   dbGetOne,
   getTacticalTerrainOverridesForRendererFromGame,
   getHexController,
+  getSeatRoster,
   listTacticalFeatureOverridesForGame,
   listUnitsForSnapshot,
 } from '../gameDb';
@@ -39,6 +41,7 @@ import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tactica
 import { loadedStrategicTerrainKindByH3 } from '../gameDb/mapHexRead';
 import { isStrategicCell } from '../../shared/h3Resolutions';
 import { HUMAN_SEAT_ID, isOwnerId } from '../../shared/seatIds';
+import { tacticalBattlePartiesForOwners } from './tacticalBattleParties';
 import { battleCellTerrainKind, tacticalBattleFootprint, tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
 import { buildTacticalFortificationOwnerRecord } from './tacticalFortificationOwners';
 import {
@@ -57,27 +60,7 @@ import {
  * Exceptions: None.
  */
 export function tacticalSubUnitCountForStrategicUnitType(unitType: string): number {
-  let count = 0;
-  switch (unitType) {
-    case 'infantry':
-      count = 8;
-      break;
-    case 'armor':
-      count = 4;
-      break;
-    case 'air':
-      count = 3;
-      break;
-    case 'naval':
-      count = 4;
-      break;
-    case 'missile':
-      count = 1;
-      break;
-    default:
-      count = 0;
-      break;
-  }
+  const count = sharedTacticalSubUnitCountForStrategicUnitType(unitType);
   tacticalLogQuery('computeTacticalBattleSnapshot tacticalSubUnitCountForStrategicUnitType', { unitType, count });
   return count;
 }
@@ -428,15 +411,15 @@ export function computeTacticalBattleSnapshot(
       : undefined;
     const inHex = allUnits.filter((u) => u.h3Index === enclosingStrategicH3Index);
     const owners = [...new Set(inHex.map((unit) => unit.player))];
-    const otherOwners = owners.filter((owner) => owner !== HUMAN_SEAT_ID);
-    if (!owners.includes(HUMAN_SEAT_ID) || otherOwners.length !== 1) {
+    const parties = tacticalBattlePartiesForOwners(
+      owners,
+      getSeatRoster().map((seat) => ({ seatId: seat.seatId, seatOrder: seat.seatOrder }))
+    );
+    if (!parties) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Hex is not contested by exactly two sides.' };
     }
-    const opposingOwner = otherOwners[0];
-    if (!opposingOwner || !isOwnerId(opposingOwner)) {
-      return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Hex is not contested by exactly two sides.' };
-    }
-    const opposingPartyId = opposingOwner;
+    const opposingPartyId = parties.opposingPartyId;
+    const leadPartyId = parties.leadPartyId;
     const parentLookup = buildUnitDisplayNameLookup(allUnits);
     const tacticalRows = getTacticalTerrainOverridesForRendererFromGame();
     const tacticalUrbanByH3 = new Map<string, boolean>();
@@ -466,7 +449,7 @@ export function computeTacticalBattleSnapshot(
       controllerOf: getHexController,
     });
     const hexController = getHexController(enclosingStrategicH3Index);
-    const defenderSide = hexController === HUMAN_SEAT_ID || hexController === opposingPartyId ? hexController : null;
+    const defenderSide = hexController != null && owners.includes(hexController) && isOwnerId(hexController) ? hexController : null;
     const urbanRubbleForPlacement = tacticalUrbanRubbleFlagRecordsForFootprint(coreChildren, tacticalRows);
     const urbanRubble = tacticalUrbanRubbleFlagRecordsForFootprint(children, tacticalRows);
     const transportForPlacement = tacticalFootprintTransportOverlayRecords({
@@ -549,7 +532,7 @@ export function computeTacticalBattleSnapshot(
       const parentName = parentLookup.get(parent.id) ?? parent.id;
       let placed = 0;
       let cellCursor = 0;
-      const placingSide: InitialPlacementSide = parent.player === HUMAN_SEAT_ID ? HUMAN_SEAT_ID : opposingPartyId;
+      const placingSide: InitialPlacementSide = isOwnerId(parent.player) ? parent.player : opposingPartyId;
       const genericPassable = (cell: string): boolean => placementPassableForSide({
         cell,
         placingOwnerId: placingSide,
@@ -639,7 +622,10 @@ export function computeTacticalBattleSnapshot(
         skippedParentDisplayNames.push(parentName);
       }
     }
-    if (!tacticalSnapshotHasPlacedUnitsForBothSides(subUnits)) {
+    const bothSidesPlaced = leadPartyId
+      ? subUnits.some((unit) => unit.player === leadPartyId) && subUnits.some((unit) => unit.player === opposingPartyId)
+      : tacticalSnapshotHasPlacedUnitsForBothSides(subUnits);
+    if (!bothSidesPlaced) {
       return {
         snapshot: null,
         skippedParentDisplayNames,
@@ -659,6 +645,7 @@ export function computeTacticalBattleSnapshot(
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       opposingPartyId,
+      ...(leadPartyId ? { leadPartyId, idleBeatStreak: 0 } : {}),
       enclosingStrategicH3Index,
       tacticalChildH3Indexes: [...children],
       coreChildH3Indexes: coreChildren,

@@ -423,6 +423,8 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
       return { ...STRING_SCHEMA };
     case 'orders':
       return arraySchema(orderRowSchema(gates));
+    case 'exitBattle':
+      return { type: 'boolean' };
     case 'airStrikes':
       return arraySchema(airStrikeRowSchema());
     case 'ferryOrders':
@@ -466,12 +468,14 @@ export function buildOrdersEnvelopeResponseFormat(gates: EnvelopeGates): Record<
   const fields = envelopeFieldsForGates(gates);
   logDebug('promptSpec buildOrdersEnvelopeResponseFormat', { ...gates, fieldCount: fields.length });
   const properties = Object.fromEntries(fields.map((field) => [field, envelopeFieldSchema(field, gates)]));
+  const required = ['message', 'strategy', 'orders'];
+  if (gates.includeExitBattle === true) required.push('exitBattle');
   return {
     type: 'json_schema',
     json_schema: {
       name: ORDERS_ENVELOPE_SCHEMA_NAME,
       strict: false,
-      schema: closedObjectSchema(properties, ['message', 'strategy', 'orders']),
+      schema: closedObjectSchema(properties, required),
     },
   };
 }

@@ -2,16 +2,17 @@
  * Tests for tactical main-process session helpers. Run with: node dist/main/tacticalBattle/tacticalBattleSession.test.js
  */
 
-import { HUMAN_SEAT_ID, type SeatId } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, isAiSeatId, type SeatId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dbGetOne } from '../gameDb';
+import { dbGetOne, dbRun } from '../gameDb';
 import { tacticalSubUnitCountForStrategicUnitType } from './computeTacticalBattleSnapshot';
 import { setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
   endTacticalBattleSession,
   endTacticalBattleSessionForHumanVoluntaryExitBailout,
+  endTacticalBattleSessionForTwoPartyVoluntaryExit,
   getActiveTacticalBattleSnapshot,
   isTacticalBattleActive,
   startTacticalBattleForEnclosingHex,
@@ -224,4 +225,74 @@ test('validateHumanTacticalMarchOrders reports the first illegal order', () => {
   } finally {
     setActiveTacticalBattleSnapshotRef(null);
   }
+});
+
+/**
+ * Starts a battle whose two owners are AI seats.
+ *
+ * Purpose: The two-party exit pass is only reachable when `leadPartyId` is set.
+ * When to use: The voluntary-exit cases below.
+ * Expected outcome: `fn` runs with an active two-AI snapshot.
+ * Exceptions: Assertion failure when the hex cannot start.
+ */
+function withTwoAiSession(label: string, fn: () => void): void {
+  tacticalDbFixtureWithTempDbContestedPlanning(label, ({ targetStrategicH3, humanId, opponentId }) => {
+    const secondSeat = AI_SEAT_IDS[1];
+    const spare = dbGetOne<{ id: string }>(
+      `SELECT id FROM units WHERE id != ? AND id != ? AND unit_type IN ('infantry', 'armor') LIMIT 1`,
+      [humanId, opponentId],
+    );
+    assert.ok(spare);
+    dbRun(
+      `INSERT INTO seats (
+         seat_id, seat_order, kind, home_region, out_reasons, consultation_count, cost_usd
+       ) SELECT ?, 3, 'ai', home_region, '[]', 0, 0 FROM seats WHERE seat_id = ?`,
+      [secondSeat, AI_SEAT_IDS[0]],
+    );
+    const elsewhere = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM hexes WHERE h3_index != ? LIMIT 1', [targetStrategicH3]);
+    assert.ok(elsewhere);
+    dbRun('UPDATE units SET h3_index = ? WHERE player = ? AND h3_index = ?', [elsewhere.h3_index, HUMAN_SEAT_ID, targetStrategicH3]);
+    dbRun('UPDATE units SET player = ?, h3_index = ? WHERE id = ?', [secondSeat, targetStrategicH3, spare.id]);
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true, started.reason);
+    fn();
+  });
+}
+
+test('two-party exit removes a parent that is under half while both parties remain', () => {
+  withTwoAiSession('aw-two-party-exit-below-', () => {
+    const snap = getActiveTacticalBattleSnapshot();
+    assert.ok(snap?.leadPartyId && isAiSeatId(snap.leadPartyId));
+    const picked = pickParentForTest(snap.leadPartyId, 3);
+    const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
+    const keepCount = Math.max(1, Math.floor((baseline - 1) / 2));
+    const target = snap.subUnits.filter((unit) => unit.parentUnitId === picked.parentUnitId);
+    const keep = new Set(target.slice(0, keepCount).map((unit) => unit.id));
+    setActiveTacticalBattleSnapshotRef({
+      ...snap,
+      subUnits: snap.subUnits.filter((unit) => unit.parentUnitId !== picked.parentUnitId || keep.has(unit.id)),
+    });
+    endTacticalBattleSessionForTwoPartyVoluntaryExit();
+    assert.equal(dbGetOne<{ id: string }>('SELECT id FROM units WHERE id = ?', [picked.parentUnitId]), undefined);
+    assert.equal(isTacticalBattleActive(), false);
+  });
+});
+
+test('two-party exit removes nothing more when one party is already gone', () => {
+  withTwoAiSession('aw-two-party-exit-gone-', () => {
+    const snap = getActiveTacticalBattleSnapshot();
+    assert.ok(snap?.leadPartyId && isAiSeatId(snap.leadPartyId));
+    const picked = pickParentForTest(snap.leadPartyId, 3);
+    const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
+    const keepCount = Math.max(1, Math.floor((baseline - 1) / 2));
+    const target = snap.subUnits.filter((unit) => unit.parentUnitId === picked.parentUnitId);
+    const keep = new Set(target.slice(0, keepCount).map((unit) => unit.id));
+    setActiveTacticalBattleSnapshotRef({
+      ...snap,
+      subUnits: snap.subUnits.filter((unit) => unit.player === snap.leadPartyId && (unit.parentUnitId !== picked.parentUnitId || keep.has(unit.id))),
+    });
+    endTacticalBattleSessionForTwoPartyVoluntaryExit();
+    assert.ok(dbGetOne<{ id: string }>('SELECT id FROM units WHERE id = ?', [picked.parentUnitId]));
+    assert.equal(isTacticalBattleActive(), false);
+  });
 });

@@ -196,5 +196,6 @@ export function withTacticalTempoAttacks(
     airStrikes: [...(draft?.airStrikes ?? []), ...sweep.airStrikes],
     ferryOrders: draft?.ferryOrders ?? [],
     embarkOrders: draft?.embarkOrders ?? [],
+    ...(draft?.exitBattle === true ? { exitBattle: true } : {}),
   };
 }

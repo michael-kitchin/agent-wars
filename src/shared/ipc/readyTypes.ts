@@ -864,6 +864,15 @@ meleeInterceptCandidates?: MeleeCandidateRow[];
    * Exceptions: None.
    */
 tacticalAutoStartH3Index?: string;
+  /**
+   * The one hex an observed match may fight while nobody is playing.
+   *
+   * Contract: Present only on the pause that offers that hex. It is also the only entry in the pause snapshot's candidate list.
+   * When to use: The renderer fights it immediately when the observe checkbox is on, and preselects it when the checkbox is off.
+   * Expected outcome: Absent for a human who is still playing.
+   * Exceptions: None.
+   */
+  aiOnlyBattleH3Index?: string;
     /**
    * True when main deferred event-driven post-resolution LLM work until `notifyResolutionPlaybackComplete`.
    *

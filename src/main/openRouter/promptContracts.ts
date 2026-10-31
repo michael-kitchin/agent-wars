@@ -56,6 +56,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includeMissileActions?: boolean;
+  /**
+   * When true, the contract names `exitBattle` after `orders`.
+   *
+   * Contract: Omitted means false. True only for a battle between two AI seats.
+   * When to use: Pass from `buildSystemPromptForTools` when `leadPartyId` is set.
+   * Expected outcome: The header and the example include the boolean together.
+   * Exceptions: None.
+   */
+  includeExitBattle?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -76,6 +85,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeNavalActions = true,
     includeStandingOrderActions = true,
     includeMissileActions = false,
+    includeExitBattle = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -88,6 +98,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeNavalActions,
     includeStandingOrderActions,
     includeMissileActions,
+    includeExitBattle,
     coordinateMode,
   });
   const gates: EnvelopeGates = {
@@ -97,12 +108,14 @@ export function buildFinalJsonContractInstruction(args: {
     includeProductionOrders,
     includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
     includeMissileActions: coordinateMode !== 'tactical' && includeMissileActions,
+    includeExitBattle,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
     message: '"message": "<one-line taunt or threat>"',
     strategy: '"strategy": "<one-line>"',
     orders: '"orders": [ ... ]',
+    exitBattle: '"exitBattle": false',
     airStrikes: '"airStrikes": [ ... ]',
     ferryOrders: '"ferryOrders": [ ... ]',
     missileLaunches: '"missileLaunches": [ ... ]',
@@ -213,6 +226,15 @@ includeProductionOrders: boolean;
    */
   includeMissileActions?: boolean;
   /**
+   * When true, the example includes `exitBattle: false` after `orders`.
+   *
+   * Contract: Omitted means false.
+   * When to use: The same flag as `buildFinalJsonContractInstruction`.
+   * Expected outcome: The example object contains `exitBattle` only for an AI-only battle.
+   * Exceptions: None.
+   */
+  includeExitBattle?: boolean;
+  /**
    * When `tactical`, the illustrative orders[] example leads with explicit_move / ranged_attack (assign_order stays blocked for sub-unit ids).
    *
    * Contract: Optional coordinate mode for example/contract text; omit or `strategic` for strategic prompts.
@@ -236,12 +258,14 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   const includeAirActions = flags.includeAirActions !== false;
   const includeStandingOrderActions = flags.includeStandingOrderActions !== false;
   const includeMissileActions = flags.includeMissileActions === true && coordinateMode !== 'tactical';
+  const includeExitBattle = flags.includeExitBattle === true;
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
     includeAirActions,
     includeStandingOrderActions,
     includeMissileActions,
+    includeExitBattle,
     coordinateMode,
   });
   const gates: EnvelopeGates = {
@@ -251,6 +275,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
     includeProductionOrders: flags.includeProductionOrders,
     includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
     includeMissileActions,
+    includeExitBattle,
   };
   const tactical = coordinateMode === 'tactical';
   const standingOrdersIssuable = !tactical && includeStandingOrderActions;
@@ -259,6 +284,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
     strategy: tactical
       ? 'Close with observed enemies this beat using explicit moves and fire.'
       : 'Close with observed enemies and keep production moving.',
+    exitBattle: false,
     orders: tactical || !standingOrdersIssuable
       ? [
           {

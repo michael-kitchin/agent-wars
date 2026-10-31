@@ -475,6 +475,13 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
   if (!args.useEventDrivenConsultation || !args.aiPlanningRunEnabled) {
     return {};
   }
+  if (args.tacticalBattle.aiOnlyEndReason != null) {
+    logDebug('runEventDrivenAfterTacticalBeatConsultation: skip ended AI-only battle', {
+      battleId: args.tacticalBattle.battleId,
+      aiOnlyEndReason: args.tacticalBattle.aiOnlyEndReason,
+    });
+    return {};
+  }
   const opposingParty = args.tacticalBattle.opposingPartyId;
   if (opposingParty !== undefined && isNeutralOwnerId(opposingParty)) {
     logDebug('runEventDrivenAfterTacticalBeatConsultation: skip neutral party', {
@@ -482,11 +489,17 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
     });
     return {};
   }
-  const seatId = opposingParty !== undefined && isAiSeatId(opposingParty) ? opposingParty : activeAiSeatIds(getSeatRoster())[0];
+  const leadParty = args.tacticalBattle.leadPartyId;
+  const seatIds: AiSeatId[] = leadParty != null && isAiSeatId(leadParty) && opposingParty !== undefined && isAiSeatId(opposingParty)
+    ? [leadParty, opposingParty]
+    : opposingParty !== undefined && isAiSeatId(opposingParty)
+      ? [opposingParty]
+      : activeAiSeatIds(getSeatRoster()).slice(0, 1);
+  const seatId = seatIds[0];
   if (seatId === undefined) return {};
-  logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs, seatId });
+  logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs, seatIds });
   let post: AfterTacticalBeatResolutionResult | undefined;
-  await consultSeatsThroughPool([seatId], 'tactical', args.tacticalBattle, args.timeoutMs, async (request) => {
+  await consultSeatsThroughPool(seatIds, 'tactical', args.tacticalBattle, args.timeoutMs, async (request) => {
     const modelId = modelIdForSeat(request.seatId, args.modelId);
     if (!modelId) return emptyConsultOutcome({ absenceReason: 'consult_failed' });
     try {

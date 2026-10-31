@@ -48,7 +48,8 @@ function autoAdvanceReady(): boolean {
   if (!S.autoAdvance || pressing || S.readyRequestInFlight) return false;
   if (!observeModeControls(S.gameState?.seats ?? []).observing) return false;
   if (S.gameState?.gameOver || S.gameState?.phase !== 'planning') return false;
-  if (S.resolutionMoveAnimation || S.tacticalBattleSnapshot) return false;
+  const aiOnlyStillPlaying = S.tacticalBattleSnapshot?.leadPartyId != null && S.tacticalBattleSnapshot.aiOnlyEndReason == null;
+  if (S.resolutionMoveAnimation || (S.tacticalBattleSnapshot && !aiOnlyStillPlaying)) return false;
   if (isDeferredResolutionPlaybackConsultPending() || anyCommanderIsPlanning() || commanderStartIsSettling()) return false;
   if (newGameOverlayIsOpen()) return false;
   const knockout = document.getElementById('knockout-dialog');

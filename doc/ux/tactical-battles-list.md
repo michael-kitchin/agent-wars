@@ -8,12 +8,12 @@ Let the player pick one contested hex to fight as a tactical battle, or ignore m
 
 ## Availability
 
-Opens in the Tactical battles list mode, after Ready reports at least one battle the player can fight, and Offer tactical battles is checked in the game menu. A match with no human seat still playing does not open it. A contested hex the human can see is listed even when it cannot be fought: three sides, or two sides that do not include the human. Those resolve on the world map. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the console). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map, the top bar, the console, and the selection panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When that checkbox is unchecked, the dialog does not open and the turn continues as Ignore. See [modes-and-transitions.md](modes-and-transitions.md) and [game-menu.md](game-menu.md).
+Opens in the Tactical battles list mode, after Ready reports at least one battle the player can fight, and Offer tactical battles is checked in the game menu. A match with no human seat still playing opens it when AI-Only Battles chose a hex and the observe checkbox is off, and only that hex can be fought. Offer tactical battles does not decide that case. A contested hex the human can see is listed even when it cannot be fought: three sides, or two sides that do not include the human. Those resolve on the world map. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the console). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map, the top bar, the console, and the selection panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When Offer tactical battles is unchecked, a human who is still playing does not see the dialog and the turn continues as Ignore. An observed match with the observe checkbox on fights the chosen hex without the dialog. See [modes-and-transitions.md](modes-and-transitions.md) and [game-menu.md](game-menu.md).
 
 ## Information Displayed
 
 - A navy panel, using the chrome in the [UI style guide](../ui-style-guide.md), titled "Tactical Battles (N)", where N is the number of battles the player can fight. Under the title: "Choose one battle to fight. The others resolve on the world map."
-- One choice row per eligible hex. The columns are Hex, Yours, and Enemy. The hex cell is the world-hex tooltip, in the same line order as [hex-tooltips.md](hex-tooltips.md): the hex code and place name, a country flag before each country name, then Control, Production, Tech, Features, Terrain, Weather, and Effects. A legend chip comes before each terrain kind. A line that does not apply is left out. The cell shows the hex code while that tooltip loads. Yours is the human seat's unit summary. Enemy is that party's dot and short name, or "Neutral" with the Neutral dot, and its unit summary. A Neutral summary ends ", defends in place". An empty summary shows an em dash.
+- One choice row per eligible hex. The columns are Hex, Yours, and Enemy when the row includes the human seat. The hex cell is the world-hex tooltip, in the same line order as [hex-tooltips.md](hex-tooltips.md): the hex code and place name, a country flag before each country name, then Control, Production, Tech, Features, Terrain, Weather, and Effects. A legend chip comes before each terrain kind. A line that does not apply is left out. The cell shows the hex code while that tooltip loads. Yours is the human seat's unit summary. Enemy is that party's dot and short name, or "Neutral" with the Neutral dot, and its unit summary. A Neutral summary ends ", defends in place". An empty summary shows an em dash. A row with no human seat names both sides: each cell is that side's dot, short name, and summary, and the two headers are those short names, lead seat then the other. An observed match checks that chosen row and scrolls it into view.
 - Below the choice rows, when any contested hex cannot be fought: "Resolve on the world map this turn", then each such hex. A hex with the human seat and two other sides reads "Three sides: you, {A}, {B}". A hex with two sides reads "{A} vs {B}". Each name has that side's dot.
 - Fight, disabled until a row is chosen.
 - Ignore.
@@ -46,7 +46,8 @@ Opens in the Tactical battles list mode, after Ready reports at least one battle
 
 - Fight never starts a battle without a chosen row.
 - Ignore never starts a tactical battle.
-- The dialog never opens while Offer tactical battles is unchecked.
+- While a human is still playing, the dialog never opens when Offer tactical battles is unchecked.
+- An observed match opens the dialog only for the chosen hex, and only when the observe checkbox is off.
 - Escape on this dialog never closes another popup.
 
 ## Strategic and Tactical Differences
@@ -73,6 +74,7 @@ None.
 - `src/renderer/gameplay/meleeInterceptModal.ts`
 - `src/renderer/gameplay/meleeInterceptHexTooltip.ts`
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/main/gameActions/aiOnlyBattleOffer.ts` (`buildAiOnlyBattleOffer`)
 - `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/tacticalBattlePromptPreference.ts`
 - `src/renderer/map/visibleMapFrame.ts`

@@ -36,6 +36,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Escape | Build popup open | Closes the build popup and does not also close the stack callout. | [build-popup.md](build-popup.md) |
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
 | Escape | Tactical battles list open | Chooses Ignore and does nothing else. | [tactical-battles-list.md](tactical-battles-list.md) |
+| Escape | AI-only battle result open | Does not close the Ok dialog. | [tactical-battle-controls.md](tactical-battle-controls.md) |
 
 Keys other than these do not pan, toggle terrain, or close popups.
 

@@ -28,6 +28,7 @@ function strategicGates(overrides: Partial<CoachingGates> = {}): CoachingGates {
     homeRegionsOverlap: true,
     hasObservedEnemy: true,
     includeScenarioWinPaths: true,
+    includeExitBattle: false,
     ...overrides,
   };
 }
@@ -239,6 +240,13 @@ test('option-copy bullets keep the mode noun and the absent-table sentences', ()
       "the sub-unit's own cell means hold."
     )
   );
+});
+
+test('exit battle coaching is present only when the gate is on', () => {
+  const sentence = 'Set exitBattle to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give. Set it to false otherwise. Orders in this reply still resolve for this beat.';
+  assert.equal(joined(tacticalGates()).includes(sentence), false);
+  assert.equal(joined(strategicGates()).includes(sentence), false);
+  assert.equal(joined(tacticalGates({ includeExitBattle: true })).includes(sentence), true);
 });
 
 test('prohibited claims appear in no gate combination', () => {

@@ -14,6 +14,15 @@ export type TacticalOpponentPlanPayload = {
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
   embarkOrders: EmbarkOrder[];
+  /**
+   * Whether this commander asked to leave an AI-only battle.
+   *
+   * Contract: Missing means false. True does not cancel the orders on this beat.
+   * When to use: The beat that decides whether both commanders have asked to leave.
+   * Expected outcome: Present only when the parsed envelope set the flag.
+   * Exceptions: None.
+   */
+  exitBattle?: boolean;
 };
 
 /**

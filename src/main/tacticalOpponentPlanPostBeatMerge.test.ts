@@ -15,6 +15,7 @@ import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPush
 import {
   committedOpponentTacticalDraftFieldAfterConsume,
   nextTacticalOpponentDraftAfterPostBeatPlan,
+  tacticalDraftAlreadyDecided,
   tacticalOpponentPlanFromRequestOrdersSuccess,
   tacticalOpponentPlanPayloadHasAnyOrders,
 } from '../shared/ipc/tacticalOpponentPlanMerge';
@@ -50,6 +51,16 @@ test('tacticalOpponentPlanPayloadHasAnyOrders is true when any list is non-empty
     }),
     true
   );
+});
+
+test('an exit flag with no orders is a stored decision and does not start another consult', () => {
+  const exitOnly: TacticalOpponentPlanPayload = { ...emptyPlan, exitBattle: true };
+  assert.equal(tacticalDraftAlreadyDecided(exitOnly), true);
+  assert.equal(tacticalDraftAlreadyDecided(emptyPlan), false);
+  assert.deepEqual(nextTacticalOpponentDraftAfterPostBeatPlan(exitOnly), {
+    draft: exitOnly,
+    startBackgroundPrefetch: false,
+  });
 });
 
 test('nextTacticalOpponentDraftAfterPostBeatPlan keeps non-empty plans and requests prefetch otherwise', () => {

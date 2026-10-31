@@ -39,6 +39,41 @@ export function getTacticalAnnihilationOutcome(
 }
 
 /**
+ * How a battle between two named parties ended.
+ *
+ * Purpose: An AI-only roster must not be read as a human loss.
+ * When to use: `getTwoPartyAnnihilationOutcome`.
+ * Expected outcome: Null while both named parties still have a sub-unit. `mutual` when both are at zero. Otherwise the owner id that still has a sub-unit.
+ * Exceptions: None. A sub-unit of any other owner does not count.
+ */
+export type TwoPartyAnnihilationOutcome = string | 'mutual';
+
+/**
+ * Returns which of two named parties is gone, or null while both remain.
+ *
+ * Purpose: An AI-only battle ends when one of its two parties has no sub-units left.
+ * When to use: After a beat, passing `leadPartyId` and `opposingPartyId`. Do not use this for a human battle.
+ * Expected outcome: Null while both parties still have a sub-unit. The remaining owner's id when only one remains. `mutual` when both are at zero.
+ * Exceptions: None. A sub-unit whose player is neither party is ignored.
+ */
+export function getTwoPartyAnnihilationOutcome(
+  subUnits: readonly { player: string }[],
+  partyA: string,
+  partyB: string
+): TwoPartyAnnihilationOutcome | null {
+  let countA = 0;
+  let countB = 0;
+  for (const unit of subUnits) {
+    if (unit.player === partyA) countA += 1;
+    else if (unit.player === partyB) countB += 1;
+  }
+  if (countA > 0 && countB > 0) return null;
+  if (countA > 0) return partyA;
+  if (countB > 0) return partyB;
+  return 'mutual';
+}
+
+/**
  * Returns true when at least one tactical side has zero sub-units so the battle cannot continue.
  *
  * Contract: Equivalent to `getTacticalAnnihilationOutcome(subUnits) !== null`.

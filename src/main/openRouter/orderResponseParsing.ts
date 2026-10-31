@@ -539,6 +539,15 @@ export function parseOrdersResponse(
    * Exceptions: None.
    */
   message?: string;
+  /**
+   * Whether this commander asked to leave an AI-only battle.
+   *
+   * Contract: True only when the envelope field is boolean true. Missing and every other value are false.
+   * When to use: Storing the tactical plan. The flag does not drop the orders on this beat.
+   * Expected outcome: `false` unless the model set `exitBattle` to true.
+   * Exceptions: None.
+   */
+  exitBattle: boolean;
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
   productionAppliedCount?: number;
@@ -627,6 +636,8 @@ export function parseOrdersResponse(
           });
         }
         const message = typeof obj.message === 'string' ? obj.message.trim() : '';
+        const exitBattle = obj.exitBattle === true;
+        logDebug('openRouter parseOrdersResponse: exitBattle', { exitBattle });
         const {
           movementOrders,
           rangedAttacks,
@@ -669,6 +680,7 @@ export function parseOrdersResponse(
           missileLaunches: normalizedMissileLaunches.missileLaunches,
           strategy,
           message,
+          exitBattle,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,

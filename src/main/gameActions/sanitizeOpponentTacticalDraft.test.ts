@@ -5,6 +5,7 @@
 
 import * as assert from 'assert';
 import { beforeEach, test } from 'node:test';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { resetTacticalMovementPlanningCacheForTests } from '../tacticalBattle/tacticalMovementPlanningCache';
 import {
@@ -83,4 +84,30 @@ test('sanitize keeps opponent march to a different reachable hex', () => {
   assert.ok(result);
   assert.strictEqual(result.movementOrders.length, 1);
   assert.strictEqual(result.movementOrders[0]!.toH3Index, neighbor);
+});
+
+test('sanitize keeps a named seat march and an exit flag when that seat is not the opposing party', () => {
+  const center = tacticalCell(40, 50);
+  const neighbor = firstRingCellDistinctFrom(center);
+  const battle = minimalOpponentMarchBattle(center, [center, neighbor]);
+  battle.leadPartyId = AI_SEAT_IDS[0];
+  battle.opposingPartyId = AI_SEAT_IDS[1];
+  const moved = sanitizeOpponentTacticalDraftForReadyCommit(battle, {
+    movementOrders: [{ unitId: 'opp:01', toH3Index: neighbor }],
+    rangedAttacks: [],
+    airStrikes: [],
+    ferryOrders: [],
+    embarkOrders: [],
+  }, AI_SEAT_IDS[0]);
+  assert.strictEqual(moved?.movementOrders.length, 1);
+  const flagged = sanitizeOpponentTacticalDraftForReadyCommit(battle, {
+    movementOrders: [{ unitId: 'missing-unit', toH3Index: neighbor }],
+    rangedAttacks: [],
+    airStrikes: [],
+    ferryOrders: [],
+    embarkOrders: [],
+    exitBattle: true,
+  }, AI_SEAT_IDS[0]);
+  assert.strictEqual(flagged?.exitBattle, true);
+  assert.strictEqual(flagged?.movementOrders.length, 0);
 });

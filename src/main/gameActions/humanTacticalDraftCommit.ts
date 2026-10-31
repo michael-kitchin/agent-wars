@@ -1,4 +1,4 @@
-import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
+import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId, type AiSeatId, type OwnerId } from '../../shared/seatIds';
 import { takeTacticalDraft } from '../openRouter/commanderPool';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
@@ -24,11 +24,12 @@ import {
   isTacticalBattleActive,
   validateHumanTacticalMarchOrders,
 } from '../tacticalBattle/tacticalBattleSession';
-import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
+import { projectTacticalSnapshotAfterOpponentMovementOrders, projectTacticalSnapshotAfterPlayerMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import { validateTacticalOpponentEmbarkOrder } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { tacticalMarchFirstStopAlongPath } from '../tacticalBattle/tacticalRulesAdapter';
+import { applyAiOnlyTacticalBeat } from '../tacticalBattle/aiOnlyTacticalBeat';
 import { opposingPartyIdOf } from '../tacticalBattle/opposingParty';
-import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
+import { tacticalComputeMovementOrderOutcome, tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/tacticalSnapshotGuards';
 import {
   resolveTacticalRangedTargetForSubUnit,
   withTacticalTempoAttacks,
@@ -51,23 +52,26 @@ import {
  * Drops opponent tactical draft rows that no longer pass footprint / strike / embark rules so Ready can complete with the remaining valid rows.
  *
  * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict. No-op marches (destination equals current hex) are dropped as a belt-and-suspenders guard; the primary anti-stagger fix is clearing `committedOpponentTacticalDraft` after Ready consume so applied rows are not recycled.
- * When to use: `commitHumanTacticalDraftOrders` after resolving `preBattle` and before `applyHumanTacticalDraftBeatInStrategicOrder`.
- * Expected outcome: Returns a subset plan or `undefined` when nothing remains; each dropped row is logged at debug with reason; a single info summary when any row was dropped.
+ * When to use: `commitHumanTacticalDraftOrders` after resolving `preBattle` and before `applyHumanTacticalDraftBeatInStrategicOrder`. An AI-only beat passes each seat id so the lead is not checked as the opposing party.
+ * Expected outcome: Returns a subset plan or `undefined` when nothing remains; each dropped row is logged at debug with reason; a single info summary when any row was dropped. A reply that only sets `exitBattle` is kept.
  * Exceptions: None; never throws.
  */
 export function sanitizeOpponentTacticalDraftForReadyCommit(
   preBattle: TacticalBattleSnapshot,
-  draft: TacticalOpponentPlanPayload | undefined
+  draft: TacticalOpponentPlanPayload | undefined,
+  player?: OwnerId,
 ): TacticalOpponentPlanPayload | undefined {
   logDebug('gameActions sanitizeOpponentTacticalDraftForReadyCommit', {
+    player: player ?? null,
     movementCount: draft?.movementOrders.length ?? 0,
     rangedCount: draft?.rangedAttacks.length ?? 0,
     airCount: draft?.airStrikes.length ?? 0,
     ferryCount: draft?.ferryOrders.length ?? 0,
     embarkCount: draft?.embarkOrders.length ?? 0,
+    exitBattle: draft?.exitBattle === true,
   });
   if (!draft) return undefined;
-  const party = opposingPartyIdOf(preBattle);
+  const party = player ?? opposingPartyIdOf(preBattle);
   const tacticalSet = new Set(preBattle.tacticalChildH3Indexes);
   const sub = [...preBattle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
@@ -76,13 +80,21 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
 
   const movementOrders: TacticalOpponentPlanPayload['movementOrders'] = [];
   for (const o of draft.movementOrders) {
-    const outcome = tacticalComputeMovementOrderOutcome({
-      byId,
-      sub,
-      order: o,
-      tacticalSet,
-      battle: preBattle,
-    });
+    const outcome = player != null
+      ? tacticalComputeMovementOrderOutcomeForPlayer(player, {
+        byId,
+        sub,
+        order: o,
+        tacticalSet,
+        battle: preBattle,
+      })
+      : tacticalComputeMovementOrderOutcome({
+        byId,
+        sub,
+        order: o,
+        tacticalSet,
+        battle: preBattle,
+      });
     if (!outcome.ok) {
       dropped += 1;
       logOrderPlanSanitizeDrop(sanitizeCtx, 'march', {
@@ -176,10 +188,11 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
     ferryOrders.push(f);
   }
 
-  const projected =
-    movementOrders.length > 0
-      ? projectTacticalSnapshotAfterOpponentMovementOrders(preBattle, movementOrders)
-      : preBattle;
+  const projected = movementOrders.length === 0
+    ? preBattle
+    : player != null
+      ? projectTacticalSnapshotAfterPlayerMovementOrders(preBattle, movementOrders, player)
+      : projectTacticalSnapshotAfterOpponentMovementOrders(preBattle, movementOrders);
   const embarkOrders: TacticalOpponentPlanPayload['embarkOrders'] = [];
   for (const e of draft.embarkOrders) {
     const er = validateTacticalOpponentEmbarkOrder(e, projected.subUnits, preBattle.enclosingStrategicH3Index);
@@ -210,14 +223,37 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
       embark: embarkOrders.length,
     });
   }
-  if (kept === 0) return undefined;
+  const exitBattle = draft.exitBattle === true;
+  if (kept === 0 && !exitBattle) return undefined;
   return {
     movementOrders,
     rangedAttacks,
     airStrikes,
     ferryOrders,
     embarkOrders,
+    ...(exitBattle ? { exitBattle: true } : {}),
   };
+}
+
+/**
+ * Takes one AI seat's tactical draft and keeps only the rows that seat can still apply.
+ *
+ * Purpose: An AI-only beat has two drafts. Each one is checked as that seat, including a reply that only asks to leave.
+ * When to use: Immediately before `applyAiOnlyTacticalBeat`.
+ * Expected outcome: The sanitized plan, or undefined when the seat had nothing legal and did not set `exitBattle`.
+ * Exceptions: None.
+ */
+function sanitizedAiSeatDraft(
+  preBattle: TacticalBattleSnapshot,
+  seatId: AiSeatId,
+): TacticalOpponentPlanPayload | undefined {
+  logDebug('gameActions sanitizedAiSeatDraft', { seatId, battleId: preBattle.battleId });
+  const taken = takeTacticalDraft(seatId, preBattle.battleId) ?? undefined;
+  return sanitizeOpponentTacticalDraftForReadyCommit(
+    preBattle,
+    withTacticalTempoAttacks(preBattle, taken, holdFireUnitIdsForPlayer(seatId), seatId),
+    seatId,
+  );
 }
 
 /**
@@ -263,6 +299,18 @@ export function commitHumanTacticalDraftOrders(args: {
     const preBattle = getActiveTacticalBattleSnapshot();
     if (!preBattle) {
       return { success: false, reason: 'No tactical battle is active.' };
+    }
+    if (preBattle.leadPartyId != null && isAiSeatId(preBattle.leadPartyId) && preBattle.opposingPartyId != null && isAiSeatId(preBattle.opposingPartyId)) {
+      const leadDraft = sanitizedAiSeatDraft(preBattle, preBattle.leadPartyId);
+      const opposingDraft = sanitizedAiSeatDraft(preBattle, preBattle.opposingPartyId);
+      const aiOnlyBeat = applyAiOnlyTacticalBeat({ leadDraft, opposingDraft });
+      if (!aiOnlyBeat.success) return aiOnlyBeat;
+      return {
+        success: true,
+        tacticalBattle: aiOnlyBeat.battle,
+        tacticalResolutionPlayback: { humanMoves: [] },
+        ...committedOpponentTacticalDraftFieldAfterConsume(false),
+      };
     }
     const party = opposingPartyIdOf(preBattle);
     const pooledDraft = isAiSeatId(party) ? takeTacticalDraft(party, preBattle.battleId) : null;

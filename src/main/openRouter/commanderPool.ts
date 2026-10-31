@@ -12,6 +12,7 @@ import type { CommanderAbsenceReason, CommanderDispatch, CommanderPoolSnapshot, 
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
 import { AI_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
+import { tacticalDraftAlreadyDecided } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getGameState, getSeatRoster } from '../gameDb';
@@ -269,24 +270,45 @@ export function startStrategicPlanning(onlySeatIds?: readonly AiSeatId[]): void 
 }
 
 /**
- * Starts a tactical consult for the battle's opposing AI seat.
+ * Starts one tactical consult unless that seat already stored a plan with orders.
  *
- * Purpose: The battle plan stays in the pool until `takeTacticalDraft`.
- * When to use: `game:startCommanderPlanning` with mode `tactical`, and later the post-beat path.
- * Expected outcome: No consult when the other party is missing, Neutral, or not an eligible AI seat. A plan is not written to strategic pending orders.
- * Exceptions: Logs and returns when the game state cannot be read.
+ * Purpose: A post-beat consult and a later planning start must not call the same seat twice.
+ * When to use: `startTacticalPlanning` for each AI party in the battle.
+ * Expected outcome: No launch when the seat is ineligible or its stored draft already has an order or Exit Battle. An all-empty draft is replaced.
+ * Exceptions: None.
  */
-export function startTacticalPlanning(battle: TacticalBattleSnapshot): void {
-  const party = battle.opposingPartyId;
-  logDebug('commanderPool startTacticalPlanning', { battleId: battle.battleId, opposingPartyId: party ?? null });
+function launchTacticalSeatIfDraftEmpty(battle: TacticalBattleSnapshot, party: TacticalBattleSnapshot['opposingPartyId'], turnNumber: number): void {
   if (party === undefined || isNeutralOwnerId(party) || !isAiSeatId(party)) return;
-  const turnNumber = readTurnNumber();
-  if (turnNumber === null) return;
+  const stored = tacticalDrafts.get(tacticalDraftKey(party, battle.battleId));
+  if (tacticalDraftAlreadyDecided(stored)) {
+    logDebug('commanderPool skipped tactical launch because a draft is stored', { seatId: party, battleId: battle.battleId });
+    return;
+  }
   const seat = getSeatRoster().find((row) => row.seatId === party);
   if (!seat) return;
   rememberRosterStatus(seat);
   if (!canLaunch(seat)) return;
   launch(party, 'tactical', battle, turnNumber);
+}
+
+/**
+ * Starts tactical consults for the seats in this battle.
+ *
+ * Purpose: An AI-only battle asks both commanders. A human battle still asks only the opposing AI.
+ * When to use: `game:startCommanderPlanning` with mode `tactical`, and the post-beat path.
+ * Expected outcome: A seat with a stored non-empty draft is not launched again. Neutral and ineligible seats are skipped.
+ * Exceptions: Returns when the turn number cannot be read.
+ */
+export function startTacticalPlanning(battle: TacticalBattleSnapshot): void {
+  logDebug('commanderPool startTacticalPlanning', {
+    battleId: battle.battleId,
+    leadPartyId: battle.leadPartyId ?? null,
+    opposingPartyId: battle.opposingPartyId ?? null,
+  });
+  const turnNumber = readTurnNumber();
+  if (turnNumber === null) return;
+  if (battle.leadPartyId != null) launchTacticalSeatIfDraftEmpty(battle, battle.leadPartyId, turnNumber);
+  launchTacticalSeatIfDraftEmpty(battle, battle.opposingPartyId, turnNumber);
 }
 
 /**

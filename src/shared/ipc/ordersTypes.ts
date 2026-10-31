@@ -2,6 +2,7 @@ import type { BonusLevel } from '../bonusLevel';
 import type { MissileLaunchOrder } from './missileTypes';
 import type { GameSize } from '../gameSize';
 import type { DoctrineChoice, SeatKind } from '../seatRoster';
+import type { AiOnlyBattleMode } from '../aiOnlyBattles';
 import type { VictoryRule } from '../victoryRules';
 
 export interface MovementOrder {
@@ -521,6 +522,15 @@ turnLimit?: number;
    * Exceptions: None.
    */
 victoryRule?: VictoryRule;
+    /**
+   * Requested AI-only battle choice.
+   *
+   * Contract: Omitted or unknown stores Balanced. One of balanced, unbalanced, random, or none otherwise.
+   * When to use: The new-game dialog's AI-Only Battles control.
+   * Expected outcome: Stored as `ai_only_battles`. Changing the select does not rewrite a match that is already running.
+   * Exceptions: None.
+   */
+aiOnlyBattles?: AiOnlyBattleMode;
     /**
    * One entry per side, in row order.
    *

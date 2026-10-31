@@ -30,9 +30,10 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Commander button: Change this side's API key, model, reasoning, and doctrine.
 - Victory rule: Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins.
 - Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
+- AI-Only Battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- "Game Options": Victory rule, turn limit, bonuses, fog of war, and Auto-start AI.
+- "Game Options": Victory rule, turn limit, AI-Only Battles, bonuses, fog of war, and Auto-start AI.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
@@ -124,6 +125,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Ignore: Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.
 - Exit Battle during a fight: Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.
 - Exit Battle on the annihilation result: Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.
+- Ok on an AI-only result: Close this result and return to the world map. The next turn does not start until you press Ready.
 - Build or hire close: Close this popup (`buildPopupCloseTooltipText`).
 - Single-hex queue remove: Remove this row from the queue (`singleHexQueueRemoveTooltipText`).
 - Multi-hex queue remove: Remove this row on every selected hex (`multiHexQueueRemoveTooltipText`).
@@ -194,7 +196,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)

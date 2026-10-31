@@ -330,11 +330,11 @@ type TacticalMovementOrderOutcome =
  * Projects one tactical march order for a specific player.
  *
  * Purpose: Single implementation of opponent and human movement-order guards.
- * When to use: Only from the two public delegates in this module.
+ * When to use: The public human and opponent delegates, and a projection that names the seat.
  * Expected outcome: Same success/failure shape as the public opponent and human helpers.
  * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, or when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`). Friendly stacking on the applied cell is legal.
  */
-function tacticalComputeMovementOrderOutcomeForPlayer(
+export function tacticalComputeMovementOrderOutcomeForPlayer(
   player: OwnerId,
   args: TacticalMovementOrderOutcomeArgs
 ): TacticalMovementOrderOutcome {

@@ -127,8 +127,10 @@ import { wireGameMenu } from './chrome/gameMenu';
 import { showLoadedSaveToastAfterReload, wireSaveLoadMenu } from './gameplay/saveLoadMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
+  leaveAiOnlyBattle,
   type TacticalExitSessionAccessor,
 } from './tactical/tacticalExitFlow';
+import { openAiOnlyBattleResultDialog } from './tactical/tacticalAnnihilationDialog';
 import {
   performTacticalBattleExitWithGameApi,
 } from './tactical/tacticalEntryFlow';
@@ -510,6 +512,36 @@ function maybeScheduleTacticalAnnihilationExit(): void {
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */
 async function performTacticalBattleExit(): Promise<void> {
+  if (S.tacticalBattleSnapshot?.leadPartyId != null) {
+    if (S.aiOnlyBattleResultSentence == null && !S.autoAdvance) {
+      openAiOnlyBattleResultDialog('The battle was left.');
+      return;
+    }
+    await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
+      endTacticalBattle: window.gameApi?.endTacticalBattle,
+      showMapToast,
+      redraw,
+      runReadyAfterExit: async () => {},
+      refreshSidebarAfterTacticalDraftTeardown: () => {
+        hideStackCallout();
+        refreshStrategicOrderSidebars();
+      },
+      refreshStrategicSnapshotAfterExit: async () => {
+        if (!window.gameApi?.getGameState) return;
+        const nextState = await fetchMatchSnapshot();
+        await applyGameStateSnapshot(nextState, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: false,
+          updateSelectionUi: false,
+          updateGameOverUi: false,
+          updateReadyButton: false,
+          refreshBuildPopup: false,
+          redraw: false,
+        });
+      },
+    }, S.aiOnlyBattleResultSentence == null && S.autoAdvance);
+    return;
+  }
   await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {
     showMapToast,
     redraw,

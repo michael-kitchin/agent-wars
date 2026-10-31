@@ -2,12 +2,14 @@
  * Pure projection of opponent tactical march orders onto a tactical battle snapshot.
  */
 
+import type { OwnerId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { syncEmbarkedLandToNavalHex } from './tacticalEmbarkedCargoSync';
 import { tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalComputeHumanMovementOrderOutcome,
   tacticalComputeMovementOrderOutcome,
+  tacticalComputeMovementOrderOutcomeForPlayer,
 } from './tacticalSnapshotGuards';
 
 /**
@@ -47,6 +49,51 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
       applied !== u.h3Index;
     sub[idx] = {
       ...u,
+      h3Index: applied,
+      ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
+    };
+  }
+  return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
+}
+
+/**
+ * Returns a new snapshot with one seat's sub-units moved.
+ *
+ * Purpose: An AI-only beat runs this once per seat so a unit of the other owner is ignored.
+ * When to use: After illegal rows for that seat have been dropped.
+ * Expected outcome: The same skip-and-apply contract as the opponent projection, for `player` only.
+ * Exceptions: None. Unknown units and illegal destinations are skipped.
+ */
+export function projectTacticalSnapshotAfterPlayerMovementOrders(
+  battle: TacticalBattleSnapshot,
+  orders: readonly { unitId: string; toH3Index: string }[],
+  player: OwnerId,
+): TacticalBattleSnapshot {
+  tacticalLogQuery('projectTacticalSnapshotAfterPlayerMovementOrders', {
+    battleId: battle.battleId,
+    player,
+    orderCount: orders.length,
+  });
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
+  const sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((unit) => ({ ...unit }));
+  const byId = new Map(sub.map((unit, index) => [unit.id, index] as const));
+  for (const order of orders) {
+    const outcome = tacticalComputeMovementOrderOutcomeForPlayer(player, { byId, sub, order, tacticalSet, battle });
+    if (!outcome.ok) {
+      tacticalLogQuery('projectTacticalSnapshotAfterPlayerMovementOrders skip', {
+        reason: outcome.reason,
+        ...outcome.context,
+      });
+      continue;
+    }
+    const unit = sub[outcome.idx]!;
+    const applied = outcome.appliedToH3Index;
+    const debarkedIndependently =
+      (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+      !!unit.embarkedOnSubUnitId &&
+      applied !== unit.h3Index;
+    sub[outcome.idx] = {
+      ...unit,
       h3Index: applied,
       ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
     };

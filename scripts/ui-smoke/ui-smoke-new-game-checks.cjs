@@ -477,10 +477,17 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-options-popover',
     scenes: [SCENES.newGameOptions],
-    needs: ['#new-game-options-popover', '#new-game-victory-select', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-options-popover', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
     run: (p, el) => {
       if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
       const victory = el('#new-game-victory-select');
+      const turnLimit = el('#new-game-turn-limit-select');
+      const aiOnly = el('#new-game-ai-only-battles-select');
+      if (!near(victory.y, turnLimit.y)) return `Rule is at ${fmt(victory)} and Turn limit is at ${fmt(turnLimit)}`;
+      if (!(aiOnly.y > victory.y)) return 'AI-Only Battles is not below Rule';
+      if (!near(aiOnly.x, victory.x) || !near(aiOnly.w, victory.w)) {
+        return `the AI-Only select is at ${fmt(aiOnly)}, expected the Rule select ${fmt(victory)}`;
+      }
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
       if (!(victory.y < origin.y)) return 'Victory is not above the bonuses';
       if (!near(origin.y, tech.y) || !near(terrain.y, weather.y) || terrain.y <= origin.y) return 'the bonuses are not two rows of two';

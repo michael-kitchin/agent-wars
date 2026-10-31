@@ -45,6 +45,8 @@ import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
   endTacticalBattleSession,
   endTacticalBattleSessionForHumanVoluntaryExitBailout,
+  endTacticalBattleSessionForTwoPartyVoluntaryExit,
+  getActiveTacticalBattleSnapshot,
   startTacticalBattleForEnclosingHex,
 } from './tacticalBattle/tacticalBattleSession';
 import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
@@ -344,6 +346,7 @@ function registerIpcHandlers(): void {
       seatCount: payload?.seats?.length ?? null,
       turnLimit: payload?.turnLimit ?? null,
       victoryRule: payload?.victoryRule ?? null,
+      aiOnlyBattles: payload?.aiOnlyBattles ?? null,
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
@@ -357,6 +360,7 @@ function registerIpcHandlers(): void {
       seats: payload?.seats,
       turnLimit: payload?.turnLimit,
       victoryRule: payload?.victoryRule,
+      aiOnlyBattles: payload?.aiOnlyBattles,
     });
     forgetAutoSaveTurnKey();
     storeNewMatchCommanderKeys(payload?.seats, loadKey());
@@ -541,7 +545,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => withAutoSaveAfter(() => {
     stopModelWork('battle_exit', sendActivityLog);
     clearDeferredPlaybackConsultPending();
-    endTacticalBattleSessionForHumanVoluntaryExitBailout();
+    if (getActiveTacticalBattleSnapshot()?.leadPartyId != null) endTacticalBattleSessionForTwoPartyVoluntaryExit();
+    else endTacticalBattleSessionForHumanVoluntaryExitBailout();
     return { success: true as const };
   }));
   const sharedReadyConsultationDeps = buildSharedHumanReadyConsultationDeps(requestOrdersWithLog);

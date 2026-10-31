@@ -91,11 +91,12 @@ When the model supports structured outputs and the developer flag `AGENT_WARS_DI
 
 ### 5.1 Repair schema contract
 
-The inlined schema is a single JSON object with fields in envelope order: `message`, `strategy`, `orders`, then the air and ferry tails, then `missileLaunches` when that gate is on, then `callbacks`, then the memory tail, then the production tail.
+The inlined schema is a single JSON object with fields in envelope order: `message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then the air and ferry tails, then `missileLaunches` when that gate is on, then `callbacks`, then the memory tail, then the production tail.
 
 | Field | Strategic | Tactical |
 | --- | --- | --- |
 | `message`, `strategy`, `orders` | always, in that order | always, in that order |
+| `exitBattle` | **never** | when the battle is between two AI commanders, immediately after `orders` |
 | `airStrikes`, `ferryOrders` | when the opponent has air units | when the opponent has air sub-units |
 | `missileLaunches` | when the opponent has a missile | **never** |
 | `callbacks` | always | always |

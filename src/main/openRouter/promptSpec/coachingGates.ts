@@ -154,4 +154,13 @@ export interface CoachingGates {
    * Exceptions: None.
    */
   readonly doctrine?: Doctrine;
+  /**
+   * Whether this tactical consultation may ask the commander to leave the battle.
+   *
+   * Contract: True only when the battle is between two AI seats. Omitted means false.
+   * When to use: The same flag as `EnvelopeGates.includeExitBattle`.
+   * Expected outcome: The exit sentence is present only when this is true.
+   * Exceptions: None.
+   */
+  readonly includeExitBattle?: boolean;
 }

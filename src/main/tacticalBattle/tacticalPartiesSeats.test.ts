@@ -10,6 +10,7 @@ import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { commitHumanTacticalDraftOrders } from '../gameActions/humanTacticalDraftCommit';
+import { clearMeleeInterceptPendingSnapshot } from '../gameActions/meleeInterceptPendingState';
 import { applyKnockout } from '../gameActions/knockoutConsequences';
 import { ready } from '../gameActions';
 import { dbGetAll, dbGetOne, dbRun } from '../gameDb';
@@ -192,7 +193,7 @@ test('Neutral holds and fires when it is the other party', (t) => {
   });
 });
 
-test('a match with no human seat does not pause for melee', (t) => {
+test('a match with no human seat pauses for one AI-only battle', (t) => {
   const map = threeGroupMap();
   if (!map) {
     t.skip('no regional map with three side groups is listed');
@@ -208,6 +209,35 @@ test('a match with no human seat does not pause for melee', (t) => {
     assert.ok(first);
     assert.ok(second);
     dbRun(`UPDATE units SET h3_index = ? WHERE id = ?`, [first.h3Index, second.id]);
+    try {
+      const result = ready();
+      assert.equal(result.success, true);
+      assert.equal(result.awaitingMeleeDecision, true);
+      assert.equal(typeof result.aiOnlyBattleH3Index, 'string');
+    } finally {
+      clearMeleeInterceptPendingSnapshot();
+    }
+  });
+});
+
+test('a match with no human seat and AI-only battles off does not pause for melee', (t) => {
+  const map = threeGroupMap();
+  if (!map) {
+    t.skip('no regional map with three side groups is listed');
+    return;
+  }
+  const seats: NewGameSeatInput[] = [
+    { kind: 'ai', sideGroupId: map.sideGroupIds[0] },
+    { kind: 'ai', sideGroupId: map.sideGroupIds[1] },
+  ];
+  withSeatedTempGameDb('aw-tactical-observe-none-', { gameMapId: map.id, seats }, () => {
+    const first = infantryAt(AI_SEAT_IDS[0]);
+    const second = infantryAt(AI_SEAT_IDS[1]);
+    assert.ok(first);
+    assert.ok(second);
+    dbRun(`UPDATE units SET h3_index = ? WHERE id = ?`, [first.h3Index, second.id]);
+    dbRun(`INSERT OR REPLACE INTO game_config (key, value) VALUES ('ai_only_battles', 'none')`);
+    clearMeleeInterceptPendingSnapshot();
     const result = ready();
     assert.equal(result.success, true);
     assert.equal(result.awaitingMeleeDecision, undefined);

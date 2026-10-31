@@ -175,7 +175,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 ### 3.1 Fields
 
-`message`, `strategy`, `orders`, `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema.
+`message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema. A human-versus-AI battle omits `exitBattle`. When it is present it is a required boolean, and the repair example sets it to false.
 
 ### 3.2 Legal actions this beat
 
@@ -227,6 +227,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 11. **A beat with no prompt is a beat not acted in.** Coaching says the model is consulted when a subscribed event fires or when the engine forces a consultation. Standing orders are inert in battle, so an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
 12. **Keep the player-facing line clean.** Same message discipline as strategic. Carries `MESSAGE_DISCIPLINE`.
+13. **Leave when the battle is already decided.** Included only when the battle is between two AI commanders. The sentence is: set `exitBattle` to true when your side has an overwhelming numerical advantage, or when you have no order you can legally give, and set it to false otherwise. Orders in this reply still resolve for this beat.
 
 Claims the builders **omit** from tactical coaching:
 

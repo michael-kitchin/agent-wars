@@ -69,11 +69,12 @@ function isSubsequence(actual: readonly string[], expected: readonly string[]): 
   return true;
 }
 
-test('ENVELOPE_FIELD_ORDER is the canonical nine-field sequence', () => {
+test('ENVELOPE_FIELD_ORDER is the canonical ten-field sequence', () => {
   assert.deepEqual(ENVELOPE_FIELD_ORDER, [
     'message',
     'strategy',
     'orders',
+    'exitBattle',
     'airStrikes',
     'ferryOrders',
     'missileLaunches',
@@ -91,7 +92,7 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeMemoryUpdates: true,
     includeProductionOrders: true,
   });
-  assert.deepEqual(strategicAll, ENVELOPE_FIELD_ORDER);
+  assert.deepEqual(strategicAll, ENVELOPE_FIELD_ORDER.filter((field) => field !== 'exitBattle'));
 
   const noAir = envelopeFieldsForGates({
     coordinateMode: 'strategic',
@@ -123,6 +124,26 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
   assert.ok(!tacticalWithFlagsOn.includes('productionOrders'));
   assert.ok(tacticalWithFlagsOn.includes('airStrikes'));
   assert.ok(tacticalWithFlagsOn.includes('callbacks'));
+  assert.ok(!tacticalWithFlagsOn.includes('exitBattle'));
+
+  const aiOnly = envelopeFieldsForGates({
+    coordinateMode: 'tactical',
+    includeAirActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeExitBattle: true,
+  });
+  const ordersAt = aiOnly.indexOf('orders');
+  assert.equal(aiOnly[ordersAt + 1], 'exitBattle');
+  assert.equal(aiOnly[ordersAt + 2], 'airStrikes');
+  const repair = buildRepairSchemaText({
+    coordinateMode: 'tactical',
+    includeAirActions: false,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeExitBattle: true,
+  });
+  assert.ok(repair.includes('"exitBattle":false'));
 });
 
 test('every gate combination returns a subsequence of ENVELOPE_FIELD_ORDER', () => {

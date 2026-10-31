@@ -15116,6 +15116,15 @@
        */
     tacticalAnnihilationOutcomeDialog: null,
     /**
+     * The sentence on the Ok dialog after an AI-only battle.
+     *
+     * Purpose: That dialog reuses the annihilation overlay without using the human win/loss kind.
+     * When to use: Set when the result or the header Exit Battle control opens the dialog. Cleared when Ok finishes or the overlay closes.
+     * Expected outcome: Ready, New game, and commander start stay blocked while this is set. Null means the dialog is not that result.
+     * Exceptions: None.
+     */
+    aiOnlyBattleResultSentence: null,
+    /**
        * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
     
        * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
@@ -22013,6 +22022,8 @@ ${bonuses}`;
   var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
   var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
   var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
+  var annihilationExitTooltipText = "Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.";
+  var aiOnlyResultOkTooltipText = "Close this result and return to the world map. The next turn does not start until you press Ready.";
 
   // src/renderer/openRouter/openRouterModelRefresh.ts
   var refreshModels = null;
@@ -22613,7 +22624,8 @@ ${bonuses}`;
     commanderStartDepth += 1;
     try {
       if (!rendererSharedState.runButtonOn) return;
-      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+      if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
+      if (rendererSharedState.tacticalBattleSnapshot?.aiOnlyEndReason != null) return;
       if (isNewGameOverlayOpen()) return;
       if (rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult) return;
       if (!window.gameApi?.startCommanderPlanning) return;
@@ -23229,7 +23241,7 @@ ${bonuses}`;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
     const deferredConsult = isDeferredResolutionPlaybackConsultPending();
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
     readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
     const deferredClock = rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning() && !waitingOnAi;
     if (waitingOnAi) {
@@ -28725,6 +28737,10 @@ ${bonuses}`;
     return document.getElementById(id)?.value ?? "";
   }
 
+  // src/shared/aiOnlyBattles.ts
+  var AI_ONLY_BATTLE_MODES = ["balanced", "unbalanced", "random", "none"];
+  var DEFAULT_AI_ONLY_BATTLES = "balanced";
+
   // src/shared/victoryRules.ts
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
@@ -28800,6 +28816,11 @@ ${bonuses}`;
     limit.value = String(selected);
     limit.disabled = false;
   }
+  function readNewGameAiOnlyBattles() {
+    const select = document.getElementById("new-game-ai-only-battles-select");
+    const value = select instanceof HTMLSelectElement ? select.value : "";
+    return AI_ONLY_BATTLE_MODES.includes(value) ? value : DEFAULT_AI_ONLY_BATTLES;
+  }
   function readNewGameVictory() {
     const victoryRule = selectedVictoryRule();
     if (victoryRule !== "most_city_hexes_at_turn_limit") {
@@ -28814,6 +28835,8 @@ ${bonuses}`;
     rememberedTurnLimit = DEFAULT_TURN_LIMIT;
     const victory = document.getElementById("new-game-victory-select");
     if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
+    const aiOnly = document.getElementById("new-game-ai-only-battles-select");
+    if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
     renderNewGameVictory();
   }
   function selectedVictoryRule() {
@@ -28918,6 +28941,7 @@ ${bonuses}`;
       seats: sidesState && !blocked ? buildSeatsPayload(sidesState) : [],
       turnLimit: victory.turnLimit,
       victoryRule: victory.victoryRule,
+      aiOnlyBattles: readNewGameAiOnlyBattles(),
       blocked
     };
   }
@@ -29399,7 +29423,8 @@ ${bonuses}`;
     if (!rendererSharedState.autoAdvance || pressing || rendererSharedState.readyRequestInFlight) return false;
     if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return false;
     if (rendererSharedState.gameState?.gameOver || rendererSharedState.gameState?.phase !== "planning") return false;
-    if (rendererSharedState.resolutionMoveAnimation || rendererSharedState.tacticalBattleSnapshot) return false;
+    const aiOnlyStillPlaying = rendererSharedState.tacticalBattleSnapshot?.leadPartyId != null && rendererSharedState.tacticalBattleSnapshot.aiOnlyEndReason == null;
+    if (rendererSharedState.resolutionMoveAnimation || rendererSharedState.tacticalBattleSnapshot && !aiOnlyStillPlaying) return false;
     if (isDeferredResolutionPlaybackConsultPending() || anyCommanderIsPlanning() || commanderStartIsSettling()) return false;
     if (newGameOverlayIsOpen()) return false;
     const knockout = document.getElementById("knockout-dialog");
@@ -29636,6 +29661,12 @@ ${bonuses}`;
   }
 
   // src/shared/battleForceCounts.ts
+  function countTwoPartyForces(subUnits, leftOwnerId, rightOwnerId) {
+    const left = subUnits.filter((sub) => sub.player === leftOwnerId).length;
+    const right = subUnits.filter((sub) => sub.player === rightOwnerId).length;
+    const total = left + right;
+    return { left, right, leftShare: total > 0 ? left / total : 0.5 };
+  }
   function countBattleForces(subUnits, opposingPartyId) {
     const human = subUnits.filter((sub) => sub.player === HUMAN_SEAT_ID).length;
     const opponent = subUnits.filter((sub) => sub.player === opposingPartyId).length;
@@ -29695,23 +29726,31 @@ ${bonuses}`;
     if (rendererSharedState.resolutionMoveAnimation != null && bar.dataset.battleId === battle.battleId) return;
     bar.dataset.battleId = battle.battleId;
     const seats = rendererSharedState.gameState?.seats ?? [];
+    const leadId = battle.leadPartyId ?? null;
     const opposingId = battle.opposingPartyId ?? battle.subUnits.find((unit) => unit.player !== HUMAN_SEAT_ID)?.player ?? null;
-    const counts = countBattleForces(battle.subUnits, opposingId ?? "");
+    const twoParty = leadId != null && opposingId != null ? countTwoPartyForces(battle.subUnits, leadId, opposingId) : null;
+    const humanCounts = twoParty == null ? countBattleForces(battle.subUnits, opposingId ?? "") : null;
+    const leftCount = twoParty != null ? twoParty.left : humanCounts?.human ?? 0;
+    const rightCount = twoParty != null ? twoParty.right : humanCounts?.opponent ?? 0;
+    const leftShare = twoParty != null ? twoParty.leftShare : humanCounts?.humanShare ?? 0;
     const humanCount = document.getElementById("battle-force-human-count");
-    if (humanCount) humanCount.textContent = counts.human.toLocaleString("en-US");
+    if (humanCount) humanCount.textContent = leftCount.toLocaleString("en-US");
     const opponentCount = document.getElementById("battle-force-enemy-count");
-    if (opponentCount) opponentCount.textContent = counts.opponent.toLocaleString("en-US");
+    if (opponentCount) opponentCount.textContent = rightCount.toLocaleString("en-US");
+    const leftName = document.getElementById("battle-force-human-name");
+    const leadSeat = seats.find((seat) => seat.seatId === leadId);
+    if (leftName) leftName.textContent = leadId != null ? shortSideName(leadSeat?.homeRegion ?? leadId) : "yours";
     const opposingSeat = seats.find((seat) => seat.seatId === opposingId);
     const nameEl = document.getElementById("battle-force-enemy-name");
     if (nameEl) nameEl.textContent = opposingId != null && isNeutralOwnerId(opposingId) ? "Neutral" : shortSideName(opposingSeat?.homeRegion ?? "Enemy");
     const dot = document.getElementById("battle-force-enemy-dot");
     const enemyPalette = paletteForOwner(opposingId, seats);
     if (dot) dot.style.background = enemyPalette?.map ?? "#9D174D";
-    const humanPalette = paletteForOwner(HUMAN_SEAT_ID, seats);
+    const humanPalette = paletteForOwner(leadId ?? HUMAN_SEAT_ID, seats);
     const fill = document.getElementById("battle-force-human-fill");
     if (fill) {
-      fill.style.width = `${(counts.humanShare * 100).toFixed(1)}%`;
-      const sidesMeet = counts.humanShare > 0 && counts.humanShare < 1;
+      fill.style.width = `${(leftShare * 100).toFixed(1)}%`;
+      const sidesMeet = leftShare > 0 && leftShare < 1;
       fill.style.borderRightWidth = sidesMeet ? "" : "0";
       if (humanPalette) fill.style.background = humanPalette.forceBar;
     }
@@ -31621,7 +31660,7 @@ ${bonuses}`;
   function syncTacticalExitButtonElementVisibility() {
     const exitBtn = document.getElementById("tactical-exit-btn");
     const active2 = !!rendererSharedState.tacticalBattleSnapshot;
-    const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null;
     const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
     const disabled = !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
     if (exitBtn) {
@@ -31654,8 +31693,31 @@ ${bonuses}`;
     syncTacticalExitButtonElementVisibility();
     updateReadyButtonState();
   }
+  function openAiOnlyBattleResultDialog(sentence) {
+    rendererSharedState.aiOnlyBattleResultSentence = sentence;
+    rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
+    void stopOpponentPlanning("teardown");
+    const overlay = document.getElementById("tactical-annihilation-overlay");
+    const messageEl = document.getElementById("tactical-annihilation-message");
+    const button = document.getElementById("tactical-annihilation-exit-btn");
+    if (messageEl) messageEl.textContent = sentence;
+    if (button) {
+      button.textContent = "Ok";
+      button.setAttribute("data-control-tooltip", aiOnlyResultOkTooltipText);
+    }
+    overlay?.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
+    syncTacticalExitButtonElementVisibility();
+    updateReadyButtonState();
+  }
   function closeTacticalAnnihilationOutcomeDialog() {
     rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
+    rendererSharedState.aiOnlyBattleResultSentence = null;
+    const button = document.getElementById("tactical-annihilation-exit-btn");
+    if (button) {
+      button.textContent = "Exit Battle";
+      button.setAttribute("data-control-tooltip", annihilationExitTooltipText);
+    }
     document.getElementById("tactical-annihilation-overlay")?.classList.add("hidden");
     setMainUIControlsEnabled(true);
     syncTacticalExitButtonElementVisibility();
@@ -35184,6 +35246,7 @@ ${bonuses}`;
           seats: seatsStart.seats,
           turnLimit: seatsStart.turnLimit,
           victoryRule: seatsStart.victoryRule,
+          aiOnlyBattles: seatsStart.aiOnlyBattles,
           gameSize: readSelectedGameSizeFromDocument()
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -35241,7 +35304,7 @@ ${bonuses}`;
     });
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return false;
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return false;
     if (rendererSharedState.readyRequestInFlight) return false;
     const overlay = document.getElementById("game-over-overlay");
     const newGameBtn = document.getElementById("new-game-btn");
@@ -35305,16 +35368,64 @@ ${bonuses}`;
     if (human === 0 && opponent > 0) return "human_loss";
     return "mutual";
   }
+  function getTwoPartyAnnihilationOutcome(subUnits, partyA, partyB) {
+    let countA = 0;
+    let countB = 0;
+    for (const unit of subUnits) {
+      if (unit.player === partyA) countA += 1;
+      else if (unit.player === partyB) countB += 1;
+    }
+    if (countA > 0 && countB > 0) return null;
+    if (countA > 0) return partyA;
+    if (countB > 0) return partyB;
+    return "mutual";
+  }
 
   // src/renderer/tactical/tacticalExitFlow.ts
+  var aiOnlyExitStarted = false;
   function tacticalMaybeScheduleAnnihilationExit(session, io) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
     const snap = session.getBattleSnapshot();
     if (!snap || !session.getPhasePlanning()) return;
+    if (snap.leadPartyId != null) {
+      if (snap.aiOnlyEndReason == null) {
+        aiOnlyExitStarted = false;
+        return;
+      }
+      if (rendererSharedState.resolutionMoveAnimation) return;
+      const sentence = aiOnlyResultSentence(snap);
+      if (sentence == null) return;
+      if (rendererSharedState.autoAdvance) {
+        if (aiOnlyExitStarted) return;
+        aiOnlyExitStarted = true;
+        void leaveAiOnlyBattle(session, io, true);
+        return;
+      }
+      openAiOnlyBattleResultDialog(sentence);
+      io.redraw();
+      return;
+    }
     const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
     if (outcome === null) return;
     openTacticalAnnihilationOutcomeDialog(outcome);
     io.redraw();
+  }
+  function aiOnlyResultSentence(snap) {
+    if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
+    if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
+    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
+    if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
+    const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
+    if (winner == null || winner === "mutual") return "All units destroyed.";
+    const home = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
+    return `${home && home.length > 0 ? home : winner} wins the battle.`;
+  }
+  async function leaveAiOnlyBattle(session, io, autoAdvance) {
+    await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
+    } });
+    if (session.getBattleSnapshot() != null) return;
+    rendererSharedState.aiOnlyBattleResultSentence = null;
+    if (autoAdvance) await maybeObserveAutoAdvance();
   }
   async function tacticalPerformBattleExit(session, io) {
     const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
@@ -36845,8 +36956,11 @@ ${bonuses}`;
     if (plan == null) return false;
     return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + plan.ferryOrders.length + plan.embarkOrders.length > 0;
   }
+  function tacticalDraftAlreadyDecided(plan) {
+    return tacticalOpponentPlanPayloadHasAnyOrders(plan) || plan?.exitBattle === true;
+  }
   function nextTacticalOpponentDraftAfterPostBeatPlan(tacticalOpponentPlan) {
-    if (tacticalOpponentPlan != null && tacticalOpponentPlanPayloadHasAnyOrders(tacticalOpponentPlan)) {
+    if (tacticalOpponentPlan != null && tacticalDraftAlreadyDecided(tacticalOpponentPlan)) {
       return { draft: tacticalOpponentPlan, startBackgroundPrefetch: false };
     }
     return { draft: null, startBackgroundPrefetch: true };
@@ -37907,7 +38021,7 @@ ${bonuses}`;
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
     if (rendererSharedState.readyRequestInFlight) return;
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
     if (isDeferredResolutionPlaybackConsultPending()) {
       deps.updateReadyButtonState();
       return;
@@ -37992,9 +38106,10 @@ ${bonuses}`;
           refreshBuildPopup: false,
           redraw: false
         });
-        const outcome = readTacticalBattlesInterceptPromptEnabled() ? await deps.openMeleeInterceptModal({
+        const outcome = readyResult.aiOnlyBattleH3Index && rendererSharedState.autoAdvance ? { decision: "fight", selectedH3Index: readyResult.aiOnlyBattleH3Index } : readyResult.aiOnlyBattleH3Index || readTacticalBattlesInterceptPromptEnabled() ? await deps.openMeleeInterceptModal({
           candidates: readyResult.meleeInterceptCandidates ?? [],
-          buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml
+          buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+          preselectH3Index: readyResult.aiOnlyBattleH3Index
         }) : { decision: "ignore" };
         const resolveResult = await window.gameApi.resolveMeleeIntercept({
           meleeDecisionToken: readyResult.meleeDecisionToken ?? "",
@@ -39629,9 +39744,11 @@ ${bonuses}`;
         colgroup.appendChild(col);
       }
       table.appendChild(colgroup);
+      const leadRow = eligible.find((row) => !row.parties.some((party) => party.ownerId === HUMAN_SEAT_ID));
       const thead = document.createElement("thead");
       const hr = document.createElement("tr");
-      for (const label of ["", "Hex", "Yours", "Enemy"]) {
+      const partyHeaders = leadRow ? [partyName(leadRow.parties[0]?.ownerId ?? ""), partyName(leadRow.parties[1]?.ownerId ?? "")] : ["Yours", "Enemy"];
+      for (const label of ["", "Hex", ...partyHeaders]) {
         const th = document.createElement("th");
         th.textContent = label;
         hr.appendChild(th);
@@ -39722,12 +39839,17 @@ ${bonuses}`;
         );
         tr.appendChild(tdHex);
         const human = row.parties.find((party) => party.ownerId === HUMAN_SEAT_ID);
-        const enemy = row.parties.find((party) => party.ownerId !== HUMAN_SEAT_ID);
+        const others = row.parties.filter((party) => party.ownerId !== HUMAN_SEAT_ID);
         const tdHuman = document.createElement("td");
-        tdHuman.textContent = human?.unitSummary || "\u2014";
-        tr.appendChild(tdHuman);
         const tdAi = document.createElement("td");
-        tdAi.append(enemy ? enemyCell(enemy.ownerId, enemy.unitSummary) : document.createTextNode("\u2014"));
+        if (human) {
+          tdHuman.textContent = human.unitSummary || "\u2014";
+          tdAi.append(others[0] ? enemyCell(others[0].ownerId, others[0].unitSummary) : document.createTextNode("\u2014"));
+        } else {
+          tdHuman.append(others[0] ? enemyCell(others[0].ownerId, others[0].unitSummary) : document.createTextNode("\u2014"));
+          tdAi.append(others[1] ? enemyCell(others[1].ownerId, others[1].unitSummary) : document.createTextNode("\u2014"));
+        }
+        tr.appendChild(tdHuman);
         tr.appendChild(tdAi);
         tbody.appendChild(tr);
       }
@@ -39738,7 +39860,14 @@ ${bonuses}`;
       }
       document.body.appendChild(overlay);
       detachFrame = attachFrameToVisibleMap(frame);
-      radios[0]?.focus();
+      const preselected = args.preselectH3Index ? radios.find((radio) => radio.value === args.preselectH3Index) : void 0;
+      if (preselected) {
+        preselected.checked = true;
+        selectedH3 = preselected.value;
+        fightBtn.disabled = false;
+        preselected.closest("tr")?.scrollIntoView({ block: "nearest" });
+      }
+      (preselected ?? radios[0])?.focus();
     });
   }
   function enemyCell(ownerId, unitSummary) {
@@ -41692,6 +41821,37 @@ ${bonuses}`;
     });
   }
   async function performTacticalBattleExit() {
+    if (rendererSharedState.tacticalBattleSnapshot?.leadPartyId != null) {
+      if (rendererSharedState.aiOnlyBattleResultSentence == null && !rendererSharedState.autoAdvance) {
+        openAiOnlyBattleResultDialog("The battle was left.");
+        return;
+      }
+      await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
+        endTacticalBattle: window.gameApi?.endTacticalBattle,
+        showMapToast,
+        redraw,
+        runReadyAfterExit: async () => {
+        },
+        refreshSidebarAfterTacticalDraftTeardown: () => {
+          hideStackCallout();
+          refreshStrategicOrderSidebars();
+        },
+        refreshStrategicSnapshotAfterExit: async () => {
+          if (!window.gameApi?.getGameState) return;
+          const nextState = await fetchMatchSnapshot();
+          await applyGameStateSnapshot2(nextState, {
+            refreshStandingOrders: false,
+            updateGameStateSidebarUi: false,
+            updateSelectionUi: false,
+            updateGameOverUi: false,
+            updateReadyButton: false,
+            refreshBuildPopup: false,
+            redraw: false
+          });
+        }
+      }, rendererSharedState.aiOnlyBattleResultSentence == null && rendererSharedState.autoAdvance);
+      return;
+    }
     await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {
       showMapToast,
       redraw,

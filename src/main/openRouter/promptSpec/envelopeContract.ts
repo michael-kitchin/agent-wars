@@ -81,6 +81,15 @@ export interface EnvelopeGates {
    * Exceptions: None.
    */
   readonly includeStandingOrderActions?: boolean;
+  /**
+   * Whether this tactical consultation may ask the commander to leave the battle.
+   *
+   * Contract: True only when the battle is between two AI seats. Omitted means false.
+   * When to use: Set from `tacticalBattle.leadPartyId != null`. Never default it to true.
+   * Expected outcome: `exitBattle` appears after `orders` and before `airStrikes`.
+   * Exceptions: None.
+   */
+  readonly includeExitBattle?: boolean;
 }
 
 /**
@@ -95,6 +104,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'message',
   'strategy',
   'orders',
+  'exitBattle',
   'airStrikes',
   'ferryOrders',
   'missileLaunches',
@@ -177,6 +187,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
   const includeProduction = gates.coordinateMode !== 'tactical' && gates.includeProductionOrders;
   return ENVELOPE_FIELD_ORDER.filter((field) => {
     if (ALWAYS_PRESENT_FIELDS.has(field)) return true;
+    if (field === 'exitBattle') return gates.includeExitBattle === true;
     if (field === 'airStrikes' || field === 'ferryOrders') return gates.includeAirActions;
     if (field === 'missileLaunches') return gates.coordinateMode !== 'tactical' && gates.includeMissileActions === true;
     if (field === 'memoryUpdates') return includeMemory;
@@ -364,6 +375,7 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
     if (field === 'message') example.message = '...';
     else if (field === 'strategy') example.strategy = '...';
     else if (field === 'orders') example.orders = orders;
+    else if (field === 'exitBattle') example.exitBattle = false;
     else if (field === 'airStrikes') {
       example.airStrikes = [{ unitId: 'a1-a1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {

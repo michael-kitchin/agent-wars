@@ -353,6 +353,7 @@ export function buildToolUsageGuidance(
     homeRegionsOverlap: false,
     hasObservedEnemy: true,
     includeScenarioWinPaths: coordinateMode !== 'tactical',
+    includeExitBattle: false,
   };
   lines.push(...buildCoachingBullets(resolvedGates));
   if (lines.length === 0) return '';
@@ -547,7 +548,12 @@ export function getInitialUserMessage(
   flags: PromptToolFlags,
   hasPrecomputedBriefing = false,
   coordinateMode: 'strategic' | 'tactical' = 'strategic',
-  roster: { readonly hasAirUnits?: boolean; readonly hasMissileUnits?: boolean; readonly hasBestOptionsTable?: boolean } = {}
+  roster: {
+    readonly hasAirUnits?: boolean;
+    readonly hasMissileUnits?: boolean;
+    readonly hasBestOptionsTable?: boolean;
+    readonly includeExitBattle?: boolean;
+  } = {}
 ): string {
   logDebug('promptText getInitialUserMessage', {
     coordinateMode,
@@ -555,6 +561,7 @@ export function getInitialUserMessage(
     hasAirUnits: roster.hasAirUnits !== false,
     hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
+    includeExitBattle: roster.includeExitBattle === true,
   });
   return buildOpeningUserMessage({
     coordinateMode,
@@ -567,5 +574,6 @@ export function getInitialUserMessage(
     hasAirUnits: roster.hasAirUnits !== false,
     hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
+    includeExitBattle: roster.includeExitBattle === true,
   });
 }

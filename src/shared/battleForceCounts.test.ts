@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countBattleForces } from './battleForceCounts';
+import { countBattleForces, countTwoPartyForces } from './battleForceCounts';
 import { NEUTRAL_OWNER_ID } from './seatIds';
 import type { TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 
@@ -24,6 +24,12 @@ test('countBattleForces gives the whole bar to a side that is alone', () => {
 
 test('countBattleForces splits an empty battle evenly', () => {
   assert.deepEqual(countBattleForces([], 'opponent'), { human: 0, opponent: 0, humanShare: 0.5 });
+});
+
+test('countTwoPartyForces counts the left and right parties and ignores anyone else', () => {
+  const subUnits = [{ player: 'alpha' as const }, { player: 'alpha' as const }, { player: 'beta' as const }, { player: 'human' as const }];
+  assert.deepEqual(countTwoPartyForces(subUnits, 'alpha', 'beta'), { left: 2, right: 1, leftShare: 2 / 3 });
+  assert.deepEqual(countTwoPartyForces([], 'alpha', 'beta'), { left: 0, right: 0, leftShare: 0.5 });
 });
 
 test('countBattleForces counts only the named opposing party', () => {

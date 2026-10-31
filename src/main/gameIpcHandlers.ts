@@ -247,6 +247,7 @@ export async function handleGameReady(
       awaitingMeleeDecision: true,
       meleeDecisionToken: readyResult.meleeDecisionToken,
       meleeInterceptCandidates: readyResult.meleeInterceptCandidates,
+      aiOnlyBattleH3Index: readyResult.aiOnlyBattleH3Index,
       aiSkipped: aiSkipped && aiOrders.length === 0,
       aiSkipReason,
       aiOrderCount: aiOrders.length,

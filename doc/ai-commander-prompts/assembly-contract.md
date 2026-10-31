@@ -128,6 +128,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `message` | string | required, first | One in-character line addressed to your enemies |
 | `strategy` | string | required, second | One line summarising this period's plan |
 | `orders` | array | required, third | Per-unit actions, processed in list order |
+| `exitBattle` | boolean | present only when the battle is between two AI commanders | Required when present. True asks to leave after this beat's orders resolve. A human-versus-AI battle and every strategic consult omit the key. The repair example sets it to false. |
 | `airStrikes` | array | present when the opponent has air units | Strike actions |
 | `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, dests are intact airport cells in the footprint; strike-or-ferry exclusivity still applies. |
 | `missileLaunches` | array | present when the opponent has a missile and the consult is strategic | One launch per missile. Each entry uses `unitId` or `unitIds` and `targetHexCode`. A battle consult does not offer the field. |

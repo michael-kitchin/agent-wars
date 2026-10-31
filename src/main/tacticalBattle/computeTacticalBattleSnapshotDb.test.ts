@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CombatUnit } from '../combatUnitTypes';
 import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../gameActions/meleeInterceptCandidates';
-import { dbGetAll, dbGetOne, dbRun, isDbReady, listFortifiableCellsForHex, listUnitsForSnapshot, setHexController, setTacticalCellFortified } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getSeatRoster, isDbReady, listFortifiableCellsForHex, listUnitsForSnapshot, setHexController, setTacticalCellFortified } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
-import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
@@ -155,6 +155,7 @@ test('computeTacticalBattleSnapshot records placed baseline counts by parent id'
     const battleId = 'baseline-map-probe';
     const result = computeTacticalBattleSnapshot(targetStrategicH3, battleId);
     assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
+    assert.equal(result.snapshot!.leadPartyId, undefined);
     const byParent = result.snapshot!.initialPlacedSubUnitCountByParentId;
     assert.ok(byParent, 'expected baseline counts map');
     const computed = result.snapshot!.subUnits.reduce<Record<string, number>>((acc, sub) => {
@@ -288,6 +289,42 @@ test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transpo
       );
       assert.equal(rowGone, undefined);
     }
+  });
+});
+
+test('two AI owners place a battle and three owners do not', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-two-ai-', ({ targetStrategicH3, humanId, opponentId }) => {
+    const secondSeat = AI_SEAT_IDS[1];
+    const spare = dbGetOne<{ id: string }>(
+      `SELECT id FROM units WHERE id != ? AND id != ? AND unit_type IN ('infantry', 'armor') LIMIT 1`,
+      [humanId, opponentId],
+    );
+    assert.ok(spare, 'seed needs a spare parent');
+    dbRun(
+      `INSERT INTO seats (
+         seat_id, seat_order, kind, home_region, out_reasons, consultation_count, cost_usd
+       ) SELECT ?, 3, 'ai', home_region, '[]', 0, 0 FROM seats WHERE seat_id = ?`,
+      [secondSeat, AI_SEAT_IDS[0]],
+    );
+    const elsewhere = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM hexes WHERE h3_index != ? LIMIT 1', [targetStrategicH3]);
+    assert.ok(elsewhere, 'seed needs a second hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE player = ? AND h3_index = ?', [elsewhere.h3_index, HUMAN_SEAT_ID, targetStrategicH3]);
+    dbRun('UPDATE units SET player = ?, h3_index = ? WHERE id = ?', [secondSeat, targetStrategicH3, spare.id]);
+    const placed = computeTacticalBattleSnapshot(targetStrategicH3, 'two-ai');
+    assert.ok(placed.snapshot, placed.failureReason ?? 'expected a two-AI snapshot');
+    const orderOf = (seatId: string): number => getSeatRoster().find((seat) => seat.seatId === seatId)?.seatOrder ?? 0;
+    const firstSeat = AI_SEAT_IDS[0];
+    const lead = orderOf(firstSeat) < orderOf(secondSeat) || (orderOf(firstSeat) === orderOf(secondSeat) && firstSeat.localeCompare(secondSeat) < 0)
+      ? firstSeat
+      : secondSeat;
+    assert.equal(placed.snapshot!.leadPartyId, lead);
+    assert.equal(placed.snapshot!.opposingPartyId, lead === firstSeat ? secondSeat : firstSeat);
+    assert.equal(placed.snapshot!.idleBeatStreak, 0);
+    assert.equal(placed.snapshot!.subUnits.some((unit) => unit.player === HUMAN_SEAT_ID), false);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [targetStrategicH3, humanId]);
+    const three = computeTacticalBattleSnapshot(targetStrategicH3, 'three-owners');
+    assert.equal(three.snapshot, null);
+    assert.equal(three.failureReason, 'Hex is not contested by exactly two sides.');
   });
 });
 

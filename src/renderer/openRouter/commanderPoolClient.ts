@@ -172,14 +172,15 @@ export function commanderSeatCostUsd(): number {
  *
  * Purpose: Run on, a new match, and a model change share one start.
  * When to use: Those actions, and after a deferred consult releases a battle.
- * Expected outcome: Strategic planning for a world-map turn. Tactical planning inside a battle. No start while a deferred consult is still pending, the annihilation dialog is open, or the new-game screen has no match under it.
+ * Expected outcome: Strategic planning for a world-map turn. Tactical planning inside a battle that is still going. No start while a deferred consult is still pending, a result dialog is open, an AI-only battle has already decided to end, or the new-game screen has no match under it.
  * Exceptions: A rejected IPC is logged and does not throw. A reply that arrives after Start does not change the snapshot.
  */
 export async function startCommanderPlanningIfAllowed(): Promise<void> {
   commanderStartDepth += 1;
   try {
     if (!S.runButtonOn) return;
-    if (S.tacticalAnnihilationOutcomeDialog != null) return;
+    if (S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null) return;
+    if (S.tacticalBattleSnapshot?.aiOnlyEndReason != null) return;
     if (isNewGameOverlayOpen()) return;
     if (S.pendingDeferredStrategicPostResolutionConsult || S.pendingDeferredTacticalPostBeatConsult) return;
     if (!window.gameApi?.startCommanderPlanning) return;

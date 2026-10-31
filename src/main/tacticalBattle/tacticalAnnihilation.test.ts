@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   getTacticalAnnihilationOutcome,
+  getTwoPartyAnnihilationOutcome,
   shouldEndTacticalBattleForAnnihilation,
 } from '../../shared/tacticalAnnihilation';
 
@@ -50,5 +51,15 @@ test('outcome human_loss when human has zero sub-units', () => {
 });
 
 test('outcome mutual when both sides are empty', () => {
+  assert.equal(getTacticalAnnihilationOutcome([]), 'mutual');
+});
+
+test('two AI owners with units are not terminal, and wiping one names that winner', () => {
+  const both = [{ player: 'alpha' }, { player: 'beta' }, { player: 'human' }];
+  assert.equal(getTwoPartyAnnihilationOutcome(both, 'alpha', 'beta'), null);
+  assert.equal(getTwoPartyAnnihilationOutcome([{ player: 'alpha' }, { player: 'human' }], 'alpha', 'beta'), 'alpha');
+  assert.equal(getTwoPartyAnnihilationOutcome([], 'alpha', 'beta'), 'mutual');
+  assert.equal(getTacticalAnnihilationOutcome([{ player: 'human' }]), 'human_win');
+  assert.equal(getTacticalAnnihilationOutcome([{ player: 'opponent' }]), 'human_loss');
   assert.equal(getTacticalAnnihilationOutcome([]), 'mutual');
 });

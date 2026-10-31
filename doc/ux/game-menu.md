@@ -55,7 +55,7 @@ Control tips for these items are in [control-tooltips.md](control-tooltips.md).
 ## Invariants
 
 - The menu button's expanded state and the popup's visibility always agree.
-- Unchecking Offer tactical battles never opens the tactical battles list.
+- Unchecking Offer tactical battles never opens the tactical battles list for a human who is still playing. An observed match uses AI-Only Battles instead.
 - A disabled item never runs an action.
 
 ## Strategic and Tactical Differences

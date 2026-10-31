@@ -5,13 +5,14 @@
 import {
   tacticalBoundaryPlanningExitAllowed,
 } from '../../shared/tacticalStateAssertions';
-import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
+import { getTacticalAnnihilationOutcome, getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { updateGameStateSidebar } from '../core/uiState';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
-import { closeTacticalAnnihilationOutcomeDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
+import { closeTacticalAnnihilationOutcomeDialog, openAiOnlyBattleResultDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
+import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
 import { invalidateBackgroundAiRequest } from '../openRouter/openRouterRuntime';
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
@@ -70,6 +71,16 @@ export type TacticalBattleExitIo = {
 };
 
 /**
+ * True after an automatic AI-only exit has already started for the current end.
+ *
+ * Purpose: The battle map redraws many times while the end IPC is in flight. Each redraw would leave again.
+ * When to use: Set when the observe checkbox starts the exit. Cleared when a later beat has no end reason.
+ * Expected outcome: One exit attempt per finished battle. A failed exit does not repeat on the next frame.
+ * Exceptions: None.
+ */
+let aiOnlyExitStarted = false;
+
+/**
  * Opens the annihilation win/loss modal when the roster is terminal; exit IPC runs only after the player confirms.
  *
  * Contract: No-op unless planning phase is active, snapshot exists, dialog not already open, and outcome is terminal.
@@ -78,13 +89,69 @@ export type TacticalBattleExitIo = {
  * Exceptions: None.
  */
 export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): void {
-  if (S.tacticalAnnihilationOutcomeDialog != null) return;
+  if (S.tacticalAnnihilationOutcomeDialog != null || S.aiOnlyBattleResultSentence != null) return;
   const snap = session.getBattleSnapshot();
   if (!snap || !session.getPhasePlanning()) return;
+  if (snap.leadPartyId != null) {
+    if (snap.aiOnlyEndReason == null) {
+      aiOnlyExitStarted = false;
+      return;
+    }
+    if (S.resolutionMoveAnimation) return;
+    const sentence = aiOnlyResultSentence(snap);
+    if (sentence == null) return;
+    if (S.autoAdvance) {
+      if (aiOnlyExitStarted) return;
+      aiOnlyExitStarted = true;
+      void leaveAiOnlyBattle(session, io, true);
+      return;
+    }
+    openAiOnlyBattleResultDialog(sentence);
+    io.redraw();
+    return;
+  }
   const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
   if (outcome === null) return;
   openTacticalAnnihilationOutcomeDialog(outcome);
   io.redraw();
+}
+
+/**
+ * The result sentence for an AI-only battle that has already decided to end.
+ *
+ * Purpose: The overlay shows this text. A missing home name uses the seat id.
+ * When to use: After playback, and not for the header Exit Battle control.
+ * Expected outcome: Null while the battle continues.
+ * Exceptions: None.
+ */
+function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
+  if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
+  if (snap.aiOnlyEndReason === 'mutual') return 'All units destroyed.';
+  if (snap.aiOnlyEndReason === 'exit') return 'The commanders left the battle.';
+  if (snap.aiOnlyEndReason === 'idle') return 'The battle ended with no orders left to carry out.';
+  const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
+  if (winner == null || winner === 'mutual') return 'All units destroyed.';
+  const home = S.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
+  return `${home && home.length > 0 ? home : winner} wins the battle.`;
+}
+
+/**
+ * Leaves an AI-only battle without starting the next strategic turn inside the exit itself.
+ *
+ * Purpose: `tacticalPerformBattleExit` always presses Ready. That plus auto-advance would skip a turn.
+ * When to use: A finished beat, Ok, and the header control while the observe checkbox is on.
+ * Expected outcome: The session ends. Auto-advance presses Ready once after the snapshot is gone. A manual Ok does not.
+ * Exceptions: IPC failures toast and keep the snapshot, matching the human exit.
+ */
+export async function leaveAiOnlyBattle(
+  session: TacticalExitSessionAccessor,
+  io: TacticalBattleExitIo,
+  autoAdvance: boolean,
+): Promise<void> {
+  await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {} });
+  if (session.getBattleSnapshot() != null) return;
+  S.aiOnlyBattleResultSentence = null;
+  if (autoAdvance) await maybeObserveAutoAdvance();
 }
 
 /**

@@ -69,6 +69,15 @@ export const autoStartCheckboxTooltipText =
   'Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, and planning stays off.';
 
 /**
+ * Purpose: Says which observed battle is fought, and that a human who is still playing is unchanged.
+ * When to use: `#new-game-ai-only-battles-select`. The same sentence is the `data-control-tooltip` on that select in `static/index.html`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const aiOnlyBattlesSelectTooltipText =
+  'Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.';
+
+/**
  * Purpose: Says a global turn is a month, a regional turn is a week, and a battle stays on the current date.
  * When to use: `#new-game-start-month`.
  * Expected outcome: The control tip shows this sentence.
@@ -564,3 +573,12 @@ export const exitBattleTooltipText =
  */
 export const annihilationExitTooltipText =
   'Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.';
+
+/**
+ * Purpose: Ok returns to the world map and leaves Ready for the player.
+ * When to use: `#tactical-annihilation-exit-btn` while an AI-only result is open.
+ * Expected outcome: The control tip shows this sentence. The human Exit Battle tip stays on a human battle.
+ * Exceptions: None.
+ */
+export const aiOnlyResultOkTooltipText =
+  'Close this result and return to the world map. The next turn does not start until you press Ready.';

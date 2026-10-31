@@ -69,7 +69,7 @@ A match you start with Observe only works the same way, except that the checkbox
 
 ## Starting a Game
 
-The setup screen lists two to four sides, and each side needs its own home. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another).
+The setup screen lists two to four sides, and each side needs its own home. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another). Game Options also has AI-Only Battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map.
 
 *New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: Eastern Asia vs Southern Africa). The buttons to the right of the lists pick random choices.*
 
