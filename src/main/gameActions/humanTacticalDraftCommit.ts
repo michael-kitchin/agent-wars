@@ -393,6 +393,7 @@ export function commitHumanTacticalDraftOrders(args: {
       if (!sub || sub.player !== HUMAN_SEAT_ID) continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
+      if (postMovementBattle.subUnits.find((u) => u.id === o.unitId)?.h3Index === from) continue;
       const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
       const maxEdges = effectiveTacticalMovementPointBudgetForMarchLeg(terrainBattle, sub, preBattle.subUnits, moveType);
       if (maxEdges <= 0) {

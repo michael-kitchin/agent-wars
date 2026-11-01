@@ -4,6 +4,7 @@
 
 import type { BuildUnitType } from '../productionRules';
 import { aiOnlyBattlesFromStored, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
+import { SIGHT_CUES_CONFIG_KEY, STORED_SIGHT_CUES_WHEN_MISSING, sightCuesFromStored } from '../../shared/sightCueSettings';
 import {
   DEFAULT_TURN_LIMIT,
   GAME_END_REASONS,
@@ -172,6 +173,23 @@ export function readAiOnlyBattles(ops: GameConfigKvDbOps): AiOnlyBattleMode {
   const mode = aiOnlyBattlesFromStored(raw);
   logTrace('gameConfigKv readAiOnlyBattles result', { mode });
   return mode;
+}
+
+/**
+ * Reads whether this match draws sight lines during observed playback.
+ *
+ * Purpose: An observed match uses this to decide whether the opening stage runs. A missing row (an older save) is off.
+ * When to use: The ready pipeline, before computing sight lines.
+ * Expected outcome: `true` only when the stored row is `'1'`.
+ * Exceptions: None.
+ */
+export function readSightCuesEnabled(ops: GameConfigKvDbOps): boolean {
+  logTrace('gameConfigKv readSightCuesEnabled');
+  if (ops.hasDb && !ops.hasDb()) return STORED_SIGHT_CUES_WHEN_MISSING;
+  const raw = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [SIGHT_CUES_CONFIG_KEY])?.value;
+  const enabled = sightCuesFromStored(raw);
+  logTrace('gameConfigKv readSightCuesEnabled result', { enabled });
+  return enabled;
 }
 
 /**

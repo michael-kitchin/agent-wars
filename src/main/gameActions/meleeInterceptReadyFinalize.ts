@@ -19,6 +19,7 @@ import type { CombatUnit } from '../combatUnitTypes';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
 import type { MissileLaunchPhaseResult } from './missileLaunchResolution';
 import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../shared/ipcTypes';
+import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
 import { evaluateEndOfTurnOutcome, recordEndOfTurnOutcome } from './endOfTurnOutcome';
 import type { EndOfTurnOutcome } from './endOfTurnOutcomeRules';
 import { applyKnockout, type KnockoutCoordinates } from './knockoutConsequences';
@@ -88,6 +89,15 @@ airStrikeResult: AirStrikePhaseResult;
    * Exceptions: None.
    */
   missileLaunchResult: MissileLaunchPhaseResult;
+  /**
+   * Sight lines computed before resolution moved units.
+   *
+   * Contract: Required. Pass `undefined` when the turn has no beams.
+   * When to use: Both the uninterrupted ready path and the melee resume path.
+   * Expected outcome: Copied onto `ReadyResult` only when the list is non-empty.
+   * Exceptions: None.
+   */
+  sightCues: SightCueBeam[] | undefined;
     /**
    * Specifies the contract for the `airStrikeTransportLosses` member (airStrikeTransportLosses: CombatUnit[];).
 
@@ -487,6 +497,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
     airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? stampLossFlags(airStrikeResult.removedUnits) : undefined,
     missileLaunches: missileLaunchResult.launches.length > 0 ? [...missileLaunchResult.launches] : undefined,
+    sightCues: args.sightCues && args.sightCues.length > 0 ? [...args.sightCues] : undefined,
     missileStrikeRemovedUnits:
       missileLaunchResult.removedUnits.length > 0 ? stampLossFlags([...missileLaunchResult.removedUnits]) : undefined,
     airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,

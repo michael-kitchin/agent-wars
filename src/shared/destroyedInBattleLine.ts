@@ -1,22 +1,6 @@
 import type { DestroyedBattleParent } from './destroyedBattleParent';
 import { isBuildUnitType, type BuildUnitType } from './ipc/productionTypes';
-import { LOSS_TYPE_NAME_LIST_MAX } from './lossSummary';
-
-/**
- * Popup labels for a collapsed type, in the same spelling the other loss lines use.
- *
- * Purpose: This sentence writes `6 Armored`, while cause lines write `6x Armored`.
- * When to use: `formatDestroyedInBattleLine`.
- * Expected outcome: The five build types, in naval, air, armor, infantry, missile order.
- * Exceptions: None.
- */
-const GROUP_LABEL_BY_TYPE: Readonly<Record<BuildUnitType, string>> = {
-  naval: 'Naval',
-  air: 'Air',
-  armor: 'Armored',
-  infantry: 'Infantry',
-  missile: 'Missile',
-};
+import { LOSS_TYPE_NAME_LIST_MAX, UNIT_GROUP_LABEL_BY_TYPE } from './lossSummary';
 
 /**
  * The order collapsed types follow on the battle sentence.
@@ -71,7 +55,7 @@ export function formatDestroyedInBattleLine(
   }
   const groups = GROUP_ORDER
     .filter((unitType) => grouped.has(unitType))
-    .map((unitType) => `${counts.get(unitType) ?? 0} ${GROUP_LABEL_BY_TYPE[unitType]}`);
+    .map((unitType) => `${counts.get(unitType) ?? 0} ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
   return `${[...named, ...groups].join(', ')} destroyed in battle.`;
 }
 

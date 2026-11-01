@@ -335,6 +335,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         turnLimit: seatsStart.turnLimit,
         victoryRule: seatsStart.victoryRule,
         aiOnlyBattles: seatsStart.aiOnlyBattles,
+        sightCues: seatsStart.sightCues,
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;

@@ -10,10 +10,14 @@ import { formatTopBarDateBlock } from '../../shared/topBarDateBlock';
 import { buildTopBarSideChips, type TopBarSideChip, type TopBarSidesBlock } from '../../shared/topBarSides';
 import { formatCreditsTooltip } from '../../shared/mercenaryRules';
 import { computeTopBarStats, formatForcesBreakdown, formatTopBarStatParts } from '../../shared/topBarStats';
+import { unitCostFor } from '../../shared/gameRules';
+import { countSideUnitsByType, formatSideUnitCountsText } from '../../shared/sideUnitCounts';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
 import { renderBattleHeader } from './battleHeader';
+import { dismissStaleControlTooltip, setRichControlTooltip } from './controlTooltip';
 import { forcesStatTooltipText } from './frameTooltipText';
+import { buildSideUnitCountsTooltip } from './sideUnitCountsTooltip';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -83,13 +87,14 @@ function renderTopBarSides(state: GameStateSnapshot | null): void {
   const host = document.getElementById('topbar-sides');
   if (!host) return;
   host.replaceChildren();
+  dismissStaleControlTooltip();
   if (!state?.seats?.length) {
     host.append(sideName('topbar-human-side', '—'), vsLabel(), sideName('topbar-second-side', '—'));
     return;
   }
   const resolved = viewerSeatId(state);
   const viewer = resolved === undefined ? HUMAN_SEAT_ID : resolved;
-  paintSides(host, buildTopBarSideChips(state.seats, commanderPoolStatuses(), viewer));
+  paintSides(host, buildTopBarSideChips(state.seats, commanderPoolStatuses(), viewer), state);
 }
 
 /**
@@ -98,14 +103,15 @@ function renderTopBarSides(state: GameStateSnapshot | null): void {
  * Purpose: The layout differs for a human seat and for Observe.
  * When to use: `renderTopBarSides` once a roster exists.
  * Expected outcome: The human name keeps `#topbar-human-side`. The first other chip keeps `#topbar-second-side`.
+ *   A chip that shows unit counts counts the units in `state`.
  * Exceptions: None.
  */
-function paintSides(host: HTMLElement, block: TopBarSidesBlock): void {
+function paintSides(host: HTMLElement, block: TopBarSidesBlock, state: GameStateSnapshot): void {
   if (block.observing) host.append(observingLabel());
-  if (block.lead) host.append(chipElement(block.lead, 'topbar-human-side'));
+  if (block.lead) host.append(chipElement(block.lead, 'topbar-human-side', state));
   if (!block.observing) host.append(vsLabel());
   block.chips.forEach((chip, index) => {
-    host.append(chipElement(chip, chipNameId(block.observing, index)));
+    host.append(chipElement(chip, chipNameId(block.observing, index), state));
   });
 }
 
@@ -176,16 +182,19 @@ function observingLabel(): HTMLElement {
  * Purpose: The dot, the name, the knockout mark, and the status icon stay together.
  * When to use: The lead chip and each other chip.
  * Expected outcome: A knocked-out name is struck through and reads "out T{N}". Planning and ready add an icon.
+ *   When the chip shows unit counts, its name gets the unit-count tip.
  * Exceptions: None.
  */
-function chipElement(chip: TopBarSideChip, nameId: string | undefined): HTMLElement {
+function chipElement(chip: TopBarSideChip, nameId: string | undefined, state: GameStateSnapshot): HTMLElement {
   const row = document.createElement('span');
   row.className = chip.outTurn === null ? 'topbar-side-chip' : 'topbar-side-chip is-out';
   const dot = document.createElement('span');
   dot.className = 'topbar-side-mark';
   dot.style.background = chip.dotColor;
   dot.setAttribute('aria-hidden', 'true');
-  row.append(dot, sideName(nameId, chip.label));
+  const name = sideName(nameId, chip.label);
+  if (chip.showsUnitCounts) attachUnitCountsTooltip(row, chip.seatId, state);
+  row.append(dot, name);
   if (chip.outTurn !== null) {
     const out = document.createElement('span');
     out.className = 'topbar-side-out';
@@ -195,6 +204,21 @@ function chipElement(chip: TopBarSideChip, nameId: string | undefined): HTMLElem
   const icon = statusIcon(chip);
   if (icon) row.append(icon);
   return row;
+}
+
+/**
+ * Gives a side's chip the unit-count tip.
+ *
+ * Purpose: The player sees that side's units by type, cheapest first, without opening a panel.
+ * When to use: The whole chip of a side whose `showsUnitCounts` is true, so the tip opens anywhere on that side's name.
+ * Expected outcome: Counts come from the units in this snapshot, so a fogged view counts only what it shows. Costs
+ *   come from the match's map (`unitCostFor`). The tip is built when it opens.
+ * Exceptions: None.
+ */
+function attachUnitCountsTooltip(chip: HTMLElement, seatId: string, state: GameStateSnapshot): void {
+  const counts = countSideUnitsByType(state.units, seatId, unitCostFor);
+  const seats = state.seats ?? [];
+  setRichControlTooltip(chip, formatSideUnitCountsText(counts), () => buildSideUnitCountsTooltip(counts, seatId, seats));
 }
 
 /**

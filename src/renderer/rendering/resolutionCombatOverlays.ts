@@ -1,3 +1,4 @@
+import { RESOLUTION_PULSE_RADIANS_PER_MS } from '../../shared/resolutionPlaybackTiming';
 import type { ResolutionMoveAnimationState } from '../core/state';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { drawResolutionDiceChips } from './combatDiceChipDrawing';
@@ -37,7 +38,7 @@ export function drawResolutionCombatAndCasualtyOverlays(
         ? meleeCombatHexes
         : undefined;
   if (combatHexes?.length) {
-    const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
+    const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * RESOLUTION_PULSE_RADIANS_PER_MS);
     const unknownSet = new Set(anim.unknownCombatHexes ?? []);
     const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
     const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
@@ -57,7 +58,7 @@ export function drawResolutionCombatAndCasualtyOverlays(
       : phase.inRangedCasualty
         ? elapsed - phase.rangedCasualtyStart
         : elapsed - phase.meleeCasualtyStart;
-    const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
+    const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * RESOLUTION_PULSE_RADIANS_PER_MS);
     const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
     const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
     const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));

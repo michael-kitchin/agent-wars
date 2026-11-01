@@ -20,6 +20,7 @@ Drawn on the map surface whenever their condition is true, in Strategic planning
 - Every movement, ranged, air-strike, and missile line above, queued, previewed, or played back, is drawn over a pale casing that keeps it readable on any terrain. Movement uses the moving seat's map color (teal, rose, orange, or blue by seat order, from `SEAT_PALETTES`), or Neutral's near-black. A queued, hover, or played-back ranged arrow, air-strike arrow, and missile launch share the missile crimson (`RANGE_PERIMETER_MISSILE_COLOR`, `#B91C1C`, the same as `--order-missile`) at `MOVEMENT_HOVER_VALID_ALPHA` (0.55). The ranged arrow is solid, the air-strike arrow is dashed, and the launch is dotted. A shot line played back during the ranged window uses that same stroke: solid for ground fire, dashed for an air unit's return fire. An air unit's flight to the target uses the dashed air-strike arrow (`drawResolutionOutboundAttackLines` in `src/renderer/rendering/orderDrawing.ts`). Its flight home stays a movement line in the moving seat's map color (`drawResolutionMoveLines` in `src/renderer/rendering/pathDrawing.ts`). A missile launch played back uses the dotted crimson arrow. A missile line, queued, hovered, or played back, is one continuous arrow (`straightOrderLineShape` with `continuous`), so a target more than half a world away is not dropped by the wrap test. The range perimeter stays an outline and is not one of these lines. A route that has an arrowhead ends with that arrowhead on the destination hex's center. A straight movement line with no route, and every ranged and air-strike line, including the playback shot lines, end in the same arrowhead, its tip a unit radius short of the target's center. A queued march stays, arrowhead included, through the movement animation (`ordersHeldUntilMovementEnds` in `src/shared/ordersHeldForPlayback.ts`). It is not drawn once that animation has finished and the unit is on its destination, so no arrowhead is left on that token. A line whose ends are the same point draws no arrowhead. A move played back for the player has no arrowhead, except an air strike's flight, and that line runs to the destination's center. See `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
 - City, transport, and infrastructure marks on hexes that have them, when that overlay is enabled for the current zoom. A city mark is a place at or below the map's city-label ceiling: scalerank 6 on the global map, 7 when the tactical resolution is 5, and 8 when it is 6. The lowest scalerank in the cell is labeled, and places that share that rank are joined with " / ".
 - Combat marks during Resolution playback: the hexes where combat and casualties are being shown.
+- Sight-cue lines during the opening stage of a watched strategic turn, when the match has them and fog of war is on. Each line is solid, in the spotter's map color, and fades from the spotter toward the spotted hex. It has no arrowhead and no dash, because movement lines, attack lines, and home borders already use every dash pattern. A new contact, a spotted hex that holds a unit that seat had not seen at the previous planning, also draws an expanding ring on that hex, above the unit token. Both use the order-line casing scaled by the line's opacity, and they fade with the stage. They are not drawn in a battle, while a human seat is playing, when fog is off, or at the zoom that hides strategic units.
 - Dice chips during Resolution playback: the dice each stack rolled in the phase being shown, drawn above every other playback overlay. See [resolution-playback.md](resolution-playback.md).
 
 Empty means the overlay is not drawn. Overlays do not show a placeholder.
@@ -38,7 +39,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
 - When targeting turns off, or the selection can no longer support a perimeter, the range perimeter stops.
 - When the hover preview is cleared, its line stops. See [order-lifecycle.md](order-lifecycle.md).
-- When playback ends, combat marks, dice chips, and playback shot lines stop.
+- When playback ends, combat marks, dice chips, playback shot lines, and sight-cue lines stop.
 
 ## States
 
@@ -49,7 +50,8 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
 - Overlays never accept clicks of their own.
 - A range perimeter is never shown while targeting is off.
-- Playback combat marks and dice chips are never shown after playback ends.
+- Playback combat marks, dice chips, and sight-cue lines are never shown after playback ends.
+- Sight-cue lines never appear in a battle, while a human seat is playing, or when fog of war is off.
 
 ## Strategic and Tactical Differences
 
@@ -92,5 +94,6 @@ None.
 - `src/renderer/rendering/terrainInfrastructureOverlay.ts`
 - `src/renderer/rendering/infrastructureOverlayState.ts`
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
+- `src/renderer/rendering/sightCueDrawing.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/renderer/tactical/tacticalDraftMarchOverlay.ts`

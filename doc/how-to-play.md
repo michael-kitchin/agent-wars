@@ -63,13 +63,14 @@ While you watch, these controls change what you see and when turns start:
 | --- | --- |
 | Look through one side's fog | Pick that side from View as, in the top bar. |
 | See every side again, with no fog | Pick "All sides, no fog" from View as. |
+| See how many units of each type a commander has | Rest the pointer on that side's name in the top bar. |
 | Start each turn yourself | Clear "Start the next turn when every commander is ready", above Ready. |
 
 A match you start with Observe only works the same way, except that the checkbox starts cleared (so the next turn waits until you check it, or click Ready yourself).
 
 ## Starting a Game
 
-The setup screen lists two to four sides, and each side needs its own home. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another). Game Options also has AI-Only Battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map.
+The setup screen lists two to four sides, and each side needs its own home. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another). Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
 
 *New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: Eastern Asia vs Southern Africa). The buttons to the right of the lists pick random choices.*
 
@@ -132,7 +133,8 @@ Save game… and Load game… are in the game menu, under the button at the top 
 4. **Selection panel:** The panel at the map's bottom-left opens as a bar that names the hex and the selection, with a hint for what a double-click does next. Its **×** clears the selection. Click the chevron at the bar's left edge to show or hide the hex's terrain and each selected unit's orders. While they show, drag the panel's corner grip to resize it. The panel keeps its state and size until you close the app.
 5. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
 6. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. With a selection of only missiles, outside a battle, it aims a launch. When the selection can't fire, the reticle is greyed out, and pointing at it says why. See [Ranged Attacks and Air Strikes](#ranged-attacks-and-air-strikes) and [Ballistic Missiles](#ballistic-missiles).
-7. **Ready:** Each unit can have one movement order and one ranged order. Click **Ready** to submit them all and resolve the turn. If that ends the match, the result screen opens, and you can start the next match from there (see [Winning and Losing](#winning-and-losing)).
+7. **Unit counts:** Rest the pointer on your side's name in the top bar to see how many units of each type you have, and the total.
+8. **Ready:** Each unit can have one movement order and one ranged order. Click **Ready** to submit them all and resolve the turn. If that ends the match, the result screen opens, and you can start the next match from there (see [Winning and Losing](#winning-and-losing)).
 
 The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).
 
@@ -153,6 +155,7 @@ Every side gives orders for the same turn, and the engine resolves them together
 - You can plan your turn while the commanders plan theirs. Moving, aiming, and building all work while they think. Only Ready waits for their plans.
 - Strikes and ranged fire use positions from before anyone moves, so they land where you aimed.
 - Melee happens wherever enemy units share a hex after movement.
+- Enemy units ordered into each other's hexes don't slip past each other. A roll picks one of the two hexes. The units there stay put, the units heading in arrive, and they fight in melee. Battles work the same way.
 - Each unit rolls one d20 and hits on a roll at or under its hit number. A roll of 18 to 20 always misses.
 - A hit removes one unit. Units don't take partial damage. In a fortified hex, a hit that would remove one of the controller's units removes one [fortification](#fortifications) instead, until none remain. The hex does not change hands while any fortification is left.
 - A side that's hit loses its lowest-defense units first, then infantry, armor, naval, and air, in that order. A missile is hit last, and a missile never rolls.

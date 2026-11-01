@@ -22,6 +22,17 @@ const controlTooltipAttr = 'data-control-tooltip';
 const controlTooltipElementId = 'control-tooltip';
 
 /**
+ * Builders for hosts whose tip is more than one plain sentence.
+ *
+ * Purpose: A tip with icons or bold text keeps the same dwell, placement, and hiding rules as every other tip.
+ * When to use: Filled by `setRichControlTooltip`, read by `showTip`.
+ * Expected outcome: A host with a builder shows the built content. A host without one shows its sentence. A removed
+ *   host's entry is released with the host.
+ * Exceptions: None.
+ */
+const richContentByHost = new WeakMap<HTMLElement, () => Node>();
+
+/**
  * State for the one shared tip.
  *
  * Purpose: Keeps a single dwell, host, and dropdown suppression so moving inside a control does not restart the wait.
@@ -189,6 +200,7 @@ function placeTip(el: HTMLElement, x: number, y: number): void {
  * Purpose: Matches the hex-tooltip offset and chrome.
  * When to use: After the dwell, when the host is still current and no order tip is showing.
  * Expected outcome: The tip is visible, placed by `placeTip`. The hex tooltip is cleared so it does not sit underneath.
+ *   A host registered with `setRichControlTooltip` shows its built content instead of the sentence.
  * Exceptions: A missing tip element returns without throwing. An order tip that is already visible is left in place.
  */
 function showTip(host: HTMLElement, text: string): void {
@@ -203,7 +215,9 @@ function showTip(host: HTMLElement, text: string): void {
     x = rect.left;
     y = rect.top;
   }
-  el.textContent = text;
+  const build = richContentByHost.get(host);
+  if (build) el.replaceChildren(build());
+  else el.textContent = text;
   el.classList.remove('hidden');
   placeTip(el, x, y);
   el.setAttribute('aria-hidden', 'false');
@@ -361,6 +375,20 @@ function hostIsAvailable(host: HTMLElement): boolean {
     : Array.from(host.querySelectorAll('button, input, select, textarea'));
   if (controls.length === 0) return true;
   return controls.some((control) => control.getClientRects().length > 0);
+}
+
+/**
+ * Gives a host a tip built from page elements, with a plain sentence beside it.
+ *
+ * Purpose: Some tips need icons or bold text. They keep the shared dwell, placement, and hiding.
+ * When to use: Each time the host is created or its content changes. Call again to replace the builder.
+ * Expected outcome: `text` becomes the host's `data-control-tooltip`, so an empty sentence still shows nothing. When
+ *   the tip opens, `build` runs and its result fills the tip.
+ * Exceptions: Whatever `build` throws, when the tip opens.
+ */
+export function setRichControlTooltip(host: HTMLElement, text: string, build: () => Node): void {
+  host.setAttribute(controlTooltipAttr, text);
+  richContentByHost.set(host, build);
 }
 
 /**

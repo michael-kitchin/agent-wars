@@ -8,6 +8,7 @@
  */
 
 import { AI_ONLY_BATTLE_MODES, DEFAULT_AI_ONLY_BATTLES, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
+import { DEFAULT_SIGHT_CUES } from '../../shared/sightCueSettings';
 import {
   DEFAULT_TURN_LIMIT,
   DEFAULT_VICTORY_RULE,
@@ -105,6 +106,19 @@ export function readNewGameAiOnlyBattles(): AiOnlyBattleMode {
 }
 
 /**
+ * Whether Start should store Sight cues on.
+ *
+ * Purpose: The checkbox is the only place the player sets this. A missing control still starts on.
+ * When to use: `readNewGameSeatsStart`.
+ * Expected outcome: The checkbox's `checked` value, or `DEFAULT_SIGHT_CUES` when the control is missing.
+ * Exceptions: None.
+ */
+export function readNewGameSightCues(): boolean {
+  const box = document.getElementById('new-game-sight-cues-checkbox');
+  return box instanceof HTMLInputElement ? box.checked : DEFAULT_SIGHT_CUES;
+}
+
+/**
  * The rule and limit Start should send.
  *
  * Purpose: Deathmatch still sends the remembered number. The main process ignores it.
@@ -128,7 +142,7 @@ export function readNewGameVictory(): { readonly victoryRule: VictoryRule; reado
  *
  * Purpose: Opening the overlay starts from the default rule.
  * When to use: `refreshNewGameSides({ reset: true })` only.
- * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, and AI-Only Battles is Balanced.
+ * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, AI-only battles is Balanced, and Sight cues is checked.
  * Exceptions: None.
  */
 export function resetNewGameVictory(): void {
@@ -137,6 +151,8 @@ export function resetNewGameVictory(): void {
   if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
   const aiOnly = document.getElementById('new-game-ai-only-battles-select');
   if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
+  const sightCues = document.getElementById('new-game-sight-cues-checkbox');
+  if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
   renderNewGameVictory();
 }
 

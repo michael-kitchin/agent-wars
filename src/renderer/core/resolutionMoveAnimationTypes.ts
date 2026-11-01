@@ -7,6 +7,7 @@ import type {
   GameStateSnapshot,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
+import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
 import type { OrdersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import type { ResolutionMove, ResolutionPlaybackMove } from './types';
@@ -34,6 +35,15 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
    * Exceptions: None.
    */
   moves: ResolutionMove[];
+  /**
+   * Beams for the opening sight-cue stage.
+   *
+   * Contract: Already filtered for the viewer when Ready returned. Absent on tactical playback and on turns with no sightings.
+   * When to use: The strategic frame while `inSightCues` is true.
+   * Expected outcome: One beam per spotter hex and target hex the viewer should see.
+   * Exceptions: None.
+   */
+  sightCues?: SightCueBeam[];
   /**
    * Air strike flights from each striker's base to its target.
    *

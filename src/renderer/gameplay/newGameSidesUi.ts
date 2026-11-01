@@ -29,7 +29,7 @@ import {
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
-import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
+import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameSightCues, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
 import { regionalHomeOptions, selectedNewGameTab, setNewGameHomesChangedListener } from './newGameMapUi';
@@ -251,6 +251,7 @@ export function readNewGameSeatsStart(): {
   readonly turnLimit: number;
   readonly victoryRule: ReturnType<typeof readNewGameVictory>['victoryRule'];
   readonly aiOnlyBattles: ReturnType<typeof readNewGameAiOnlyBattles>;
+  readonly sightCues: ReturnType<typeof readNewGameSightCues>;
   readonly blocked: string | null;
 } {
   const blocked = startBlockedReason(sidesState);
@@ -260,6 +261,7 @@ export function readNewGameSeatsStart(): {
     turnLimit: victory.turnLimit,
     victoryRule: victory.victoryRule,
     aiOnlyBattles: readNewGameAiOnlyBattles(),
+    sightCues: readNewGameSightCues(),
     blocked,
   };
 }

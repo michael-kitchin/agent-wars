@@ -2,6 +2,7 @@ import {
   getResolutionPlaybackPhase,
   type ResolutionPlaybackPhase,
 } from '../../shared/resolutionPlaybackPhase';
+import { RESOLUTION_STAGE_MS, SIGHT_CUE_STAGE_MS } from '../../shared/resolutionPlaybackTiming';
 
 /**
  * Re-exports the playback timeline snapshot so existing renderer imports keep their path.
@@ -14,23 +15,24 @@ import {
 export type { ResolutionPlaybackPhase };
 
 /**
- * Documents the module-scope binding `RESOLUTION_FADE_MS` (RESOLUTION_FADE_MS).
-
- * Purpose: Supports maintainability by documenting why `RESOLUTION_FADE_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Length of one fade stage, in milliseconds.
+ *
+ * Purpose: Air-strike legs and movement each last this long when that stage exists.
+ * When to use: Pass as `fadeMs` to `getResolutionPlaybackPhase`.
+ * Expected outcome: Equal to `RESOLUTION_STAGE_MS`.
  * Exceptions: None.
  */
-export const RESOLUTION_FADE_MS = 1000;
+export const RESOLUTION_FADE_MS = RESOLUTION_STAGE_MS;
+
 /**
- * Documents the module-scope binding `LIGHTNING_DURATION_MS` (LIGHTNING_DURATION_MS).
-
- * Purpose: Supports maintainability by documenting why `LIGHTNING_DURATION_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Length of one lightning stage, in milliseconds.
+ *
+ * Purpose: Combat and casualty stages each last this long when that stage exists.
+ * When to use: Pass as `lightningMs` to `getResolutionPlaybackPhase`.
+ * Expected outcome: Equal to `RESOLUTION_STAGE_MS`.
  * Exceptions: None.
  */
-export const LIGHTNING_DURATION_MS = 1000;
+export const LIGHTNING_DURATION_MS = RESOLUTION_STAGE_MS;
 
 
 /**
@@ -123,6 +125,15 @@ casualtyHexes?: unknown[];
    * Exceptions: None.
    */
   moves?: unknown[];
+  /**
+   * Beams for the opening stage.
+   *
+   * Contract: A non-empty list gives the sight-cue stage its duration.
+   * When to use: Strategic playback that has sight lines.
+   * Expected outcome: Missing or empty skips the stage.
+   * Exceptions: None.
+   */
+  sightCues?: unknown[];
     /**
    * Specifies the contract for the `meleeCombatHexes` member (meleeCombatHexes?: unknown[];).
 
@@ -233,6 +244,15 @@ hasMeleeCombat: boolean;
    * Exceptions: None.
    */
 hasMeleeCasualties: boolean;
+  /**
+   * Whether this frame's animation has sight lines.
+   *
+   * Contract: True only when `sightCues` is non-empty.
+   * When to use: Callers that need the stage flag without reading the phase.
+   * Expected outcome: Matches the timeline's sight-cue duration.
+   * Exceptions: None.
+   */
+  hasSightCues: boolean;
     /**
    * Specifies the contract for the `phase` member (phase: ResolutionPlaybackPhase;).
 
@@ -281,6 +301,7 @@ export function buildResolutionPlaybackState(
   const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
   const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
   const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+  const hasSightCues = (anim.sightCues?.length ?? 0) > 0;
   return {
     hasAirStrikeOutbound,
     hasAirStrikeCombat,
@@ -290,10 +311,13 @@ export function buildResolutionPlaybackState(
     hasRangedCasualties,
     hasMeleeCombat,
     hasMeleeCasualties,
+    hasSightCues,
     phase: getResolutionPlaybackPhase({
       elapsed,
       fadeMs: RESOLUTION_FADE_MS,
       lightningMs: LIGHTNING_DURATION_MS,
+      hasSightCues,
+      sightCueMs: SIGHT_CUE_STAGE_MS,
       hasAirStrikeOutbound,
       hasAirStrikeCombat,
       hasAirStrikeCasualties,

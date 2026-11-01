@@ -16,6 +16,7 @@ export * from './meleeInterceptTypes';
 export * from './deferredPlaybackConsultAbandoned';
 export * from './humanOrderPreviewTypes';
 export * from './sealiftTypes';
+export * from './sightCueTypes';
 export * from './gameApiTypes';
 export type { GameMapListEntry } from '../gameMapList';
 export type { NewGameMapPreview, NewGameMapPreviewRequest } from '../newGameMapPreviewTypes';

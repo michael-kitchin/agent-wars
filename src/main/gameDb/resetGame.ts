@@ -14,6 +14,7 @@ import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolutio
 import { createSeededRng } from '../seededRng';
 import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
 import { aiOnlyBattlesForRequest, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
+import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY, sightCuesForRequest } from '../../shared/sightCueSettings';
 import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import {
@@ -194,11 +195,20 @@ export interface ResetGameForNewMatchOptions {
    * Requested AI-only battle choice.
    *
    * Contract: Omitted or unknown stores Balanced. A known mode is stored as itself.
-   * When to use: The new-game dialog's AI-Only Battles control, only when Start succeeds.
+   * When to use: The new-game dialog's AI-only battles control, only when Start succeeds.
    * Expected outcome: Stored as `ai_only_battles`.
    * Exceptions: None.
    */
   readonly aiOnlyBattles?: AiOnlyBattleMode;
+  /**
+   * Whether observed playback opens with sight lines.
+   *
+   * Contract: Omitted or not a boolean stores on. Stored as `sight_cues`. Changing the box does not rewrite a match that is already running.
+   * When to use: The new-game dialog's Sight cues checkbox, only when Start succeeds.
+   * Expected outcome: Persisted as `sight_cues` (`'1'` or `'0'`).
+   * Exceptions: None.
+   */
+  readonly sightCues?: boolean;
   /**
    * Match seed to store instead of a random one.
    *
@@ -401,12 +411,14 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   });
   clearAttackMixOnNewGame();
   const aiOnlyBattles = aiOnlyBattlesForRequest(options?.aiOnlyBattles);
+  const sightCues = sightCuesForRequest(options?.sightCues);
   logDebug('gameDb resetGameForNewMatch', {
     fogOfWarEnabled,
     gameSize,
     ...originBonusSettings,
     gameMapId: options?.gameMapId ?? null,
     aiOnlyBattles,
+    sightCues,
   });
   if (!deps.hasDb()) return;
   const mapId = requireGameMapId(options?.gameMapId);
@@ -439,6 +451,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['turn_limit', String(victory.turnLimit)]);
   }
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['ai_only_battles', aiOnlyBattles]);
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [SIGHT_CUES_CONFIG_KEY, sightCues ? '1' : '0']);
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
   persistRegionVsRegionScenarioId({ run });
@@ -471,6 +484,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM ai_loss_events_since_consultation');
   run("DELETE FROM game_config WHERE key LIKE 'ai_last_consultation_turn_%'");
   run("DELETE FROM game_config WHERE key LIKE 'fog_new_contacts_%'");
+  run('DELETE FROM game_config WHERE key = ?', [SIGHT_CUE_SEEN_UNITS_CONFIG_KEY]);
   run("DELETE FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');

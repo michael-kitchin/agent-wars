@@ -6,6 +6,7 @@
  * Expected outcome: Plain data; no DOM, canvas, or logging.
  * Exceptions: None.
  */
+import { RESOLUTION_STAGE_MS } from './resolutionPlaybackTiming';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
 import type { CombatDicePlaybackFields, CombatDiceRoll, CombatDiceRollKind } from './ipc/combatDiceTypes';
 import type { ResolutionPlaybackPhase } from './resolutionPlaybackPhase';
@@ -35,20 +36,20 @@ export const COMBAT_DICE_ROW_MAX_FACES = 3;
  *
  * Purpose: Chips appear smoothly with the lightning beat instead of popping in.
  * When to use: `combatDiceChipOpacity`.
- * Expected outcome: Opacity ramps from 0 to 1 over this many milliseconds.
+ * Expected outcome: Opacity ramps from 0 to 1 over this many milliseconds. The length scales with `RESOLUTION_STAGE_MS`.
  * Exceptions: None.
  */
-export const COMBAT_DICE_FADE_IN_MS = 150;
+export const COMBAT_DICE_FADE_IN_MS = (RESOLUTION_STAGE_MS * 3) / 20;
 
 /**
  * Fade-out time at the end of a phase's chip window.
  *
  * Purpose: Chips leave smoothly instead of popping out.
  * When to use: `combatDiceChipOpacity`.
- * Expected outcome: Opacity ramps from 1 to 0 over the last this many milliseconds.
+ * Expected outcome: Opacity ramps from 1 to 0 over the last this many milliseconds. The length scales with `RESOLUTION_STAGE_MS`.
  * Exceptions: None.
  */
-export const COMBAT_DICE_FADE_OUT_MS = 250;
+export const COMBAT_DICE_FADE_OUT_MS = RESOLUTION_STAGE_MS / 4;
 
 /**
  * How many times longer a chip stays up than the combat beat it belongs to.

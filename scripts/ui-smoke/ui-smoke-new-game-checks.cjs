@@ -477,7 +477,7 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-options-popover',
     scenes: [SCENES.newGameOptions],
-    needs: ['#new-game-options-popover', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-options-popover', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
     run: (p, el) => {
       if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
       const victory = el('#new-game-victory-select');
@@ -493,6 +493,13 @@ const NEW_GAME_CHECKS = Object.freeze([
       }
       if (victory.w < 80 || turnLimit.w < 80 || aiOnly.w < 80) {
         return `a Victory select is under 80 px: Rule ${Math.round(victory.w)}, Turn limit ${Math.round(turnLimit.w)}, AI-Only ${Math.round(aiOnly.w)}`;
+      }
+      const sightCues = el('#new-game-sight-cues-checkbox');
+      if (Math.abs((sightCues.y + sightCues.h / 2) - (aiOnly.y + aiOnly.h / 2)) > 4) {
+        return `Sight cues is at ${fmt(sightCues)}, expected on the AI-Only row ${fmt(aiOnly)}`;
+      }
+      if (sightCues.x < aiOnly.x + aiOnly.w) {
+        return `Sight cues is at ${fmt(sightCues)}, expected to the right of the AI-Only select ${fmt(aiOnly)}`;
       }
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
       if (!(victory.y < origin.y)) return 'Victory is not above the bonuses';

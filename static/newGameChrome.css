@@ -457,9 +457,9 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   color: var(--chrome-muted);
   border: 1px dashed var(--chrome-border);
 }
-/* One grid of label and dropdown pairs: Rule and Turn limit, then AI-Only Battles in the left half. Each label
-   column is as wide as its longest label and the two dropdown columns share what is left, so Rule, Turn limit, and
-   AI-Only Battles are one width and fill the row. */
+/* One grid of label and dropdown pairs: Rule and Turn limit, then AI-only battles in the left half.
+   Sight cues fills the right half of the AI-only battles row. Each label column is as wide as its longest label and the
+   two dropdown columns share what is left, so Rule, Turn limit, and AI-only battles are one width and fill the row. */
 .new-game-victory {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
@@ -477,6 +477,18 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+/* Sight cues fills the right half of the AI-only battles row, set apart like Turn limit.
+   The shared check rule adds a bottom margin that lifts this label above the other labels. */
+.new-game-victory > .new-game-sight-cues {
+  grid-column: 3 / 5;
+  padding-left: 10px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+.new-game-victory > .new-game-sight-cues input {
+  margin: 0;
 }
 
 /* ---------- Forces ---------- */

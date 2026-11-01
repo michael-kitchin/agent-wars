@@ -18,9 +18,14 @@ export const LOSS_ENTRY_LIST_MAX = 5;
 export const LOSS_TYPE_NAME_LIST_MAX = 3;
 
 /**
- * Unit type labels for grouped loss totals.
+ * Plural-free labels for a count of one unit type, such as `6 Armored`.
+ *
+ * Purpose: Loss lines, the battle sentence, and the top-bar side tooltip spell a type the same way.
+ * When to use: After a count, wherever a line totals units by type.
+ * Expected outcome: Naval, Air, Armored, Infantry, and Missile.
+ * Exceptions: None.
  */
-const GROUP_LABEL_BY_TYPE: Record<LostUnitType, string> = {
+export const UNIT_GROUP_LABEL_BY_TYPE: Readonly<Record<LostUnitType, string>> = {
   naval: 'Naval',
   air: 'Air',
   armor: 'Armored',
@@ -253,7 +258,7 @@ export function formatLossEntries(units: readonly LostUnit[]): string {
   }
   for (const unitType of GROUP_ORDER) {
     const count = counts[unitType];
-    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
+    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
   }
   return parts.join(', ');
 }
@@ -291,7 +296,7 @@ function formatGroupedTypeTotals(units: readonly LostUnit[]): string {
   const parts: string[] = [];
   for (const t of GROUP_ORDER) {
     const n = counts[t];
-    if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
+    if (n > 0) parts.push(`${n.toLocaleString()} ${UNIT_GROUP_LABEL_BY_TYPE[t]}`);
   }
   return parts.join(', ');
 }

@@ -131,6 +131,8 @@ describe('combatDiceWindowForPhase', () => {
       hasMoves: false,
       hasMeleeCombat: true,
       hasMeleeCasualties: false,
+      hasSightCues: false,
+      sightCueMs: 0,
     });
     const air = combatDiceWindowForPhase(phase, 'airStrike');
     const airBeatMs = phase.airStrikeReturnStart - phase.airStrikeCombatStart;

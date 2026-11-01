@@ -9,7 +9,9 @@
 
 import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getSeatRoster, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
 import { readAiOnlyBattles } from '../gameDb/gameConfigKv';
+import { buildSightCuesForReady } from '../sightCues/sightCueReadyStage';
 import { buildAiOnlyBattleOffer } from './aiOnlyBattleOffer';
+import { withoutStrategicHeadOnHolderMoves } from './strategicHeadOnContact';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from '../combatResolution';
 import { logDebug, logError } from '../logger';
@@ -176,6 +178,8 @@ export function executeReadyStrategicTurn(
   dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
   const hexList = getOrderedHexList();
+  const planningUnits = listUnitsForSnapshot();
+  const sightCues = buildSightCuesForReady({ units: planningUnits, hexList });
   prepareNeutralTransportsForTurn(buildLatLngCoordinateMap(hexList));
   const unitsBeforeMove = listUnitsForSnapshot();
   const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map(toCombatUnit);
@@ -339,15 +343,23 @@ export function executeReadyStrategicTurn(
   const mergedHuman = new Map<string, string>();
   for (const o of generatedHuman.movementOrders) mergedHuman.set(o.unitId, o.toH3Index);
   for (const o of humanOrders) mergedHuman.set(o.unit_id, o.to_h3_index);
+  const humanMovementOrders = Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index }));
+  const unitsAtMovement = listUnitsForSnapshot();
+  const headOn = withoutStrategicHeadOnHolderMoves({
+    orders: listsInResolutionOrder(humanMovementOrders, ordersForOwners, (orders) => orders.movementOrders),
+    unitsAtMovement,
+    turnNumber,
+    gameSeed,
+  });
+  const allOrders = headOn.orders;
   const humanMoves = Array.from(mergedHuman.entries())
+    .filter(([unitId]) => !headOn.cancelledUnitIds.has(unitId))
     .map(([unitId, toH3Index]) => {
       const fromH3Index = unitsBeforeMove.find((u) => u.id === unitId)?.h3Index;
       if (!fromH3Index || fromH3Index === toH3Index) return null;
       return { unitId, fromH3Index, toH3Index };
     })
     .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null);
-  const humanMovementOrders = Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index }));
-  const allOrders = listsInResolutionOrder(humanMovementOrders, ordersForOwners, (orders) => orders.movementOrders);
   const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
   const movingNavalUnitIds = allOrders
     .filter((order) => unitsBeforeMove.find((unit) => unit.id === order.unitId)?.unitType === 'naval')
@@ -374,7 +386,7 @@ export function executeReadyStrategicTurn(
       });
     }
   }
-  const unitsBeforeMovementAfterCombat = listUnitsForSnapshot().map((u) => ({
+  const unitsBeforeMovementAfterCombat = unitsAtMovement.map((u) => ({
     id: u.id,
     player: u.player,
     h3Index: u.h3Index,
@@ -511,6 +523,7 @@ export function executeReadyStrategicTurn(
       rangedResult,
       airStrikeResult,
       missileLaunchResult,
+      sightCues,
       airStrikeTransportLosses,
       rangedTransportLosses,
       humanMoves: [...humanMoves],
@@ -549,6 +562,7 @@ export function executeReadyStrategicTurn(
     rangedResult,
     airStrikeResult,
     missileLaunchResult,
+    sightCues,
     airStrikeTransportLosses,
     rangedTransportLosses,
     combatUnitsAfter,

@@ -8,7 +8,7 @@ Show movement and combat that just resolved, including battles the player cannot
 
 ## Availability
 
-Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, or dice to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The strategic update for the turn that opened the battle is not shown then. It waits until the battle ends and the Ready that follows has returned, and that popup is the one left on the map. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
+Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, dice, or sight cues to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The strategic update for the turn that opened the battle is not shown then. It waits until the battle ends and the Ready that follows has returned, and that popup is the one left on the map. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
@@ -16,6 +16,7 @@ An AI-only beat plays back like a human beat: both commanders' marches, fire, ai
 
 The player sees the following stages, skipping any stage the resolution does not have:
 
+- Sight cues, on the world map while observing, when the match stored `sight_cues` and fog of war is on. One solid line per spotter hex and spotted hex, in the spotter's map color, fading toward the spotted hex. A spotted hex that holds a unit that seat had not seen by unit vision at the previous turn's planning also gets an expanding ring. The lines draw in over 0.3 s, hold for 0.9 s, and fade over 0.3 s (`SIGHT_CUE_DRAW_IN_MS`, `SIGHT_CUE_HOLD_MS`, `SIGHT_CUE_FADE_MS`). Reduced motion shows them still during the hold. View as All sides shows every seat's lines. Choosing a seat shows only that seat's lines, chosen once when Ready returns. Missiles draw none. The lines are not drawn at the zoom that hides strategic units, and the stage still takes its time.
 - Missile launches fly to the target on a continuous dotted crimson line, the same stroke as a queued launch, and do not return. The missile is already gone. Infrastructure and based air lost to the launch are part of that strike.
 - Air units move out on the dashed crimson air-strike arrow, then air combat, air casualties, then air units return on a movement line in that side's map color.
 - Ranged combat draws the solid crimson arrow for ground fire and the dashed crimson arrow for an air unit's return fire, then ranged casualties.
@@ -24,6 +25,8 @@ The player sees the following stages, skipping any stage the resolution does not
 - Melee combat, then melee casualties.
 
 The engine's resolution order is in the [combat rules](../combat-rules-v3.md). This list is the on-screen order.
+
+Each stage lasts 1.5 s (`RESOLUTION_STAGE_MS` in `src/shared/resolutionPlaybackTiming.ts`), on the world map and in battles.
 
 Dice chips show every die rolled in air combat, ranged combat, and melee combat. A phase's chips appear with its combat lightning and stay up for twice the time from that lightning through its casualties. They can still be up during later stages, and playback keeps running after the last stage until they fade. They are drawn above every other playback layer.
 
@@ -63,7 +66,8 @@ A map toast can summarize losses the player can see, and the hex changes from th
 
 ## Invariants
 
-- Playback never starts when the resolution has no movement, no combat, and no dice to show.
+- Playback never starts when the resolution has no movement, no combat, no dice, and no sight cues to show.
+- Sight cues never appear in a battle, while a human seat is playing, or when fog of war is off.
 - Starting a tactical battle never leaves a strategic playback running.
 - A map gesture during playback never queues, changes, or cancels an order, and never changes the unit selection except by right-click.
 - Unknown battles are never described as if the player could see the units.
@@ -71,13 +75,14 @@ A map toast can summarize losses the player can see, and the hex changes from th
 - Dice chips never take input. They do not change when the other stages play, and playback continues after those stages until the chips fade.
 - Build markers and tactical entry markers never cover dice chips.
 - Dice chips are not drawn on the strategic map while it is zoomed in far enough to hide strategic units.
-- A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays on the map through that stage's destruction mark and is not drawn again, including on the flight home. A unit removed by ranged fire, including return fire, stays through the ranged destruction mark and is not drawn from movement onward. A failed ferry does not glide. A melee victim stays through the melee destruction mark and is drawn moving only when the removal hex is the march destination. A removed icon is not drawn on an unknown casualty hex. A survivor on that hex stays. Dice chips can continue after the icon is gone.
+- A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays on the map through that stage's destruction mark and is not drawn again, including on the flight home. A unit removed by ranged fire, including return fire, stays through the ranged destruction mark and is not drawn from movement onward. A failed ferry does not glide. A unit whose move was cancelled because it would have traded hexes with another owner is not drawn moving. Strategic playback omits that order (`withoutStrategicHeadOnHolderMoves`). In a battle, the glide is omitted when the sub-unit is still on its start cell (`withoutTacticalHeadOnHolderMoves`, and the human march loop in `commitHumanTacticalDraftOrders`). A melee victim stays through the melee destruction mark and is drawn moving only when the removal hex is the march destination. A removed icon is not drawn on an unknown casualty hex. A survivor on that hex stays. Dice chips can continue after the icon is gone.
 
 ## Strategic and Tactical Differences
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
 | What plays | The strategic turn, on the world map | The battle beat, on the battle map |
+| Sight cues | Opening stage while observing, when the match has them and fog is on | None |
 | Top bar | The date block can already name the next planning turn | The battle header stays up. Its status line reads "Tactical resolution" and already names the next beat |
 | Dice chips | Under hexes in the player's vision before or after the turn only, and not at the zoom that hides strategic units | Under every battle cell that rolled, because battles have no fog |
 | Turn-update toast | Units and hexes outside vision are an unknown battle. A battle Ready opened holds this toast until the battle ends and the following Ready has returned | Every battle cell counts as visible, so battle losses and engagements are never an unknown battle |
@@ -102,6 +107,11 @@ None.
 ## Code Entry Points
 
 - `src/renderer/rendering/resolutionPlayback.ts`
+- `src/main/sightCues/sightCueReadyStage.ts`
+- `src/main/sightCues/sightCueBeams.ts`
+- `src/shared/sightCueDrawModel.ts`
+- `src/renderer/rendering/sightCueDrawing.ts`
+- `src/shared/resolutionPlaybackTiming.ts`
 - `src/shared/resolutionCasualtyDraw.ts`
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
@@ -112,6 +122,10 @@ None.
 - `src/main/combatDiceRecording.ts`
 - `src/main/fortificationCombat.ts` (`runSiegeRolls`)
 - `src/main/combatResolution.ts` (`runMeleePhase`)
+- `src/main/gameActions/strategicHeadOnContact.ts` (`withoutStrategicHeadOnHolderMoves`)
+- `src/main/tacticalBattle/tacticalHeadOnContact.ts` (`withoutTacticalHeadOnHolderMoves`)
+- `src/main/gameActions/humanTacticalDraftCommit.ts` (`commitHumanTacticalDraftOrders`)
+- `src/shared/headOnContact.ts` (`resolveHeadOnContacts`)
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/gameplay/observeChrome.ts` (`maybeObserveAutoAdvance`)
 - `src/renderer/gameplay/readyHandler.ts`

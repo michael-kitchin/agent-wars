@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { CombatResolutionResult } from '../combatResolution';
 import type { FerryAnimationMove, GameStateSnapshot, MeleeCandidateRow, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
 import type { LossFlagFacts } from '../../shared/lossFlagFacts';
 import type { FortificationLossTally } from '../fortificationCombat';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
@@ -112,6 +113,15 @@ airStrikeResult: AirStrikePhaseResult;
    * Exceptions: None.
    */
   missileLaunchResult: MissileLaunchPhaseResult;
+  /**
+   * Beams computed before the pause.
+   *
+   * Contract: Passed into finalize on resume. Absent when the turn has none.
+   * When to use: The resume path, so a paused turn still plays its opening stage.
+   * Expected outcome: The same beams the uninterrupted path would return.
+   * Exceptions: None.
+   */
+  sightCues?: SightCueBeam[];
     /**
    * Specifies the contract for the `airStrikeTransportLosses` member (airStrikeTransportLosses: CombatUnit[];).
 

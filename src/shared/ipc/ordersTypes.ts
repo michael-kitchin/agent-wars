@@ -526,11 +526,20 @@ victoryRule?: VictoryRule;
    * Requested AI-only battle choice.
    *
    * Contract: Omitted or unknown stores Balanced. One of balanced, unbalanced, random, or none otherwise.
-   * When to use: The new-game dialog's AI-Only Battles control.
+   * When to use: The new-game dialog's AI-only battles control.
    * Expected outcome: Stored as `ai_only_battles`. Changing the select does not rewrite a match that is already running.
    * Exceptions: None.
    */
 aiOnlyBattles?: AiOnlyBattleMode;
+    /**
+   * Whether observed playback opens with sight lines.
+   *
+   * Contract: Omitted or not a boolean stores on. Stored as `sight_cues`. Changing the box does not rewrite a match that is already running.
+   * When to use: The new-game dialog's Sight cues checkbox, only when Start succeeds.
+   * Expected outcome: `true` or `false` on the start payload.
+   * Exceptions: None.
+   */
+sightCues?: boolean;
     /**
    * One entry per side, in row order.
    *

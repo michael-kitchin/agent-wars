@@ -347,6 +347,7 @@ function registerIpcHandlers(): void {
       turnLimit: payload?.turnLimit ?? null,
       victoryRule: payload?.victoryRule ?? null,
       aiOnlyBattles: payload?.aiOnlyBattles ?? null,
+      sightCues: payload?.sightCues ?? null,
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
@@ -361,6 +362,7 @@ function registerIpcHandlers(): void {
       turnLimit: payload?.turnLimit,
       victoryRule: payload?.victoryRule,
       aiOnlyBattles: payload?.aiOnlyBattles,
+      sightCues: payload?.sightCues,
     });
     forgetAutoSaveTurnKey();
     storeNewMatchCommanderKeys(payload?.seats, loadKey());

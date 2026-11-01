@@ -78,6 +78,15 @@ export const aiOnlyBattlesSelectTooltipText =
   'Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.';
 
 /**
+ * Purpose: Says observed playback opens with lines from each AI commander to the units it could see.
+ * When to use: `#new-game-sight-cues-checkbox`. The same sentence is the `data-control-tooltip` on that checkbox in `static/index.html`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const sightCuesCheckboxTooltipText =
+  'Leave this checked to start each turn\'s playback with lines from each AI commander\'s units to the units they could see when they planned. This applies only while you are observing.';
+
+/**
  * Purpose: Says a global turn is a month, a regional turn is a week, and a battle stays on the current date.
  * When to use: `#new-game-start-month`.
  * Expected outcome: The control tip shows this sentence.

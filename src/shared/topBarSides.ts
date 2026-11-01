@@ -9,7 +9,7 @@
 
 import type { CommanderStatus } from './commanderStatus';
 import { SEAT_PALETTES } from './seatPalette';
-import { shortSideName, type SeatKind } from './seatRoster';
+import { AI_SEAT_KIND, shortSideName, type SeatKind } from './seatRoster';
 
 const READY_CHECK_COLOR = '#86EFAC';
 
@@ -161,6 +161,16 @@ export interface TopBarSideChip {
    * Exceptions: None.
    */
   readonly outTurn: number | null;
+  /**
+   * Whether the name shows that side's unit counts on hover.
+   *
+   * Contract: True for the viewer's own chip, and for every AI chip while observing. False for an opponent of a
+   *   human who is still playing, and for the human seat's chip while observing.
+   * When to use: Deciding whether the name gets the unit-count tooltip.
+   * Expected outcome: A knocked-out AI chip is still true while observing.
+   * Exceptions: None.
+   */
+  readonly showsUnitCounts: boolean;
 }
 
 /**
@@ -206,7 +216,8 @@ export interface TopBarSidesBlock {
  *
  * Purpose: Tests can cover names, icons, and knockout text without a DOM.
  * When to use: Each top-bar refresh. Pass null for `viewerSeatId` while observing.
- * Expected outcome: Planning and ready draw an icon. A knocked-out seat is marked out and has no icon.
+ * Expected outcome: Planning and ready draw an icon. A knocked-out seat is marked out and has no icon. The viewer's
+ *   chip shows unit counts. While observing, every AI chip does.
  * Exceptions: None.
  */
 export function buildTopBarSideChips(
@@ -215,11 +226,15 @@ export function buildTopBarSideChips(
   viewerSeatId: string | null
 ): TopBarSidesBlock {
   const ordered = [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
-  const chips = ordered.map((seat) => chipFor(seat, statuses));
-  if (viewerSeatId === null) return { observing: true, lead: null, chips };
-  const lead = chips.find((chip) => chip.seatId === viewerSeatId) ?? null;
-  if (!lead) return { observing: true, lead: null, chips };
-  return { observing: false, lead: { ...lead, label: fullName(ordered, lead.seatId) }, chips: chips.filter((chip) => chip.seatId !== viewerSeatId) };
+  const viewer = viewerSeatId === null ? undefined : ordered.find((seat) => seat.seatId === viewerSeatId);
+  if (!viewer) {
+    return { observing: true, lead: null, chips: ordered.map((seat) => chipFor(seat, statuses, seat.kind === AI_SEAT_KIND)) };
+  }
+  return {
+    observing: false,
+    lead: { ...chipFor(viewer, statuses, true), label: viewer.homeRegion },
+    chips: ordered.filter((seat) => seat !== viewer).map((seat) => chipFor(seat, statuses, false)),
+  };
 }
 
 /**
@@ -227,10 +242,11 @@ export function buildTopBarSideChips(
  *
  * Purpose: Icon rules stay in one place.
  * When to use: `buildTopBarSideChips`.
- * Expected outcome: A short name, a seat color, and an icon only for planning or ready.
+ * Expected outcome: A short name, a seat color, and an icon only for planning or ready. `showsUnitCounts` is passed
+ *   through, because only `buildTopBarSideChips` knows whether the match is observed.
  * Exceptions: None.
  */
-function chipFor(seat: TopBarSideSeat, statuses: readonly TopBarCommanderStatus[]): TopBarSideChip {
+function chipFor(seat: TopBarSideSeat, statuses: readonly TopBarCommanderStatus[], showsUnitCounts: boolean): TopBarSideChip {
   const palette = SEAT_PALETTES[seat.seatOrder - 1] ?? SEAT_PALETTES[0]!;
   const status = statuses.find((row) => row.seatId === seat.seatId)?.status ?? null;
   const knockedOut = seat.outTurn !== null;
@@ -242,17 +258,6 @@ function chipFor(seat: TopBarSideSeat, statuses: readonly TopBarCommanderStatus[
     statusIcon,
     statusColor: statusIcon === 'planning' ? palette.text : statusIcon === 'ready' ? READY_CHECK_COLOR : null,
     outTurn: seat.outTurn,
+    showsUnitCounts,
   };
-}
-
-/**
- * The seat's full home name.
- *
- * Purpose: The lead chip keeps the long name. The model otherwise stores the short one.
- * When to use: The viewer's chip.
- * Expected outcome: The roster's `homeRegion`.
- * Exceptions: None.
- */
-function fullName(seats: readonly TopBarSideSeat[], seatId: string): string {
-  return seats.find((seat) => seat.seatId === seatId)?.homeRegion ?? '';
 }

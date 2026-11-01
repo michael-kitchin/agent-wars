@@ -141,14 +141,14 @@ function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameS
 }
 
 /**
- * Defines the `isFogOfWarEnabled` function shape (function isFogOfWarEnabled(ops: FogDbOps): boolean).
-
- * Purpose: Supports maintainability by documenting why `isFogOfWarEnabled` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Whether this match hides unexplored places.
+ *
+ * Purpose: Fog is on unless the row is `'0'` or `'false'`. A missing row is on.
+ * When to use: Before a read that should show the whole map when fog is off.
+ * Expected outcome: `false` only for those two stored values.
  * Exceptions: None.
  */
-function isFogOfWarEnabled(ops: FogDbOps): boolean {
+export function isFogOfWarEnabled(ops: Pick<FogDbOps, 'getOne'>): boolean {
   const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [FOG_OF_WAR_ENABLED_KEY]);
   if (!row?.value) return true;
   return row.value !== '0' && row.value.toLowerCase() !== 'false';

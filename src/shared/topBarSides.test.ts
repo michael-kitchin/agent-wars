@@ -23,6 +23,8 @@ test('buildTopBarSideChips names the human seat and shortens the others', () => 
   assert.equal(block.chips[0]?.statusColor, '#F0B4C8');
   assert.equal(block.chips[1]?.statusIcon, 'ready');
   assert.equal(block.chips[1]?.statusColor, '#86EFAC');
+  assert.equal(block.lead?.showsUnitCounts, true);
+  assert.deepEqual(block.chips.map((chip) => chip.showsUnitCounts), [false, false]);
 });
 
 test('buildTopBarSideChips draws no icon for no model, a timeout, or a knockout', () => {
@@ -37,9 +39,10 @@ test('buildTopBarSideChips draws no icon for no model, a timeout, or a knockout'
   assert.equal(block.chips[1]?.label, 'Levant');
 });
 
-test('buildTopBarSideChips lists every side while observing', () => {
+test('buildTopBarSideChips lists every side while observing, and only AI chips show unit counts', () => {
   const block = buildTopBarSideChips(seats, [], null);
   assert.equal(block.observing, true);
   assert.equal(block.lead, null);
   assert.deepEqual(block.chips.map((chip) => chip.label), ['W. Turkey', 'E. Turkey', 'Levant']);
+  assert.deepEqual(block.chips.map((chip) => chip.showsUnitCounts), [false, true, true]);
 });

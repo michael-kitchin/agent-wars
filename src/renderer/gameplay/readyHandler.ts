@@ -6,6 +6,7 @@ import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromp
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
+import { sightCueBeamsForViewer } from '../../shared/sightCueDrawModel';
 import { deferTacticalEntryUntilStrategicPlayback, observeModeControls } from '../../shared/observeModeControls';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import {
@@ -259,6 +260,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         new Set([...visibleHexesBeforeTurn, ...visibleHexes])
       )
     );
+    const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
     const strikeMoves = [...(readyResult.airStrikeMoves ?? []), ...buildMissilePlaybackMoves(visibleMissileLaunches)];
     const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
     const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
@@ -316,8 +318,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         .map((record) => record.targetH3Index)
         .filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex)),
     ];
-    const needsAnimation =
+    const needsCombatOrMovementAnimation =
       resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+    const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
     const watching = observeModeControls(state.seats ?? []).observing;
     const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
       watching,
@@ -341,7 +344,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       scheduleResolutionPlaybackCompleteNotify(sendStrategicNotify, needsAnimation);
     }
     const holdForBattle = Boolean(readyResult.tacticalAutoStartH3Index);
-    if (needsAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
+    if (needsCombatOrMovementAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
       const killToastFormatter = deps.buildKillToastFormatterBundle(
         state,
         readyResult.removedUnits,
@@ -368,6 +371,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(S.humanStandingOrders, state.units, humanMoves);
       S.resolutionMoveAnimation = {
         moves: resolutionMoves,
+        ...(sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {}),
         airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
         airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined,
         airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : undefined,

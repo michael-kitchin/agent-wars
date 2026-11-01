@@ -8,13 +8,13 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Save game and Load game show the sentences in [save-and-load.md](save-and-load.md). Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Start before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. Save game and Load game show the sentences in [save-and-load.md](save-and-load.md). Add another opponent shows its reason while it is disabled. Start game shows its reason while the rows cannot start. The top bar's four readouts show a tip the same way, though they are not controls. So does a side chip that lists unit counts: the human seat's own chip, and each AI seat's chip while observing. The tip opens on the name or its dot.
 
 ## Information Displayed
 
 - One shared tip, using the same chrome as the [hex tooltip](hex-tooltips.md). It is wider than that tooltip and draws above the new-game overlay, the tactical battles list, and the annihilation dialog.
 - The tip appears one second after the pointer or keyboard focus arrives on the control or on its label. Moving on that same control does not start the wait again. It follows the pointer. Keyboard focus, with the pointer on a different control or on none, places the tip at the focused control. The tip opens below and to the right of that point, or above or to the left of it where it would otherwise leave the window.
-- The text is plain. Opening a dropdown, or choosing an item in it, hides the tip until the pointer leaves that control.
+- The text is plain, except the side-name tip, which lists unit counts with mini tokens and a bold total. Opening a dropdown, or choosing an item in it, hides the tip until the pointer leaves that control.
 - While a blocked-order tip or an order-effects tip is showing, this tip hides and does not hide those tips. Once that order tip hides, moving on the control starts this wait again. When this tip appears, the hex tooltip hides.
 - Hiding a control hides its tip. The in-battle Exit Battle tip does not remain over the annihilation dialog.
 - The model dropdown keeps the model description tooltip. Unit origin flags keep the Bonuses tooltip. This tip is not added to either.
@@ -30,10 +30,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Commander button: Change this side's API key, model, reasoning, and doctrine.
 - Victory rule: Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins.
 - Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
-- AI-Only Battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
+- AI-only battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
+- Sight cues: Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- "Game Options": Victory rule, turn limit, AI-Only Battles, bonuses, fog of war, and Auto-start AI.
+- "Game Options": Victory rule, turn limit, AI-only battles, Sight cues, bonuses, fog of war, and Auto-start AI.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
@@ -77,6 +78,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
+- Side chip: the human seat's own chip, and each AI seat's chip while observing, including a knocked-out AI seat. The tip opens on the name or its dot. One line per unit type that side has in the snapshot on screen, cheapest first (`unitCostFor`), as "10 Infantry". The mark is that side's mini unit token, the same circle the dice chips and loss lines use (`createLossTypeToken`). A type with none is left out. Mercenaries count under their type. The last line is a bold "Total:" and the count of those units. A side with none shows only "Total: 0". The other side names have no tip. See [top-bar.md](top-bar.md).
 - Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and the hire amount already taken from the balance. The balance, the upkeep, and that hire amount start with `¤` (`CREDITS_SYMBOL`). The sentence that names `CREDITS_PER_ITEM` still says credits.
 - Hire marker: `Hire Units` (`hireEntryTooltipText`). Hire count, Hire, and remove: `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
 - Hire type, when the list has no value: `hireTypeTooltipText`. When a type is selected, `queueItemTooltipText` for that type.
@@ -196,7 +198,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
@@ -207,5 +209,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
 - `src/renderer/chrome/frameTooltipText.ts`
+- `src/renderer/chrome/sideUnitCountsTooltip.ts` (`buildSideUnitCountsTooltip`)
+- `src/shared/sideUnitCounts.ts` (`countSideUnitsByType`, `formatSideUnitCountsText`)
 - `src/shared/saveLoadAvailability.ts`
 - `src/renderer/gameplay/saveLoadMenu.ts`

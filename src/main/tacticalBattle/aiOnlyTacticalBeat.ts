@@ -19,6 +19,7 @@ import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { commitAiOnlyTacticalBeatSnapshot } from './tacticalBattleSession';
 import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
 import { projectTacticalSnapshotAfterPlayerMovementOrders } from './tacticalMovementApply';
+import { withoutTacticalHeadOnHolderMoves } from './tacticalHeadOnContact';
 import { validateTacticalOpponentEmbarkOrder } from './tacticalOpponentOrderValidation';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
@@ -163,11 +164,17 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
     next,
     'mergedHumanThenOpponent',
   );
-  const afterLeadMove = leadKept.movement.length > 0
-    ? projectTacticalSnapshotAfterPlayerMovementOrders(airAndRanged.battle, leadKept.movement, lead)
+  const headOn = withoutTacticalHeadOnHolderMoves({
+    battle: airAndRanged.battle,
+    first: { player: lead, orders: leadKept.movement },
+    second: { player: opposing, orders: opposingKept.movement },
+    gameSeed: getGameSeed(),
+  });
+  const afterLeadMove = headOn.firstOrders.length > 0
+    ? projectTacticalSnapshotAfterPlayerMovementOrders(airAndRanged.battle, headOn.firstOrders, lead)
     : airAndRanged.battle;
-  const afterOpposingMove = opposingKept.movement.length > 0
-    ? projectTacticalSnapshotAfterPlayerMovementOrders(afterLeadMove, opposingKept.movement, opposing)
+  const afterOpposingMove = headOn.secondOrders.length > 0
+    ? projectTacticalSnapshotAfterPlayerMovementOrders(afterLeadMove, headOn.secondOrders, opposing)
     : afterLeadMove;
   const leadEmbark = legalEmbarkOrders(afterOpposingMove, drafts.leadDraft?.embarkOrders ?? [], lead);
   const afterLeadEmbark = applyTacticalEmbarkPhaseOnBattle(afterOpposingMove, leadEmbark, lead);

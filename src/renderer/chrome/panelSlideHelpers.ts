@@ -21,12 +21,12 @@ const PANEL_SLIDE_MS = 150;
 /**
  * Reports whether the system asks for reduced motion.
  *
- * Purpose: The slide is skipped for players who turn motion off.
- * When to use: Before each slide.
+ * Purpose: Panel slides are skipped, and the sight-cue stage draws its lines only during the hold, for players who turn motion off.
+ * When to use: Before each slide, and each frame of the sight-cue stage.
  * Expected outcome: True when `prefers-reduced-motion: reduce` matches.
  * Exceptions: None; false when the media query cannot be read.
  */
-function reducedMotionRequested(): boolean {
+export function reducedMotionRequested(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 

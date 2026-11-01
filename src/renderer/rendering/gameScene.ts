@@ -45,6 +45,7 @@ import {
 import { drawRangePerimeterOverlay, ensureRangePerimeterAnimation } from './rangePerimeterOverlay';
 import { drawStrategicInspectionHexCodes } from './tacticalCityOverlays';
 import { drawResolutionCombatAndCasualtyOverlays } from './resolutionCombatOverlays';
+import { drawSightCueBeams } from './sightCueDrawing';
 import {
   buildResolutionPlaybackState,
   resolutionAnimationElapsedMs,
@@ -664,6 +665,9 @@ function drawGameScene(
     } else if (moveProgress < 1) {
       drawMovingUnits(ctx, width, height, regularPlaybackMoves, hexList, moveProgress);
     }
+  }
+  if (playbackPhase?.inSightCues && anim?.sightCues && !hideStrategicUnits) {
+    drawSightCueBeams(ctx, anim.sightCues, elapsedStrategic - playbackPhase.sightCueStart);
   }
   if (anim && hexList) {
     drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsedStrategic);

@@ -224,12 +224,13 @@ function firstRemoval(
  *
  * Purpose: Later flags must not override an earlier stage when more than one flag is set.
  * When to use: Once per frame from the playback phase.
- * Expected outcome: `'afterCasualties'` when every flag is false, including while dice chips are still fading.
+ * Expected outcome: `'afterCasualties'` when every flag is false, including while dice chips are still fading. The sight-cue stage comes before every casualty, so every removed unit is still drawn.
  * Exceptions: None.
  */
 export function resolutionCasualtyTiming(
   phase: Pick<
     ResolutionPlaybackPhase,
+    | 'inSightCues'
     | 'inAirStrikeOutbound'
     | 'inAirStrikeLightning'
     | 'inAirStrikeCasualty'
@@ -241,7 +242,7 @@ export function resolutionCasualtyTiming(
     | 'inMeleeCasualty'
   >
 ): ResolutionCasualtyTiming {
-  if (phase.inAirStrikeOutbound || phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
+  if (phase.inSightCues || phase.inAirStrikeOutbound || phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
     return 'throughAirCasualties';
   }
   if (phase.inAirStrikeReturn) return 'airReturn';

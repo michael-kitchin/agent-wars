@@ -56,6 +56,7 @@ const timings: ResolutionCasualtyTiming[] = [
 describe('resolutionCasualtyTiming', () => {
   it('maps each playback flag in timeline order and treats a quiet clock as finished', () => {
     const flags = {
+      inSightCues: false,
       inAirStrikeOutbound: false,
       inAirStrikeLightning: false,
       inAirStrikeCasualty: false,
@@ -67,6 +68,7 @@ describe('resolutionCasualtyTiming', () => {
       inMeleeCasualty: false,
     };
     assert.equal(resolutionCasualtyTiming(flags), 'afterCasualties');
+    assert.equal(resolutionCasualtyTiming({ ...flags, inSightCues: true }), 'throughAirCasualties');
     assert.equal(resolutionCasualtyTiming({ ...flags, inAirStrikeOutbound: true, inMovement: true }), 'throughAirCasualties');
     assert.equal(resolutionCasualtyTiming({ ...flags, inAirStrikeLightning: true }), 'throughAirCasualties');
     assert.equal(resolutionCasualtyTiming({ ...flags, inAirStrikeCasualty: true }), 'throughAirCasualties');

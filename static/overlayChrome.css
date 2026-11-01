@@ -101,6 +101,16 @@
   height: 100%;
   object-fit: contain;
 }
+/* A side name's unit counts: one line per type, then the bold total set a little apart. */
+.side-unit-tooltip-row {
+  white-space: nowrap;
+}
+.side-unit-tooltip-row + .side-unit-tooltip-row {
+  margin-top: 2px;
+}
+.side-unit-tooltip-row + .side-unit-tooltip-total {
+  margin-top: 4px;
+}
 /* Opponent index, the size of a country flag. An inline-block with no in-flow text
    aligns on its bottom edge, the same way the country flag does. The digit is
    system-ui even inside a button, whose own font would place the ink elsewhere. */

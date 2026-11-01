@@ -58,6 +58,7 @@ When you change one of these, update [combat-rules-v3.md](combat-rules-v3.md) (a
 | Seat limits and seat ids | `MIN_SEATS`, `MAX_SEATS`, `AI_SEAT_IDS`, `HUMAN_SEAT_ID`, `NEUTRAL_OWNER_ID` in `src/shared/seatIds.ts` |
 | Win rules, knockout, and places | `decideEndOfTurnOutcome` in `src/main/gameActions/endOfTurnOutcomeRules.ts`, `TURN_LIMIT_OPTIONS`, `DEFAULT_TURN_LIMIT`, `victorySettingsForRequest`, and `DEFAULT_VICTORY_RULE` in `src/shared/victoryRules.ts` |
 | AI-only battles | `selectAiOnlyBattle`, `aiOnlyBattlesForRequest`, and `aiOnlyBattlesFromStored` in `src/shared/aiOnlyBattles.ts`. The offer is `buildAiOnlyBattleOffer`. End reasons are `applyAiOnlyTacticalBeat`. The parties are `tacticalBattlePartiesForOwners`. |
+| Head-on contact | `resolveHeadOnContacts` in `src/shared/headOnContact.ts`. Strategic turns use `withoutStrategicHeadOnHolderMoves`. Battle beats use `withoutTacticalHeadOnHolderMoves`. The held cell is `createHeadOnInitiativePicker`. |
 
 Prompt-generating code is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md). That package describes today's emitted prompts and answers to the same engine symbols; it does not invent stats. How the consult is scheduled and which tools exist: [hybrid-ai.md](hybrid-ai.md) and [ai-tools.md](ai-tools.md).
 

@@ -15907,7 +15907,7 @@
 
   // src/shared/lossSummary.ts
   var LOSS_TYPE_NAME_LIST_MAX = 3;
-  var GROUP_LABEL_BY_TYPE = {
+  var UNIT_GROUP_LABEL_BY_TYPE = {
     naval: "Naval",
     air: "Air",
     armor: "Armored",
@@ -15938,7 +15938,7 @@
     }
     for (const unitType of GROUP_ORDER) {
       const count = counts[unitType];
-      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${GROUP_LABEL_BY_TYPE[unitType]}`);
+      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
     }
     return parts.join(", ");
   }
@@ -21217,6 +21217,7 @@ ${bonuses}`;
   // src/renderer/chrome/controlTooltip.ts
   var controlTooltipAttr = "data-control-tooltip";
   var controlTooltipElementId = "control-tooltip";
+  var richContentByHost = /* @__PURE__ */ new WeakMap();
   var installed = false;
   var delayTimer = null;
   var currentHost = null;
@@ -21299,7 +21300,9 @@ ${bonuses}`;
       x = rect.left;
       y = rect.top;
     }
-    el.textContent = text;
+    const build = richContentByHost.get(host);
+    if (build) el.replaceChildren(build());
+    else el.textContent = text;
     el.classList.remove("hidden");
     placeTip(el, x, y);
     el.setAttribute("aria-hidden", "false");
@@ -21383,6 +21386,10 @@ ${bonuses}`;
     const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
     if (controls.length === 0) return true;
     return controls.some((control) => control.getClientRects().length > 0);
+  }
+  function setRichControlTooltip(host, text, build) {
+    host.setAttribute(controlTooltipAttr, text);
+    richContentByHost.set(host, build);
   }
   function dismissStaleControlTooltip() {
     if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
@@ -27445,11 +27452,19 @@ ${bonuses}`;
     showStackCallout(units, Number(rawX), Number(rawY));
   }
 
+  // src/shared/resolutionPlaybackTiming.ts
+  var RESOLUTION_STAGE_MS = 1500;
+  var RESOLUTION_PULSE_RADIANS_PER_MS = 8 / RESOLUTION_STAGE_MS;
+  var SIGHT_CUE_DRAW_IN_MS = RESOLUTION_STAGE_MS / 5;
+  var SIGHT_CUE_HOLD_MS = RESOLUTION_STAGE_MS * 3 / 5;
+  var SIGHT_CUE_FADE_MS = RESOLUTION_STAGE_MS / 5;
+  var SIGHT_CUE_STAGE_MS = SIGHT_CUE_DRAW_IN_MS + SIGHT_CUE_HOLD_MS + SIGHT_CUE_FADE_MS;
+
   // src/shared/combatDiceChips.ts
   var COMBAT_DICE_CHIP_MAX_LINES = 4;
   var COMBAT_DICE_ROW_MAX_FACES = 3;
-  var COMBAT_DICE_FADE_IN_MS = 150;
-  var COMBAT_DICE_FADE_OUT_MS = 250;
+  var COMBAT_DICE_FADE_IN_MS = RESOLUTION_STAGE_MS * 3 / 20;
+  var COMBAT_DICE_FADE_OUT_MS = RESOLUTION_STAGE_MS / 4;
   var COMBAT_DICE_WINDOW_SCALE = 2;
   var TAG_BY_KIND = Object.freeze({
     airStrike: "ATK",
@@ -27550,7 +27565,7 @@ ${bonuses}`;
     return units.find((unit) => unit.id === unitId);
   }
   function resolutionCasualtyTiming(phase) {
-    if (phase.inAirStrikeOutbound || phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
+    if (phase.inSightCues || phase.inAirStrikeOutbound || phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
       return "throughAirCasualties";
     }
     if (phase.inAirStrikeReturn) return "airReturn";
@@ -28811,6 +28826,9 @@ ${bonuses}`;
   var AI_ONLY_BATTLE_MODES = ["balanced", "unbalanced", "random", "none"];
   var DEFAULT_AI_ONLY_BATTLES = "balanced";
 
+  // src/shared/sightCueSettings.ts
+  var DEFAULT_SIGHT_CUES = true;
+
   // src/shared/victoryRules.ts
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
@@ -28891,6 +28909,10 @@ ${bonuses}`;
     const value = select instanceof HTMLSelectElement ? select.value : "";
     return AI_ONLY_BATTLE_MODES.includes(value) ? value : DEFAULT_AI_ONLY_BATTLES;
   }
+  function readNewGameSightCues() {
+    const box = document.getElementById("new-game-sight-cues-checkbox");
+    return box instanceof HTMLInputElement ? box.checked : DEFAULT_SIGHT_CUES;
+  }
   function readNewGameVictory() {
     const victoryRule = selectedVictoryRule();
     if (victoryRule !== "most_city_hexes_at_turn_limit") {
@@ -28907,6 +28929,8 @@ ${bonuses}`;
     if (victory instanceof HTMLSelectElement) victory.value = DEFAULT_VICTORY_RULE;
     const aiOnly = document.getElementById("new-game-ai-only-battles-select");
     if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
+    const sightCues = document.getElementById("new-game-sight-cues-checkbox");
+    if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
     renderNewGameVictory();
   }
   function selectedVictoryRule() {
@@ -29012,6 +29036,7 @@ ${bonuses}`;
       turnLimit: victory.turnLimit,
       victoryRule: victory.victoryRule,
       aiOnlyBattles: readNewGameAiOnlyBattles(),
+      sightCues: readNewGameSightCues(),
       blocked
     };
   }
@@ -29999,7 +30024,7 @@ ${bonuses}`;
       const options = ordered.map((seat) => {
         const option2 = document.createElement("option");
         option2.value = seat.seatId;
-        option2.textContent = seat.homeRegion;
+        option2.textContent = abbreviatedSideName(seat);
         option2.disabled = seat.outTurn != null;
         return option2;
       });
@@ -30052,13 +30077,17 @@ ${bonuses}`;
   var READY_CHECK_COLOR = "#86EFAC";
   function buildTopBarSideChips(seats, statuses, viewerSeatId2) {
     const ordered = [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
-    const chips = ordered.map((seat) => chipFor(seat, statuses));
-    if (viewerSeatId2 === null) return { observing: true, lead: null, chips };
-    const lead = chips.find((chip) => chip.seatId === viewerSeatId2) ?? null;
-    if (!lead) return { observing: true, lead: null, chips };
-    return { observing: false, lead: { ...lead, label: fullName(ordered, lead.seatId) }, chips: chips.filter((chip) => chip.seatId !== viewerSeatId2) };
+    const viewer = viewerSeatId2 === null ? void 0 : ordered.find((seat) => seat.seatId === viewerSeatId2);
+    if (!viewer) {
+      return { observing: true, lead: null, chips: ordered.map((seat) => chipFor(seat, statuses, seat.kind === AI_SEAT_KIND)) };
+    }
+    return {
+      observing: false,
+      lead: { ...chipFor(viewer, statuses, true), label: viewer.homeRegion },
+      chips: ordered.filter((seat) => seat !== viewer).map((seat) => chipFor(seat, statuses, false))
+    };
   }
-  function chipFor(seat, statuses) {
+  function chipFor(seat, statuses, showsUnitCounts) {
     const palette = SEAT_PALETTES[seat.seatOrder - 1] ?? SEAT_PALETTES[0];
     const status = statuses.find((row) => row.seatId === seat.seatId)?.status ?? null;
     const knockedOut = seat.outTurn !== null;
@@ -30069,11 +30098,9 @@ ${bonuses}`;
       dotColor: palette.map,
       statusIcon: statusIcon2,
       statusColor: statusIcon2 === "planning" ? palette.text : statusIcon2 === "ready" ? READY_CHECK_COLOR : null,
-      outTurn: seat.outTurn
+      outTurn: seat.outTurn,
+      showsUnitCounts
     };
-  }
-  function fullName(seats, seatId) {
-    return seats.find((seat) => seat.seatId === seatId)?.homeRegion ?? "";
   }
 
   // src/shared/topBarStats.ts
@@ -30165,6 +30192,20 @@ ${bonuses}`;
     return ALL_BUILD_UNIT_TYPES.map(
       (unitType) => `${unitType} ${formatCount(stats.fieldedByType[unitType])} of ${formatCount(stats.capByType[unitType])}`
     ).join(", ");
+  }
+
+  // src/shared/sideUnitCounts.ts
+  function countSideUnitsByType(units, seatId, costFor) {
+    const counts = /* @__PURE__ */ new Map();
+    units.flatMap((unit) => unit.player === seatId && isBuildUnitType(unit.unitType) ? [unit.unitType] : []).forEach((unitType) => counts.set(unitType, (counts.get(unitType) ?? 0) + 1));
+    const rows = [...counts.entries()].map(([unitType, count]) => ({ unitType, label: UNIT_GROUP_LABEL_BY_TYPE[unitType], count })).sort((left, right) => costFor(left.unitType) - costFor(right.unitType) || typeIndex(left.unitType) - typeIndex(right.unitType));
+    return { rows, total: rows.reduce((sum, row) => sum + row.count, 0) };
+  }
+  function formatSideUnitCountsText(counts) {
+    return [...counts.rows.map((row) => `${row.count} ${row.label}`), `Total: ${counts.total}`].join(", ");
+  }
+  function typeIndex(unitType) {
+    return ALL_BUILD_UNIT_TYPES.indexOf(unitType);
   }
 
   // src/shared/battleForceCounts.ts
@@ -30290,6 +30331,25 @@ ${bonuses}`;
     renderBattleForceBar(battle);
   }
 
+  // src/renderer/chrome/sideUnitCountsTooltip.ts
+  function buildSideUnitCountsTooltip(counts, seatId, seats) {
+    const body = document.createElement("div");
+    body.className = "side-unit-tooltip";
+    const rows = counts.rows.map((row) => {
+      const line = document.createElement("div");
+      line.className = "side-unit-tooltip-row";
+      line.append(createLossTypeToken(row.unitType, seatId, seats), `${row.count} ${row.label}`);
+      return line;
+    });
+    const total = document.createElement("div");
+    total.className = "side-unit-tooltip-total";
+    const label = document.createElement("strong");
+    label.textContent = "Total:";
+    total.append(label, ` ${counts.total}`);
+    body.append(...rows, total);
+    return body;
+  }
+
   // src/renderer/chrome/topBar.ts
   var SVG_NS = "http://www.w3.org/2000/svg";
   function formatStrategicPhaseLabel(phase) {
@@ -30313,20 +30373,21 @@ ${bonuses}`;
     const host = document.getElementById("topbar-sides");
     if (!host) return;
     host.replaceChildren();
+    dismissStaleControlTooltip();
     if (!state?.seats?.length) {
       host.append(sideName("topbar-human-side", "\u2014"), vsLabel(), sideName("topbar-second-side", "\u2014"));
       return;
     }
     const resolved = viewerSeatId(state);
     const viewer = resolved === void 0 ? HUMAN_SEAT_ID : resolved;
-    paintSides(host, buildTopBarSideChips(state.seats, commanderPoolStatuses(), viewer));
+    paintSides(host, buildTopBarSideChips(state.seats, commanderPoolStatuses(), viewer), state);
   }
-  function paintSides(host, block) {
+  function paintSides(host, block, state) {
     if (block.observing) host.append(observingLabel());
-    if (block.lead) host.append(chipElement(block.lead, "topbar-human-side"));
+    if (block.lead) host.append(chipElement(block.lead, "topbar-human-side", state));
     if (!block.observing) host.append(vsLabel());
     block.chips.forEach((chip, index) => {
-      host.append(chipElement(chip, chipNameId(block.observing, index)));
+      host.append(chipElement(chip, chipNameId(block.observing, index), state));
     });
   }
   function chipNameId(observing, index) {
@@ -30363,14 +30424,16 @@ ${bonuses}`;
     label.append(eye, text);
     return label;
   }
-  function chipElement(chip, nameId) {
+  function chipElement(chip, nameId, state) {
     const row = document.createElement("span");
     row.className = chip.outTurn === null ? "topbar-side-chip" : "topbar-side-chip is-out";
     const dot = document.createElement("span");
     dot.className = "topbar-side-mark";
     dot.style.background = chip.dotColor;
     dot.setAttribute("aria-hidden", "true");
-    row.append(dot, sideName(nameId, chip.label));
+    const name = sideName(nameId, chip.label);
+    if (chip.showsUnitCounts) attachUnitCountsTooltip(row, chip.seatId, state);
+    row.append(dot, name);
     if (chip.outTurn !== null) {
       const out = document.createElement("span");
       out.className = "topbar-side-out";
@@ -30380,6 +30443,11 @@ ${bonuses}`;
     const icon = statusIcon(chip);
     if (icon) row.append(icon);
     return row;
+  }
+  function attachUnitCountsTooltip(name, seatId, state) {
+    const counts = countSideUnitsByType(state.units, seatId, unitCostFor);
+    const seats = state.seats ?? [];
+    setRichControlTooltip(name, formatSideUnitCountsText(counts), () => buildSideUnitCountsTooltip(counts, seatId, seats));
   }
   function sideName(id, label) {
     const name = document.createElement("span");
@@ -31617,7 +31685,9 @@ ${bonuses}`;
   function getResolutionPlaybackPhase(args) {
     const fadeMs = args.fadeMs;
     const lightningMs = args.lightningMs;
-    const airStrikeOutboundStart = 0;
+    const sightCueStart = 0;
+    const sightCueEnd = sightCueStart + (args.hasSightCues ? args.sightCueMs : 0);
+    const airStrikeOutboundStart = sightCueEnd;
     const airStrikeOutboundEnd = airStrikeOutboundStart + (args.hasAirStrikeOutbound ? fadeMs : 0);
     const airStrikeCombatStart = airStrikeOutboundEnd;
     const airStrikeCombatEnd = airStrikeCombatStart + (args.hasAirStrikeCombat ? lightningMs : 0);
@@ -31639,6 +31709,7 @@ ${bonuses}`;
     const airStrikeOutboundProgress = !args.hasAirStrikeOutbound || args.elapsed < airStrikeOutboundStart ? 0 : args.elapsed >= airStrikeOutboundEnd ? 1 : (args.elapsed - airStrikeOutboundStart) / fadeMs;
     const airStrikeReturnProgress = !args.hasAirStrikeReturn || args.elapsed < airStrikeReturnStart ? 0 : args.elapsed >= airStrikeReturnEnd ? 1 : (args.elapsed - airStrikeReturnStart) / fadeMs;
     return {
+      sightCueStart,
       airStrikeOutboundStart,
       airStrikeCombatStart,
       airStrikeCasualtyStart,
@@ -31652,6 +31723,7 @@ ${bonuses}`;
       airStrikeOutboundProgress,
       airStrikeReturnProgress,
       moveProgress: progressAtStage(args.elapsed, movementStart, movementMs),
+      inSightCues: args.hasSightCues && args.sightCueMs > 0 && args.elapsed >= sightCueStart && args.elapsed < sightCueEnd,
       inAirStrikeOutbound: args.hasAirStrikeOutbound && args.elapsed >= airStrikeOutboundStart && args.elapsed < airStrikeOutboundEnd,
       inAirStrikeLightning: args.hasAirStrikeCombat && args.elapsed >= airStrikeCombatStart && args.elapsed < airStrikeCombatEnd,
       inAirStrikeCasualty: args.hasAirStrikeCasualties && args.elapsed >= airStrikeCasualtyStart && args.elapsed < airStrikeCasualtyEnd,
@@ -31665,8 +31737,8 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/resolutionPlayback.ts
-  var RESOLUTION_FADE_MS = 1e3;
-  var LIGHTNING_DURATION_MS = 1e3;
+  var RESOLUTION_FADE_MS = RESOLUTION_STAGE_MS;
+  var LIGHTNING_DURATION_MS = RESOLUTION_STAGE_MS;
   function resolutionAnimationElapsedMs(anim) {
     if (anim.tacticalDeferResolutionClock) return 0;
     return Date.now() - anim.startTime;
@@ -31680,6 +31752,7 @@ ${bonuses}`;
     const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
     const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
     const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    const hasSightCues = (anim.sightCues?.length ?? 0) > 0;
     return {
       hasAirStrikeOutbound,
       hasAirStrikeCombat,
@@ -31689,10 +31762,13 @@ ${bonuses}`;
       hasRangedCasualties,
       hasMeleeCombat,
       hasMeleeCasualties,
+      hasSightCues,
       phase: getResolutionPlaybackPhase({
         elapsed,
         fadeMs: RESOLUTION_FADE_MS,
         lightningMs: LIGHTNING_DURATION_MS,
+        hasSightCues,
+        sightCueMs: SIGHT_CUE_STAGE_MS,
         hasAirStrikeOutbound,
         hasAirStrikeCombat,
         hasAirStrikeCasualties,
@@ -35175,7 +35251,7 @@ ${bonuses}`;
     ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
     const combatHexes = phase.inAirStrikeLightning ? anim.airStrikeCombatHexes : phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? meleeCombatHexes : void 0;
     if (combatHexes?.length) {
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * RESOLUTION_PULSE_RADIANS_PER_MS);
       const unknownSet = new Set(anim.unknownCombatHexes ?? []);
       const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
       const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
@@ -35185,7 +35261,7 @@ ${bonuses}`;
     const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
     if (casualtyHexes?.length) {
       const casualtyElapsed = phase.inAirStrikeCasualty ? elapsed - phase.airStrikeCasualtyStart : phase.inRangedCasualty ? elapsed - phase.rangedCasualtyStart : elapsed - phase.meleeCasualtyStart;
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * RESOLUTION_PULSE_RADIANS_PER_MS);
       const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
       const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
       const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
@@ -35195,6 +35271,136 @@ ${bonuses}`;
     if (anim && !shouldHideStrategicMapUnitsForZoom()) {
       drawResolutionDiceChips(ctx, width, height, anim, elapsed);
     }
+  }
+
+  // src/shared/sightCueDrawModel.ts
+  var SIGHT_CUE_STYLE = {
+    ongoing: { startOpacity: 0.45, endOpacity: 0.05, widthScale: 0.5 },
+    newContact: { startOpacity: 0.85, endOpacity: 0.15, widthScale: 0.8 },
+    ring: { startRadiusScale: 1, endRadiusScale: 2, startOpacity: 0.85, endOpacity: 0.15 },
+    casingAlpha: 0.8
+  };
+  function sightCueBeamsForViewer(beams, viewerSeatId2) {
+    if (viewerSeatId2 == null) return [...beams];
+    return beams.filter((beam) => beam.seatId === viewerSeatId2);
+  }
+  function sightCueFrameAt(stageElapsedMs, reducedMotion) {
+    const drawIn = SIGHT_CUE_DRAW_IN_MS;
+    const holdEnd = drawIn + SIGHT_CUE_HOLD_MS;
+    if (reducedMotion) {
+      const duringHold = stageElapsedMs >= drawIn && stageElapsedMs < holdEnd;
+      return duringHold ? { drawProgress: 1, alpha: 1, ringProgress: 1 } : { drawProgress: 0, alpha: 0, ringProgress: null };
+    }
+    const drawProgress = drawIn <= 0 ? 1 : Math.min(1, stageElapsedMs / drawIn);
+    const alpha = stageElapsedMs < holdEnd ? 1 : Math.max(0, 1 - (stageElapsedMs - holdEnd) / SIGHT_CUE_FADE_MS);
+    const ringProgress = stageElapsedMs < drawIn ? null : Math.min(1, (stageElapsedMs - drawIn) / SIGHT_CUE_HOLD_MS);
+    return { drawProgress, alpha, ringProgress };
+  }
+  function insetBeamSegment(from, to, inset) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1) return null;
+    const pull = length < inset * 2 ? length / 4 : inset;
+    const ux = dx / length;
+    const uy = dy / length;
+    return {
+      start: { x: from.x + ux * pull, y: from.y + uy * pull },
+      end: { x: to.x - ux * pull, y: to.y - uy * pull }
+    };
+  }
+  function sightCueRingTargets(beams) {
+    const seen = /* @__PURE__ */ new Set();
+    const rings = [];
+    for (const beam of beams) {
+      if (!beam.isNewContact) continue;
+      const key = `${beam.seatId}\0${beam.toH3Index}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rings.push(beam);
+    }
+    return rings;
+  }
+  function lerpNumber(from, to, t) {
+    const clamped = Math.min(1, Math.max(0, t));
+    return from + (to - from) * clamped;
+  }
+
+  // src/renderer/rendering/sightCueDrawing.ts
+  function drawSightCueBeams(ctx, beams, stageElapsedMs) {
+    if (beams.length === 0) return;
+    const frame = sightCueFrameAt(stageElapsedMs, reducedMotionRequested());
+    if (frame.alpha <= 0 || frame.drawProgress <= 0) return;
+    const connectorWidth = getCurrentRangeOverlayLineWidth("connector");
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineCap = "round";
+    for (const beam of beams.filter((item) => !item.isNewContact)) {
+      strokeSightCueBeam(ctx, beam, frame, connectorWidth * SIGHT_CUE_STYLE.ongoing.widthScale, SIGHT_CUE_STYLE.ongoing);
+    }
+    for (const beam of beams.filter((item) => item.isNewContact)) {
+      strokeSightCueBeam(
+        ctx,
+        beam,
+        frame,
+        connectorWidth * SIGHT_CUE_STYLE.newContact.widthScale,
+        SIGHT_CUE_STYLE.newContact
+      );
+    }
+    if (frame.ringProgress !== null) {
+      for (const beam of sightCueRingTargets(beams)) {
+        strokeSightCueRing(ctx, beam, frame, connectorWidth * SIGHT_CUE_STYLE.newContact.widthScale);
+      }
+    }
+    ctx.restore();
+  }
+  function strokeSightCueBeam(ctx, beam, frame, width, opacity) {
+    const color = paletteForCurrentOwner(beam.seatId)?.map;
+    if (!color) return;
+    const segment = insetBeamSegment(
+      hexCenterPx(beam.fromH3Index),
+      hexCenterPxRelativeTo(beam.fromH3Index, beam.toH3Index),
+      UNIT_RADIUS
+    );
+    if (!segment) return;
+    const tip = {
+      x: lerpNumber(segment.start.x, segment.end.x, frame.drawProgress),
+      y: lerpNumber(segment.start.y, segment.end.y, frame.drawProgress)
+    };
+    const startAlpha = opacity.startOpacity * frame.alpha;
+    const endAlpha = opacity.endOpacity * frame.alpha;
+    const gradient = ctx.createLinearGradient(segment.start.x, segment.start.y, segment.end.x, segment.end.y);
+    gradient.addColorStop(0, withOpacityHex(color, startAlpha));
+    gradient.addColorStop(1, withOpacityHex(color, endAlpha));
+    const casing = ctx.createLinearGradient(segment.start.x, segment.start.y, segment.end.x, segment.end.y);
+    casing.addColorStop(0, withOpacityHex("#ffffff", SIGHT_CUE_STYLE.casingAlpha * startAlpha));
+    casing.addColorStop(1, withOpacityHex("#ffffff", SIGHT_CUE_STYLE.casingAlpha * endAlpha));
+    ctx.beginPath();
+    ctx.moveTo(segment.start.x, segment.start.y);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.lineWidth = width + ORDER_LINE_CASING_PAD * 2;
+    ctx.strokeStyle = casing;
+    ctx.stroke();
+    ctx.lineWidth = width;
+    ctx.strokeStyle = gradient;
+    ctx.stroke();
+  }
+  function strokeSightCueRing(ctx, beam, frame, width) {
+    const color = paletteForCurrentOwner(beam.seatId)?.map;
+    if (!color || frame.ringProgress == null) return;
+    const center = hexCenterPxRelativeTo(beam.fromH3Index, beam.toH3Index);
+    const radius = UNIT_RADIUS * lerpNumber(SIGHT_CUE_STYLE.ring.startRadiusScale, SIGHT_CUE_STYLE.ring.endRadiusScale, frame.ringProgress);
+    const opacity = lerpNumber(SIGHT_CUE_STYLE.ring.startOpacity, SIGHT_CUE_STYLE.ring.endOpacity, frame.ringProgress) * frame.alpha;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.lineWidth = width + ORDER_LINE_CASING_PAD * 2;
+    ctx.strokeStyle = withOpacityHex("#ffffff", SIGHT_CUE_STYLE.casingAlpha * opacity);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = withOpacityHex(color, opacity);
+    ctx.stroke();
   }
 
   // src/renderer/rendering/gameScene.ts
@@ -35499,6 +35705,9 @@ ${bonuses}`;
         drawMovingUnits(ctx, width, height, regularPlaybackMoves, hexList, moveProgress);
       }
     }
+    if (playbackPhase?.inSightCues && anim?.sightCues && !hideStrategicUnits) {
+      drawSightCueBeams(ctx, anim.sightCues, elapsedStrategic - playbackPhase.sightCueStart);
+    }
     if (anim && hexList) {
       drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsedStrategic);
     }
@@ -35756,6 +35965,7 @@ ${bonuses}`;
           turnLimit: seatsStart.turnLimit,
           victoryRule: seatsStart.victoryRule,
           aiOnlyBattles: seatsStart.aiOnlyBattles,
+          sightCues: seatsStart.sightCues,
           gameSize: readSelectedGameSizeFromDocument()
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
@@ -36182,13 +36392,6 @@ ${bonuses}`;
   }
 
   // src/shared/destroyedInBattleLine.ts
-  var GROUP_LABEL_BY_TYPE2 = {
-    naval: "Naval",
-    air: "Air",
-    armor: "Armored",
-    infantry: "Infantry",
-    missile: "Missile"
-  };
   var GROUP_ORDER2 = ["naval", "air", "armor", "infantry", "missile"];
   function visibleDestroyedParents(units, viewerSeatId2, visibleHexes) {
     if (viewerSeatId2 == null) return [...units];
@@ -36208,7 +36411,7 @@ ${bonuses}`;
         named.push(unit.displayName);
       }
     }
-    const groups = GROUP_ORDER2.filter((unitType) => grouped.has(unitType)).map((unitType) => `${counts.get(unitType) ?? 0} ${GROUP_LABEL_BY_TYPE2[unitType]}`);
+    const groups = GROUP_ORDER2.filter((unitType) => grouped.has(unitType)).map((unitType) => `${counts.get(unitType) ?? 0} ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
     return `${[...named, ...groups].join(", ")} destroyed in battle.`;
   }
   function destroyedInBattleLinesByOwner(units) {
@@ -38796,6 +38999,7 @@ ${bonuses}`;
           /* @__PURE__ */ new Set([...visibleHexesBeforeTurn, ...visibleHexes])
         )
       );
+      const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
       const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
       const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
       const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
@@ -38832,7 +39036,8 @@ ${bonuses}`;
         ...readyResult.airStrikeHexes ?? [],
         ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
       ];
-      const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+      const needsCombatOrMovementAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+      const needsAnimation = needsCombatOrMovementAnimation || sightCuesForPlayback.length > 0;
       const watching = observeModeControls(state.seats ?? []).observing;
       const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
         watching,
@@ -38856,7 +39061,7 @@ ${bonuses}`;
         scheduleResolutionPlaybackCompleteNotify(sendStrategicNotify, needsAnimation);
       }
       const holdForBattle = Boolean(readyResult.tacticalAutoStartH3Index);
-      if (needsAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
+      if (needsCombatOrMovementAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
         const killToastFormatter = deps.buildKillToastFormatterBundle(
           state,
           readyResult.removedUnits,
@@ -38883,6 +39088,7 @@ ${bonuses}`;
         const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(rendererSharedState.humanStandingOrders, state.units, humanMoves);
         rendererSharedState.resolutionMoveAnimation = {
           moves: resolutionMoves,
+          ...sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {},
           airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : void 0,
           airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : void 0,
           airStrikeCombatHexes: airStrikeCombatHexesForPlayback.length > 0 ? airStrikeCombatHexesForPlayback : void 0,

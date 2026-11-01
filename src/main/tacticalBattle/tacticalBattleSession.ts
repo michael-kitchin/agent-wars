@@ -31,6 +31,7 @@ import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
+import { withoutTacticalHeadOnHolderMoves } from './tacticalHeadOnContact';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
   applyTacticalEmbarkPhaseOnBattle,
@@ -546,14 +547,20 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       rawNext,
       'mergedHumanThenOpponent'
     );
-    const bAfterHumanMove =
-      args.movementOrders.length > 0
-        ? projectTacticalSnapshotAfterHumanMovementOrders(acc.battle, args.movementOrders)
-        : acc.battle;
     const oppMarch = holds ? [] : (opp?.movementOrders ?? []);
+    const headOn = withoutTacticalHeadOnHolderMoves({
+      battle: acc.battle,
+      first: { player: HUMAN_SEAT_ID, orders: args.movementOrders },
+      second: { player: party, orders: oppMarch },
+      gameSeed: getGameSeed(),
+    });
+    const bAfterHumanMove =
+      headOn.firstOrders.length > 0
+        ? projectTacticalSnapshotAfterHumanMovementOrders(acc.battle, headOn.firstOrders)
+        : acc.battle;
     const bAfterBothMoves =
-      oppMarch.length > 0
-        ? projectTacticalSnapshotAfterOpponentMovementOrders(bAfterHumanMove, oppMarch)
+      headOn.secondOrders.length > 0
+        ? projectTacticalSnapshotAfterOpponentMovementOrders(bAfterHumanMove, headOn.secondOrders)
         : bAfterHumanMove;
     for (const e of args.embarkOrders ?? []) {
       const emb = validateTacticalHumanEmbarkOrder(e, bAfterBothMoves.subUnits, bAfterBothMoves.enclosingStrategicH3Index);

@@ -3,7 +3,7 @@
  *
  * Purpose: Keeps stage start times, progress, and in-stage flags in shared code so a Node test can cover a zero-length movement stage.
  * When to use: From `buildResolutionPlaybackState` once per animation frame.
- * Expected outcome: Stages stay in air, ranged, movement, then melee order. A stage whose flag is false lasts 0 ms.
+ * Expected outcome: Stages stay in sight cues, air, ranged, movement, then melee order. A stage whose flag is false lasts 0 ms.
  * Exceptions: None.
  */
 
@@ -17,11 +17,29 @@
  */
 export interface ResolutionPlaybackPhase {
   /**
+   * Milliseconds from playback start until sight lines begin.
+   *
+   * Contract: Always 0. The stage is first when it exists.
+   * When to use: When placing the sight-cue stage on the timeline.
+   * Expected outcome: 0.
+   * Exceptions: None.
+   */
+  sightCueStart: number;
+  /**
+   * Whether the clock is inside the sight-cue stage.
+   *
+   * Contract: False when the turn has no beams or the clock has left the stage.
+   * When to use: The frame that draws beams.
+   * Expected outcome: True only while elapsed is inside a positive-length sight-cue stage.
+   * Exceptions: None.
+   */
+  inSightCues: boolean;
+  /**
    * Milliseconds from playback start until air units begin moving out.
    *
-   * Contract: Always 0, so later starts are offsets from a named origin.
+   * Contract: Equals the sight-cue stage's end, or 0 when there is none.
    * When to use: When placing the outbound air leg on the timeline.
-   * Expected outcome: 0.
+   * Expected outcome: 0 when the turn has no sight cues.
    * Exceptions: None.
    */
   airStrikeOutboundStart: number;
@@ -253,6 +271,24 @@ export interface ResolutionPlaybackPhaseArgs {
    */
   lightningMs: number;
   /**
+   * Whether the turn has sight lines to play.
+   *
+   * Contract: False gives that stage duration 0.
+   * When to use: True when the filtered beam list is non-empty.
+   * Expected outcome: The stage lasts `sightCueMs` only when this is true.
+   * Exceptions: None.
+   */
+  hasSightCues: boolean;
+  /**
+   * Duration of the sight-cue stage, in milliseconds.
+   *
+   * Contract: Pass `SIGHT_CUE_STAGE_MS`. Zero does not add time.
+   * When to use: From `buildResolutionPlaybackState`.
+   * Expected outcome: A non-negative duration.
+   * Exceptions: None.
+   */
+  sightCueMs: number;
+  /**
    * Whether air units have an outbound leg.
    *
    * Contract: False gives that leg duration 0.
@@ -352,7 +388,7 @@ function progressAtStage(elapsed: number, startMs: number, durationMs: number): 
 /**
  * Places one elapsed time on the resolution playback timeline.
  *
- * Purpose: Stage order is air outbound, air combat, air casualties, air return, ranged combat, ranged casualties, movement, melee combat, then melee casualties. Movement is skipped when there are no moves.
+ * Purpose: Stage order is sight cues, air outbound, air combat, air casualties, air return, ranged combat, ranged casualties, movement, melee combat, then melee casualties. Movement is skipped when there are no moves.
  * When to use: Once per animation frame from `buildResolutionPlaybackState`. Do not call this to decide whether playback should start; that guard stays outside.
  * Expected outcome: Start times, progress values, and in-stage flags for `elapsed`. Movement progress is 0 before a zero-length movement stage and 1 at and after it, and `inMovement` is false for that stage.
  * Exceptions: None.
@@ -360,7 +396,9 @@ function progressAtStage(elapsed: number, startMs: number, durationMs: number): 
 export function getResolutionPlaybackPhase(args: ResolutionPlaybackPhaseArgs): ResolutionPlaybackPhase {
   const fadeMs = args.fadeMs;
   const lightningMs = args.lightningMs;
-  const airStrikeOutboundStart = 0;
+  const sightCueStart = 0;
+  const sightCueEnd = sightCueStart + (args.hasSightCues ? args.sightCueMs : 0);
+  const airStrikeOutboundStart = sightCueEnd;
   const airStrikeOutboundEnd = airStrikeOutboundStart + (args.hasAirStrikeOutbound ? fadeMs : 0);
   const airStrikeCombatStart = airStrikeOutboundEnd;
   const airStrikeCombatEnd = airStrikeCombatStart + (args.hasAirStrikeCombat ? lightningMs : 0);
@@ -392,6 +430,7 @@ export function getResolutionPlaybackPhase(args: ResolutionPlaybackPhaseArgs): R
         ? 1
         : (args.elapsed - airStrikeReturnStart) / fadeMs;
   return {
+    sightCueStart,
     airStrikeOutboundStart,
     airStrikeCombatStart,
     airStrikeCasualtyStart,
@@ -405,6 +444,7 @@ export function getResolutionPlaybackPhase(args: ResolutionPlaybackPhaseArgs): R
     airStrikeOutboundProgress,
     airStrikeReturnProgress,
     moveProgress: progressAtStage(args.elapsed, movementStart, movementMs),
+    inSightCues: args.hasSightCues && args.sightCueMs > 0 && args.elapsed >= sightCueStart && args.elapsed < sightCueEnd,
     inAirStrikeOutbound:
       args.hasAirStrikeOutbound && args.elapsed >= airStrikeOutboundStart && args.elapsed < airStrikeOutboundEnd,
     inAirStrikeLightning:

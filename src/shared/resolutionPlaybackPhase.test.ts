@@ -13,7 +13,7 @@ const lightningMs = 1000;
 /**
  * Builds a timeline sample with every stage off unless the test turns one on.
  *
- * Purpose: The two cases below only need ranged combat, or movement, plus an elapsed time.
+ * Purpose: Each case turns on only the stages it cares about, including sight cues.
  * When to use: Inside this file's tests.
  * Expected outcome: Unspecified flags are false and elapsed defaults to 0.
  * Exceptions: None.
@@ -32,6 +32,8 @@ function phase(overrides: Partial<ResolutionPlaybackPhaseArgs>) {
     hasMoves: false,
     hasMeleeCombat: false,
     hasMeleeCasualties: false,
+    hasSightCues: false,
+    sightCueMs: 1500,
     ...overrides,
   });
 }
@@ -56,5 +58,24 @@ describe('getResolutionPlaybackPhase movement duration', () => {
     assert.equal(atMovement.meleeCombatStart, atMovement.movementStart);
     assert.equal(atMovement.moveProgress, 1);
     assert.equal(atMovement.inMovement, false);
+  });
+});
+
+describe('getResolutionPlaybackPhase sight cues', () => {
+  it('plays sight cues before the outbound air leg and adds their duration', () => {
+    const during = phase({ elapsed: 0, hasSightCues: true, hasAirStrikeOutbound: true });
+    assert.equal(during.inSightCues, true);
+    assert.equal(during.inAirStrikeOutbound, false);
+    assert.equal(during.airStrikeOutboundStart, during.sightCueStart + 1500);
+    const after = phase({ elapsed: 1500, hasSightCues: true, hasAirStrikeOutbound: true });
+    assert.equal(after.inSightCues, false);
+    assert.equal(after.inAirStrikeOutbound, true);
+    assert.equal(after.totalMs, 1500 + fadeMs);
+  });
+
+  it('keeps the outbound air leg at 0 when there are no sight cues', () => {
+    const result = phase({ hasAirStrikeOutbound: true });
+    assert.equal(result.airStrikeOutboundStart, 0);
+    assert.equal(result.inSightCues, false);
   });
 });

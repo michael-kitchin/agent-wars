@@ -10,6 +10,7 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { observeModeControls } from '../../shared/observeModeControls';
+import { abbreviatedSideName } from '../../shared/sideLabels';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { isSeatId, type SeatId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
@@ -178,7 +179,7 @@ async function refreshObservedSnapshot(): Promise<void> {
  *
  * Purpose: Both controls exist only while watching, and they follow the roster.
  * When to use: From `renderTopBarStatus`.
- * Expected outcome: Hidden while a human seat is playing. The select lists All sides, then each seat's full name.
+ * Expected outcome: Hidden while a human seat is playing. The select lists All sides, then each seat's short name.
  *   A knocked-out seat is disabled. The checkbox matches `S.autoAdvance`.
  * Exceptions: None. Missing elements are skipped.
  */
@@ -210,7 +211,7 @@ export function syncObserveChrome(): void {
     const options = ordered.map((seat) => {
       const option = document.createElement('option');
       option.value = seat.seatId;
-      option.textContent = seat.homeRegion;
+      option.textContent = abbreviatedSideName(seat);
       option.disabled = seat.outTurn != null;
       return option;
     });

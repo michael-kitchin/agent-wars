@@ -1,6 +1,7 @@
 import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
 import type { FortificationReport } from './fortificationTypes';
 import type { MissileLaunchRecord } from './missileTypes';
+import type { SightCueBeam } from './sightCueTypes';
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
@@ -418,6 +419,15 @@ airStrikeRemovedUnits?: RemovedUnitSnapshot[];
    * Exceptions: None.
    */
   missileLaunches?: MissileLaunchRecord[];
+  /**
+   * Sight lines for the opening playback stage.
+   *
+   * Contract: Present only on a completed strategic turn while observing, with the setting on, fog on, and at least one beam. The renderer plays it as the first stage.
+   * When to use: Arming strategic playback.
+   * Expected outcome: One beam per spotter hex and target hex.
+   * Exceptions: None.
+   */
+  sightCues?: SightCueBeam[];
   /**
    * Air units destroyed on the ground by a missile.
    *

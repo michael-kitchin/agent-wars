@@ -20,8 +20,8 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 - **Simultaneous resolution:** The engine resolves all combat and movement in a defined phase sequence. No mid-combat input, except the melee-intercept choice to enter a tactical battle or continue strategic melee.
 - **Dice-based hits:** Each unit rolls one d20; a hit is scored when the result is **less than or equal to** that unit's hit number (A&A style). The attack hit number is `min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`; the defense hit number is `min(17, defense + origin bonus + tech defense bonus)` (§4.9). Penalties and cover never take an attack below 2 before either bonus, and a roll of 18 to 20 always misses.
 - **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`). A missile is always last (`compareCasualtyOrder`). A missile never rolls. A hit that would remove the hex controller's unit strips one fortification instead, until none remain (§4.9).
-- **Resolution order (strategic):** embark → missile launches → air strikes → ranged → ground/naval movement → cargo sync → ferry → melee. A siege of an enemy fortified hex is the last part of that melee step (§4.6). Production, control, and fog refresh run after melee. Control does not change a hex while `fortifiedCount` is above 0.
-- **Resolution order (tactical beat):** embark → air strikes → ranged → movement → ferry → cargo sync → melee. No production step.
+- **Resolution order (strategic):** embark → missile launches → air strikes → ranged → head-on contact → ground/naval movement → cargo sync → ferry → melee. Head-on contact (§4.3) only removes move orders, from the positions after ranged fire. A siege of an enemy fortified hex is the last part of that melee step (§4.6). Production, control, and fog refresh run after melee. Control does not change a hex while `fortifiedCount` is above 0.
+- **Resolution order (tactical beat):** embark → air strikes → ranged → head-on contact → movement → ferry → cargo sync → melee. No production step.
 - **Participant IDs:** At the start of combat resolution, each side with at least one unit in any combat is assigned a unique random integer ID from the game RNG. Melee ordering uses these IDs.
 - **RNG:** A single game seed plus turn number produces deterministic replay for a given order set.
 - **Infrastructure destruction is permanent.** Destroyed urban cells, airports, and seaports do not rebuild.
@@ -174,6 +174,8 @@ Using the **current** positions, after air strike casualties:
 
 Move every ground and naval unit that has a movement order to its destination. Positions are now final for ground and naval units. Friendly stacking is legal. An **enemy**-occupied cell is legal contact (move/melee).
 
+**Head-on contact.** Before any unit moves, the engine compares every side's moves. When units of two different owners would trade hexes, so that one ends where an enemy started and that enemy ends where the first started, neither move happens as ordered. Every unit moving between those two hexes, of any owner, takes part. A 50/50 roll seeded from the match seed, the turn, and the two hexes (`createHeadOnInitiativePicker` in `src/main/headOnInitiative.ts`) picks one of them. Units moving out of that hex stay in it, and units moving into it complete their moves. The hex then holds both sides and fights in the melee phase (§4.6), which can pause for the melee intercept as usual. Only exact trades count: paths that cross partway, and rings of three or more hexes, still move as ordered. The rule is `resolveHeadOnContacts` in `src/shared/headOnContact.ts`. A unit destroyed before movement does not take part.
+
 ### 4.4 Cargo sync (strategic; after movement, before ferry)
 
 Embarked land units that did not receive an independent move are moved to stay with their naval carrier. Strategic order: cargo sync **before** ferry. Tactical beats run ferry **before** cargo sync.
@@ -200,7 +202,7 @@ Using the **post-movement** positions:
 
 This order ensures: cargo is aboard before shooting; missile launches resolve first, then air strikes; ranged attacks resolve when targets are still where the player aimed; movement is applied only after ranged resolution; ferry validation uses post-movement ground truth. Casualties are applied immediately after each engagement.
 
-Within each phase, process engagements in a **deterministic order** (attacker/defender hex H3 index ascending). With a single game seed, replay is deterministic.
+Within each phase, process engagements in a **deterministic order** (attacker/defender hex H3 index ascending). With a single game seed, replay is deterministic. The head-on contact roll (§4.3) has its own seed and draws nothing from the combat RNG, so it never changes a combat die.
 
 ### 4.8 One round per phase
 
@@ -336,7 +338,7 @@ When a unit is chosen as a casualty (one hit = one unit removed), it is removed 
 
 ## 5. Detailed resolution flow (single resolution phase)
 
-High-level flow: **embark → missile launches → air strikes → ranged at pre-move positions → ground/naval movement → cargo sync → ferry → melee at post-move positions** (strategic). Tactical beats omit missile launches, swap cargo sync to after ferry, and omit production.
+High-level flow: **embark → missile launches → air strikes → ranged at pre-move positions → head-on contact → ground/naval movement → cargo sync → ferry → melee at post-move positions** (strategic). Tactical beats omit missile launches, run head-on contact on each sub-unit's first-leg stop, put cargo sync after ferry, and omit production.
 
 Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Neutral ship that is already on a landing hex, or gives one that is not a march toward a landing. `buildNeutralTurnOrders` then adds Neutral's movement, ranged, and air orders from the omniscient snapshot. A caller cannot submit Neutral orders.
 
@@ -371,7 +373,9 @@ Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Ne
      reach each roll once (attack value, no cover).
    - Assign attacker hits to D; assign defender return-fire hits to attacker
      hexes (most units remaining, then lowest H3 index).
-7. Apply ground and naval movement orders.
+7. Head-on contact (§4.3): for each pair of hexes that two owners would
+   trade, roll for the held hex and cancel the moves out of it. Then apply
+   ground and naval movement orders.
 8. Cargo sync (strategic): embarked land follows the carrier unless it
    received an independent move. Tactical: this step runs after ferry.
 9. Apply ferry movement orders (destination airport owned and intact;
@@ -403,6 +407,7 @@ No player input during steps 2–12 except the melee-intercept dialog at step 10
 ## 6. Edge cases and clarifications
 
 - **Stacking:** If multiple friendly units are in one hex, they all defend together in melee. When they attack (ranged or melee), each unit rolls. No stacking limit is assumed unless specified elsewhere. Friendly stacking is legal on both the strategic and tactical maps. Enemy-occupied cells are legal move/melee contact destinations.
+- **Units that trade hexes:** They do not pass each other. Head-on contact (§4.3) puts both in one of the two hexes, picked by a seeded 50/50 roll, and they melee there. In a battle the comparison uses the cell each sub-unit's first leg stops on this beat.
 - **Ranged vs. same hex:** A unit with range 1 or 2 can still participate in melee if it is in the same hex as the enemy. Armor in a hex with enemy infantry both (a) can be resolved in ranged phase as attacker against **other** hexes, and (b) participates in melee in its own hex. Each unit rolls at most once per phase for its declared action.
 - **Coastal bombardment:** Naval at range 2 can target land units in hexes within 2. Armor in a land hex may attack naval units in an adjacent water hex (range 1). Infantry (range 0) cannot attack naval on the strategic map.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement. Assign defender return-fire hits to attacker hexes one at a time: most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
@@ -667,7 +672,7 @@ The tactical game uses **WEGO** simultaneous resolution — the same model as th
 2. **Embark.**
 3. **Air strike phase.**
 4. **Ranged phase.**
-5. **Movement phase** (first-leg truncation as in §12.4).
+5. **Movement phase** (first-leg truncation as in §12.4). Head-on contact (§4.3) runs first, comparing each sub-unit's start cell with the cell its first leg stops on this beat, for both sides. The roll's seed also includes the battle id and the beat.
 6. **Ferry** (tactical air ferry is only between intact airport cells of the enclosing hex, not a neighbor airport in the margin, and not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit is destroyed; if the origin is still intact, it stays.
 7. **Cargo sync.**
 8. **Melee phase.**
@@ -711,7 +716,7 @@ When the AI plays a tactical battle, the LLM receives a tactical briefing: full 
 
 ### 13.1 Strategic resolution animation
 
-During the resolution phase, the client animates so that combat and death overlays stay on the correct units:
+During the resolution phase, the client animates so that combat and death overlays stay on the correct units. Each stage lasts `RESOLUTION_STAGE_MS` (1.5 s). While observing, with Sight cues and fog of war both on, a sight-cue stage plays before missile flights. It draws a line from each active AI seat's units to the hexes holding another owner's units that those units could see when the seat planned, using the vision radii in §6 (`VISION_RANGE_BY_UNIT_TYPE`). It is display only and changes no outcome (`buildSightCuesForReady` in `src/main/sightCues/sightCueReadyStage.ts`). A unit whose head-on move was cancelled (§4.3) does not glide.
 
 1. **Missile flights** — A launched missile draws a continuous line to the target and is not drawn flying home. The missile is already gone. Infrastructure losses and based air destroyed by the launch are shown with the strike, before air-strike flights.
 2. **Air strike indicators** — Highlight at hexes where air strikes occurred; units drawn at **pre-move** positions.
