@@ -97,7 +97,7 @@ Element documents share a fixed heading set:
 
 ## Element Documents
 
-- [map-surface.md](ux/map-surface.md): the world map as the workspace for pan, zoom, selection, and orders. Pan and zoom-out stop at the loaded map's extent. A new match frames that extent before the first order.
+- [map-surface.md](ux/map-surface.md): the world map as the workspace for pan, zoom, selection, and orders. Pan and zoom-out stop at the loaded map's extent. A new match frames that extent before the first order. An automatic watch also frames the visible units on each planning turn.
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
 - [minimap.md](ux/minimap.md): the minimap panel: the world overview, how it relates to the main map view, and the map-mode tabs under it, which a toggle on its corner shows and hides.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.

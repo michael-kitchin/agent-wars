@@ -202,6 +202,15 @@ export interface ConsolidatedTurnUpdateToastArgs {
    * Exceptions: None. A blank line is dropped.
    */
   fortificationReportLines?: readonly FortificationToastLine[];
+  /**
+   * One destroyed-in-battle sentence per side.
+   *
+   * Contract: Keys are owner ids. Values include the trailing period. Omitted means no battle sentence.
+   * When to use: The strategic popup for the turn that opened a battle, after that battle ends.
+   * Expected outcome: Each sentence sits in that side's loss section after the cause lines and before missile, fortification, and hex sentences. It is not copied into Updates.
+   * Exceptions: None.
+   */
+  battleLinesByOwner?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -384,7 +393,8 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     turnReport?.viewerSeatId ?? null,
     turnReport?.seats ?? [],
     turnReport ? hexChangeLinesByOwner(turnReport) : undefined,
-    mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
+    mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner),
+    args.battleLinesByOwner
   );
   sections.push(...lossSections);
   let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);

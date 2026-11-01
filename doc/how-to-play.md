@@ -55,7 +55,7 @@ The result screen lists every side, and its header depends on how the match went
 Getting knocked out doesn't stop the other commanders. When the match goes on without you, a dialog says who knocked you out and where you placed, and gives you two choices:
 
 - **End game** ranks the sides still in the match and opens the result screen.
-- **Watch the rest** keeps the match going. You see every side with no fog, and the next turn starts on its own once every commander is ready.
+- **Watch the rest** keeps the match going. You see every side with no fog, and the next turn starts on its own once every commander is ready. While turns start that way, the map frames the units you can see at the start of each turn, with a little room on one side.
 
 While you watch, these controls change what you see and when turns start:
 
@@ -476,7 +476,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **A queue can pause:** outside your home, a queue spends only on a hex that holds one of your units or fortifications. Elsewhere it keeps its points and its rows, and the map label shows ∞t.
 - **Unpaid mercenaries desert:** if the treasury cannot cover upkeep, some mercenaries become Neutral. An order the hex cannot fill returns any fee that was reserved for it.
 - **A shared hex fights:** a deserter or a mercenary you dismiss left beside your units, or a Neutral unit you rehire into a hex that already holds another side, fights at the next resolution.
-- **Reading the turn report:** After Ready, the map toast and the Reports tab give each side a section when that side lost a visible unit, lost hexes, controlled a hex hit by a missile launch you can see, or owned a hex whose fortifications fell. **Updates** lists city cells you fortified, credits added, mercenaries hired, units that deserted, hire orders that were not filled ("1 hire order could not be filled, so it was not charged."), and hexes where building paused. A named unit is the unit name, without the short side prefix, and keeps its origin flag. The layout of those lines is in [ux/reports-tab.md](ux/reports-tab.md) and [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md).
+- **Reading the turn report:** After Ready, the map toast and the Reports tab give each side a section when that side lost a visible unit, lost hexes, controlled a hex hit by a missile launch you can see, or owned a hex whose fortifications fell. A strategic unit destroyed in a battle is named on that line, ending with "destroyed in battle." When Ready opened the battle, that turn's popup waits until the battle ends and the next Ready has returned. A battle you open from the map puts that line on the next turn's report. **Updates** lists city cells you fortified, credits added, mercenaries hired, units that deserted, hire orders that were not filled ("1 hire order could not be filled, so it was not charged."), and hexes where building paused. A named unit is the unit name, without the short side prefix, and keeps its origin flag. The layout of those lines is in [ux/reports-tab.md](ux/reports-tab.md) and [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md).
 
 ## Where Messages Appear
 

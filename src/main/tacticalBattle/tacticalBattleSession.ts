@@ -40,6 +40,8 @@ import {
 import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
 import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
 import { applyTacticalEmbarkCommittedOrdersToStrategicDb, deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
+import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
+import { clearDestroyedBattleParents, recordDestroyedBattleParents, takeDestroyedBattleParents } from './destroyedBattleParents';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import {
@@ -201,7 +203,7 @@ function applyHumanVoluntaryBailoutStrategicParentElimination(
       continue;
     }
     if (parentState.survivors * 2 >= baseline) continue;
-    deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId);
+    recordDestroyedBattleParents(deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId));
     eliminatedParentIds.push(parentUnitId);
   }
   tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination complete', {
@@ -289,6 +291,7 @@ export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: st
     if (!concurrent.ok) {
       return { success: false, reason: 'A tactical battle is already in progress.' };
     }
+    clearDestroyedBattleParents();
     const battleId = `tb-${enclosingStrategicH3Index}-${Date.now()}`;
     const { snapshot, skippedParentDisplayNames, failureReason } = computeTacticalBattleSnapshot(
       enclosingStrategicH3Index,
@@ -325,12 +328,13 @@ export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: st
  *
  * Contract: Idempotent; restores `unit_transport_assignments` for parents in the battle from the captured tactical baseline, then sets `activeTacticalBattle` to null and clears tactical `game_config` keys.
  * When to use: Tactical exit IPC, annihilation cleanup, test teardown, and error recovery paths.
- * Expected outcome: `isTacticalBattleActive()` becomes false; strategic transport rows match the pre-battle baseline for involved parents; subsequent apply calls fail until a new start.
+ * Expected outcome: `isTacticalBattleActive()` becomes false; strategic transport rows match the pre-battle baseline for involved parents; subsequent apply calls fail until a new start. The return is every parent this battle already removed.
  * Exceptions: None.
  */
-export function endTacticalBattleSession(): void {
+export function endTacticalBattleSession(): DestroyedBattleParent[] {
   tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
   endTacticalBattleSessionCore('none');
+  return takeDestroyedBattleParents();
 }
 
 /**
@@ -338,14 +342,15 @@ export function endTacticalBattleSession(): void {
  *
  * Contract: Idempotent; restores transport baseline like `endTacticalBattleSession` and then removes strategic parents that fail `survivors * 2 < baseline` when both players still have tactical sub-units.
  * When to use: Main-process `game:endTacticalBattle` handler for human Return-to-Strategic bailout.
- * Expected outcome: Tactical session closes, strategic-ready gating reopens, and below-half parent strategic units are removed before automatic strategic continuation.
+ * Expected outcome: Tactical session closes, strategic-ready gating reopens, and below-half parent strategic units are removed before automatic strategic continuation. The return includes those parents and any already removed during the battle.
  * Exceptions: Elimination failures are logged and suppressed so tactical teardown still completes.
  */
-export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): void {
+export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): DestroyedBattleParent[] {
   tacticalLogMutate('endTacticalBattleSessionForHumanVoluntaryExitBailout', {
     hadBattle: !!getActiveTacticalBattleSnapshotRef(),
   });
   endTacticalBattleSessionCore('human');
+  return takeDestroyedBattleParents();
 }
 
 /**
@@ -353,14 +358,15 @@ export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): void {
  *
  * Purpose: Idle, commander exit, and the header Exit Battle control use the same threshold as a human Exit Battle.
  * When to use: `game:endTacticalBattle` when the active snapshot has `leadPartyId`.
- * Expected outcome: A parent under half is removed when both parties still have a sub-unit. A party that is already gone removes nothing more. The session clears either way.
+ * Expected outcome: A parent under half is removed when both parties still have a sub-unit. A party that is already gone removes nothing more. The session clears either way. The return includes the removed parents.
  * Exceptions: Elimination failures are logged and suppressed so teardown still completes.
  */
-export function endTacticalBattleSessionForTwoPartyVoluntaryExit(): void {
+export function endTacticalBattleSessionForTwoPartyVoluntaryExit(): DestroyedBattleParent[] {
   tacticalLogMutate('endTacticalBattleSessionForTwoPartyVoluntaryExit', {
     hadBattle: !!getActiveTacticalBattleSnapshotRef(),
   });
   endTacticalBattleSessionCore('twoParty');
+  return takeDestroyedBattleParents();
 }
 
 /**

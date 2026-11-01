@@ -15152,6 +15152,24 @@
        */
     strategicScenarioInitialLeafletView: null,
     /**
+     * Strategic turn the automatic camera last framed.
+     *
+     * Purpose: A planning turn is framed once, then left alone until the next turn.
+     * When to use: Written when that frame moves the camera. Cleared when a new match loads.
+     * Expected outcome: Null until the first automatic frame. Equal to the current turn after that turn has been framed.
+     * Exceptions: None.
+     */
+    automaticFramedTurnNumber: null,
+    /**
+     * Tactical beat the automatic camera last framed.
+     *
+     * Purpose: A beat is framed once, then left alone until the next beat.
+     * When to use: Written when that frame moves the camera. Cleared when a new match loads.
+     * Expected outcome: Null until the first automatic battle frame. Equal to the current beat after that beat has been framed.
+     * Exceptions: None.
+     */
+    automaticFramedBeatNumber: null,
+    /**
        * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).
     
        * Purpose: Supports maintainability by documenting why `strategicDominantTerrainKindByH3` exists.
@@ -15954,11 +15972,14 @@
     Missile: "missile"
   };
   var GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
+  var BATTLE_GROUP_TOKEN = /^(\d+) (Naval|Air|Armored|Infantry|Missile)$/;
+  var DESTROYED_IN_BATTLE_SUFFIX = " destroyed in battle.";
   var VICTIM_SEPARATOR = ", ";
   var BULLET_PREFIX = "\u2022 ";
   function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
     const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
     const body = line.slice(bullet.length);
+    if (body.endsWith(DESTROYED_IN_BATTLE_SUFFIX)) return battleLineSegments(bullet, body, knownDisplayNames);
     const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
     if (!label) return [{ text: line, unitDisplayName: null }];
     const prefix = `${bullet}${label}: `;
@@ -15969,6 +15990,27 @@
       segments.push(victimSegment(token, knownDisplayNames));
     });
     return segments;
+  }
+  function battleLineSegments(bullet, body, knownDisplayNames) {
+    const front = body.slice(0, -DESTROYED_IN_BATTLE_SUFFIX.length);
+    const tokens = front.length === 0 ? [] : front.split(VICTIM_SEPARATOR);
+    const segments = [];
+    if (bullet.length > 0) segments.push({ text: bullet, unitDisplayName: null });
+    tokens.forEach((token, index) => {
+      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
+      segments.push(battleVictimSegment(token, knownDisplayNames));
+    });
+    segments.push({ text: DESTROYED_IN_BATTLE_SUFFIX, unitDisplayName: null });
+    return segments;
+  }
+  function battleVictimSegment(token, knownDisplayNames) {
+    if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
+    const match = BATTLE_GROUP_TOKEN.exec(token);
+    const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ""] : void 0;
+    if (match && unitType) {
+      return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
+    }
+    return { text: token, unitDisplayName: null };
   }
   function victimSegment(token, knownDisplayNames) {
     if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
@@ -15983,10 +16025,11 @@
   // src/shared/turnLossSections.ts
   var NO_HEX_LINES = /* @__PURE__ */ new Map();
   var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
+  var NO_BATTLE_LINES = /* @__PURE__ */ new Map();
   var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES) {
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES, battleLinesByOwner = NO_BATTLE_LINES) {
     const lines = [];
-    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner)) {
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner)) {
       const header = headerFor(ownerId, viewerSeatId2, seats);
       lines.push(
         ...sectionLines(
@@ -15994,17 +16037,19 @@
           ownerId,
           header,
           hexLinesByOwner.get(ownerId) ?? [],
-          strikeLinesByOwner.get(ownerId) ?? []
+          strikeLinesByOwner.get(ownerId) ?? [],
+          battleLinesByOwner.get(ownerId) ?? ""
         )
       );
     }
     return lines;
   }
-  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner) {
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner) {
     const ids = /* @__PURE__ */ new Set([
       ...Object.keys(summary.byOwner),
       ...hexLinesByOwner.keys(),
-      ...strikeLinesByOwner.keys()
+      ...strikeLinesByOwner.keys(),
+      ...battleLinesByOwner.keys()
     ]);
     const ordered = [];
     if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
@@ -16034,13 +16079,15 @@
     const name = seat?.homeRegion.trim() ?? "";
     return `${name.length > 0 ? name : ownerId} Losses`;
   }
-  function sectionLines(summary, ownerId, header, hexLines, strikeLines) {
+  function sectionLines(summary, ownerId, header, hexLines, strikeLines, battleLine) {
     const buckets = summary.byOwner[ownerId];
     const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-    if (causes.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
+    const battle = battleLine.trim();
+    if (causes.length === 0 && battle.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
     return [
       `${SECTION_HEADER_PREFIX}${header}`,
       ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+      ...battle.length > 0 ? [battle] : [],
       ...strikeLines,
       ...hexLines
     ];
@@ -16892,11 +16939,11 @@
   function panPhysicalKeyId(code, key) {
     return code || key;
   }
-  function resolveNetPanAxes(held) {
-    const north = held.has("north");
-    const south = held.has("south");
-    const east = held.has("east");
-    const west = held.has("west");
+  function resolveNetPanAxes(held2) {
+    const north = held2.has("north");
+    const south = held2.has("south");
+    const east = held2.has("east");
+    const west = held2.has("west");
     const ns = north === south ? 0 : north ? 1 : -1;
     const ew = east === west ? 0 : east ? 1 : -1;
     return { ns, ew };
@@ -20903,10 +20950,30 @@ ${bonuses}`;
         return { ownerId, name: victim.displayName, value };
       })
     );
-    return indexLossFlagsByOwner(
-      rows,
-      (left, right) => unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel
+    return indexLossFlagsByOwner(rows, lossFlagsAgree);
+  }
+  function mergeDestroyedBattleParentFlags(existing, parents) {
+    const added = indexLossFlagsByOwner(
+      parents.map((parent) => ({
+        ownerId: parent.ownerId,
+        name: parent.displayName,
+        value: parent.origin ? { origin: parent.origin, formedLabel: formedLabelFor(parent.id) } : null
+      })),
+      lossFlagsAgree
     );
+    const merged = /* @__PURE__ */ new Map();
+    for (const [ownerId, names] of existing) merged.set(ownerId, names);
+    for (const [ownerId, names] of added) {
+      const prior = new Map(merged.get(ownerId) ?? []);
+      for (const [name, identity] of names) {
+        if (!prior.has(name)) prior.set(name, identity);
+      }
+      merged.set(ownerId, prior);
+    }
+    return merged;
+  }
+  function lossFlagsAgree(left, right) {
+    return unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel;
   }
 
   // src/renderer/openRouter/mapToastBody.ts
@@ -28766,8 +28833,8 @@ ${bonuses}`;
   function rankSeatsByCityHexes(seatIds, cityHexCountBySeat) {
     const places = /* @__PURE__ */ new Map();
     for (const seatId of seatIds) {
-      const held = cityHexCountBySeat.get(seatId) ?? 0;
-      const better = seatIds.filter((other) => (cityHexCountBySeat.get(other) ?? 0) > held).length;
+      const held2 = cityHexCountBySeat.get(seatId) ?? 0;
+      const better = seatIds.filter((other) => (cityHexCountBySeat.get(other) ?? 0) > held2).length;
       places.set(seatId, 1 + better);
     }
     return places;
@@ -29446,6 +29513,395 @@ ${bonuses}`;
     notifyResolutionPlaybackFinished();
   }
 
+  // src/shared/unitFrameBox.ts
+  var UNIT_FRAME_PAD_HEXES = 3;
+  function unitFrameBox(args) {
+    const { unit, limit } = args;
+    if (!positivePanel(args.panelWidthPx, args.panelHeightPx)) return null;
+    if (!finiteBox(unit) || !finiteBox(limit)) return null;
+    if (unit.south > unit.north || unit.west > unit.east) return null;
+    if (limit.south > limit.north || limit.west > limit.east) return null;
+    const pad = UNIT_FRAME_PAD_HEXES / 2;
+    const latPad = positiveStep(args.latStep) ? pad * args.latStep : 0;
+    const lngPad = positiveStep(args.lngStep) ? pad * args.lngStep : 0;
+    const widen = mercatorAspect(unit) >= args.panelWidthPx / args.panelHeightPx;
+    const padded = widen ? { south: unit.south, north: unit.north, west: unit.west - lngPad, east: unit.east + lngPad } : { south: unit.south - latPad, north: unit.north + latPad, west: unit.west, east: unit.east };
+    const clamped = {
+      south: Math.max(limit.south, padded.south),
+      west: Math.max(limit.west, padded.west),
+      north: Math.min(limit.north, padded.north),
+      east: Math.min(limit.east, padded.east)
+    };
+    if (clamped.south > clamped.north || clamped.west > clamped.east) return null;
+    return clamped;
+  }
+  function hexCenterSteps(h3Index) {
+    try {
+      const neighbors = gridDisk(h3Index, 1);
+      const center = cellToLatLng(h3Index);
+      const lat = center[0];
+      const lng = center[1];
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      let latStep = 0;
+      let lngStep = 0;
+      let found = false;
+      for (const neighbor of neighbors) {
+        if (neighbor === h3Index) continue;
+        const point = cellToLatLng(neighbor);
+        if (!Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
+        const alignedLng = alignTo2(point[1], lng);
+        latStep = Math.max(latStep, Math.abs(point[0] - lat));
+        lngStep = Math.max(lngStep, Math.abs(alignedLng - lng));
+        found = true;
+      }
+      if (!found || latStep === 0 && lngStep === 0) return null;
+      return { latStep, lngStep };
+    } catch {
+      return null;
+    }
+  }
+  function shouldApplyAutomaticUnitFrame(gate) {
+    return gate.observing && gate.autoAdvance && !gate.inBattle && gate.phase === "planning" && !gate.playbackRunning && gate.framedTurnNumber !== gate.turnNumber;
+  }
+  function shouldApplyAutomaticBattleFrame(gate) {
+    return gate.observing && gate.autoAdvance && gate.inBattle && !gate.playbackRunning && gate.framedBeatNumber !== gate.tacticalTurnNumber;
+  }
+  function positivePanel(widthPx, heightPx) {
+    return Number.isFinite(widthPx) && widthPx > 0 && Number.isFinite(heightPx) && heightPx > 0;
+  }
+  function finiteBox(box) {
+    return Number.isFinite(box.south) && Number.isFinite(box.west) && Number.isFinite(box.north) && Number.isFinite(box.east);
+  }
+  function positiveStep(step) {
+    return Number.isFinite(step) && step > 0;
+  }
+  function mercatorAspect(box) {
+    const width = mercatorX(box.east) - mercatorX(box.west);
+    const height = mercatorY(box.north) - mercatorY(box.south);
+    if (height === 0) return Number.POSITIVE_INFINITY;
+    return width / height;
+  }
+  function mercatorX(lngDeg) {
+    return lngDeg * Math.PI / 180;
+  }
+  function mercatorY(latDeg) {
+    const lat = latDeg * Math.PI / 180;
+    return Math.log(Math.tan(Math.PI / 4 + lat / 2));
+  }
+  function alignTo2(lng, refLng) {
+    let shifted = lng;
+    while (shifted - refLng > 180) shifted -= 360;
+    while (refLng - shifted > 180) shifted += 360;
+    return shifted;
+  }
+
+  // src/renderer/map/unitFrameCamera.ts
+  function clearAutomaticFrameMemory() {
+    rendererSharedState.automaticFramedTurnNumber = null;
+    rendererSharedState.automaticFramedBeatNumber = null;
+  }
+  function clearAutomaticBattleFrameMemory() {
+    rendererSharedState.automaticFramedBeatNumber = null;
+  }
+  function frameAutomaticStrategicUnits() {
+    try {
+      frameStrategicUnits();
+    } catch (err) {
+      console.error("automatic unit frame failed", err);
+    }
+  }
+  function frameStrategicUnits() {
+    const state = rendererSharedState.gameState;
+    if (!state) return;
+    const open = shouldApplyAutomaticUnitFrame({
+      observing: observeModeControls(state.seats ?? []).observing,
+      autoAdvance: rendererSharedState.autoAdvance,
+      inBattle: rendererSharedState.tacticalBattleSnapshot != null,
+      phase: state.phase ?? "",
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      turnNumber: state.turnNumber,
+      framedTurnNumber: rendererSharedState.automaticFramedTurnNumber
+    });
+    if (!open) return;
+    const indexes = state.units.map((unit) => unit.h3Index).filter((index) => index.length > 0);
+    const framed = frameForIndexes(indexes, null);
+    if (!framed) return;
+    if (!fitMainMapToFrame(framed)) return;
+    rendererSharedState.automaticFramedTurnNumber = state.turnNumber;
+    console.debug("automatic unit frame", { turnNumber: state.turnNumber, ...framed });
+  }
+  function frameAutomaticBattleUnits(battleLimit) {
+    try {
+      frameBattleUnits(battleLimit);
+    } catch (err) {
+      console.error("automatic battle frame failed", err);
+    }
+  }
+  function frameBattleUnits(battleLimit) {
+    const snap = rendererSharedState.tacticalBattleSnapshot;
+    const state = rendererSharedState.gameState;
+    if (!snap || !state || snap.aiOnlyEndReason != null) return;
+    const open = shouldApplyAutomaticBattleFrame({
+      observing: observeModeControls(state.seats ?? []).observing,
+      autoAdvance: rendererSharedState.autoAdvance,
+      inBattle: true,
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      tacticalTurnNumber: snap.tacticalTurnNumber,
+      framedBeatNumber: rendererSharedState.automaticFramedBeatNumber
+    });
+    if (!open) return;
+    const indexes = snap.subUnits.filter((unit) => unit.h3Index.length > 0).map((unit) => unit.h3Index);
+    const framed = frameForIndexes(indexes, battleLimit);
+    if (!framed) return;
+    if (!fitMainMapToFrame(framed)) return;
+    rendererSharedState.automaticFramedBeatNumber = snap.tacticalTurnNumber;
+    console.debug("automatic battle frame", { tacticalTurnNumber: snap.tacticalTurnNumber, ...framed });
+  }
+  function frameForIndexes(indexes, battleLimit) {
+    if (indexes.length === 0) return null;
+    const panel = mainMapPanelSize();
+    if (!panel) return null;
+    const unit = unitVertexBox(indexes);
+    if (!unit) return null;
+    const limit = battleLimit ? shiftIntoFrame(battleLimit, (unit.west + unit.east) / 2) : panLimitFor(unit);
+    if (!limit) return null;
+    const steps = stepsNear(indexes);
+    return unitFrameBox({
+      unit,
+      latStep: steps.latStep,
+      lngStep: steps.lngStep,
+      panelWidthPx: panel.width,
+      panelHeightPx: panel.height,
+      limit
+    });
+  }
+  function mainMapPanelSize() {
+    const map = getMainLeafletMap();
+    const container = map?.getContainer?.();
+    if (!container) return null;
+    return { width: container.clientWidth, height: container.clientHeight };
+  }
+  function unitVertexBox(indexes) {
+    const readable = [];
+    const longitudes = [];
+    for (const index of indexes) {
+      try {
+        const lng = cellToLatLng(index)[1];
+        if (!Number.isFinite(lng)) continue;
+        longitudes.push(lng);
+        readable.push(index);
+      } catch (err) {
+        console.error("automatic unit frame skipped a cell", index, err);
+      }
+    }
+    try {
+      const box = mapExtentBoxForHexes(longitudeIntervalFromCenters(longitudes), readable);
+      if (!box) return null;
+      return { south: box.south, west: box.west, north: box.north, east: box.east };
+    } catch (err) {
+      console.error("automatic unit frame skipped the unit box", err);
+      return null;
+    }
+  }
+  function panLimitFor(unit) {
+    const target = loadedMapExtentTarget();
+    if (target === "world") {
+      const mid = (unit.west + unit.east) / 2;
+      return {
+        south: -WEB_MERCATOR_MAX_ABS_LAT,
+        west: mid - 180,
+        north: WEB_MERCATOR_MAX_ABS_LAT,
+        east: mid + 180
+      };
+    }
+    return shiftIntoFrame(
+      { south: target.south, west: target.west, north: target.north, east: target.east },
+      (unit.west + unit.east) / 2
+    );
+  }
+  function shiftIntoFrame(box, referenceLng) {
+    const mid = (box.west + box.east) / 2;
+    let shift = 0;
+    while (mid + shift - referenceLng > 180) shift -= 360;
+    while (referenceLng - (mid + shift) > 180) shift += 360;
+    return { south: box.south, west: box.west + shift, north: box.north, east: box.east + shift };
+  }
+  function stepsNear(indexes) {
+    const sample = nearestIndex(indexes);
+    const ordered = sample == null ? indexes : [sample, ...indexes.filter((index) => index !== sample)];
+    for (const index of ordered) {
+      const steps = hexCenterSteps(index);
+      if (steps) return steps;
+    }
+    return { latStep: 0, lngStep: 0 };
+  }
+  function nearestIndex(indexes) {
+    const centers = [];
+    for (const index of indexes) {
+      try {
+        const [lat, lng] = cellToLatLng(index);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) centers.push({ index, lat, lng });
+      } catch (err) {
+        console.error("automatic unit frame skipped a cell center", index, err);
+      }
+    }
+    if (centers.length === 0) return null;
+    const interval = longitudeIntervalFromCenters(centers.map((center) => center.lng));
+    const reference = interval?.referenceLng ?? centers[0].lng;
+    const aligned = centers.map((center) => ({ ...center, lng: alignTo3(center.lng, reference) }));
+    const meanLat = aligned.reduce((sum, center) => sum + center.lat, 0) / aligned.length;
+    const meanLng = aligned.reduce((sum, center) => sum + center.lng, 0) / aligned.length;
+    let best = aligned[0];
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const center of aligned) {
+      const distance2 = (center.lat - meanLat) ** 2 + (center.lng - meanLng) ** 2;
+      if (distance2 < bestDistance) {
+        best = center;
+        bestDistance = distance2;
+      }
+    }
+    return best.index;
+  }
+  function alignTo3(lng, refLng) {
+    let shifted = lng;
+    while (shifted - refLng > 180) shifted -= 360;
+    while (refLng - shifted > 180) shifted += 360;
+    return shifted;
+  }
+  function fitMainMapToFrame(framed) {
+    const map = getMainLeafletMap();
+    const leaflet = getLeafletGlobal();
+    if (!map?.fitBounds || !leaflet?.latLng || !leaflet.latLngBounds) return false;
+    try {
+      const bounds = leaflet.latLngBounds(
+        leaflet.latLng(framed.south, framed.west, true),
+        leaflet.latLng(framed.north, framed.east, true)
+      );
+      map.fitBounds(bounds, { padding: [2, 2], animate: false });
+      return true;
+    } catch (err) {
+      console.error("automatic unit frame failed", err);
+      return false;
+    }
+  }
+
+  // src/renderer/map/tacticalMapView.ts
+  function tacticalBattleAreaFrameBox(childTacticalH3Indexes) {
+    let minLat = 90;
+    let maxLat = -90;
+    let minLng = 180;
+    let maxLng = -180;
+    for (const h3 of childTacticalH3Indexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
+      for (const [lat, lng] of boundary) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+    if (minLat > maxLat) return null;
+    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
+    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
+    return {
+      south: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat),
+      west: minLng - padLng,
+      north: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat),
+      east: maxLng + padLng
+    };
+  }
+  function automaticBattleEntry() {
+    const snap = rendererSharedState.tacticalBattleSnapshot;
+    const state = rendererSharedState.gameState;
+    if (!snap || !state || snap.aiOnlyEndReason != null) return false;
+    return shouldApplyAutomaticBattleFrame({
+      observing: observeModeControls(state.seats ?? []).observing,
+      autoAdvance: rendererSharedState.autoAdvance,
+      inBattle: true,
+      playbackRunning: rendererSharedState.resolutionMoveAnimation != null,
+      tacticalTurnNumber: snap.tacticalTurnNumber,
+      framedBeatNumber: null
+    });
+  }
+  function frameOpenAutomaticBattle() {
+    const snap = rendererSharedState.tacticalBattleSnapshot;
+    if (!snap || snap.aiOnlyEndReason != null) return;
+    const limit = tacticalBattleAreaFrameBox(snap.tacticalChildH3Indexes);
+    if (!limit) return;
+    frameAutomaticBattleUnits(limit);
+  }
+  function enterTacticalMapView(childTacticalH3Indexes) {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L || typeof map.fitBounds !== "function") return;
+    const area = tacticalBattleAreaFrameBox(childTacticalH3Indexes);
+    if (!area) return;
+    const sw = { lat: area.south, lng: area.west };
+    const ne = { lat: area.north, lng: area.east };
+    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+    hidePlanningChromeToasts();
+    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
+      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
+    }
+    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
+      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
+    }
+    const tacticalFlyMaxZoom = 14.5;
+    const tacticalAbsoluteMaxZoom = 16;
+    if (typeof map.setMaxZoom === "function") map.setMaxZoom(tacticalAbsoluteMaxZoom);
+    if (automaticBattleEntry()) {
+      clearAutomaticBattleFrameMemory();
+      map.fitBounds(tacticalBounds, { padding: [20, 20], animate: false });
+      if (typeof map.getZoom === "function" && typeof map.setMinZoom === "function") {
+        map.setMinZoom(map.getZoom());
+      }
+      if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
+      frameAutomaticBattleUnits(area);
+      return;
+    }
+    const finalizeTacticalViewZoomAndPan = () => {
+      if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
+      if (typeof map.getZoom === "function" && typeof map.setMinZoom === "function") {
+        map.setMinZoom(map.getZoom());
+      }
+    };
+    if (typeof map.flyToBounds === "function") {
+      map.flyToBounds(tacticalBounds, { padding: [20, 20], duration: 0.55, maxZoom: tacticalFlyMaxZoom });
+      setTimeout(finalizeTacticalViewZoomAndPan, 750);
+    } else {
+      map.fitBounds?.(tacticalBounds, { padding: [20, 20], animate: true });
+      if (typeof map.once === "function") {
+        map.once("moveend", finalizeTacticalViewZoomAndPan);
+      } else {
+        setTimeout(finalizeTacticalViewZoomAndPan, 200);
+      }
+    }
+  }
+  function exitTacticalMapView() {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) {
+      rendererSharedState.preTacticalLeafletMinZoom = null;
+      rendererSharedState.preTacticalLeafletMaxZoom = null;
+      return;
+    }
+    restoreLoadedMapExtent();
+    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
+      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
+    }
+    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
+      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
+    }
+    rendererSharedState.preTacticalLeafletMinZoom = null;
+    rendererSharedState.preTacticalLeafletMaxZoom = null;
+    const home = rendererSharedState.strategicScenarioInitialLeafletView;
+    if (home && typeof map.setView === "function") {
+      map.setView(L.latLng(home.lat, home.lng), home.zoom);
+    } else {
+      restoreLoadedMapExtent(true);
+    }
+  }
+
   // src/renderer/gameplay/observeChrome.ts
   var applySnapshot = null;
   var pressReady = null;
@@ -29455,6 +29911,17 @@ ${bonuses}`;
   var battleEntryHoldsAutoAdvance = false;
   function holdObserveAutoAdvanceForBattleEntry(hold) {
     battleEntryHoldsAutoAdvance = hold;
+  }
+  function observeAutoAdvanceHeldForBattleEntry() {
+    return battleEntryHoldsAutoAdvance;
+  }
+  function frameAutomaticWatchCamera() {
+    if (observeAutoAdvanceHeldForBattleEntry()) return;
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalBattleSnapshot.aiOnlyEndReason == null) {
+      frameOpenAutomaticBattle();
+      return;
+    }
+    frameAutomaticStrategicUnits();
   }
   function autoAdvanceReady() {
     if (battleEntryHoldsAutoAdvance) return false;
@@ -29561,12 +30028,14 @@ ${bonuses}`;
       const input = event.target;
       if (!(input instanceof HTMLInputElement)) return;
       rendererSharedState.autoAdvance = input.checked;
+      if (input.checked) frameAutomaticWatchCamera();
       if (input.checked) void maybeObserveAutoAdvance();
     });
     subscribeCommanderPool(() => {
       void maybeObserveAutoAdvance();
     });
     onResolutionPlaybackFinished(() => {
+      frameAutomaticWatchCamera();
       void maybeObserveAutoAdvance();
     });
   }
@@ -29670,9 +30139,9 @@ ${bonuses}`;
     });
     const tooltip = `City hexes held. Most at the end of turn ${turnLimit} wins. A tie leaves no single winner. ${lines.join("; ")}`;
     if (viewer === null) return { summary: null, tooltip };
-    const held = counts.get(viewer) ?? 0;
+    const held2 = counts.get(viewer) ?? 0;
     const place = places.get(viewer) ?? active2.length;
-    return { summary: `${formatCount(held)} \xB7 ${place} of ${active2.length}`, tooltip };
+    return { summary: `${formatCount(held2)} \xB7 ${place} of ${active2.length}`, tooltip };
   }
   function formatCount(value) {
     return value.toLocaleString("en-US");
@@ -31762,83 +32231,6 @@ ${bonuses}`;
     updateReadyButtonState();
   }
 
-  // src/renderer/map/tacticalMapView.ts
-  function enterTacticalMapView(childTacticalH3Indexes) {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L || typeof map.fitBounds !== "function") return;
-    let minLat = 90;
-    let maxLat = -90;
-    let minLng = 180;
-    let maxLng = -180;
-    for (const h3 of childTacticalH3Indexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
-      for (const [lat, lng] of boundary) {
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-      }
-    }
-    if (minLat > maxLat) return;
-    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
-    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
-    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
-    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
-    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
-    hidePlanningChromeToasts();
-    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
-      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
-    }
-    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
-      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
-    }
-    const tacticalFlyMaxZoom = 14.5;
-    const tacticalAbsoluteMaxZoom = 16;
-    if (typeof map.setMaxZoom === "function") map.setMaxZoom(tacticalAbsoluteMaxZoom);
-    const finalizeTacticalViewZoomAndPan = () => {
-      if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
-      if (typeof map.getZoom === "function" && typeof map.setMinZoom === "function") {
-        map.setMinZoom(map.getZoom());
-      }
-    };
-    if (typeof map.flyToBounds === "function") {
-      map.flyToBounds(tacticalBounds, { padding: [20, 20], duration: 0.55, maxZoom: tacticalFlyMaxZoom });
-      setTimeout(finalizeTacticalViewZoomAndPan, 750);
-    } else {
-      map.fitBounds?.(tacticalBounds, { padding: [20, 20], animate: true });
-      if (typeof map.once === "function") {
-        map.once("moveend", finalizeTacticalViewZoomAndPan);
-      } else {
-        setTimeout(finalizeTacticalViewZoomAndPan, 200);
-      }
-    }
-  }
-  function exitTacticalMapView() {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L) {
-      rendererSharedState.preTacticalLeafletMinZoom = null;
-      rendererSharedState.preTacticalLeafletMaxZoom = null;
-      return;
-    }
-    restoreLoadedMapExtent();
-    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
-      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
-    }
-    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
-      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
-    }
-    rendererSharedState.preTacticalLeafletMinZoom = null;
-    rendererSharedState.preTacticalLeafletMaxZoom = null;
-    const home = rendererSharedState.strategicScenarioInitialLeafletView;
-    if (home && typeof map.setView === "function") {
-      map.setView(L.latLng(home.lat, home.lng), home.zoom);
-    } else {
-      restoreLoadedMapExtent(true);
-    }
-  }
-
   // src/shared/filterOrdersToLivingUnitIds.ts
   function filterOrdersToLivingUnitIds(rows, livingUnitIds) {
     return rows.filter((row) => livingUnitIds.has(row.unitId));
@@ -33618,6 +34010,80 @@ ${bonuses}`;
     renderSelectionBarState();
   }
 
+  // src/renderer/gameplay/heldBattleTurnUpdate.ts
+  var held = null;
+  var queued = null;
+  var pending = null;
+  var nextHoldId = 1;
+  function stashHeldBattleTurnUpdate(inputs, deps, parents) {
+    const record = { id: nextHoldId, inputs, deps, destroyedParents: [...parents] };
+    nextHoldId += 1;
+    if (held) queued = record;
+    else held = record;
+    console.debug("[agent-wars] stashHeldBattleTurnUpdate", {
+      queued: held !== record,
+      parentCount: record.destroyedParents.length
+    });
+  }
+  function attachDestroyedBattleParents(parents) {
+    console.debug("[agent-wars] attachDestroyedBattleParents", {
+      parentCount: parents.length,
+      held: held != null,
+      pending: pending != null
+    });
+    if (parents.length === 0) return;
+    if (held) {
+      appendDestroyedParents(held.destroyedParents, parents);
+      return;
+    }
+    if (!pending) pending = [];
+    appendDestroyedParents(pending, parents);
+  }
+  function appendDestroyedParents(target, parents) {
+    const seen = new Set(target.map((unit) => unit.id));
+    for (const parent of parents) {
+      if (seen.has(parent.id)) continue;
+      seen.add(parent.id);
+      target.push(parent);
+    }
+  }
+  function hasPendingDestroyedBattleParents() {
+    const waiting = pending != null && pending.length > 0;
+    console.debug("[agent-wars] hasPendingDestroyedBattleParents", { waiting });
+    return waiting;
+  }
+  function takePendingDestroyedBattleParents() {
+    const taken = pending ?? [];
+    pending = null;
+    console.debug("[agent-wars] takePendingDestroyedBattleParents", { parentCount: taken.length });
+    return taken;
+  }
+  function waitingHeldBattleTurnUpdateId() {
+    const id = held?.id ?? null;
+    console.debug("[agent-wars] waitingHeldBattleTurnUpdateId", { id });
+    return id;
+  }
+  function takeHeldBattleTurnUpdate() {
+    const current = held;
+    held = queued;
+    queued = null;
+    console.debug("[agent-wars] takeHeldBattleTurnUpdate", {
+      found: current != null,
+      promoted: held != null
+    });
+    return current;
+  }
+  function dropHeldBattleTurnUpdate() {
+    console.debug("[agent-wars] dropHeldBattleTurnUpdate", {
+      held: held != null,
+      queued: queued != null,
+      pending: pending != null
+    });
+    held = null;
+    queued = null;
+    pending = null;
+  }
+
   // src/renderer/tactical/tacticalUiOrchestration.ts
   function clearResolutionPlaybackAnimationState() {
     if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
@@ -33642,6 +34108,8 @@ ${bonuses}`;
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
     rendererSharedState.tacticalBattleSnapshot = null;
     rendererSharedState.tacticalPhasePlanning = true;
+    clearAutomaticFrameMemory();
+    dropHeldBattleTurnUpdate();
     clearPendingTacticalOrders();
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
     exitTacticalMapView();
@@ -33666,6 +34134,7 @@ ${bonuses}`;
       cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
       rendererSharedState.tacticalBattleSnapshot = null;
       rendererSharedState.tacticalPhasePlanning = true;
+      clearAutomaticBattleFrameMemory();
       rendererSharedState.tacticalPendingMarches = [];
       rendererSharedState.pendingEmbarkOrders = [];
       exitTacticalMapView();
@@ -35184,6 +35653,7 @@ ${bonuses}`;
     rendererSharedState.autoAdvance = true;
     rendererSharedState.viewAs = "all";
     syncObserveChrome();
+    frameAutomaticWatchCamera();
   }
   function clearObserveAfterKnockout() {
     watchTheRest = false;
@@ -35420,210 +35890,6 @@ ${bonuses}`;
     return "mutual";
   }
 
-  // src/renderer/tactical/tacticalExitFlow.ts
-  var aiOnlyExitStarted = false;
-  function tacticalMaybeScheduleAnnihilationExit(session, io) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
-    const snap = session.getBattleSnapshot();
-    if (!snap || !session.getPhasePlanning()) return;
-    if (snap.leadPartyId != null) {
-      if (snap.aiOnlyEndReason == null) {
-        aiOnlyExitStarted = false;
-        return;
-      }
-      if (rendererSharedState.resolutionMoveAnimation) return;
-      const sentence = aiOnlyResultSentence(snap);
-      if (sentence == null) return;
-      if (rendererSharedState.autoAdvance) {
-        if (aiOnlyExitStarted) return;
-        aiOnlyExitStarted = true;
-        void leaveAiOnlyBattle(session, io, true);
-        return;
-      }
-      openAiOnlyBattleResultDialog(sentence);
-      io.redraw();
-      return;
-    }
-    const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
-    if (outcome === null) return;
-    openTacticalAnnihilationOutcomeDialog(outcome);
-    io.redraw();
-  }
-  function aiOnlyResultSentence(snap) {
-    if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
-    if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
-    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
-    if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
-    const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
-    if (winner == null || winner === "mutual") return "All units destroyed.";
-    const home = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
-    return `${home && home.length > 0 ? home : winner} wins the battle.`;
-  }
-  async function leaveAiOnlyBattle(session, io, autoAdvance) {
-    await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
-    } });
-    if (session.getBattleSnapshot() != null) return;
-    rendererSharedState.aiOnlyBattleResultSentence = null;
-    if (autoAdvance) await maybeObserveAutoAdvance();
-  }
-  async function tacticalPerformBattleExit(session, io) {
-    const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
-    if (!boundary.ok) return;
-    const matchEpoch = currentRendererMatchEpoch();
-    invalidateBackgroundAiRequest();
-    try {
-      if (io.endTacticalBattle) {
-        await io.endTacticalBattle();
-      }
-    } catch (err) {
-      console.error("endTacticalBattle failed:", err);
-      if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      io.showMapToast("Could not exit tactical battle.", { isError: true });
-      return;
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    tacticalBattleExitTeardownTransientRendererState();
-    session.setBattleSnapshot(null);
-    closeTacticalAnnihilationOutcomeDialog();
-    session.setPhasePlanning(true);
-    exitTacticalMapView();
-    tacticalApplyStrategicSidebarForTacticalMode(false);
-    const tel = document.getElementById("tactical-entry-layer");
-    if (tel) hideTacticalEntryLayer(tel, false);
-    tacticalUpdateExitButtonVisibility();
-    try {
-      await io.refreshStrategicSnapshotAfterExit?.();
-    } catch (err) {
-      console.error("refreshStrategicSnapshotAfterExit failed:", err);
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    updateGameStateSidebar(rendererSharedState.gameState);
-    restoreStrategicOrderDraftsAfterTacticalSession();
-    io.refreshSidebarAfterTacticalDraftTeardown?.();
-    io.redraw();
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    await io.runReadyAfterExit();
-  }
-
-  // src/renderer/tactical/tacticalIpcHandlers.ts
-  function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned() {
-    const interruptedStrategicPlayback = rendererSharedState.resolutionMoveAnimation !== null || rendererSharedState.resolutionMoveAnimationFrameId !== null;
-    if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
-      cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
-    }
-    rendererSharedState.resolutionMoveAnimationFrameId = null;
-    rendererSharedState.resolutionMoveAnimation = null;
-    if (interruptedStrategicPlayback) {
-      flushResolutionPlaybackCompleteNotifyCallbacks();
-    }
-    reconcileSelectionToCurrentState();
-    rendererSharedState.hoverRoutePreview = null;
-    rendererSharedState.hoverPreviewRequestSeq++;
-    rendererSharedState.hoveredHexH3 = null;
-    rendererSharedState.hoveredDetailHexH3 = null;
-    rendererSharedState.selectedUnitIdsAtMouseDown = [];
-    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
-    rendererSharedState.hideCommittedOrderLinesAfterReady = false;
-  }
-  function tacticalRendererApplyStartBattleIpcResult(result, fx) {
-    if (!result.success || !result.battle) {
-      fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
-      return;
-    }
-    stashStrategicOrderDraftsForTacticalSession();
-    fx.assignBattleSnapshot(result.battle);
-    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
-    fx.setPhasePlanning(true);
-    const skipped = result.skippedParentDisplayNames;
-    if (skipped && skipped.length > 0) {
-      fx.showMapToast(`Some units could not be placed tactically: ${skipped.join(", ")}.`, { isError: true });
-    }
-    fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
-    fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitButton();
-    fx.scheduleAnnihilationExit();
-    fx.refreshReadyButton();
-    fx.syncTacticalEntryOverlay();
-    fx.redraw();
-    updateGameStateSidebar(rendererSharedState.gameState);
-    fx.refreshOrderSidebars?.();
-  }
-  function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
-    stashStrategicOrderDraftsForTacticalSession();
-    fx.assignBattleSnapshot(battle);
-    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
-    fx.setPhasePlanning(true);
-    fx.enterTacticalView(battle.tacticalChildH3Indexes);
-    fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitButton();
-    fx.scheduleAnnihilationExit();
-    fx.refreshReadyButton();
-    fx.syncTacticalEntryOverlay();
-    fx.redraw();
-    updateGameStateSidebar(rendererSharedState.gameState);
-    fx.refreshOrderSidebars?.();
-  }
-
-  // src/renderer/tactical/tacticalEntryFlow.ts
-  function buildDefaultTacticalBattleActivationSideEffects(bindings) {
-    return {
-      showMapToast: bindings.showMapToast,
-      assignBattleSnapshot: (battle) => {
-        rendererSharedState.tacticalBattleSnapshot = battle;
-        bindings.rebuildUnitDisplayNameLookup?.();
-      },
-      setPhasePlanning: (planning) => {
-        rendererSharedState.tacticalPhasePlanning = planning;
-      },
-      enterTacticalView: enterTacticalMapView,
-      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-      refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
-      scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
-      refreshReadyButton: bindings.refreshReadyButton,
-      syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
-      redraw: bindings.redraw,
-      refreshOrderSidebars: bindings.refreshOrderSidebars
-    };
-  }
-  async function startTacticalBattleFromEntryHex(enclosingStrategicH3Index, deps) {
-    const matchEpoch = currentRendererMatchEpoch();
-    if (deps.prepareStrategicUiBeforeTacticalStart) {
-      await deps.prepareStrategicUiBeforeTacticalStart();
-    }
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    const resumedSession = rendererSharedState.gameState?.tacticalBattleSession && rendererSharedState.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index && !rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.gameState.tacticalBattleSession : null;
-    if (resumedSession) {
-      deps.hideBuildPopup();
-      activateRestoredTacticalBattleFromMainSnapshot(resumedSession, deps.getActivationSideEffects());
-      return;
-    }
-    const ipc = deps.invokeStartTacticalBattle;
-    if (!ipc) {
-      deps.onMissingStartTacticalBattleIpc();
-      return;
-    }
-    deps.hideBuildPopup();
-    const result = await ipc({ enclosingStrategicH3Index });
-    if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
-  }
-  function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
-    tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
-  }
-  async function performTacticalBattleExitWithGameApi(session, io) {
-    await tacticalPerformBattleExit(session, {
-      ...io,
-      endTacticalBattle: window.gameApi?.endTacticalBattle
-    });
-  }
-
-  // src/shared/buildQueueItemLabels.ts
-  function formatBuildQueueItemLabel(item) {
-    if (item === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_QUEUE_ITEM_LABEL;
-    if (item === CREDITS_QUEUE_ITEM) return CREDITS_QUEUE_ITEM_LABEL;
-    return item.charAt(0).toUpperCase() + item.slice(1);
-  }
-
   // src/shared/consolidatedTurnUpdateToast.ts
   var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
   var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
@@ -35720,7 +35986,8 @@ ${bonuses}`;
       turnReport?.viewerSeatId ?? null,
       turnReport?.seats ?? [],
       turnReport ? hexChangeLinesByOwner(turnReport) : void 0,
-      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner)
+      mergeStrikeLines(missileLines.byOwner, fortificationReports.byOwner),
+      args.battleLinesByOwner
     );
     sections.push(...lossSections);
     let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
@@ -35743,6 +36010,268 @@ ${bonuses}`;
     return sections.join("\n");
   }
 
+  // src/shared/missileStrikeReport.ts
+  var MISSILE_STRIKE_UNNAMED_PLACE = "an unnamed hex";
+  function missileLaunchVisibleToViewer(record, viewerSeatId2, visibleHexes) {
+    if (viewerSeatId2 === null) return true;
+    if (record.player === viewerSeatId2) return true;
+    if (record.targetControllerId === viewerSeatId2) return true;
+    return visibleHexes.has(record.targetH3Index);
+  }
+  function flagPhrase(destroyed, before, singular, plural) {
+    if (before <= 0) return null;
+    return `${destroyed} ${destroyed === 1 ? singular : plural}`;
+  }
+  function formatMissileStrikeLine(args) {
+    const record = args.record;
+    const parts = [
+      flagPhrase(record.urbanDestroyed, record.urbanBefore, "city cell", "city cells"),
+      flagPhrase(record.airportsDestroyed, record.airportsBefore, "airport", "airports"),
+      flagPhrase(record.seaportsDestroyed, record.seaportsBefore, "seaport", "seaports"),
+      flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, "fortification", "fortifications")
+    ].filter((part) => part !== null);
+    if (parts.length === 0) return `Missile strike on ${args.placeName}: nothing there to destroy.`;
+    const air = record.destroyedAirUnitIds.length;
+    const squadrons = air === 0 ? "" : `; ${air} ${air === 1 ? "squadron" : "squadrons"} lost`;
+    return `Missile strike on ${args.placeName}: ${joinWithSerialComma(parts)} destroyed${squadrons}.`;
+  }
+  function buildMissilePlaybackMoves(records) {
+    return records.map((record) => ({
+      unitId: record.unitId,
+      player: record.player,
+      unitType: "missile",
+      fromH3Index: record.fromH3Index,
+      targetH3Index: record.targetH3Index,
+      returnsToBase: false
+    }));
+  }
+
+  // src/shared/lossSummaryFromResolution.ts
+  function normalizeUnitType(raw) {
+    return isBuildUnitType(raw) ? raw : null;
+  }
+  function snapshotById(snapshots) {
+    const map = /* @__PURE__ */ new Map();
+    for (const s of snapshots) map.set(s.id, s);
+    return map;
+  }
+  function allRemovedSnapshots(args) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const s of args.removedUnits ?? []) byId.set(s.id, s);
+    for (const s of args.missileStrikeRemovedUnits ?? []) byId.set(s.id, s);
+    for (const s of args.airStrikeRemovedUnits ?? []) byId.set(s.id, s);
+    return [...byId.values()];
+  }
+  function resolveLostUnit(victimId, snapshots, args) {
+    const snap = snapshots.get(victimId);
+    const meta = args.resolveUnitMeta(victimId) ?? (snap ? { player: snap.player, unitType: snap.unitType } : void 0);
+    if (!meta) return null;
+    const unitType = normalizeUnitType(meta.unitType);
+    if (!unitType) return null;
+    const player = meta.player;
+    const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
+    const visible = player === alwaysVisiblePlayer || !args.isVictimVisible || args.isVictimVisible(victimId, player);
+    if (!visible) return null;
+    const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
+    return { unitType, displayName, unitId: victimId };
+  }
+  function bucketForPlayer(summary, player) {
+    const existing = summary.byOwner[player];
+    if (existing) return existing;
+    const created = emptyPlayerLossSummary();
+    summary.byOwner[player] = created;
+    return created;
+  }
+  function pushToBucket(summary, player, bucket, unit) {
+    bucketForPlayer(summary, player)[bucket].push(unit);
+  }
+  function airStrikeAttackerLossUnitIdsFromMoves(moves) {
+    if (!moves || moves.length === 0) return [];
+    return moves.filter((m) => m.returnsToBase === false).map((m) => m.unitId);
+  }
+  function classifyAirStrikeKillCause(edge, args) {
+    const victimMeta = args.resolveUnitMeta(edge.victimId);
+    if (victimMeta?.unitType !== "air") return "airStrike";
+    const killerId = edge.killerIds?.[0];
+    if (!killerId) return "returnFire";
+    const killerMeta = args.resolveUnitMeta(killerId);
+    if (killerMeta && killerMeta.player !== victimMeta.player) return "returnFire";
+    return "airStrike";
+  }
+  function causeForAirStrikeRemovedUnit(snap, args) {
+    const edge = (args.killsByAirStrike ?? []).find((e) => e.victimId === snap.id);
+    if (edge) return classifyAirStrikeKillCause(edge, args);
+    if (args.airStrikeAttackerLossUnitIds?.includes(snap.id)) return "returnFire";
+    return "airStrike";
+  }
+  function buildTurnLossSummary(args) {
+    const summary = emptyTurnLossSummary();
+    const snapshots = snapshotById(allRemovedSnapshots(args));
+    const victimToCause = /* @__PURE__ */ new Map();
+    const assignFromEdges = (edges, cause) => {
+      for (const edge of edges ?? []) {
+        if (!victimToCause.has(edge.victimId)) victimToCause.set(edge.victimId, cause);
+      }
+    };
+    for (const edge of args.killsByAirStrike ?? []) {
+      if (!victimToCause.has(edge.victimId)) {
+        victimToCause.set(edge.victimId, classifyAirStrikeKillCause(edge, args));
+      }
+    }
+    assignFromEdges(args.killsByDirectFire, "ranged");
+    assignFromEdges(args.killsByReturnFire, "returnFire");
+    if (args.killsByMelee && args.killsByMelee.length > 0) {
+      assignFromEdges(args.killsByMelee, "melee");
+    } else {
+      assignFromEdges(args.kills, "melee");
+    }
+    for (const snap of args.missileStrikeRemovedUnits ?? []) {
+      if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, "missileStrike");
+    }
+    for (const snap of args.airStrikeRemovedUnits ?? []) {
+      if (!victimToCause.has(snap.id)) {
+        victimToCause.set(snap.id, causeForAirStrikeRemovedUnit(snap, args));
+      }
+    }
+    const claimed = /* @__PURE__ */ new Set();
+    const addVictim = (victimId, cause) => {
+      if (claimed.has(victimId)) return;
+      const unit = resolveLostUnit(victimId, snapshots, args);
+      if (!unit) return;
+      const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
+      const player = meta?.player ?? AI_SEAT_IDS[0];
+      pushToBucket(summary, player, cause, unit);
+      claimed.add(victimId);
+    };
+    for (const [victimId, cause] of victimToCause) {
+      addVictim(victimId, cause);
+    }
+    for (const snap of allRemovedSnapshots(args)) {
+      if (claimed.has(snap.id)) continue;
+      addVictim(snap.id, "other");
+    }
+    return summary;
+  }
+  function buildTurnLossSummaryFromReadyShape(args) {
+    return buildTurnLossSummary(args);
+  }
+
+  // src/shared/tacticalToastKillSlice.ts
+  function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
+    return [
+      ...playback.killsByDirectFire ?? [],
+      ...playback.killsByReturnFire ?? [],
+      ...playback.killsByMelee ?? []
+    ];
+  }
+
+  // src/shared/unknownBattleContinentNames.ts
+  async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
+    const unknownContinentNames = [];
+    if (!fetchContinentNames) return unknownContinentNames;
+    const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter(
+      (h3, idx, arr) => arr.indexOf(h3) === idx
+    );
+    for (const h3 of unknownHexes) {
+      const names = await fetchContinentNames(h3);
+      for (const n of names) {
+        if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
+      }
+    }
+    return unknownContinentNames;
+  }
+
+  // src/shared/destroyedInBattleLine.ts
+  var GROUP_LABEL_BY_TYPE2 = {
+    naval: "Naval",
+    air: "Air",
+    armor: "Armored",
+    infantry: "Infantry",
+    missile: "Missile"
+  };
+  var GROUP_ORDER2 = ["naval", "air", "armor", "infantry", "missile"];
+  function visibleDestroyedParents(units, viewerSeatId2, visibleHexes) {
+    if (viewerSeatId2 == null) return [...units];
+    return units.filter((unit) => unit.ownerId === viewerSeatId2 || visibleHexes.has(unit.h3Index));
+  }
+  function formatDestroyedInBattleLine(units) {
+    if (units.length === 0) return "";
+    const counts = /* @__PURE__ */ new Map();
+    for (const unit of units) counts.set(unit.unitType, (counts.get(unit.unitType) ?? 0) + 1);
+    const named = [];
+    const grouped = /* @__PURE__ */ new Set();
+    for (const unit of units) {
+      const count = counts.get(unit.unitType) ?? 0;
+      if (count > LOSS_TYPE_NAME_LIST_MAX && isBuildUnitType(unit.unitType)) {
+        grouped.add(unit.unitType);
+      } else {
+        named.push(unit.displayName);
+      }
+    }
+    const groups = GROUP_ORDER2.filter((unitType) => grouped.has(unitType)).map((unitType) => `${counts.get(unitType) ?? 0} ${GROUP_LABEL_BY_TYPE2[unitType]}`);
+    return `${[...named, ...groups].join(", ")} destroyed in battle.`;
+  }
+  function destroyedInBattleLinesByOwner(units) {
+    const byOwner = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const list = byOwner.get(unit.ownerId);
+      if (list) list.push(unit);
+      else byOwner.set(unit.ownerId, [unit]);
+    }
+    const lines = /* @__PURE__ */ new Map();
+    for (const [ownerId, list] of byOwner) {
+      const line = formatDestroyedInBattleLine(list);
+      if (line.length > 0) lines.set(ownerId, line);
+    }
+    return lines;
+  }
+
+  // src/shared/fortificationReport.ts
+  function fortificationReportVisibleToViewer(report, viewerSeatId2, exploredHexes) {
+    if (viewerSeatId2 === null) return true;
+    if (viewerSeatId2 === report.ownerId) return true;
+    return exploredHexes.has(report.h3Index);
+  }
+
+  // src/renderer/gameplay/fortificationUpdateLines.ts
+  async function fortificationUpdateLinesFor(readySlice) {
+    const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
+    if (hexes.length === 0) return [];
+    return [formatFortificationQueuePausedLine(await placeNamesForHexes(hexes))];
+  }
+  async function placeNamesForHexes(hexes) {
+    const names = [];
+    for (const h3Index of hexes) {
+      let placeName = FORTIFICATION_UNNAMED_PLACE;
+      try {
+        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
+        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
+      } catch (err) {
+        console.error("place name lookup failed", err);
+      }
+      names.push(placeName);
+    }
+    return names;
+  }
+  async function fortificationReportLinesFor(readySlice, viewer) {
+    const lines = [];
+    for (const report of readySlice.fortificationReports ?? []) {
+      if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
+      let placeName = FORTIFICATION_UNNAMED_PLACE;
+      try {
+        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: report.h3Index, resolution: 1 });
+        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
+      } catch (err) {
+        console.error("fortification place name failed", err);
+      }
+      lines.push({
+        ownerId: report.ownerId,
+        line: formatFortificationReportLine({ placeName, lost: report.lost, remaining: report.remaining })
+      });
+    }
+    return lines;
+  }
+
   // src/shared/productionBuildability.ts
   var BUILD_PAUSED_NOTE = "Building is paused here: this hex is outside your home region and holds none of your units or fortifications. Its points still bank. Have a unit here at the end of a turn to build again.";
   function formatBuildPausedLine(placeNames) {
@@ -35750,6 +36279,538 @@ ${bonuses}`;
       return `Building is paused at ${placeNames[0]}, which holds none of your units or fortifications.`;
     }
     return `Building is paused at ${joinWithSerialComma(placeNames)}, which hold none of your units or fortifications.`;
+  }
+
+  // src/renderer/gameplay/productionPauseUpdateLines.ts
+  async function productionPauseUpdateLinesFor(readySlice) {
+    const hexes = readySlice.humanBuildPausedHexes ?? [];
+    if (hexes.length === 0) return [];
+    return [formatBuildPausedLine(await placeNamesForHexes(hexes))];
+  }
+
+  // src/renderer/gameplay/readyResolutionAnnouncements.ts
+  function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
+    const allKills = readyResult.kills ?? [];
+    const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
+    const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
+    const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
+    const killerOwner = (id) => {
+      const removedPlayer = removedById.get(id)?.player;
+      if (removedPlayer) return removedPlayer;
+      return rendererSharedState.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
+    };
+    const friendlyInvolvedKillVictimIds = new Set(
+      allKills.filter((k) => {
+        const victim = removedById.get(k.victimId);
+        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
+        const victimIsFriendly = viewerInvolved(victim?.player);
+        return killerIsFriendly || victimIsFriendly;
+      }).map((k) => k.victimId)
+    );
+    const friendlyInvolvedCombatHexes = new Set(
+      [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
+    );
+    const friendlyPlannedCombatHexes = new Set(
+      viewerIsHuman ? [
+        ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+        ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
+        ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
+        ...(readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+        ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index)
+      ] : []
+    );
+    for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
+    const knownHumanAirStrikeTargetHexes = new Set(
+      (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
+    );
+    const unknownCombatHexes = [
+      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCombatHexes ?? [],
+      ...readyResult.meleeCombatHexes ?? [],
+      ...readyResult.combatHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const unknownCasualtyHexes = [
+      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCasualtyHexes ?? [],
+      ...readyResult.meleeCasualtyHexes ?? [],
+      ...readyResult.casualtyHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
+    for (const removed of readyResult.removedUnits ?? []) {
+      if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
+    }
+    for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
+    for (const launch of readyResult.missileLaunches ?? []) {
+      if (launch.player !== viewerSeatId2) continue;
+      for (const victimId of launch.destroyedAirUnitIds) knownVictimIds.add(victimId);
+    }
+    const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
+      const removed = removedById.get(id);
+      if (viewerInvolved(removed?.player)) return false;
+      return !friendlyInvolvedKillVictimIds.has(id);
+    }).filter((id) => {
+      const removed = removedById.get(id);
+      return removed ? !visibleHexes.has(removed.h3Index) : false;
+    });
+    return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
+  }
+  function buildTacticalCommitReadyResultForToast(playback) {
+    const killsByDirectFire = playback.killsByDirectFire ?? [];
+    const killsByAirStrike = playback.killsByAirStrike ?? [];
+    const killsByReturnFire = playback.killsByReturnFire ?? [];
+    const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
+    const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
+    const removedAll = [...playback.rangedRemovedUnits ?? [], ...playback.meleeRemovedUnits ?? []];
+    const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
+    const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
+    const airStrikeRemovedUnits = removedAll.filter((u) => {
+      if (airStrikeVictimIds.has(u.id)) return true;
+      if (u.player === HUMAN_SEAT_ID && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
+      return false;
+    });
+    return {
+      success: true,
+      kills,
+      killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : void 0,
+      killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : void 0,
+      killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : void 0,
+      removedUnits: removedAll.length > 0 ? removedAll : void 0,
+      humanMoves: playback.humanMoves,
+      rangedCombatHexes: playback.rangedCombatHexes,
+      rangedCasualtyHexes: playback.rangedCasualtyHexes,
+      rangedRemovedUnits: playback.rangedRemovedUnits,
+      airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
+      infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
+      airStrikeAttemptCount: playback.airStrikeAttemptCount,
+      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
+    };
+  }
+  function buildPopupTurnLossSummary(args) {
+    const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
+    const removed = readySlice.removedUnits ?? [];
+    const metaMap = /* @__PURE__ */ new Map();
+    for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    for (const u of readySlice.missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    const readyWithAir = readySlice;
+    return buildTurnLossSummaryFromReadyShape({
+      kills: readySlice.kills,
+      killsByDirectFire: readySlice.killsByDirectFire,
+      killsByReturnFire: readySlice.killsByReturnFire,
+      killsByMelee,
+      killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
+      removedUnits: removed,
+      airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+      missileStrikeRemovedUnits: readySlice.missileStrikeRemovedUnits,
+      airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
+      resolveDisplayName: (id) => {
+        const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id) ?? readySlice.missileStrikeRemovedUnits?.find((u) => u.id === id);
+        if (snap?.displayName) return snap.displayName;
+        return formatBaseUnitName(id);
+      },
+      resolveUnitMeta: (id) => metaMap.get(id),
+      isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
+    });
+  }
+  function formatHexCount(label, count) {
+    return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
+  }
+  function buildCombatActivityFallbackBullets(readyResult) {
+    const bullets = [];
+    const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
+    if (rangedHexCount > 0) bullets.push(formatHexCount("Ranged engagements", rangedHexCount));
+    const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
+    if (meleeHexCount > 0) bullets.push(formatHexCount("Melee engagements", meleeHexCount));
+    const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
+    if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
+    return bullets;
+  }
+  function reportViewerSeatId() {
+    const seats = rendererSharedState.gameState?.seats ?? [];
+    const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
+    return viewer ?? null;
+  }
+  function launchTurnSeats() {
+    return (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      homeRegion: seat.homeRegion
+    }));
+  }
+  async function announceResolutionTurnUpdate(args, deps) {
+    const parents = args.destroyedParents ?? (args.usePendingBattleParents ? takePendingDestroyedBattleParents() : []);
+    if (args.holdForBattle) {
+      console.debug("[agent-wars] announceResolutionTurnUpdate holding for battle", {
+        parentCount: parents.length,
+        reportTag: args.reportTag
+      });
+      stashHeldBattleTurnUpdate(
+        {
+          ...args,
+          holdForBattle: false,
+          usePendingBattleParents: false,
+          viewerSeatId: reportViewerSeatId(),
+          seats: launchTurnSeats(),
+          exploredHexes: getExploredHexSet(rendererSharedState.gameState)
+        },
+        deps,
+        parents
+      );
+      return;
+    }
+    const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
+    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
+    const turnLossSummary = buildPopupTurnLossSummary({
+      readySlice,
+      knownVictimIds,
+      formatBaseUnitName: killToastFormatter.formatBaseUnitName,
+      ...extraKills !== void 0 ? extraKills : {}
+    });
+    const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
+    const seats = args.seats ? [...args.seats] : launchTurnSeats();
+    const viewerSeatId2 = args.viewerSeatId !== void 0 ? args.viewerSeatId : reportViewerSeatId();
+    const visibleParents = visibleDestroyedParents(parents, viewerSeatId2, args.visibleHexes ?? /* @__PURE__ */ new Set());
+    const battleLinesByOwner = destroyedInBattleLinesByOwner(visibleParents);
+    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+    let unknownBattleLine;
+    if (hasUnknownBattle) {
+      try {
+        const getContinentNames = window.gameApi?.getHexContinentNames;
+        const unknownContinentNames = await collectUnknownBattleContinentNames(
+          unknownCombatHexes,
+          unknownCasualtyHexes,
+          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+        );
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
+      } catch (err) {
+        console.error("unknown battle continent names failed", err);
+        unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
+      }
+    }
+    const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
+    const fortificationLines = await fortificationUpdateLinesFor(readySlice);
+    const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
+    const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
+      viewerSeatId: viewerSeatId2,
+      exploredHexes: args.exploredHexes ?? getExploredHexSet(rendererSharedState.gameState)
+    });
+    const updateText = buildConsolidatedTurnUpdateToastMessage({
+      readyResult: readySlice,
+      turnLossSummary,
+      combatFallbackBullets,
+      turnReport: {
+        viewerSeatId: viewerSeatId2,
+        seats,
+        transitions: readySlice.controlTransitions ?? []
+      },
+      unknownBattleLine,
+      missileStrikeLines,
+      fortificationLines,
+      productionPauseLines,
+      fortificationReportLines,
+      battleLinesByOwner
+    });
+    if (updateText) {
+      rememberUnitOrigins([
+        ...readySlice.removedUnits ?? [],
+        ...readySlice.airStrikeRemovedUnits ?? [],
+        ...readySlice.missileStrikeRemovedUnits ?? [],
+        ...readySlice.rangedRemovedUnits ?? [],
+        ...readySlice.meleeRemovedUnits ?? [],
+        ...visibleParents
+      ]);
+      const unitOriginByDisplayName = mergeDestroyedBattleParentFlags(
+        buildUnitOriginByLossDisplayName(turnLossSummary),
+        visibleParents
+      );
+      deps.showMapToast(updateText, {
+        isError: false,
+        unitOriginByDisplayName,
+        seats,
+        viewerSeatId: viewerSeatId2,
+        report: { kind: "turn", tag: reportTag }
+      });
+      deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
+    }
+  }
+  async function showHeldBattleTurnUpdate(includeBattleLines = true) {
+    const held2 = takeHeldBattleTurnUpdate();
+    console.debug("[agent-wars] showHeldBattleTurnUpdate", {
+      found: held2 != null,
+      includeBattleLines,
+      parentCount: held2?.destroyedParents.length ?? 0
+    });
+    if (!held2) return;
+    await announceResolutionTurnUpdate(
+      {
+        ...held2.inputs,
+        destroyedParents: includeBattleLines ? held2.destroyedParents : [],
+        holdForBattle: false,
+        usePendingBattleParents: false
+      },
+      held2.deps
+    );
+  }
+  async function missileStrikeLinesFor(launches) {
+    const lines = [];
+    for (const record of launches ?? []) {
+      let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
+      try {
+        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: record.targetH3Index, resolution: 1 });
+        placeName = caption?.text.trim() || MISSILE_STRIKE_UNNAMED_PLACE;
+      } catch (err) {
+        console.error("missile strike place name failed", err);
+      }
+      lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
+    }
+    return lines;
+  }
+  function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
+    if (needsPlayback) {
+      enqueueResolutionPlaybackCompleteNotify(send);
+    } else {
+      dropQueuedResolutionPlaybackCompleteNotifies();
+      send();
+      notifyResolutionPlaybackFinished();
+    }
+  }
+
+  // src/renderer/tactical/tacticalExitFlow.ts
+  var aiOnlyExitStarted = false;
+  function tacticalMaybeScheduleAnnihilationExit(session, io) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null || rendererSharedState.aiOnlyBattleResultSentence != null) return;
+    const snap = session.getBattleSnapshot();
+    if (!snap || !session.getPhasePlanning()) return;
+    if (snap.leadPartyId != null) {
+      if (snap.aiOnlyEndReason == null) {
+        aiOnlyExitStarted = false;
+        return;
+      }
+      if (rendererSharedState.resolutionMoveAnimation) return;
+      const sentence = aiOnlyResultSentence(snap);
+      if (sentence == null) return;
+      if (rendererSharedState.autoAdvance) {
+        if (aiOnlyExitStarted) return;
+        aiOnlyExitStarted = true;
+        void leaveAiOnlyBattle(session, io, true);
+        return;
+      }
+      openAiOnlyBattleResultDialog(sentence);
+      io.redraw();
+      return;
+    }
+    const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
+    if (outcome === null) return;
+    openTacticalAnnihilationOutcomeDialog(outcome);
+    io.redraw();
+  }
+  function aiOnlyResultSentence(snap) {
+    if (snap.aiOnlyEndReason == null || snap.leadPartyId == null || snap.opposingPartyId == null) return null;
+    if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
+    if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
+    if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
+    const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
+    if (winner == null || winner === "mutual") return "All units destroyed.";
+    const home = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
+    return `${home && home.length > 0 ? home : winner} wins the battle.`;
+  }
+  async function leaveAiOnlyBattle(session, io, autoAdvance) {
+    await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
+    } });
+    if (session.getBattleSnapshot() != null) return;
+    rendererSharedState.aiOnlyBattleResultSentence = null;
+    const waitingHoldId = waitingHeldBattleTurnUpdateId();
+    if (autoAdvance) await maybeObserveAutoAdvance();
+    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+      await showHeldBattleTurnUpdate(true);
+    }
+  }
+  async function tacticalPerformBattleExit(session, io) {
+    const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
+    if (!boundary.ok) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    invalidateBackgroundAiRequest();
+    try {
+      if (io.endTacticalBattle) {
+        const ended = await io.endTacticalBattle();
+        attachDestroyedBattleParents(destroyedParentsFromEnd(ended));
+      }
+    } catch (err) {
+      console.error("endTacticalBattle failed:", err);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      io.showMapToast("Could not exit tactical battle.", { isError: true });
+      return;
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    tacticalBattleExitTeardownTransientRendererState();
+    session.setBattleSnapshot(null);
+    clearAutomaticBattleFrameMemory();
+    closeTacticalAnnihilationOutcomeDialog();
+    session.setPhasePlanning(true);
+    exitTacticalMapView();
+    tacticalApplyStrategicSidebarForTacticalMode(false);
+    const tel = document.getElementById("tactical-entry-layer");
+    if (tel) hideTacticalEntryLayer(tel, false);
+    tacticalUpdateExitButtonVisibility();
+    try {
+      await io.refreshStrategicSnapshotAfterExit?.();
+    } catch (err) {
+      console.error("refreshStrategicSnapshotAfterExit failed:", err);
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    updateGameStateSidebar(rendererSharedState.gameState);
+    restoreStrategicOrderDraftsAfterTacticalSession();
+    io.refreshSidebarAfterTacticalDraftTeardown?.();
+    io.redraw();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    frameAutomaticStrategicUnits();
+    await io.runReadyAfterExit();
+  }
+  function destroyedParentsFromEnd(ended) {
+    if (!ended || typeof ended !== "object" || !("destroyedParents" in ended)) return [];
+    const parents = ended.destroyedParents;
+    return Array.isArray(parents) ? parents : [];
+  }
+
+  // src/renderer/tactical/tacticalIpcHandlers.ts
+  function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned() {
+    const interruptedStrategicPlayback = rendererSharedState.resolutionMoveAnimation !== null || rendererSharedState.resolutionMoveAnimationFrameId !== null;
+    if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
+      cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+    }
+    rendererSharedState.resolutionMoveAnimationFrameId = null;
+    rendererSharedState.resolutionMoveAnimation = null;
+    if (interruptedStrategicPlayback) {
+      flushResolutionPlaybackCompleteNotifyCallbacks();
+    }
+    reconcileSelectionToCurrentState();
+    rendererSharedState.hoverRoutePreview = null;
+    rendererSharedState.hoverPreviewRequestSeq++;
+    rendererSharedState.hoveredHexH3 = null;
+    rendererSharedState.hoveredDetailHexH3 = null;
+    rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+    rendererSharedState.hideCommittedOrderLinesAfterReady = false;
+  }
+  function tacticalRendererApplyStartBattleIpcResult(result, fx) {
+    if (!result.success || !result.battle) {
+      fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
+      return;
+    }
+    stashStrategicOrderDraftsForTacticalSession();
+    fx.assignBattleSnapshot(result.battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
+    fx.setPhasePlanning(true);
+    const skipped = result.skippedParentDisplayNames;
+    if (skipped && skipped.length > 0) {
+      fx.showMapToast(`Some units could not be placed tactically: ${skipped.join(", ")}.`, { isError: true });
+    }
+    fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitButton();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+    updateGameStateSidebar(rendererSharedState.gameState);
+    fx.refreshOrderSidebars?.();
+  }
+  function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
+    stashStrategicOrderDraftsForTacticalSession();
+    fx.assignBattleSnapshot(battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
+    fx.setPhasePlanning(true);
+    fx.enterTacticalView(battle.tacticalChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitButton();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+    updateGameStateSidebar(rendererSharedState.gameState);
+    fx.refreshOrderSidebars?.();
+  }
+
+  // src/renderer/tactical/tacticalEntryFlow.ts
+  function buildDefaultTacticalBattleActivationSideEffects(bindings) {
+    return {
+      showMapToast: bindings.showMapToast,
+      assignBattleSnapshot: (battle) => {
+        rendererSharedState.tacticalBattleSnapshot = battle;
+        bindings.rebuildUnitDisplayNameLookup?.();
+      },
+      setPhasePlanning: (planning) => {
+        rendererSharedState.tacticalPhasePlanning = planning;
+      },
+      enterTacticalView: enterTacticalMapView,
+      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+      refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
+      scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
+      refreshReadyButton: bindings.refreshReadyButton,
+      syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
+      redraw: bindings.redraw,
+      refreshOrderSidebars: bindings.refreshOrderSidebars
+    };
+  }
+  async function startTacticalBattleFromEntryHex(enclosingStrategicH3Index, deps) {
+    const matchEpoch = currentRendererMatchEpoch();
+    if (deps.prepareStrategicUiBeforeTacticalStart) {
+      await deps.prepareStrategicUiBeforeTacticalStart();
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) {
+      dropHeldBattleTurnUpdate();
+      return;
+    }
+    const resumedSession = rendererSharedState.gameState?.tacticalBattleSession && rendererSharedState.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index && !rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.gameState.tacticalBattleSession : null;
+    if (resumedSession) {
+      deps.hideBuildPopup();
+      activateRestoredTacticalBattleFromMainSnapshot(resumedSession, deps.getActivationSideEffects());
+      return;
+    }
+    const ipc = deps.invokeStartTacticalBattle;
+    if (!ipc) {
+      deps.onMissingStartTacticalBattleIpc();
+      await showHeldBattleTurnUpdate(true);
+      return;
+    }
+    deps.hideBuildPopup();
+    let result;
+    try {
+      result = await ipc({ enclosingStrategicH3Index });
+    } catch (err) {
+      console.error("startTacticalBattle failed", err);
+      await showHeldBattleTurnUpdate(true);
+      return;
+    }
+    if (!rendererMatchEpochCurrent(matchEpoch)) {
+      dropHeldBattleTurnUpdate();
+      return;
+    }
+    tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
+    if (!result.success || !result.battle) await showHeldBattleTurnUpdate(true);
+  }
+  function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
+    tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
+  }
+  async function performTacticalBattleExitWithGameApi(session, io) {
+    const waitingHoldId = waitingHeldBattleTurnUpdateId();
+    await tacticalPerformBattleExit(session, {
+      ...io,
+      endTacticalBattle: window.gameApi?.endTacticalBattle
+    });
+    if (session.getBattleSnapshot() != null) return;
+    if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+      await showHeldBattleTurnUpdate(true);
+    }
+  }
+
+  // src/shared/buildQueueItemLabels.ts
+  function formatBuildQueueItemLabel(item) {
+    if (item === FORTIFICATION_QUEUE_ITEM) return FORTIFICATION_QUEUE_ITEM_LABEL;
+    if (item === CREDITS_QUEUE_ITEM) return CREDITS_QUEUE_ITEM_LABEL;
+    return item.charAt(0).toUpperCase() + item.slice(1);
   }
 
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
@@ -36912,42 +37973,6 @@ ${bonuses}`;
     return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup3, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
-  // src/shared/missileStrikeReport.ts
-  var MISSILE_STRIKE_UNNAMED_PLACE = "an unnamed hex";
-  function missileLaunchVisibleToViewer(record, viewerSeatId2, visibleHexes) {
-    if (viewerSeatId2 === null) return true;
-    if (record.player === viewerSeatId2) return true;
-    if (record.targetControllerId === viewerSeatId2) return true;
-    return visibleHexes.has(record.targetH3Index);
-  }
-  function flagPhrase(destroyed, before, singular, plural) {
-    if (before <= 0) return null;
-    return `${destroyed} ${destroyed === 1 ? singular : plural}`;
-  }
-  function formatMissileStrikeLine(args) {
-    const record = args.record;
-    const parts = [
-      flagPhrase(record.urbanDestroyed, record.urbanBefore, "city cell", "city cells"),
-      flagPhrase(record.airportsDestroyed, record.airportsBefore, "airport", "airports"),
-      flagPhrase(record.seaportsDestroyed, record.seaportsBefore, "seaport", "seaports"),
-      flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, "fortification", "fortifications")
-    ].filter((part) => part !== null);
-    if (parts.length === 0) return `Missile strike on ${args.placeName}: nothing there to destroy.`;
-    const air = record.destroyedAirUnitIds.length;
-    const squadrons = air === 0 ? "" : `; ${air} ${air === 1 ? "squadron" : "squadrons"} lost`;
-    return `Missile strike on ${args.placeName}: ${joinWithSerialComma(parts)} destroyed${squadrons}.`;
-  }
-  function buildMissilePlaybackMoves(records) {
-    return records.map((record) => ({
-      unitId: record.unitId,
-      player: record.player,
-      unitType: "missile",
-      fromH3Index: record.fromH3Index,
-      targetH3Index: record.targetH3Index,
-      returnsToBase: false
-    }));
-  }
-
   // src/renderer/gameplay/tacticalBattlePromptPreference.ts
   var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
   function readTacticalBattlesInterceptPromptEnabled() {
@@ -36969,7 +37994,7 @@ ${bonuses}`;
   // src/shared/ordersHeldForPlayback.ts
   function ordersHeldUntilMovementEnds(orders, units, moves) {
     const originH3ByUnitId = {};
-    const held = [];
+    const held2 = [];
     for (const order of orders) {
       if (!order.destinationH3Index) continue;
       const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === HUMAN_SEAT_ID);
@@ -36979,7 +38004,7 @@ ${bonuses}`;
       );
       if (!move) continue;
       originH3ByUnitId[order.unitId] = move.fromH3Index;
-      held.push({
+      held2.push({
         ...order,
         routeSegments: order.routeSegments?.map((segment) => ({
           turn: segment.turn,
@@ -36987,7 +38012,7 @@ ${bonuses}`;
         }))
       });
     }
-    return { orders: held, originH3ByUnitId };
+    return { orders: held2, originH3ByUnitId };
   }
 
   // src/shared/ipc/tacticalOpponentPlanMerge.ts
@@ -37108,435 +38133,6 @@ ${bonuses}`;
       ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
       ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
     };
-  }
-
-  // src/shared/lossSummaryFromResolution.ts
-  function normalizeUnitType(raw) {
-    return isBuildUnitType(raw) ? raw : null;
-  }
-  function snapshotById(snapshots) {
-    const map = /* @__PURE__ */ new Map();
-    for (const s of snapshots) map.set(s.id, s);
-    return map;
-  }
-  function allRemovedSnapshots(args) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const s of args.removedUnits ?? []) byId.set(s.id, s);
-    for (const s of args.missileStrikeRemovedUnits ?? []) byId.set(s.id, s);
-    for (const s of args.airStrikeRemovedUnits ?? []) byId.set(s.id, s);
-    return [...byId.values()];
-  }
-  function resolveLostUnit(victimId, snapshots, args) {
-    const snap = snapshots.get(victimId);
-    const meta = args.resolveUnitMeta(victimId) ?? (snap ? { player: snap.player, unitType: snap.unitType } : void 0);
-    if (!meta) return null;
-    const unitType = normalizeUnitType(meta.unitType);
-    if (!unitType) return null;
-    const player = meta.player;
-    const alwaysVisiblePlayer = args.perspectivePlayerId ?? HUMAN_SEAT_ID;
-    const visible = player === alwaysVisiblePlayer || !args.isVictimVisible || args.isVictimVisible(victimId, player);
-    if (!visible) return null;
-    const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
-    return { unitType, displayName, unitId: victimId };
-  }
-  function bucketForPlayer(summary, player) {
-    const existing = summary.byOwner[player];
-    if (existing) return existing;
-    const created = emptyPlayerLossSummary();
-    summary.byOwner[player] = created;
-    return created;
-  }
-  function pushToBucket(summary, player, bucket, unit) {
-    bucketForPlayer(summary, player)[bucket].push(unit);
-  }
-  function airStrikeAttackerLossUnitIdsFromMoves(moves) {
-    if (!moves || moves.length === 0) return [];
-    return moves.filter((m) => m.returnsToBase === false).map((m) => m.unitId);
-  }
-  function classifyAirStrikeKillCause(edge, args) {
-    const victimMeta = args.resolveUnitMeta(edge.victimId);
-    if (victimMeta?.unitType !== "air") return "airStrike";
-    const killerId = edge.killerIds?.[0];
-    if (!killerId) return "returnFire";
-    const killerMeta = args.resolveUnitMeta(killerId);
-    if (killerMeta && killerMeta.player !== victimMeta.player) return "returnFire";
-    return "airStrike";
-  }
-  function causeForAirStrikeRemovedUnit(snap, args) {
-    const edge = (args.killsByAirStrike ?? []).find((e) => e.victimId === snap.id);
-    if (edge) return classifyAirStrikeKillCause(edge, args);
-    if (args.airStrikeAttackerLossUnitIds?.includes(snap.id)) return "returnFire";
-    return "airStrike";
-  }
-  function buildTurnLossSummary(args) {
-    const summary = emptyTurnLossSummary();
-    const snapshots = snapshotById(allRemovedSnapshots(args));
-    const victimToCause = /* @__PURE__ */ new Map();
-    const assignFromEdges = (edges, cause) => {
-      for (const edge of edges ?? []) {
-        if (!victimToCause.has(edge.victimId)) victimToCause.set(edge.victimId, cause);
-      }
-    };
-    for (const edge of args.killsByAirStrike ?? []) {
-      if (!victimToCause.has(edge.victimId)) {
-        victimToCause.set(edge.victimId, classifyAirStrikeKillCause(edge, args));
-      }
-    }
-    assignFromEdges(args.killsByDirectFire, "ranged");
-    assignFromEdges(args.killsByReturnFire, "returnFire");
-    if (args.killsByMelee && args.killsByMelee.length > 0) {
-      assignFromEdges(args.killsByMelee, "melee");
-    } else {
-      assignFromEdges(args.kills, "melee");
-    }
-    for (const snap of args.missileStrikeRemovedUnits ?? []) {
-      if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, "missileStrike");
-    }
-    for (const snap of args.airStrikeRemovedUnits ?? []) {
-      if (!victimToCause.has(snap.id)) {
-        victimToCause.set(snap.id, causeForAirStrikeRemovedUnit(snap, args));
-      }
-    }
-    const claimed = /* @__PURE__ */ new Set();
-    const addVictim = (victimId, cause) => {
-      if (claimed.has(victimId)) return;
-      const unit = resolveLostUnit(victimId, snapshots, args);
-      if (!unit) return;
-      const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
-      const player = meta?.player ?? AI_SEAT_IDS[0];
-      pushToBucket(summary, player, cause, unit);
-      claimed.add(victimId);
-    };
-    for (const [victimId, cause] of victimToCause) {
-      addVictim(victimId, cause);
-    }
-    for (const snap of allRemovedSnapshots(args)) {
-      if (claimed.has(snap.id)) continue;
-      addVictim(snap.id, "other");
-    }
-    return summary;
-  }
-  function buildTurnLossSummaryFromReadyShape(args) {
-    return buildTurnLossSummary(args);
-  }
-
-  // src/shared/tacticalToastKillSlice.ts
-  function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
-    return [
-      ...playback.killsByDirectFire ?? [],
-      ...playback.killsByReturnFire ?? [],
-      ...playback.killsByMelee ?? []
-    ];
-  }
-
-  // src/shared/unknownBattleContinentNames.ts
-  async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
-    const unknownContinentNames = [];
-    if (!fetchContinentNames) return unknownContinentNames;
-    const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter(
-      (h3, idx, arr) => arr.indexOf(h3) === idx
-    );
-    for (const h3 of unknownHexes) {
-      const names = await fetchContinentNames(h3);
-      for (const n of names) {
-        if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-      }
-    }
-    return unknownContinentNames;
-  }
-
-  // src/shared/fortificationReport.ts
-  function fortificationReportVisibleToViewer(report, viewerSeatId2, exploredHexes) {
-    if (viewerSeatId2 === null) return true;
-    if (viewerSeatId2 === report.ownerId) return true;
-    return exploredHexes.has(report.h3Index);
-  }
-
-  // src/renderer/gameplay/fortificationUpdateLines.ts
-  async function fortificationUpdateLinesFor(readySlice) {
-    const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
-    if (hexes.length === 0) return [];
-    return [formatFortificationQueuePausedLine(await placeNamesForHexes(hexes))];
-  }
-  async function placeNamesForHexes(hexes) {
-    const names = [];
-    for (const h3Index of hexes) {
-      let placeName = FORTIFICATION_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
-        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("place name lookup failed", err);
-      }
-      names.push(placeName);
-    }
-    return names;
-  }
-  async function fortificationReportLinesFor(readySlice, viewer) {
-    const lines = [];
-    for (const report of readySlice.fortificationReports ?? []) {
-      if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
-      let placeName = FORTIFICATION_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: report.h3Index, resolution: 1 });
-        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("fortification place name failed", err);
-      }
-      lines.push({
-        ownerId: report.ownerId,
-        line: formatFortificationReportLine({ placeName, lost: report.lost, remaining: report.remaining })
-      });
-    }
-    return lines;
-  }
-
-  // src/renderer/gameplay/productionPauseUpdateLines.ts
-  async function productionPauseUpdateLinesFor(readySlice) {
-    const hexes = readySlice.humanBuildPausedHexes ?? [];
-    if (hexes.length === 0) return [];
-    return [formatBuildPausedLine(await placeNamesForHexes(hexes))];
-  }
-
-  // src/renderer/gameplay/readyResolutionAnnouncements.ts
-  function deriveCombatVisibilityClassification(readyResult, visibleHexes, viewerSeatId2) {
-    const allKills = readyResult.kills ?? [];
-    const viewerInvolved = (ownerId) => viewerSeatId2 !== null && ownerId === viewerSeatId2;
-    const viewerIsHuman = viewerSeatId2 !== null && isHumanSeatId(viewerSeatId2);
-    const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
-    const killerOwner = (id) => {
-      const removedPlayer = removedById.get(id)?.player;
-      if (removedPlayer) return removedPlayer;
-      return rendererSharedState.gameState?.units.find((unit) => unit.id === id)?.player ?? unitIdOwnerFromId(id);
-    };
-    const friendlyInvolvedKillVictimIds = new Set(
-      allKills.filter((k) => {
-        const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => viewerInvolved(killerOwner(id)));
-        const victimIsFriendly = viewerInvolved(victim?.player);
-        return killerIsFriendly || victimIsFriendly;
-      }).map((k) => k.victimId)
-    );
-    const friendlyInvolvedCombatHexes = new Set(
-      [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
-    );
-    const friendlyPlannedCombatHexes = new Set(
-      viewerIsHuman ? [
-        ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
-        ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
-        ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
-        ...(readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).flatMap((move) => [move.fromH3Index, move.targetH3Index]),
-        ...(readyResult.removedUnits ?? []).filter((unit) => viewerInvolved(unit.player)).map((unit) => unit.h3Index)
-      ] : []
-    );
-    for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
-    const knownHumanAirStrikeTargetHexes = new Set(
-      (readyResult.airStrikeMoves ?? []).filter((move) => viewerInvolved(move.player)).map((move) => move.targetH3Index)
-    );
-    const unknownCombatHexes = [
-      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...readyResult.rangedCombatHexes ?? [],
-      ...readyResult.meleeCombatHexes ?? [],
-      ...readyResult.combatHexes ?? []
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-    const unknownCasualtyHexes = [
-      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...readyResult.rangedCasualtyHexes ?? [],
-      ...readyResult.meleeCasualtyHexes ?? [],
-      ...readyResult.casualtyHexes ?? []
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-    const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
-    for (const removed of readyResult.removedUnits ?? []) {
-      if (viewerInvolved(removed.player)) knownVictimIds.add(removed.id);
-    }
-    for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
-    for (const launch of readyResult.missileLaunches ?? []) {
-      if (launch.player !== viewerSeatId2) continue;
-      for (const victimId of launch.destroyedAirUnitIds) knownVictimIds.add(victimId);
-    }
-    const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
-      const removed = removedById.get(id);
-      if (viewerInvolved(removed?.player)) return false;
-      return !friendlyInvolvedKillVictimIds.has(id);
-    }).filter((id) => {
-      const removed = removedById.get(id);
-      return removed ? !visibleHexes.has(removed.h3Index) : false;
-    });
-    return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
-  }
-  function buildTacticalCommitReadyResultForToast(playback) {
-    const killsByDirectFire = playback.killsByDirectFire ?? [];
-    const killsByAirStrike = playback.killsByAirStrike ?? [];
-    const killsByReturnFire = playback.killsByReturnFire ?? [];
-    const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
-    const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
-    const removedAll = [...playback.rangedRemovedUnits ?? [], ...playback.meleeRemovedUnits ?? []];
-    const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
-    const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
-    const airStrikeRemovedUnits = removedAll.filter((u) => {
-      if (airStrikeVictimIds.has(u.id)) return true;
-      if (u.player === HUMAN_SEAT_ID && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
-      return false;
-    });
-    return {
-      success: true,
-      kills,
-      killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : void 0,
-      killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : void 0,
-      killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : void 0,
-      removedUnits: removedAll.length > 0 ? removedAll : void 0,
-      humanMoves: playback.humanMoves,
-      rangedCombatHexes: playback.rangedCombatHexes,
-      rangedCasualtyHexes: playback.rangedCasualtyHexes,
-      rangedRemovedUnits: playback.rangedRemovedUnits,
-      airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
-      infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
-      airStrikeAttemptCount: playback.airStrikeAttemptCount,
-      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
-      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
-    };
-  }
-  function buildPopupTurnLossSummary(args) {
-    const { readySlice, knownVictimIds, formatBaseUnitName, killsByMelee, killsByAirStrike } = args;
-    const removed = readySlice.removedUnits ?? [];
-    const metaMap = /* @__PURE__ */ new Map();
-    for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    for (const u of readySlice.missileStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
-    const readyWithAir = readySlice;
-    return buildTurnLossSummaryFromReadyShape({
-      kills: readySlice.kills,
-      killsByDirectFire: readySlice.killsByDirectFire,
-      killsByReturnFire: readySlice.killsByReturnFire,
-      killsByMelee,
-      killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
-      removedUnits: removed,
-      airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
-      missileStrikeRemovedUnits: readySlice.missileStrikeRemovedUnits,
-      airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
-      resolveDisplayName: (id) => {
-        const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id) ?? readySlice.missileStrikeRemovedUnits?.find((u) => u.id === id);
-        if (snap?.displayName) return snap.displayName;
-        return formatBaseUnitName(id);
-      },
-      resolveUnitMeta: (id) => metaMap.get(id),
-      isVictimVisible: (_id, player) => player === HUMAN_SEAT_ID || knownVictimIds.has(_id)
-    });
-  }
-  function formatHexCount(label, count) {
-    return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
-  }
-  function buildCombatActivityFallbackBullets(readyResult) {
-    const bullets = [];
-    const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
-    if (rangedHexCount > 0) bullets.push(formatHexCount("Ranged engagements", rangedHexCount));
-    const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
-    if (meleeHexCount > 0) bullets.push(formatHexCount("Melee engagements", meleeHexCount));
-    const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
-    if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
-    return bullets;
-  }
-  function reportViewerSeatId() {
-    const seats = rendererSharedState.gameState?.seats ?? [];
-    const viewer = readoutViewerSeatId(seats, rendererSharedState.viewAs);
-    return viewer ?? null;
-  }
-  async function announceResolutionTurnUpdate(args, deps) {
-    const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
-    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
-    const turnLossSummary = buildPopupTurnLossSummary({
-      readySlice,
-      knownVictimIds,
-      formatBaseUnitName: killToastFormatter.formatBaseUnitName,
-      ...extraKills !== void 0 ? extraKills : {}
-    });
-    const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
-    const seats = (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
-      seatId: seat.seatId,
-      seatOrder: seat.seatOrder,
-      homeRegion: seat.homeRegion
-    }));
-    const viewerSeatId2 = reportViewerSeatId();
-    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
-    let unknownBattleLine;
-    if (hasUnknownBattle) {
-      try {
-        const getContinentNames = window.gameApi?.getHexContinentNames;
-        const unknownContinentNames = await collectUnknownBattleContinentNames(
-          unknownCombatHexes,
-          unknownCasualtyHexes,
-          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
-        );
-        unknownBattleLine = deps.formatUnknownBattleAnnouncement(unknownContinentNames);
-      } catch (err) {
-        console.error("unknown battle continent names failed", err);
-        unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
-      }
-    }
-    const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
-    const fortificationLines = await fortificationUpdateLinesFor(readySlice);
-    const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
-    const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
-      viewerSeatId: viewerSeatId2,
-      exploredHexes: getExploredHexSet(rendererSharedState.gameState)
-    });
-    const updateText = buildConsolidatedTurnUpdateToastMessage({
-      readyResult: readySlice,
-      turnLossSummary,
-      combatFallbackBullets,
-      turnReport: {
-        viewerSeatId: viewerSeatId2,
-        seats,
-        transitions: readySlice.controlTransitions ?? []
-      },
-      unknownBattleLine,
-      missileStrikeLines,
-      fortificationLines,
-      productionPauseLines,
-      fortificationReportLines
-    });
-    if (updateText) {
-      rememberUnitOrigins([
-        ...readySlice.removedUnits ?? [],
-        ...readySlice.airStrikeRemovedUnits ?? [],
-        ...readySlice.missileStrikeRemovedUnits ?? [],
-        ...readySlice.rangedRemovedUnits ?? [],
-        ...readySlice.meleeRemovedUnits ?? []
-      ]);
-      const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-      deps.showMapToast(updateText, {
-        isError: false,
-        unitOriginByDisplayName,
-        seats,
-        viewerSeatId: viewerSeatId2,
-        report: { kind: "turn", tag: reportTag }
-      });
-      deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
-    }
-  }
-  async function missileStrikeLinesFor(launches) {
-    const lines = [];
-    for (const record of launches ?? []) {
-      let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: record.targetH3Index, resolution: 1 });
-        placeName = caption?.text.trim() || MISSILE_STRIKE_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("missile strike place name failed", err);
-      }
-      lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
-    }
-    return lines;
-  }
-  function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
-    if (needsPlayback) {
-      enqueueResolutionPlaybackCompleteNotify(send);
-    } else {
-      dropQueuedResolutionPlaybackCompleteNotifies();
-      send();
-      notifyResolutionPlaybackFinished();
-    }
   }
 
   // src/shared/pendingMovementSidebarLabels.ts
@@ -37917,9 +38513,9 @@ ${bonuses}`;
   var REASON_ORDER = ["home_control", "no_city_hexes", "home_cities_destroyed"];
   function formatKnockoutNotice(input) {
     const sentences = [input.victimIsHuman ? "You are out of the match." : `${input.victimName} is out of the match.`];
-    const held = new Set(input.reasons);
+    const held2 = new Set(input.reasons);
     for (const reason of REASON_ORDER) {
-      if (!held.has(reason)) continue;
+      if (!held2.has(reason)) continue;
       if (reason === "home_control") {
         const outBy = input.outByName ?? "A side";
         sentences.push(
@@ -37976,10 +38572,10 @@ ${bonuses}`;
     };
   }
   function reasonLead(input) {
-    const held = new Set(input.reasons);
+    const held2 = new Set(input.reasons);
     const sentences = [];
     for (const reason of REASON_ORDER2) {
-      if (!held.has(reason)) continue;
+      if (!held2.has(reason)) continue;
       if (reason === "home_control") {
         sentences.push(
           input.globalHome ? "A side holds all of your home." : `A side holds ${input.controlShareLabel} of your home's cities.`
@@ -37991,7 +38587,7 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/knockoutDialog.ts
-  var pending = null;
+  var pending2 = null;
   async function offerHumanKnockoutChoice(state, knockouts, endMatch, applyEndedMatch, showError) {
     const row = (knockouts ?? []).find((knockout) => isHumanSeatId(knockout.seatId));
     if (!row || state.gameOver) return "continue";
@@ -38033,14 +38629,14 @@ ${bonuses}`;
     dialog.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     return new Promise((resolve) => {
-      pending = resolve;
+      pending2 = resolve;
     });
   }
   function closeHumanKnockoutDialog(choice) {
     document.getElementById("knockout-dialog")?.classList.add("hidden");
     if (choice === "watch") setMainUIControlsEnabled(true);
-    const resolve = pending;
-    pending = null;
+    const resolve = pending2;
+    pending2 = null;
     resolve?.(choice);
   }
   if (typeof document !== "undefined") {
@@ -38244,6 +38840,7 @@ ${bonuses}`;
         needsAnimation
       );
       let playbackFinished = null;
+      if (watching && readyResult.tacticalAutoStartH3Index) holdObserveAutoAdvanceForBattleEntry(true);
       if (readyResult.postResolutionConsultDeferred === true) {
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = true;
         rendererSharedState.deferredResolutionConsultNotifySent = false;
@@ -38257,6 +38854,29 @@ ${bonuses}`;
           deps.updateReadyButtonState();
         };
         scheduleResolutionPlaybackCompleteNotify(sendStrategicNotify, needsAnimation);
+      }
+      const holdForBattle = Boolean(readyResult.tacticalAutoStartH3Index);
+      if (needsAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
+        const killToastFormatter = deps.buildKillToastFormatterBundle(
+          state,
+          readyResult.removedUnits,
+          void 0,
+          readyResult.killLabelUnits
+        );
+        await announceResolutionTurnUpdate(
+          {
+            readySlice: readyResult,
+            visibility,
+            killToastFormatter,
+            reportTag: turnReportTag,
+            missileLaunches: visibleMissileLaunches,
+            visibleHexes,
+            holdForBattle,
+            usePendingBattleParents: true
+          },
+          deps
+        );
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
       }
       if (needsAnimation) {
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
@@ -38289,22 +38909,6 @@ ${bonuses}`;
             unknownHexes: /* @__PURE__ */ new Set([...unknownCombatHexes, ...unknownCasualtyHexes])
           })
         };
-        const killToastFormatter = deps.buildKillToastFormatterBundle(
-          state,
-          readyResult.removedUnits,
-          void 0,
-          readyResult.killLabelUnits
-        );
-        await announceResolutionTurnUpdate(
-          {
-            readySlice: readyResult,
-            visibility,
-            killToastFormatter,
-            reportTag: turnReportTag,
-            missileLaunches: visibleMissileLaunches
-          },
-          deps
-        );
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
         if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
@@ -38344,7 +38948,11 @@ ${bonuses}`;
         deps.showSidebarError
       );
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
-      if (knockoutChoice === "ended") return;
+      if (knockoutChoice === "ended") {
+        dropHeldBattleTurnUpdate();
+        return;
+      }
+      if (!needsAnimation && !readyResult.tacticalAutoStartH3Index) frameAutomaticStrategicUnits();
       if (rendererSharedState.runButtonOn && !rendererSharedState.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
       deps.redraw();
       if (readyResult.tacticalAutoStartH3Index) {
@@ -39447,7 +40055,7 @@ ${bonuses}`;
       queuedModelKey = null;
       modelRefreshInFlight = true;
       modelDescriptionTooltip?.clear();
-      const pending2 = api.listModels(key).then((result) => {
+      const pending3 = api.listModels(key).then((result) => {
         if (!modelSelect) return;
         const kept = modelSelect.value;
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
@@ -39490,8 +40098,8 @@ ${bonuses}`;
         modelRefreshInFlight = false;
         renderOpponentStatus();
       });
-      modelRefreshPromise = pending2;
-      return pending2;
+      modelRefreshPromise = pending3;
+      return pending3;
     }
     setOpenRouterModelRefresh((key) => refreshModels2(key, false));
     api.getSelectedModel().then(async (modelId) => {

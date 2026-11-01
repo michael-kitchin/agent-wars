@@ -11,7 +11,15 @@ import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleCo
 import { isHumanSeatId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { readoutViewerSeatId } from '../../shared/observeModeControls';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
-import { buildUnitOriginByLossDisplayName, rememberUnitOrigins } from '../core/unitOriginFlags';
+import { buildUnitOriginByLossDisplayName, mergeDestroyedBattleParentFlags, rememberUnitOrigins } from '../core/unitOriginFlags';
+import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
+import { destroyedInBattleLinesByOwner, visibleDestroyedParents } from '../../shared/destroyedInBattleLine';
+import type { TurnReportSeat } from '../../shared/turnReportLines';
+import {
+  stashHeldBattleTurnUpdate,
+  takeHeldBattleTurnUpdate,
+  takePendingDestroyedBattleParents,
+} from './heldBattleTurnUpdate';
 import { getExploredHexSet } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import {
@@ -305,6 +313,22 @@ export function reportViewerSeatId(): string | null {
 }
 
 /**
+ * Copies the roster rows a turn report uses for names.
+ *
+ * Purpose: A held popup has to name sides the way the launch turn did.
+ * When to use: When that popup is stashed, and when a toast is built without a stored roster.
+ * Expected outcome: One row per seat, with id, order, and home name. An empty roster is an empty list.
+ * Exceptions: None.
+ */
+function launchTurnSeats(): TurnReportSeat[] {
+  return (S.gameState?.seats ?? []).map((seat) => ({
+    seatId: seat.seatId,
+    seatOrder: seat.seatOrder,
+    homeRegion: seat.homeRegion,
+  }));
+}
+
+/**
  * Shows the consolidated turn-update toast, including an unknown battle as an Updates line.
  *
  * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast.
@@ -312,7 +336,9 @@ export function reportViewerSeatId(): string | null {
  *   Pass `reportTag`, the tag of the turn or beat that just resolved, captured before Ready resolved it.
  * Expected outcome: One update toast and one log line when there is text. An unknown battle is the last Updates line.
  *   The Reports tab files that toast as one turn report under `reportTag`. A name-lookup failure uses the
- *   unidentified-continent sentence and still shows the toast.
+ *   unidentified-continent sentence and still shows the toast. When `holdForBattle` is set, nothing is shown and
+ *   `showHeldBattleTurnUpdate` shows this turn later. A strategic call with `usePendingBattleParents` includes
+ *   units a map-opened battle destroyed, once.
  * Exceptions: A rejected continent lookup is logged and becomes the unidentified-continent sentence. It is not rethrown.
  */
 export async function announceResolutionTurnUpdate(
@@ -326,9 +352,93 @@ export async function announceResolutionTurnUpdate(
       killsByAirStrike?: readonly { victimId: string; killerIds?: readonly string[] }[];
     };
     missileLaunches?: readonly MissileLaunchRecord[];
+    /**
+     * Strategic units a battle removed.
+     *
+     * Contract: Omitted when this announce should take the pending list instead, or when there are none.
+     * When to use: Replaying a held update. A strategic announce that is not a replay uses the pending list.
+     * Expected outcome: Filtered by `visibleHexes` and the viewer before the sentence is built.
+     * Exceptions: None.
+     */
+    destroyedParents?: readonly DestroyedBattleParent[];
+    /**
+     * Hexes the viewer could see for this resolution.
+     *
+     * Contract: Empty or omitted hides enemy units that are not the viewer's.
+     * When to use: Strategic Ready, and a replay of that Ready.
+     * Expected outcome: Combined with the owner check in `visibleDestroyedParents`.
+     * Exceptions: None.
+     */
+    visibleHexes?: ReadonlySet<string>;
+    /**
+     * True when this turn opens a battle and the popup must wait.
+     *
+     * Contract: The world-map animation is unaffected. The popup is not shown.
+     * When to use: Strategic Ready when `tacticalAutoStartH3Index` is set.
+     * Expected outcome: The inputs are stashed. A later `showHeldBattleTurnUpdate` shows them.
+     * Exceptions: None.
+     */
+    holdForBattle?: boolean;
+    /**
+     * True when this is the strategic announce that should consume map-opened battle losses.
+     *
+     * Contract: A tactical beat announce leaves the pending list alone. A replay of a hold leaves it alone.
+     * When to use: Strategic Ready only.
+     * Expected outcome: The pending list is taken once and included. A later announce does not see it.
+     * Exceptions: None.
+     */
+    usePendingBattleParents?: boolean;
+    /**
+     * The seat the launch turn called "you".
+     *
+     * Contract: Omitted means the view that is current now. Null is All sides. A string is that seat.
+     * When to use: A replay of a held update. The hold stores the view from the turn that opened the battle.
+     * Expected outcome: Loss headers and the battle line use this viewer. A later View as change does not rewrite them.
+     * Exceptions: None.
+     */
+    viewerSeatId?: string | null;
+    /**
+     * The roster the launch turn used for side names.
+     *
+     * Contract: Omitted means the roster that is current now.
+     * When to use: A replay of a held update.
+     * Expected outcome: Headers and hex sentences use these homes and this seat order.
+     * Exceptions: None.
+     */
+    seats?: readonly TurnReportSeat[];
+    /**
+     * Hexes the launch turn had explored.
+     *
+     * Contract: Omitted means the explored set that is current now.
+     * When to use: A replay of a held update. The hold stores the set from the turn that opened the battle.
+     * Expected outcome: Fortification sentences use this set. Exploration on a later turn does not reveal or hide that turn's lines.
+     * Exceptions: None.
+     */
+    exploredHexes?: ReadonlySet<string>;
   },
   deps: Pick<ReadyHandlerDeps, 'showMapToast' | 'appendOpenRouterLog' | 'formatUnknownBattleAnnouncement'>
 ): Promise<void> {
+  const parents = args.destroyedParents
+    ?? (args.usePendingBattleParents ? takePendingDestroyedBattleParents() : []);
+  if (args.holdForBattle) {
+    console.debug('[agent-wars] announceResolutionTurnUpdate holding for battle', {
+      parentCount: parents.length,
+      reportTag: args.reportTag,
+    });
+    stashHeldBattleTurnUpdate(
+      {
+        ...args,
+        holdForBattle: false,
+        usePendingBattleParents: false,
+        viewerSeatId: reportViewerSeatId(),
+        seats: launchTurnSeats(),
+        exploredHexes: getExploredHexSet(S.gameState),
+      },
+      deps,
+      parents
+    );
+    return;
+  }
   const { readySlice, visibility, killToastFormatter, extraKills, reportTag, missileLaunches } = args;
   const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
   const turnLossSummary = buildPopupTurnLossSummary({
@@ -338,12 +448,10 @@ export async function announceResolutionTurnUpdate(
     ...(extraKills !== undefined ? extraKills : {}),
   });
   const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
-  const seats = (S.gameState?.seats ?? []).map((seat) => ({
-    seatId: seat.seatId,
-    seatOrder: seat.seatOrder,
-    homeRegion: seat.homeRegion,
-  }));
-  const viewerSeatId = reportViewerSeatId();
+  const seats = args.seats ? [...args.seats] : launchTurnSeats();
+  const viewerSeatId = args.viewerSeatId !== undefined ? args.viewerSeatId : reportViewerSeatId();
+  const visibleParents = visibleDestroyedParents(parents, viewerSeatId, args.visibleHexes ?? new Set());
+  const battleLinesByOwner = destroyedInBattleLinesByOwner(visibleParents);
   const hasUnknownBattle =
     unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
   let unknownBattleLine: string | undefined;
@@ -366,7 +474,7 @@ export async function announceResolutionTurnUpdate(
   const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
   const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
     viewerSeatId,
-    exploredHexes: getExploredHexSet(S.gameState),
+    exploredHexes: args.exploredHexes ?? getExploredHexSet(S.gameState),
   });
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
@@ -382,6 +490,7 @@ export async function announceResolutionTurnUpdate(
     fortificationLines,
     productionPauseLines,
     fortificationReportLines,
+    battleLinesByOwner,
   });
   if (updateText) {
     // Casualties carry birth records for units that never appeared in a fog-filtered snapshot.
@@ -391,8 +500,12 @@ export async function announceResolutionTurnUpdate(
       ...(readySlice.missileStrikeRemovedUnits ?? []),
       ...(readySlice.rangedRemovedUnits ?? []),
       ...(readySlice.meleeRemovedUnits ?? []),
+      ...visibleParents,
     ]);
-    const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+    const unitOriginByDisplayName = mergeDestroyedBattleParentFlags(
+      buildUnitOriginByLossDisplayName(turnLossSummary),
+      visibleParents
+    );
     deps.showMapToast(updateText, {
       isError: false,
       unitOriginByDisplayName,
@@ -402,6 +515,33 @@ export async function announceResolutionTurnUpdate(
     });
     deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
   }
+}
+
+/**
+ * Shows the strategic update that was waiting for a battle, then clears that wait.
+ *
+ * Purpose: The launch turn's popup is the one left on the map after the following Ready returns.
+ * When to use: After that Ready returns, and only for the update that was already waiting before that Ready. Pass false to omit units already attached. A battle that failed to start passes true: it attached nothing, and units from an earlier battle stay listed.
+ * Expected outcome: The held message is shown when it has text, filed under the launch turn's report tag. The hold is cleared either way. A second waiting update stays held. Nothing is shown when no update was waiting.
+ * Exceptions: A name lookup failure is logged by `announceResolutionTurnUpdate` and still shows the toast.
+ */
+export async function showHeldBattleTurnUpdate(includeBattleLines = true): Promise<void> {
+  const held = takeHeldBattleTurnUpdate();
+  console.debug('[agent-wars] showHeldBattleTurnUpdate', {
+    found: held != null,
+    includeBattleLines,
+    parentCount: held?.destroyedParents.length ?? 0,
+  });
+  if (!held) return;
+  await announceResolutionTurnUpdate(
+    {
+      ...held.inputs,
+      destroyedParents: includeBattleLines ? held.destroyedParents : [],
+      holdForBattle: false,
+      usePendingBattleParents: false,
+    },
+    held.deps
+  );
 }
 
 /**

@@ -19,6 +19,8 @@ import { newGameOverlayIsOpen } from './newGameDialogCollapse';
 import { isDeferredResolutionPlaybackConsultPending } from '../openRouter/aiPlanningState';
 import { anyCommanderIsPlanning, commanderStartIsSettling, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
 import { onResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
+import { frameOpenAutomaticBattle } from '../map/tacticalMapView';
+import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
 
 /**
  * Applies a freshly read snapshot after View as changes.
@@ -47,6 +49,35 @@ let battleEntryHoldsAutoAdvance = false;
  */
 export function holdObserveAutoAdvanceForBattleEntry(hold: boolean): void {
   battleEntryHoldsAutoAdvance = hold;
+}
+
+/**
+ * True while a watched match is waiting to open a battle.
+ *
+ * Purpose: The strategic camera must not frame a turn that is about to leave the world map.
+ * When to use: Before framing from playback or from turning auto-advance on.
+ * Expected outcome: True after `holdObserveAutoAdvanceForBattleEntry(true)` until that hold is released.
+ * Exceptions: None.
+ */
+export function observeAutoAdvanceHeldForBattleEntry(): boolean {
+  return battleEntryHoldsAutoAdvance;
+}
+
+/**
+ * Frames the current automatic view unless a battle is about to open.
+ *
+ * Purpose: Turning auto-advance on, and the end of playback, share one camera decision.
+ * When to use: The observe checkbox, Watch the rest, and playback finishing.
+ * Expected outcome: An open battle frames its current beat. A world-map planning turn frames visible units. A held battle entry does nothing.
+ * Exceptions: None.
+ */
+export function frameAutomaticWatchCamera(): void {
+  if (observeAutoAdvanceHeldForBattleEntry()) return;
+  if (S.tacticalBattleSnapshot && S.tacticalBattleSnapshot.aiOnlyEndReason == null) {
+    frameOpenAutomaticBattle();
+    return;
+  }
+  frameAutomaticStrategicUnits();
 }
 
 /**
@@ -221,8 +252,12 @@ export function wireObserveMode(deps: {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
     S.autoAdvance = input.checked;
+    if (input.checked) frameAutomaticWatchCamera();
     if (input.checked) void maybeObserveAutoAdvance();
   });
   subscribeCommanderPool(() => { void maybeObserveAutoAdvance(); });
-  onResolutionPlaybackFinished(() => { void maybeObserveAutoAdvance(); });
+  onResolutionPlaybackFinished(() => {
+    frameAutomaticWatchCamera();
+    void maybeObserveAutoAdvance();
+  });
 }

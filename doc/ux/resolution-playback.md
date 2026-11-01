@@ -8,7 +8,7 @@ Show movement and combat that just resolved, including battles the player cannot
 
 ## Availability
 
-Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, or dice to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
+Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, or dice to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The strategic update for the turn that opened the battle is not shown then. It waits until the battle ends and the Ready that follows has returned, and that popup is the one left on the map. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
@@ -33,7 +33,7 @@ Dice chips show every die rolled in air combat, ranged combat, and melee combat.
 - Rolls of the same kind, player, unit type, and hit number share a row. A row with more than three rolls shows a tally such as `2/5 ≤3` (hits, then rolls) instead of each face.
 - A chip shows at most four lines. When it has more rows, it shows three of them and a final `+N more` line.
 
-A map toast can summarize losses the player can see, and the hex changes from that turn. Combat outside vision is one sentence at the end of that toast's Updates section. It names those continents in alphabetical order, separated by commas, or says the continent was unidentified when no name is known. The Reports tab keeps the summary and that sentence as one turn report, tagged with the turn or beat Ready just resolved. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
+A map toast can summarize losses the player can see, and the hex changes from that turn. Combat outside vision is one sentence at the end of that toast's Updates section. It names those continents in alphabetical order, separated by commas, or says the continent was unidentified when no name is known. The Reports tab keeps the summary and that sentence as one turn report. A strategic update held for a battle is tagged with the turn that opened the battle. Every other turn report is tagged with the turn or beat Ready just resolved. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
 
 ## Inputs and Responses
 
@@ -58,7 +58,7 @@ A map toast can summarize losses the player can see, and the hex changes from th
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The timeline starts when the first frame is drawn, after the turn-update toast is ready, so that lookup does not skip the opening of movement, combat, or dice. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The timeline starts when the first frame is drawn. When that turn shows its update, the toast is ready first, so that lookup does not skip the opening of movement, combat, or dice. A turn that opens a battle does not show the strategic update before the animation. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
 - Finished: the animation is cleared. On a watch, a battle, the game-over screen, or the knocked-out dialog can follow. Otherwise Strategic planning or Tactical planning continues.
 
 ## Invariants
@@ -80,7 +80,7 @@ A map toast can summarize losses the player can see, and the hex changes from th
 | What plays | The strategic turn, on the world map | The battle beat, on the battle map |
 | Top bar | The date block can already name the next planning turn | The battle header stays up. Its status line reads "Tactical resolution" and already names the next beat |
 | Dice chips | Under hexes in the player's vision before or after the turn only, and not at the zoom that hides strategic units | Under every battle cell that rolled, because battles have no fog |
-| Turn-update toast | Units and hexes outside vision are an unknown battle | Every battle cell counts as visible, so battle losses and engagements are never an unknown battle |
+| Turn-update toast | Units and hexes outside vision are an unknown battle. A battle Ready opened holds this toast until the battle ends and the following Ready has returned | Every battle cell counts as visible, so battle losses and engagements are never an unknown battle |
 | Afterward | Strategic planning, or a battle if Fight started one. On a watch, the battle opens after the world-map animation finishes | Tactical planning, or Tactical annihilation if a side is gone |
 
 ## Related Documents

@@ -170,6 +170,24 @@ preTacticalLeafletMaxZoom: null as number | null,
    * Exceptions: When null (before first camera apply), tactical exit falls back to world `fitBounds`.
    */
 strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null,
+  /**
+   * Strategic turn the automatic camera last framed.
+   *
+   * Purpose: A planning turn is framed once, then left alone until the next turn.
+   * When to use: Written when that frame moves the camera. Cleared when a new match loads.
+   * Expected outcome: Null until the first automatic frame. Equal to the current turn after that turn has been framed.
+   * Exceptions: None.
+   */
+  automaticFramedTurnNumber: null as number | null,
+  /**
+   * Tactical beat the automatic camera last framed.
+   *
+   * Purpose: A beat is framed once, then left alone until the next beat.
+   * When to use: Written when that frame moves the camera. Cleared when a new match loads.
+   * Expected outcome: Null until the first automatic battle frame. Equal to the current beat after that beat has been framed.
+   * Exceptions: None.
+   */
+  automaticFramedBeatNumber: null as number | null,
 
     /**
    * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).

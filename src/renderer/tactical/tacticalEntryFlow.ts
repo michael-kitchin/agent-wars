@@ -17,6 +17,8 @@ import {
   type TacticalBattleExitIo,
   type TacticalExitSessionAccessor,
 } from './tacticalExitFlow';
+import { dropHeldBattleTurnUpdate, waitingHeldBattleTurnUpdateId } from '../gameplay/heldBattleTurnUpdate';
+import { showHeldBattleTurnUpdate } from '../gameplay/readyResolutionAnnouncements';
 import {
   tacticalRendererActivateRestoredBattleSnapshot,
   tacticalRendererApplyStartBattleIpcResult,
@@ -132,7 +134,10 @@ export async function startTacticalBattleFromEntryHex(
   if (deps.prepareStrategicUiBeforeTacticalStart) {
     await deps.prepareStrategicUiBeforeTacticalStart();
   }
-  if (!rendererMatchEpochCurrent(matchEpoch)) return;
+  if (!rendererMatchEpochCurrent(matchEpoch)) {
+    dropHeldBattleTurnUpdate();
+    return;
+  }
   const resumedSession =
     S.gameState?.tacticalBattleSession &&
     S.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index &&
@@ -147,12 +152,24 @@ export async function startTacticalBattleFromEntryHex(
   const ipc = deps.invokeStartTacticalBattle;
   if (!ipc) {
     deps.onMissingStartTacticalBattleIpc();
+    await showHeldBattleTurnUpdate(true);
     return;
   }
   deps.hideBuildPopup();
-  const result: StartTacticalBattleIpcResult = await ipc({ enclosingStrategicH3Index });
-  if (!rendererMatchEpochCurrent(matchEpoch)) return;
+  let result: StartTacticalBattleIpcResult;
+  try {
+    result = await ipc({ enclosingStrategicH3Index });
+  } catch (err) {
+    console.error('startTacticalBattle failed', err);
+    await showHeldBattleTurnUpdate(true);
+    return;
+  }
+  if (!rendererMatchEpochCurrent(matchEpoch)) {
+    dropHeldBattleTurnUpdate();
+    return;
+  }
   tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
+  if (!result.success || !result.battle) await showHeldBattleTurnUpdate(true);
 }
 
 /**
@@ -175,16 +192,21 @@ export function activateRestoredTacticalBattleFromMainSnapshot(
  *
  * Contract: Spreads caller IO and injects current `window.gameApi.endTacticalBattle` after the spread so IPC always wins.
  * When to use: Exit Battle in the battle header, and the annihilation modal's `Exit Battle` confirmation.
- * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state, restores living-unit stash drafts, refreshes order sidebars, then invokes Ready pipeline on success.
+ * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state, restores living-unit stash drafts, refreshes order sidebars, then invokes Ready pipeline on success. The update that was waiting before that Ready is shown. An update that Ready stashed for a new battle keeps waiting.
  * Exceptions: Surfaces toasts when IPC fails per `tacticalPerformBattleExit` contract.
  */
 export async function performTacticalBattleExitWithGameApi(
   session: TacticalExitSessionAccessor,
   io: Omit<TacticalBattleExitIo, 'endTacticalBattle'>
 ): Promise<void> {
+  const waitingHoldId = waitingHeldBattleTurnUpdateId();
   await tacticalPerformBattleExit(session, {
     ...io,
     endTacticalBattle: window.gameApi?.endTacticalBattle,
   });
+  if (session.getBattleSnapshot() != null) return;
+  if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+    await showHeldBattleTurnUpdate(true);
+  }
 }
 

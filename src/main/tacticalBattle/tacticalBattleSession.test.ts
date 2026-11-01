@@ -7,6 +7,9 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dbGetOne, dbRun } from '../gameDb';
+import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
+import { recordDestroyedBattleParents, takeDestroyedBattleParents } from './destroyedBattleParents';
+import { syncStrategicUnitsDbWhenTacticalParentsEliminated } from './tacticalStrategicOrderPhases';
 import { tacticalSubUnitCountForStrategicUnitType } from './computeTacticalBattleSnapshot';
 import { setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
@@ -294,5 +297,51 @@ test('two-party exit removes nothing more when one party is already gone', () =>
     endTacticalBattleSessionForTwoPartyVoluntaryExit();
     assert.ok(dbGetOne<{ id: string }>('SELECT id FROM units WHERE id = ?', [picked.parentUnitId]));
     assert.equal(isTacticalBattleActive(), false);
+  });
+});
+
+test('a parent removed by the exit threshold is listed with its side, type, and name', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-destroyed-bailout-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true, started.reason);
+    const picked = pickParentForTest(HUMAN_SEAT_ID, 3);
+    const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
+    const keepCount = Math.max(1, Math.floor((baseline - 1) / 2));
+    setCustomSurvivorCountForParent(picked.parentUnitId, keepCount);
+    const listed = endTacticalBattleSessionForHumanVoluntaryExitBailout();
+    const row = listed.find((unit) => unit.id === picked.parentUnitId);
+    assert.ok(row);
+    assert.equal(row.ownerId, HUMAN_SEAT_ID);
+    assert.equal(row.unitType, picked.unitType);
+    assert.ok(row.displayName.length > 0);
+  });
+});
+
+test('eliminating every sub-unit records that parent and leaves a surviving parent off the list', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-destroyed-sync-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true, started.reason);
+    const snap = getActiveTacticalBattleSnapshot();
+    assert.ok(snap);
+    const eliminated = pickParentForTest(HUMAN_SEAT_ID, 1);
+    const surviving = snap.subUnits.find((unit) => unit.parentUnitId !== eliminated.parentUnitId);
+    assert.ok(surviving);
+    const subsAfter = snap.subUnits.filter((unit) => unit.parentUnitId !== eliminated.parentUnitId);
+    syncStrategicUnitsDbWhenTacticalParentsEliminated(snap.subUnits, subsAfter);
+    const listed = takeDestroyedBattleParents();
+    assert.ok(listed.some((unit) => unit.id === eliminated.parentUnitId));
+    assert.equal(listed.some((unit) => unit.id === surviving.parentUnitId), false);
+  });
+});
+
+test('deleting a parent that is already gone does not record it again', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-destroyed-missing-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true, started.reason);
+    const picked = pickParentForTest(HUMAN_SEAT_ID, 1);
+    recordDestroyedBattleParents(deleteStrategicParentUnitAndApplyTransportOutcome(picked.parentUnitId));
+    recordDestroyedBattleParents(deleteStrategicParentUnitAndApplyTransportOutcome(picked.parentUnitId));
+    const listed = takeDestroyedBattleParents();
+    assert.equal(listed.filter((unit) => unit.id === picked.parentUnitId).length, 1);
   });
 });

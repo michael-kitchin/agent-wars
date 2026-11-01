@@ -36,6 +36,24 @@ test('a collapsed group is marked, and a known name with that shape stays a unit
   assert.equal(knownGroup[3]?.group, undefined);
 });
 
+test('a destroyed-in-battle sentence marks the name and the group and leaves the ending plain', () => {
+  const line = 'III Infantry, 6 Armored destroyed in battle.';
+  const segments = splitLossCauseLineForUnitFlags(line, new Set(['III Infantry']));
+  assert.equal(segments.map((segment) => segment.text).join(''), line);
+  assert.equal(segments[0]?.unitDisplayName, 'III Infantry');
+  assert.equal(segments[0]?.group, undefined);
+  assert.deepEqual(segments[2]?.group, { unitType: 'armor', count: 6 });
+  assert.equal(segments[2]?.unitDisplayName, null);
+  assert.deepEqual(segments[3], { text: ' destroyed in battle.', unitDisplayName: null });
+});
+
+test('a ranged group still uses the 4x token', () => {
+  const line = 'Ranged attack: 4x Infantry';
+  const segments = splitLossCauseLineForUnitFlags(line, new Set());
+  assert.deepEqual(segments[1]?.group, { unitType: 'infantry', count: 4 });
+  assert.equal(segments.map((segment) => segment.text).join(''), line);
+});
+
 test('a line that is not a loss cause line stays one plain segment', () => {
   const line = '\u2022 1st Infantry captured a hex';
   assert.deepEqual(splitLossCauseLineForUnitFlags(line, KNOWN), [{ text: line, unitDisplayName: null }]);

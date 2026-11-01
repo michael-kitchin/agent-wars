@@ -31,6 +31,16 @@ const NO_HEX_LINES: ReadonlyMap<string, readonly string[]> = new Map();
 const NO_STRIKE_LINES: ReadonlyMap<string, readonly string[]> = new Map();
 
 /**
+ * An empty battle-line map for a toast that has no units destroyed in a battle.
+ *
+ * Purpose: Callers that are not closing a battle can omit the map. One shared instance stays immutable.
+ * When to use: The default of `buildTurnLossSections`.
+ * Expected outcome: No destroyed-in-battle sentence is appended.
+ * Exceptions: None.
+ */
+const NO_BATTLE_LINES: ReadonlyMap<string, string> = new Map();
+
+/**
  * The same prefix `MAP_TOAST_SECTION_HEADER_PREFIX` uses for a bold toast header.
  *
  * Purpose: This module must not import the toast builder, which already imports these sections.
@@ -83,8 +93,8 @@ export interface TurnLossSectionSeat {
  *
  * Purpose: Unit losses, missile and fortification sentences, and territory changes for one side stay together.
  * When to use: `buildConsolidatedTurnUpdateToastMessage`.
- * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`, then that owner's missile and fortification sentences, then that owner's hex sentences.
- *   An owner with empty buckets, no strike sentences, and no hex sentences is omitted. A null viewer does not get `Your Losses`.
+ * Expected outcome: Header lines start with `## `. Cause lines are `{label}: {text}`, then that owner's destroyed-in-battle sentence, then missile and fortification sentences, then hex sentences.
+ *   An owner with only the battle sentence still gets a header. An owner with none of these is omitted. A null viewer does not get `Your Losses`. Omitting the battle map leaves the older lines unchanged.
  * Exceptions: None.
  */
 export function buildTurnLossSections(
@@ -92,10 +102,11 @@ export function buildTurnLossSections(
   viewerSeatId: string | null,
   seats: readonly TurnLossSectionSeat[],
   hexLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_HEX_LINES,
-  strikeLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_STRIKE_LINES
+  strikeLinesByOwner: ReadonlyMap<string, readonly string[]> = NO_STRIKE_LINES,
+  battleLinesByOwner: ReadonlyMap<string, string> = NO_BATTLE_LINES
 ): string[] {
   const lines: string[] = [];
-  for (const ownerId of orderedOwners(summary, viewerSeatId, seats, hexLinesByOwner, strikeLinesByOwner)) {
+  for (const ownerId of orderedOwners(summary, viewerSeatId, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner)) {
     const header = headerFor(ownerId, viewerSeatId, seats);
     lines.push(
       ...sectionLines(
@@ -103,7 +114,8 @@ export function buildTurnLossSections(
         ownerId,
         header,
         hexLinesByOwner.get(ownerId) ?? [],
-        strikeLinesByOwner.get(ownerId) ?? []
+        strikeLinesByOwner.get(ownerId) ?? [],
+        battleLinesByOwner.get(ownerId) ?? ''
       )
     );
   }
@@ -115,7 +127,7 @@ export function buildTurnLossSections(
  *
  * Purpose: A side that only lost hexes, only took missile infrastructure damage, or only lost visible fortifications still appears between the viewer and Neutral.
  * When to use: `buildTurnLossSections`.
- * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in none of the three sources is absent.
+ * Expected outcome: The viewer, then other owners by seat order, then Neutral. An owner in none of the sources is absent.
  * Exceptions: None.
  */
 function orderedOwners(
@@ -123,12 +135,14 @@ function orderedOwners(
   viewerSeatId: string | null,
   seats: readonly TurnLossSectionSeat[],
   hexLinesByOwner: ReadonlyMap<string, readonly string[]>,
-  strikeLinesByOwner: ReadonlyMap<string, readonly string[]>
+  strikeLinesByOwner: ReadonlyMap<string, readonly string[]>,
+  battleLinesByOwner: ReadonlyMap<string, string>
 ): string[] {
   const ids = new Set<string>([
     ...Object.keys(summary.byOwner),
     ...hexLinesByOwner.keys(),
     ...strikeLinesByOwner.keys(),
+    ...battleLinesByOwner.keys(),
   ]);
   const ordered: string[] = [];
   if (viewerSeatId !== null && ids.has(viewerSeatId)) ordered.push(viewerSeatId);
@@ -198,7 +212,7 @@ function lossSectionTitle(seat: TurnLossSectionSeat | undefined, ownerId: string
  *
  * Purpose: Empty buckets must not open a section, and a side that only lost hexes, only took missile damage, or only lost fortifications still does.
  * When to use: Each owner in `buildTurnLossSections`.
- * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the missile and fortification sentences, then the hex sentences.
+ * Expected outcome: The header, then one `{cause}: {names}` line per non-empty cause, then the destroyed-in-battle sentence, then the missile and fortification sentences, then the hex sentences.
  * Exceptions: None.
  */
 function sectionLines(
@@ -206,14 +220,17 @@ function sectionLines(
   ownerId: string,
   header: string,
   hexLines: readonly string[],
-  strikeLines: readonly string[]
+  strikeLines: readonly string[],
+  battleLine: string
 ): string[] {
   const buckets = summary.byOwner[ownerId];
   const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-  if (causes.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
+  const battle = battleLine.trim();
+  if (causes.length === 0 && battle.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
   return [
     `${SECTION_HEADER_PREFIX}${header}`,
     ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+    ...(battle.length > 0 ? [battle] : []),
     ...strikeLines,
     ...hexLines,
   ];

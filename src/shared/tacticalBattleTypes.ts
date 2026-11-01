@@ -8,6 +8,7 @@ import type { ActiveBonusLevel } from './bonusLevel';
 import type { UnitOrigin } from './unitOriginTypes';
 import type { TechLevel } from './techBonusTypes';
 import type { WeatherState } from './weatherBonusTypes';
+import type { DestroyedBattleParent } from './destroyedBattleParent';
 
 /**
  * Identifies which player owns a tactical sub-unit for rendering and rules parity.
@@ -478,5 +479,14 @@ export interface EndTacticalBattleIpcResult {
    * Exceptions: None.
    */
   reason?: string;
+  /**
+   * Strategic units this battle deleted.
+   *
+   * Contract: Present on every success result, and empty when the battle removed none. Each row was captured before its delete.
+   * When to use: The strategic update popup after the battle.
+   * Expected outcome: Parents eliminated during beats, parents under the exit threshold, and transport fallout of those deletes.
+   * Exceptions: None.
+   */
+  destroyedParents?: DestroyedBattleParent[];
 }
 

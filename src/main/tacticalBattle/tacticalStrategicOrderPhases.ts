@@ -44,6 +44,7 @@ import {
 } from '../../shared/rangedResolutionShotLines';
 import type { CombatUnit } from '../combatUnitTypes';
 import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
+import { recordDestroyedBattleParents } from './destroyedBattleParents';
 import { applyInfrastructureDestructionEffects } from '../gameActions/airStrikeResolution';
 import {
   applyTacticalRangedRubbleToCell,
@@ -122,7 +123,7 @@ export function syncStrategicUnitsDbWhenTacticalParentsEliminated(
   }
   if (eliminatedParents.size === 0) return;
   for (const pid of [...eliminatedParents].sort()) {
-    deleteStrategicParentUnitAndApplyTransportOutcome(pid);
+    recordDestroyedBattleParents(deleteStrategicParentUnitAndApplyTransportOutcome(pid));
   }
   tacticalLogMutate('syncStrategicUnitsDbWhenTacticalParentsEliminated', {
     eliminatedParentCount: eliminatedParents.size,

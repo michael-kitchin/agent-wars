@@ -470,7 +470,54 @@ export function buildUnitOriginByLossDisplayName(
       return { ownerId, name: victim.displayName, value };
     })
   );
-  return indexLossFlagsByOwner(rows, (left, right) =>
-    unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel
+  return indexLossFlagsByOwner(rows, lossFlagsAgree);
+}
+
+/**
+ * Adds battle-parent flags for names the cause buckets did not already claim.
+ *
+ * Purpose: The cause lookup does not see units that were destroyed in a battle.
+ * When to use: After `rememberUnitOrigins` for those parents and after `buildUnitOriginByLossDisplayName`.
+ * Expected outcome: A name already in `existing` is left as it is. A name whose parents disagree on origin or formation date is omitted. Other names are added under their owner.
+ * Exceptions: None.
+ */
+export function mergeDestroyedBattleParentFlags(
+  existing: ReadonlyMap<string, ReadonlyMap<string, LossFlagIdentity>>,
+  parents: readonly {
+    readonly id: string;
+    readonly ownerId: string;
+    readonly displayName: string;
+    readonly origin?: UnitOrigin;
+  }[]
+): ReadonlyMap<string, ReadonlyMap<string, LossFlagIdentity>> {
+  const added = indexLossFlagsByOwner(
+    parents.map((parent) => ({
+      ownerId: parent.ownerId,
+      name: parent.displayName,
+      value: parent.origin ? { origin: parent.origin, formedLabel: formedLabelFor(parent.id) } : null,
+    })),
+    lossFlagsAgree
   );
+  const merged = new Map<string, ReadonlyMap<string, LossFlagIdentity>>();
+  for (const [ownerId, names] of existing) merged.set(ownerId, names);
+  for (const [ownerId, names] of added) {
+    const prior = new Map(merged.get(ownerId) ?? []);
+    for (const [name, identity] of names) {
+      if (!prior.has(name)) prior.set(name, identity);
+    }
+    merged.set(ownerId, prior);
+  }
+  return merged;
+}
+
+/**
+ * True when two loss flags would look the same.
+ *
+ * Purpose: Two units that share a display name and disagree get no flag.
+ * When to use: `buildUnitOriginByLossDisplayName` and `mergeDestroyedBattleParentFlags`.
+ * Expected outcome: True when the origin presentation and the formation label match.
+ * Exceptions: None.
+ */
+function lossFlagsAgree(left: LossFlagIdentity, right: LossFlagIdentity): boolean {
+  return unitOriginsPresentTheSame(left.origin, right.origin) && left.formedLabel === right.formedLabel;
 }

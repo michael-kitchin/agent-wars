@@ -10,6 +10,10 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { updateGameStateSidebar } from '../core/uiState';
 import { exitTacticalMapView } from '../map/tacticalMapView';
+import { clearAutomaticBattleFrameMemory, frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
+import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
+import { attachDestroyedBattleParents, waitingHeldBattleTurnUpdateId } from '../gameplay/heldBattleTurnUpdate';
+import { showHeldBattleTurnUpdate } from '../gameplay/readyResolutionAnnouncements';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
 import { closeTacticalAnnihilationOutcomeDialog, openAiOnlyBattleResultDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
 import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
@@ -140,7 +144,7 @@ function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
  *
  * Purpose: `tacticalPerformBattleExit` always presses Ready. That plus auto-advance would skip a turn.
  * When to use: A finished beat, Ok, and the header control while the observe checkbox is on.
- * Expected outcome: The session ends. Auto-advance presses Ready once after the snapshot is gone. A manual Ok does not.
+ * Expected outcome: The session ends. Auto-advance presses Ready once after the snapshot is gone. A manual Ok does not. The update that was waiting before that Ready is shown. An update that Ready stashed for a new battle keeps waiting.
  * Exceptions: IPC failures toast and keep the snapshot, matching the human exit.
  */
 export async function leaveAiOnlyBattle(
@@ -151,7 +155,11 @@ export async function leaveAiOnlyBattle(
   await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {} });
   if (session.getBattleSnapshot() != null) return;
   S.aiOnlyBattleResultSentence = null;
+  const waitingHoldId = waitingHeldBattleTurnUpdateId();
   if (autoAdvance) await maybeObserveAutoAdvance();
+  if (waitingHoldId != null && waitingHeldBattleTurnUpdateId() === waitingHoldId) {
+    await showHeldBattleTurnUpdate(true);
+  }
 }
 
 /**
@@ -169,7 +177,8 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   invalidateBackgroundAiRequest();
   try {
     if (io.endTacticalBattle) {
-      await io.endTacticalBattle();
+      const ended = await io.endTacticalBattle();
+      attachDestroyedBattleParents(destroyedParentsFromEnd(ended));
     }
   } catch (err) {
     console.error('endTacticalBattle failed:', err);
@@ -180,6 +189,7 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   if (!rendererMatchEpochCurrent(matchEpoch)) return;
   tacticalBattleExitTeardownTransientRendererState();
   session.setBattleSnapshot(null);
+  clearAutomaticBattleFrameMemory();
   closeTacticalAnnihilationOutcomeDialog();
   session.setPhasePlanning(true);
   exitTacticalMapView();
@@ -198,6 +208,21 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   io.refreshSidebarAfterTacticalDraftTeardown?.();
   io.redraw();
   if (!rendererMatchEpochCurrent(matchEpoch)) return;
+  frameAutomaticStrategicUnits();
   await io.runReadyAfterExit();
+}
+
+/**
+ * Reads the parent list from an end-battle reply.
+ *
+ * Purpose: The reply is typed as unknown because several callers share the exit function.
+ * When to use: Immediately after `endTacticalBattle` resolves.
+ * Expected outcome: The array when the reply carries one, otherwise empty.
+ * Exceptions: None.
+ */
+function destroyedParentsFromEnd(ended: unknown): readonly DestroyedBattleParent[] {
+  if (!ended || typeof ended !== 'object' || !('destroyedParents' in ended)) return [];
+  const parents = (ended as { destroyedParents?: unknown }).destroyedParents;
+  return Array.isArray(parents) ? (parents as DestroyedBattleParent[]) : [];
 }
 

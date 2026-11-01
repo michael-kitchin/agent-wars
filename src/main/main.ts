@@ -552,9 +552,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => withAutoSaveAfter(() => {
     stopModelWork('battle_exit', sendActivityLog);
     clearDeferredPlaybackConsultPending();
-    if (getActiveTacticalBattleSnapshot()?.leadPartyId != null) endTacticalBattleSessionForTwoPartyVoluntaryExit();
-    else endTacticalBattleSessionForHumanVoluntaryExitBailout();
-    return { success: true as const };
+    const destroyedParents = getActiveTacticalBattleSnapshot()?.leadPartyId != null
+      ? endTacticalBattleSessionForTwoPartyVoluntaryExit()
+      : endTacticalBattleSessionForHumanVoluntaryExitBailout();
+    return { success: true as const, destroyedParents };
   }));
   const sharedReadyConsultationDeps = buildSharedHumanReadyConsultationDeps(requestOrdersWithLog);
   ipcMain.handle(IPC_GAME.ready, async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {

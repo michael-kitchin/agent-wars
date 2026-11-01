@@ -15,7 +15,7 @@ test('the viewer section comes before the other side, and a cause line names the
   const lines = buildTurnLossSections(
     {
       byOwner: {
-        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
         [western]: { ...emptyPlayerLossSummary(), melee: [{ unitType: 'armor', displayName: '1st Armor' }] },
       },
     },
@@ -34,7 +34,7 @@ test('a null viewer uses the full home name, empty buckets are omitted, and Neut
   const lines = buildTurnLossSections(
     {
       byOwner: {
-        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
         [western]: emptyPlayerLossSummary(),
         [NEUTRAL_OWNER_ID]: { ...emptyPlayerLossSummary(), other: [{ unitType: 'infantry', displayName: 'Garrison' }] },
       },
@@ -80,7 +80,7 @@ test('hex sentences follow cause lines, and a hex-only side still gets a section
   const lines = buildTurnLossSections(
     {
       byOwner: {
-        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
       },
     },
     HUMAN_SEAT_ID,
@@ -110,7 +110,7 @@ test('a missile sentence follows cause lines and precedes hex sentences', () => 
   const lines = buildTurnLossSections(
     {
       byOwner: {
-        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
       },
     },
     HUMAN_SEAT_ID,
@@ -148,4 +148,51 @@ test('lossSectionOwnerId reads the header and breaks a shared name by seat order
   assert.equal(lossSectionOwnerId('Neutral Losses', HUMAN_SEAT_ID, roster), NEUTRAL_OWNER_ID);
   assert.equal(lossSectionOwnerId('Eastern Turkey Losses', null, roster), western);
   assert.equal(lossSectionOwnerId('Updates', HUMAN_SEAT_ID, roster), null);
+});
+
+test('a section with only the battle sentence is that header and that sentence', () => {
+  const battle = 'III Infantry, 6 Armored destroyed in battle.';
+  const lines = buildTurnLossSections(
+    { byOwner: {} },
+    HUMAN_SEAT_ID,
+    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+    undefined,
+    undefined,
+    new Map([[HUMAN_SEAT_ID, battle]])
+  );
+  assert.deepEqual(lines, ['## Your Losses', battle]);
+  assert.equal(lines.some((line) => line.includes('Ranged attack') || line.includes('## Updates')), false);
+});
+
+test('a ranged loss is printed before the battle sentence', () => {
+  const lines = buildTurnLossSections(
+    {
+      byOwner: {
+        [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
+      },
+    },
+    HUMAN_SEAT_ID,
+    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+    undefined,
+    undefined,
+    new Map([[HUMAN_SEAT_ID, 'III Infantry destroyed in battle.']])
+  );
+  assert.deepEqual(lines, [
+    '## Your Losses',
+    'Ranged attack: 1st Infantry',
+    'III Infantry destroyed in battle.',
+  ]);
+});
+
+test('omitting the battle map leaves a ranged section unchanged', () => {
+  const summary = {
+    byOwner: {
+      [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
+    },
+  };
+  const roster = [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }];
+  assert.deepEqual(
+    buildTurnLossSections(summary, HUMAN_SEAT_ID, roster),
+    ['## Your Losses', 'Ranged attack: 1st Infantry']
+  );
 });

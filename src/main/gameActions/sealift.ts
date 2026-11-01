@@ -1,6 +1,8 @@
 import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, isDbReady, listUnitsForSnapshot } from '../gameDb';
+import { describeDestroyedBattleParents } from '../tacticalBattle/destroyedBattleParents';
+import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
 import type { CombatUnit } from '../combatUnitTypes';
 import { logDebug, logTrace } from '../logger';
 import { normalizeMovementTerrain } from '../movementTerrain';
@@ -804,31 +806,31 @@ export function applyTransportOutcomeForRemovedStrategicUnits(
  *
  * Purpose: Lets tactical air-vs-units resolution mirror strategic strike DB effects without duplicating transport edge-case logic at each callsite.
  * When to use: When a tactical strike eliminates an entire strategic parent stack identified by `parentUnitId` and the row may still exist in SQLite.
- * Expected outcome: Row removed when present; transport tables stay consistent with `applyTransportOutcomeForRemovedStrategicUnits`.
- * Exceptions: None; no-op when the parent row is already absent.
+ * Expected outcome: The parent, and any land unit removed because that parent was a naval carrier, each described from the roster before the delete. An empty list when the parent row is already gone. Transport tables stay consistent with `applyTransportOutcomeForRemovedStrategicUnits`.
+ * Exceptions: None. A missing parent deletes nothing more.
  */
-export function deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId: string): void {
+export function deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId: string): DestroyedBattleParent[] {
   logDebug('deleteStrategicParentUnitAndApplyTransportOutcome', { parentUnitId });
-  const row = dbGetOne<{
-    id: string;
-    player: string;
-    unitType: string;
-    h3Index: string;
-    displayOrder: number | null;
-  }>(
-    'SELECT id, player, unit_type AS unitType, h3_index AS h3Index, display_order AS displayOrder FROM units WHERE id = ?',
-    [parentUnitId]
-  );
-  if (!row) return;
+  const roster = listUnitsForSnapshot();
+  const parent = roster.find((unit) => unit.id === parentUnitId);
+  if (!parent) {
+    logDebug('deleteStrategicParentUnitAndApplyTransportOutcome missing row', { parentUnitId });
+    return [];
+  }
+  const removed = parent.unitType === 'naval'
+    ? [parent, ...roster.filter((unit) => unit.embarkedOnNavalUnitId === parent.id)]
+    : [parent];
+  const described = describeDestroyedBattleParents(removed, roster);
   const cu: CombatUnit = {
-    id: row.id,
-    player: row.player,
-    unitType: row.unitType,
-    h3Index: row.h3Index,
-    displayOrder: row.displayOrder ?? undefined,
+    id: parent.id,
+    player: parent.player,
+    unitType: parent.unitType,
+    h3Index: parent.h3Index,
+    displayOrder: parent.displayOrder,
   };
   dbRun('DELETE FROM units WHERE id = ?', [parentUnitId]);
   applyTransportOutcomeForRemovedStrategicUnits([parentUnitId], [cu]);
+  return described;
 }
 
 /**

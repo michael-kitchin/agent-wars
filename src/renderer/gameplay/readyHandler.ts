@@ -25,9 +25,11 @@ import {
   reportViewerSeatId,
   scheduleResolutionPlaybackCompleteNotify,
 } from './readyResolutionAnnouncements';
+import { dropHeldBattleTurnUpdate, hasPendingDestroyedBattleParents } from './heldBattleTurnUpdate';
 import { announceKnockouts } from './knockoutNotices';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
 import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
+import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
 import { waitForNextResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
 export type { ReadyHandlerDeps } from './readyHandlerTypes';
 
@@ -323,6 +325,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       needsAnimation
     );
     let playbackFinished: Promise<void> | null = null;
+    if (watching && readyResult.tacticalAutoStartH3Index) holdObserveAutoAdvanceForBattleEntry(true);
     if (readyResult.postResolutionConsultDeferred === true) {
       S.pendingDeferredStrategicPostResolutionConsult = true;
       S.deferredResolutionConsultNotifySent = false;
@@ -336,6 +339,29 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         deps.updateReadyButtonState();
       };
       scheduleResolutionPlaybackCompleteNotify(sendStrategicNotify, needsAnimation);
+    }
+    const holdForBattle = Boolean(readyResult.tacticalAutoStartH3Index);
+    if (needsAnimation || holdForBattle || hasPendingDestroyedBattleParents()) {
+      const killToastFormatter = deps.buildKillToastFormatterBundle(
+        state,
+        readyResult.removedUnits,
+        undefined,
+        readyResult.killLabelUnits
+      );
+      await announceResolutionTurnUpdate(
+        {
+          readySlice: readyResult,
+          visibility,
+          killToastFormatter,
+          reportTag: turnReportTag,
+          missileLaunches: visibleMissileLaunches,
+          visibleHexes,
+          holdForBattle,
+          usePendingBattleParents: true,
+        },
+        deps
+      );
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
     }
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
@@ -370,22 +396,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           unknownHexes: new Set([...unknownCombatHexes, ...unknownCasualtyHexes]),
         }),
       };
-      const killToastFormatter = deps.buildKillToastFormatterBundle(
-        state,
-        readyResult.removedUnits,
-        undefined,
-        readyResult.killLabelUnits
-      );
-      await announceResolutionTurnUpdate(
-        {
-          readySlice: readyResult,
-          visibility,
-          killToastFormatter,
-          reportTag: turnReportTag,
-          missileLaunches: visibleMissileLaunches,
-        },
-        deps
-      );
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
       if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
@@ -425,7 +435,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.showSidebarError
     );
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
-    if (knockoutChoice === 'ended') return;
+    if (knockoutChoice === 'ended') {
+      dropHeldBattleTurnUpdate();
+      return;
+    }
+    if (!needsAnimation && !readyResult.tacticalAutoStartH3Index) frameAutomaticStrategicUnits();
     if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
     if (readyResult.tacticalAutoStartH3Index) {

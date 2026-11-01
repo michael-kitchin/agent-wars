@@ -66,6 +66,26 @@ const GROUP_TYPE_BY_LABEL: Readonly<Record<string, LostUnitType>> = {
 const GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
 
 /**
+ * A collapsed group on the destroyed-in-battle sentence.
+ *
+ * Purpose: That sentence writes `6 Armored`, without the `x` the other cause lines use.
+ * When to use: `battleLineSegments`.
+ * Expected outcome: The count and one of the five labels.
+ * Exceptions: None.
+ */
+const BATTLE_GROUP_TOKEN = /^(\d+) (Naval|Air|Armored|Infantry|Missile)$/;
+
+/**
+ * The ending of a destroyed-in-battle sentence, including the leading space and the period.
+ *
+ * Purpose: The splitter has to recognize this sentence without treating it as a cause label.
+ * When to use: `splitLossCauseLineForUnitFlags`.
+ * Expected outcome: ` destroyed in battle.`
+ * Exceptions: None.
+ */
+const DESTROYED_IN_BATTLE_SUFFIX = ' destroyed in battle.';
+
+/**
  * Separator between victim names on a loss cause line.
  *
  * Purpose: Matches the join used by the loss formatters.
@@ -94,6 +114,7 @@ const BULLET_PREFIX = '\u2022 ';
  *   comma-separated token is its own segment, marked as a unit name only when it is in `knownDisplayNames`
  *   (older totals such as `3 Infantry` stay plain). A token `4x Infantry` that is not a known name
  *   carries `group`, so a loss section can paint a type icon even when no origin flag exists.
+ *   A sentence ending in ` destroyed in battle.` splits the same way, and a token such as `6 Armored` carries `group` without the `x`.
  *   Any other line is one plain segment. The segments' text always concatenates back to `line`.
  * Exceptions: None.
  */
@@ -103,6 +124,7 @@ export function splitLossCauseLineForUnitFlags(
 ): ReadonlyArray<LossLineSegment> {
   const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : '';
   const body = line.slice(bullet.length);
+  if (body.endsWith(DESTROYED_IN_BATTLE_SUFFIX)) return battleLineSegments(bullet, body, knownDisplayNames);
   const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
   if (!label) return [{ text: line, unitDisplayName: null }];
   const prefix = `${bullet}${label}: `;
@@ -113,6 +135,49 @@ export function splitLossCauseLineForUnitFlags(
     segments.push(victimSegment(token, knownDisplayNames));
   });
   return segments;
+}
+
+/**
+ * Splits a destroyed-in-battle sentence into names, groups, and the fixed ending.
+ *
+ * Purpose: Flags and the type icon use the same painters as the other loss lines.
+ * When to use: When the body ends with ` destroyed in battle.`.
+ * Expected outcome: The ending, including its leading space and period, is one plain segment. Known names are unit segments. A token such as `6 Armored` is a group.
+ * Exceptions: None.
+ */
+function battleLineSegments(
+  bullet: string,
+  body: string,
+  knownDisplayNames: ReadonlySet<string>
+): LossLineSegment[] {
+  const front = body.slice(0, -DESTROYED_IN_BATTLE_SUFFIX.length);
+  const tokens = front.length === 0 ? [] : front.split(VICTIM_SEPARATOR);
+  const segments: LossLineSegment[] = [];
+  if (bullet.length > 0) segments.push({ text: bullet, unitDisplayName: null });
+  tokens.forEach((token, index) => {
+    if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
+    segments.push(battleVictimSegment(token, knownDisplayNames));
+  });
+  segments.push({ text: DESTROYED_IN_BATTLE_SUFFIX, unitDisplayName: null });
+  return segments;
+}
+
+/**
+ * One token of a destroyed-in-battle sentence.
+ *
+ * Purpose: A known name gets a flag, and a count such as `6 Armored` gets the type icon.
+ * When to use: `battleLineSegments`.
+ * Expected outcome: A unit segment, a group segment, or a plain segment. A known name wins over the group pattern.
+ * Exceptions: None.
+ */
+function battleVictimSegment(token: string, knownDisplayNames: ReadonlySet<string>): LossLineSegment {
+  if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
+  const match = BATTLE_GROUP_TOKEN.exec(token);
+  const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ''] : undefined;
+  if (match && unitType) {
+    return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
+  }
+  return { text: token, unitDisplayName: null };
 }
 
 /**

@@ -7,6 +7,7 @@ import { rendererSharedState as S } from '../core/state';
 import { closeTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
 import { syncTacticalExitButtonElementVisibility } from './tacticalExitButtonDom';
 import { exitTacticalMapView } from '../map/tacticalMapView';
+import { clearAutomaticBattleFrameMemory, clearAutomaticFrameMemory } from '../map/unitFrameCamera';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
 import { updateGameStateSidebar } from '../core/uiState';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
@@ -15,6 +16,7 @@ import {
   cancelTacticalScopedBackgroundPrefetchForSessionTeardown,
 } from '../openRouter/openRouterRuntime';
 import { clearPendingTacticalOrders } from '../gameplay/tacticalOrders';
+import { dropHeldBattleTurnUpdate } from '../gameplay/heldBattleTurnUpdate';
 import { abandonResolutionPlaybackWaits, dropQueuedResolutionPlaybackCompleteNotifies } from '../openRouter/resolutionPlaybackDeferral';
 
 /**
@@ -71,6 +73,8 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(
   S.pendingDeferredTacticalPostBeatConsult = false;
   S.tacticalBattleSnapshot = null;
   S.tacticalPhasePlanning = true;
+  clearAutomaticFrameMemory();
+  dropHeldBattleTurnUpdate();
   // `clearPendingTacticalOrders` replaces manual tactical march/embark clears and aligns with voluntary tactical exit.
   clearPendingTacticalOrders();
   S.hideCommittedOrderLinesAfterReady = false;
@@ -123,6 +127,7 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
     cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
     S.tacticalBattleSnapshot = null;
     S.tacticalPhasePlanning = true;
+    clearAutomaticBattleFrameMemory();
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];
     exitTacticalMapView();

@@ -8,7 +8,7 @@
  */
 
 import { rendererSharedState as S } from '../core/state';
-import { syncObserveChrome } from './observeChrome';
+import { frameAutomaticWatchCamera, syncObserveChrome } from './observeChrome';
 
 /**
  * True after the player chooses to watch the rest of a match.
@@ -33,6 +33,7 @@ export function chooseWatchTheRest(): void {
   S.autoAdvance = true;
   S.viewAs = 'all';
   syncObserveChrome();
+  frameAutomaticWatchCamera();
 }
 
 /**
