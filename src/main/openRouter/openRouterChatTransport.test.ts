@@ -1,16 +1,23 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import type { ClientRequest, IncomingMessage } from 'node:http';
 import { afterEach, describe, it } from 'node:test';
 import {
   resolveOpenRouterChatTransport,
   setOpenRouterPostChatForTests,
   type OpenRouterChatTransportPayload,
 } from './openRouterChatTransport';
+import {
+  setOpenRouterHttpsRequestForTests,
+  type OpenRouterHttpsRequest,
+} from './openRouterHttpsRequest';
 
 const savedHang = process.env.AGENT_WARS_SIMULATE_MODEL_HANG;
 const savedHangMs = process.env.AGENT_WARS_SIMULATE_MODEL_HANG_MS;
 
 afterEach(() => {
   setOpenRouterPostChatForTests(null);
+  setOpenRouterHttpsRequestForTests(null);
   if (savedHang === undefined) delete process.env.AGENT_WARS_SIMULATE_MODEL_HANG;
   else process.env.AGENT_WARS_SIMULATE_MODEL_HANG = savedHang;
   if (savedHangMs === undefined) delete process.env.AGENT_WARS_SIMULATE_MODEL_HANG_MS;
@@ -107,5 +114,82 @@ describe('openRouterChatTransport', { concurrency: 1 }, () => {
     });
     const result = await resolveOpenRouterChatTransport()(payload(controller.signal));
     assert.deepEqual(result, { ok: false, error: 'Cancelled' });
+  });
+
+  /**
+   * The keys `test-openrouter-key` and `test-openrouter-key-b` are for testing.
+   */
+  it('sends attribution headers on the chat POST', async () => {
+    delete process.env.AGENT_WARS_SIMULATE_MODEL_HANG;
+    const seen: Array<{
+      hostname?: string | null;
+      path?: string | null;
+      method?: string;
+      headers?: unknown;
+    }> = [];
+    const fake: OpenRouterHttpsRequest = (options, callback) => {
+      seen.push({
+        hostname: options.hostname,
+        path: typeof options.path === 'string' ? options.path : null,
+        method: options.method,
+        headers: options.headers,
+      });
+      const req = new EventEmitter();
+      const end = (): void => {
+        const res = new EventEmitter();
+        queueMicrotask(() => {
+          callback(
+            Object.assign(res, {
+              statusCode: 200,
+              headers: {},
+              setTimeout: () => res,
+            }) as unknown as IncomingMessage
+          );
+          res.emit('end');
+        });
+      };
+      return Object.assign(req, {
+        destroy: () => req,
+        setTimeout: () => req,
+        write: () => true,
+        end,
+      }) as unknown as ClientRequest;
+    };
+    setOpenRouterHttpsRequestForTests(fake);
+    const first = await resolveOpenRouterChatTransport()({
+      key: 'test-openrouter-key',
+      body: { max_tokens: 128 },
+      requestLabel: 'test',
+    });
+    const second = await resolveOpenRouterChatTransport()({
+      key: 'test-openrouter-key-b',
+      body: { max_tokens: 128 },
+      requestLabel: 'test',
+    });
+    assert.equal(first.ok, true);
+    assert.equal(second.ok, true);
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0].hostname, 'openrouter.ai');
+    assert.equal(seen[0].path, '/api/v1/chat/completions');
+    assert.equal(seen[0].method, 'POST');
+    assert.deepEqual(seen[1].hostname, seen[0].hostname);
+    assert.deepEqual(seen[1].path, seen[0].path);
+    assert.deepEqual(seen[1].method, seen[0].method);
+    assert.deepEqual(seen[0].headers, {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer test-openrouter-key',
+      'Accept-Encoding': 'gzip, deflate, br, identity',
+      'HTTP-Referer': 'https://github.com/michael-kitchin/agent-wars',
+      'X-OpenRouter-Title': 'Agent Wars',
+      'X-OpenRouter-Categories': 'game',
+    });
+    assert.deepEqual(seen[1].headers, {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer test-openrouter-key-b',
+      'Accept-Encoding': 'gzip, deflate, br, identity',
+      'HTTP-Referer': 'https://github.com/michael-kitchin/agent-wars',
+      'X-OpenRouter-Title': 'Agent Wars',
+      'X-OpenRouter-Categories': 'game',
+    });
   });
 });

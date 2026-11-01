@@ -1,4 +1,3 @@
-import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import {
@@ -8,6 +7,8 @@ import {
 import { logDebug, logError } from '../logger';
 import { formatModelCallFailureLine } from './modelCallAttemptMessages';
 import { readModelHangSimulationMs, shouldSimulateModelHang } from './modelHangSimulation';
+import { openRouterChatRequestHeaders } from './openRouterAttributionHeaders';
+import { requestOpenRouterHttps } from './openRouterHttpsRequest';
 import {
   formatOpenRouterChatApiError,
   noteOpenRouterAffordableMaxTokens,
@@ -452,12 +453,12 @@ export function setOpenRouterPostChatForTests(override: typeof postChatViaHttps 
 }
 
 /**
- * Defines the `postChatViaHttps` function shape (async function postChatViaHttps(args: { key: string; requestBody: Record<string, unknown>; signal: AbortSignal; timeoutMs: number; responseIdleTi).
-
- * Purpose: Supports maintainability by documenting why `postChatViaHttps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Posts one chat completion over HTTPS and decodes the body.
+ *
+ * Purpose: One attempt of the OpenRouter chat call, including the socket timeout and gzip decoding.
+ * When to use: The default attempt poster. Retries call it again.
+ * Expected outcome: Request headers come from `openRouterChatRequestHeaders`. The promise resolves with status, response headers, and decoded body text.
+ * Exceptions: Rejects on socket errors, abort, and body-decode failure.
  */
 async function postChatViaHttps(args: {
   key: string;
@@ -471,18 +472,14 @@ async function postChatViaHttps(args: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }> {
   const url = new URL(OPENROUTER_CHAT_URL);
   return new Promise((resolve, reject) => {
-    const req = httpsRequest(
+    const req = requestOpenRouterHttps(
       {
         protocol: url.protocol,
         hostname: url.hostname,
         port: url.port || 443,
         path: `${url.pathname}${url.search}`,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${args.key}`,
-          'Accept-Encoding': 'gzip, deflate, br, identity',
-        },
+        headers: openRouterChatRequestHeaders(args.key),
       },
       (res) => {
         const chunks: Buffer[] = [];

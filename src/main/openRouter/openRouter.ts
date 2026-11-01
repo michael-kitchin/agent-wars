@@ -59,6 +59,7 @@ import {
 } from './openRouterToolGroups';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { buildOpenRouterModelList } from './buildOpenRouterModelList';
+import { openRouterModelsRequestHeaders } from './openRouterAttributionHeaders';
 import { getOpenRouterModelCapabilities, rememberOpenRouterModels } from './openRouterModelCapabilities';
 import { resolveOrdersRequestProfile, resolveSeatOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
@@ -371,7 +372,7 @@ export type ModelItem = OpenRouterModel;
  *
  * Purpose: Each popover refresh uses the key in that popover.
  * When to use: The model-list IPC. Pass `''` when the argument is not a string.
- * Expected outcome: The model list, or `{ error: 'No API key set' }` without a fetch when the key is blank. The key is not logged.
+ * Expected outcome: The model list on success. The request headers are `openRouterModelsRequestHeaders(supplied)`. `{ error: 'No API key set' }` without a fetch when the trimmed key is empty. The key is not logged.
  * Exceptions: None. A failed fetch returns `{ error }` and is logged.
  */
 export async function listModels(key: string): Promise<{ models: ModelItem[] } | { error: string }> {
@@ -383,7 +384,7 @@ export async function listModels(key: string): Promise<{ models: ModelItem[] } |
   }
   try {
     const res = await fetch(OPENROUTER_MODELS_URL, {
-      headers: { Authorization: `Bearer ${supplied}` },
+      headers: openRouterModelsRequestHeaders(supplied),
     });
     if (!res.ok) {
       const text = await res.text();

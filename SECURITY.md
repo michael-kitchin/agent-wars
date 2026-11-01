@@ -13,6 +13,7 @@ Only the latest release is supported. Fixes ship in a new release rather than as
 - You enter the key in the renderer. It is handed to the Electron main process over the preload bridge, and only the main process uses it.
 - The key is saved in the app's user-data directory, not in the repository or the install folder. It is encrypted with Electron's `safeStorage` when the operating system provides encryption, and saved as plain text when it doesn't. To delete the saved key, clear the key field and click outside it.
 - The key is sent only to OpenRouter (`openrouter.ai`), in the `Authorization` header of chat and model-list requests.
+- Those same chat and model-list requests also send `HTTP-Referer: https://github.com/michael-kitchin/agent-wars`, `X-OpenRouter-Title: Agent Wars`, and `X-OpenRouter-Categories: game`. They do not send `X-OpenRouter-App-Visibility`, so OpenRouter treats the app as public. The key stays in the `Authorization` header only.
 
 ## Hardening in the current build
 
