@@ -9,7 +9,7 @@ import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMov
 import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
 import { FORTIFIED_CELL_BLOCKED_REASON } from '../../shared/fortificationRules';
 import { isCellBlockedByFortification, tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
-import { briefingSeatForBattle } from '../briefing/briefingPerspective';
+import type { AiSeatId } from '../../shared/seatIds';
 import { checkDistanceTagSourceUnit } from './pathfindingDistanceHelpers';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import {
@@ -378,13 +378,14 @@ export function executeTacticalPlanRoute(
  * Weather budgets and enter costs use the tags of the sub-unit `checkDistanceTagSourceUnit` picks on the start cell, as
  * strategic `check_distance` does; an empty start cell means an untagged mover. Terrain-bonus stops use that same
  * sub-unit's birth terrain, so an empty start cell gets none.
- * Exceptions: Returns error for invalid hexes; air unitType yields unreachable ok with zero distances.
+ * Exceptions: Returns error for invalid hexes; air unitType yields unreachable ok with zero distances. `ownSeatId` is the commander whose sub-unit supplies weather tags on a shared start cell.
  */
 export function executeTacticalCheckDistance(
   from: LatLng,
   to: LatLng,
   unitType: string,
   battle: TacticalBattleSnapshot,
+  ownSeatId: AiSeatId,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): CheckDistanceOk | CheckDistanceError {
@@ -393,6 +394,7 @@ export function executeTacticalCheckDistance(
     from: from.join(','),
     to: to.join(','),
     unitType,
+    ownSeatId,
   });
   const fromH3 = resolveToH3(from[0], from[1]);
   const toH3 = resolveToH3(to[0], to[1]);
@@ -405,11 +407,11 @@ export function executeTacticalCheckDistance(
   if (isMissileUnitType(unitType) || unitType === 'air') {
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
-  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType, briefingSeatForBattle(battle));
+  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType, ownSeatId);
   const mover = {
     unitType,
     h3Index: fromH3,
-    player: briefingSeatForBattle(battle),
+    player: ownSeatId,
     weatherTags: occupant?.weatherTags,
     origin: occupant?.origin,
   };

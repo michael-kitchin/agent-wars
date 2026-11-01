@@ -27,6 +27,7 @@ import {
   tacticalBattleWithSyncedEmbarkCargo,
 } from './tacticalStrategicOrderPhases';
 import { tacticalComputeMovementOrderOutcomeForPlayer } from './tacticalSnapshotGuards';
+import type { TacticalBeatOutcome } from './tacticalBeatOutcome';
 import { withFortificationOwnersFromGameDb } from './tacticalFortificationOwners';
 
 /**
@@ -113,16 +114,26 @@ function legalEmbarkOrders(
 }
 
 /**
+ * Success carries the full beat outcome. Failure is a reason string.
+ *
+ * Purpose: Callers that only stored `battle` now also receive combat results for playback and loss notes.
+ * When to use: The return of `applyAiOnlyTacticalBeat`.
+ * Expected outcome: `success: true` includes `TacticalBeatOutcome`. `success: false` has `reason`.
+ * Exceptions: None.
+ */
+export type AiOnlyTacticalBeatResult =
+  | ({ readonly success: true } & TacticalBeatOutcome)
+  | { readonly success: false; readonly reason: string };
+
+/**
  * Applies both AI drafts and records the end reason when this beat finishes the battle.
  *
- * Purpose: Elimination, then three idle beats, then both exit flags after five completed beats.
+ * Purpose: Elimination, then three idle beats, then both exit flags after five completed beats. The result keeps every phase the playback builder needs.
  * When to use: After each seat's draft has been taken once.
- * Expected outcome: The stored snapshot has the next turn number. The session stays up.
- * Exceptions: Failure when the active battle is missing or is not between two AI seats.
+ * Expected outcome: `battle` is the stored snapshot. `battleAfterMovementBeforeFerry` is the snapshot before embark and ferry. Removals include both ferry phases.
+ * Exceptions: Failure reason `'No AI-only tactical battle is active.'` when no AI-only battle is active.
  */
-export function applyAiOnlyTacticalBeat(
-  drafts: AiOnlyTacticalBeatDrafts,
-): { success: true; battle: TacticalBattleSnapshot } | { success: false; reason: string } {
+export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnlyTacticalBeatResult {
   const current = getActiveTacticalBattleSnapshotRef();
   const lead = current?.leadPartyId;
   const opposing = current?.opposingPartyId;
@@ -195,5 +206,27 @@ export function applyAiOnlyTacticalBeat(
     applied,
     aiOnlyEndReason: aiOnlyEndReason ?? null,
   });
-  return { success: true, battle };
+  return {
+    success: true,
+    battle,
+    battleAfterMovementBeforeFerry: afterOpposingMove,
+    killsByDirectFire: airAndRanged.killsByDirectFire,
+    killsByAirStrike: airAndRanged.killsByAirStrike,
+    killsByReturnFire: airAndRanged.killsByReturnFire,
+    removedUnits: [
+      ...airAndRanged.removedUnits,
+      ...afterLeadFerry.removedUnits,
+      ...afterOpposingFerry.removedUnits,
+    ],
+    infrastructureDestroyedEvents: airAndRanged.infrastructureDestroyedEvents,
+    airStrikeAttemptCount: airAndRanged.airStrikeAttemptCount,
+    airStrikePlaybackMoves: airAndRanged.airStrikePlaybackMoves,
+    airStrikePlaybackStrikeHexes: airAndRanged.airStrikePlaybackStrikeHexes,
+    airStrikePlaybackCasualtyHexes: airAndRanged.airStrikePlaybackCasualtyHexes,
+    airStrikePlaybackRemovedUnits: airAndRanged.airStrikePlaybackRemovedUnits,
+    rangedResolutionShotLines: airAndRanged.rangedResolutionShotLines,
+    airStrikeDiceRolls: airAndRanged.airStrikeDiceRolls,
+    rangedDiceRolls: airAndRanged.rangedDiceRolls,
+    meleePack: { ...melee, battle },
+  };
 }

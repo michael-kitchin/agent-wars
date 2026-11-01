@@ -247,8 +247,8 @@ phase: ResolutionPlaybackPhase;
 /**
  * Milliseconds elapsed on the resolution playback timeline for the active animation object.
  *
- * Purpose: Tactical Ready arms `S.resolutionMoveAnimation` before awaiting IPC; without deferring, rAF would advance
- * `Date.now() - startTime` during those awaits and consume most of the movement segment before the first visible frame.
+ * Purpose: Tactical Ready and strategic Ready both arm playback before an await. Without the hold, that await
+ *   advances `Date.now() - startTime` and can finish movement, combat, and dice before the first visible frame.
  * When to use: Any call site that previously used `Date.now() - anim.startTime` with `buildResolutionPlaybackState`.
  * Expected outcome: Returns 0 while `tacticalDeferResolutionClock` is true; otherwise `Date.now() - anim.startTime`.
  * Exceptions: None.

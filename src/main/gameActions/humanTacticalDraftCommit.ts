@@ -11,11 +11,10 @@ import type {
   TacticalOpponentPlanPayload,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { combatDicePlaybackFields } from '../combatDiceRecording';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMarchSetForMover } from '../../shared/tacticalFortificationMovement';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
-import { isDbReady, reconcileStrategicInfrastructureCountsFromTacticalOverrides } from '../gameDb';
+import { isDbReady } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { holdFireUnitIdsForPlayer } from '../tools/standingOrders';
 import {
@@ -27,14 +26,20 @@ import {
 import { projectTacticalSnapshotAfterOpponentMovementOrders, projectTacticalSnapshotAfterPlayerMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import { validateTacticalOpponentEmbarkOrder } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { tacticalMarchFirstStopAlongPath } from '../tacticalBattle/tacticalRulesAdapter';
-import { applyAiOnlyTacticalBeat } from '../tacticalBattle/aiOnlyTacticalBeat';
+import { commitAiOnlyTacticalBeat } from './aiOnlyTacticalCommit';
 import { opposingPartyIdOf } from '../tacticalBattle/opposingParty';
 import { tacticalComputeMovementOrderOutcome, tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/tacticalSnapshotGuards';
 import {
   resolveTacticalRangedTargetForSubUnit,
   withTacticalTempoAttacks,
 } from '../tacticalBattle/tacticalRangedTargetResolve';
-import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
+import {
+  buildSeatPlaybackMoves,
+  buildTacticalCombatPlaybackFields,
+  captureTacticalBeatLossNote,
+  reconcileInfrastructureAfterTacticalBeat,
+  tacticalTerrainBattleView,
+} from './tacticalBeatPlayback';
 import type { SubmitOrdersResult } from './gameActionsTypes';
 import {
   ORDER_PLAN_SANITIZE_CONTEXT,
@@ -303,14 +308,7 @@ export function commitHumanTacticalDraftOrders(args: {
     if (preBattle.leadPartyId != null && isAiSeatId(preBattle.leadPartyId) && preBattle.opposingPartyId != null && isAiSeatId(preBattle.opposingPartyId)) {
       const leadDraft = sanitizedAiSeatDraft(preBattle, preBattle.leadPartyId);
       const opposingDraft = sanitizedAiSeatDraft(preBattle, preBattle.opposingPartyId);
-      const aiOnlyBeat = applyAiOnlyTacticalBeat({ leadDraft, opposingDraft });
-      if (!aiOnlyBeat.success) return aiOnlyBeat;
-      return {
-        success: true,
-        tacticalBattle: aiOnlyBeat.battle,
-        tacticalResolutionPlayback: { humanMoves: [] },
-        ...committedOpponentTacticalDraftFieldAfterConsume(false),
-      };
+      return commitAiOnlyTacticalBeat({ preBattle, leadDraft, opposingDraft });
     }
     const party = opposingPartyIdOf(preBattle);
     const pooledDraft = isAiSeatId(party) ? takeTacticalDraft(party, preBattle.battleId) : null;
@@ -335,22 +333,7 @@ export function commitHumanTacticalDraftOrders(args: {
       explicitRangedCount: explicitRanged.length,
       explicitAirCount: explicitAir.length,
     });
-    const terrainBattle = {
-      battleId: preBattle.battleId,
-      tacticalTurnNumber: preBattle.tacticalTurnNumber,
-      subUnits: preBattle.subUnits,
-      tacticalChildH3Indexes: preBattle.tacticalChildH3Indexes,
-      tacticalTerrainKindByH3: preBattle.tacticalTerrainKindByH3,
-      strategicHexTerrain: preBattle.strategicHexTerrain,
-      strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
-      ...(preBattle.tacticalIsSeaportByH3 ? { tacticalIsSeaportByH3: preBattle.tacticalIsSeaportByH3 } : {}),
-      ...(preBattle.tacticalIsUrbanByH3 ? { tacticalIsUrbanByH3: preBattle.tacticalIsUrbanByH3 } : {}),
-      ...(preBattle.tacticalIsRubbleByH3 ? { tacticalIsRubbleByH3: preBattle.tacticalIsRubbleByH3 } : {}),
-      ...(preBattle.tacticalRoadSidesByH3 ? { tacticalRoadSidesByH3: preBattle.tacticalRoadSidesByH3 } : {}),
-      ...(preBattle.tacticalRailSidesByH3 ? { tacticalRailSidesByH3: preBattle.tacticalRailSidesByH3 } : {}),
-      ...(preBattle.weatherBonusEnabled ? { weatherBonusEnabled: true as const, weatherBonusLevel: preBattle.weatherBonusLevel, weather: preBattle.weather } : {}),
-      ...(preBattle.terrainBonusEnabled === true ? { terrainBonusEnabled: true as const } : {}),
-    };
+    const terrainBattle = tacticalTerrainBattleView(preBattle);
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
     const humanMarchPlanByUnitId = new Map<
@@ -398,16 +381,11 @@ export function commitHumanTacticalDraftOrders(args: {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected beat', { reason: beat.reason });
       return { success: false, reason: beat.reason };
     }
-    const support = beat;
+    reconcileInfrastructureAfterTacticalBeat(
+      beat,
+      'gameActions commitHumanTacticalDraftOrders reconciled res1 infrastructure after tactical strikes'
+    );
     const postMovementBattle = beat.battleAfterMovementBeforeFerry;
-    if ((support.infrastructureDestroyedEvents?.length ?? 0) > 0) {
-      const { changedHexCount } = reconcileStrategicInfrastructureCountsFromTacticalOverrides();
-      logDebug('gameActions commitHumanTacticalDraftOrders reconciled res1 infrastructure after tactical strikes', {
-        changedHexCount,
-        eventCount: support.infrastructureDestroyedEvents.length,
-      });
-    }
-    const meleePack = beat.meleePack;
     const finalBattle = beat.battle;
     const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
     for (const o of effectiveHumanMarches) {
@@ -440,64 +418,17 @@ export function commitHumanTacticalDraftOrders(args: {
       humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
     }
     const od = opponentTacticalDraft;
-    const opponentMoves: NonNullable<TacticalCommitResolutionPlayback['opponentMoves']> = [];
-    if (od) {
-      for (const o of od.movementOrders) {
-        const su = preBattle.subUnits.find((u) => u.id === o.unitId);
-        if (!su || su.player === HUMAN_SEAT_ID) continue;
-        const from = su.h3Index;
-        if (from === o.toH3Index) continue;
-        const after = postMovementBattle.subUnits.find((u) => u.id === o.unitId);
-        const to = after?.h3Index ?? o.toH3Index;
-        if (from === to) continue;
-        const oppMoveType = tacticalMovementUnitTypeForPathfinding(su, o.toH3Index);
-        const oppMaxEdges = effectiveTacticalMovementPointBudgetForMarchLeg(
-          terrainBattle,
-          su,
-          preBattle.subUnits,
-          oppMoveType
-        );
-        let pathH3Indexes: string[] | undefined;
-        if (oppMaxEdges > 0) {
-          const oppMarch = tacticalMarchFirstStopAlongPath(
-            from,
-            o.toH3Index,
-            oppMaxEdges,
-            tacticalMarchSetForMover({ battle: preBattle, moverPlayer: su.player, originH3: from }),
-            terrainBattle,
-            oppMoveType,
-            su
-          );
-          pathH3Indexes = clipTacticalMarchPathToDestination(to, oppMarch.pathH3Prefix);
-        }
-        opponentMoves.push({
-          unitId: o.unitId,
-          fromH3Index: from,
-          toH3Index: to,
-          ...(pathH3Indexes ? { pathH3Indexes } : {}),
-        });
-      }
-      for (const f of od.ferryOrders) {
-        const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
-        if (!u || u.unitType !== 'air' || u.player === HUMAN_SEAT_ID) continue;
-        if (u.h3Index === f.destinationH3Index) continue;
-        opponentMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
-      }
-    }
-    const rangedRemovedUnits = support.removedUnits;
-    const airStrikePlaybackRemovedUnits = support.airStrikePlaybackRemovedUnits;
-    const rangedCombatHexSet = new Set<string>();
-    for (const r of explicitRanged) {
-      rangedCombatHexSet.add(r.targetH3Index);
-    }
-    for (const r of od?.rangedAttacks ?? []) {
-      rangedCombatHexSet.add(r.targetH3Index);
-    }
-    const rangedCombatHexes = [...rangedCombatHexSet];
-    const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
-    const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
-    const humanBeatHadSubmittedRangedOrAirOrders =
-      explicitRanged.length > 0 || explicitAir.length > 0;
+    const opponentMoves = od
+      ? buildSeatPlaybackMoves({
+        preBattle,
+        postMovementBattle,
+        terrainBattle,
+        movementOrders: od.movementOrders,
+        ferryOrders: od.ferryOrders,
+        isMover: (player) => player !== HUMAN_SEAT_ID,
+      })
+      : [];
+    const humanBeatHadSubmittedRangedOrAirOrders = explicitRanged.length > 0 || explicitAir.length > 0;
     const opponentBeatHadSubmittedRangedOrAirOrders =
       !!od && ((od.rangedAttacks?.length ?? 0) > 0 || (od.airStrikes?.length ?? 0) > 0);
     const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {
@@ -505,30 +436,10 @@ export function commitHumanTacticalDraftOrders(args: {
       ...(humanBeatHadSubmittedRangedOrAirOrders ? { humanBeatHadSubmittedRangedOrAirOrders: true } : {}),
       ...(opponentBeatHadSubmittedRangedOrAirOrders ? { opponentBeatHadSubmittedRangedOrAirOrders: true } : {}),
       opponentMoves: opponentMoves.length > 0 ? opponentMoves : undefined,
-      rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
-      rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
-      rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
-      rangedResolutionShotLines:
-        support.rangedResolutionShotLines.length > 0 ? support.rangedResolutionShotLines : undefined,
-      killsByDirectFire: support.killsByDirectFire.length > 0 ? support.killsByDirectFire : undefined,
-      killsByReturnFire: support.killsByReturnFire.length > 0 ? support.killsByReturnFire : undefined,
-      killsByAirStrike: support.killsByAirStrike.length > 0 ? support.killsByAirStrike : undefined,
-      infrastructureDestroyedEvents:
-        support.infrastructureDestroyedEvents.length > 0 ? support.infrastructureDestroyedEvents : undefined,
-      airStrikeAttemptCount: support.airStrikeAttemptCount > 0 ? support.airStrikeAttemptCount : undefined,
-      ...(support.airStrikePlaybackMoves.length > 0 ? { airStrikeMoves: support.airStrikePlaybackMoves } : {}),
-      ...(support.airStrikePlaybackStrikeHexes.length > 0 ? { airStrikeHexes: support.airStrikePlaybackStrikeHexes } : {}),
-      ...(support.airStrikePlaybackCasualtyHexes.length > 0
-        ? { airStrikeCasualtyHexes: support.airStrikePlaybackCasualtyHexes }
-        : {}),
-      ...(airStrikePlaybackRemovedUnits.length > 0
-        ? { airStrikeRemovedUnits: airStrikePlaybackRemovedUnits }
-        : {}),
-      killsByMelee: meleePack.killsByMelee.length > 0 ? meleePack.killsByMelee : undefined,
-      meleeCombatHexes: meleePack.meleeCombatHexes.length > 0 ? meleePack.meleeCombatHexes : undefined,
-      meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
-      meleeRemovedUnits: meleePack.meleeRemovedUnits.length > 0 ? meleePack.meleeRemovedUnits : undefined,
-      ...combatDicePlaybackFields(support.airStrikeDiceRolls, support.rangedDiceRolls, meleePack.meleeDiceRolls),
+      ...buildTacticalCombatPlaybackFields(beat, [
+        ...explicitRanged.map((row) => row.targetH3Index),
+        ...(od?.rangedAttacks ?? []).map((row) => row.targetH3Index),
+      ]),
     };
     const livingSubUnitIds = new Set(finalBattle.subUnits.map((u) => u.id));
     const livingMarchContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
@@ -547,22 +458,22 @@ export function commitHumanTacticalDraftOrders(args: {
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
       opponentMoveCount: opponentMoves.length,
-      rangedCombatHexCount: rangedCombatHexes.length,
-      airStrikePlaybackMoveCount: support.airStrikePlaybackMoves.length,
-      airStrikePlaybackStrikeHexCount: support.airStrikePlaybackStrikeHexes.length,
-      airStrikePlaybackCasualtyHexCount: support.airStrikePlaybackCasualtyHexes.length,
-      airStrikePlaybackRemovedCount: airStrikePlaybackRemovedUnits.length,
-      rangedRemovedCount: rangedRemovedUnits.length,
-      rangedKillEdgeCount: support.killsByDirectFire.length,
-      returnFireKillEdgeCount: support.killsByReturnFire.length,
-      airStrikeKillEdgeCount: support.killsByAirStrike.length,
-      meleeKillEdgeCount: meleePack.killsByMelee.length,
-      meleeRemovedCount: meleePack.meleeRemovedUnits.length,
+      rangedCombatHexCount: tacticalResolutionPlayback.rangedCombatHexes?.length ?? 0,
+      airStrikePlaybackMoveCount: beat.airStrikePlaybackMoves.length,
+      airStrikePlaybackStrikeHexCount: beat.airStrikePlaybackStrikeHexes.length,
+      airStrikePlaybackCasualtyHexCount: beat.airStrikePlaybackCasualtyHexes.length,
+      airStrikePlaybackRemovedCount: beat.airStrikePlaybackRemovedUnits.length,
+      rangedRemovedCount: beat.removedUnits.length,
+      rangedKillEdgeCount: beat.killsByDirectFire.length,
+      returnFireKillEdgeCount: beat.killsByReturnFire.length,
+      airStrikeKillEdgeCount: beat.killsByAirStrike.length,
+      meleeKillEdgeCount: beat.meleePack.killsByMelee.length,
+      meleeRemovedCount: beat.meleePack.meleeRemovedUnits.length,
       marchContinuationCount: livingMarchContinuations.length,
-      shotLineCount: support.rangedResolutionShotLines.length,
-      airStrikeDiceRollCount: support.airStrikeDiceRolls.length,
-      rangedDiceRollCount: support.rangedDiceRolls.length,
-      meleeDiceRollCount: meleePack.meleeDiceRolls.length,
+      shotLineCount: beat.rangedResolutionShotLines.length,
+      airStrikeDiceRollCount: beat.airStrikeDiceRolls.length,
+      rangedDiceRollCount: beat.rangedDiceRolls.length,
+      meleeDiceRollCount: beat.meleePack.meleeDiceRolls.length,
     });
     /**
      * Persists human tactical embark onto strategic `unit_transport_assignments` after the beat succeeded.
@@ -578,30 +489,7 @@ export function commitHumanTacticalDraftOrders(args: {
         return row?.parentUnitId ?? null;
       });
     }
-    const tacticalRemovedById = new Map<string, (typeof rangedRemovedUnits)[number]>();
-    for (const u of rangedRemovedUnits) tacticalRemovedById.set(u.id, u);
-    for (const u of meleePack.meleeRemovedUnits ?? []) tacticalRemovedById.set(u.id, u);
-    const tacticalRemovedAll = [...tacticalRemovedById.values()];
-    const airStrikeVictimIds = new Set((support.killsByAirStrike ?? []).map((k) => k.victimId));
-    const rangedVictimIds = new Set(support.killsByDirectFire.map((k) => k.victimId));
-    const airStrikeRemovedUnits = tacticalRemovedAll.filter((u) => {
-      if (airStrikeVictimIds.has(u.id)) return true;
-      if (u.player === HUMAN_SEAT_ID && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
-      return false;
-    });
-    const beatNumberResolved = Math.max(1, finalBattle.tacticalTurnNumber - 1);
-    captureTurnLossNoteFromResolution({
-      scope: 'tactical',
-      battleId: finalBattle.battleId,
-      turnNumber: beatNumberResolved,
-      killsByDirectFire: support.killsByDirectFire,
-      killsByReturnFire: support.killsByReturnFire,
-      killsByMelee: meleePack.killsByMelee,
-      killsByAirStrike: support.killsByAirStrike,
-      removedUnits: tacticalRemovedAll,
-      airStrikeRemovedUnits,
-      airStrikeMoves: support.airStrikePlaybackMoves,
-    });
+    captureTacticalBeatLossNote(beat);
     return {
       success: true,
       tacticalBattle: finalBattle,

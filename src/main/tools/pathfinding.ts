@@ -895,6 +895,7 @@ export function executePathfinding(
           to,
           a.unitType,
           tacticalBattle,
+          briefingOwnSeatId(state),
           latLngByH3,
           resolveToH3
         ) as unknown as Record<string, unknown>;

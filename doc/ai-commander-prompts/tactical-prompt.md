@@ -22,7 +22,7 @@ Emit order. Sections shared with strategic keep the same heading strings; the di
 
 ### 2.1 Role and clock line
 
-Same shape as strategic, with the beat clock: strategic turn, tactical beat, phase.
+Same shape as strategic, with the beat clock: strategic turn, tactical beat, phase. The role line names the consulted commander's side. In an AI-only battle each commander is briefed as its own side, with its own sub-units as "yours".
 
 ### 2.2 Goal statement
 

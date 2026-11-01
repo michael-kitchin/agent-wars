@@ -15,6 +15,22 @@ const playbackCompleteNotifyQueue: Array<() => void> = [];
 /** Listeners that run after playback finishes, including a turn that had nothing to animate. */
 const playbackFinishedListeners: Array<() => void> = [];
 
+/** One-shot waits that must end when playback is cancelled instead of finished. */
+const playbackAbandonedListeners: Array<() => void> = [];
+
+/**
+ * Drops `fn` from `list` when it is still registered.
+ *
+ * Purpose: A one-shot wait listens for both a normal finish and a cancel, and must leave both lists.
+ * When to use: When that wait settles.
+ * Expected outcome: `fn` is gone from `list`. A missing entry is left alone.
+ * Exceptions: None.
+ */
+function removePlaybackListener(list: Array<() => void>, fn: () => void): void {
+  const index = list.indexOf(fn);
+  if (index >= 0) list.splice(index, 1);
+}
+
 /**
  * Runs `listener` whenever resolution playback finishes.
  *
@@ -36,11 +52,54 @@ export function onResolutionPlaybackFinished(listener: () => void): void {
  * Exceptions: Logs a listener error and continues.
  */
 export function notifyResolutionPlaybackFinished(): void {
-  for (const listener of playbackFinishedListeners) {
+  for (const listener of [...playbackFinishedListeners]) {
     try {
       listener();
     } catch (err) {
       console.error('resolutionPlaybackDeferral: playback-finished listener failed', err);
+    }
+  }
+}
+
+/**
+ * Resolves when the current playback finishes, or when it is cancelled first.
+ *
+ * Purpose: A watch has to open its battle after movement, combat, and dice, and a new game has to unblock that wait.
+ * When to use: After the animation state is assigned, and before `requestAnimationFrame`, so a later await cannot miss the finish.
+ * Expected outcome: The promise resolves once. A later finish or cancel does not resolve it again.
+ * Exceptions: None. A listener error is logged by the notifier that runs it.
+ */
+export function waitForNextResolutionPlaybackFinished(): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      removePlaybackListener(playbackFinishedListeners, finish);
+      removePlaybackListener(playbackAbandonedListeners, finish);
+      resolve();
+    };
+    playbackFinishedListeners.push(finish);
+    playbackAbandonedListeners.push(finish);
+  });
+}
+
+/**
+ * Releases waits that were waiting for a playback this caller just cancelled.
+ *
+ * Purpose: Cancelling the animation does not finish it, but a watch must not stay parked on the old battle entry.
+ * When to use: From the teardown that clears `resolutionMoveAnimation` without flushing playback-complete notifies.
+ * Expected outcome: Each abandoned wait resolves once. Playback-finished listeners, including auto-advance, are not called.
+ * Exceptions: Logs a listener error and continues.
+ */
+export function abandonResolutionPlaybackWaits(): void {
+  const waiting = [...playbackAbandonedListeners];
+  playbackAbandonedListeners.length = 0;
+  for (const listener of waiting) {
+    try {
+      listener();
+    } catch (err) {
+      console.error('resolutionPlaybackDeferral: abandoned playback wait failed', err);
     }
   }
 }

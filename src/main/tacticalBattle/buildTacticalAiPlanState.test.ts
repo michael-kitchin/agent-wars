@@ -74,3 +74,27 @@ test('buildTacticalAiPlanState uses per-res4 terrain, not the enclosing water pa
   assert.notEqual(byH3.get(tacticala)?.terrain, 'water');
   assert.equal(byH3.get(tacticalb)?.terrain, 'water');
 });
+
+test('buildTacticalAiPlanState uses the consulted seat, and the other party when the seat is omitted', () => {
+  const parentCell = tacticalParentCell(12, 34);
+  const tacticala = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+  };
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-plan-seats',
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: [tacticala],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    leadPartyId: 'opponent',
+    opposingPartyId: 'opponent2',
+    subUnits: [],
+  };
+  assert.equal(buildTacticalAiPlanState(strategic, tactical, 'opponent').playerPerspective, 'opponent');
+  assert.equal(buildTacticalAiPlanState(strategic, tactical).playerPerspective, 'opponent2');
+});

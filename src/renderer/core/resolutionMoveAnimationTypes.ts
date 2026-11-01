@@ -90,12 +90,11 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
    */
   startTime: number;
   /**
-   * When true, resolution playback elapsed stays at 0 until tactical Ready clears it and resets `startTime` after IPC.
+   * When true, resolution playback elapsed stays at 0 until Ready clears it and resets `startTime` before the first frame.
    *
-   * Purpose: Prevents `requestAnimationFrame` from advancing the movement timeline during `await getGameState` and
-   *   terrain refresh while the canvas is not yet showing the committed frame.
-   * When to use: Only tactical `commitHumanTacticalDraftOrders` success path; omit for strategic Ready animations.
-   * Expected outcome: Hop-free snapshot swap without consuming the movement segment before the first visible paint.
+   * Purpose: An await between arming playback and the first frame must not consume movement, combat, or dice.
+   * When to use: Tactical Ready, during the snapshot refresh. Strategic Ready, during the turn-update toast.
+   * Expected outcome: The first painted frame is the start of the timeline. The clock then follows `startTime`.
    * Exceptions: None.
    */
   tacticalDeferResolutionClock?: boolean;

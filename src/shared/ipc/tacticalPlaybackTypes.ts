@@ -1,3 +1,4 @@
+import type { AiSeatId } from '../seatIds';
 import type { AirStrikeAnimationMove } from './ordersTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
@@ -58,6 +59,15 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    * Exceptions: None.
    */
   opponentBeatHadSubmittedRangedOrAirOrders?: boolean;
+  /**
+   * AI seats whose sanitized draft had at least one ranged or air-strike row on an AI-only beat.
+   *
+   * Purpose: Ranged fire adds no march playback, so the post-beat policy reads this list as that seat's activity.
+   * When to use: Set only on an AI-only beat. Human battles keep the two submitted-order flags and leave this unset.
+   * Expected outcome: Each listed seat fired or struck this beat. Omitted when no AI seat did.
+   * Exceptions: None.
+   */
+  aiSeatsWithRangedOrAirOrders?: AiSeatId[];
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];

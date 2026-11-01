@@ -220,11 +220,25 @@ export function enemyHadStrategicResolutionObservableActions(
 }
 
 /**
- * Returns true when opponent tactical sub-units had march or kill credit on this beat.
+ * The owner of a playback unit: the battle roster first, then the id prefix.
  *
- * Purpose: Tactical idle-opponent detection.
+ * Purpose: AI-only playback lists every march in one array, so activity is attributed by owner.
+ * When to use: The AI-only branches of the two tactical beat-activity predicates.
+ * Expected outcome: The sub-unit's `player`, or the owner encoded in the id when the roster has no row.
+ * Exceptions: None. An unknown id returns null.
+ */
+function tacticalPlaybackUnitOwner(unitId: string, tacticalBattle: TacticalBattleSnapshot): string | null {
+  const owner = tacticalBattle.subUnits.find((unit) => unit.id === unitId)?.player ?? unitIdOwnerFromId(unitId);
+  logTrace('tacticalPlaybackUnitOwner', { unitId, owner: owner ?? null });
+  return owner;
+}
+
+/**
+ * Returns true when this seat's tactical sub-units had march or kill credit on this beat.
+ *
+ * Purpose: Tactical idle detection. On an AI-only battle, any of this seat's marches counts, including a march that stayed on its cell, plus a ranged or air row and a kill.
  * When to use: `afterTacticalBeatResolution`.
- * Expected outcome: True when this seat marched, fired, or scored a kill on the beat.
+ * Expected outcome: True when this seat marched, fired, or scored a kill on the beat. A human battle keeps the opposing-party march list.
  * Exceptions: None.
  */
 export function seatHadTacticalBeatResolutionActions(
@@ -233,20 +247,26 @@ export function seatHadTacticalBeatResolutionActions(
   seatId: AiSeatId
 ): boolean {
   logTrace('seatHadTacticalBeatResolutionActions', { seatId });
-  const partyIsSeat = tacticalBattle.opposingPartyId === undefined || tacticalBattle.opposingPartyId === seatId;
-  if (partyIsSeat && (playback.opponentMoves?.length ?? 0) > 0) return true;
-  if (partyIsSeat && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
+  if (tacticalBattle.leadPartyId != null) {
+    const moves = [...playback.humanMoves, ...(playback.opponentMoves ?? [])];
+    if (moves.some((move) => tacticalPlaybackUnitOwner(move.unitId, tacticalBattle) === seatId)) return true;
+    if ((playback.aiSeatsWithRangedOrAirOrders ?? []).includes(seatId)) return true;
+  } else {
+    const partyIsSeat = tacticalBattle.opposingPartyId === undefined || tacticalBattle.opposingPartyId === seatId;
+    if (partyIsSeat && (playback.opponentMoves?.length ?? 0) > 0) return true;
+    if (partyIsSeat && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
+  }
   const ids = new Set(tacticalBattle.subUnits.filter((unit) => unit.player === seatId).map((unit) => unit.id));
   const buckets = [playback.killsByDirectFire, playback.killsByAirStrike, playback.killsByReturnFire, playback.killsByMelee];
   return buckets.some((bucket) => (bucket ?? []).some((edge) => edge.killerIds.some((id) => ids.has(id))));
 }
 
 /**
- * Returns true when human tactical sub-units had non–no-op march or kill credit on this beat.
+ * Returns true when another seat's tactical sub-units had a real march or kill credit on this beat.
  *
- * Purpose: Tactical human-observable detection.
+ * Purpose: Tactical enemy-observable detection. On an AI-only battle both commanders' marches live in `opponentMoves`, so the owner of each move decides whose activity it is.
  * When to use: `afterTacticalBeatResolution`.
- * Expected outcome: True when another seat marched, fired, or scored a kill. Neutral fire does not count.
+ * Expected outcome: True when another seat marched to a new cell, fired, or scored a kill. Neutral fire does not count. A human battle still reads `humanMoves` and the human ranged flag.
  * Exceptions: None.
  */
 export function enemyHadTacticalBeatResolutionActions(
@@ -255,8 +275,17 @@ export function enemyHadTacticalBeatResolutionActions(
   seatId: AiSeatId
 ): boolean {
   logTrace('enemyHadTacticalBeatResolutionActions', { seatId });
-  if (hasNonNoopMarchMoves(playback.humanMoves)) return true;
-  if (playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
+  if (tacticalBattle.leadPartyId != null) {
+    const enemyMoves = [...playback.humanMoves, ...(playback.opponentMoves ?? [])].filter((move) => {
+      const owner = tacticalPlaybackUnitOwner(move.unitId, tacticalBattle);
+      return owner !== null && owner !== seatId && isSeatId(owner);
+    });
+    if (hasNonNoopMarchMoves(enemyMoves)) return true;
+    if ((playback.aiSeatsWithRangedOrAirOrders ?? []).some((id) => id !== seatId)) return true;
+  } else {
+    if (hasNonNoopMarchMoves(playback.humanMoves)) return true;
+    if (playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
+  }
   const enemyIds = new Set(
     tacticalBattle.subUnits.filter((unit) => unit.player !== seatId && isSeatId(unit.player)).map((unit) => unit.id)
   );

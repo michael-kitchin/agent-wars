@@ -389,26 +389,18 @@
     </div>
     <section class="new-game-section" aria-labelledby="new-game-section-victory">
       <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>
-      <div class="new-game-victory-line">
-        <div class="new-game-victory-field">
-          <label for="new-game-victory-select">Rule</label>
-          <select id="new-game-victory-select" data-control-tooltip="Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins."></select>
-        </div>
-        <div class="new-game-victory-field">
-          <label for="new-game-turn-limit-select">Turn limit</label>
-          <select id="new-game-turn-limit-select" data-control-tooltip="How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit."></select>
-        </div>
-      </div>
-      <div class="new-game-victory-line">
-        <div class="new-game-victory-field">
-          <label for="new-game-ai-only-battles-select">AI-Only Battles</label>
-          <select id="new-game-ai-only-battles-select" data-control-tooltip="Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.">
-            <option value="balanced" selected>Balanced</option>
-            <option value="unbalanced">Unbalanced</option>
-            <option value="random">Random</option>
-            <option value="none">None</option>
-          </select>
-        </div>
+      <div class="new-game-victory">
+        <label for="new-game-victory-select">Rule</label>
+        <select id="new-game-victory-select" data-control-tooltip="Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins."></select>
+        <label for="new-game-turn-limit-select">Turn limit</label>
+        <select id="new-game-turn-limit-select" data-control-tooltip="How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit."></select>
+        <label for="new-game-ai-only-battles-select">AI-Only Battles</label>
+        <select id="new-game-ai-only-battles-select" data-control-tooltip="Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.">
+          <option value="balanced" selected>Balanced</option>
+          <option value="unbalanced">Unbalanced</option>
+          <option value="random">Random</option>
+          <option value="none">None</option>
+        </select>
       </div>
     </section>
     <section class="new-game-section" aria-labelledby="new-game-section-rules">

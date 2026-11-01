@@ -3,6 +3,7 @@
  */
 
 import { briefingSeatForBattle } from '../briefing/briefingPerspective';
+import type { AiSeatId } from '../../shared/seatIds';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { cellToLatLng } from 'h3-js';
 import type { UnitAssessmentResult } from '../precomputation';
@@ -255,21 +256,24 @@ function assessTacticalOpponentUnit(
  * `currentStandingOrder` is always null (standing orders do not apply in tactical beats). Same-hex same-type stacks
  * reuse one scan. With an origin bonus flag on, each `unit` block also carries the same origin bonus fields `assess_unit`
  * reports, which turns on the Unit Status Bonus column.
- * Exceptions: None.
+ * Exceptions: None. An omitted seat falls back to the battle's other party.
  */
 export function buildLightweightTacticalUnitAssessments(
   tacticalBattle: TacticalBattleSnapshot,
-  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF
+  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF,
+  ownSeatId?: AiSeatId
 ): UnitAssessmentResult[] {
+  const ownSeat = ownSeatId ?? briefingSeatForBattle(tacticalBattle);
+  const bonusSettings = originBonusSettings ?? ORIGIN_BONUS_OFF;
   logDebug('tacticalBriefingAssessments buildLightweightTacticalUnitAssessments', {
     battleId: tacticalBattle.battleId,
     subUnitCount: tacticalBattle.subUnits.length,
-    ...originBonusSettings,
+    ownSeatId: ownSeat,
+    ...bonusSettings,
   });
   const originBonusFor = (unit: TacticalSubUnitSnapshot): OriginBonusUnitFields =>
-    tacticalOriginBonusUnitFields(originBonusSettings, tacticalBattle, unit);
+    tacticalOriginBonusUnitFields(bonusSettings, tacticalBattle, unit);
   const byId = new Map(tacticalBattle.subUnits.map((u) => [u.id, u]));
-  const ownSeat = briefingSeatForBattle(tacticalBattle);
   const enemies = tacticalBattle.subUnits.filter((u) => u.player !== ownSeat);
   const opponents = tacticalBattle.subUnits.filter((u) => u.player === ownSeat);
   const assessmentByStackKey = new Map<string, UnitAssessmentResult>();
@@ -311,13 +315,18 @@ export function buildLightweightTacticalUnitAssessments(
  * Purpose: Mirrors strategic narrative sentence patterns using lightweight assessments and full visibility.
  * When to use: `formatTacticalBriefing` opener after the H1 title.
  * Expected outcome: Up to five sentences covering force counts, contact, critical threats, and a review CTA (no standing-order language).
- * Exceptions: None.
+ * Exceptions: None. An omitted seat falls back to the battle's other party.
  */
 export function buildTacticalBriefingNarrative(
   tacticalBattle: TacticalBattleSnapshot,
-  unitAssessments: UnitAssessmentResult[]
+  unitAssessments: UnitAssessmentResult[],
+  ownSeatId?: AiSeatId
 ): string {
-  const ownSeat = briefingSeatForBattle(tacticalBattle);
+  const ownSeat = ownSeatId ?? briefingSeatForBattle(tacticalBattle);
+  logDebug('tacticalBriefingAssessments buildTacticalBriefingNarrative', {
+    battleId: tacticalBattle.battleId,
+    ownSeatId: ownSeat,
+  });
   const aiUnits = tacticalBattle.subUnits.filter((u) => u.player === ownSeat);
   const humanUnits = tacticalBattle.subUnits.filter((u) => u.player !== ownSeat);
   const inContact = unitAssessments.filter(

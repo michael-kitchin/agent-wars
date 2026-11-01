@@ -6,6 +6,7 @@ import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromp
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
+import { deferTacticalEntryUntilStrategicPlayback, observeModeControls } from '../../shared/observeModeControls';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import {
   isDeferredResolutionPlaybackConsultPending,
@@ -26,7 +27,8 @@ import {
 } from './readyResolutionAnnouncements';
 import { announceKnockouts } from './knockoutNotices';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
-import { maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
+import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
+import { waitForNextResolutionPlaybackFinished } from '../openRouter/resolutionPlaybackDeferral';
 export type { ReadyHandlerDeps } from './readyHandlerTypes';
 
 /**
@@ -96,7 +98,8 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
  *   annihilation dialog is open, or a deferred AI consult is pending. In battle, commits the beat and plays it back.
  *   On the world map, submits drafts, resolves the turn (pausing for the tactical battles list when melee candidates
  *   are reported), reloads state, and plays the turn back with fog-filtered combat marks and dice chips. It can then
- *   start a battle the turn chose. Failures show on the map toast and return the player to planning.
+ *   start a battle the turn chose. On a watch, world-map playback, including dice, finishes before that battle, the
+ *   game-over screen, and the knocked-out dialog. Failures show on the map toast and return the player to planning.
  * Exceptions: None; errors are caught and reported. A newer match skips that report.
  */
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
@@ -288,6 +291,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
       (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
       (readyResult.baseInvalidAirLossCount ?? 0) > 0;
+    const hasDiceRolls =
+      (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 ||
+      (readyResult.rangedDiceRolls?.length ?? 0) > 0 ||
+      (readyResult.meleeDiceRolls?.length ?? 0) > 0;
     const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
     const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
     const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
@@ -307,7 +314,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         .map((record) => record.targetH3Index)
         .filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex)),
     ];
-    const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
+    const needsAnimation =
+      resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+    const watching = observeModeControls(state.seats ?? []).observing;
+    const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
+      watching,
+      readyResult.tacticalAutoStartH3Index,
+      needsAnimation
+    );
+    let playbackFinished: Promise<void> | null = null;
     if (readyResult.postResolutionConsultDeferred === true) {
       S.pendingDeferredStrategicPostResolutionConsult = true;
       S.deferredResolutionConsultNotifySent = false;
@@ -333,6 +348,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : undefined,
         ...(airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {}),
         startTime: Date.now(),
+        tacticalDeferResolutionClock: true,
         combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : undefined,
         casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : undefined,
         rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : undefined,
@@ -371,6 +387,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         deps
       );
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
+      if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
+      if (S.resolutionMoveAnimation) {
+        S.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+        S.resolutionMoveAnimation.startTime = Date.now();
+      }
       S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
     }
     S.hoverRoutePreview = null;
@@ -378,6 +400,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
     await prepareStrategicPlanningUiBeforeTacticalAutoStart(state, deps);
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    if (playbackFinished) {
+      await playbackFinished;
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
+    }
     deps.updateGameOverUI(state);
     deps.updateReadyButtonState();
     const knockoutChoice = await offerHumanKnockoutChoice(
@@ -413,6 +439,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     deps.showSidebarError(String(err));
     deps.updateReadyButtonState();
   } finally {
+    holdObserveAutoAdvanceForBattleEntry(false);
     if (rendererMatchEpochCurrent(matchEpoch)) {
       S.readyRequestInFlight = false;
       void readCommanderPoolAndApply(true);

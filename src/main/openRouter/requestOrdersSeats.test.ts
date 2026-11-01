@@ -11,8 +11,9 @@ import Module = require('module');
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
+import { gridDisk } from 'h3-js';
 import { afterResolution } from './afterResolution';
-import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import {
   closeGameDatabaseForTests,
@@ -41,6 +42,7 @@ import { tacticalChildrenOf } from '../../shared/h3Resolutions';
 import { missileReachSet } from '../gameActions/missileReach';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/tacticalSnapshotGuards';
 
 /**
  * Installs a stand-in Electron so the key store can load under Node.
@@ -593,6 +595,159 @@ test('a strategic consult drops an out-of-range missile launch and returns one i
       assert.ok(
         (result.dropReasons ?? []).some((reason) => reason.includes('more than')),
         `expected an out-of-range drop: ${(result.dropReasons ?? []).join(' | ')}`
+      );
+    });
+  } finally {
+    openRouter.setChatTransportOverrideForTests(null);
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A tactical consult keeps the consulted seat's march and drops the other seat's.
+ *
+ * Purpose: An AI-only battle briefs and validates each commander as itself, so the lead seat's own step is stored and the other seat's step is not.
+ * When to use: After tactical movement validation names the consulted seat.
+ * Expected outcome: `orders` contains only the lead unit, and a drop reason says `non_opponent`.
+ * Exceptions: Skips when the regional pack is missing or no one-step march is legal.
+ */
+test('a tactical consult keeps the consulted seat\'s march and drops the other seat\'s', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orders-tactical-seat-'));
+  const restoreElectron = installElectronMock(userData);
+  delete require.cache[require.resolve('./openRouter')];
+  const openRouter = require('./openRouter') as {
+    saveKey: (key: string) => void;
+    setSelectedModel: (modelId: string) => void;
+    setChatTransportOverrideForTests: (override: ((payload: { key: string }) => Promise<{
+      ok: true;
+      status: number;
+      headers: Record<string, string>;
+      bodyText: string;
+    }>) | null) => void;
+    requestOrders: (
+      state: ReturnType<typeof getGameState>,
+      modelId: string,
+      options: {
+        seatId: (typeof AI_SEAT_IDS)[number];
+        enabledToolNames: string[];
+        usePrecomputation: boolean;
+        tacticalAiBattle: TacticalBattleSnapshot;
+      }
+    ) => Promise<{ success: boolean; orders: { unitId: string }[]; dropReasons?: string[]; error?: string }>;
+  };
+  const memory = require('./commanderKeyMemory') as {
+    writeSeatApiKeys: (entries: readonly { seatId: string; apiKey: string }[]) => void;
+  };
+  try {
+    openRouter.saveKey('test-openrouter-key');
+    openRouter.setSelectedModel('test-model');
+    await withThreeSeatMatch(async () => {
+      memory.writeSeatApiKeys([{ seatId: AI_SEAT_IDS[0], apiKey: 'test-openrouter-key' }]);
+      const leadParent = dbGetOne<{ id: string; h3Index: string }>(
+        'SELECT id, h3_index AS h3Index FROM units WHERE player = ? AND unit_type = ? LIMIT 1',
+        [AI_SEAT_IDS[0], 'infantry']
+      );
+      const otherParent = dbGetOne<{ id: string; h3Index: string }>(
+        'SELECT id, h3_index AS h3Index FROM units WHERE player = ? AND unit_type = ? LIMIT 1',
+        [AI_SEAT_IDS[1], 'infantry']
+      );
+      if (!leadParent || !otherParent) {
+        t.skip('both AI seats need infantry');
+        return;
+      }
+      const footprint = tacticalChildrenOf(leadParent.h3Index);
+      const leadCell = footprint[0];
+      const otherCell = footprint.find((cell) => cell !== leadCell);
+      if (!leadCell || !otherCell) {
+        t.skip('the enclosing hex has fewer than two tactical cells');
+        return;
+      }
+      const battle: TacticalBattleSnapshot = {
+        battleId: 'tb-consulted-seat-march',
+        leadPartyId: AI_SEAT_IDS[0],
+        opposingPartyId: AI_SEAT_IDS[1],
+        enclosingStrategicH3Index: leadParent.h3Index,
+        tacticalChildH3Indexes: footprint,
+        strategicTurnNumber: 1,
+        tacticalTurnNumber: 1,
+        subUnits: [
+          {
+            id: `${leadParent.id}-s1`,
+            parentUnitId: leadParent.id,
+            player: AI_SEAT_IDS[0],
+            unitType: 'infantry',
+            h3Index: leadCell,
+            displayName: 'I Infantry (01)',
+          },
+          {
+            id: `${otherParent.id}-s1`,
+            parentUnitId: otherParent.id,
+            player: AI_SEAT_IDS[1],
+            unitType: 'infantry',
+            h3Index: otherCell,
+            displayName: 'I Infantry (02)',
+          },
+        ],
+      };
+      const tacticalSet = new Set(footprint);
+      const sub = battle.subUnits.map((unit) => ({ ...unit }));
+      const byId = new Map(sub.map((unit, index) => [unit.id, index] as const));
+      const leadUnit = battle.subUnits[0]!;
+      let leadDestination: string | null = null;
+      for (const cell of gridDisk(leadCell, 1)) {
+        if (cell === leadCell || !tacticalSet.has(cell)) continue;
+        const outcome = tacticalComputeMovementOrderOutcomeForPlayer(AI_SEAT_IDS[0], {
+          byId,
+          sub,
+          order: { unitId: leadUnit.id, toH3Index: cell },
+          tacticalSet,
+          battle,
+        });
+        if (outcome.ok) {
+          leadDestination = cell;
+          break;
+        }
+      }
+      if (!leadDestination) {
+        t.skip('the lead infantry has no legal step');
+        return;
+      }
+      initTacticalCoordinateRegistry(battle.battleId, battle.enclosingStrategicH3Index);
+      const coord = { mode: 'tactical' as const, battleId: battle.battleId, tacticalTurnNumber: battle.tacticalTurnNumber };
+      const content = JSON.stringify({
+        message: 'hold',
+        strategy: 'hold',
+        orders: [
+          { action: 'explicit_move', unitId: leadUnit.id, destination: h3ToCode(leadDestination, coord) },
+          { action: 'explicit_move', unitId: battle.subUnits[1]!.id, destination: h3ToCode(leadCell, coord) },
+        ],
+        airStrikes: [],
+        ferryOrders: [],
+        callbacks: [],
+      });
+      openRouter.setChatTransportOverrideForTests(async () => ({
+        ok: true as const,
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({ choices: [{ message: { content } }] }),
+      }));
+      const result = await openRouter.requestOrders(getGameState(), 'test-model', {
+        seatId: AI_SEAT_IDS[0],
+        enabledToolNames: [],
+        usePrecomputation: false,
+        tacticalAiBattle: battle,
+      });
+      assert.equal(result.success, true, result.error);
+      assert.deepEqual(result.orders.map((order) => order.unitId), [leadUnit.id]);
+      assert.ok(
+        (result.dropReasons ?? []).some((reason) => reason.includes('non_opponent')),
+        `expected a non_opponent drop: ${(result.dropReasons ?? []).join(' | ')}`
       );
     });
   } finally {

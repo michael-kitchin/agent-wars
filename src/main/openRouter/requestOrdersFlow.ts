@@ -119,7 +119,7 @@ export async function requestOrdersFlow(
     });
   }
   const planState = tacticalBattle
-    ? buildTacticalAiPlanState(state, tacticalBattle)
+    ? buildTacticalAiPlanState(state, tacticalBattle, seatId)
     : { ...state, playerPerspective: seatId };
   resetHexControllerParityCheckDedupForTurn();
   const aiOrderUnitLabel = (unitId: string) =>

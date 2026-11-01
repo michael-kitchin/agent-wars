@@ -23,14 +23,14 @@ import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools
 import { mergeCommanderAttackOrders } from '../tools/tempoRuleAttacks';
 import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
 import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
-import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
+import { projectTacticalSnapshotAfterPlayerMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import {
   validateTacticalOpponentAirStrikeOrder,
   validateTacticalOpponentEmbarkOrder,
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { holdsShooterOnClampedMove } from '../tacticalBattle/tacticalClampedMoveGuards';
-import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
+import { tacticalComputeMovementOrderOutcomeForPlayer } from '../tacticalBattle/tacticalSnapshotGuards';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
@@ -355,7 +355,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       const tacticalSet = new Set(tacticalBattle.tacticalChildH3Indexes);
       const sub = [...tacticalBattle.subUnits];
       const byId = new Map(sub.map((u, i) => [u.id, i] as const));
-      const tacticalOutcome = tacticalComputeMovementOrderOutcome({
+      const tacticalOutcome = tacticalComputeMovementOrderOutcomeForPlayer(seatId, {
         byId,
         sub,
         order,
@@ -461,13 +461,18 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   if (tacticalBattle) {
     const movementProjected =
       validated.length > 0
-        ? projectTacticalSnapshotAfterOpponentMovementOrders(tacticalBattle, validated)
+        ? projectTacticalSnapshotAfterPlayerMovementOrders(tacticalBattle, validated, seatId)
         : tacticalBattle;
     const validatedAir: AirStrikeOrder[] = [];
     const seenStrike = new Set<string>();
     for (const s of mergedAirStrikes) {
       if (seenStrike.has(s.unitId)) {
         dropReasons.push(`Duplicate air strike for ${aiOrderUnitLabel(s.unitId)}`);
+        continue;
+      }
+      const airOwner = dropReasonWhenTacticalUnitIsNotSeat(tacticalBattle, s.unitId, seatId, aiOrderUnitLabel, 'Air strike');
+      if (airOwner) {
+        dropReasons.push(airOwner);
         continue;
       }
       const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove, aiOrderUnitLabel, tacticalBattle);
@@ -490,6 +495,11 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         dropReasons.push(`Air unit ${aiOrderUnitLabel(f.unitId)} cannot strike and ferry in the same tactical turn`);
         continue;
       }
+      const ferryOwner = dropReasonWhenTacticalUnitIsNotSeat(tacticalBattle, f.unitId, seatId, aiOrderUnitLabel, 'Ferry');
+      if (ferryOwner) {
+        dropReasons.push(ferryOwner);
+        continue;
+      }
       const fr = validateTacticalOpponentFerryOrder(f, planAfterMove, aiOrderUnitLabel, movementProjected);
       if (fr.valid) {
         validatedFerry.push(f);
@@ -503,6 +513,11 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     for (const e of llmEmbarkOrders) {
       if (seenEmbarkLand.has(e.unitId)) {
         dropReasons.push(`Duplicate embark for ${aiOrderUnitLabel(e.unitId)}`);
+        continue;
+      }
+      const embarkOwner = dropReasonWhenTacticalUnitIsNotSeat(tacticalBattle, e.unitId, seatId, aiOrderUnitLabel, 'Embark');
+      if (embarkOwner) {
+        dropReasons.push(embarkOwner);
         continue;
       }
       const er = validateTacticalOpponentEmbarkOrder(
@@ -595,5 +610,25 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     inputTokens: usage.totalInputTokens > 0 ? usage.totalInputTokens : undefined,
     outputTokens: usage.totalOutputTokens > 0 ? usage.totalOutputTokens : undefined,
   };
+}
+
+/**
+ * Names a tactical order whose sub-unit is not the consulted seat, so that seat cannot store the other commander's air, ferry, or embark row.
+ *
+ * Purpose: Consult-time validation has to reject the other seat before the air, ferry, and embark validators, which accept any non-human owner.
+ * When to use: Immediately before those validators during a tactical consultation.
+ * Expected outcome: `null` when the sub-unit's player is `seatId`; otherwise a drop reason that names the unit.
+ * Exceptions: None. A missing sub-unit is treated as not this seat.
+ */
+function dropReasonWhenTacticalUnitIsNotSeat(
+  battle: TacticalBattleSnapshot,
+  unitId: string,
+  seatId: AiSeatId,
+  label: (id: string) => string,
+  kind: string
+): string | null {
+  const owner = battle.subUnits.find((unit) => unit.id === unitId)?.player;
+  if (owner === seatId) return null;
+  return `${kind} ${label(unitId)}: unit belongs to another commander`;
 }
 

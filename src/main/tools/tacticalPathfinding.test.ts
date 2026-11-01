@@ -11,6 +11,7 @@ import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanS
 import { tacticalParentCell, tacticalUnderCorner } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { buildTacticalToolFixture } from '../tacticalBattle/testSupport/tacticalToolFixtures';
 import { executePathfinding } from './pathfinding';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { executeTacticalCheckDistance } from './tacticalPathfinding';
 
 /**
@@ -191,6 +192,7 @@ function testTacticalCheckDistanceUsesStartCellTags(): void {
       cellToLatLng(fx.cells.far) as [number, number],
       'armor',
       battle,
+      AI_SEAT_IDS[0],
       fx.latLngByH3,
       fx.resolveToH3
     ) as { status: string; estimatedTurns?: number };
@@ -231,6 +233,7 @@ function testTacticalCheckDistanceKeepsTerrainBonusWetlands(): void {
       cellToLatLng(fx.cells.mid) as [number, number],
       'naval',
       { ...fx.battle, terrainBonusEnabled: true },
+      AI_SEAT_IDS[0],
       fx.latLngByH3,
       fx.resolveToH3
     ) as { status: string; to?: [number, number]; reachable?: boolean; estimatedTurns?: number };

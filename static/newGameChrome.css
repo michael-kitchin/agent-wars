@@ -457,26 +457,23 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   color: var(--chrome-muted);
   border: 1px dashed var(--chrome-border);
 }
-.new-game-victory-line {
+/* One grid of label and dropdown pairs: Rule and Turn limit, then AI-Only Battles in the left half. Each label
+   column is as wide as its longest label and the two dropdown columns share what is left, so Rule, Turn limit, and
+   AI-Only Battles are one width and fill the row. */
+.new-game-victory {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 12px;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
   align-items: center;
+  gap: 8px 6px;
 }
-.new-game-victory-line + .new-game-victory-line {
-  margin-top: 8px;
-}
-.new-game-victory-field {
-  display: grid;
-  grid-template-columns: 10em minmax(0, 1fr);
-  column-gap: 6px;
-  align-items: center;
-  min-width: 0;
-}
-.new-game-victory-field label {
+.new-game-victory > label {
   white-space: nowrap;
 }
-.new-game-victory-field select {
+/* Turn limit opens the second pair, set a little apart from Rule's dropdown. */
+.new-game-victory > label:nth-of-type(2) {
+  padding-left: 10px;
+}
+.new-game-victory > select {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;

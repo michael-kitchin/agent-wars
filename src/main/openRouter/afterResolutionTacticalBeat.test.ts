@@ -457,3 +457,119 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
     resetCommanderPool([]);
   });
 });
+
+/**
+ * A two-AI battle whose four sub-units stay on the snapshot after the beat.
+ *
+ * Purpose: Post-beat policy attributes marches by the roster owner, so the movers have to remain listed.
+ * When to use: The AI-only consult cases in this file.
+ * Expected outcome: `leadPartyId` is the first AI seat and `opposingPartyId` is the second, with two sub-units each.
+ * Exceptions: None.
+ */
+function twoAiBeatBattle(): { state: GameStateSnapshot; battle: TacticalBattleSnapshot; cellA: string; cellB: string } {
+  const strategic = tacticalParentCell(18, 40);
+  const cellA = tacticalUnderCorner(18, 40, { latEpsilon: 0.02 });
+  const cellB = firstRingCellDistinctFrom(cellA);
+  const state: GameStateSnapshot = {
+    turnNumber: 3,
+    phase: 'planning',
+    hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+  };
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'bt-two-ai',
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [cellA, cellB],
+    strategicTurnNumber: 3,
+    tacticalTurnNumber: 2,
+    leadPartyId: 'opponent',
+    opposingPartyId: 'opponent2',
+    subUnits: [
+      { id: 'opp-sub-1', parentUnitId: 'opp-parent-1', player: 'opponent', unitType: 'infantry', h3Index: cellA, displayName: 'Lead A' },
+      { id: 'opp-sub-2', parentUnitId: 'opp-parent-2', player: 'opponent', unitType: 'armor', h3Index: cellB, displayName: 'Lead B' },
+      { id: 'a2-sub-1', parentUnitId: 'a2-parent-1', player: 'opponent2', unitType: 'infantry', h3Index: cellA, displayName: 'Other A' },
+      { id: 'a2-sub-2', parentUnitId: 'a2-parent-2', player: 'opponent2', unitType: 'armor', h3Index: cellB, displayName: 'Other B' },
+    ],
+  };
+  return { state, battle, cellA, cellB };
+}
+
+test('an AI-only post-beat consult asks the requested seat', async () => {
+  await withFreshDb(async () => {
+    clearSubscriptions('opponent2');
+    const { state, battle } = twoAiBeatBattle();
+    const seen: string[] = [];
+    const res = await afterTacticalBeatResolution(state, battle, { humanMoves: [] }, {
+      modelId: 'test-model',
+      enabledToolNames: [],
+      hasKey: () => true,
+      requestOrders: async (_state, _modelId, options) => {
+        seen.push(options.seatId);
+        return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
+      },
+    }, 'opponent');
+    assert.deepEqual(seen, ['opponent']);
+    assert.equal(res.consulted, true);
+  });
+});
+
+test('on an AI-only beat, the seat that marched alone is not consulted and the idle seat is', async () => {
+  await withFreshDb(async () => {
+    clearSubscriptions('opponent2');
+    const { state, battle, cellA, cellB } = twoAiBeatBattle();
+    const playback: TacticalCommitResolutionPlayback = {
+      humanMoves: [],
+      opponentMoves: [{ unitId: 'opp-sub-1', fromH3Index: cellA, toH3Index: cellB }],
+    };
+    const marched = await afterTacticalBeatResolution(state, battle, playback, {
+      modelId: 'test-model',
+      enabledToolNames: [],
+      hasKey: () => true,
+      requestOrders: async () => {
+        throw new Error('the seat that marched should not be consulted');
+      },
+    }, 'opponent');
+    assert.equal(marched.consulted, false);
+    const seen: string[] = [];
+    const idle = await afterTacticalBeatResolution(state, battle, playback, {
+      modelId: 'test-model',
+      enabledToolNames: [],
+      hasKey: () => true,
+      requestOrders: async (_state, _modelId, options) => {
+        seen.push(options.seatId);
+        return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
+      },
+    }, 'opponent2');
+    assert.deepEqual(seen, ['opponent2']);
+    assert.equal(idle.consulted, true);
+  });
+});
+
+test('on an AI-only beat, both seats are consulted when both marched', async () => {
+  await withFreshDb(async () => {
+    clearSubscriptions('opponent2');
+    const { state, battle, cellA, cellB } = twoAiBeatBattle();
+    const playback: TacticalCommitResolutionPlayback = {
+      humanMoves: [],
+      opponentMoves: [
+        { unitId: 'opp-sub-1', fromH3Index: cellA, toH3Index: cellB },
+        { unitId: 'a2-sub-1', fromH3Index: cellA, toH3Index: cellB },
+      ],
+    };
+    for (const seatId of ['opponent', 'opponent2'] as const) {
+      const seen: string[] = [];
+      const res = await afterTacticalBeatResolution(state, battle, playback, {
+        modelId: 'test-model',
+        enabledToolNames: [],
+        hasKey: () => true,
+        requestOrders: async (_state, _modelId, options) => {
+          seen.push(options.seatId);
+          return { success: true, orders: [], tacticalOpponentPlan: emptyTacticalPlan };
+        },
+      }, seatId);
+      assert.deepEqual(seen, [seatId]);
+      assert.equal(res.consulted, true);
+    }
+  });
+});

@@ -3,6 +3,7 @@
  */
 
 import { briefingSeatForBattle } from '../briefing/briefingPerspective';
+import type { AiSeatId } from '../../shared/seatIds';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -18,17 +19,19 @@ import { tacticalLogQuery } from './tacticalLogging';
  *
  * Contract: `hexes` contains only `tactical.tacticalChildH3Indexes` rows; each row uses that child's tactical kind and land/water class, falling back to the enclosing hex only when the child has no kind.
  * When to use: `requestOrdersFlow` when `tacticalAiBattle` is set so `validateAiOrder` and `plan_route` operate on tactical geometry.
- * Expected outcome: `units` mirror tactical sub-units with the same ids and tactical `h3Index` values; all other fields copy `strategic`.
+ * Expected outcome: `units` mirror tactical sub-units with the same ids and tactical `h3Index` values; all other fields copy `strategic`. `playerPerspective` is the consulted seat when one is passed, and the battle's other party when it is omitted.
  * Exceptions: Tactical cells whose parent strategic is missing from `strategic.hexes` default to land/plains-like terrain rows when the battle also lacks a child kind.
  */
 export function buildTacticalAiPlanState(
   strategic: GameStateSnapshot,
-  tactical: TacticalBattleSnapshot
+  tactical: TacticalBattleSnapshot,
+  seatId?: AiSeatId
 ): GameStateSnapshot {
   tacticalLogQuery('buildTacticalAiPlanState', {
     battleId: tactical.battleId,
     tacticalCount: tactical.tacticalChildH3Indexes.length,
     subUnitCount: tactical.subUnits.length,
+    seatId: seatId ?? null,
   });
   const hexByStrategic = new Map(strategic.hexes.map((h) => [h.h3Index, h]));
   const tacticalHexes = tactical.tacticalChildH3Indexes.map((h3) => {
@@ -66,6 +69,6 @@ export function buildTacticalAiPlanState(
     hexes: tacticalHexes,
     units: tacticalUnits,
     fogOfWarEnabled: false,
-    playerPerspective: briefingSeatForBattle(tactical),
+    playerPerspective: seatId ?? briefingSeatForBattle(tactical),
   };
 }

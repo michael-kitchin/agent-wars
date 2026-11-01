@@ -5,7 +5,7 @@
  * tool results use briefing hex codes after `encodeOpenRouterToolResultForLlm`.
  */
 
-import { briefingOwnSeatId, briefingSeatForBattle } from '../briefing/briefingPerspective';
+import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { hitChanceForThreshold } from '../combatDice';
 import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
@@ -463,7 +463,7 @@ export function executeEstimateCombat(
     ? buildTacticalCombatEstimationTheater(tacticalBattle, originBonusSettingsFromSnapshot(state))
     : buildStrategicCombatEstimationTheater(state);
   const warnings: string[] = [];
-  const ownSeatId = tacticalBattle ? briefingSeatForBattle(tacticalBattle) : briefingOwnSeatId(state);
+  const ownSeatId = briefingOwnSeatId(state);
   const ctx: CombatSideContext = { theater, engagementType, targetHexH3, latLngByH3, warnings, ownSeatId };
   const attackers = buildAttackers(parsed.attackers, ctx);
   if (attackers.error !== undefined) return { status: 'error', error: attackers.error };

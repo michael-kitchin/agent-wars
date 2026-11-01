@@ -2,12 +2,10 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
-import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
-import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import { HUMAN_SEAT_ID, isAiSeatId, isNeutralOwnerId } from '../../shared/seatIds';
 import { FORTIFIED_CELL_BLOCKED_REASON } from '../../shared/fortificationRules';
 import { MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
@@ -28,6 +26,7 @@ import {
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
 import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
+import type { TacticalBeatOutcome } from './tacticalBeatOutcome';
 import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
@@ -302,8 +301,10 @@ export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: st
     clearTacticalTurnNotes();
     captureTacticalTransportBaselineForParentUnitIds([...new Set(snapshot.subUnits.map((u) => u.parentUnitId))]);
     const opposingParty = snapshot.opposingPartyId ?? null;
+    const leadParty = snapshot.leadPartyId ?? null;
     stashOpponentCallbackSubscriptionsForTacticalBattle(
-      opposingParty !== null && isAiSeatId(opposingParty) ? opposingParty : null
+      opposingParty !== null && isAiSeatId(opposingParty) ? opposingParty : null,
+      leadParty !== null && isAiSeatId(leadParty) ? leadParty : null
     );
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });
@@ -486,27 +487,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
    * Buffered opponent tactical plan (movement, support, embark) applied only on this Ready beat after merged air+ranged, in strategic order relative to human slices.
    */
   opponentTacticalDraft?: TacticalOpponentPlanPayload;
-}):
-  | {
-      success: true;
-      battle: TacticalBattleSnapshot;
-      battleAfterMovementBeforeFerry: TacticalBattleSnapshot;
-      killsByDirectFire: KillEdge[];
-      killsByAirStrike: KillEdge[];
-      killsByReturnFire: KillEdge[];
-      removedUnits: RemovedUnitSnapshot[];
-      infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
-      airStrikeAttemptCount: number;
-      airStrikePlaybackMoves: AirStrikeAnimationMove[];
-      airStrikePlaybackStrikeHexes: string[];
-      airStrikePlaybackCasualtyHexes: string[];
-      airStrikePlaybackRemovedUnits: RemovedUnitSnapshot[];
-      rangedResolutionShotLines: RangedResolutionShotLine[];
-      airStrikeDiceRolls: CombatDiceRoll[];
-      rangedDiceRolls: CombatDiceRoll[];
-      meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
-    }
-  | { success: false; reason: string } {
+}): ({ success: true } & TacticalBeatOutcome) | { success: false; reason: string } {
   const opp = args.opponentTacticalDraft;
   tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder', {
     movementCount: args.movementOrders.length,

@@ -13,7 +13,7 @@ import {
   tacticalPentagonCrossingPair,
   tacticalUnderCorner,
 } from '../tacticalBattle/testSupport/tacticalHexFixtures';
-import { buildLightweightTacticalUnitAssessments } from './tacticalBriefingAssessments';
+import { buildLightweightTacticalUnitAssessments, buildTacticalBriefingNarrative } from './tacticalBriefingAssessments';
 
 /**
  * Battle snapshot placing one opponent armor and one human armor on a pair `gridDistance` cannot measure.
@@ -172,4 +172,46 @@ test('tactical threat severity reflects a close enemy across a face crossing', (
   assert.ok(threat, 'a close enemy must raise a threat');
   assert.strictEqual(threat.sourceUnit, 'hum-armor:01');
   assert.strictEqual(threat.severity, 'moderate');
+});
+
+test('an AI-only briefing assesses the consulted seat rather than the other party', () => {
+  const pair = tacticalPentagonCrossingPair();
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-briefing-own-seat',
+    enclosingStrategicH3Index: pair.strategicH3Index,
+    tacticalChildH3Indexes: pair.tacticalChildH3Indexes,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    leadPartyId: 'opponent',
+    opposingPartyId: 'opponent2',
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    tacticalTerrainKindByH3: Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
+    subUnits: [
+      {
+        id: 'opp-armor:01',
+        parentUnitId: 'opp-armor',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: pair.originH3Index,
+        displayName: 'Armor',
+      },
+      {
+        id: 'a2-armor:01',
+        parentUnitId: 'a2-armor',
+        player: 'opponent2',
+        unitType: 'armor',
+        h3Index: pair.crossingH3Index,
+        displayName: 'Other Armor',
+      },
+    ],
+  };
+  const assessments = buildLightweightTacticalUnitAssessments(battle, undefined, 'opponent');
+  const ownIds = battle.subUnits.filter((unit) => unit.player === 'opponent').map((unit) => unit.id);
+  assert.equal(assessments.length, ownIds.length);
+  for (const row of assessments) {
+    assert.ok(ownIds.includes(row.result.unit.unitId));
+  }
+  const narrative = buildTacticalBriefingNarrative(battle, assessments, 'opponent');
+  assert.match(narrative, new RegExp(`you command ${ownIds.length} sub-unit`));
 });

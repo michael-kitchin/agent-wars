@@ -73,17 +73,29 @@ export function looksLikeTacticalSubUnitId(id: string): boolean {
  *
  * Purpose: Preserves that seat's strategic subscriptions so sub-unit tactical callbacks can be discarded on battle end.
  * When to use: Immediately after a successful `startTacticalBattleForEnclosingStrategicHex` installs the session. Pass null when the other party is not an AI seat.
- * Expected outcome: In-memory stash overwritten; durable key written. A null seat records that restore must not touch any seat.
+ * Expected outcome: In-memory stash overwritten; durable key written. A null seat records that restore must not touch any seat. When `leadSeatId` is a different AI seat, that seat's rows are stashed too.
  * Exceptions: None.
  */
-export function stashOpponentCallbackSubscriptionsForTacticalBattle(seatId: AiSeatId | null = AI_SEAT_IDS[0]): void {
+export function stashOpponentCallbackSubscriptionsForTacticalBattle(
+  seatId: AiSeatId | null = AI_SEAT_IDS[0],
+  leadSeatId: AiSeatId | null = null
+): void {
+  const leadSeat = seatId !== null && leadSeatId !== null && leadSeatId !== seatId
+    ? { seatId: leadSeatId, subscriptions: copyCallbackSubscriptions(getSubscriptions(leadSeatId)) }
+    : undefined;
   stashedOpponentSubscriptions = seatId === null
     ? { seatId: null, subscriptions: [] }
-    : { seatId, subscriptions: copyCallbackSubscriptions(getSubscriptions(seatId)) };
+    : {
+      seatId,
+      subscriptions: copyCallbackSubscriptions(getSubscriptions(seatId)),
+      ...(leadSeat ? { leadSeat } : {}),
+    };
   writeTacticalCallbackStashToGameConfig(stashedOpponentSubscriptions);
   logDebug('tacticalCallbackSubscriptionLifecycle stashOpponentCallbackSubscriptionsForTacticalBattle', {
     seatId,
     count: stashedOpponentSubscriptions.subscriptions.length,
+    leadSeatId,
+    leadCount: leadSeat?.subscriptions.length ?? 0,
   });
 }
 
@@ -99,11 +111,24 @@ export function hydrateOpponentCallbackStashFromGameConfig(): void {
   const fromDisk = readTacticalCallbackStashFromGameConfig();
   stashedOpponentSubscriptions = fromDisk === null
     ? null
-    : { seatId: fromDisk.seatId, subscriptions: copyCallbackSubscriptions(fromDisk.subscriptions) };
+    : {
+      seatId: fromDisk.seatId,
+      subscriptions: copyCallbackSubscriptions(fromDisk.subscriptions),
+      ...(fromDisk.leadSeat
+        ? {
+          leadSeat: {
+            seatId: fromDisk.leadSeat.seatId,
+            subscriptions: copyCallbackSubscriptions(fromDisk.leadSeat.subscriptions),
+          },
+        }
+        : {}),
+    };
   logDebug('tacticalCallbackSubscriptionLifecycle hydrateOpponentCallbackStashFromGameConfig', {
     hydrated: fromDisk !== null,
     seatId: fromDisk?.seatId ?? null,
     count: fromDisk?.subscriptions.length ?? 0,
+    leadSeatId: fromDisk?.leadSeat?.seatId ?? null,
+    leadCount: fromDisk?.leadSeat?.subscriptions.length ?? 0,
   });
 }
 
@@ -229,17 +254,15 @@ export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void 
         return;
       }
       const seatId = snapshot.seatId;
-      clearSubscriptions(seatId);
-      if (snapshot.subscriptions.length > 0) {
-        const turn =
-          snapshot.subscriptions.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ?? 0;
-        replaceSubscriptions(seatId, [...snapshot.subscriptions], turn);
-      }
+      restoreSeatSubscriptions(seatId, snapshot.subscriptions);
+      if (snapshot.leadSeat) restoreSeatSubscriptions(snapshot.leadSeat.seatId, snapshot.leadSeat.subscriptions);
       clearTacticalCallbackStashFromGameConfig();
       logDebug('tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle', {
         mode: 'full_restore',
         seatId,
         restoredCount: snapshot.subscriptions.length,
+        leadSeatId: snapshot.leadSeat?.seatId ?? null,
+        leadCount: snapshot.leadSeat?.subscriptions.length ?? 0,
       });
       return;
     }
@@ -279,4 +302,19 @@ export function clearTacticalCallbackSubscriptionStash(): void {
  */
 export function resetTacticalCallbackSubscriptionStashForTests(): void {
   clearTacticalCallbackSubscriptionStash();
+}
+
+/**
+ * Replaces one seat's live callbacks with the stashed list.
+ *
+ * Purpose: Full restore clears the tactical rows first, then puts the pre-battle rows back, for the other party and for the lead seat.
+ * When to use: `restoreOpponentCallbackSubscriptionsAfterTacticalBattle` once per stashed seat.
+ * Expected outcome: The seat's list matches `subscriptions`. An empty list leaves the seat with no callbacks.
+ * Exceptions: Propagates a database failure to the caller, which logs it.
+ */
+function restoreSeatSubscriptions(seatId: AiSeatId, subscriptions: readonly CallbackSubscription[]): void {
+  clearSubscriptions(seatId);
+  if (subscriptions.length === 0) return;
+  const turn = subscriptions.find((row) => typeof row.subscribedTurn === 'number')?.subscribedTurn ?? 0;
+  replaceSubscriptions(seatId, [...subscriptions], turn);
 }

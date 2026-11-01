@@ -488,10 +488,19 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (!near(aiOnly.x, victory.x) || !near(aiOnly.w, victory.w)) {
         return `the AI-Only select is at ${fmt(aiOnly)}, expected the Rule select ${fmt(victory)}`;
       }
+      if (!near(turnLimit.w, victory.w) || !near(aiOnly.w, victory.w)) {
+        return `the Victory selects are ${Math.round(victory.w)}, ${Math.round(turnLimit.w)}, and ${Math.round(aiOnly.w)} px wide`;
+      }
+      if (victory.w < 80 || turnLimit.w < 80 || aiOnly.w < 80) {
+        return `a Victory select is under 80 px: Rule ${Math.round(victory.w)}, Turn limit ${Math.round(turnLimit.w)}, AI-Only ${Math.round(aiOnly.w)}`;
+      }
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
       if (!(victory.y < origin.y)) return 'Victory is not above the bonuses';
       if (!near(origin.y, tech.y) || !near(terrain.y, weather.y) || terrain.y <= origin.y) return 'the bonuses are not two rows of two';
       if (!near(origin.x, terrain.x) || !near(tech.x, weather.x) || tech.x <= origin.x) return 'the bonuses are not two columns';
+      if (!near(turnLimit.x + turnLimit.w, weather.x + weather.w)) {
+        return `Turn limit ends at ${Math.round(turnLimit.x + turnLimit.w)}, Weather ends at ${Math.round(weather.x + weather.w)}`;
+      }
       const fog = el('#new-game-fog-checkbox');
       const autoStart = el('#new-game-auto-start-checkbox');
       return fog.shown && autoStart.shown && near(autoStart.y, fog.y) && autoStart.x > fog.x

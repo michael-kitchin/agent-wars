@@ -40,6 +40,7 @@ import {
   seatHadTacticalBeatResolutionActions,
   type ReadyResultWithParticipants,
 } from './consultationPolicy';
+import { buildTacticalBeatResolutionReadyParticipants } from './tacticalBeatConsultParticipants';
 
 /**
  * What a post-resolution consult needs from the process that calls the model.
@@ -303,40 +304,6 @@ export async function afterResolution(
 }
 
 /**
- * Builds the callback evaluation slice for a completed tactical beat from deterministic playback metadata.
- *
- * Purpose: Feeds `evaluateTacticalMandatoryOverrides` / `evaluateSubscriptionEvents` without a full strategic `ReadyResult`.
- * When to use: Only from `afterTacticalBeatResolution` after `commitHumanTacticalDraftOrders` succeeds.
- * Expected outcome: `opponentCombatParticipantUnitIds` lists opponent sub-units that moved this beat or were removed (combat-adjacent signal).
- * Exceptions: None.
- */
-export function buildTacticalBeatResolutionReadyParticipants(
-  playback: TacticalCommitResolutionPlayback,
-  tacticalBattle: TacticalBattleSnapshot
-): ReadyResultWithParticipants {
-  const removedCombined = [...(playback.rangedRemovedUnits ?? []), ...(playback.meleeRemovedUnits ?? [])];
-  const removedUnitIds = removedCombined.map((u) => u.id);
-  const party = tacticalBattle.opposingPartyId;
-  const removedForParty = party
-    ? removedCombined.filter((unit) => unit.player === party).map((unit) => unit.id)
-    : [];
-  const oppCombat = new Set<string>();
-  for (const move of playback.opponentMoves ?? []) {
-    if (party && tacticalBattle.subUnits.some((unit) => unit.id === move.unitId && unit.player === party)) {
-      oppCombat.add(move.unitId);
-    }
-  }
-  for (const id of removedForParty) oppCombat.add(id);
-  return {
-    success: true,
-    removedUnitIds: removedUnitIds.length > 0 ? removedUnitIds : undefined,
-    removedUnitIdsBySeat: party ? { [party]: removedForParty } : undefined,
-    combatParticipantUnitIdsBySeat: party ? { [party]: [...oppCombat] } : undefined,
-    infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents,
-  };
-}
-
-/**
  * What a post-beat consult needs from the process that calls the model.
 
  * Purpose: Same injection surface as strategic `afterResolution`, but `requestOrders` may pass `tacticalAiBattle`.
@@ -539,11 +506,25 @@ export async function afterTacticalBeatResolution(
     });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
-  const seatId =
-    tacticalBattle.opposingPartyId !== undefined && isAiSeatId(tacticalBattle.opposingPartyId)
+  const seatId = tacticalBattle.leadPartyId != null
+    ? requestedSeatId
+    : tacticalBattle.opposingPartyId !== undefined && isAiSeatId(tacticalBattle.opposingPartyId)
       ? tacticalBattle.opposingPartyId
       : requestedSeatId;
-  const resolutionSlice = buildTacticalBeatResolutionReadyParticipants(playback, tacticalBattle);
+  if (
+    tacticalBattle.leadPartyId != null
+    && seatId !== tacticalBattle.leadPartyId
+    && seatId !== tacticalBattle.opposingPartyId
+  ) {
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_seat_not_in_battle',
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+      seatId,
+    });
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+  }
+  const resolutionSlice = buildTacticalBeatResolutionReadyParticipants(playback, tacticalBattle, seatId);
   const removedUnitIds = resolutionSlice.removedUnitIds ?? [];
   const removedOpponentUnitIds = [...(resolutionSlice.removedUnitIdsBySeat?.[seatId] ?? [])];
   const opponentCombatants = [...(resolutionSlice.combatParticipantUnitIdsBySeat?.[seatId] ?? [])];

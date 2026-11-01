@@ -35,6 +35,19 @@ let pressReady: (() => Promise<void>) | null = null;
 let wired = false;
 let pressing = false;
 let viewSeq = 0;
+let battleEntryHoldsAutoAdvance = false;
+
+/**
+ * Holds or releases the watch's next Ready press while a battle is waiting on world-map playback.
+ *
+ * Purpose: Auto-advance would otherwise start the next strategic turn before the battle from this one opens.
+ * When to use: Set true just before waiting for playback, and false once that battle has opened or the turn has moved on.
+ * Expected outcome: `maybeObserveAutoAdvance` does nothing while the hold is set.
+ * Exceptions: None.
+ */
+export function holdObserveAutoAdvanceForBattleEntry(hold: boolean): void {
+  battleEntryHoldsAutoAdvance = hold;
+}
 
 /**
  * True when the watch may press Ready now.
@@ -45,6 +58,7 @@ let viewSeq = 0;
  * Exceptions: None.
  */
 function autoAdvanceReady(): boolean {
+  if (battleEntryHoldsAutoAdvance) return false;
   if (!S.autoAdvance || pressing || S.readyRequestInFlight) return false;
   if (!observeModeControls(S.gameState?.seats ?? []).observing) return false;
   if (S.gameState?.gameOver || S.gameState?.phase !== 'planning') return false;

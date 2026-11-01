@@ -167,8 +167,12 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     (playback?.airStrikeMoves?.length ?? 0) > 0 ||
     (playback?.airStrikeHexes?.length ?? 0) > 0 ||
     (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
+  const hasDicePlayback =
+    (playback?.airStrikeDiceRolls?.length ?? 0) > 0 ||
+    (playback?.rangedDiceRolls?.length ?? 0) > 0 ||
+    (playback?.meleeDiceRolls?.length ?? 0) > 0;
   const needsResolutionPlayback =
-    hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
+    hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
   // Start resolution playback before updating the tactical snapshot so no redraw can paint post-commit cells
   // while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
   // Defer the playback clock and the first rAF until after post-commit `getGameState` / terrain refresh so the
@@ -274,7 +278,11 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   }
   if (playback && S.gameState && needsResolutionPlayback) {
     const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
-    const visibleHexes = deps.getVisibleHexSet(S.gameState);
+    // A battle has no fog, so every battle cell is visible to the turn report.
+    const visibleHexes = new Set([
+      ...deps.getVisibleHexSet(S.gameState),
+      ...(S.tacticalBattleSnapshot?.tacticalChildH3Indexes ?? []),
+    ]);
     const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
     const killToastFormatter = deps.buildKillToastFormatterBundle(
       S.gameState,

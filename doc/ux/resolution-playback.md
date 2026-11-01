@@ -8,9 +8,11 @@ Show movement and combat that just resolved, including battles the player cannot
 
 ## Availability
 
-Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement or combat to show. It ends when the animation finishes. Entering a tactical battle cancels a strategic playback that is still running. See [modes-and-transitions.md](modes-and-transitions.md).
+Runs in Resolution playback after strategic Ready or a tactical Ready commit, when that resolution has movement, combat, or dice to show. It ends when the animation finishes, including dice chips that are still fading. On a watch, with no active human seat, that world-map animation finishes before a battle opens, before the game-over screen, and before the knocked-out dialog. The wait is the same when the player presses Ready and when "Start the next turn when every commander is ready" is checked. A battle beat's marches, fire, melee, and dice play in both cases. While the checkbox is on, the next Ready waits until that playback finishes. Entering a tactical battle while a human seat is still playing cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
+
+An AI-only beat plays back like a human beat: both commanders' marches, fire, air strikes, melee, dice, and the turn-update toast.
 
 The player sees the following stages, skipping any stage the resolution does not have:
 
@@ -56,12 +58,12 @@ A map toast can summarize losses the player can see, and the hex changes from th
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
-- Finished: the animation is cleared and Strategic planning or Tactical planning continues.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The timeline starts when the first frame is drawn, after the turn-update toast is ready, so that lookup does not skip the opening of movement, combat, or dice. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
+- Finished: the animation is cleared. On a watch, a battle, the game-over screen, or the knocked-out dialog can follow. Otherwise Strategic planning or Tactical planning continues.
 
 ## Invariants
 
-- Playback never starts when the resolution has no movement and no combat to show.
+- Playback never starts when the resolution has no movement, no combat, and no dice to show.
 - Starting a tactical battle never leaves a strategic playback running.
 - A map gesture during playback never queues, changes, or cancels an order, and never changes the unit selection except by right-click.
 - Unknown battles are never described as if the player could see the units.
@@ -78,7 +80,8 @@ A map toast can summarize losses the player can see, and the hex changes from th
 | What plays | The strategic turn, on the world map | The battle beat, on the battle map |
 | Top bar | The date block can already name the next planning turn | The battle header stays up. Its status line reads "Tactical resolution" and already names the next beat |
 | Dice chips | Under hexes in the player's vision before or after the turn only, and not at the zoom that hides strategic units | Under every battle cell that rolled, because battles have no fog |
-| Afterward | Strategic planning, or a battle if Fight started one | Tactical planning, or Tactical annihilation if a side is gone |
+| Turn-update toast | Units and hexes outside vision are an unknown battle | Every battle cell counts as visible, so battle losses and engagements are never an unknown battle |
+| Afterward | Strategic planning, or a battle if Fight started one. On a watch, the battle opens after the world-map animation finishes | Tactical planning, or Tactical annihilation if a side is gone |
 
 ## Related Documents
 
@@ -113,5 +116,8 @@ None.
 - `src/renderer/gameplay/observeChrome.ts` (`maybeObserveAutoAdvance`)
 - `src/renderer/gameplay/readyHandler.ts`
 - `src/renderer/gameplay/readyTacticalCommit.ts`
+- `src/main/gameActions/aiOnlyTacticalCommit.ts` (`commitAiOnlyTacticalBeat`)
+- `src/main/gameActions/tacticalBeatPlayback.ts` (`buildSeatPlaybackMoves`, `buildTacticalCombatPlaybackFields`)
+- `src/shared/observeModeControls.ts` (`deferTacticalEntryUntilStrategicPlayback`)
 - `src/renderer/gameplay/readyResolutionAnnouncements.ts`
 - `src/renderer/gameplay/turnUpdateSummary.ts`

@@ -55,11 +55,16 @@ export function formatTacticalBriefing(args: {
     battleId: tacticalBattle.battleId,
     tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
   };
-  const assessments = buildLightweightTacticalUnitAssessments(tacticalBattle, originBonusSettingsFromSnapshot(planState));
+  const ownSeat = briefingOwnSeatId(planState);
+  const assessments = buildLightweightTacticalUnitAssessments(
+    tacticalBattle,
+    originBonusSettingsFromSnapshot(planState),
+    ownSeat
+  );
   const sections: string[] = [];
 
   sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));
-  sections.push(buildTacticalBriefingNarrative(tacticalBattle, assessments));
+  sections.push(buildTacticalBriefingNarrative(tacticalBattle, assessments, ownSeat));
   sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
   sections.push(
     buildUnitStatusTable(assessments, coordCtx, false, originBonusSettingsFromSnapshot(planState))
@@ -79,7 +84,6 @@ export function formatTacticalBriefing(args: {
   sections.push('\n\n' + markdownHeading1(SECTION_TITLE_OPERATIONAL_MAP));
   sections.push(operational.trim());
 
-  const ownSeat = briefingOwnSeatId(planState);
   const recentTurnNotes = buildRecentTurnNotesSection({
     scope: 'tactical',
     battleId: tacticalBattle.battleId,

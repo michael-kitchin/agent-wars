@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HUMAN_SEAT_ID, aiSeatIdForIndex } from './seatIds';
-import { activeHumanSeatId, isObservingRoster, observeModeControls, readoutViewerSeatId, resolveMatchView, staleIntelViewer, type ObserveSeat } from './observeModeControls';
+import { activeHumanSeatId, deferTacticalEntryUntilStrategicPlayback, isObservingRoster, observeModeControls, readoutViewerSeatId, resolveMatchView, staleIntelViewer, type ObserveSeat } from './observeModeControls';
 
 const FIRST_AI = 'opponent' as const;
 const SECOND_AI = aiSeatIdForIndex(2);
@@ -99,6 +99,14 @@ test('a watch can request one seat and rejects an unknown seat', () => {
   assert.equal(resolveMatchView({ seats, requested: 'not-a-seat' }).view, 'all');
   assert.equal(readoutViewerSeatId(seats, FIRST_AI), FIRST_AI);
   assert.equal(readoutViewerSeatId(seats, HUMAN_SEAT_ID), null);
+});
+
+test('a watch waits for world-map playback before a battle opens', () => {
+  assert.equal(deferTacticalEntryUntilStrategicPlayback(true, 'hex-1', true), true);
+  assert.equal(deferTacticalEntryUntilStrategicPlayback(false, 'hex-1', true), false);
+  assert.equal(deferTacticalEntryUntilStrategicPlayback(true, undefined, true), false);
+  assert.equal(deferTacticalEntryUntilStrategicPlayback(true, '', true), false);
+  assert.equal(deferTacticalEntryUntilStrategicPlayback(true, 'hex-1', false), false);
 });
 
 test('stale intel follows the snapshot viewer', () => {

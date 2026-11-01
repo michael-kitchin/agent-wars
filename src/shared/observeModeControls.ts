@@ -275,3 +275,20 @@ export function staleIntelViewer(playerPerspective: string | undefined): SeatId 
   if (playerPerspective !== undefined && isSeatId(playerPerspective)) return playerPerspective;
   return HUMAN_SEAT_ID;
 }
+
+/**
+ * A watch lets the world-map animation finish before the battle opens.
+ *
+ * Purpose: Opening the battle in the same turn as Ready used to cancel movement, combat, and dice.
+ * When to use: After strategic Ready, when the result names a battle hex.
+ * Expected outcome: True only while no human is playing, a battle hex is set, and the turn has something to animate.
+ *   The same answer applies whether or not the watch is pressing Ready itself.
+ * Exceptions: None.
+ */
+export function deferTacticalEntryUntilStrategicPlayback(
+  observing: boolean,
+  battleHex: string | undefined,
+  needsAnimation: boolean
+): boolean {
+  return observing && typeof battleHex === 'string' && battleHex.length > 0 && needsAnimation;
+}

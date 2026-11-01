@@ -16364,6 +16364,9 @@
     if (playerPerspective !== void 0 && isSeatId(playerPerspective)) return playerPerspective;
     return HUMAN_SEAT_ID;
   }
+  function deferTacticalEntryUntilStrategicPlayback(observing, battleHex, needsAnimation) {
+    return observing && typeof battleHex === "string" && battleHex.length > 0 && needsAnimation;
+  }
 
   // src/shared/unitIds.ts
   var UNIT_TYPE_ID_CODES = {
@@ -29381,15 +29384,45 @@ ${bonuses}`;
   // src/renderer/openRouter/resolutionPlaybackDeferral.ts
   var playbackCompleteNotifyQueue = [];
   var playbackFinishedListeners = [];
+  var playbackAbandonedListeners = [];
+  function removePlaybackListener(list, fn) {
+    const index = list.indexOf(fn);
+    if (index >= 0) list.splice(index, 1);
+  }
   function onResolutionPlaybackFinished(listener) {
     playbackFinishedListeners.push(listener);
   }
   function notifyResolutionPlaybackFinished() {
-    for (const listener of playbackFinishedListeners) {
+    for (const listener of [...playbackFinishedListeners]) {
       try {
         listener();
       } catch (err) {
         console.error("resolutionPlaybackDeferral: playback-finished listener failed", err);
+      }
+    }
+  }
+  function waitForNextResolutionPlaybackFinished() {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        removePlaybackListener(playbackFinishedListeners, finish);
+        removePlaybackListener(playbackAbandonedListeners, finish);
+        resolve();
+      };
+      playbackFinishedListeners.push(finish);
+      playbackAbandonedListeners.push(finish);
+    });
+  }
+  function abandonResolutionPlaybackWaits() {
+    const waiting = [...playbackAbandonedListeners];
+    playbackAbandonedListeners.length = 0;
+    for (const listener of waiting) {
+      try {
+        listener();
+      } catch (err) {
+        console.error("resolutionPlaybackDeferral: abandoned playback wait failed", err);
       }
     }
   }
@@ -29419,7 +29452,12 @@ ${bonuses}`;
   var wired = false;
   var pressing = false;
   var viewSeq = 0;
+  var battleEntryHoldsAutoAdvance = false;
+  function holdObserveAutoAdvanceForBattleEntry(hold) {
+    battleEntryHoldsAutoAdvance = hold;
+  }
   function autoAdvanceReady() {
+    if (battleEntryHoldsAutoAdvance) return false;
     if (!rendererSharedState.autoAdvance || pressing || rendererSharedState.readyRequestInFlight) return false;
     if (!observeModeControls(rendererSharedState.gameState?.seats ?? []).observing) return false;
     if (rendererSharedState.gameState?.gameOver || rendererSharedState.gameState?.phase !== "planning") return false;
@@ -33588,6 +33626,7 @@ ${bonuses}`;
     rendererSharedState.resolutionMoveAnimationFrameId = null;
     rendererSharedState.resolutionMoveAnimation = null;
     dropQueuedResolutionPlaybackCompleteNotifies();
+    abandonResolutionPlaybackWaits();
   }
   function tacticalBattleExitTeardownTransientRendererState() {
     cancelInFlightBackgroundAiRequestForRendererTeardown();
@@ -37723,7 +37762,8 @@ ${bonuses}`;
     const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
     const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
     const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
+    const hasDicePlayback = (playback?.airStrikeDiceRolls?.length ?? 0) > 0 || (playback?.rangedDiceRolls?.length ?? 0) > 0 || (playback?.meleeDiceRolls?.length ?? 0) > 0;
+    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim || hasDicePlayback;
     if (playback && needsResolutionPlayback) {
       if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
       rendererSharedState.resolutionMoveAnimationFrameId = null;
@@ -37814,7 +37854,10 @@ ${bonuses}`;
     }
     if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
       const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
-      const visibleHexes = deps.getVisibleHexSet(rendererSharedState.gameState);
+      const visibleHexes = /* @__PURE__ */ new Set([
+        ...deps.getVisibleHexSet(rendererSharedState.gameState),
+        ...rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes ?? []
+      ]);
       const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes, reportViewerSeatId());
       const killToastFormatter = deps.buildKillToastFormatterBundle(
         rendererSharedState.gameState,
@@ -38177,6 +38220,7 @@ ${bonuses}`;
       const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
       const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
       const hasAirStrikeResolution = visibleMissileLaunches.length > 0 || (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
+      const hasDiceRolls = (readyResult.airStrikeDiceRolls?.length ?? 0) > 0 || (readyResult.rangedDiceRolls?.length ?? 0) > 0 || (readyResult.meleeDiceRolls?.length ?? 0) > 0;
       const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes, reportViewerSeatId());
       const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
       const visibleMissileVictimIds = new Set(visibleMissileLaunches.flatMap((record) => record.destroyedAirUnitIds));
@@ -38192,7 +38236,14 @@ ${bonuses}`;
         ...readyResult.airStrikeHexes ?? [],
         ...visibleMissileLaunches.map((record) => record.targetH3Index).filter((hex) => !(readyResult.airStrikeHexes ?? []).includes(hex))
       ];
-      const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
+      const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution || hasDiceRolls;
+      const watching = observeModeControls(state.seats ?? []).observing;
+      const deferBattleEntry = deferTacticalEntryUntilStrategicPlayback(
+        watching,
+        readyResult.tacticalAutoStartH3Index,
+        needsAnimation
+      );
+      let playbackFinished = null;
       if (readyResult.postResolutionConsultDeferred === true) {
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = true;
         rendererSharedState.deferredResolutionConsultNotifySent = false;
@@ -38218,6 +38269,7 @@ ${bonuses}`;
           airStrikeCasualtyHexes: airStrikeCasualtyHexesForPlayback.length > 0 ? airStrikeCasualtyHexesForPlayback : void 0,
           ...airStrikeRemovedForPlayback.length > 0 ? { airStrikeRemovedUnits: airStrikeRemovedForPlayback } : {},
           startTime: Date.now(),
+          tacticalDeferResolutionClock: true,
           combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : void 0,
           casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : void 0,
           rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : void 0,
@@ -38254,6 +38306,12 @@ ${bonuses}`;
           deps
         );
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
+        if (watching) playbackFinished = waitForNextResolutionPlaybackFinished();
+        if (deferBattleEntry) holdObserveAutoAdvanceForBattleEntry(true);
+        if (rendererSharedState.resolutionMoveAnimation) {
+          rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+          rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
+        }
         rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
       }
       rendererSharedState.hoverRoutePreview = null;
@@ -38261,6 +38319,10 @@ ${bonuses}`;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       await prepareStrategicPlanningUiBeforeTacticalAutoStart(state, deps);
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      if (playbackFinished) {
+        await playbackFinished;
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
+      }
       deps.updateGameOverUI(state);
       deps.updateReadyButtonState();
       const knockoutChoice = await offerHumanKnockoutChoice(
@@ -38296,6 +38358,7 @@ ${bonuses}`;
       deps.showSidebarError(String(err));
       deps.updateReadyButtonState();
     } finally {
+      holdObserveAutoAdvanceForBattleEntry(false);
       if (rendererMatchEpochCurrent(matchEpoch)) {
         rendererSharedState.readyRequestInFlight = false;
         void readCommanderPoolAndApply(true);

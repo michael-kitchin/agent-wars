@@ -480,6 +480,13 @@ function registerIpcHandlers(): void {
     ) {
       return result;
     }
+    if (result.tacticalBattle.aiOnlyEndReason != null) {
+      logDebug('main commitHumanTacticalDraftOrders: no deferred consult after an ended AI-only beat', {
+        battleId: result.tacticalBattle.battleId,
+        aiOnlyEndReason: result.tacticalBattle.aiOnlyEndReason,
+      });
+      return result;
+    }
     const modelId = fallbackConsultModelId(getSelectedModel);
     const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
     const battleId = result.tacticalBattle.battleId;
