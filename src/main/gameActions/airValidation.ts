@@ -4,6 +4,7 @@ import {
   getMapHexSet,
   getStrategicInfrastructureForHex,
 } from '../gameDb';
+import { airStrikeInfrastructureGapReason } from '../../shared/airStrikeInfrastructure';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
@@ -87,15 +88,8 @@ export function validateAirStrikeOrder(
   }
 
   const targetInfrastructure = getStrategicInfrastructureForHex(targetH3Index);
-  if (targetType === 'urban' && targetInfrastructure.urbanHexCount <= 0) {
-    return { valid: false, reason: 'Target hex has no urban infrastructure' };
-  }
-  if (targetType === 'airport' && targetInfrastructure.airportCount <= 0) {
-    return { valid: false, reason: 'Target hex has no airport' };
-  }
-  if (targetType === 'seaport' && targetInfrastructure.seaportCount <= 0) {
-    return { valid: false, reason: 'Target hex has no seaport' };
-  }
+  const gap = airStrikeInfrastructureGapReason(targetType, targetInfrastructure);
+  if (gap !== null) return { valid: false, reason: gap };
   return { valid: true };
 }
 

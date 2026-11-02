@@ -2,6 +2,7 @@ import { clearAttackMixOnNewGame } from '../attackMixReset';
 import { logDebug, logError } from '../logger';
 import { getScenarioHomeRegionHexes, listScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
+import { deleteGameConfigRow, upsertGameConfigValue } from './gameConfigRows';
 import { persistGameSize } from './gameSizeConfig';
 import { persistOriginBonusSettings } from './originBonusConfig';
 import { parseBonusLevel, type BonusLevel } from '../../shared/bonusLevel';
@@ -441,17 +442,17 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   began = true;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['game_map_id', mapId]);
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
+  upsertGameConfigValue({ run }, 'game_map_id', mapId);
+  upsertGameConfigValue({ run }, 'fog_of_war_enabled', fogOfWarEnabled ? '1' : '0');
   const victory = victorySettingsForRequest(options?.victoryRule, options?.turnLimit);
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['victory_rule', victory.rule]);
+  upsertGameConfigValue({ run }, 'victory_rule', victory.rule);
   if (victory.turnLimit === null) {
     run("DELETE FROM game_config WHERE key = 'turn_limit'");
   } else {
-    run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['turn_limit', String(victory.turnLimit)]);
+    upsertGameConfigValue({ run }, 'turn_limit', String(victory.turnLimit));
   }
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['ai_only_battles', aiOnlyBattles]);
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [SIGHT_CUES_CONFIG_KEY, sightCues ? '1' : '0']);
+  upsertGameConfigValue({ run }, 'ai_only_battles', aiOnlyBattles);
+  upsertGameConfigValue({ run }, SIGHT_CUES_CONFIG_KEY, sightCues ? '1' : '0');
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
   persistRegionVsRegionScenarioId({ run });
@@ -484,7 +485,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM ai_loss_events_since_consultation');
   run("DELETE FROM game_config WHERE key LIKE 'ai_last_consultation_turn_%'");
   run("DELETE FROM game_config WHERE key LIKE 'fog_new_contacts_%'");
-  run('DELETE FROM game_config WHERE key = ?', [SIGHT_CUE_SEEN_UNITS_CONFIG_KEY]);
+  deleteGameConfigRow({ run }, SIGHT_CUE_SEEN_UNITS_CONFIG_KEY);
   run("DELETE FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');

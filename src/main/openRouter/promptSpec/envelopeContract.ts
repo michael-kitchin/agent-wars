@@ -13,6 +13,12 @@
 import { logDebug, logTrace } from '../../logger';
 import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH, KEY_PATTERN } from '../../tools/memory';
 import { buildCallbackVocabularyClause } from './callbackVocabularyText';
+import {
+  EXAMPLE_CALLBACKS,
+  EXAMPLE_MEMORY_UPDATES,
+  EXAMPLE_MISSILE_LAUNCHES,
+  EXAMPLE_PRODUCTION_ORDERS,
+} from './envelopeExampleRows';
 import type { PromptCoordinateMode } from './promptCoordinateMode';
 
 export type { PromptCoordinateMode } from './promptCoordinateMode';
@@ -381,20 +387,13 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
     } else if (field === 'ferryOrders') {
       example.ferryOrders = [{ unitId: 'a1-a2', destination: 'CJ' }];
     } else if (field === 'missileLaunches') {
-      example.missileLaunches = [{ unitId: 'a1-m1', targetHexCode: 'CK' }];
+      example.missileLaunches = EXAMPLE_MISSILE_LAUNCHES;
     } else if (field === 'callbacks') {
-      example.callbacks = [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }];
+      example.callbacks = EXAMPLE_CALLBACKS;
     } else if (field === 'memoryUpdates') {
-      example.memoryUpdates = [
-        {
-          action: 'write',
-          key: 'turn_objectives',
-          tier: 'persistent',
-          content: 'Close with observed enemies; keep air and naval production moving.',
-        },
-      ];
+      example.memoryUpdates = EXAMPLE_MEMORY_UPDATES;
     } else if (field === 'productionOrders') {
-      example.productionOrders = [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }];
+      example.productionOrders = EXAMPLE_PRODUCTION_ORDERS;
     }
   }
   const json = JSON.stringify(example);

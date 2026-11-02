@@ -6,6 +6,7 @@ import type { BuildUnitType } from '../productionRules';
 import { logDebug, logTrace } from '../logger';
 import { getMaxUnitsPerType, parseGameSize, type GameSize } from '../../shared/gameSize';
 import type { GameConfigKvDbOps } from './gameConfigKv';
+import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 
 /**
  * `game_config` key for the match size that scales unit caps.
@@ -29,7 +30,7 @@ export function persistGameSize(ops: Pick<GameConfigKvDbOps, 'run'> & { hasDb?: 
   const parsed = parseGameSize(size);
   logDebug('gameDb persistGameSize', { gameSize: parsed });
   if (ops.hasDb && !ops.hasDb()) return;
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [GAME_SIZE_CONFIG_KEY, parsed]);
+  upsertGameConfigValue(ops, GAME_SIZE_CONFIG_KEY, parsed);
 }
 
 /**
@@ -43,8 +44,7 @@ export function persistGameSize(ops: Pick<GameConfigKvDbOps, 'run'> & { hasDb?: 
 export function readPersistedGameSize(ops: GameConfigKvDbOps): GameSize {
   logTrace('gameDb readPersistedGameSize');
   if (ops.hasDb && !ops.hasDb()) return 'small';
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [GAME_SIZE_CONFIG_KEY]);
-  return parseGameSize(row?.value);
+  return parseGameSize(selectGameConfigValue(ops, GAME_SIZE_CONFIG_KEY));
 }
 
 /**

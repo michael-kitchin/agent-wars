@@ -1,5 +1,5 @@
 import { isNeutralOwnerId, isSeatId } from './seatIds';
-import { HUMAN_SEAT_KIND, shortSideName, type SeatSnapshot } from './seatRoster';
+import { HUMAN_SEAT_KIND, shortSideName, sortSeatsByOrder, type SeatSnapshot } from './seatRoster';
 
 /**
  * The roster fields a side label needs.
@@ -94,10 +94,11 @@ function controllerSideLabel(controllerId: string | null, seats: readonly SideLa
  * Exceptions: None.
  */
 function homesInOrder(homeSeatIds: readonly string[], seats: readonly SideLabelSeat[]): SideLabelSeat[] {
-  return homeSeatIds
-    .map((seatId) => seats.find((seat) => seat.seatId === seatId))
-    .filter((seat): seat is SideLabelSeat => seat != null)
-    .sort((left, right) => left.seatOrder - right.seatOrder);
+  return sortSeatsByOrder(
+    homeSeatIds
+      .map((seatId) => seats.find((seat) => seat.seatId === seatId))
+      .filter((seat): seat is SideLabelSeat => seat != null)
+  );
 }
 
 /**

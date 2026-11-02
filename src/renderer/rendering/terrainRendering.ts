@@ -9,7 +9,6 @@ import {
   resolveOwnershipBorderStyle,
   type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
-import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { drawClosedPolygonPath } from './polygonOutline';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
@@ -159,11 +158,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   const perspective = ownershipPerspective(S.gameState.playerPerspective);
   const controlBordersShown = areControlBordersShown();
   for (const hx of S.gameState.hexes) {
-    const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-    const pts = boundary.map(([lat, lng]: [number, number]) => {
-      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-      return { x: p.x, y: p.y };
-    });
+    const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, L);
     const storedKind =
       hx.terrainKind ??
       (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains');
@@ -340,11 +335,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
     });
     if (style.kind === 'none') continue;
-    const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-    const pts = boundary.map(([lat, lng]: [number, number]) => {
-      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-      return { x: p.x, y: p.y };
-    });
+    const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
     const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
     drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
       controllerPlayerId: controlByHex.get(h3Index),
@@ -429,11 +420,7 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
       const ap = S.terrainInfraStrategicAirport.has(hx.h3Index);
       const pt = S.terrainInfraStrategicSeaport.has(hx.h3Index);
       if (!ap && !pt) continue;
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-      const pts = boundary.map(([lat, lng]: [number, number]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
+      const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, L);
       drawTerrainInfrastructureGlyphs(ctx, pts, {
         showAirport: ap,
         showSeaport: pt,

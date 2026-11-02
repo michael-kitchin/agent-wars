@@ -13,6 +13,7 @@ import { loadedStrategicFootprint } from '../../shared/loadedStrategicFootprint'
 import { logDebug, logError, logTrace } from '../logger';
 import type { StrategicInfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { gameMapLoadError } from '../gameMap/loadGameMap';
 import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
@@ -149,9 +150,9 @@ function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameS
  * Exceptions: None.
  */
 export function isFogOfWarEnabled(ops: Pick<FogDbOps, 'getOne'>): boolean {
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [FOG_OF_WAR_ENABLED_KEY]);
-  if (!row?.value) return true;
-  return row.value !== '0' && row.value.toLowerCase() !== 'false';
+  const stored = selectGameConfigValue(ops, FOG_OF_WAR_ENABLED_KEY);
+  if (!stored) return true;
+  return stored !== '0' && stored.toLowerCase() !== 'false';
 }
 
 /**
@@ -437,7 +438,7 @@ function refreshFogOfWarIntelForPlayer(
     }
     ops.run(`UPDATE player_unit_intel SET intel_state = 'stale' WHERE player_id = ? AND enemy_unit_id = ?`, [playerId, row.enemy_unit_id]);
   }
-  ops.run(`INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)`, [`fog_new_contacts_${playerId}`, JSON.stringify(newContactIds)]);
+  upsertGameConfigValue(ops, `fog_new_contacts_${playerId}`, JSON.stringify(newContactIds));
 }
 
 /**
@@ -462,7 +463,7 @@ export function refreshFogOfWarIntelFromCurrentState(
     ops.run('DELETE FROM player_hex_intel');
     ops.run('DELETE FROM player_unit_intel');
     for (const seat of seats) {
-      ops.run('DELETE FROM game_config WHERE key = ?', [`fog_new_contacts_${seat.seatId}`]);
+      deleteGameConfigRow(ops, `fog_new_contacts_${seat.seatId}`);
     }
     return;
   }
@@ -491,11 +492,11 @@ export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: SeatId):
   logDebug('gameDb consumeFogNewContactsForPlayer', { playerId });
   if (!ops.hasDb()) return [];
   const key = `fog_new_contacts_${playerId}`;
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  ops.run('DELETE FROM game_config WHERE key = ?', [key]);
-  if (!row?.value) return [];
+  const stored = selectGameConfigValue(ops, key);
+  deleteGameConfigRow(ops, key);
+  if (!stored) return [];
   try {
-    const parsed = JSON.parse(row.value) as unknown;
+    const parsed = JSON.parse(stored) as unknown;
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
   } catch {
     return [];

@@ -13,6 +13,7 @@ import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3G
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetAll, dbGetOne, dbRun, getSeatRoster } from '../gameDb';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import { updateSeatCommander } from '../gameDb/seatRosterStore';
 import { cancelModelCalls } from './modelCallControl';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
@@ -125,8 +126,7 @@ function getConfigPath(): string {
  * Exceptions: None.
  */
 function loadGameConfigValue(key: string): string | null {
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  return row?.value ?? null;
+  return selectGameConfigValue({ getOne: dbGetOne }, key) ?? null;
 }
 
 /**
@@ -138,7 +138,7 @@ function loadGameConfigValue(key: string): string | null {
  * Exceptions: None.
  */
 function saveGameConfigValue(key: string, value: string): void {
-  dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, value]);
+  upsertGameConfigValue({ run: dbRun }, key, value);
 }
 
 /**
@@ -150,7 +150,7 @@ function saveGameConfigValue(key: string, value: string): void {
  * Exceptions: None.
  */
 function deleteGameConfigValue(key: string): void {
-  dbRun('DELETE FROM game_config WHERE key = ?', [key]);
+  deleteGameConfigRow({ run: dbRun }, key);
 }
 
 /**

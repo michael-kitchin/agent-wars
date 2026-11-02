@@ -9,6 +9,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { logDebug, logTrace } from '../logger';
 import { createHeadOnInitiativePicker } from '../headOnInitiative';
 import { tacticalComputeMovementOrderOutcomeForPlayer } from './tacticalSnapshotGuards';
+import { withTacticalMarchStop } from './tacticalMovementApply';
 
 /**
  * One side's marches for the beat.
@@ -106,15 +107,7 @@ function tacticalSeatMovers(battle: TacticalBattleSnapshot, seat: TacticalSeatMa
     const unit = sub[outcome.idx];
     if (!unit) continue;
     const applied = outcome.appliedToH3Index;
-    const debarkedIndependently =
-      (unit.unitType === 'infantry' || unit.unitType === 'armor')
-      && !!unit.embarkedOnSubUnitId
-      && applied !== unit.h3Index;
-    sub[outcome.idx] = {
-      ...unit,
-      h3Index: applied,
-      ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
-    };
+    sub[outcome.idx] = withTacticalMarchStop(unit, applied);
     stopByUnitId.set(order.unitId, applied);
   }
   const originalById = new Map(battle.subUnits.map((unit) => [unit.id, unit]));

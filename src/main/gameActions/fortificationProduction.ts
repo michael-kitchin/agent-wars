@@ -8,6 +8,7 @@
  * Exceptions: None. A missing cell list fortifies nothing.
  */
 
+import { hashStringToUint32 } from '../../shared/stableHash';
 import { createSeededRng } from '../seededRng';
 import { getGameSeed, listFortifiableCellsForHex, setTacticalCellFortified } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
@@ -22,12 +23,7 @@ import { logDebug, logTrace } from '../logger';
  */
 export function fortificationPlacementSeed(gameSeed: number, turnNumber: number, h3Index: string): number {
   const text = `${gameSeed}|${turnNumber}|${h3Index}`;
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  const seed = hash >>> 0;
+  const seed = hashStringToUint32(text);
   logTrace('fortificationPlacementSeed', { gameSeed, turnNumber, h3Index, seed });
   return seed;
 }

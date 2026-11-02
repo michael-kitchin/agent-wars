@@ -20,9 +20,8 @@ import {
 } from '../../shared/fortificationTickGeometry';
 import { OWNERSHIP_BORDER_ALPHA } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getLeafletGlobal } from '../map/mapHelpers';
-import { shouldRenderTacticalHexes } from '../map/terrainView';
+import { projectHexBoundaryToContainerPoints, shouldRenderTacticalHexes } from '../map/terrainView';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import { resolveControllerBorderColor } from './homeRegionBorderDrawing';
 
@@ -207,11 +206,7 @@ export function drawStrategicFortificationTicks(ctx: CanvasRenderingContext2D, d
     const row = infra.get(hex.h3Index);
     const fortified = row?.fortifiedCount ?? 0;
     if (fortified <= 0) continue;
-    const boundary = getHexBoundaryLatLngForLeafletOverlay(hex.h3Index);
-    const points = boundary.map(([lat, lng]) => {
-      const projected = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
-      return { x: projected.x, y: projected.y };
-    });
+    const points = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
     const cornerCount = fortificationCornerCount(hex.h3Index);
     const ownershipVisible = isHexOwnershipVisibleToPerspective({
       h3Index: hex.h3Index,

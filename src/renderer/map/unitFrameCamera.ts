@@ -1,4 +1,5 @@
 import { cellToLatLng } from 'h3-js';
+import { alignLongitudeToReference } from '../../shared/webMercator';
 import { longitudeIntervalFromCenters, mapExtentBoxForHexes } from '../../shared/mapExtent';
 import { observeModeControls } from '../../shared/observeModeControls';
 import {
@@ -343,7 +344,7 @@ function nearestIndex(indexes: readonly string[]): string | null {
   if (centers.length === 0) return null;
   const interval = longitudeIntervalFromCenters(centers.map((center) => center.lng));
   const reference = interval?.referenceLng ?? centers[0].lng;
-  const aligned = centers.map((center) => ({ ...center, lng: alignTo(center.lng, reference) }));
+  const aligned = centers.map((center) => ({ ...center, lng: alignLongitudeToReference(center.lng, reference) }));
   const meanLat = aligned.reduce((sum, center) => sum + center.lat, 0) / aligned.length;
   const meanLng = aligned.reduce((sum, center) => sum + center.lng, 0) / aligned.length;
   let best = aligned[0];
@@ -356,21 +357,6 @@ function nearestIndex(indexes: readonly string[]): string | null {
     }
   }
   return best.index;
-}
-
-/**
- * Shifts `lng` by 360° until it is within 180° of `refLng`.
- *
- * Purpose: Averaging centers across the antimeridian must not put the sample on the wrong side.
- * When to use: `nearestIndex`.
- * Expected outcome: The returned longitude differs from `lng` by a multiple of 360.
- * Exceptions: None.
- */
-function alignTo(lng: number, refLng: number): number {
-  let shifted = lng;
-  while (shifted - refLng > 180) shifted -= 360;
-  while (refLng - shifted > 180) shifted += 360;
-  return shifted;
 }
 
 /**

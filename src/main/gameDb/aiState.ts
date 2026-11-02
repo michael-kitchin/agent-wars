@@ -4,6 +4,7 @@ import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GuardedDbOps } from './dbOps';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 
 /**
  * Config key for one seat's tool-limit flag.
@@ -289,9 +290,9 @@ export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps, seatId
   logDebug('gameDb getAndClearAiToolLimitExceededLastTurn', { seatId });
   if (!ops.hasDb()) return false;
   const key = toolLimitKey(seatId);
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  ops.run('DELETE FROM game_config WHERE key = ?', [key]);
-  return row?.value === '1';
+  const stored = selectGameConfigValue(ops, key);
+  deleteGameConfigRow(ops, key);
+  return stored === '1';
 }
 
 /**
@@ -305,9 +306,9 @@ export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps, seatId
 export function getAiLastConsultationTurn(ops: AiStateDbOps, seatId: AiSeatId): number {
   logTrace('gameDb getAiLastConsultationTurn', { seatId });
   if (!ops.hasDb()) return 0;
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [lastConsultationKey(seatId)]);
-  if (!row) return 0;
-  const n = parseInt(row.value, 10);
+  const stored = selectGameConfigValue(ops, lastConsultationKey(seatId));
+  if (stored === undefined) return 0;
+  const n = parseInt(stored, 10);
   return Number.isNaN(n) ? 0 : n;
 }
 
@@ -327,7 +328,7 @@ export function setAiLastConsultationTurn(ops: AiStateDbOps, seatId: AiSeatId, t
     return;
   }
   logDebug('gameDb setAiLastConsultationTurn', { seatId, turn });
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [lastConsultationKey(seatId), String(turn)]);
+  upsertGameConfigValue(ops, lastConsultationKey(seatId), String(turn));
 }
 
 /**

@@ -7,6 +7,7 @@
  */
 
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { projectedRingCentroid } from '../../shared/projectedRingCentroid';
 
 import {
   projectHexBoundaryToContainerPoints,
@@ -67,25 +68,6 @@ export interface TacticalCityOverlayDrawDeps {
 }
 
 type LabelJob = { x: number; y: number; text: string; fontPx: number };
-
-/**
- * Defines the `projectedCentroid` function shape (function projectedCentroid(pts: readonly { x: number; y: number }[]): { x: number; y: number }).
-
- * Purpose: Screen-space centroid of the projected hex ring for city glyph placement.
- * When to use: Once per tactical child cell that has a city label.
- * Expected outcome: Arithmetic mean of vertex coordinates; callers must pass non-empty `pts`.
- * Exceptions: None.
- */
-function projectedCentroid(pts: readonly { x: number; y: number }[]): { x: number; y: number } {
-  let sx = 0;
-  let sy = 0;
-  for (const p of pts) {
-    sx += p.x;
-    sy += p.y;
-  }
-  const n = pts.length;
-  return { x: sx / n, y: sy / n };
-}
 
 /**
  * Queues one halo city-style label using the same font size and vertical lift as named-city overlays.
@@ -234,7 +216,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
         if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
         const span = spanForProjectedHex(pts);
-        const centerPx = projectedCentroid(pts);
+        const centerPx = projectedRingCentroid(pts);
         const cityLabel = S.tacticalCityOverlayLabelByH3.get(child);
         const hasAirportOrSeaport =
           tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
@@ -273,7 +255,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
         if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
         const span = spanForProjectedHex(pts);
-        const centerPx = projectedCentroid(pts);
+        const centerPx = projectedRingCentroid(pts);
         const cityLabel = S.tacticalCityOverlayLabelByH3.get(child);
 
         if (cityLabel) {
@@ -341,7 +323,7 @@ export function drawStrategicInspectionHexCodes(
       if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       const pts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
       const span = spanForProjectedHex(pts);
-      const centerPx = projectedCentroid(pts);
+      const centerPx = projectedRingCentroid(pts);
       const code = getStrategicHexCode(parent.h3Index);
       if (!code) continue;
       scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);

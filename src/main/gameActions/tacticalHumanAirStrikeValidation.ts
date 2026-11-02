@@ -4,6 +4,7 @@
 
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
+import { airStrikeInfrastructureGapReason } from '../../shared/airStrikeInfrastructure';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
@@ -68,15 +69,8 @@ export function validateTacticalHumanAirStrikeGroup(
       continue;
     }
     const targetInfra = getStrategicInfrastructureForHex(snap.enclosingStrategicH3Index);
-    if (targetType === 'urban' && targetInfra.urbanHexCount <= 0) {
-      return { success: false, reason: `${label}: Target hex has no urban infrastructure` };
-    }
-    if (targetType === 'airport' && targetInfra.airportCount <= 0) {
-      return { success: false, reason: `${label}: Target hex has no airport` };
-    }
-    if (targetType === 'seaport' && targetInfra.seaportCount <= 0) {
-      return { success: false, reason: `${label}: Target hex has no seaport` };
-    }
+    const gap = airStrikeInfrastructureGapReason(targetType, targetInfra);
+    if (gap !== null) return { success: false, reason: `${label}: ${gap}` };
   }
   return { success: true };
 }

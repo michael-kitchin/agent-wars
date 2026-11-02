@@ -9,6 +9,7 @@
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { clearTacticalTransportBaselineFromGameConfig } from './tacticalTransportBaseline';
@@ -40,7 +41,7 @@ export function writeTacticalBattleSnapshotToGameConfig(snapshot: TacticalBattle
   }
   try {
     const json = JSON.stringify(snapshot);
-    dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY, json]);
+    upsertGameConfigValue({ run: dbRun }, TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY, json);
     saveDatabase();
   } catch (err) {
     logError('writeTacticalBattleSnapshotToGameConfig: persist failed', err);
@@ -62,7 +63,7 @@ export function clearTacticalBattleSnapshotFromGameConfig(): void {
     return;
   }
   try {
-    dbRun('DELETE FROM game_config WHERE key = ?', [TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY]);
+    deleteGameConfigRow({ run: dbRun }, TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY);
     clearTacticalTransportBaselineFromGameConfig();
     clearTacticalCallbackStashFromGameConfig();
     saveDatabase();
@@ -81,10 +82,10 @@ export function clearTacticalBattleSnapshotFromGameConfig(): void {
  */
 function readTacticalBattleSnapshotFromGameConfig(): TacticalBattleSnapshot | null {
   if (!isDbReady()) return null;
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY]);
-  if (!row?.value) return null;
+  const value = selectGameConfigValue({ getOne: dbGetOne }, TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY);
+  if (!value) return null;
   try {
-    return JSON.parse(row.value) as TacticalBattleSnapshot;
+    return JSON.parse(value) as TacticalBattleSnapshot;
   } catch (err) {
     logError('readTacticalBattleSnapshotFromGameConfig: JSON parse failed, clearing', err);
     clearTacticalBattleSnapshotFromGameConfig();

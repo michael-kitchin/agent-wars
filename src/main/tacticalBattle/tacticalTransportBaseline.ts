@@ -9,6 +9,7 @@
  */
 
 import { dbGetAll, dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 
 /**
@@ -56,7 +57,7 @@ export function captureTacticalTransportBaselineForParentUnitIds(parentUnitIds: 
   );
   try {
     const json = JSON.stringify(rows as TacticalTransportBaselineRow[]);
-    dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY, json]);
+    upsertGameConfigValue({ run: dbRun }, TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY, json);
     saveDatabase();
   } catch (err) {
     logError('captureTacticalTransportBaselineForParentUnitIds: persist failed', err);
@@ -78,7 +79,7 @@ export function clearTacticalTransportBaselineFromGameConfig(): void {
     return;
   }
   try {
-    dbRun('DELETE FROM game_config WHERE key = ?', [TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY]);
+    deleteGameConfigRow({ run: dbRun }, TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY);
     saveDatabase();
   } catch (err) {
     logError('clearTacticalTransportBaselineFromGameConfig: delete failed', err);
@@ -95,8 +96,8 @@ export function clearTacticalTransportBaselineFromGameConfig(): void {
  */
 export function tacticalTransportBaselineConfigExists(): boolean {
   if (!isDbReady()) return false;
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY]);
-  return !!(row?.value && row.value.trim().length > 0);
+  const value = selectGameConfigValue({ getOne: dbGetOne }, TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY);
+  return !!(value && value.trim().length > 0);
 }
 
 /**
@@ -113,14 +114,14 @@ export function restoreTacticalTransportBaselineForParentUnitIds(parentUnitIds: 
     logDebug('restoreTacticalTransportBaselineForParentUnitIds: database not ready', {});
     return;
   }
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY]);
-  if (!row?.value) {
+  const value = selectGameConfigValue({ getOne: dbGetOne }, TACTICAL_TRANSPORT_BASELINE_CONFIG_KEY);
+  if (!value) {
     clearTacticalTransportBaselineFromGameConfig();
     return;
   }
   let baseline: TacticalTransportBaselineRow[];
   try {
-    baseline = JSON.parse(row.value) as TacticalTransportBaselineRow[];
+    baseline = JSON.parse(value) as TacticalTransportBaselineRow[];
     if (!Array.isArray(baseline)) throw new Error('baseline is not an array');
   } catch (err) {
     logError('restoreTacticalTransportBaselineForParentUnitIds: invalid baseline JSON', err);

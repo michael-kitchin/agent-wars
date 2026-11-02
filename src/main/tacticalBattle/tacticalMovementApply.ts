@@ -13,6 +13,27 @@ import {
 } from './tacticalSnapshotGuards';
 
 /**
+ * Applies one march stop, and clears a land unit's carrier when its own order leaves that cell.
+ *
+ * Purpose: Opponent projection, per-seat projection, and the head-on mover walk share this update.
+ * When to use: After a movement outcome names the cell the sub-unit stops on.
+ * Expected outcome: `h3Index` is the applied cell. Embarked infantry or armor that moved to a different cell has no `embarkedOnSubUnitId`. A unit that stays, and every other type, keeps its carrier.
+ * Exceptions: None.
+ */
+export function withTacticalMarchStop(unit: TacticalSubUnitSnapshot, appliedToH3Index: string): TacticalSubUnitSnapshot {
+  const debarkedIndependently =
+    (unit.unitType === 'infantry' || unit.unitType === 'armor')
+    && !!unit.embarkedOnSubUnitId
+    && appliedToH3Index !== unit.h3Index;
+  tacticalLogQuery('withTacticalMarchStop', { unitId: unit.id, appliedToH3Index, debarkedIndependently });
+  return {
+    ...unit,
+    h3Index: appliedToH3Index,
+    ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
+  };
+}
+
+/**
  * Returns a new tactical snapshot with opponent sub-unit positions updated from validated movement orders.
  *
  * Contract: Only the battle's other party moves, and Neutral never does. Destinations must lie in `battle.tacticalChildH3Indexes`. Reachability uses §12.4 terrain-weighted paths and terrain-adjusted movement-point budgets from `tacticalTerrainCombatModifiers`.
@@ -43,15 +64,7 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
     const idx = outcome.idx;
     const u = sub[idx]!;
     const applied = outcome.appliedToH3Index;
-    const debarkedIndependently =
-      (u.unitType === 'infantry' || u.unitType === 'armor') &&
-      !!u.embarkedOnSubUnitId &&
-      applied !== u.h3Index;
-    sub[idx] = {
-      ...u,
-      h3Index: applied,
-      ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
-    };
+    sub[idx] = withTacticalMarchStop(u, applied);
   }
   return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
 }
@@ -88,15 +101,7 @@ export function projectTacticalSnapshotAfterPlayerMovementOrders(
     }
     const unit = sub[outcome.idx]!;
     const applied = outcome.appliedToH3Index;
-    const debarkedIndependently =
-      (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
-      !!unit.embarkedOnSubUnitId &&
-      applied !== unit.h3Index;
-    sub[outcome.idx] = {
-      ...unit,
-      h3Index: applied,
-      ...(debarkedIndependently ? { embarkedOnSubUnitId: undefined } : {}),
-    };
+    sub[outcome.idx] = withTacticalMarchStop(unit, applied);
   }
   return { ...battle, subUnits: syncEmbarkedLandToNavalHex(sub) };
 }

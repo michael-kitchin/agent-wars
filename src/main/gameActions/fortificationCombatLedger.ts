@@ -42,6 +42,23 @@ function stripListedCell(h3Index: string, next: () => number, tally: Fortificati
 }
 
 /**
+ * Whether an enemy holds a fortification on the hex.
+ *
+ * Purpose: Ranged fire may target an empty fortified hex, and combat soak uses the same test.
+ * When to use: After the caller has a strategic hex and the attacking player.
+ * Expected outcome: True when the controller is someone else and at least one cell is fortified.
+ * Exceptions: Propagates SQLite errors from the controller and infrastructure reads.
+ */
+export function isEnemyFortifiedStrategicHex(h3Index: string, attackerPlayer: string): boolean {
+  const controller = getHexController(h3Index);
+  const fortified = controller !== null
+    && controller !== attackerPlayer
+    && getStrategicInfrastructureForHex(h3Index).fortifiedCount > 0;
+  logTrace('fortificationCombatLedger isEnemyFortifiedStrategicHex', { h3Index, attackerPlayer, controller, fortified });
+  return fortified;
+}
+
+/**
  * Builds the soak hooks for one strategic turn.
  *
  * Purpose: Ranged fire, melee, and air strikes share one way of spending a fortification.
@@ -61,12 +78,7 @@ export function createStrategicFortificationHooks(args: {
       return stripListedCell(victim.h3Index, args.next, args.tally);
     },
     isEnemyFortifiedHex(h3Index: string, attackerPlayer: string): boolean {
-      const controller = getHexController(h3Index);
-      const fortified = controller !== null
-        && controller !== attackerPlayer
-        && getStrategicInfrastructureForHex(h3Index).fortifiedCount > 0;
-      logTrace('fortificationCombatLedger isEnemyFortifiedHex', { h3Index, attackerPlayer, controller, fortified });
-      return fortified;
+      return isEnemyFortifiedStrategicHex(h3Index, attackerPlayer);
     },
     stripOne(h3Index: string): boolean {
       if (getStrategicInfrastructureForHex(h3Index).fortifiedCount <= 0) return false;

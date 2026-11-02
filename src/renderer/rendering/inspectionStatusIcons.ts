@@ -9,6 +9,7 @@
  * Exceptions: A missing map or a failed image load leaves that icon blank. The function does not throw.
  */
 
+import { projectedRingCentroid } from '../../shared/projectedRingCentroid';
 import {
   inspectionStatusIconDrawPx,
   inspectionStatusIconsForHex,
@@ -84,25 +85,6 @@ export interface InspectionStatusIconDrawDeps {
  * Exceptions: None.
  */
 const iconImages = new Map<string, HTMLImageElement | null>();
-
-/**
- * Returns the average of a projected hex ring.
- *
- * Purpose: The inspection hex code is placed on this centroid, and the icon row uses the same point.
- * When to use: After `projectHexBoundaryToContainerPoints` returns a non-empty ring.
- * Expected outcome: The arithmetic mean of the vertices.
- * Exceptions: None. Callers skip an empty ring.
- */
-function projectedCentroid(pts: readonly { x: number; y: number }[]): { x: number; y: number } {
-  let sx = 0;
-  let sy = 0;
-  for (const point of pts) {
-    sx += point.x;
-    sy += point.y;
-  }
-  const count = pts.length;
-  return { x: sx / count, y: sy / count };
-}
 
 /**
  * Starts or returns the cached image for one icon path.
@@ -289,7 +271,7 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
       if (icons.length === 0) continue;
       const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
       if (pts.length === 0) continue;
-      const centroid = projectedCentroid(pts);
+      const centroid = projectedRingCentroid(pts);
       const centerY = centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts));
       const iconPx = inspectionStatusIconDrawPx({
         productionSurface: surface === 'button' ? 'button' : 'canvas',

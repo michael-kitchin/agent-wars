@@ -15,9 +15,26 @@ import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import { dbRun, isDbReady } from '../gameDb';
 import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { COMBAT_DIE_SIDES } from '../combatDice';
-import { applyTacticalMeleeAfterSupportOrders } from './tacticalMeleeApply';
+import { applyTacticalMeleeAfterSupportOrders, tacticalCombatSeed } from './tacticalMeleeApply';
 import { firstRingCellDistinctFrom, tacticalParentCell, tacticalUnderCorner } from './testSupport/tacticalHexFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
+
+test('tacticalCombatSeed mixes the match seed and turn, and wraps to 32 bits', () => {
+  assert.equal(tacticalCombatSeed({ gameSeed: 1, strategicTurnNumber: 2, tacticalTurnNumber: 3 }), 330026);
+  assert.equal(tacticalCombatSeed({ gameSeed: 4294967295, strategicTurnNumber: 1, tacticalTurnNumber: 0 }), 7918);
+  assert.equal(
+    tacticalCombatSeed({
+      gameSeed: 1,
+      strategicTurnNumber: 2,
+      tacticalTurnNumber: 3,
+      layoutSubUnits: [
+        { id: 'b', h3Index: 'y' },
+        { id: 'a', h3Index: 'x' },
+      ],
+    }),
+    6957787
+  );
+});
 
 test('tactical melee adjudicates co-located opposing sub-units on the same res4 hex', () => {
   withTempGameDb('aw-tactical-melee-', () => {

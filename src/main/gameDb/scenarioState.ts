@@ -1,4 +1,5 @@
 import type { DbReadOps, DbWriteOps } from './dbOps';
+import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -50,8 +51,7 @@ scenarioId: string;
  */
 export function loadScenarioState(ops: Pick<DbReadOps, 'getOne'>): ScenarioStateSnapshot {
   logTrace('gameDb loadScenarioState');
-  const scenarioId =
-    ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [SCENARIO_ID_KEY])?.value ?? '';
+  const scenarioId = selectGameConfigValue(ops, SCENARIO_ID_KEY) ?? '';
   return { scenarioId };
 }
 
@@ -65,8 +65,5 @@ export function loadScenarioState(ops: Pick<DbReadOps, 'getOne'>): ScenarioState
  */
 export function persistRegionVsRegionScenarioId(ops: Pick<DbWriteOps, 'run'>): void {
   logDebug('gameDb persistRegionVsRegionScenarioId');
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
-    SCENARIO_ID_KEY,
-    REGION_VS_REGION_SCENARIO_ID,
-  ]);
+  upsertGameConfigValue(ops, SCENARIO_ID_KEY, REGION_VS_REGION_SCENARIO_ID);
 }

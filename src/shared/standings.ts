@@ -11,7 +11,7 @@ import { formatCommanderSummary } from './commanderSummary';
 import { formatPlaceOrdinal } from './placeOrdinal';
 import { paletteForOwner } from './seatPalette';
 import type { SeatId } from './seatIds';
-import { HUMAN_SEAT_KIND, type Doctrine, type DoctrineChoice, type SeatKind } from './seatRoster';
+import { HUMAN_SEAT_KIND, sortSeatsByOrder, type Doctrine, type DoctrineChoice, type SeatKind } from './seatRoster';
 import type { GameEndReason } from './victoryRules';
 
 /**
@@ -362,7 +362,7 @@ const TOTAL_LABEL = 'Model cost this match';
  * Exceptions: None.
  */
 export function buildStandings(input: StandingsInput): Standings {
-  const first = input.seats.filter((seat) => seat.place === 1).sort((left, right) => left.seatOrder - right.seatOrder);
+  const first = sortSeatsByOrder(input.seats.filter((seat) => seat.place === 1));
   const rows = [...input.seats]
     .sort((left, right) => (left.place ?? Number.MAX_SAFE_INTEGER) - (right.place ?? Number.MAX_SAFE_INTEGER) || left.seatOrder - right.seatOrder)
     .map((seat) => standingsRow(seat, input, first.length === 1));

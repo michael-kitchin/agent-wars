@@ -1,5 +1,11 @@
 import { logDebug } from '../logger';
 import {
+  EXAMPLE_CALLBACKS,
+  EXAMPLE_MEMORY_UPDATES,
+  EXAMPLE_MISSILE_LAUNCHES,
+  EXAMPLE_PRODUCTION_ORDERS,
+} from './promptSpec/envelopeExampleRows';
+import {
   buildCallbackContractClause,
   buildInvalidOutputRulesClause,
   buildMemoryWriteLimitsClause,
@@ -306,17 +312,10 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
         ],
     airStrikes: [],
     ferryOrders: [],
-    missileLaunches: [{ unitId: 'a1-m1', targetHexCode: 'CK' }],
-    callbacks: [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }],
-    memoryUpdates: [
-      {
-        action: 'write',
-        key: 'turn_objectives',
-        tier: 'persistent',
-        content: 'Close with observed enemies; keep air and naval production moving.',
-      },
-    ],
-    productionOrders: [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }],
+    missileLaunches: EXAMPLE_MISSILE_LAUNCHES,
+    callbacks: EXAMPLE_CALLBACKS,
+    memoryUpdates: EXAMPLE_MEMORY_UPDATES,
+    productionOrders: EXAMPLE_PRODUCTION_ORDERS,
   };
   const example: Record<string, unknown> = {};
   for (const field of envelopeFieldsForGates(gates)) {

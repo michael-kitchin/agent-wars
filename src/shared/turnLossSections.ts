@@ -9,6 +9,7 @@
 
 import { formatPlayerLossLinesMultiline, type TurnLossSummary } from './lossSummary';
 import { NEUTRAL_OWNER_ID } from './seatIds';
+import { sortSeatsByOrder } from './seatRoster';
 
 /**
  * An empty hex-line map for a toast that has no territory changes.
@@ -185,12 +186,12 @@ export function lossSectionOwnerId(
   if (headerTitle === 'Neutral Losses') return NEUTRAL_OWNER_ID;
   if (!headerTitle.endsWith(' Losses')) return null;
   const name = headerTitle.slice(0, -' Losses'.length);
-  const matches = seats
-    .filter((seat) => {
+  const matches = sortSeatsByOrder(
+    seats.filter((seat) => {
       const home = seat.homeRegion.trim();
       return (home.length > 0 ? home : seat.seatId) === name;
     })
-    .sort((left, right) => left.seatOrder - right.seatOrder);
+  );
   return matches[0]?.seatId ?? null;
 }
 

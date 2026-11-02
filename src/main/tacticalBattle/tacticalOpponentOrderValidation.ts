@@ -2,6 +2,7 @@
  * Snapshot-based validation for opponent tactical orders (air, ferry, embark) using tactical geometry and strategic infrastructure DB rows.
  */
 
+import { airStrikeInfrastructureGapReason } from '../../shared/airStrikeInfrastructure';
 import { strategicParentOf } from '../../shared/h3Resolutions';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
 import { logDebug } from '../logger';
@@ -10,7 +11,8 @@ import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from 
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryAirportRejectionReason } from './tacticalFerryAirportGuards';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
-import { dbGetOne, getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
+import { getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
+import { readHexEmbarkFacts } from '../hexEmbarkFacts';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInfrastructureStrikeStaysOnEnclosingHex } from './tacticalSnapshotGuards';
@@ -31,26 +33,13 @@ export function canPlayerEmbarkFromTacticalHex(
 ): boolean {
   logDebug('canPlayerEmbarkFromTacticalHex', { h3Index, playerId, enclosingStrategicH3Index });
   const strategic = enclosingStrategicH3Index;
-  const terrainRow = dbGetOne<{ terrain: string; terrainKind: string | null }>(
-    'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
-    [strategic]
-  );
-  if (!terrainRow) return false;
-  const infra = dbGetOne<{ seaportCount: number }>(
-    'SELECT seaport_count AS seaportCount FROM res_s_infrastructure WHERE h3_index = ?',
-    [strategic]
-  );
-  const control = dbGetOne<{ controllerPlayerId: string | null }>(
-    'SELECT controller_player_id AS controllerPlayerId FROM res_s_control WHERE h3_index = ?',
-    [strategic]
-  );
-  const seaportCount = infra?.seaportCount ?? 0;
-  const controllerPlayerId = control?.controllerPlayerId ?? null;
+  const facts = readHexEmbarkFacts(strategic);
+  if (!facts) return false;
   return canEmbarkAtHex({
-    nativeTerrain: terrainRow.terrain,
-    terrainKind: terrainRow.terrainKind ?? undefined,
-    hasSeaport: seaportCount > 0,
-    hexControlledByPlayer: controllerPlayerId === playerId,
+    nativeTerrain: facts.nativeTerrain,
+    terrainKind: facts.terrainKind,
+    hasSeaport: facts.seaportCount > 0,
+    hexControlledByPlayer: facts.controllerPlayerId === playerId,
   });
 }
 
@@ -93,15 +82,8 @@ export function validateTacticalOpponentAirStrikeOrder(
     return tacticalInvalidResult('Air strikes may only target the contested strategic hex.');
   }
   const targetInfra = getStrategicInfrastructureForHex(battle.enclosingStrategicH3Index);
-  if (order.targetType === 'urban' && targetInfra.urbanHexCount <= 0) {
-    return tacticalInvalidResult('Target hex has no urban infrastructure');
-  }
-  if (order.targetType === 'airport' && targetInfra.airportCount <= 0) {
-    return tacticalInvalidResult('Target hex has no airport');
-  }
-  if (order.targetType === 'seaport' && targetInfra.seaportCount <= 0) {
-    return tacticalInvalidResult('Target hex has no seaport');
-  }
+  const gap = airStrikeInfrastructureGapReason(order.targetType, targetInfra);
+  if (gap !== null) return tacticalInvalidResult(gap);
   tacticalLogQuery('validateTacticalOpponentAirStrikeOrder ok', { unitId: order.unitId });
   return tacticalValidResult();
 }

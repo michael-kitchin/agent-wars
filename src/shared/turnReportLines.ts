@@ -8,7 +8,7 @@
  */
 
 import { aiIndexForSeatId, isNeutralOwnerId } from './seatIds';
-import { shortSideName } from './seatRoster';
+import { shortSideName, sortSeatsByOrder } from './seatRoster';
 
 /**
  * A side the report can name.
@@ -375,9 +375,7 @@ function seatForDisplayedName(
   name: string,
   nameOf: (seat: SideNameMarkSeat) => string | null
 ): SideNameMarkSeat | null {
-  const matches = seats
-    .filter((seat) => nameOf(seat) === name)
-    .sort((left, right) => left.seatOrder - right.seatOrder);
+  const matches = sortSeatsByOrder(seats.filter((seat) => nameOf(seat) === name));
   return matches[0] ?? null;
 }
 
@@ -484,9 +482,9 @@ function seatForHexName(
   preferredId: string | null
 ): SideNameMarkSeat | null {
   if (name === 'You' || name === 'you' || name === 'Neutral') return null;
-  const matches = seats
-    .filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name)
-    .sort((left, right) => left.seatOrder - right.seatOrder);
+  const matches = sortSeatsByOrder(
+    seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name)
+  );
   if (preferredId) {
     const preferred = matches.find((seat) => seat.seatId === preferredId);
     if (preferred) return preferred;

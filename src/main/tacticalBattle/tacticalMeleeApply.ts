@@ -13,6 +13,7 @@ import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
+import { hashStringToUint32 } from '../../shared/stableHash';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { syncStrategicUnitsDbWhenTacticalParentsEliminated } from './tacticalStrategicOrderPhases';
@@ -26,16 +27,31 @@ import { syncStrategicUnitsDbWhenTacticalParentsEliminated } from './tacticalStr
  * Exceptions: None.
  */
 export function tacticalSubUnitLayoutSeed32(subUnits: readonly { id: string; h3Index: string }[]): number {
-  let h = 2166136261 >>> 0;
-  const s = [...subUnits]
-    .map((u) => `${u.id}:${u.h3Index}`)
-    .sort()
-    .join('|');
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+  return hashStringToUint32(
+    [...subUnits]
+      .map((u) => `${u.id}:${u.h3Index}`)
+      .sort()
+      .join('|')
+  );
+}
+
+/**
+ * Mixes the match seed and the tactical turn into one combat-generator seed.
+ *
+ * Purpose: Air, ranged, and melee in one beat draw from the same stream.
+ * When to use: Where a tactical beat builds `createCombatRng`. Omit `layoutSubUnits` when that beat has no layout term.
+ * Expected outcome: An unsigned 32-bit seed. Omitting `layoutSubUnits` adds nothing. An empty array adds the hash of the empty string, 2166136261, so a caller without a layout term must omit the field.
+ * Exceptions: None.
+ */
+export function tacticalCombatSeed(args: {
+  readonly gameSeed: number;
+  readonly strategicTurnNumber: number;
+  readonly tacticalTurnNumber: number;
+  readonly layoutSubUnits?: readonly { id: string; h3Index: string }[];
+}): number {
+  tacticalLogQuery('tacticalCombatSeed', { hasLayout: args.layoutSubUnits !== undefined });
+  const layout = args.layoutSubUnits === undefined ? 0 : tacticalSubUnitLayoutSeed32(args.layoutSubUnits);
+  return (args.gameSeed + args.strategicTurnNumber * 7919 + args.tacticalTurnNumber * 104729 + layout) >>> 0;
 }
 
 /**
@@ -93,11 +109,12 @@ export function applyTacticalMeleeAfterSupportOrders(
   const next =
     combatNext ??
     createCombatRng(
-      (getGameSeed() +
-        battle.strategicTurnNumber * 7919 +
-        battle.tacticalTurnNumber * 104729 +
-        tacticalSubUnitLayoutSeed32(battle.subUnits)) >>>
-        0
+      tacticalCombatSeed({
+        gameSeed: getGameSeed(),
+        strategicTurnNumber: battle.strategicTurnNumber,
+        tacticalTurnNumber: battle.tacticalTurnNumber,
+        layoutSubUnits: battle.subUnits,
+      })
     );
   const meleeResult = runMeleePhase(combatUnits, battle.tacticalChildH3Indexes, next);
   const meleeDiceRolls = meleeResult.diceRolls ?? [];

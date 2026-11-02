@@ -1,4 +1,5 @@
 import type { GameConfigKvDbOps } from '../gameDb/gameConfigKv';
+import { selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY } from '../../shared/sightCueSettings';
 import { logDebug, logError, logTrace } from '../logger';
 
@@ -24,7 +25,7 @@ function isStringList(value: unknown): value is string[] {
  */
 export function readSightCueSeenUnits(ops: Pick<GameConfigKvDbOps, 'getOne'>): Record<string, string[]> {
   logTrace('readSightCueSeenUnits');
-  const raw = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [SIGHT_CUE_SEEN_UNITS_CONFIG_KEY])?.value;
+  const raw = selectGameConfigValue(ops, SIGHT_CUE_SEEN_UNITS_CONFIG_KEY);
   if (raw == null) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -58,8 +59,5 @@ export function writeSightCueSeenUnits(
   const seatIds = Object.keys(seenBySeat);
   const idCount = seatIds.reduce((sum, seatId) => sum + (seenBySeat[seatId]?.length ?? 0), 0);
   logDebug('writeSightCueSeenUnits', { seatCount: seatIds.length, idCount });
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
-    SIGHT_CUE_SEEN_UNITS_CONFIG_KEY,
-    JSON.stringify(seenBySeat),
-  ]);
+  upsertGameConfigValue(ops, SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, JSON.stringify(seenBySeat));
 }

@@ -17,7 +17,7 @@ import { getGameSeed } from '../gameDb';
 import { logDebug } from '../logger';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { commitAiOnlyTacticalBeatSnapshot } from './tacticalBattleSession';
-import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
+import { applyTacticalMeleeAfterSupportOrders, tacticalCombatSeed } from './tacticalMeleeApply';
 import { projectTacticalSnapshotAfterPlayerMovementOrders } from './tacticalMovementApply';
 import { withoutTacticalHeadOnHolderMoves } from './tacticalHeadOnContact';
 import { validateTacticalOpponentEmbarkOrder } from './tacticalOpponentOrderValidation';
@@ -151,10 +151,12 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
   const opposingKept = keptOrdersForSeat(current, drafts.opposingDraft, opposing);
   const opposingEmbark = legalEmbarkOrders(current, drafts.opposingDraft?.embarkOrders ?? [], opposing);
   const afterOpposingEmbark = applyTacticalEmbarkPhaseOnBattle(current, opposingEmbark, opposing);
-  const seed = (getGameSeed()
-    + current.strategicTurnNumber * 7919
-    + current.tacticalTurnNumber * 104729
-    + tacticalSubUnitLayoutSeed32(current.subUnits)) >>> 0;
+  const seed = tacticalCombatSeed({
+    gameSeed: getGameSeed(),
+    strategicTurnNumber: current.strategicTurnNumber,
+    tacticalTurnNumber: current.tacticalTurnNumber,
+    layoutSubUnits: current.subUnits,
+  });
   const next = createCombatRng(seed);
   const airAndRanged = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     afterOpposingEmbark,

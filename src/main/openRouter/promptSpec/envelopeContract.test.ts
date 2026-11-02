@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { getFinalJsonOrdersExampleBlock } from '../promptContracts';
 import {
   ENVELOPE_FIELD_ORDER,
   buildCallbackContractClause,
@@ -361,4 +362,34 @@ test('missileLaunches is strategic and only present when the flag is on', () => 
     includeProductionOrders: false,
   });
   assert.match(rules, /use missileLaunches/);
+});
+
+test('the repair schema and the final JSON example share the four tail rows', () => {
+  const repair = buildRepairSchemaText({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMissileActions: true,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+    includeStandingOrderActions: true,
+    includeExitBattle: false,
+  });
+  const example = getFinalJsonOrdersExampleBlock({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMissileActions: true,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+    includeStandingOrderActions: true,
+  });
+  const rows = [
+    '"missileLaunches":[{"unitId":"a1-m1","targetHexCode":"CK"}]',
+    '"callbacks":[{"event":"infrastructure_destroyed","params":{"targetType":"airport","hex":"CD"}}]',
+    '"memoryUpdates":[{"action":"write","key":"turn_objectives","tier":"persistent","content":"Close with observed enemies; keep air and naval production moving."}]',
+    '"productionOrders":[{"action":"set_build_queue","hex":"CF","unitType":"air","count":1}]',
+  ];
+  for (const row of rows) {
+    assert.ok(repair.includes(row), row);
+    assert.ok(example.includes(row), row);
+  }
 });

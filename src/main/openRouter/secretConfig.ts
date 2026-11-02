@@ -10,6 +10,7 @@
 import { safeStorage } from 'electron';
 import { logDebug, logError, logTrace } from '../logger';
 import { getOne, run } from '../gameDb/dbConnection';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 
 /**
  * One stored secret envelope.
@@ -49,8 +50,8 @@ interface SecretEnvelope {
  * Exceptions: None. A closed database reads as null.
  */
 function readConfigRow(configKey: string): string | null {
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [configKey]);
-  return typeof row?.value === 'string' ? row.value : null;
+  const value = selectGameConfigValue({ getOne }, configKey);
+  return typeof value === 'string' ? value : null;
 }
 
 /**
@@ -147,10 +148,10 @@ export function writeSecretString(configKey: string, value: string): void {
   logDebug('secretConfig writeSecretString', { configKey, length: value.trim().length });
   try {
     if (!value.trim()) {
-      run('DELETE FROM game_config WHERE key = ?', [configKey]);
+      deleteGameConfigRow({ run }, configKey);
       return;
     }
-    run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [configKey, envelopeJson(value)]);
+    upsertGameConfigValue({ run }, configKey, envelopeJson(value));
   } catch (err) {
     logError('secretConfig writeSecretString: failed to write secret', err);
   }

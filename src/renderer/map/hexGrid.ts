@@ -5,16 +5,17 @@
 
 import { cellToBoundary, cellToLatLng, cellToLocalIj } from 'h3-js';
 import { mapExtentReferenceLng } from '../../shared/mapExtent';
+import { alignLongitudeToReference, WEB_MERCATOR_MAX_ABS_LAT } from '../../shared/webMercator';
 
 /**
- * Documents the module-scope binding `WEB_MERCATOR_MAX_ABS_LAT` (WEB_MERCATOR_MAX_ABS_LAT).
-
- * Purpose: Supports maintainability by documenting why `WEB_MERCATOR_MAX_ABS_LAT` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * The Web Mercator latitude cutoff, re-exported for renderer map code.
+ *
+ * Purpose: Camera bounds, the tactical view, and the world map clamp to the same latitude.
+ * When to use: Import from here in renderer map modules. The value is defined in `src/shared/webMercator.ts`.
+ * Expected outcome: The same number as `WEB_MERCATOR_MAX_ABS_LAT` in that module.
  * Exceptions: None.
  */
-export const WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
+export { WEB_MERCATOR_MAX_ABS_LAT };
 
 /**
  * Defines the `clampLatForWebMercatorDisplay` function shape (export function clampLatForWebMercatorDisplay(lat: number): number).
@@ -40,10 +41,7 @@ export function clampLatForWebMercatorDisplay(lat: number): number {
  */
 export function alignLngToReference(lng: number, refLng: number): number {
   const reference = mapExtentReferenceLng() ?? refLng;
-  let l = lng;
-  while (l - reference > 180) l -= 360;
-  while (reference - l > 180) l += 360;
-  return l;
+  return alignLongitudeToReference(lng, reference);
 }
 
 /**

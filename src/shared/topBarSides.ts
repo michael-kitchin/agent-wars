@@ -9,7 +9,7 @@
 
 import type { CommanderStatus } from './commanderStatus';
 import { SEAT_PALETTES } from './seatPalette';
-import { AI_SEAT_KIND, shortSideName, type SeatKind } from './seatRoster';
+import { AI_SEAT_KIND, shortSideName, sortSeatsByOrder, type SeatKind } from './seatRoster';
 
 const READY_CHECK_COLOR = '#86EFAC';
 
@@ -225,7 +225,7 @@ export function buildTopBarSideChips(
   statuses: readonly TopBarCommanderStatus[],
   viewerSeatId: string | null
 ): TopBarSidesBlock {
-  const ordered = [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+  const ordered = sortSeatsByOrder(seats);
   const viewer = viewerSeatId === null ? undefined : ordered.find((seat) => seat.seatId === viewerSeatId);
   if (!viewer) {
     return { observing: true, lead: null, chips: ordered.map((seat) => chipFor(seat, statuses, seat.kind === AI_SEAT_KIND)) };

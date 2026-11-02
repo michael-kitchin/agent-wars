@@ -1,4 +1,5 @@
 import { cellToBoundary, cellToLatLng } from 'h3-js';
+import { alignLongitudeToReference, WEB_MERCATOR_MAX_ABS_LAT } from './webMercator';
 
 /**
  * Unwrapped longitude window for the loaded map.
@@ -102,9 +103,6 @@ export interface MapExtentBox {
    */
   readonly referenceLng: number;
 }
-
-/** Web Mercator latitude limit used when clamping extent vertices. */
-const MERCATOR_LAT = 85.05112877980659;
 
 /**
  * Active draw reference, or null while the global map is showing.
@@ -216,9 +214,9 @@ export function mapExtentBoxForHexes(
   for (const h3 of h3Indexes) {
     const [, centerLng] = cellToLatLng(h3);
     for (const [lat, lng] of cellToBoundary(h3)) {
-      const alignedToCell = alignTo(lng, centerLng);
-      const aligned = alignTo(alignedToCell, interval.referenceLng);
-      const clampedLat = Math.max(-MERCATOR_LAT, Math.min(MERCATOR_LAT, lat));
+      const alignedToCell = alignLongitudeToReference(lng, centerLng);
+      const aligned = alignLongitudeToReference(alignedToCell, interval.referenceLng);
+      const clampedLat = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
       south = Math.min(south, clampedLat);
       north = Math.max(north, clampedLat);
       west = Math.min(west, aligned);
@@ -226,23 +224,8 @@ export function mapExtentBoxForHexes(
     }
   }
   if (south > north) {
-    south = -MERCATOR_LAT;
-    north = MERCATOR_LAT;
+    south = -WEB_MERCATOR_MAX_ABS_LAT;
+    north = WEB_MERCATOR_MAX_ABS_LAT;
   }
   return { south, west, north, east, referenceLng: interval.referenceLng };
-}
-
-/**
- * Shifts `lng` by 360° until it is within 180° of `refLng`.
- *
- * Purpose: Local copy of the renderer helper so this module stays free of DOM imports.
- * When to use: Only while expanding hex vertices into the extent frame.
- * Expected outcome: The returned longitude differs from `lng` by a multiple of 360.
- * Exceptions: None.
- */
-function alignTo(lng: number, refLng: number): number {
-  let shifted = lng;
-  while (shifted - refLng > 180) shifted -= 360;
-  while (refLng - shifted > 180) shifted += 360;
-  return shifted;
 }

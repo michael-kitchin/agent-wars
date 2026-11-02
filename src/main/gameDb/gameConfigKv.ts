@@ -14,6 +14,7 @@ import {
   type VictorySettings,
 } from '../../shared/victoryRules';
 import { logDebug, logError, logTrace } from '../logger';
+import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 
 /**
  * Minimal DB surface for `game_config` reads and writes without importing `gameDb.ts`.
@@ -83,10 +84,10 @@ export function allocateNextUnitDisplayOrderWithOps(ops: GameConfigKvDbOps, unit
   logDebug('gameDb allocateNextUnitDisplayOrder', { unitType, player });
   if (ops.hasDb && !ops.hasDb()) return 1;
   const key = unitDisplaySequenceKey(unitType, player);
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  const current = row ? Number.parseInt(row.value, 10) : 0;
+  const stored = selectGameConfigValue(ops, key);
+  const current = stored !== undefined ? Number.parseInt(stored, 10) : 0;
   const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, String(next)]);
+  upsertGameConfigValue(ops, key, String(next));
   return next;
 }
 
@@ -107,10 +108,10 @@ export function allocateNextUnitIdOrdinalWithOps(ops: GameConfigKvDbOps, unitTyp
     throw err;
   }
   const key = unitIdSequenceKey(unitType, player);
-  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  const current = row ? Number.parseInt(row.value, 10) : 0;
+  const stored = selectGameConfigValue(ops, key);
+  const current = stored !== undefined ? Number.parseInt(stored, 10) : 0;
   const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, String(next)]);
+  upsertGameConfigValue(ops, key, String(next));
   return next;
 }
 
@@ -186,7 +187,7 @@ export function readAiOnlyBattles(ops: GameConfigKvDbOps): AiOnlyBattleMode {
 export function readSightCuesEnabled(ops: GameConfigKvDbOps): boolean {
   logTrace('gameConfigKv readSightCuesEnabled');
   if (ops.hasDb && !ops.hasDb()) return STORED_SIGHT_CUES_WHEN_MISSING;
-  const raw = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [SIGHT_CUES_CONFIG_KEY])?.value;
+  const raw = selectGameConfigValue(ops, SIGHT_CUES_CONFIG_KEY);
   const enabled = sightCuesFromStored(raw);
   logTrace('gameConfigKv readSightCuesEnabled result', { enabled });
   return enabled;

@@ -14,6 +14,7 @@ import {
   dbRun,
   setHexController,
 } from '../gameDb';
+import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 import { convertUnitsToNeutral, type KnockoutCoordinates } from './unitOwnershipTransfer';
 
@@ -81,7 +82,7 @@ function deleteSeatPrivateRows(seatId: SeatId): void {
   for (const table of tables) {
     dbRun(`DELETE FROM ${table} WHERE player_id = ?`, [seatId]);
   }
-  dbRun('DELETE FROM game_config WHERE key = ?', [`fog_new_contacts_${seatId}`]);
+  deleteGameConfigRow({ run: dbRun }, `fog_new_contacts_${seatId}`);
 }
 
 /**

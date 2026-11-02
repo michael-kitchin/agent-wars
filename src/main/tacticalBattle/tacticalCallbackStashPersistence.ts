@@ -10,6 +10,7 @@
 import { AI_SEAT_IDS, isAiSeatId, type AiSeatId } from '../../shared/seatIds';
 import { copyCallbackSubscriptions, type CallbackSubscription } from '../callbackSubscriptions';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 
 /**
@@ -123,10 +124,7 @@ export function writeTacticalCallbackStashToGameConfig(stash: TacticalCallbackSt
           }
           : {}),
       };
-    dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
-      TACTICAL_CALLBACK_STASH_CONFIG_KEY,
-      JSON.stringify(payload),
-    ]);
+    upsertGameConfigValue({ run: dbRun }, TACTICAL_CALLBACK_STASH_CONFIG_KEY, JSON.stringify(payload));
     saveDatabase();
   } catch (err) {
     logError('writeTacticalCallbackStashToGameConfig: persist failed', err);
@@ -148,7 +146,7 @@ export function clearTacticalCallbackStashFromGameConfig(): void {
     return;
   }
   try {
-    dbRun('DELETE FROM game_config WHERE key = ?', [TACTICAL_CALLBACK_STASH_CONFIG_KEY]);
+    deleteGameConfigRow({ run: dbRun }, TACTICAL_CALLBACK_STASH_CONFIG_KEY);
     saveDatabase();
   } catch (err) {
     logError('clearTacticalCallbackStashFromGameConfig: delete failed', err);
@@ -165,10 +163,8 @@ export function clearTacticalCallbackStashFromGameConfig(): void {
  */
 export function tacticalCallbackStashConfigExists(): boolean {
   if (!isDbReady()) return false;
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [
-    TACTICAL_CALLBACK_STASH_CONFIG_KEY,
-  ]);
-  return !!(row?.value && row.value.trim().length > 0);
+  const value = selectGameConfigValue({ getOne: dbGetOne }, TACTICAL_CALLBACK_STASH_CONFIG_KEY);
+  return !!(value && value.trim().length > 0);
 }
 
 /**
@@ -181,12 +177,10 @@ export function tacticalCallbackStashConfigExists(): boolean {
  */
 export function readTacticalCallbackStashFromGameConfig(): TacticalCallbackStash | null {
   if (!isDbReady()) return null;
-  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [
-    TACTICAL_CALLBACK_STASH_CONFIG_KEY,
-  ]);
-  if (!row?.value?.trim()) return null;
+  const value = selectGameConfigValue({ getOne: dbGetOne }, TACTICAL_CALLBACK_STASH_CONFIG_KEY);
+  if (!value?.trim()) return null;
   try {
-    const parsed = JSON.parse(row.value) as {
+    const parsed = JSON.parse(value) as {
       subscriptions?: unknown;
       seatId?: unknown;
       noAiParty?: unknown;

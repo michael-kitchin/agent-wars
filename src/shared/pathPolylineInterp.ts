@@ -7,12 +7,7 @@
  * Exceptions: Degenerate zero-length polyline returns last vertex when `frac >= 1`, first when `frac <= 0`.
  */
 
-function alignLngToRef(lng: number, refLng: number): number {
-  let l = lng;
-  while (l - refLng > 180) l -= 360;
-  while (refLng - l > 180) l += 360;
-  return l;
-}
+import { alignLongitudeToReference } from './webMercator';
 
 /**
  * Approximate geodesic step length in meters using local planar metric (adequate for sub-degree tactical legs).
@@ -24,7 +19,7 @@ function alignLngToRef(lng: number, refLng: number): number {
  */
 function segmentLengthMetersApprox(a: { lat: number; lng: number }, b: { lat: number; lng: number }, refLng: number): number {
   const dLatM = (b.lat - a.lat) * 111_320;
-  const dLngRad = ((alignLngToRef(b.lng, refLng) - alignLngToRef(a.lng, refLng)) * Math.PI) / 180;
+  const dLngRad = ((alignLongitudeToReference(b.lng, refLng) - alignLongitudeToReference(a.lng, refLng)) * Math.PI) / 180;
   const dLngM = dLngRad * 6371000 * Math.cos((a.lat * Math.PI) / 180);
   return Math.hypot(dLatM, dLngM);
 }
@@ -65,8 +60,8 @@ export function latLngAlongPolylineByArcFraction(
     const r = len <= 0 ? 1 : Math.min(1, target / len);
     const a = coords[i - 1]!;
     const b = coords[i]!;
-    const lngA = alignLngToRef(a.lng, refLng);
-    const lngB = alignLngToRef(b.lng, refLng);
+    const lngA = alignLongitudeToReference(a.lng, refLng);
+    const lngB = alignLongitudeToReference(b.lng, refLng);
     const lat = a.lat + r * (b.lat - a.lat);
     const lngAligned = lngA + r * (lngB - lngA);
     let lng = lngAligned;

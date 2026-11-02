@@ -15,6 +15,7 @@ import {
   tacticalTerrainLayerSignature,
   type TacticalTerrainKindResolver,
 } from '../../shared/tacticalTerrainMovement';
+import { hashStringToUint32 } from '../../shared/stableHash';
 import { logDebug } from '../logger';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
@@ -231,14 +232,7 @@ type TacticalMarchSessionCacheBattle = Pick<
  */
 function tacticalSetMemoTag(tacticalSet: ReadonlySet<string>, fullFootprintSize: number): string {
   if (fullFootprintSize > 0 && tacticalSet.size === fullFootprintSize) return 'F';
-  let h = 2166136261;
-  for (const x of tacticalSet) {
-    for (let i = 0; i < x.length; i++) {
-      h ^= x.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-  }
-  return `S${tacticalSet.size}:${h >>> 0}`;
+  return `S${tacticalSet.size}:${hashStringToUint32([...tacticalSet].join(''))}`;
 }
 
 /**

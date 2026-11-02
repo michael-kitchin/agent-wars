@@ -1,4 +1,5 @@
 import { cellToLatLng, gridDisk } from 'h3-js';
+import { alignLongitudeToReference } from './webMercator';
 
 /**
  * How many hexes of span an automatic camera adds on one axis.
@@ -343,7 +344,7 @@ export function hexCenterSteps(h3Index: string): HexCenterSteps | null {
       if (neighbor === h3Index) continue;
       const point = cellToLatLng(neighbor);
       if (!Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
-      const alignedLng = alignTo(point[1], lng);
+      const alignedLng = alignLongitudeToReference(point[1], lng);
       latStep = Math.max(latStep, Math.abs(point[0] - lat));
       lngStep = Math.max(lngStep, Math.abs(alignedLng - lng));
       found = true;
@@ -465,19 +466,4 @@ function mercatorX(lngDeg: number): number {
 function mercatorY(latDeg: number): number {
   const lat = latDeg * Math.PI / 180;
   return Math.log(Math.tan(Math.PI / 4 + lat / 2));
-}
-
-/**
- * Shifts `lng` by 360° until it is within 180° of `refLng`.
- *
- * Purpose: A neighbor across the antimeridian must not look a whole world away.
- * When to use: `hexCenterSteps` only.
- * Expected outcome: The returned longitude differs from `lng` by a multiple of 360.
- * Exceptions: None.
- */
-function alignTo(lng: number, refLng: number): number {
-  let shifted = lng;
-  while (shifted - refLng > 180) shifted -= 360;
-  while (refLng - shifted > 180) shifted += 360;
-  return shifted;
 }

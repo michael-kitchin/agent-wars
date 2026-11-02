@@ -7,6 +7,8 @@
  * Exceptions: None. This module does not import the main-process logger.
  */
 
+import { hashStringToUint32 } from './stableHash';
+
 /**
  * The four choices for an observed match.
  *
@@ -204,26 +206,6 @@ export interface SelectAiOnlyBattleArgs {
 }
 
 /**
- * The FNV-1a offset used by tactical melee layout seeds.
- *
- * Purpose: Random battle choice uses the same constants without calling that function.
- * When to use: `fnv1a32`.
- * Expected outcome: 2166136261.
- * Exceptions: None.
- */
-const FNV_OFFSET = 2166136261;
-
-/**
- * The FNV-1a prime used by tactical melee layout seeds.
- *
- * Purpose: Random battle choice uses the same constants without calling that function.
- * When to use: `fnv1a32`.
- * Expected outcome: 16777619.
- * Exceptions: None.
- */
-const FNV_PRIME = 16777619;
-
-/**
  * How close two counts are, and how far apart they are.
  *
  * Purpose: Balanced wants the ratio nearest 1. Unbalanced wants the ratio farthest from 1. A tie uses the gap.
@@ -259,23 +241,6 @@ interface PairScore {
    * Exceptions: None.
    */
   readonly ownerKey: string;
-}
-
-/**
- * A 32-bit FNV-1a hash of one string.
- *
- * Purpose: Random picks a stable index without touching the combat RNG.
- * When to use: `selectAiOnlyBattle` when the mode is random.
- * Expected outcome: The same string always hashes to the same unsigned 32-bit number.
- * Exceptions: None.
- */
-function fnv1a32(text: string): number {
-  let hash = FNV_OFFSET >>> 0;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, FNV_PRIME);
-  }
-  return hash >>> 0;
 }
 
 /**
@@ -374,7 +339,7 @@ export function selectAiOnlyBattle(args: SelectAiOnlyBattleArgs): string | null 
   if (rows.length === 0) return null;
   if (args.mode === 'random') {
     const hexIds = rows.map((row) => row.h3Index).sort((left, right) => left.localeCompare(right));
-    const hash = fnv1a32(`${args.seed >>> 0}|${args.turnNumber}|${hexIds.join(',')}`);
+    const hash = hashStringToUint32(`${args.seed >>> 0}|${args.turnNumber}|${hexIds.join(',')}`);
     return hexIds[(hash >>> 0) % hexIds.length] ?? null;
   }
   let best: { readonly ratio: number; readonly gap: number; readonly h3Index: string } | null = null;

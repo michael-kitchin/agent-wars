@@ -25,7 +25,7 @@ import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
-import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
+import { applyTacticalMeleeAfterSupportOrders, tacticalCombatSeed } from './tacticalMeleeApply';
 import type { TacticalBeatOutcome } from './tacticalBeatOutcome';
 import {
   projectTacticalSnapshotAfterHumanMovementOrders,
@@ -529,12 +529,12 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       });
       return { success: false, reason: oppMarchFail };
     }
-    const seed =
-      (getGameSeed() +
-        cur.strategicTurnNumber * 7919 +
-        cur.tacticalTurnNumber * 104729 +
-        tacticalSubUnitLayoutSeed32(cur.subUnits)) >>>
-      0;
+    const seed = tacticalCombatSeed({
+      gameSeed: getGameSeed(),
+      strategicTurnNumber: cur.strategicTurnNumber,
+      tacticalTurnNumber: cur.tacticalTurnNumber,
+      layoutSubUnits: cur.subUnits,
+    });
     const rawNext = createCombatRng(seed);
     const afterOpponentEmbark = applyTacticalEmbarkPhaseOnBattle(cur, holds ? undefined : opp?.embarkOrders, party);
     const mergedAir = [...(args.airStrikes ?? []), ...(opp?.airStrikes ?? [])];

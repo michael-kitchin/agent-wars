@@ -16022,85 +16022,6 @@
     return { text: token, unitDisplayName: null };
   }
 
-  // src/shared/turnLossSections.ts
-  var NO_HEX_LINES = /* @__PURE__ */ new Map();
-  var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
-  var NO_BATTLE_LINES = /* @__PURE__ */ new Map();
-  var SECTION_HEADER_PREFIX = "## ";
-  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES, battleLinesByOwner = NO_BATTLE_LINES) {
-    const lines = [];
-    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner)) {
-      const header = headerFor(ownerId, viewerSeatId2, seats);
-      lines.push(
-        ...sectionLines(
-          summary,
-          ownerId,
-          header,
-          hexLinesByOwner.get(ownerId) ?? [],
-          strikeLinesByOwner.get(ownerId) ?? [],
-          battleLinesByOwner.get(ownerId) ?? ""
-        )
-      );
-    }
-    return lines;
-  }
-  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner) {
-    const ids = /* @__PURE__ */ new Set([
-      ...Object.keys(summary.byOwner),
-      ...hexLinesByOwner.keys(),
-      ...strikeLinesByOwner.keys(),
-      ...battleLinesByOwner.keys()
-    ]);
-    const ordered = [];
-    if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
-    const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
-    others.sort((left, right) => compareOwners(left, right, seats));
-    ordered.push(...others);
-    if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
-    return ordered;
-  }
-  function headerFor(ownerId, viewerSeatId2, seats) {
-    if (viewerSeatId2 !== null && ownerId === viewerSeatId2) return "Your Losses";
-    if (ownerId === NEUTRAL_OWNER_ID) return "Neutral Losses";
-    return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
-  }
-  function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
-    if (headerTitle === "Your Losses") return viewerSeatId2;
-    if (headerTitle === "Neutral Losses") return NEUTRAL_OWNER_ID;
-    if (!headerTitle.endsWith(" Losses")) return null;
-    const name = headerTitle.slice(0, -" Losses".length);
-    const matches = seats.filter((seat) => {
-      const home = seat.homeRegion.trim();
-      return (home.length > 0 ? home : seat.seatId) === name;
-    }).sort((left, right) => left.seatOrder - right.seatOrder);
-    return matches[0]?.seatId ?? null;
-  }
-  function lossSectionTitle(seat, ownerId) {
-    const name = seat?.homeRegion.trim() ?? "";
-    return `${name.length > 0 ? name : ownerId} Losses`;
-  }
-  function sectionLines(summary, ownerId, header, hexLines, strikeLines, battleLine) {
-    const buckets = summary.byOwner[ownerId];
-    const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
-    const battle = battleLine.trim();
-    if (causes.length === 0 && battle.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
-    return [
-      `${SECTION_HEADER_PREFIX}${header}`,
-      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
-      ...battle.length > 0 ? [battle] : [],
-      ...strikeLines,
-      ...hexLines
-    ];
-  }
-  function compareOwners(left, right, seats) {
-    const leftSeat = seats.find((row) => row.seatId === left);
-    const rightSeat = seats.find((row) => row.seatId === right);
-    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
-    if (leftSeat) return -1;
-    if (rightSeat) return 1;
-    return left.localeCompare(right, "en");
-  }
-
   // src/shared/shortSideName.ts
   var COMPASS_PREFIXES = [
     ["Northern", "N."],
@@ -16209,6 +16130,87 @@
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
   }
 
+  // src/shared/turnLossSections.ts
+  var NO_HEX_LINES = /* @__PURE__ */ new Map();
+  var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
+  var NO_BATTLE_LINES = /* @__PURE__ */ new Map();
+  var SECTION_HEADER_PREFIX = "## ";
+  function buildTurnLossSections(summary, viewerSeatId2, seats, hexLinesByOwner = NO_HEX_LINES, strikeLinesByOwner = NO_STRIKE_LINES, battleLinesByOwner = NO_BATTLE_LINES) {
+    const lines = [];
+    for (const ownerId of orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner)) {
+      const header = headerFor(ownerId, viewerSeatId2, seats);
+      lines.push(
+        ...sectionLines(
+          summary,
+          ownerId,
+          header,
+          hexLinesByOwner.get(ownerId) ?? [],
+          strikeLinesByOwner.get(ownerId) ?? [],
+          battleLinesByOwner.get(ownerId) ?? ""
+        )
+      );
+    }
+    return lines;
+  }
+  function orderedOwners(summary, viewerSeatId2, seats, hexLinesByOwner, strikeLinesByOwner, battleLinesByOwner) {
+    const ids = /* @__PURE__ */ new Set([
+      ...Object.keys(summary.byOwner),
+      ...hexLinesByOwner.keys(),
+      ...strikeLinesByOwner.keys(),
+      ...battleLinesByOwner.keys()
+    ]);
+    const ordered = [];
+    if (viewerSeatId2 !== null && ids.has(viewerSeatId2)) ordered.push(viewerSeatId2);
+    const others = [...ids].filter((ownerId) => ownerId !== viewerSeatId2 && ownerId !== NEUTRAL_OWNER_ID);
+    others.sort((left, right) => compareOwners(left, right, seats));
+    ordered.push(...others);
+    if (ids.has(NEUTRAL_OWNER_ID)) ordered.push(NEUTRAL_OWNER_ID);
+    return ordered;
+  }
+  function headerFor(ownerId, viewerSeatId2, seats) {
+    if (viewerSeatId2 !== null && ownerId === viewerSeatId2) return "Your Losses";
+    if (ownerId === NEUTRAL_OWNER_ID) return "Neutral Losses";
+    return lossSectionTitle(seats.find((row) => row.seatId === ownerId), ownerId);
+  }
+  function lossSectionOwnerId(headerTitle, viewerSeatId2, seats) {
+    if (headerTitle === "Your Losses") return viewerSeatId2;
+    if (headerTitle === "Neutral Losses") return NEUTRAL_OWNER_ID;
+    if (!headerTitle.endsWith(" Losses")) return null;
+    const name = headerTitle.slice(0, -" Losses".length);
+    const matches = sortSeatsByOrder(
+      seats.filter((seat) => {
+        const home = seat.homeRegion.trim();
+        return (home.length > 0 ? home : seat.seatId) === name;
+      })
+    );
+    return matches[0]?.seatId ?? null;
+  }
+  function lossSectionTitle(seat, ownerId) {
+    const name = seat?.homeRegion.trim() ?? "";
+    return `${name.length > 0 ? name : ownerId} Losses`;
+  }
+  function sectionLines(summary, ownerId, header, hexLines, strikeLines, battleLine) {
+    const buckets = summary.byOwner[ownerId];
+    const causes = buckets ? formatPlayerLossLinesMultiline(buckets) : [];
+    const battle = battleLine.trim();
+    if (causes.length === 0 && battle.length === 0 && hexLines.length === 0 && strikeLines.length === 0) return [];
+    return [
+      `${SECTION_HEADER_PREFIX}${header}`,
+      ...causes.map((cause) => `${cause.causeLabel}: ${cause.text}`),
+      ...battle.length > 0 ? [battle] : [],
+      ...strikeLines,
+      ...hexLines
+    ];
+  }
+  function compareOwners(left, right, seats) {
+    const leftSeat = seats.find((row) => row.seatId === left);
+    const rightSeat = seats.find((row) => row.seatId === right);
+    if (leftSeat && rightSeat) return leftSeat.seatOrder - rightSeat.seatOrder || left.localeCompare(right, "en");
+    if (leftSeat) return -1;
+    if (rightSeat) return 1;
+    return left.localeCompare(right, "en");
+  }
+
   // src/shared/turnReportLines.ts
   function hexChangeLinesByOwner(input) {
     const lostTo = /* @__PURE__ */ new Map();
@@ -16271,7 +16273,7 @@
     return home.length > 0 ? home : seat.seatId;
   }
   function seatForDisplayedName(seats, name, nameOf) {
-    const matches = seats.filter((seat) => nameOf(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    const matches = sortSeatsByOrder(seats.filter((seat) => nameOf(seat) === name));
     return matches[0] ?? null;
   }
   function markInBody(body, seats, sectionOwnerId) {
@@ -16328,7 +16330,9 @@
   }
   function seatForHexName(name, seats, used, preferredId) {
     if (name === "You" || name === "you" || name === "Neutral") return null;
-    const matches = seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name).sort((left, right) => left.seatOrder - right.seatOrder);
+    const matches = sortSeatsByOrder(
+      seats.filter((seat) => !used.has(seat.seatId) && hexNameForSeat(seat) === name)
+    );
     if (preferredId) {
       const preferred = matches.find((seat) => seat.seatId === preferredId);
       if (preferred) return preferred;
@@ -16518,8 +16522,16 @@
     ctx.restore();
   }
 
+  // src/shared/webMercator.ts
+  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
+  function alignLongitudeToReference(lng, refLng) {
+    let shifted = lng;
+    while (shifted - refLng > 180) shifted -= 360;
+    while (refLng - shifted > 180) shifted += 360;
+    return shifted;
+  }
+
   // src/shared/mapExtent.ts
-  var MERCATOR_LAT = 85.05112877980659;
   var extentReferenceLng = null;
   function setMapExtentReferenceLng(lng) {
     extentReferenceLng = lng;
@@ -16565,9 +16577,9 @@
     for (const h3 of h3Indexes) {
       const [, centerLng] = cellToLatLng(h3);
       for (const [lat, lng] of cellToBoundary(h3)) {
-        const alignedToCell = alignTo(lng, centerLng);
-        const aligned = alignTo(alignedToCell, interval.referenceLng);
-        const clampedLat = Math.max(-MERCATOR_LAT, Math.min(MERCATOR_LAT, lat));
+        const alignedToCell = alignLongitudeToReference(lng, centerLng);
+        const aligned = alignLongitudeToReference(alignedToCell, interval.referenceLng);
+        const clampedLat = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
         south = Math.min(south, clampedLat);
         north = Math.max(north, clampedLat);
         west = Math.min(west, aligned);
@@ -16575,20 +16587,13 @@
       }
     }
     if (south > north) {
-      south = -MERCATOR_LAT;
-      north = MERCATOR_LAT;
+      south = -WEB_MERCATOR_MAX_ABS_LAT;
+      north = WEB_MERCATOR_MAX_ABS_LAT;
     }
     return { south, west, north, east, referenceLng: interval.referenceLng };
   }
-  function alignTo(lng, refLng) {
-    let shifted = lng;
-    while (shifted - refLng > 180) shifted -= 360;
-    while (refLng - shifted > 180) shifted += 360;
-    return shifted;
-  }
 
   // src/renderer/map/hexGrid.ts
-  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
   function clampLatForWebMercatorDisplay(lat) {
     if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
     if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
@@ -16596,10 +16601,7 @@
   }
   function alignLngToReference(lng, refLng) {
     const reference = mapExtentReferenceLng() ?? refLng;
-    let l = lng;
-    while (l - reference > 180) l -= 360;
-    while (reference - l > 180) l += 360;
-    return l;
+    return alignLongitudeToReference(lng, reference);
   }
   function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
     const boundary = cellToBoundary(h3Index);
@@ -20730,7 +20732,9 @@ ${bonuses}`;
     return seat ? abbreviatedSideName(seat) : controllerId;
   }
   function homesInOrder(homeSeatIds, seats) {
-    return homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null).sort((left, right) => left.seatOrder - right.seatOrder);
+    return sortSeatsByOrder(
+      homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null)
+    );
   }
   function formatHexControlLabel(args) {
     const homes = homesInOrder(args.homeSeatIds, args.seats);
@@ -25396,11 +25400,7 @@ ${bonuses}`;
       const row = infra.get(hex.h3Index);
       const fortified = row?.fortifiedCount ?? 0;
       if (fortified <= 0) continue;
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(hex.h3Index);
-      const points = boundary.map(([lat, lng]) => {
-        const projected = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
-        return { x: projected.x, y: projected.y };
-      });
+      const points = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       const cornerCount = fortificationCornerCount(hex.h3Index);
       const ownershipVisible = isHexOwnershipVisibleToPerspective({
         h3Index: hex.h3Index,
@@ -27816,18 +27816,20 @@ ${bonuses}`;
     return getMainLeafletMap();
   }
 
-  // src/renderer/rendering/inspectionStatusIcons.ts
-  var iconImages = /* @__PURE__ */ new Map();
-  function projectedCentroid(pts) {
+  // src/shared/projectedRingCentroid.ts
+  function projectedRingCentroid(points) {
     let sx = 0;
     let sy = 0;
-    for (const point of pts) {
+    for (const point of points) {
       sx += point.x;
       sy += point.y;
     }
-    const count = pts.length;
+    const count = points.length;
     return { x: sx / count, y: sy / count };
   }
+
+  // src/renderer/rendering/inspectionStatusIcons.ts
+  var iconImages = /* @__PURE__ */ new Map();
   function iconImage(src, requestRedraw3) {
     if (iconImages.has(src)) return iconImages.get(src) ?? null;
     const img = new Image();
@@ -27905,7 +27907,7 @@ ${bonuses}`;
         if (icons.length === 0) continue;
         const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
         if (pts.length === 0) continue;
-        const centroid = projectedCentroid(pts);
+        const centroid = projectedRingCentroid(pts);
         const centerY = centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts));
         const iconPx = inspectionStatusIconDrawPx({
           productionSurface: surface === "button" ? "button" : "canvas",
@@ -28211,11 +28213,7 @@ ${bonuses}`;
     const perspective = ownershipPerspective(rendererSharedState.gameState.playerPerspective);
     const controlBordersShown2 = areControlBordersShown();
     for (const hx of rendererSharedState.gameState.hexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-      const pts = boundary.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
+      const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, L);
       const storedKind = hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains");
       const kind = strategicMapFillTerrainKind(storedKind, deps.getStrategicDominantTerrainKind(hx.h3Index, storedKind));
       const drawClosedPath = () => {
@@ -28362,11 +28360,7 @@ ${bonuses}`;
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
       });
       if (style.kind === "none") continue;
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-      const pts = boundary.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
+      const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
       const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
       drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
         controllerPlayerId: controlByHex.get(h3Index),
@@ -28406,11 +28400,7 @@ ${bonuses}`;
         const ap = rendererSharedState.terrainInfraStrategicAirport.has(hx.h3Index);
         const pt = rendererSharedState.terrainInfraStrategicSeaport.has(hx.h3Index);
         if (!ap && !pt) continue;
-        const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-        const pts = boundary.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-          return { x: p.x, y: p.y };
-        });
+        const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, L);
         drawTerrainInfrastructureGlyphs(ctx, pts, {
           showAirport: ap,
           showSeaport: pt,
@@ -29229,7 +29219,7 @@ ${bonuses}`;
   // src/shared/standings.ts
   var TOTAL_LABEL = "Model cost this match";
   function buildStandings(input) {
-    const first = input.seats.filter((seat) => seat.place === 1).sort((left, right) => left.seatOrder - right.seatOrder);
+    const first = sortSeatsByOrder(input.seats.filter((seat) => seat.place === 1));
     const rows = [...input.seats].sort((left, right) => (left.place ?? Number.MAX_SAFE_INTEGER) - (right.place ?? Number.MAX_SAFE_INTEGER) || left.seatOrder - right.seatOrder).map((seat) => standingsRow(seat, input, first.length === 1));
     const total = input.seats.reduce((sum, seat) => sum + (Number.isFinite(seat.costUsd) ? seat.costUsd : 0), 0);
     return {
@@ -29574,7 +29564,7 @@ ${bonuses}`;
         if (neighbor === h3Index) continue;
         const point = cellToLatLng(neighbor);
         if (!Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
-        const alignedLng = alignTo2(point[1], lng);
+        const alignedLng = alignLongitudeToReference(point[1], lng);
         latStep = Math.max(latStep, Math.abs(point[0] - lat));
         lngStep = Math.max(lngStep, Math.abs(alignedLng - lng));
         found = true;
@@ -29612,12 +29602,6 @@ ${bonuses}`;
   function mercatorY(latDeg) {
     const lat = latDeg * Math.PI / 180;
     return Math.log(Math.tan(Math.PI / 4 + lat / 2));
-  }
-  function alignTo2(lng, refLng) {
-    let shifted = lng;
-    while (shifted - refLng > 180) shifted -= 360;
-    while (refLng - shifted > 180) shifted += 360;
-    return shifted;
   }
 
   // src/renderer/map/unitFrameCamera.ts
@@ -29773,7 +29757,7 @@ ${bonuses}`;
     if (centers.length === 0) return null;
     const interval = longitudeIntervalFromCenters(centers.map((center) => center.lng));
     const reference = interval?.referenceLng ?? centers[0].lng;
-    const aligned = centers.map((center) => ({ ...center, lng: alignTo3(center.lng, reference) }));
+    const aligned = centers.map((center) => ({ ...center, lng: alignLongitudeToReference(center.lng, reference) }));
     const meanLat = aligned.reduce((sum, center) => sum + center.lat, 0) / aligned.length;
     const meanLng = aligned.reduce((sum, center) => sum + center.lng, 0) / aligned.length;
     let best = aligned[0];
@@ -29786,12 +29770,6 @@ ${bonuses}`;
       }
     }
     return best.index;
-  }
-  function alignTo3(lng, refLng) {
-    let shifted = lng;
-    while (shifted - refLng > 180) shifted -= 360;
-    while (refLng - shifted > 180) shifted += 360;
-    return shifted;
   }
   function fitMainMapToFrame(framed) {
     const map = getMainLeafletMap();
@@ -30076,7 +30054,7 @@ ${bonuses}`;
   // src/shared/topBarSides.ts
   var READY_CHECK_COLOR = "#86EFAC";
   function buildTopBarSideChips(seats, statuses, viewerSeatId2) {
-    const ordered = [...seats].sort((left, right) => left.seatOrder - right.seatOrder);
+    const ordered = sortSeatsByOrder(seats);
     const viewer = viewerSeatId2 === null ? void 0 : ordered.find((seat) => seat.seatId === viewerSeatId2);
     if (!viewer) {
       return { observing: true, lead: null, chips: ordered.map((seat) => chipFor(seat, statuses, seat.kind === AI_SEAT_KIND)) };
@@ -30444,10 +30422,10 @@ ${bonuses}`;
     if (icon) row.append(icon);
     return row;
   }
-  function attachUnitCountsTooltip(name, seatId, state) {
+  function attachUnitCountsTooltip(chip, seatId, state) {
     const counts = countSideUnitsByType(state.units, seatId, unitCostFor);
     const seats = state.seats ?? [];
-    setRichControlTooltip(name, formatSideUnitCountsText(counts), () => buildSideUnitCountsTooltip(counts, seatId, seats));
+    setRichControlTooltip(chip, formatSideUnitCountsText(counts), () => buildSideUnitCountsTooltip(counts, seatId, seats));
   }
   function sideName(id, label) {
     const name = document.createElement("span");
@@ -34238,15 +34216,9 @@ ${bonuses}`;
   }
 
   // src/shared/pathPolylineInterp.ts
-  function alignLngToRef(lng, refLng) {
-    let l = lng;
-    while (l - refLng > 180) l -= 360;
-    while (refLng - l > 180) l += 360;
-    return l;
-  }
   function segmentLengthMetersApprox(a, b, refLng) {
     const dLatM = (b.lat - a.lat) * 111320;
-    const dLngRad = (alignLngToRef(b.lng, refLng) - alignLngToRef(a.lng, refLng)) * Math.PI / 180;
+    const dLngRad = (alignLongitudeToReference(b.lng, refLng) - alignLongitudeToReference(a.lng, refLng)) * Math.PI / 180;
     const dLngM = dLngRad * 6371e3 * Math.cos(a.lat * Math.PI / 180);
     return Math.hypot(dLatM, dLngM);
   }
@@ -34274,8 +34246,8 @@ ${bonuses}`;
       const r = len <= 0 ? 1 : Math.min(1, target / len);
       const a = coords[i - 1];
       const b = coords[i];
-      const lngA = alignLngToRef(a.lng, refLng);
-      const lngB = alignLngToRef(b.lng, refLng);
+      const lngA = alignLongitudeToReference(a.lng, refLng);
+      const lngB = alignLongitudeToReference(b.lng, refLng);
       const lat = a.lat + r * (b.lat - a.lat);
       const lngAligned = lngA + r * (lngB - lngA);
       let lng = lngAligned;
@@ -35017,16 +34989,6 @@ ${bonuses}`;
 
   // src/renderer/rendering/tacticalCityOverlays.ts
   var INSPECTION_HEX_CODE_FONT_SCALE = 0.75;
-  function projectedCentroid2(pts) {
-    let sx = 0;
-    let sy = 0;
-    for (const p of pts) {
-      sx += p.x;
-      sy += p.y;
-    }
-    const n = pts.length;
-    return { x: sx / n, y: sy / n };
-  }
   function scheduleCityStyleLabelJob(labelJobs, centerPx, span, text, zoomStrokeScale) {
     const fontPx = Math.max(14, Math.min(23, span * 0.165));
     const labelLiftPx = (span * TACTICAL_MAP_OVERLAY_CITY_LABEL_UPWARD_OFFSET_SPAN_FRAC + TACTICAL_MAP_OVERLAY_CITY_LABEL_UPWARD_EXTRA_PX * zoomStrokeScale) * TACTICAL_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE;
@@ -35107,7 +35069,7 @@ ${bonuses}`;
           const pts = projectHexBoundaryToContainerPoints(child, map, L);
           if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
           const span = spanForProjectedHex(pts);
-          const centerPx = projectedCentroid2(pts);
+          const centerPx = projectedRingCentroid(pts);
           const cityLabel = rendererSharedState.tacticalCityOverlayLabelByH3.get(child);
           const hasAirportOrSeaport = tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
           if (cityLabel && !hasAirportOrSeaport) {
@@ -35144,7 +35106,7 @@ ${bonuses}`;
           const pts = projectHexBoundaryToContainerPoints(child, map, L);
           if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
           const span = spanForProjectedHex(pts);
-          const centerPx = projectedCentroid2(pts);
+          const centerPx = projectedRingCentroid(pts);
           const cityLabel = rendererSharedState.tacticalCityOverlayLabelByH3.get(child);
           if (cityLabel) {
             const hasAirportOrSeaport = rendererSharedState.terrainInfraTacticalAirport.has(child) || rendererSharedState.terrainInfraTacticalSeaport.has(child);
@@ -35195,7 +35157,7 @@ ${bonuses}`;
         if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
         const pts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
         const span = spanForProjectedHex(pts);
-        const centerPx = projectedCentroid2(pts);
+        const centerPx = projectedRingCentroid(pts);
         const code = getStrategicHexCode(parent.h3Index);
         if (!code) continue;
         scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);

@@ -14,7 +14,7 @@ import { opposingPartyIdOf } from './opposingParty';
 import { tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
-import { tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
+import { tacticalCombatSeed } from './tacticalMeleeApply';
 import { projectTacticalSnapshotAfterOpponentMovementOrders } from './tacticalMovementApply';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
@@ -52,7 +52,11 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
   const party = opposingPartyIdOf(battle);
   const holds = isNeutralOwnerId(party);
   const afterEmbark = applyTacticalEmbarkPhaseOnBattle(battle, holds ? undefined : opts.embarkOrders, party);
-  const seed = (getGameSeed() + battle.strategicTurnNumber * 7919 + battle.tacticalTurnNumber * 104729) >>> 0;
+  const seed = tacticalCombatSeed({
+    gameSeed: getGameSeed(),
+    strategicTurnNumber: battle.strategicTurnNumber,
+    tacticalTurnNumber: battle.tacticalTurnNumber,
+  });
   const next = createCombatRng(seed);
   const airRanged = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     afterEmbark,
@@ -112,12 +116,12 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     ferryCount: opts.ferryOrders?.length ?? 0,
     embarkCount: opts.embarkOrders?.length ?? 0,
   });
-  const seed =
-    (getGameSeed() +
-      battle.strategicTurnNumber * 7919 +
-      battle.tacticalTurnNumber * 104729 +
-      tacticalSubUnitLayoutSeed32(battle.subUnits)) >>>
-    0;
+  const seed = tacticalCombatSeed({
+    gameSeed: getGameSeed(),
+    strategicTurnNumber: battle.strategicTurnNumber,
+    tacticalTurnNumber: battle.tacticalTurnNumber,
+    layoutSubUnits: battle.subUnits,
+  });
   const next = createCombatRng(seed);
   const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     battle,

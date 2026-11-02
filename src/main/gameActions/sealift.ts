@@ -1,6 +1,7 @@
 import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetAll, dbGetOne, dbRun, isDbReady, listUnitsForSnapshot } from '../gameDb';
+import { readHexEmbarkFacts } from '../hexEmbarkFacts';
 import { describeDestroyedBattleParents } from '../tacticalBattle/destroyedBattleParents';
 import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
 import type { CombatUnit } from '../combatUnitTypes';
@@ -217,31 +218,14 @@ function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
  * Exceptions: None.
  */
 function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
-  const terrainRow = dbGetOne<{ terrain: string; terrainKind: string | null }>(
-    'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
-    [h3Index]
-  );
-  if (!terrainRow) return null;
-  const infra = dbGetOne<{ seaportCount: number }>(
-    'SELECT seaport_count AS seaportCount FROM res_s_infrastructure WHERE h3_index = ?',
-    [h3Index]
-  );
-  const control = dbGetOne<{ controllerPlayerId: string | null }>(
-    'SELECT controller_player_id AS controllerPlayerId FROM res_s_control WHERE h3_index = ?',
-    [h3Index]
-  );
+  const facts = readHexEmbarkFacts(h3Index);
+  if (!facts) return null;
   const normalizedMovementTerrain = normalizeMovementTerrain({
     h3Index,
-    terrain: terrainRow.terrain,
-    terrainKind: terrainRow.terrainKind ?? undefined,
+    terrain: facts.nativeTerrain,
+    terrainKind: facts.terrainKind,
   });
-  return {
-    normalizedMovementTerrain,
-    nativeTerrain: terrainRow.terrain,
-    terrainKind: terrainRow.terrainKind ?? undefined,
-    seaportCount: infra?.seaportCount ?? 0,
-    controllerPlayerId: control?.controllerPlayerId ?? null,
-  };
+  return { normalizedMovementTerrain, ...facts };
 }
 
 /**

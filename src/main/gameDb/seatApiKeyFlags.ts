@@ -9,6 +9,7 @@
 
 import { logDebug, logError, logTrace } from '../logger';
 import { getOne, run } from './dbConnection';
+import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { SEAT_API_KEY_FLAGS_CONFIG_KEY } from './machineLocalConfigKeys';
 
 /**
@@ -31,10 +32,10 @@ export { SEAT_API_KEY_FLAGS_CONFIG_KEY };
  */
 export function readSeatApiKeyFlagMap(): Readonly<Record<string, boolean>> {
   logTrace('seatApiKeyFlags readSeatApiKeyFlagMap');
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [SEAT_API_KEY_FLAGS_CONFIG_KEY]);
-  if (typeof row?.value !== 'string' || row.value.length === 0) return {};
+  const stored = selectGameConfigValue({ getOne }, SEAT_API_KEY_FLAGS_CONFIG_KEY);
+  if (typeof stored !== 'string' || stored.length === 0) return {};
   try {
-    const parsed = JSON.parse(row.value) as unknown;
+    const parsed = JSON.parse(stored) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       logError('seatApiKeyFlags readSeatApiKeyFlagMap: stored flags are not an object');
       return {};
@@ -58,10 +59,7 @@ export function readSeatApiKeyFlagMap(): Readonly<Record<string, boolean>> {
  */
 export function writeSeatApiKeyFlags(flags: Readonly<Record<string, boolean>>): void {
   logDebug('seatApiKeyFlags writeSeatApiKeyFlags', { count: Object.keys(flags).length, flagsKey: SEAT_API_KEY_FLAGS_CONFIG_KEY });
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [
-    SEAT_API_KEY_FLAGS_CONFIG_KEY,
-    JSON.stringify(flags),
-  ]);
+  upsertGameConfigValue({ run }, SEAT_API_KEY_FLAGS_CONFIG_KEY, JSON.stringify(flags));
 }
 
 /**

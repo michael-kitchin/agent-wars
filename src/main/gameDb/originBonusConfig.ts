@@ -8,6 +8,7 @@ import { ORIGIN_BONUS_OFF } from '../../shared/originBonusRules';
 import { parseStartMonth } from '../../shared/weatherBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 import type { GameConfigKvDbOps } from './gameConfigKv';
+import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 
 /**
  * `game_config` key for the origin bonus flag.
@@ -113,16 +114,15 @@ export function persistOriginBonusSettings(
 ): void {
   logDebug('gameDb persistOriginBonusSettings', { ...settings });
   if (ops.hasDb && !ops.hasDb()) return;
-  const upsert = 'INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)';
-  ops.run(upsert, [ORIGIN_BONUS_CONFIG_KEY, settings.originBonusEnabled ? '1' : '0']);
-  ops.run(upsert, [TERRAIN_BONUS_CONFIG_KEY, settings.terrainBonusEnabled ? '1' : '0']);
-  ops.run(upsert, [WEATHER_BONUS_CONFIG_KEY, settings.weatherBonusEnabled === true ? '1' : '0']);
-  ops.run(upsert, [ORIGIN_BONUS_LEVEL_CONFIG_KEY, settings.originBonusLevel ?? 'low']);
-  ops.run(upsert, [TERRAIN_BONUS_LEVEL_CONFIG_KEY, settings.terrainBonusLevel ?? 'low']);
-  ops.run(upsert, [WEATHER_BONUS_LEVEL_CONFIG_KEY, settings.weatherBonusLevel ?? 'low']);
-  ops.run(upsert, [TECH_BONUS_CONFIG_KEY, settings.techBonusEnabled === true ? '1' : '0']);
-  ops.run(upsert, [TECH_BONUS_LEVEL_CONFIG_KEY, settings.techBonusLevel ?? 'low']);
-  ops.run(upsert, [START_MONTH_CONFIG_KEY, String(parseStartMonth(settings.startMonth))]);
+  upsertGameConfigValue(ops, ORIGIN_BONUS_CONFIG_KEY, settings.originBonusEnabled ? '1' : '0');
+  upsertGameConfigValue(ops, TERRAIN_BONUS_CONFIG_KEY, settings.terrainBonusEnabled ? '1' : '0');
+  upsertGameConfigValue(ops, WEATHER_BONUS_CONFIG_KEY, settings.weatherBonusEnabled === true ? '1' : '0');
+  upsertGameConfigValue(ops, ORIGIN_BONUS_LEVEL_CONFIG_KEY, settings.originBonusLevel ?? 'low');
+  upsertGameConfigValue(ops, TERRAIN_BONUS_LEVEL_CONFIG_KEY, settings.terrainBonusLevel ?? 'low');
+  upsertGameConfigValue(ops, WEATHER_BONUS_LEVEL_CONFIG_KEY, settings.weatherBonusLevel ?? 'low');
+  upsertGameConfigValue(ops, TECH_BONUS_CONFIG_KEY, settings.techBonusEnabled === true ? '1' : '0');
+  upsertGameConfigValue(ops, TECH_BONUS_LEVEL_CONFIG_KEY, settings.techBonusLevel ?? 'low');
+  upsertGameConfigValue(ops, START_MONTH_CONFIG_KEY, String(parseStartMonth(settings.startMonth)));
 }
 
 /**
@@ -136,8 +136,7 @@ export function persistOriginBonusSettings(
 export function readPersistedOriginBonusSettings(ops: Pick<GameConfigKvDbOps, 'getOne' | 'hasDb'>): OriginBonusSettings {
   logTrace('gameDb readPersistedOriginBonusSettings');
   if (ops.hasDb && !ops.hasDb()) return ORIGIN_BONUS_OFF;
-  const valueOf = (key: string): string | undefined =>
-    ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key])?.value;
+  const valueOf = (key: string): string | undefined => selectGameConfigValue(ops, key);
   const levelOf = (key: string): ActiveBonusLevel => parseActiveBonusLevel(valueOf(key));
   const originBonusEnabled = valueOf(ORIGIN_BONUS_CONFIG_KEY) === '1';
   const terrainBonusEnabled = valueOf(TERRAIN_BONUS_CONFIG_KEY) === '1';

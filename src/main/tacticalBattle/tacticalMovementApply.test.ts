@@ -9,6 +9,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
+  withTacticalMarchStop,
 } from './tacticalMovementApply';
 import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -45,6 +46,24 @@ function coastalFootprintTerrain(ringCells: readonly string[]): Pick<
     tacticalTerrainKindByH3,
   };
 }
+
+test('withTacticalMarchStop clears a carrier only when embarked land moves to a new cell', () => {
+  const embarked = {
+    id: 'land',
+    parentUnitId: 'parent',
+    player: 'opponent' as const,
+    unitType: 'infantry' as const,
+    h3Index: 'cell-a',
+    displayName: 'I Infantry (01)',
+    embarkedOnSubUnitId: 'nav',
+  };
+  const moved = withTacticalMarchStop(embarked, 'cell-b');
+  assert.equal(moved.h3Index, 'cell-b');
+  assert.equal(moved.embarkedOnSubUnitId, undefined);
+  const stayed = withTacticalMarchStop(embarked, 'cell-a');
+  assert.equal(stayed.h3Index, 'cell-a');
+  assert.equal(stayed.embarkedOnSubUnitId, 'nav');
+});
 
 test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => {
   const strategic = tacticalParentCell(10, 20);

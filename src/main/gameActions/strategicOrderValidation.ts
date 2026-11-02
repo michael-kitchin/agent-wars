@@ -11,8 +11,8 @@ import type { OwnerId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { getRange } from '../combatConstants';
-import { dbGetOne, getGameStateForPlayer, getHexController, getMapHexSet, getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
-import { logDebug, logError, logTrace } from '../logger';
+import { dbGetOne, getGameStateForPlayer, getMapHexSet, isDbReady } from '../gameDb';
+import { logDebug, logError } from '../logger';
 import { isLandSeaportSpawnHex, normalizeMovementTerrain } from '../movementTerrain';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
@@ -26,6 +26,7 @@ import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import { MISSILES_CANNOT_FIRE_IN_BATTLE_REASON, NO_SELECTED_MISSILES_REASON } from '../../shared/missileRules';
 import { FERRY_REASON_ALREADY_BASED, validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import { isEnemyFortifiedStrategicHex } from './fortificationCombatLedger';
 import { validateMissileLaunchOrder } from './missileValidation';
 import type { SubmitOrdersResult } from './gameActionsTypes';
 import { isWithinGridRangeSafe } from './gridRange';
@@ -232,23 +233,6 @@ export function validateOrder(
 }
 
 /**
- * Whether an enemy holds a fortification on the hex.
- *
- * Purpose: Ranged fire may target an empty fortified hex.
- * When to use: After the target has no enemy units.
- * Expected outcome: True when the controller is someone else and at least one cell is fortified.
- * Exceptions: None.
- */
-function isEnemyFortifiedHex(h3Index: string, attackerPlayer: string): boolean {
-  const controller = getHexController(h3Index);
-  const fortified = controller !== null
-    && controller !== attackerPlayer
-    && getStrategicInfrastructureForHex(h3Index).fortifiedCount > 0;
-  logTrace('strategicOrderValidation isEnemyFortifiedHex', { h3Index, attackerPlayer, controller, fortified });
-  return fortified;
-}
-
-/**
  * Checks whether one unit may make a strategic ranged attack against a hex.
  *
  * Purpose: Single-unit ranged gate shared by group targeting and submit-orders.
@@ -280,7 +264,7 @@ export function validateRangedAttack(
   const withinRange = isWithinGridRangeSafe(unit.h3_index, targetH3Index, range, 'validateRangedAttack');
   if (!withinRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, range) };
 
-  if (!hasEnemyUnitsAtHex(targetH3Index, unit.player) && !isEnemyFortifiedHex(targetH3Index, unit.player)) {
+  if (!hasEnemyUnitsAtHex(targetH3Index, unit.player) && !isEnemyFortifiedStrategicHex(targetH3Index, unit.player)) {
     return { valid: false, reason: 'Target hex has no enemy units' };
   }
 
