@@ -22,21 +22,23 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 
 | # | Block | Nature |
 | --- | --- | --- |
-| 1 | Role and clock line | prose, one line |
-| 2 | Goal statement | prose |
-| 3 | Situational directives (scouting, previous-consult tool-budget warning) | prose, gated |
-| 4 | Coordinate preamble | prose, two paragraphs |
-| 5 | Combat and attack rules | prose |
+| 1 | `# Your Command` — role and clock line | prose, one line |
+| 2 | Goal statement, still under `# Your Command` | prose |
+| 3 | Situational directives (scouting, previous-consult tool-budget warning), still under `# Your Command` | prose, gated |
+| 4 | `# Coordinates` | prose |
+| 5 | `# Combat and Movement Rules` | prose |
 | 6 | `# Commander's Briefing` and its subsections | briefing body |
 | 7 | `# Scenario Objective (Required)` | gated section |
-| 8 | `Strategic context:` coaching block | prose bullets |
+| 8 | `# Strategic Context`, or `# Battle Context` in a battle | prose bullets |
 | 9 | `# Air Operations Status` | gated section |
 | 10 | `# Missile Forces` | gated section, strategic only |
 | 11 | `# Naval Transport Status` | gated section |
-| 12 | `# Available Tools` | section with numbered tool lines and guidance bullets |
-| 13 | Observed enemy roster line | prose, one line |
-| 14 | Response envelope contract | prose |
-| 15 | Response envelope example | compact JSON, no fence |
+| 12 | `# Available Tools`, then `## How to Use These Tools Effectively` | section with numbered tool lines and guidance bullets |
+| 13 | `# Unit Roster` | prose roster lines |
+| 14 | `# Response Format` | prose |
+| 15 | `## Example Response` | compact JSON, no fence |
+
+Headings nest: the first is H1, and no heading is more than one level deeper than the one before it. Section builders keep the level they use when they stand alone. `formatBriefing` passes production, memory, and standing-order text through `shiftMarkdownHeadings(markdown, 1)`, so those H1 sections become H2 inside the briefing and their H2 subsections become H3. The operational map is H2 in both briefings. `## Sides` stays H2 when a briefing is present. The no-briefing prompt passes that block through `shiftMarkdownHeadings(sidesBlock, -1)`, so it is H1 beside the other standalone sections. A line of three backticks toggles a fence, and headings inside a fence are not shifted.
 
 Ordering rules that must not be relaxed:
 
@@ -61,19 +63,19 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | Narrative paragraph | always inside the briefing | always inside the briefing | never empty; own count 0 omits the scout clause and adds the still-in-match sentence ([`strategic-prompt.md`](strategic-prompt.md)) |
 | `## Unit Status and Threats` | always inside the briefing | always inside the briefing | header row plus `(No AI units)` |
 | Distance-basis caveat line | fog off on the strategic map: hop-count honesty line; fog on: path-vs-Best-Options line (after the staleness sentence) | never | omit |
-| `## Attention Flags` | always inside the briefing | always inside the briefing | `None.` |
-| `# Operational Map` | always inside the briefing | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
+| `## Attention Flags` | always inside the briefing. Five unit bullets, then at most one production bullet from `findIdleProductionHexes` when production is on and a hex is idle. The production bullet replaces `None.` when it is the only bullet and does not count against the five-bullet cap. It names at most `PRODUCTION_ATTENTION_LISTED_HEXES` (6) hexes. | always inside the briefing, without the production bullet | `None.` |
+| `## Operational Map` | always inside the briefing | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
 | `### Best Options This Turn` | when at least one option row exists | when at least one option row exists | omit heading and table |
 | `## Supplemental Hex Intelligence` | when at least one hex assessment exists | never | omit |
 | `## Recent Turn Notes` | when at least one of the previous three periods has a message, strategy, or loss | when the same condition holds for this battle | omit |
-| `# Production Status` | when production tools are enabled | never | omit |
+| `## Production Status` | when production tools are enabled. H1 when the briefing is absent | never | omit |
 | `## Controlled Hex Queues` | when production is present and at least one controlled cell has an editable queue | never | replace the table with `No currently controlled hexes with editable production queues.` |
-| `# Your Strategic Memory` | when memory tools are enabled | never | omit |
-| `# Standing Order Status` | when standing-order tools are enabled | never | omit |
+| `## Your Strategic Memory` | when memory tools are enabled. H1 when the briefing is absent | never | omit |
+| `## Standing Order Status` | when standing-order tools are enabled. H1 when the briefing is absent | never | omit |
 | `## Units Without Standing Orders` | when the standing-order block is present | never | one row of `—` |
 | `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and the empty-list sentence that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now |
 | `# Scenario Objective (Required)` | when `scenarioId === 'region_vs_region'` | never | omit |
-| `Strategic context:` block | always | always (tactical variant) | n/a |
+| `# Strategic Context` | always | `# Battle Context` | n/a |
 | `# Air Operations Status` | when the opponent has at least one air unit | when the opponent has at least one air sub-unit in this battle | omit the section |
 | `# Missile Forces` | when the opponent has at least one missile | never | omit the section |
 | `# Mercenaries` | when the snapshot has an economy and production is on, or the seat has a mercenary | never | omit. Production off keeps the upkeep-only form when the seat has a mercenary |
@@ -195,22 +197,22 @@ Every item marked `required` in [`information-decision-model.md`](information-de
 | `SUBUNIT_IDENTITY`, `BATTLE_FRAME` | Role and clock line; coordinate preamble |
 | `TURN_CLOCK` | Role and clock line |
 | `FOG_MODE` | Narrative paragraph |
-| `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES` | `# Operational Map` |
+| `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES` | `## Operational Map` |
 | `BEST_OPTIONS_ROWS`, `RANGED_LEGAL_TARGETS`, `LEGAL_DEST_OCCUPANCY` | `### Best Options This Turn` plus the options bullet in `# Available Tools` |
 | `ENEMY_ROSTER_OBSERVED` | Observed enemy roster line and `## Unit Status and Threats` |
 | `ATTENTION_FLAGS` | `## Attention Flags` |
 | `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER` | Combat and attack rules |
 | `MOVE_BUDGET`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION` | Combat and attack rules, and the envelope movement clause |
-| `HOLD_FIRE_SEMANTICS`, `ORDER_TYPE_LEGALITY`, `STANDING_ORDER_STATE`, `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION` | `# Standing Order Status` and the standing-order guidance bullet |
+| `HOLD_FIRE_SEMANTICS`, `ORDER_TYPE_LEGALITY`, `STANDING_ORDER_STATE`, `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION` | `## Standing Order Status` and the standing-order guidance bullet |
 | `MARCH_CURRENT_HEX_RULE` | The standing-order guidance bullet and the invalid-output clause of the response envelope |
 | `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS` | `# Air Operations Status` |
 | `EMBARK_STATE`, `EMBARK_HEX`, `EMBARK_LEGALITY`, `NAVAL_MOVEMENT_DOMAIN` | `# Naval Transport Status` and the combat rules paragraph |
-| `PRODUCTION_*` | `# Production Status` |
-| `MEMORY_*` | `# Your Strategic Memory` |
+| `PRODUCTION_*` | `## Production Status` |
+| `MEMORY_*` | `## Your Strategic Memory` |
 | `CALLBACK_ACTIVE_LIST` | `## Active Callbacks` |
 | `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`, `CALLBACK_TACTICAL_SCOPE` | Response envelope contract |
-| `SCENARIO_ID`, `WIN_CONDITIONS`, `HOME_REGION_*`, `HOME_CONTROL_PROGRESS` | `# Scenario Objective (Required)` and the `Strategic context:` block |
-| `EXPLORED_CONTROLLED_PROGRESS` | `Strategic context:` block |
+| `SCENARIO_ID`, `WIN_CONDITIONS`, `HOME_REGION_*`, `HOME_CONTROL_PROGRESS` | `# Scenario Objective (Required)` and `# Strategic Context` |
+| `EXPLORED_CONTROLLED_PROGRESS` | `# Strategic Context` |
 | `RECENT_TURN_NOTES` | `## Recent Turn Notes` |
 | `TERRAIN_KIND_NOTES` | `## Supplemental Hex Intelligence` |
 | `STANDING_ORDERS_INERT_IN_BATTLE` | Tactical guidance bullets |

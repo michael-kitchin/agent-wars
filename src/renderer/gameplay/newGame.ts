@@ -30,6 +30,7 @@ import { bindNewGameSides, loadCommanderKeyMemory, newGameHasAnyModel, readNewGa
 import { confirmStartWithNoModels } from './startConfirmDialog';
 import { closeCommanderPopover } from '../openRouter/commanderPopover';
 import { closeNewGameOptionsPopover, wireNewGameOptionsPopover } from './newGameOptionsPopover';
+import { readHumanNicknameForStart, wireHumanNicknameField } from './humanNicknameField';
 import { showNewGameBanner } from './newGameBanner';
 import { hideGameOverStandings } from './gameOverStandings';
 import { clearObserveAfterKnockout } from './observeIntent';
@@ -309,6 +310,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   bindNewGameSides();
   registerGameSizeSelect();
   wireNewGameOptionsPopover();
+  wireHumanNicknameField();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
     if (!window.gameApi?.newGame) return;
@@ -327,6 +329,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
     stopMatchWaitingUnderNewGame();
     const cameraHold = holdNewGameMapPreviewCamera();
     try {
+      const humanNickname = readHumanNicknameForStart();
       const state = (await window.gameApi.newGame({
         ...readNewGameOptionChoices(),
         startMonth: readNewGameStartMonth(),
@@ -337,6 +340,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         aiOnlyBattles: seatsStart.aiOnlyBattles,
         sightCues: seatsStart.sightCues,
         gameSize: readSelectedGameSizeFromDocument(),
+        ...(humanNickname === undefined ? {} : { humanNickname }),
       })) as GameStateSnapshot;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       installRendererGameMap(state);

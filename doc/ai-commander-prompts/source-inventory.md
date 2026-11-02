@@ -15,7 +15,7 @@ Every row cites a symbol or file so a later reader can re-verify. Paths are repo
 
 ## 2. Strategic section catalog
 
-Assembled by `buildSystemPromptForTools` in `src/main/openRouter/openRouterBuildSystemPrompt.ts`. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openRouter/promptSpec/gameRuleText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
+Assembled by `buildSystemPromptForTools` in `src/main/openRouter/openRouterBuildSystemPrompt.ts`. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openRouter/promptSpec/gameRuleText.ts`. Weather and terrain cover are `buildWeatherRule` and `buildTerrainCoverRule` in `src/main/openRouter/promptSpec/gameRuleEnvironmentText.ts`. The production submit clause is `buildProductionSubmitClause` in `src/main/openRouter/promptSpec/productionSubmitText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
 
 ### 2.1 Preamble (no headings)
 
@@ -51,17 +51,17 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | (fog intel-staleness + path-distance lines) | `buildIntelStalenessRule` then `FOG_PATH_DISTANCE_BRIEFING_LINE` | fog on, on the strategic map | omitted when fog is off or in battle |
 | (unit status table) | `buildUnitStatusTable` | always; a `Bonus` column follows `Hex` only when the assessments carry `originBonusHere` (origin bonus on) | header plus `(No AI units)` |
 | `## Attention Flags` | `formatBriefing` | always | `None.` |
-| `# Operational Map` | `buildStrategicOperationalMapSectionMarkdown` | `operational.trim().length > 0` | heading plus `(No units — map not rendered.)` when neither side has units |
+| `## Operational Map` | `buildStrategicOperationalMapSectionMarkdown` | `operational.trim().length > 0` | heading plus `(No units — map not rendered.)` when neither side has units |
 | `### Best Options This Turn` | `formatBestOptionsThisTurnSubsection` | at least one aggregated row | heading and table omitted |
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 3 turns has a message, strategy, or loss | omitted |
-| `# Production Status` | `buildProductionBriefingBlock` | `flags.productionEnabled` | omitted |
+| `## Production Status` | `buildProductionBriefingBlock`, then `shiftMarkdownHeadings` inside the briefing | `flags.productionEnabled` | omitted |
 | `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
-| `# Your Strategic Memory` | `getInjectionText` (`memory.ts`) | `flags.memoryEnabled` | omitted |
+| `## Your Strategic Memory` | `getInjectionText` (`memory.ts`), then `shiftMarkdownHeadings` inside the briefing | `flags.memoryEnabled` | omitted |
 | `## Persistent (Active Strategic Context)` | same | whenever the memory block is present | one row of `—` |
 | `## Reminders Triggered This Turn` | same | whenever the memory block is present | one row of `—` |
-| `# Standing Order Status` | `getInjectionText` (`standingOrdersInjectionText.ts`) | `flags.ordersEnabled`; returns `''` in tactical | omitted |
+| `## Standing Order Status` | `getInjectionText` (`standingOrdersInjectionText.ts`), then `shiftMarkdownHeadings` inside the briefing | `flags.ordersEnabled`; returns `''` in tactical | omitted |
 | `## Units Without Standing Orders` | same | whenever the standing-order block is present | one row of `—` |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | one `—` row plus the empty-list sentence |
 
@@ -84,7 +84,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 | Heading | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
 | `# Scenario Objective (Required)` | `buildRegionVsRegionScenarioObjectiveBlock` | `state.scenarioId === 'region_vs_region'` and not tactical | omitted |
-| `Strategic context:` block | `buildContextCoaching` plus progress lines | always (strategic) | n/a |
+| `# Strategic Context` | `buildContextCoaching` plus progress lines | always (strategic) | n/a |
 | `# Air Operations Status` | `buildAirOperationsBriefingBlock` | opponent has at least one air unit | **section omitted** (empty string, no dash row) |
 | `# Missile Forces` | `buildMissileForcesBriefingBlock` | strategic, and the opponent has at least one missile | **section omitted** in a battle and when the roster has no missile |
 | `# Naval Transport Status` | `buildSealiftBriefingBlock` | opponent has at least one naval unit | **section omitted** |
@@ -95,7 +95,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 
 When a strategic briefing is present, planning or assessment tools are on, and standing-order tools are on, the intro says that status is already in the briefing and limits `query_orders` to a rare detail. Memory and production, when those tools are on, are named in the following selective-tools sentence.
 
-`Strategic context:` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`, `Explored:` land-hex progress, `Controlled:` land-hex progress, then `regionHomeProgressAndHexBullets` when `homePartitions` is non-null. There is **no** unconditional enemy-intent opening sentence.
+`# Strategic Context` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`, `Explored:` land-hex progress, `Controlled:` land-hex progress, then `regionHomeProgressAndHexBullets` when `homePartitions` is non-null. There is **no** unconditional enemy-intent opening sentence.
 
 Air Operations columns (strategic): `Unit ID` | `Base Hex` | `Base Intact` | `Base Controlled` | `Enemy Unit Targets` | `Strikeable Urban` | `Strikeable Airports` | `Strikeable Seaports` | `Ferry Destinations`. Missile Forces, when present, starts with `missileForcesRulesLine`, then `| Unit ID | Hex |`, then either the target intro and `| Target | Owner | City Cells | Airports | Seaports | Enemy Air Based | In Range Of |` (at most `MISSILE_BRIEFING_TARGET_LIMIT`, 8) or `NO_MISSILE_TARGETS_LINE`. Naval Transport columns: `Unit ID` | `Hex` | `Your control` | `Seaport Here` | `Aboard` | `Capacity Used` | `Nearest Embark Hex`. Embark prose states coastal or land seaport without control, or a water seaport the opponent controls.
 
@@ -103,7 +103,7 @@ When a briefing override is present, `buildSystemPromptForTools` still computes 
 
 `### Unit Roster` exists in neither code nor dumps. It must not be reintroduced.
 
-### 2.4 Coaching bullets (`HOW TO USE THESE TOOLS EFFECTIVELY`)
+### 2.4 Coaching bullets (`## How to Use These Tools Effectively`)
 
 After the numbered tool lines, `buildToolUsageGuidance` emits mechanic bullets (briefing-already-contains, tool-call batching, memory tiers, production query/set), then `buildStrategicCoachingBullets`. Membership is gated by `CoachingGates`. Tempo wording tells the model to copy listed Best Options rows and not invent a target, and does **not** contain `damage given up for free`.
 
@@ -119,7 +119,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | (narrative) | `buildTacticalBriefingNarrative` | always | opens with beat number, own sub-unit count, human sub-unit count, full visibility |
 | `## Unit Status and Threats` | `buildUnitStatusTable(..., false)` | always; a `Bonus` column follows `Hex` when either origin bonus flag is on | `(No AI units)` |
 | `## Attention Flags` | `buildAttentionFlags(..., 'tactical', false)` | always | `None.` |
-| `# Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
+| `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
 | `## Recent Turn Notes` | `scope: 'tactical'` | at least one qualifying prior row | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
@@ -134,13 +134,13 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
 | Combat paragraph | same composer; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; `buildFortificationRule` adds the tactical fortification sentence only when `hasFortifiedCells` is true; no hold-fire (standing orders are not issuable) |
-| Coaching | `buildTacticalCoachingBullets` plus `Strategic context:` with engage-priority, doctrine, message |
+| Coaching | `buildTacticalCoachingBullets` plus `# Battle Context` with engage-priority, doctrine, message |
 | Scenario objective | omitted |
 | Scouting directive | omitted |
 | Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes` / `ferryOrders` listed when the roster has air; Best Options may list airport ferry dests |
 | Tools | planning, `assess_unit`, and `estimate_combat` when their groups are enabled, with battle prompt lines (`getFilteredToolMetadata` tactical mode) and battle guidance bullets (`buildToolUsageGuidance`); `assess_hex`, memory, orders, production stripped (`filterToolNamesForTacticalBattle`) |
 
-Always omitted: `# Standing Order Status`, orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, Unit Roster, hop-honesty line, Explored/Controlled bullets, the strategic no-briefing `assess_unit` / `estimate_combat` hints.
+Always omitted: `## Standing Order Status`, the orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, the strategic own-unit roster line, hop-honesty line, Explored/Controlled bullets, the strategic no-briefing `assess_unit` / `estimate_combat` hints. The tactical prompt does include `# Unit Roster` for the enemy listing.
 
 Forbidden substrings (`TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`): `memoryupdates`, `productionorders`, `query_production`, `enemyintel`, `set_build_queue`.
 

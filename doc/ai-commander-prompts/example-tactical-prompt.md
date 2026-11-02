@@ -2,17 +2,23 @@
 
 One tactical prompt from a single consultation, laid out for reading on GitHub. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the capture prints that object on one line.
 
-The catalog is [tactical-prompt.md](tactical-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation. Changed sentences (identity, legend, loss labels, roster line, narrative, and message) follow the builders. This capture does not record a home name, so the role line uses the builder's fallback. A named three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`.
+The catalog is [tactical-prompt.md](tactical-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation. Headings, paragraph breaks, and the changed sentences (identity, legend, loss labels, roster line, narrative, message, and the same-cell shot) follow the builders. This capture does not record a home name, so the role line uses the builder's fallback. A named three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`.
 
 ---
+
+# Your Command
 
 You command your side in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons. Strategic turn: 6, date: June, Year 1, tactical beat: 4, phase: planning.
 
 Your goal is to engage and defeat enemy forces in this battle. Review the rules, below, for how to order this.
 
+# Coordinates
+
 Tactical battle map: the enclosing strategic hex's tactical cells plus up to three neighboring rings (cells beyond a regional map's edge are not part of the battle). Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are tactical hex steps where shown.
 
 Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for targetUnitId. Never emit raw H3 strings or latitude/longitude pairs.
+
+# Combat and Movement Rules
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, range 2; armor: 10 attack / 7 defense, range 5; naval: 7 attack / 7 defense, range 10.
 
@@ -42,11 +48,7 @@ The Unit Status Weather column names the weather where that unit stands. Birth t
 
 Terrain cover: ranged fire at a forest, mountain, urban, or rubble cell needs a roll 2 lower, or 1 lower for wetlands. An air strike on units in a forest, urban, or rubble cell needs a roll 1 lower. Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.
 
-This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step. Ranged uses pre-move positions. At most one ranged_attack per unit from beat-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination).
-
-Infantry and armor fire at their tactical baselines (infantry 2, armor 5); forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of range.
-
-Copy each ranged row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from beat-start positions and do not prevent movement in the same beat. Drop invalid attacks before submit.
+This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step. Ranged uses pre-move positions. At most one ranged_attack per unit from beat-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId. A unit may fire at a cell and move into that same cell in the same beat; the shot resolves first. Infantry and armor fire at their tactical baselines (infantry 2, armor 5); forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of range. Copy each ranged row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from beat-start positions and do not prevent movement in the same beat. Drop invalid attacks before submit.
 
 Clear of weather, the point budget is 2 points for infantry, 4 for armor, 3 for naval, and air does not march.
 
@@ -90,7 +92,7 @@ Tactical beat 4: you command 13 sub-unit(s); enemy sub-units in this battle: 4 (
 - a1-t2-s2 faces a critical threat (nearest enemy: h1-t1-s3, distance 1).
 - 6 unit(s) have a legal attack this beat — copy a Best Options ranged row for each and do not invent a target: a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4.
 
-# Operational Map
+## Operational Map
 
 Each cell: top = tactical hex code, bottom = terrain + overlay.
 
@@ -201,7 +203,9 @@ Turn 3:
 | --- | --- |
 | — | None. Omitting callbacks or sending [] leaves this list empty. You have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now. |
 
-Strategic context:
+# Battle Context
+
+
 - Your priority is to engage enemy forces and inflict losses when advantageous
 - Your strategy is:
     (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
@@ -223,7 +227,7 @@ Use plan_route only for dests not listed for that sub-unit.
 3. assess_unit(unitId, radius?) - Battle briefing on one sub-unit: enemies and friendlies within radius cells, which enemies it can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each unit.
 4. estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict a ranged or melee engagement under battle range, terrain, and line-of-sight rules, from beat-start positions. Returns win probability, expected casualties, and an assessment. Does not cover air strikes. Always check before committing to an attack.
 
-HOW TO USE THESE TOOLS EFFECTIVELY:
+## How to Use These Tools Effectively
 
 - The Commander's Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.
 - Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. Sub-units of one parent on the same cell match, so assess one of them; assess another sub-unit on that cell when its parent differs.
@@ -250,7 +254,11 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
 
+# Unit Roster
+
 Enemy units (currently observed): Enemy: h1-t1-s1 (armor) at PI; h1-t1-s3 (armor) at KI; h1-t2-s1 (armor) at PI; h1-t2-s3 (armor) at KI
+
+# Response Format
 
 Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments).
 
@@ -277,7 +285,7 @@ explicit_move (include "destination": briefing hex code for this beat's march; a
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. A ranged action's target must not be the acting unit's own move destination. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is dropped as already arrived.
+An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is dropped as already arrived.
 
 Do not emit assign_order or cancel_order for tactical sub-unit ids. memoryUpdates and productionOrders are not accepted this beat.
 
@@ -296,6 +304,8 @@ Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not
 Legal events and their parameters: turns (n: fires after n turns have passed since the subscription); unit_engaged (unitId: fires when that unit takes part in combat); unit_destroyed (side or unitId: fires when an own or enemy unit, or a named unit, is destroyed); threat_escalation (unitId, severity: fires when that unit's threat reaches the named severity); infrastructure_destroyed (targetType, hex (omit both for an unfiltered watch): fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any).
 
 In battle, unit-scoped events use sub-unit ids, not strategic parent ids. 
+
+## Example Response
 
 Example (illustrative only — use briefing hex codes and unit ids from this operational map, not these placeholders). Emit compact JSON with no markdown fence:
 

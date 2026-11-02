@@ -22,7 +22,22 @@ import {
   type SeatOutReason,
   type SeatRecord,
 } from '../../shared/seatRoster';
-import type { DbReadOps, DbWriteOps } from './dbOps';
+import type { BasicDbOps, DbReadOps, DbWriteOps } from './dbOps';
+
+/**
+ * Adds `seats.nickname` when an older match file does not have it.
+ *
+ * Purpose: A nickname column can arrive without making every earlier save unloadable.
+ * When to use: On open, next to `ensureHireOrderReservedCreditsColumn`. A fresh database already has the column.
+ * Expected outcome: The column exists. A second call does nothing.
+ * Exceptions: Propagates SQLite errors from the alter.
+ */
+export function ensureSeatNicknameColumn(ops: BasicDbOps): void {
+  logDebug('seatRosterStore ensureSeatNicknameColumn');
+  const columns = ops.getAll<{ name: string } & Record<string, unknown>>('PRAGMA table_info(seats)');
+  if (columns.some((column) => column.name === 'nickname')) return;
+  ops.run('ALTER TABLE seats ADD COLUMN nickname TEXT');
+}
 
 /**
  * One `seats` row as SQLite returns it.
@@ -37,6 +52,7 @@ type SeatRow = {
   readonly seat_order: number;
   readonly kind: string;
   readonly home_region: string;
+  readonly nickname: string | null;
   readonly model_id: string | null;
   readonly reasoning_effort: string | null;
   readonly doctrine_choice: string | null;
@@ -122,6 +138,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
     seatOrder: row.seat_order,
     kind,
     homeRegion: row.home_region,
+    nickname: row.nickname,
     commander: kind === HUMAN_SEAT_KIND
       ? null
       : {
@@ -151,7 +168,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
 export function readSeatRoster(ops: Pick<DbReadOps, 'getAll'>): SeatRecord[] {
   logTrace('seatRosterStore readSeatRoster');
   const rows = ops.getAll<SeatRow>(
-    `SELECT seat_id, seat_order, kind, home_region, model_id, reasoning_effort, doctrine_choice, doctrine,
+    `SELECT seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, doctrine_choice, doctrine,
             out_turn, out_by, out_reasons, place, consultation_count, cost_usd
      FROM seats
      ORDER BY seat_order`
@@ -176,14 +193,15 @@ export function replaceSeatRoster(ops: Pick<DbWriteOps, 'run'>, seats: readonly 
   for (const seat of seats) {
     ops.run(
       `INSERT INTO seats (
-         seat_id, seat_order, kind, home_region, model_id, reasoning_effort, doctrine_choice, doctrine,
+         seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, doctrine_choice, doctrine,
          out_turn, out_by, out_reasons, place, consultation_count, cost_usd
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         seat.seatId,
         seat.seatOrder,
         seat.kind,
         seat.homeRegion,
+        seat.nickname,
         seat.commander?.modelId ?? null,
         seat.commander?.reasoningEffort ?? null,
         seat.commander?.doctrineChoice ?? null,
@@ -309,4 +327,29 @@ export function updateSeatCommander(
     [nextCommander.modelId, nextCommander.reasoningEffort, nextCommander.doctrineChoice, nextCommander.doctrine, seatId]
   );
   return { ...seat, commander: nextCommander };
+}
+
+/**
+ * Stores the name shown for one AI seat.
+ *
+ * Purpose: A nickname edit during a match stays on that seat and does not change the commander.
+ * When to use: The commander IPC, after `updateSeatCommander`, when the payload includes a nickname.
+ * Expected outcome: The updated row. `null` means the short home name is shown.
+ * Exceptions: Throws when the seat is missing, human, or already knocked out. Propagates SQLite errors.
+ */
+export function updateSeatNickname(
+  ops: Pick<DbReadOps, 'getAll'> & Pick<DbWriteOps, 'run'>,
+  seatId: SeatId,
+  nickname: string | null
+): SeatRecord {
+  logDebug('seatRosterStore updateSeatNickname', { seatId, nicknameLength: nickname?.length ?? 0 });
+  const seat = readSeatRoster(ops).find((row) => row.seatId === seatId);
+  if (!seat || seat.kind !== AI_SEAT_KIND || seat.commander === null) {
+    throw new Error(`Cannot update a commander for ${seatId}`);
+  }
+  if (seat.outTurn !== null) {
+    throw new Error(`Cannot update a commander for a knocked-out seat ${seatId}`);
+  }
+  ops.run('UPDATE seats SET nickname = ? WHERE seat_id = ?', [nickname, seatId]);
+  return { ...seat, nickname };
 }

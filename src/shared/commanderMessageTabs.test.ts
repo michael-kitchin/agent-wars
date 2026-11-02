@@ -18,8 +18,8 @@ import {
 } from './commanderMessageTabs';
 
 const seats = [
-  { seatId: 'opponent', label: 'Northern America' },
-  { seatId: 'opponent2', label: 'Central Thailand' },
+  { seatId: 'opponent', label: 'N. America' },
+  { seatId: 'opponent2', label: 'C. Thailand' },
 ];
 
 test('tabs start in opponent-number order and a message selects that tab', () => {
@@ -60,15 +60,20 @@ test('tabs start in opponent-number order and a message selects that tab', () =>
 
 test('a home name that sorts first still follows its opponent number', () => {
   const state = initialCommanderMessageTabs([
-    { seatId: 'opponent3', label: 'Eastern Europe' },
-    { seatId: 'human', label: 'Western Europe' },
-    { seatId: 'opponent', label: 'Northern America' },
+    { seatId: 'opponent3', label: 'E. Europe' },
+    { seatId: 'human', label: 'W. Europe' },
+    { seatId: 'opponent', label: 'N. America' },
   ]);
   assert.deepEqual(
     state.tabs.map((tab) => tab.seatId),
     ['opponent', 'opponent3', 'human']
   );
   assert.deepEqual(state.tabs.map((tab) => tab.label), ['N. America', 'E. Europe', 'W. Europe']);
+});
+
+test('a nickname is stored character for character', () => {
+  const state = initialCommanderMessageTabs([{ seatId: 'opponent', label: 'Grok' }]);
+  assert.equal(state.tabs[0]?.label, 'Grok');
 });
 
 test('commanderDispatchHasProse keeps a message, a strategy, or both', () => {

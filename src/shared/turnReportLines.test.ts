@@ -10,9 +10,9 @@ import { hexChangeLinesByOwner, sideNameMarksForLine, type TurnReportSeat } from
 const western = 'opponent';
 const eastern = aiSeatIdForIndex(2);
 const seats: TurnReportSeat[] = [
-  { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-  { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
-  { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey' },
+  { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+  { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const },
+  { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
 ];
 
 test('hex sentences total the turn and name the other sides once, in name order', () => {
@@ -76,8 +76,8 @@ test('a null viewer names every seat and writes no You', () => {
 
 test('a blank home is the seat id in a hex sentence and in its mark', () => {
   const blankSeats = [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-    { seatId: 'opponent2', seatOrder: 4, homeRegion: '   ' },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+    { seatId: 'opponent2', seatOrder: 4, homeRegion: '   ', nickname: null, kind: 'ai' as const },
   ];
   const lines = hexChangeLinesByOwner({
     viewerSeatId: HUMAN_SEAT_ID,
@@ -95,8 +95,8 @@ test('a blank home is the seat id in a hex sentence and in its mark', () => {
 
 test('sideNameMarksForLine marks every opponent and skips You, you, and Neutral', () => {
   const markSeats = [
-    { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
-    { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey' },
+    { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const },
+    { seatId: eastern, seatOrder: 3, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
   ];
   const sentence = 'E. Turkey lost 3 hexes to you, Neutral, and W. Turkey.';
   const easternAt = sentence.indexOf('E. Turkey');
@@ -119,8 +119,8 @@ test('a short name that contains to or from still receives its flag', () => {
   const rome = 'opponent2';
   const home = 'opponent3';
   const named = [
-    { seatId: rome, seatOrder: 2, homeRegion: 'Road to Rome' },
-    { seatId: home, seatOrder: 3, homeRegion: 'Far from Home' },
+    { seatId: rome, seatOrder: 2, homeRegion: 'Road to Rome', nickname: null, kind: 'ai' as const },
+    { seatId: home, seatOrder: 3, homeRegion: 'Far from Home', nickname: null, kind: 'ai' as const },
   ];
   const lost = 'You lost 1 hex to Road to Rome.';
   const lostAt = lost.indexOf('Road to Rome');
@@ -140,8 +140,8 @@ test('a shared short name flags the section owner as the subject', () => {
   const early = 'opponent';
   const late = 'opponent3';
   const shared = [
-    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey' },
-    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey & Caucasus' },
+    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
+    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey & Caucasus', nickname: null, kind: 'ai' as const },
   ];
   const sentence = 'E. Turkey lost 1 hex to E. Turkey.';
   assert.deepEqual(sideNameMarksForLine(sentence, shared, late), [
@@ -149,11 +149,27 @@ test('a shared short name flags the section owner as the subject', () => {
     { seatId: early, start: sentence.lastIndexOf('E. Turkey'), end: sentence.lastIndexOf('E. Turkey') + 'E. Turkey'.length },
   ]);
   const headerSeats = [
-    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey' },
-    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+    { seatId: late, seatOrder: 4, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
+    { seatId: early, seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
   ];
-  const header = '## Eastern Turkey Losses';
+  const header = '## E. Turkey Losses';
   assert.deepEqual(sideNameMarksForLine(header, headerSeats), [
-    { seatId: early, start: 3, end: 3 + 'Eastern Turkey'.length },
+    { seatId: early, start: 3, end: 3 + 'E. Turkey'.length },
+  ]);
+});
+
+test('a nickname is the hex sentence and the loss header, and both marks use it', () => {
+  const grok = [{ seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: 'Grok', kind: 'ai' as const }];
+  const lines = hexChangeLinesByOwner({
+    viewerSeatId: null,
+    seats: grok,
+    transitions: [{ h3Index: 'a', from: western, to: NEUTRAL_OWNER_ID }],
+  });
+  assert.deepEqual(lines.get(western), ['Grok lost 1 hex to Neutral.']);
+  assert.deepEqual(sideNameMarksForLine('Grok lost 1 hex to Neutral.', grok), [
+    { seatId: western, start: 0, end: 'Grok'.length },
+  ]);
+  assert.deepEqual(sideNameMarksForLine('## Grok Losses', grok), [
+    { seatId: western, start: 3, end: 3 + 'Grok'.length },
   ]);
 });

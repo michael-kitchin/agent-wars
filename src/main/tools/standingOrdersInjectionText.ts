@@ -6,31 +6,24 @@ import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { buildPromptTableLines } from '../promptTableHelpers';
-import { SECTION_TITLE_STANDING_ORDER_STATUS, topLevelHeading } from '../openRouter/promptSpec/sectionHeadings';
-import { parseComputedRoute, parseOrderParams, type StandingOrderRow } from './standingOrdersShared';
+import {
+  SECTION_TITLE_STANDING_ORDER_STATUS,
+  SECTION_TITLE_UNITS_WITHOUT_STANDING_ORDERS,
+  subHeading,
+  topLevelHeading,
+} from '../openRouter/promptSpec/sectionHeadings';
+import {
+  parseComputedRoute,
+  parseOrderParams,
+  STANDING_ORDER_WARNING_STATUSES,
+  type StandingOrderRow,
+} from './standingOrdersShared';
 import {
   collectOrderlessMissionContext,
   type OrderlessMissionSuggestion,
 } from './orderlessUnitSuggestions';
 import { expireAndUpdateStatus } from './standingOrdersGeneration';
 import { marchStepRecedesFromEnemy, nearestObservedEnemyH3 } from './standingMarchReceding';
-
-/**
- * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
-
- * Purpose: Supports maintainability by documenting why `WARNING_STATUSES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const WARNING_STATUSES = new Set([
-  'blocked',
-  'target_lost',
-  'target_out_of_range',
-  'target_destroyed',
-  'arrived',
-  'contact',
-]);
 
 /**
  * Documents the `StandingOrderPromptRow` interface as a named contract surface (interface StandingOrderPromptRow).
@@ -203,16 +196,16 @@ function toStandingOrderPromptRow(
     status: row.status,
     nextMove: nextMoveText,
     turnsRemaining: turnsRemainingText,
-    attention: WARNING_STATUSES.has(row.status) || receding ? 'yes' : 'no',
+    attention: STANDING_ORDER_WARNING_STATUSES.has(row.status) || receding ? 'yes' : 'no',
   };
 }
 
 /**
  * True when this standing-order row's next step increases hop distance to the nearest enemy.
  *
- * Purpose: Attention column must flag receding marches, not only stalled statuses.
+ * Purpose: Attention column must flag receding marches and defend walk-backs, not only stalled statuses.
  * When to use: `toStandingOrderPromptRow` after next-move and destination text are computed.
- * Expected outcome: False for air units, non-march/pursue orders, and unmeasurable geometry.
+ * Expected outcome: False for air units, orders other than march, pursue, and defend, a defend order that is not `en_route`, a defend order with no stored next step, and unmeasurable geometry.
  * Exceptions: None.
  */
 function standingOrderRowRecedesFromEnemy(
@@ -223,13 +216,19 @@ function standingOrderRowRecedesFromEnemy(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): boolean {
   if (unitType === 'air' || !unitH3) return false;
-  if (row.order_type !== 'march' && row.order_type !== 'pursue') return false;
+  if (row.order_type !== 'march' && row.order_type !== 'pursue' && row.order_type !== 'defend') return false;
+  if (row.order_type === 'defend' && row.status !== 'en_route') return false;
   const enemyH3 = nearestObservedEnemyH3(unitH3, enemyH3s);
   if (!enemyH3) return false;
   const computed = parseComputedRoute(row);
   const nextMove = computed?.nextMoveHex;
   const params = parseOrderParams(row);
-  const dest = Array.isArray(params.destination) ? (params.destination as [number, number]) : null;
+  const dest =
+    row.order_type === 'defend'
+      ? null
+      : Array.isArray(params.destination)
+        ? (params.destination as [number, number])
+        : null;
   const stepLl = (Array.isArray(nextMove) ? nextMove : dest) as [number, number] | null;
   if (!stepLl || stepLl.length < 2) return false;
   const stepH3 = resolveToH3(Number(stepLl[0]), Number(stepLl[1]));
@@ -336,7 +335,7 @@ export function getInjectionText(
     )
   );
   lines.push('');
-  lines.push('## Units Without Standing Orders');
+  lines.push(subHeading(SECTION_TITLE_UNITS_WITHOUT_STANDING_ORDERS));
   lines.push('');
   const suggestedDestinations = collectOrderlessMissionContext({
     playerId,

@@ -551,6 +551,15 @@ export function parseOrdersResponse(
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
   productionAppliedCount?: number;
+  /**
+   * Units whose standing order this response assigned or cancelled.
+   *
+   * Contract: Present when at least one assign succeeded or one cancel ran. Absent when that list is empty.
+   * When to use: Skipping a defend-post move for a unit this response already changed through a standing-order row.
+   * Expected outcome: Unit ids in envelope order. Undefined when none.
+   * Exceptions: None.
+   */
+  standingOrderUnitIds?: string[];
   dropReasons?: string[];
   /**
    * True when the envelope named actor rows and none of them were kept.
@@ -644,6 +653,7 @@ export function parseOrdersResponse(
           embarkOrders,
           dropReasons: orderRowDropReasons,
           appliedStandingOrderCount,
+          standingOrderUnitIds,
         } = processV3OrdersArray(ordersArray, state, latLngByH3, resolveToH3, context);
         const expandedAirStrikes = expandGroupedActorEntries(obj.airStrikes);
         const expandedFerryOrders = expandGroupedActorEntries(obj.ferryOrders);
@@ -684,6 +694,7 @@ export function parseOrdersResponse(
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
+          standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
           everyActorRowDropped:
             expandedActorRowCount > 0 &&

@@ -199,11 +199,20 @@ export interface SeatRecord {
    * Home name used by prompts and hex lookup.
    *
    * Contract: On a regional map this is the side group's display name. On the global map it is the UN subregion name.
-   * When to use: Home hex lookup and labels. Short names are computed, not stored.
+   * When to use: Home hex lookup and prompts. On-screen labels use `nickname` through `sideDisplayName`.
    * Expected outcome: A non-empty name `getScenarioHomeRegionHexes` can resolve.
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Name shown for this seat, or null when the UI should use the default.
+   *
+   * Contract: Null means `sideDisplayName` chooses Human or the short home name. A string is the stored nickname.
+   * When to use: Labels. Prompt builders keep `homeRegion`.
+   * Expected outcome: The human seat can have one. An AI seat can have one. It is not a commander field.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
   /**
    * The AI seat's commander, or null for the human seat.
    *

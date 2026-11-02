@@ -16130,6 +16130,34 @@
     return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND) ?? null;
   }
 
+  // src/shared/sideNicknames.ts
+  var SIDE_NICKNAME_MAX_LENGTH = 16;
+  var HUMAN_NICKNAME_DEFAULT = "Human";
+  var DISALLOWED_NICKNAME_CHARACTER = /[^\p{L}\p{M}\p{N} .'\u2019-]/gu;
+  function normalizeSideNickname(value) {
+    if (typeof value !== "string") return "";
+    const cleaned = value.replace(DISALLOWED_NICKNAME_CHARACTER, "").replace(/\s+/g, " ").trim();
+    const capped = Array.from(cleaned).slice(0, SIDE_NICKNAME_MAX_LENGTH).join("").trim();
+    const lower = capped.toLowerCase();
+    if (lower === "you" || lower === "your" || lower === NEUTRAL_OWNER_ID) return "";
+    if (lower.includes(" lost ") || lower.includes(" took ") || lower.includes(" and ")) return "";
+    return capped;
+  }
+  function defaultAiNickname(homeRegion, seatId) {
+    return homeRegion.trim().length > 0 ? shortSideName(homeRegion) : seatId;
+  }
+  function nicknameFieldValue(value, defaultNickname) {
+    const cleaned = normalizeSideNickname(value);
+    if (cleaned.length === 0 || cleaned === normalizeSideNickname(defaultNickname)) return defaultNickname;
+    return cleaned;
+  }
+  function sideDisplayName(seat) {
+    const nickname = normalizeSideNickname(seat.nickname);
+    if (nickname.length > 0) return nickname;
+    if (seat.kind === HUMAN_SEAT_KIND) return HUMAN_NICKNAME_DEFAULT;
+    return defaultAiNickname(seat.homeRegion, seat.seatId);
+  }
+
   // src/shared/turnLossSections.ts
   var NO_HEX_LINES = /* @__PURE__ */ new Map();
   var NO_STRIKE_LINES = /* @__PURE__ */ new Map();
@@ -16178,16 +16206,13 @@
     if (!headerTitle.endsWith(" Losses")) return null;
     const name = headerTitle.slice(0, -" Losses".length);
     const matches = sortSeatsByOrder(
-      seats.filter((seat) => {
-        const home = seat.homeRegion.trim();
-        return (home.length > 0 ? home : seat.seatId) === name;
-      })
+      seats.filter((seat) => sideDisplayName(seat) === name)
     );
     return matches[0]?.seatId ?? null;
   }
   function lossSectionTitle(seat, ownerId) {
-    const name = seat?.homeRegion.trim() ?? "";
-    return `${name.length > 0 ? name : ownerId} Losses`;
+    if (!seat) return `${ownerId} Losses`;
+    return `${sideDisplayName(seat)} Losses`;
   }
   function sectionLines(summary, ownerId, header, hexLines, strikeLines, battleLine) {
     const buckets = summary.byOwner[ownerId];
@@ -16242,7 +16267,7 @@
     return seat ? hexLabelForSeat(seat) : ownerId;
   }
   function hexLabelForSeat(seat) {
-    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+    return sideDisplayName(seat);
   }
   function partyLabel(ownerId, input, place) {
     if (input.viewerSeatId !== null && ownerId === input.viewerSeatId) return place === "subject" ? "You" : "you";
@@ -16269,8 +16294,7 @@
   }
   function headerNameForSeat(seat) {
     if (aiIndexForSeatId(seat.seatId) == null) return null;
-    const home = seat.homeRegion.trim();
-    return home.length > 0 ? home : seat.seatId;
+    return sideDisplayName(seat);
   }
   function seatForDisplayedName(seats, name, nameOf) {
     const matches = sortSeatsByOrder(seats.filter((seat) => nameOf(seat) === name));
@@ -20714,62 +20738,6 @@ ${body}`;
 ${bonuses}`;
   }
 
-  // src/shared/sideLabels.ts
-  function homeSeatIdsAtHex(h3Index, lists) {
-    const bySeat = lists.homeRegionHexesBySeat;
-    if (!bySeat) return [];
-    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
-  }
-  function viewerSeatIdForRoster(seats) {
-    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
-  }
-  function abbreviatedSideName(seat) {
-    return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
-  }
-  function controllerSideLabel(controllerId, seats) {
-    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
-    const seat = seats.find((row) => row.seatId === controllerId);
-    return seat ? abbreviatedSideName(seat) : controllerId;
-  }
-  function homesInOrder(homeSeatIds, seats) {
-    return sortSeatsByOrder(
-      homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null)
-    );
-  }
-  function formatHexControlLabel(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    const controllerName = controllerSideLabel(args.controllerId, args.seats);
-    if (homes.length === 0) return controllerName;
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => abbreviatedSideName(seat));
-      return `${controllerName} (${names.join(" & ")} homes)`;
-    }
-    const home = homes[0];
-    if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
-    return `${controllerName} (${abbreviatedSideName(home)} home)`;
-  }
-  function formatUnitNameForViewer(args) {
-    if (isNeutralOwnerId(args.ownerId)) return args.baseName;
-    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
-    if (args.seats.length === 2) return args.baseName;
-    const seat = args.seats.find((row) => row.seatId === args.ownerId);
-    if (!seat) return args.baseName;
-    return `${shortSideName(seat.homeRegion)} \xB7 ${args.baseName}`;
-  }
-  function formatHomeChip(args) {
-    const homes = homesInOrder(args.homeSeatIds, args.seats);
-    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
-      return { kind: "home", text: "Home" };
-    }
-    if (homes.length === 1) return { kind: "enemy-home", text: `${shortSideName(homes[0].homeRegion)} home` };
-    if (homes.length >= 2) {
-      const names = homes.map((seat) => shortSideName(seat.homeRegion));
-      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
-    }
-    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
-    return null;
-  }
-
   // src/renderer/core/unitOriginFlags.ts
   var unitOriginById = /* @__PURE__ */ new Map();
   var formedTurnById = /* @__PURE__ */ new Map();
@@ -20816,9 +20784,9 @@ ${bonuses}`;
   function mercenaryTooltipViewerSeatId() {
     return findHumanSeat(rendererSharedState.gameState?.seats ?? [])?.seatId ?? null;
   }
-  function mercenaryOwnerShortName(ownerId) {
+  function mercenaryOwnerDisplayName(ownerId) {
     const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === ownerId);
-    return seat ? abbreviatedSideName(seat) : null;
+    return seat ? sideDisplayName(seat) : null;
   }
   function hexFortifiedByAnotherSide(h3Index, viewerSeatId2) {
     const infra = rendererSharedState.gameState?.strategicInfrastructure?.find((row) => row.h3Index === h3Index);
@@ -20859,7 +20827,7 @@ ${bonuses}`;
       isMercenary,
       forHire,
       upkeep,
-      ownerShortName: mercenaryOwnerShortName(shown.player)
+      ownerShortName: mercenaryOwnerDisplayName(shown.player)
     });
   }
   function selectedBonusOptions() {
@@ -21065,7 +21033,7 @@ ${bonuses}`;
   function initialCommanderMessageTabs(seats) {
     const tabs = seats.map((seat) => ({
       seatId: seat.seatId,
-      label: shortSideName(seat.label),
+      label: seat.label,
       enabled: false,
       message: null,
       strategy: null,
@@ -21827,20 +21795,31 @@ ${bonuses}`;
   }
 
   // src/shared/newGameSides.ts
+  function nicknameForHome(homeKey, homes) {
+    const home = homes.find((option2) => option2.key === homeKey);
+    return home ? defaultAiNickname(home.label, "") : "";
+  }
   function initialSidesState(args) {
     const requested = args.rowCount ?? MIN_SEATS;
     const count = Math.min(MAX_SEATS, args.homes.length, Math.max(0, requested));
     const rows = args.homes.slice(0, count).map((home, index) => ({
       kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
       homeKey: home.key,
-      commander: index === 0 ? null : args.defaultCommander
+      commander: index === 0 ? null : { ...args.defaultCommander, nickname: nicknameForHome(home.key, args.homes) }
     }));
     return { mapKind: args.mapKind, observeOnly: false, rows };
   }
-  function setObserveOnly(state, on, defaultCommander2) {
+  function setObserveOnly(state, on, defaultCommander2, homes) {
     if (state.rows.length === 0) return { ...state, observeOnly: on };
     const first = state.rows[0];
-    const nextFirst = on ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander2 } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
+    const nextFirst = on ? {
+      ...first,
+      kind: AI_SEAT_KIND,
+      commander: {
+        ...first.commander ?? defaultCommander2,
+        nickname: nicknameForHome(first.homeKey ?? "", homes)
+      }
+    } : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
     return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
   }
   function sidesHaveAnyModel(state) {
@@ -21854,12 +21833,13 @@ ${bonuses}`;
     if (!free) return state;
     const source = [...state.rows].reverse().find((row2) => row2.kind === AI_SEAT_KIND && row2.commander != null);
     const copied = source?.commander;
-    const commander = copied ? {
-      modelId: copied.modelId,
-      reasoningEffort: copied.reasoningEffort,
-      doctrineChoice: copied.doctrineChoice,
-      apiKey: (copied.apiKey ?? "").trim()
-    } : defaultCommander2;
+    const commander = {
+      modelId: copied?.modelId ?? defaultCommander2.modelId,
+      reasoningEffort: copied?.reasoningEffort ?? defaultCommander2.reasoningEffort,
+      doctrineChoice: copied?.doctrineChoice ?? defaultCommander2.doctrineChoice,
+      apiKey: copied ? (copied.apiKey ?? "").trim() : defaultCommander2.apiKey,
+      nickname: nicknameForHome(free.key, homes)
+    };
     const row = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
     return { ...state, rows: [...state.rows, row] };
   }
@@ -21868,11 +21848,14 @@ ${bonuses}`;
     if (index < 0 || index >= state.rows.length) return state;
     return { ...state, rows: state.rows.filter((_, rowIndex) => rowIndex !== index) };
   }
-  function setRowHome(state, index, homeKey) {
+  function setRowHome(state, index, homeKey, homes) {
     if (index < 0 || index >= state.rows.length) return state;
+    const current = state.rows[index];
+    if (current.homeKey === homeKey) return state;
     const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
     if (taken) return state;
-    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey } : row);
+    const commander = current.kind === AI_SEAT_KIND && current.commander ? { ...current.commander, nickname: nicknameForHome(homeKey, homes) } : current.commander;
+    const rows = state.rows.map((row, rowIndex) => rowIndex === index ? { ...row, homeKey, commander } : row);
     return { ...state, rows };
   }
   function randomizeRowHome(state, index, homes, random) {
@@ -21881,7 +21864,7 @@ ${bonuses}`;
     const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
     if (free.length === 0) return state;
     const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))];
-    return setRowHome(state, index, picked.key);
+    return setRowHome(state, index, picked.key, homes);
   }
   function setRowCommander(state, index, commander) {
     if (index < 0 || index >= state.rows.length || state.rows[index].kind !== AI_SEAT_KIND) return state;
@@ -21929,7 +21912,9 @@ ${bonuses}`;
     return state.rows.map((row) => {
       const home = row.homeKey ?? void 0;
       const seat = state.mapKind === "global" ? { kind: row.kind, homeRegion: home } : { kind: row.kind, sideGroupId: home };
-      if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
+      if (row.kind === AI_SEAT_KIND && row.commander) {
+        return { ...seat, nickname: row.commander.nickname ?? "", commander: row.commander };
+      }
       return seat;
     });
   }
@@ -21942,7 +21927,7 @@ ${bonuses}`;
     const index = state.rows.findIndex((row2) => row2.kind === AI_SEAT_KIND);
     if (index < 0) return state;
     const row = state.rows[index];
-    const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: "balanced" };
+    const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: "balanced", nickname: "" };
     const rows = state.rows.map(
       (entry, rowIndex) => rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
     );
@@ -22029,6 +22014,7 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/controlTooltipText.ts
+  var humanNicknameFieldTooltipText = "The name shown for you during a match. Saved on this computer, and used the next time a game starts.";
   var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
   var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
   function newGameButtonTooltipText(startGame) {
@@ -22046,13 +22032,14 @@ ${bonuses}`;
     return aiming ? rangedStopTooltipText : rangedAimTooltipText;
   }
   var apiKeyTooltipText = "Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent's key.";
+  var commanderNicknameTooltipText = "The name shown for this side during a match. It starts as the short home name and resets when this side's home changes.";
   var refreshModelsTooltipText = "Load the model list again. If that fails, the message appears in the AI activity log.";
   var runDisabledTooltipText = "Turn planning on or off for every commander. Give at least one commander an API key and a model first.";
   var runEnabledTooltipText = "Turn planning on or off for every commander. On can hold Ready while a commander is planning; off cancels a plan that is still running.";
   function runButtonTooltipText(enabled) {
     return enabled ? runEnabledTooltipText : runDisabledTooltipText;
   }
-  var newGameCommanderTooltipText = "Change this side's API key, model, reasoning, and doctrine.";
+  var newGameCommanderTooltipText = "Change this side's nickname, API key, model, reasoning, and doctrine.";
   var newGameItemOpenTooltipText = "The new-game screen is already open.";
   var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
   var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
@@ -22132,6 +22119,7 @@ ${bonuses}`;
   // src/renderer/openRouter/commanderPopoverLabels.ts
   var popoverLabelWidthText = "Reasoning";
   var POPOVER_CONTROL_IDS = {
+    nickname: "commander-popover-nickname",
     apiKey: "commander-popover-api-key",
     model: "commander-popover-model",
     reasoning: "commander-popover-reasoning",
@@ -22213,7 +22201,8 @@ ${bonuses}`;
       modelId: request.commander.modelId,
       reasoningEffort: request.commander.reasoningEffort,
       doctrineChoice: request.commander.doctrineChoice,
-      apiKey: commanderApiKey(request.commander)
+      apiKey: commanderApiKey(request.commander),
+      nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname)
     };
     const root = document.createElement("div");
     root.className = "commander-popover";
@@ -22284,6 +22273,15 @@ ${bonuses}`;
   function popoverFields(draft, request) {
     const fields = document.createElement("div");
     fields.className = "commander-popover-fields";
+    const nicknameInput2 = document.createElement("input");
+    nicknameInput2.id = POPOVER_CONTROL_IDS.nickname;
+    nicknameInput2.type = "text";
+    nicknameInput2.maxLength = SIDE_NICKNAME_MAX_LENGTH;
+    nicknameInput2.autocomplete = "off";
+    nicknameInput2.spellcheck = false;
+    nicknameInput2.setAttribute("aria-label", "Nickname");
+    nicknameInput2.value = draft.nickname;
+    nicknameInput2.setAttribute("data-control-tooltip", commanderNicknameTooltipText);
     const keyInput = document.createElement("input");
     keyInput.id = POPOVER_CONTROL_IDS.apiKey;
     keyInput.type = "password";
@@ -22306,6 +22304,8 @@ ${bonuses}`;
     const keyModel = document.createElement("div");
     keyModel.className = "commander-popover-key-model";
     keyModel.append(
+      fieldLabel(POPOVER_CONTROL_IDS.nickname, "Nickname"),
+      nicknameInput2,
       fieldLabel(POPOVER_CONTROL_IDS.apiKey, "API key"),
       keyInput,
       fieldLabel(POPOVER_CONTROL_IDS.model, "Model"),
@@ -22315,6 +22315,7 @@ ${bonuses}`;
     reasoning.id = POPOVER_CONTROL_IDS.reasoning;
     reasoning.setAttribute("aria-label", "Reasoning");
     const current = () => {
+      draft.nickname = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
       draft.apiKey = keyInput.value.trim();
       return { ...draft };
     };
@@ -22342,6 +22343,17 @@ ${bonuses}`;
       request.onChange(current());
     });
     showReasoning();
+    const emitNicknameIfChanged = () => {
+      const next = nicknameFieldValue(nicknameInput2.value, request.defaultNickname);
+      nicknameInput2.value = next;
+      if (next === draft.nickname) return;
+      draft.nickname = next;
+      request.onChange(current());
+    };
+    nicknameInput2.addEventListener("blur", emitNicknameIfChanged);
+    nicknameInput2.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") emitNicknameIfChanged();
+    });
     const emitKeyIfChanged = () => {
       const next = keyInput.value.trim();
       if (next === (draft.apiKey ?? "")) return;
@@ -22375,6 +22387,8 @@ ${bonuses}`;
       draft.reasoningEffort = commander.reasoningEffort;
       draft.doctrineChoice = commander.doctrineChoice;
       draft.apiKey = commanderApiKey(commander);
+      draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
+      nicknameInput2.value = draft.nickname;
       keyInput.value = draft.apiKey ?? "";
       copyModelOptions(model, draft.modelId);
       showReasoning();
@@ -22961,7 +22975,7 @@ ${bonuses}`;
     }
     const current = select.value;
     select.replaceChildren(option("All commanders", ""));
-    for (const seat of seats) select.append(option(seat.homeRegion, seat.seatId));
+    for (const seat of seats) select.append(option(sideDisplayName(seat), seat.seatId));
     if ([...select.options].some((row) => row.value === current)) select.value = current;
   }
   function option(label, value) {
@@ -22985,7 +22999,9 @@ ${bonuses}`;
     dot.style.background = paletteForOwner(seat.seatId, rendererSharedState.gameState?.seats ?? [])?.map ?? "#115E59";
     const name = document.createElement("span");
     name.className = "commander-card-name";
-    name.textContent = seat.homeRegion;
+    const shownName = sideDisplayName(seat);
+    name.textContent = shownName;
+    name.title = shownName;
     const chip = document.createElement("span");
     chip.className = "commander-card-chip";
     chip.textContent = presentation.chip;
@@ -23047,19 +23063,22 @@ ${bonuses}`;
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
       doctrineChoice: seat.commander.doctrineChoice,
+      nickname: sideDisplayName(seat),
       ...includeKey ? { apiKey } : {}
     };
     openCommanderPopover({
       anchor: anchor3,
-      title: `${seat.homeRegion} commander`,
+      title: `${sideDisplayName(seat)} commander`,
       commander,
+      defaultNickname: defaultAiNickname(seat.homeRegion, seat.seatId),
       copyButton: null,
       onChange: (next) => {
         if (!includeKey && (next.apiKey ?? "") === "") {
           void saveCommander(seatId, {
             modelId: next.modelId,
             reasoningEffort: next.reasoningEffort,
-            doctrineChoice: next.doctrineChoice
+            doctrineChoice: next.doctrineChoice,
+            nickname: next.nickname
           });
           return;
         }
@@ -23191,7 +23210,7 @@ ${bonuses}`;
     }
     const name = document.createElement("span");
     const message = meta.messageText?.trim() ?? "";
-    const home = seat?.homeRegion ?? "Commander";
+    const home = seat ? sideDisplayName(seat) : "Commander";
     name.textContent = message.length > 0 ? `${home} "${message}"` : home;
     line.append(mark, name);
     wrap.append(line);
@@ -23213,7 +23232,7 @@ ${bonuses}`;
     }
     const current = select.value;
     select.replaceChildren(filterOption("Everyone", ""));
-    for (const seat of rendererSharedState.gameState?.seats ?? []) select.append(filterOption(seat.homeRegion, seat.seatId));
+    for (const seat of rendererSharedState.gameState?.seats ?? []) select.append(filterOption(sideDisplayName(seat), seat.seatId));
     if ([...select.options].some((row) => row.value === current)) select.value = current;
   }
   function filterOption(label, value) {
@@ -23414,7 +23433,7 @@ ${bonuses}`;
   function activitySeatPrefix(seatId) {
     if (!seatId) return "";
     const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === seatId);
-    const name = seat ? shortSideName(seat.homeRegion) : seatId;
+    const name = seat ? sideDisplayName(seat) : seatId;
     const turn = rendererSharedState.gameState?.turnNumber;
     return `${turn ? `T${turn} ` : ""}${name} `;
   }
@@ -23723,6 +23742,59 @@ ${bonuses}`;
     const total = uniqueRegionHexes.length;
     const pct = computeRoundedPercentage(controlled, total);
     return { controlled, total, pct };
+  }
+
+  // src/shared/sideLabels.ts
+  function homeSeatIdsAtHex(h3Index, lists) {
+    const bySeat = lists.homeRegionHexesBySeat;
+    if (!bySeat) return [];
+    return Object.entries(bySeat).filter(([, hexes]) => hexes.includes(h3Index)).map(([seatId]) => seatId);
+  }
+  function viewerSeatIdForRoster(seats) {
+    return seats.find((seat) => seat.kind === HUMAN_SEAT_KIND)?.seatId ?? null;
+  }
+  function controllerSideLabel(controllerId, seats) {
+    if (controllerId == null || !isSeatId(controllerId)) return "Neutral";
+    const seat = seats.find((row) => row.seatId === controllerId);
+    return seat ? sideDisplayName(seat) : controllerId;
+  }
+  function homesInOrder(homeSeatIds, seats) {
+    return sortSeatsByOrder(
+      homeSeatIds.map((seatId) => seats.find((seat) => seat.seatId === seatId)).filter((seat) => seat != null)
+    );
+  }
+  function formatHexControlLabel(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    const controllerName = controllerSideLabel(args.controllerId, args.seats);
+    if (homes.length === 0) return controllerName;
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => sideDisplayName(seat));
+      return `${controllerName} (${names.join(" & ")} homes)`;
+    }
+    const home = homes[0];
+    if (args.controllerId === home.seatId) return `${sideDisplayName(home)} (home)`;
+    return `${controllerName} (${sideDisplayName(home)} home)`;
+  }
+  function formatUnitNameForViewer(args) {
+    if (isNeutralOwnerId(args.ownerId)) return args.baseName;
+    if (args.viewerSeatId != null && args.ownerId === args.viewerSeatId) return args.baseName;
+    if (args.seats.length === 2) return args.baseName;
+    const seat = args.seats.find((row) => row.seatId === args.ownerId);
+    if (!seat) return args.baseName;
+    return `${sideDisplayName(seat)} \xB7 ${args.baseName}`;
+  }
+  function formatHomeChip(args) {
+    const homes = homesInOrder(args.homeSeatIds, args.seats);
+    if (homes.length === 1 && args.viewerSeatId != null && homes[0].seatId === args.viewerSeatId) {
+      return { kind: "home", text: "Home" };
+    }
+    if (homes.length === 1) return { kind: "enemy-home", text: `${sideDisplayName(homes[0])} home` };
+    if (homes.length >= 2) {
+      const names = homes.map((seat) => sideDisplayName(seat));
+      return { kind: "enemy-home", text: `${names.join(" & ")} homes` };
+    }
+    if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: "enemy-home", text: "Neutral" };
+    return null;
   }
 
   // src/shared/statusIconHtml.ts
@@ -28962,7 +29034,7 @@ ${bonuses}`;
     const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
     const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
     const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-    return { modelId, reasoningEffort, doctrineChoice: "balanced", apiKey: "" };
+    return { modelId, reasoningEffort, doctrineChoice: "balanced", apiKey: "", nickname: "" };
   }
   function commanderButtonLabel(commander) {
     const modelSelect = document.getElementById("openrouter-model");
@@ -28984,7 +29056,7 @@ ${bonuses}`;
     const mapKind = selectedNewGameTab();
     const commander = defaultCommander();
     let next = initialSidesState({ mapKind, homes, defaultCommander: commander, rowCount: requestedRows });
-    if (!options?.reset && sidesState?.observeOnly) next = setObserveOnly(next, true, commander);
+    if (!options?.reset && sidesState?.observeOnly) next = setObserveOnly(next, true, commander, homes);
     for (let index = 0; index < next.rows.length; index += 1) {
       next = randomizeRowHome(next, index, homes, Math.random);
     }
@@ -28999,7 +29071,7 @@ ${bonuses}`;
       const box = document.getElementById("new-game-observe-only");
       closeCommanderPopover();
       sidesState = prefillFirstAiApiKey(
-        setObserveOnly(sidesState, box?.checked === true, defaultCommander()),
+        setObserveOnly(sidesState, box?.checked === true, defaultCommander(), homesForTab()),
         rememberedCommanders.prefillApiKey
       );
       renderNewGameSides();
@@ -29079,9 +29151,12 @@ ${bonuses}`;
   function copyCommanderFrom(index, source) {
     if (!sidesState) return;
     const copied = source === "previous-match" ? commanderFromLastGame() : commanderFromPreviousRow(index);
-    if (!copied) return;
-    sidesState = setRowCommander(sidesState, index, copied);
-    replaceOpenCommanderDraft(copied);
+    if (!copied || !sidesState) return;
+    const kept = sidesState.rows[index]?.commander?.nickname ?? "";
+    const nickname = normalizeSideNickname(copied.nickname) || kept;
+    const next = { ...copied, nickname };
+    sidesState = setRowCommander(sidesState, index, next);
+    replaceOpenCommanderDraft(next);
     renderNewGameSides();
   }
   function commanderFromLastGame() {
@@ -29091,7 +29166,8 @@ ${bonuses}`;
       modelId: previous.modelId,
       reasoningEffort: previous.reasoningEffort,
       doctrineChoice: previous.doctrineChoice,
-      apiKey: previous.apiKey
+      apiKey: previous.apiKey,
+      nickname: previous.nickname
     };
   }
   function commanderFromPreviousRow(index) {
@@ -29116,6 +29192,7 @@ ${bonuses}`;
       anchor: button,
       title: `${label} commander`,
       commander: row.commander ?? defaultCommander(),
+      defaultNickname: nicknameForHome(row.homeKey ?? "", homesForTab()),
       copyButton: buttonState ? {
         label: buttonState.label,
         disabled: buttonState.disabled,
@@ -29152,7 +29229,7 @@ ${bonuses}`;
     }
     select.addEventListener("change", () => {
       if (!sidesState) return;
-      sidesState = setRowHome(sidesState, index, select.value);
+      sidesState = setRowHome(sidesState, index, select.value, homesForTab());
       renderNewGameSides();
       void refreshNewGameMapPreview();
     });
@@ -29234,7 +29311,7 @@ ${bonuses}`;
   function headingFor(seats, first) {
     if (first.length !== 1) return "No side won.";
     const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
-    if (!human) return `${first[0].homeRegion} wins.`;
+    if (!human) return `${sideDisplayName(first[0])} wins.`;
     return `You placed ${formatPlaceOrdinal(human.place ?? seats.length)} of ${seats.length}.`;
   }
   function resultLine(input, first) {
@@ -29243,21 +29320,21 @@ ${bonuses}`;
     if (input.gameEndReason === "ended_by_human") return `You ended the match on turn ${input.turnNumber}.`;
     if (first.length !== 1) return "";
     const winner = first[0];
-    if (input.gameEndReason === "mutual_elimination") return `${winner.homeRegion} holds the most city hexes.`;
+    if (input.gameEndReason === "mutual_elimination") return `${sideDisplayName(winner)} holds the most city hexes.`;
     if (input.gameEndReason === "turn_limit") {
-      return `${winner.homeRegion} holds the most city hexes at the end of turn ${input.turnNumber}.`;
+      return `${sideDisplayName(winner)} holds the most city hexes at the end of turn ${input.turnNumber}.`;
     }
     return lastStandingLine(winner, input.seats);
   }
   function lastStandingLine(winner, seats) {
-    const opening = `${winner.homeRegion} is the last side standing.`;
+    const opening = `${sideDisplayName(winner)} is the last side standing.`;
     const victims = seats.filter((seat) => seat.outBy === winner.seatId && seat.outTurn !== null).sort((left, right) => (right.outTurn ?? 0) - (left.outTurn ?? 0) || left.seatOrder - right.seatOrder);
     const latest = victims[0];
     if (!latest || latest.outTurn === null) return opening;
-    return `${opening} It knocked out ${latest.homeRegion} on turn ${latest.outTurn}.`;
+    return `${opening} It knocked out ${sideDisplayName(latest)} on turn ${latest.outTurn}.`;
   }
   function shareSentence(first) {
-    const names = first.map((seat) => seat.homeRegion);
+    const names = first.map((seat) => sideDisplayName(seat));
     const named = names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
     return `${named} share first place with ${cityHexPhrase(first[0]?.cityHexes ?? 0)} each.`;
   }
@@ -29267,7 +29344,7 @@ ${bonuses}`;
     return {
       place: seat.place,
       seatId: seat.seatId,
-      name: you ? `${seat.homeRegion} (you)` : seat.homeRegion,
+      name: you ? `${sideDisplayName(seat)} (you)` : sideDisplayName(seat),
       dotColor: paletteForOwner(seat.seatId, input.seats)?.map ?? "#9CA3AF",
       status: statusFor(seat, input.gameEndReason, singleWinner),
       commanderSummary: ai ? commanderSummary(seat, input.modelLabels) : null,
@@ -29294,7 +29371,8 @@ ${bonuses}`;
   function knockedOutBy(seat, input) {
     if (seat.outBy === null) return null;
     if (input.viewerSeatId !== null && seat.outBy === input.viewerSeatId) return "Knocked out by you";
-    const name = input.seats.find((row) => row.seatId === seat.outBy)?.homeRegion;
+    const credited = input.seats.find((row) => row.seatId === seat.outBy);
+    const name = credited ? sideDisplayName(credited) : void 0;
     return `Knocked out by ${name ?? "A side"}`;
   }
   function cityHexPhrase(count) {
@@ -29346,6 +29424,7 @@ ${bonuses}`;
       seatOrder: seat.seatOrder,
       kind: seat.kind,
       homeRegion: seat.homeRegion,
+      nickname: seat.nickname,
       outTurn: seat.outTurn,
       outBy: seat.outBy,
       place: seat.place,
@@ -29993,7 +30072,7 @@ ${bonuses}`;
       void refreshObservedSnapshot();
     }
     const ordered = sortSeatsByOrder(seats);
-    const key = ordered.map((seat) => `${seat.seatId}:${seat.outTurn ?? ""}:${seat.homeRegion}`).join("|");
+    const key = ordered.map((seat) => `${seat.seatId}:${seat.outTurn ?? ""}:${sideDisplayName(seat)}`).join("|");
     if (select.dataset.seats !== key) {
       select.dataset.seats = key;
       const all = document.createElement("option");
@@ -30002,7 +30081,7 @@ ${bonuses}`;
       const options = ordered.map((seat) => {
         const option2 = document.createElement("option");
         option2.value = seat.seatId;
-        option2.textContent = abbreviatedSideName(seat);
+        option2.textContent = sideDisplayName(seat);
         option2.disabled = seat.outTurn != null;
         return option2;
       });
@@ -30061,7 +30140,7 @@ ${bonuses}`;
     }
     return {
       observing: false,
-      lead: { ...chipFor(viewer, statuses, true), label: viewer.homeRegion },
+      lead: { ...chipFor(viewer, statuses, true), label: sideDisplayName(viewer) },
       chips: ordered.filter((seat) => seat !== viewer).map((seat) => chipFor(seat, statuses, false))
     };
   }
@@ -30072,7 +30151,7 @@ ${bonuses}`;
     const statusIcon2 = knockedOut || status === null || status === "no_model" || status === "timed_out" || status === "out" ? null : status;
     return {
       seatId: seat.seatId,
-      label: shortSideName(seat.homeRegion),
+      label: sideDisplayName(seat),
       dotColor: palette.map,
       statusIcon: statusIcon2,
       statusColor: statusIcon2 === "planning" ? palette.text : statusIcon2 === "ready" ? READY_CHECK_COLOR : null,
@@ -30140,7 +30219,7 @@ ${bonuses}`;
     });
     const lines = ranked.map((seat) => {
       const you = viewer !== null && seat.seatId === viewer ? " (you)" : "";
-      return `${seat.homeRegion}${you} ${counts.get(seat.seatId) ?? 0}`;
+      return `${sideDisplayName(seat)}${you} ${counts.get(seat.seatId) ?? 0}`;
     });
     const tooltip = `City hexes held. Most at the end of turn ${turnLimit} wins. A tie leaves no single winner. ${lines.join("; ")}`;
     if (viewer === null) return { summary: null, tooltip };
@@ -30265,10 +30344,18 @@ ${bonuses}`;
     if (opponentCount) opponentCount.textContent = rightCount.toLocaleString("en-US");
     const leftName = document.getElementById("battle-force-human-name");
     const leadSeat = seats.find((seat) => seat.seatId === leadId);
-    if (leftName) leftName.textContent = leadId != null ? shortSideName(leadSeat?.homeRegion ?? leadId) : "yours";
+    if (leftName) {
+      const leftLabel = leadId == null ? "yours" : leadSeat ? sideDisplayName(leadSeat) : leadId;
+      leftName.textContent = leftLabel;
+      leftName.title = leftLabel;
+    }
     const opposingSeat = seats.find((seat) => seat.seatId === opposingId);
     const nameEl = document.getElementById("battle-force-enemy-name");
-    if (nameEl) nameEl.textContent = opposingId != null && isNeutralOwnerId(opposingId) ? "Neutral" : shortSideName(opposingSeat?.homeRegion ?? "Enemy");
+    if (nameEl) {
+      const rightLabel = opposingId != null && isNeutralOwnerId(opposingId) ? "Neutral" : opposingSeat ? sideDisplayName(opposingSeat) : "Enemy";
+      nameEl.textContent = rightLabel;
+      nameEl.title = rightLabel;
+    }
     const dot = document.getElementById("battle-force-enemy-dot");
     const enemyPalette = paletteForOwner(opposingId, seats);
     if (dot) dot.style.background = enemyPalette?.map ?? "#9D174D";
@@ -30432,6 +30519,7 @@ ${bonuses}`;
     name.className = "topbar-side-name";
     if (id) name.id = id;
     name.textContent = label;
+    name.title = label;
     return name;
   }
   function statusIcon(chip) {
@@ -35817,6 +35905,53 @@ ${bonuses}`;
     initialFocus: "confirm"
   });
 
+  // src/renderer/gameplay/humanNicknameField.ts
+  function wireHumanNicknameField() {
+    const input = nicknameInput();
+    if (!input || input.dataset.wired === "true") return;
+    input.dataset.wired = "true";
+    input.maxLength = SIDE_NICKNAME_MAX_LENGTH;
+    input.dataset.controlTooltip = humanNicknameFieldTooltipText;
+    input.title = humanNicknameFieldTooltipText;
+    const api = window.gameApi;
+    if (!api) return;
+    void api.getHumanNickname().then((name) => {
+      if (input.dataset.loaded === "true") return;
+      input.value = name;
+      input.dataset.loaded = "true";
+    }).catch((err) => {
+      console.error("human nickname load failed", err);
+    });
+    const save = (value) => {
+      input.dataset.loaded = "true";
+      void api.setHumanNickname(value).catch((err) => {
+        console.error("human nickname save failed", err);
+      });
+    };
+    input.addEventListener("input", () => save(input.value));
+    input.addEventListener("blur", () => {
+      if (input.dataset.loaded !== "true") return;
+      const accepted = acceptedHumanNickname(input.value);
+      input.value = accepted;
+      save(accepted);
+    });
+  }
+  function readHumanNicknameField() {
+    return acceptedHumanNickname(nicknameInput()?.value ?? HUMAN_NICKNAME_DEFAULT);
+  }
+  function readHumanNicknameForStart() {
+    const input = nicknameInput();
+    if (!input || input.dataset.loaded !== "true") return void 0;
+    return readHumanNicknameField();
+  }
+  function acceptedHumanNickname(value) {
+    return normalizeSideNickname(value) || HUMAN_NICKNAME_DEFAULT;
+  }
+  function nicknameInput() {
+    const input = document.getElementById("new-game-human-nickname");
+    return input instanceof HTMLInputElement ? input : null;
+  }
+
   // src/renderer/gameplay/observeIntent.ts
   var watchTheRest = false;
   function chooseWatchTheRest() {
@@ -35901,6 +36036,7 @@ ${bonuses}`;
     bindNewGameSides();
     registerGameSizeSelect();
     wireNewGameOptionsPopover();
+    wireHumanNicknameField();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
       if (!window.gameApi?.newGame) return;
@@ -35919,6 +36055,7 @@ ${bonuses}`;
       stopMatchWaitingUnderNewGame();
       const cameraHold = holdNewGameMapPreviewCamera();
       try {
+        const humanNickname = readHumanNicknameForStart();
         const state = await window.gameApi.newGame({
           ...readNewGameOptionChoices(),
           startMonth: readNewGameStartMonth(),
@@ -35928,7 +36065,8 @@ ${bonuses}`;
           victoryRule: seatsStart.victoryRule,
           aiOnlyBattles: seatsStart.aiOnlyBattles,
           sightCues: seatsStart.sightCues,
-          gameSize: readSelectedGameSizeFromDocument()
+          gameSize: readSelectedGameSizeFromDocument(),
+          ...humanNickname === void 0 ? {} : { humanNickname }
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         installRendererGameMap(state);
@@ -36601,7 +36739,9 @@ ${bonuses}`;
     return (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
       seatId: seat.seatId,
       seatOrder: seat.seatOrder,
-      homeRegion: seat.homeRegion
+      homeRegion: seat.homeRegion,
+      kind: seat.kind,
+      nickname: seat.nickname
     }));
   }
   async function announceResolutionTurnUpdate(args, deps) {
@@ -36778,8 +36918,8 @@ ${bonuses}`;
     if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
     const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
     if (winner == null || winner === "mutual") return "All units destroyed.";
-    const home = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
-    return `${home && home.length > 0 ? home : winner} wins the battle.`;
+    const winnerSeat = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner);
+    return `${winnerSeat ? sideDisplayName(winnerSeat) : winner} wins the battle.`;
   }
   async function leaveAiOnlyBattle(session, io, autoAdvance) {
     await tacticalPerformBattleExit(session, { ...io, runReadyAfterExit: async () => {
@@ -38716,9 +38856,9 @@ ${bonuses}`;
     const remaining = (before?.units ?? []).filter((unit) => unit.player === row.seatId && !removed.has(unit.id)).length;
     const share = activeGameMap().controlWinMinUrbanShare;
     return formatKnockoutNotice({
-      victimName: victim?.homeRegion ?? row.seatId,
+      victimName: victim ? sideDisplayName(victim) : row.seatId,
       victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
-      outByName: outBy?.homeRegion ?? null,
+      outByName: outBy ? sideDisplayName(outBy) : null,
       reasons: row.reasons,
       globalHome: share === null,
       controlShareLabel: share === null ? "" : `${Math.round(share * 100)}%`,
@@ -38760,7 +38900,7 @@ ${bonuses}`;
     const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
     const share = activeGameMap().controlWinMinUrbanShare;
     const choice = await openHumanKnockoutDialog(formatHumanKnockoutDialog({
-      outByName: outBy?.homeRegion ?? (row.outBy ? "A side" : null),
+      outByName: outBy ? sideDisplayName(outBy) : row.outBy ? "A side" : null,
       turnNumber: state.turnNumber,
       place: row.place,
       seatCount: Math.max(seats.length, 1),
@@ -39800,7 +39940,7 @@ ${bonuses}`;
     const opening = strategyToastHidden() || tabState === null;
     if (opening && !dispatches.some((dispatch) => commanderDispatchHasProse(dispatch.message, dispatch.strategy))) return;
     if (opening) {
-      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
+      const seats = (rendererSharedState.gameState?.seats ?? []).filter((seat) => seat.kind === AI_SEAT_KIND).map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
       tabState = initialCommanderMessageTabs(seats);
     } else if (tabState) {
       tabState = resetCommanderConsultMarks(tabState);
@@ -39855,6 +39995,7 @@ ${bonuses}`;
       const flag = createSideNumberFlag(tab.seatId, rendererSharedState.gameState?.seats ?? []);
       if (flag) button.appendChild(flag);
       button.appendChild(document.createTextNode(tab.label));
+      button.title = tab.label;
       button.disabled = !tab.enabled;
       button.setAttribute("aria-selected", tab.seatId === state.selectedSeatId ? "true" : "false");
       button.addEventListener("click", () => {
@@ -40590,6 +40731,7 @@ ${bonuses}`;
       for (const label of ["", "Hex", ...partyHeaders]) {
         const th = document.createElement("th");
         th.textContent = label;
+        if (label) th.title = label;
         hr.appendChild(th);
       }
       thead.appendChild(hr);
@@ -40758,7 +40900,7 @@ ${bonuses}`;
   function partyName(ownerId) {
     if (isNeutralOwnerId(ownerId)) return "Neutral";
     const seat = rendererSharedState.gameState?.seats?.find((row) => row.seatId === ownerId);
-    return seat ? shortSideName(seat.homeRegion) : ownerId;
+    return seat ? sideDisplayName(seat) : ownerId;
   }
   function ownerDot(ownerId) {
     const dot = document.createElement("span");

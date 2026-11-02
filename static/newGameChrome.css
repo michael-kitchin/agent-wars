@@ -546,6 +546,23 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-options-popover[hidden] {
   display: none;
 }
+.new-game-human-nickname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.new-game-human-nickname > label {
+  flex: 0 0 auto;
+}
+.new-game-human-nickname > input {
+  height: 30px;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
 .new-game-options-popover .new-game-section {
   padding: 12px 0;
   border-bottom: 1px solid var(--chrome-divider);

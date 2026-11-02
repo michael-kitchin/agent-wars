@@ -21,6 +21,8 @@ import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { isBuildUnitType } from '../productionRules';
+import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
+import { findIdleProductionHexes, selectNextQueueEntry, type IdleProductionHex } from './productionAttention';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
@@ -100,145 +102,6 @@ export function formatBriefingProductionQueueCell(
     return `${queueLabel} (blocked: at cap)`;
   }
   return queueLabel;
-}
-
-/**
- * Documents the `ProductionQueueEntrySnapshot` interface as a named contract surface (interface ProductionQueueEntrySnapshot).
-
- * Purpose: Supports maintainability by documenting why `ProductionQueueEntrySnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface ProductionQueueEntrySnapshot {
-    /**
-   * Specifies the contract for the `entryId` member (entryId?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `entryId` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-entryId?: unknown;
-    /**
-   * Specifies the contract for the `queueIndex` member (queueIndex?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `queueIndex` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-queueIndex?: unknown;
-    /**
-   * Specifies the contract for the `unitType` member (unitType?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-unitType?: unknown;
-    /**
-   * Specifies the contract for the `count` member (count?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `count` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-count?: unknown;
-}
-
-/**
- * Documents the `ControlledHexQueueSnapshot` interface as a named contract surface (interface ControlledHexQueueSnapshot).
-
- * Purpose: Supports maintainability by documenting why `ControlledHexQueueSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface ControlledHexQueueSnapshot {
-    /**
-   * Specifies the contract for the `hex` member (hex?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `hex` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-hex?: unknown;
-    /**
-   * Specifies the contract for the `urbanHexCount` member (urbanHexCount?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-urbanHexCount?: unknown;
-    /**
-   * Specifies the contract for the `airportCount` member (airportCount?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-airportCount?: unknown;
-    /**
-   * Specifies the contract for the `seaportCount` member (seaportCount?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-seaportCount?: unknown;
-  /**
-   * Fortified city cells on a hex the commander controls.
-   *
-   * Contract: From `query_production`. Absent on another seat's hex.
-   * When to use: The Fortified column.
-   * Expected outcome: A non-negative count.
-   * Exceptions: None.
-   */
-  fortifiedCount?: unknown;
-  /**
-   * Intact city cells that are not yet fortified.
-   *
-   * Contract: From `query_production`, paired with `fortifiedCount`.
-   * When to use: The Fortified column's denominator.
-   * Expected outcome: A non-negative count.
-   * Exceptions: None.
-   */
-  fortifiableCount?: unknown;
-  /**
-   * Whether building is paused on this hex.
-   *
-   * Contract: True only when the queue cannot spend because the seat has no unit or fortification there.
-   * When to use: The Building column.
-   * Expected outcome: True, false, or absent.
-   * Exceptions: None.
-   */
-  buildPaused?: unknown;
-    /**
-   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-availableUnitTypes?: unknown;
-    /**
-   * Specifies the contract for the `entries` member (entries?: unknown;).
-
-   * Contract: Describes stable behavior for callers of `entries` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-entries?: unknown;
 }
 
 /**
@@ -358,19 +221,7 @@ function normalizeControlledHexQueueRow(
     : [];
   const available = formatBriefingAvailableUnitTypes(availableList, maxedTypes);
   const entriesList = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
-  const nextEntry = [...entriesList].sort((a, b) => {
-    const queueIndexA = Number(a.queueIndex);
-    const queueIndexB = Number(b.queueIndex);
-    if (Number.isFinite(queueIndexA) && Number.isFinite(queueIndexB) && queueIndexA !== queueIndexB) {
-      return queueIndexA - queueIndexB;
-    }
-    const entryIdA = Number(a.entryId);
-    const entryIdB = Number(b.entryId);
-    if (Number.isFinite(entryIdA) && Number.isFinite(entryIdB) && entryIdA !== entryIdB) {
-      return entryIdA - entryIdB;
-    }
-    return 0;
-  })[0];
+  const nextEntry = selectNextQueueEntry(entriesList);
   const queuedUnitType = nextEntry ? String(nextEntry.unitType ?? '') : undefined;
   const entriesRaw = nextEntry
     ? `${Number.isFinite(Number(nextEntry.count)) ? Number(nextEntry.count) : '?'} ${queuedUnitType ?? '?'}`
@@ -390,25 +241,25 @@ function normalizeControlledHexQueueRow(
 }
 
 /**
- * Defines the `buildProductionBriefingBlock` function shape (export function buildProductionBriefingBlock(args: { productionEnabled: boolean; state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>;).
-
- * Purpose: Supports maintainability by documenting why `buildProductionBriefingBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Production status text plus every idle controlled hex.
+ *
+ * Purpose: The section text is unchanged. The idle list feeds Attention Flags and is computed from every queue, including queues the table does not show.
+ * When to use: `buildProductionBriefingBlock` and `buildStatusInjectionTexts`.
+ * Expected outcome: `text` is the production section, or empty when production is off. `idleHexes` is empty when production is off, the snapshot failed, or no hex is idle.
  * Exceptions: None.
  */
-export function buildProductionBriefingBlock(args: {
+export function buildProductionBriefing(args: {
   productionEnabled: boolean;
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   resolveToH3: (lat: number, lng: number) => string | undefined;
   formatHexLabel: (ll: [number, number]) => string;
-}): string {
-  logDebug('briefingSections buildProductionBriefingBlock', {
+}): { readonly text: string; readonly idleHexes: readonly IdleProductionHex[] } {
+  logDebug('briefingSections buildProductionBriefing', {
     productionEnabled: args.productionEnabled,
     turnNumber: args.state.turnNumber,
   });
-  if (!args.productionEnabled) return '';
+  if (!args.productionEnabled) return { text: '', idleHexes: [] };
   const ownSeat = briefingOwnSeatId(args.state);
   const snapshot = executeProductionTools(ownSeat, 'query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
     status?: string;
@@ -417,10 +268,16 @@ export function buildProductionBriefingBlock(args: {
     unavailableReason?: string;
   };
   if (snapshot.status !== 'ok') {
-    return `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
+    return {
+      text: `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`,
+      idleHexes: [],
+    };
   }
   if (typeof snapshot.unavailableReason === 'string' && snapshot.unavailableReason.trim().length > 0) {
-    return `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`;
+    return {
+      text: `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`,
+      idleHexes: [],
+    };
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
   const opponentCounts = getPlayerUnitCountsByType(args.state.units, ownSeat);
@@ -444,14 +301,15 @@ export function buildProductionBriefingBlock(args: {
     lines.push(PRODUCTION_CAP_QUEUE_GUIDANCE);
   }
   lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
+  const maxedTypeSet = new Set(maxedTypes);
+  const idleHexes = findIdleProductionHexes(queues as ControlledHexQueueSnapshot[], maxedTypeSet, args.formatHexLabel);
   if (queues.length === 0) {
     lines.push(PRODUCTION_EMPTY_QUEUES_SENTENCE);
-    return lines.join('\n');
+    return { text: lines.join('\n'), idleHexes };
   }
   lines.push('');
   lines.push(subHeading(SECTION_TITLE_CONTROLLED_HEX_QUEUES));
   lines.push('');
-  const maxedTypeSet = new Set(maxedTypes);
   const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
     normalizeControlledHexQueueRow(row, args.formatHexLabel, maxedTypeSet)
   );
@@ -475,6 +333,24 @@ export function buildProductionBriefingBlock(args: {
       ['—', '—', '—', '—', '—', '—', '—', '—']
     )
   );
-  return lines.join('\n');
+  return { text: lines.join('\n'), idleHexes };
+}
+
+/**
+ * Production status section text.
+ *
+ * Purpose: Callers that only insert the section do not need the idle-hex list.
+ * When to use: Anywhere that previously called this function for the markdown alone.
+ * Expected outcome: `buildProductionBriefing(args).text`.
+ * Exceptions: None.
+ */
+export function buildProductionBriefingBlock(args: {
+  productionEnabled: boolean;
+  state: GameStateSnapshot;
+  latLngByH3: Map<string, [number, number]>;
+  resolveToH3: (lat: number, lng: number) => string | undefined;
+  formatHexLabel: (ll: [number, number]) => string;
+}): string {
+  return buildProductionBriefing(args).text;
 }
 

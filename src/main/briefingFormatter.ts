@@ -5,6 +5,8 @@
  */
 
 import { strategicCellAt, tacticalCellAt } from '../shared/h3Resolutions';
+import { STANDING_ORDER_WARNING_STATUSES } from './tools/standingOrdersShared';
+import { appendProductionAttentionBullet } from './openRouter/productionAttention';
 import { isMissileUnitType } from '../shared/missileRules';
 
 import type { GameStateSnapshot } from './gameDb';
@@ -31,7 +33,7 @@ import {
 } from './tools/assessUnitProximity';
 import { getMovementBudgetForUnit } from './pathfinding';
 import { formatBriefingWeatherCell } from '../shared/weatherBonusRules';
-import { marchStepRecedesFromEnemy } from './tools/standingMarchReceding';
+import { recedingOrderAttentionText, standingOrderRecedesFromNearestEnemy, standingOrderTypeOf } from './tools/standingMarchReceding';
 import {
   collectBestOptionsAirStrikeUnitIds,
   collectOrderlessMissionContext,
@@ -47,6 +49,7 @@ import {
   SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE,
   SECTION_TITLE_UNIT_STATUS_AND_THREATS,
   SECTION_TITLE_ATTENTION_FLAGS,
+  shiftMarkdownHeadings,
   topLevelHeading,
 } from './openRouter/promptSpec/sectionHeadings';
 import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
@@ -74,24 +77,16 @@ export type FormatBriefingSharedContext = {
    * Exceptions: None.
    */
   includeProductionSection?: boolean;
+  /**
+   * Production attention sentence, without a leading list marker.
+   *
+   * Contract: Null or omitted when production is off or no hex is idle. Otherwise the sentence from `formatProductionAttentionBullet`.
+   * When to use: Strategic `formatBriefing` only. Tactical briefings do not receive it.
+   * Expected outcome: Appended after the unit attention bullets, replacing `None.` when it is the only bullet.
+   * Exceptions: None.
+   */
+  productionAttention?: string | null;
 };
-
-/**
- * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
-
- * Purpose: Supports maintainability by documenting why `WARNING_STATUSES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const WARNING_STATUSES = new Set([
-  'blocked',
-  'target_lost',
-  'target_out_of_range',
-  'target_destroyed',
-  'arrived',
-  'contact',
-]);
 
 /**
  * Defines the `formatPos` function shape (function formatPos(ll: [number, number]): string).
@@ -329,39 +324,6 @@ function canCloseThisTurn(assessment: UnitAssessmentResult, useGridHopBudget: bo
 }
 
 /**
- * True when a standing march's destination is farther from the nearest enemy than the unit's current cell.
- *
- * Purpose: Units with a healthy march away from contact were marked Action needed no and kept sailing.
- * When to use: `needsAction` after shots and this-turn closes are considered.
- * Expected outcome: True only for march orders with a destination that recedes in hops.
- * Exceptions: Missing geometry or unmeasurable hops return false.
- */
-function standingMarchRecedesFromNearestEnemy(assessment: UnitAssessmentResult): boolean {
-  const order = assessment.result.unit?.currentStandingOrder as
-    | { type?: unknown; orderType?: unknown; destination?: unknown }
-    | null
-    | undefined;
-  if (!order) return false;
-  const orderType = typeof order.type === 'string' ? order.type : typeof order.orderType === 'string' ? order.orderType : '';
-  if (orderType !== 'march') return false;
-  const dest = order.destination;
-  if (!Array.isArray(dest) || dest.length < 2) return false;
-  const unitPos = assessment.result.unit?.position;
-  if (!Array.isArray(unitPos) || unitPos.length < 2) return false;
-  const nearest = assessment.result.nearbyEnemies?.[0] as { position?: unknown } | undefined;
-  const enemyPos = nearest?.position;
-  if (!Array.isArray(enemyPos) || enemyPos.length < 2) return false;
-  try {
-    const unitH3 = strategicCellAt(Number(unitPos[0]), Number(unitPos[1]));
-    const destH3 = strategicCellAt(Number(dest[0]), Number(dest[1]));
-    const enemyH3 = strategicCellAt(Number(enemyPos[0]), Number(enemyPos[1]));
-    return marchStepRecedesFromEnemy(unitH3, destH3, enemyH3);
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Empty air-strike set for callers that have no Best Options rows.
  *
  * Purpose: Tactical briefings and the strategic narrative omit infrastructure strikes.
@@ -394,8 +356,8 @@ function hasListedAirStrike(assessment: UnitAssessmentResult, airStrikeRowUnitId
  * with no strike row and no other reason stays off, and ferry coaching does not mark it.
  * When to use: Unit Status rows and Attention Flags assembly.
  * Expected outcome: Always true when the unit has a legal attack, a listed air strike, can close this turn under a
- * moderate/critical threat, or is on a standing march that recedes from the nearest enemy under a moderate/critical
- * threat. Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also
+ * moderate/critical threat, or is on a standing march or defend walk-back that recedes from the nearest enemy under a
+ * moderate/critical threat. Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also
  * missing/warning standing orders. The strategic narrative passes the empty air-strike set.
  * Exceptions: None.
  */
@@ -413,12 +375,12 @@ function needsAction(
   // A this-turn close is the other action the engine cannot choose a destination for. A healthy march to a
   // rear hex must not mark the unit as needing nothing while Best Options lists move/melee onto the enemy.
   if (canCloseThisTurn(assessment, useGridHopBudget) && hasActionableThreat(assessment)) return true;
-  if (standingMarchRecedesFromNearestEnemy(assessment) && hasActionableThreat(assessment)) return true;
+  if (standingOrderRecedesFromNearestEnemy(assessment) && hasActionableThreat(assessment)) return true;
   const actionable = hasActionableThreat(assessment);
   if (!standingOrdersActive) return actionable;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   if (!order && actionable) return true;
-  if (order && typeof order.status === 'string' && WARNING_STATUSES.has(order.status)) return true;
+  if (order && typeof order.status === 'string' && STANDING_ORDER_WARNING_STATUSES.has(order.status)) return true;
   return false;
 }
 
@@ -428,7 +390,7 @@ function needsAction(
  * Purpose: Softens Action needed for units with a healthy standing order and only low threats.
  * When to use: Strategic Unit Status rows when Orders tools are enabled.
  * Expected outcome: false when standing orders are inactive, the unit has a legal attack, Best Options lists an air
- * strike for an air unit, the march recedes from the nearest enemy, or threats are non-low / order missing/warning.
+ * strike for an air unit, the standing march or defend walk-back recedes from the nearest enemy, or threats are non-low / order missing/warning.
  * A healthy defend order does not make an air unit with a listed strike quiet.
  * Exceptions: None.
  */
@@ -439,20 +401,20 @@ function isQuiet(
 ): boolean {
   if (!standingOrdersActive) return false;
   if (hasLegalAttackThisTurn(assessment) || hasListedAirStrike(assessment, airStrikeRowUnitIds)) return false;
-  if (standingMarchRecedesFromNearestEnemy(assessment)) return false;
+  if (standingOrderRecedesFromNearestEnemy(assessment)) return false;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   const threats = assessment.result.threats ?? [];
   const hasNonLow = threats.some((t) => t.severity !== 'low');
   if (hasNonLow) return false;
   if (!order) return false;
-  if (order.status && WARNING_STATUSES.has(order.status)) return false;
+  if (order.status && STANDING_ORDER_WARNING_STATUSES.has(order.status)) return false;
   return true;
 }
 
 /**
  * Builds the Unit Status and Threats markdown table for Commander briefings.
  *
- * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in `# Standing Order Status` when Orders are enabled.
+ * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in the Standing Order Status section when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
  *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
@@ -658,7 +620,10 @@ export function buildAttentionFlags(
       }
       continue;
     }
-    const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
+    const order = a.result.unit?.currentStandingOrder as
+      | { status?: string; type?: unknown; orderType?: unknown }
+      | null
+      | undefined;
     // Shooters already occupy the armed-units aggregate. Emitting them again as closers lets naval/air
     // shots fill the reserved threat slots and hide armor that can only move/melee this turn.
     if (canCloseThisTurn(a, coordinateMode === 'strategic') && hasActionableThreat(a) && nearest && !hasOrderableShotThisTurn(a, coordinateMode)) {
@@ -673,22 +638,24 @@ export function buildAttentionFlags(
         rank: severityRank(sev),
         text: `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev ?? 'moderate'} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`,
       });
-    } else if (order?.status && WARNING_STATUSES.has(order.status)) {
+    } else if (order?.status && STANDING_ORDER_WARNING_STATUSES.has(order.status)) {
       candidates.push({
         rank: 2,
         text: `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`,
       });
     } else if (
-      standingMarchRecedesFromNearestEnemy(a) &&
+      standingOrderRecedesFromNearestEnemy(a) &&
       hasActionableThreat(a) &&
       nearest &&
       !hasOrderableShotThisTurn(a, coordinateMode)
     ) {
       candidates.push({
         rank: 1,
-        text:
-          `${formatUnitDisplayRef(a.unitId)} standing march recedes from the nearest enemy ` +
-          `(${formatUnitDisplayRef(nearest.unitId)}) — override it this turn.`,
+        text: recedingOrderAttentionText(
+          formatUnitDisplayRef(a.unitId),
+          formatUnitDisplayRef(nearest.unitId),
+          standingOrderTypeOf(order)
+        ),
       });
     }
   }
@@ -804,7 +771,7 @@ function omniscientGridProximityBriefingLine(state: GameStateSnapshot): string {
  *
  * Purpose: Single map-first briefing (status, attention, operational map, memory, optional Standing Order Status, callbacks).
  * When to use: `requestOrdersFlow` when building strategic `briefingOverride`.
- * Expected outcome: Full briefing string; `# Standing Order Status` appears only when `standingOrderText` is non-empty (Orders enabled).
+ * Expected outcome: Full briefing string. Standing Order Status appears, shifted one level, only when `standingOrderText` is non-empty (Orders enabled).
  * Exceptions: None.
  */
 export function formatBriefing(
@@ -886,12 +853,15 @@ export function formatBriefing(
   );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
   sections.push(
-    buildAttentionFlags(
-      precomputed.unitAssessments,
-      'strategic',
-      standingOrdersActive,
-      orderlessAction,
-      airStrikeRowUnitIds
+    appendProductionAttentionBullet(
+      buildAttentionFlags(
+        precomputed.unitAssessments,
+        'strategic',
+        standingOrdersActive,
+        orderlessAction,
+        airStrikeRowUnitIds
+      ),
+      sharedContext?.productionAttention ?? null
     )
   );
   const operational = buildStrategicOperationalMapSectionMarkdown({
@@ -917,9 +887,9 @@ export function formatBriefing(
     sections.push('\n\n' + recentTurnNotes);
   }
   if (productionText.trim().length > 0) {
-    sections.push('\n\n' + productionText.trim());
+    sections.push('\n\n' + shiftMarkdownHeadings(productionText.trim(), 1));
   } else if (sharedContext?.includeProductionSection) {
-    sections.push('\n\n' + buildEmptyProductionQueuesSection());
+    sections.push('\n\n' + shiftMarkdownHeadings(buildEmptyProductionQueuesSection().trim(), 1));
   }
   const mem = memoryText ?? '';
   if (mem.trim().length > 0) {
@@ -929,15 +899,14 @@ export function formatBriefing(
       mem.includes('# Your strategic memory') ||
       mem.includes(topLevelHeading(SECTION_TITLE_STRATEGIC_MEMORY));
     if (hasStrategicMemoryHeader) {
-      sections.push('\n\n' + mem);
+      sections.push('\n\n' + shiftMarkdownHeadings(mem, 1));
     } else {
-      sections.push(markdownHeading1(SECTION_TITLE_STRATEGIC_MEMORY));
+      sections.push(markdownHeading2(SECTION_TITLE_STRATEGIC_MEMORY));
       sections.push(mem);
     }
   }
   if (standingOrdersActive) {
-    sections.push('\n\n');
-    sections.push(standingOrderText);
+    sections.push('\n\n' + shiftMarkdownHeadings(standingOrderText.trim(), 1));
   }
   sections.push(markdownHeading2(SECTION_TITLE_ACTIVE_CALLBACKS));
   sections.push(buildActiveCallbacksSection(subscriptions ?? [], coordCtx));

@@ -11,6 +11,7 @@ import type { CommanderKeyMemoryView, RememberedCommander } from '../../shared/c
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS, aiSeatIdForIndex } from '../../shared/seatIds';
 import { AI_SEAT_KIND, DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
+import { normalizeSideNickname, storedAiNickname } from '../../shared/sideNicknames';
 import { logDebug, logError, logTrace } from '../logger';
 import { readSeatApiKeyFlagMap, SEAT_API_KEY_FLAGS_CONFIG_KEY, writeSeatApiKeyFlags } from '../gameDb/seatApiKeyFlags';
 import { COMMANDER_MEMORY_CONFIG_KEY, SEAT_API_KEYS_CONFIG_KEY } from '../gameDb/machineLocalConfigKeys';
@@ -21,11 +22,11 @@ import { readSecretString, readStoredSecret, writeSecretString } from './secretC
  *
  * Purpose: A shorter snapshot grows with empty slots up to the commander being saved.
  * When to use: `updateRememberedCommander` when the stored array does not reach that AI number yet.
- * Expected outcome: Balanced doctrine and an empty key.
+ * Expected outcome: Balanced doctrine, an empty key, and an empty nickname.
  * Exceptions: None.
  */
 function emptyRememberedCommander(): RememberedCommander {
-  return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', apiKey: '' };
+  return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', apiKey: '', nickname: '' };
 }
 
 /**
@@ -45,7 +46,7 @@ function doctrineChoiceOf(value: unknown): DoctrineChoice {
  *
  * Purpose: A snapshot row is trusted only after its fields have a legal shape.
  * When to use: While reading the remembered array.
- * Expected outcome: Strings are trimmed. A missing key becomes `''`. The key is not logged.
+ * Expected outcome: Strings are trimmed. A missing key becomes `''`. A missing nickname becomes `''`. The key and the nickname are not logged.
  * Exceptions: None.
  */
 function rememberedFromUnknown(value: unknown): RememberedCommander {
@@ -55,6 +56,7 @@ function rememberedFromUnknown(value: unknown): RememberedCommander {
     reasoningEffort: typeof record.reasoningEffort === 'string' ? record.reasoningEffort : null,
     doctrineChoice: doctrineChoiceOf(record.doctrineChoice),
     apiKey: typeof record.apiKey === 'string' ? record.apiKey.trim() : '',
+    nickname: normalizeSideNickname(record.nickname),
   };
 }
 
@@ -201,7 +203,12 @@ export function updateRememberedCommander(aiNumber: number, commander: Remembere
   }
   const next = [...(readStoredCommanders() ?? [])];
   while (next.length < aiNumber - 1) next.push(emptyRememberedCommander());
-  next[aiNumber - 1] = { ...commander, apiKey: commander.apiKey.trim(), doctrineChoice: doctrineChoiceOf(commander.doctrineChoice) };
+  next[aiNumber - 1] = {
+    ...commander,
+    apiKey: commander.apiKey.trim(),
+    doctrineChoice: doctrineChoiceOf(commander.doctrineChoice),
+    nickname: normalizeSideNickname(commander.nickname),
+  };
   writeSecretString(COMMANDER_MEMORY_CONFIG_KEY, JSON.stringify(next));
 }
 
@@ -279,15 +286,40 @@ export function writeSeatApiKeys(entries: readonly { seatId: string; apiKey: str
 }
 
 /**
+ * The nickname the next game should copy for one AI seat.
+ *
+ * Purpose: An unchanged short home name is not a custom nickname, and a long one must not be copied back cut to 16 characters.
+ * When to use: `storeNewMatchCommanderKeys` for each AI row.
+ * Expected outcome: `''` when the cleaned nickname is empty or only repeats that seat's short home name. Otherwise the cleaned nickname.
+ * Exceptions: None. A seat missing from `resolvedHomes` uses the payload's `homeRegion`, and a blank home keeps the cleaned nickname.
+ */
+function rememberedNickname(
+  seat: NewGameSeatInput,
+  seatId: string,
+  resolvedHomes: readonly { readonly seatId: string; readonly homeRegion: string }[],
+): string {
+  const resolved = resolvedHomes.find((row) => row.seatId === seatId)?.homeRegion ?? seat.homeRegion ?? '';
+  const raw = seat.commander?.nickname ?? seat.nickname;
+  if (resolved.trim().length === 0) return normalizeSideNickname(raw);
+  return storedAiNickname(raw, resolved, seatId) ?? '';
+}
+
+/**
  * Stores seat keys and the remembered array for a new match.
  *
  * Purpose: Starting a match is the snapshot the next game reads.
  * When to use: After the roster has been reset, from the new-game handler.
  * Expected outcome: A missing `seats` array writes nothing. Otherwise each AI row, in payload order, is paired with
  *   `aiSeatIdForIndex`. A missing `apiKey` stores `legacyKey`. A present string is trimmed and stored, including `''`.
+ *   The nickname is cleaned. A missing one, and one that only repeats that seat's short home name, stores `''`.
+ *   `resolvedHomes` supplies the display name after the roster is written. Without it, only the payload's own home name can be compared.
  * Exceptions: None. More AI rows than this game allows are logged and skipped.
  */
-export function storeNewMatchCommanderKeys(seats: readonly NewGameSeatInput[] | undefined, legacyKey: string): void {
+export function storeNewMatchCommanderKeys(
+  seats: readonly NewGameSeatInput[] | undefined,
+  legacyKey: string,
+  resolvedHomes: readonly { readonly seatId: string; readonly homeRegion: string }[] = [],
+): void {
   if (seats === undefined) {
     logDebug('commanderKeyMemory storeNewMatchCommanderKeys', { wrote: false });
     return;
@@ -310,6 +342,7 @@ export function storeNewMatchCommanderKeys(seats: readonly NewGameSeatInput[] | 
       reasoningEffort: seat.commander?.reasoningEffort ?? null,
       doctrineChoice: doctrineChoiceOf(seat.commander?.doctrineChoice),
       apiKey,
+      nickname: rememberedNickname(seat, aiSeatIdForIndex(aiNumber), resolvedHomes),
     });
   }
   writeSeatApiKeys(entries);

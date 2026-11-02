@@ -8,7 +8,8 @@
  */
 
 import { aiIndexForSeatId, isNeutralOwnerId } from './seatIds';
-import { shortSideName, sortSeatsByOrder } from './seatRoster';
+import { sortSeatsByOrder, type SeatKind } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
 
 /**
  * A side the report can name.
@@ -41,11 +42,29 @@ export interface TurnReportSeat {
    * The full home name.
    *
    * Contract: The roster's `homeRegion`.
-   * When to use: `shortSideName`.
-   * Expected outcome: "Western Turkey" becomes "W. Turkey".
+   * When to use: `sideDisplayName`.
+   * Expected outcome: The full name stays available. The sentence shows the nickname.
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means Human or the short home name.
+   * When to use: `sideDisplayName`.
+   * Expected outcome: The name in a hex sentence.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
+  /**
+   * Whether a person or a commander plays the seat.
+   *
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
+   * When to use: The nickname default.
+   * Expected outcome: A human seat with no nickname reads Human.
+   * Exceptions: None.
+   */
+  readonly kind: SeatKind;
 }
 
 /**
@@ -186,11 +205,11 @@ function hexSentence(
 }
 
 /**
- * The short name of an owner.
+ * The display name of an owner.
  *
- * Purpose: Sentences use "E. Turkey" and "Neutral".
+ * Purpose: Sentences use the name `sideDisplayName` returns, and Neutral stays "Neutral".
  * When to use: Every named side.
- * Expected outcome: Neutral is "Neutral". A known seat uses its short name, or its seat id when the home name is blank. An unknown id is printed as itself.
+ * Expected outcome: Neutral is "Neutral". A known seat uses `sideDisplayName`. An unknown id is printed as itself.
  * Exceptions: None.
  */
 function ownerName(ownerId: string, seats: readonly TurnReportSeat[]): string {
@@ -204,17 +223,17 @@ function ownerName(ownerId: string, seats: readonly TurnReportSeat[]): string {
  *
  * Purpose: The sentence and the number-flag mark have to name the seat with the same characters.
  * When to use: `ownerName` and `hexNameForSeat`.
- * Expected outcome: The short home name, or the seat id when the trimmed home is empty.
+ * Expected outcome: `sideDisplayName` of that seat.
  * Exceptions: None.
  */
-function hexLabelForSeat(seat: { readonly seatId: string; readonly homeRegion: string }): string {
-  return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
+function hexLabelForSeat(seat: TurnReportSeat): string {
+  return sideDisplayName(seat);
 }
 
 /**
  * The name a sentence uses for one owner.
  *
- * Purpose: The viewer is addressed as "you". Every other owner uses the short name.
+ * Purpose: The viewer is addressed as "you". Every other owner uses the name `sideDisplayName` returns.
  * When to use: The subject of a sentence and each name in its list.
  * Expected outcome: "You" at the start of the viewer's own sentence, and "you" when the viewer is in someone else's list.
  *   Neutral is "Neutral". A null viewer names every seat.
@@ -228,7 +247,7 @@ function partyLabel(ownerId: string, input: TurnReportInput, place: 'subject' | 
 /**
  * Orders the other owners in one sentence.
  *
- * Purpose: The viewer is named first. The rest follow the displayed short name.
+ * Purpose: The viewer is named first. The rest follow the display name.
  * When to use: Before joining the names in `hexSentence`.
  * Expected outcome: A negative number when `left` is named first. Equal names use seat order, then the owner id.
  * Exceptions: None.
@@ -300,7 +319,7 @@ export interface SideNameMark {
 /**
  * A seat a toast line can name.
  *
- * Purpose: Hex sentences use the short name. Loss headers use the full home name.
+ * Purpose: Hex sentences and loss headers both use `sideDisplayName`.
  * When to use: `sideNameMarksForLine`.
  * Expected outcome: One row per seat.
  * Exceptions: None.
@@ -327,19 +346,37 @@ export interface SideNameMarkSeat {
   /**
    * Full home name.
    *
-   * Contract: Blank or whitespace means the seat id is the displayed name.
-   * When to use: `shortSideName` for hex sentences, and the full name for loss headers.
-   * Expected outcome: The name the roster stores.
+   * Contract: Blank or whitespace means an AI seat shows its seat id. A human seat still shows Human.
+   * When to use: `sideDisplayName` for hex sentences and loss headers.
+   * Expected outcome: The name the roster stores. The toast shows the nickname.
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means the short home name for an AI seat.
+   * When to use: `sideDisplayName`.
+   * Expected outcome: The same characters in a sentence and a loss header.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
+  /**
+   * Whether a person or a commander plays the seat.
+   *
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
+   * When to use: The nickname default.
+   * Expected outcome: A human seat is not marked.
+   * Exceptions: None.
+   */
+  readonly kind: SeatKind;
 }
 
 /**
  * The name an AI seat shows in a hex sentence.
  *
- * Purpose: Hex sentences use the short name, and a blank home uses the seat id.
- * When to use: Matching a short name in a hex sentence.
+ * Purpose: Hex sentences use `sideDisplayName`, and a blank AI home uses the seat id.
+ * When to use: Matching a display name in a hex sentence.
  * Expected outcome: Null when the seat is not an AI seat.
  * Exceptions: None.
  */
@@ -351,15 +388,14 @@ function hexNameForSeat(seat: SideNameMarkSeat): string | null {
 /**
  * The name an AI seat shows in a loss header.
  *
- * Purpose: Headers use the full home name, and a blank home uses the seat id.
+ * Purpose: Headers use the name `sideDisplayName` returns, and a blank home uses the seat id.
  * When to use: Matching `{name} Losses`.
  * Expected outcome: Null when the seat is not an AI seat.
  * Exceptions: None.
  */
 function headerNameForSeat(seat: SideNameMarkSeat): string | null {
   if (aiIndexForSeatId(seat.seatId) == null) return null;
-  const home = seat.homeRegion.trim();
-  return home.length > 0 ? home : seat.seatId;
+  return sideDisplayName(seat);
 }
 
 /**
@@ -404,8 +440,8 @@ function markInBody(body: string, seats: readonly SideNameMarkSeat[], sectionOwn
  *   The popup writes loss sentences only. A gain sentence still gets flags when one is painted.
  * When to use: `markInBody` before the loss-header check.
  * Expected outcome: Null when `body` is not a hex sentence. Otherwise one mark per opponent name, in sentence order.
- *   The subject uses `sectionOwnerId` when two seats share that short name. List names then take the remaining seats
- *   in the order the sentence already listed them. The list is the text before the final period, so a short name that
+ *   The subject uses `sectionOwnerId` when two seats share that display name. List names then take the remaining seats
+ *   in the order the sentence already listed them. The list is the text before the final period, so a display name that
  *   contains "to" or "from" is still the name that gets the flag.
  * Exceptions: None.
  */

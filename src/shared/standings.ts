@@ -12,6 +12,7 @@ import { formatPlaceOrdinal } from './placeOrdinal';
 import { paletteForOwner } from './seatPalette';
 import type { SeatId } from './seatIds';
 import { HUMAN_SEAT_KIND, sortSeatsByOrder, type Doctrine, type DoctrineChoice, type SeatKind } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
 import type { GameEndReason } from './victoryRules';
 
 /**
@@ -54,11 +55,20 @@ export interface StandingsSeatInput {
    * Full home name.
    *
    * Contract: The roster's `homeRegion`, not a shortened label.
-   * When to use: The row name and the result line.
-   * Expected outcome: The name the player reads.
+   * When to use: `sideDisplayName`. The row does not print this field itself.
+   * Expected outcome: The name the roster stores.
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means Human for a human seat and the short home name for an AI seat.
+   * When to use: Every standings sentence that names a side.
+   * Expected outcome: Passed to `sideDisplayName`.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
   /**
    * Turn on which the seat was knocked out, or null while it finished active.
    *
@@ -224,7 +234,7 @@ export interface StandingsRow {
   /**
    * Full home name, with " (you)" on the viewer's row.
    *
-   * Contract: `homeRegion`, plus " (you)" when this seat is `viewerSeatId`.
+   * Contract: `sideDisplayName`, plus " (you)" when this seat is `viewerSeatId`.
    * When to use: The name on the row.
    * Expected outcome: The words the player reads.
    * Exceptions: None.
@@ -280,7 +290,7 @@ export interface StandingsRow {
    *
    * Contract: Null when `outBy` is null. "Knocked out by you" when `outBy` is the viewer.
    * When to use: The line under the commander.
-   * Expected outcome: A full home name, or "you".
+   * Expected outcome: A display name, or "you".
    * Exceptions: None.
    */
   readonly knockedOutBy: string | null;
@@ -388,7 +398,7 @@ export function buildStandings(input: StandingsInput): Standings {
 function headingFor(seats: readonly StandingsSeatInput[], first: readonly StandingsSeatInput[]): string {
   if (first.length !== 1) return 'No side won.';
   const human = seats.find((seat) => seat.kind === HUMAN_SEAT_KIND);
-  if (!human) return `${first[0]!.homeRegion} wins.`;
+  if (!human) return `${sideDisplayName(first[0]!)} wins.`;
   return `You placed ${formatPlaceOrdinal(human.place ?? seats.length)} of ${seats.length}.`;
 }
 
@@ -406,9 +416,9 @@ function resultLine(input: StandingsInput, first: readonly StandingsSeatInput[])
   if (input.gameEndReason === 'ended_by_human') return `You ended the match on turn ${input.turnNumber}.`;
   if (first.length !== 1) return '';
   const winner = first[0]!;
-  if (input.gameEndReason === 'mutual_elimination') return `${winner.homeRegion} holds the most city hexes.`;
+  if (input.gameEndReason === 'mutual_elimination') return `${sideDisplayName(winner)} holds the most city hexes.`;
   if (input.gameEndReason === 'turn_limit') {
-    return `${winner.homeRegion} holds the most city hexes at the end of turn ${input.turnNumber}.`;
+    return `${sideDisplayName(winner)} holds the most city hexes at the end of turn ${input.turnNumber}.`;
   }
   return lastStandingLine(winner, input.seats);
 }
@@ -422,13 +432,13 @@ function resultLine(input: StandingsInput, first: readonly StandingsSeatInput[])
  * Exceptions: None.
  */
 function lastStandingLine(winner: StandingsSeatInput, seats: readonly StandingsSeatInput[]): string {
-  const opening = `${winner.homeRegion} is the last side standing.`;
+  const opening = `${sideDisplayName(winner)} is the last side standing.`;
   const victims = seats
     .filter((seat) => seat.outBy === winner.seatId && seat.outTurn !== null)
     .sort((left, right) => (right.outTurn ?? 0) - (left.outTurn ?? 0) || left.seatOrder - right.seatOrder);
   const latest = victims[0];
   if (!latest || latest.outTurn === null) return opening;
-  return `${opening} It knocked out ${latest.homeRegion} on turn ${latest.outTurn}.`;
+  return `${opening} It knocked out ${sideDisplayName(latest)} on turn ${latest.outTurn}.`;
 }
 
 /**
@@ -440,7 +450,7 @@ function lastStandingLine(winner: StandingsSeatInput, seats: readonly StandingsS
  * Exceptions: None.
  */
 function shareSentence(first: readonly StandingsSeatInput[]): string {
-  const names = first.map((seat) => seat.homeRegion);
+  const names = first.map((seat) => sideDisplayName(seat));
   const named = names.length === 2
     ? `${names[0]} and ${names[1]}`
     : `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
@@ -461,7 +471,7 @@ function standingsRow(seat: StandingsSeatInput, input: StandingsInput, singleWin
   return {
     place: seat.place,
     seatId: seat.seatId,
-    name: you ? `${seat.homeRegion} (you)` : seat.homeRegion,
+    name: you ? `${sideDisplayName(seat)} (you)` : sideDisplayName(seat),
     dotColor: paletteForOwner(seat.seatId, input.seats)?.map ?? '#9CA3AF',
     status: statusFor(seat, input.gameEndReason, singleWinner),
     commanderSummary: ai ? commanderSummary(seat, input.modelLabels) : null,
@@ -515,7 +525,8 @@ function commanderSummary(seat: StandingsSeatInput, modelLabels: Readonly<Record
 function knockedOutBy(seat: StandingsSeatInput, input: StandingsInput): string | null {
   if (seat.outBy === null) return null;
   if (input.viewerSeatId !== null && seat.outBy === input.viewerSeatId) return 'Knocked out by you';
-  const name = input.seats.find((row) => row.seatId === seat.outBy)?.homeRegion;
+  const credited = input.seats.find((row) => row.seatId === seat.outBy);
+  const name = credited ? sideDisplayName(credited) : undefined;
   return `Knocked out by ${name ?? 'A side'}`;
 }
 

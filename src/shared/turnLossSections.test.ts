@@ -21,16 +21,16 @@ test('the viewer section comes before the other side, and a cause line names the
     },
     HUMAN_SEAT_ID,
     [
-      { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-      { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
+      { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+      { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const },
     ]
   );
   assert.equal(lines[0], '## Your Losses');
   assert.equal(lines[1], 'Ranged attack: 1st Infantry');
-  assert.ok(lines.indexOf('## Western Turkey Losses') > lines.indexOf('## Your Losses'));
+  assert.ok(lines.indexOf('## W. Turkey Losses') > lines.indexOf('## Your Losses'));
 });
 
-test('a null viewer uses the full home name, empty buckets are omitted, and Neutral is last', () => {
+test('a null viewer uses the display name, empty buckets are omitted, and Neutral is last', () => {
   const lines = buildTurnLossSections(
     {
       byOwner: {
@@ -41,14 +41,14 @@ test('a null viewer uses the full home name, empty buckets are omitted, and Neut
     },
     null,
     [
-      { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-      { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
+      { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+      { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const },
     ]
   );
   assert.equal(lines.includes('## Your Losses'), false);
-  assert.equal(lines.includes('## Western Turkey Losses'), false);
-  assert.ok(lines.indexOf('## Levant Losses') >= 0);
-  assert.ok(lines.indexOf('## Neutral Losses') > lines.indexOf('## Levant Losses'));
+  assert.equal(lines.includes('## W. Turkey Losses'), false);
+  assert.ok(lines.indexOf('## Human Losses') >= 0);
+  assert.ok(lines.indexOf('## Neutral Losses') > lines.indexOf('## Human Losses'));
 });
 
 test('a blank home name uses the seat id', () => {
@@ -59,15 +59,15 @@ test('a blank home name uses the seat id', () => {
       },
     },
     null,
-    [{ seatId: western, seatOrder: 1, homeRegion: '   ' }]
+    [{ seatId: western, seatOrder: 1, homeRegion: '   ', nickname: null, kind: 'ai' as const }]
   );
   assert.equal(lines[0], '## opponent Losses');
 });
 
 test('hex sentences follow cause lines, and a hex-only side still gets a section', () => {
   const roster = [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-    { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey' },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+    { seatId: western, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const },
   ];
   const hexLines = hexChangeLinesByOwner({
     viewerSeatId: HUMAN_SEAT_ID,
@@ -91,7 +91,7 @@ test('hex sentences follow cause lines, and a hex-only side still gets a section
     '## Your Losses',
     'Ranged attack: 1st Infantry',
     'You lost 1 hex to W. Turkey.',
-    '## Western Turkey Losses',
+    '## W. Turkey Losses',
     'W. Turkey lost 1 hex to you.',
   ]);
 });
@@ -99,8 +99,8 @@ test('hex sentences follow cause lines, and a hex-only side still gets a section
 test('a missile sentence follows cause lines and precedes hex sentences', () => {
   const eastern = AI_SEAT_IDS[1];
   const roster = [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-    { seatId: eastern, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+    { seatId: eastern, seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
   ];
   const hexLines = hexChangeLinesByOwner({
     viewerSeatId: HUMAN_SEAT_ID,
@@ -130,23 +130,23 @@ test('a side with only a missile sentence still has a section', () => {
   const lines = buildTurnLossSections(
     { byOwner: {} },
     null,
-    [{ seatId: AI_SEAT_IDS[0], seatOrder: 1, homeRegion: 'Western Turkey' }],
+    [{ seatId: AI_SEAT_IDS[0], seatOrder: 1, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const }],
     undefined,
     new Map([[AI_SEAT_IDS[0], ['Missile strike on Osaka: 0 airports destroyed.']]])
   );
-  assert.deepEqual(lines, ['## Western Turkey Losses', 'Missile strike on Osaka: 0 airports destroyed.']);
+  assert.deepEqual(lines, ['## W. Turkey Losses', 'Missile strike on Osaka: 0 airports destroyed.']);
 });
 
 test('lossSectionOwnerId reads the header and breaks a shared name by seat order', () => {
   const roster = [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-    { seatId: 'opponent2', seatOrder: 3, homeRegion: 'Eastern Turkey' },
-    { seatId: western, seatOrder: 2, homeRegion: 'Eastern Turkey' },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const },
+    { seatId: 'opponent2', seatOrder: 3, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
+    { seatId: western, seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' as const },
   ];
   assert.equal(lossSectionOwnerId('Your Losses', HUMAN_SEAT_ID, roster), HUMAN_SEAT_ID);
   assert.equal(lossSectionOwnerId('Your Losses', null, roster), null);
   assert.equal(lossSectionOwnerId('Neutral Losses', HUMAN_SEAT_ID, roster), NEUTRAL_OWNER_ID);
-  assert.equal(lossSectionOwnerId('Eastern Turkey Losses', null, roster), western);
+  assert.equal(lossSectionOwnerId('E. Turkey Losses', null, roster), western);
   assert.equal(lossSectionOwnerId('Updates', HUMAN_SEAT_ID, roster), null);
 });
 
@@ -155,7 +155,7 @@ test('a section with only the battle sentence is that header and that sentence',
   const lines = buildTurnLossSections(
     { byOwner: {} },
     HUMAN_SEAT_ID,
-    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const }],
     undefined,
     undefined,
     new Map([[HUMAN_SEAT_ID, battle]])
@@ -172,7 +172,7 @@ test('a ranged loss is printed before the battle sentence', () => {
       },
     },
     HUMAN_SEAT_ID,
-    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+    [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const }],
     undefined,
     undefined,
     new Map([[HUMAN_SEAT_ID, 'III Infantry destroyed in battle.']])
@@ -190,9 +190,22 @@ test('omitting the battle map leaves a ranged section unchanged', () => {
       [HUMAN_SEAT_ID]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry' as const, displayName: '1st Infantry' }] },
     },
   };
-  const roster = [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }];
+  const roster = [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' as const }];
   assert.deepEqual(
     buildTurnLossSections(summary, HUMAN_SEAT_ID, roster),
     ['## Your Losses', 'Ranged attack: 1st Infantry']
   );
+});
+
+test('a nickname is the loss header', () => {
+  const lines = buildTurnLossSections(
+    {
+      byOwner: {
+        [western]: { ...emptyPlayerLossSummary(), ranged: [{ unitType: 'infantry', displayName: '1st Infantry' }] },
+      },
+    },
+    null,
+    [{ seatId: western, seatOrder: 1, homeRegion: 'Western Turkey', nickname: 'Grok', kind: 'ai' as const }]
+  );
+  assert.equal(lines[0], '## Grok Losses');
 });

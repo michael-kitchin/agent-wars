@@ -70,7 +70,7 @@ A match you start with Observe only works the same way, except that the checkbox
 
 ## Starting a Game
 
-The setup screen lists two to four sides, and each side needs its own home. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another). Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
+The setup screen lists two to four sides, and each side needs its own home.
 
 *New global game: In the Map section, click the Global tab, then pick each side's home region (in this case: Eastern Asia vs Southern Africa). The buttons to the right of the lists pick random choices.*
 
@@ -94,6 +94,12 @@ The setup screen lists two to four sides, and each side needs its own home. Obse
 
 The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: ⚒N+ hexes` line.
 
+Game Options has a Nickname setting for you, the human player. It starts as Human, stays on this computer, and is the name the next match shows for your side.
+
+Each opponent's name starts as that side's short home name, and you change it on that side's commander. The match shows those names on the top bar, in reports, and on tooltips. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another).
+
+Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
+
 ## Saving and Loading
 
 Save game… and Load game… are in the game menu, under the button at the top left. Load game… is also on the New game bar.
@@ -108,7 +114,7 @@ Save game… and Load game… are in the game menu, under the button at the top 
 
 - **When Save is off:** Save is disabled when there's no match, the match is over, the new-game screen is open over a live match, or a turn or beat is still resolving. It works while you are giving orders, including during a battle.
 - **Automatic saves:** The last five turn starts sit in an `autosaves` folder. Open one with Load game….
-- **What the file leaves out:** This computer's API keys aren't in the file. A file written by another version of Agent Wars can't be opened.
+- **What the file leaves out:** This computer's API keys aren't in the file, and neither is the Nickname in Game Options. The names the sides are using in that match are in the file. A file written by another version of Agent Wars can't be opened.
 - **New game:** Opening New game from the menu leaves that match running. Close the screen to come back, or start a match to replace it.
 
 ## Playing a Turn
@@ -479,7 +485,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **A queue can pause:** outside your home, a queue spends only on a hex that holds one of your units or fortifications. Elsewhere it keeps its points and its rows, and the map label shows ∞t.
 - **Unpaid mercenaries desert:** if the treasury cannot cover upkeep, some mercenaries become Neutral. An order the hex cannot fill returns any fee that was reserved for it.
 - **A shared hex fights:** a deserter or a mercenary you dismiss left beside your units, or a Neutral unit you rehire into a hex that already holds another side, fights at the next resolution.
-- **Reading the turn report:** After Ready, the map toast and the Reports tab give each side a section when that side lost a visible unit, lost hexes, controlled a hex hit by a missile launch you can see, or owned a hex whose fortifications fell. A strategic unit destroyed in a battle is named on that line, ending with "destroyed in battle." When Ready opened the battle, that turn's popup waits until the battle ends and the next Ready has returned. A battle you open from the map puts that line on the next turn's report. **Updates** lists city cells you fortified, credits added, mercenaries hired, units that deserted, hire orders that were not filled ("1 hire order could not be filled, so it was not charged."), and hexes where building paused. A named unit is the unit name, without the short side prefix, and keeps its origin flag. The layout of those lines is in [ux/reports-tab.md](ux/reports-tab.md) and [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md).
+- **Reading the turn report:** After Ready, the map toast and the Reports tab give each side a section when that side lost a visible unit, lost hexes, controlled a hex hit by a missile launch you can see, or owned a hex whose fortifications fell. A strategic unit destroyed in a battle is named on that line, ending with "destroyed in battle." When Ready opened the battle, that turn's popup waits until the battle ends and the next Ready has returned. A battle you open from the map puts that line on the next turn's report. **Updates** lists city cells you fortified, credits added, mercenaries hired, units that deserted, hire orders that were not filled ("1 hire order could not be filled, so it was not charged."), and hexes where building paused. A named unit is the unit name, without a side-name prefix, and keeps its origin flag. The layout of those lines is in [ux/reports-tab.md](ux/reports-tab.md) and [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md).
 
 ## Where Messages Appear
 
@@ -490,5 +496,5 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 | Message area      | Where                                                                                     | What it shows                                                                                                    | How long it stays                                                                                                         |
 | ----------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Map toast         | Lower right of the map, covering the + and − buttons, whether the console is open or collapsed. | Errors, rejected orders, and turn reports. Updates can include credits added, mercenaries hired, units that deserted, and hire orders that were not filled. | Until you click its ×, a timer passes, or a newer message replaces it. The same lines are listed in the Reports tab. |
-| AI strategy toast | Top right of the map. One tab per AI opponent, in opponent-number order. | The short side name, that opponent's message, then its strategy, when it sent them. A commander that is still planning stays off. | It dismisses like the map toast. Selecting a unit, opening build, arming an attack, or entering a battle hides it. Details are in [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md). |
+| AI strategy toast | Top right of the map. One tab per AI opponent, in opponent-number order. | The name `sideDisplayName` returns (`src/shared/sideNicknames.ts`; a null nickname shows the short home name), that opponent's message, then its strategy, when it sent them. A commander that is still planning stays off. | It dismisses like the map toast. Selecting a unit, opening build, arming an attack, or entering a battle hides it. Details are in [ux/notifications-and-feedback.md](ux/notifications-and-feedback.md). |
 | Activity log      | Console, Commanders tab, at the bottom                                                      | AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update | Until you start a new match                                                                       |

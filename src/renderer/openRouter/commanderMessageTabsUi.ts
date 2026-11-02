@@ -22,6 +22,7 @@ import {
 } from '../../shared/commanderMessageTabs';
 import type { CommanderDispatch, CommanderStatusRow } from '../../shared/commanderStatus';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { rendererSharedState as S } from '../core/state';
 import { createSideNumberFlag } from '../chrome/toastInlineMarks';
 import { appendMapToastSectionHeader, restartAiStrategyToastTimer, setAiStrategyToastHiddenListener, showFilledAiStrategyToast } from './openRouterUiHelpers';
@@ -67,7 +68,7 @@ export function showCommanderMessageTabs(
   if (opening) {
     const seats = (S.gameState?.seats ?? [])
       .filter((seat) => seat.kind === AI_SEAT_KIND)
-      .map((seat) => ({ seatId: seat.seatId, label: seat.homeRegion.trim() || seat.seatId }));
+      .map((seat) => ({ seatId: seat.seatId, label: sideDisplayName(seat) }));
     tabState = initialCommanderMessageTabs(seats);
   } else if (tabState) {
     tabState = resetCommanderConsultMarks(tabState);
@@ -155,6 +156,7 @@ export function renderCommanderMessageTabs(target?: HTMLElement): void {
     const flag = createSideNumberFlag(tab.seatId, S.gameState?.seats ?? []);
     if (flag) button.appendChild(flag);
     button.appendChild(document.createTextNode(tab.label));
+    button.title = tab.label;
     button.disabled = !tab.enabled;
     button.setAttribute('aria-selected', tab.seatId === state.selectedSeatId ? 'true' : 'false');
     button.addEventListener('click', () => {

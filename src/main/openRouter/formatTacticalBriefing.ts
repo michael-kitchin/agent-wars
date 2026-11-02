@@ -36,7 +36,7 @@ import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
  *
  * Purpose: Parity with strategic `formatBriefing` sections that apply in-battle (map, status, callbacks), omitting Standing Order Status while assign_order/cancel_order stay blocked for sub-unit ids.
  * When to use: `requestOrdersFlow` when `tacticalAiBattle` is set.
- * Expected outcome: Markdown containing Commander's Briefing through Active Callbacks; Operational Map uses `#` heading; no `# Standing Order Status`.
+ * Expected outcome: Markdown containing Commander's Briefing through Active Callbacks. Operational Map is an H2. Standing Order Status is omitted.
  * Exceptions: Returns empty string only if map generation yields empty content (caller treats as failure).
  */
 export function formatTacticalBriefing(args: {
@@ -81,7 +81,7 @@ export function formatTacticalBriefing(args: {
     logDebug('formatTacticalBriefing: empty operational map', { battleId: tacticalBattle.battleId });
     return '';
   }
-  sections.push('\n\n' + markdownHeading1(SECTION_TITLE_OPERATIONAL_MAP));
+  sections.push(markdownHeading2(SECTION_TITLE_OPERATIONAL_MAP));
   sections.push(operational.trim());
 
   const recentTurnNotes = buildRecentTurnNotesSection({

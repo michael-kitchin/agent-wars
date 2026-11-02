@@ -51,6 +51,7 @@ import {
   tacticalCallbackStashConfigExists,
 } from '../tacticalBattle/tacticalCallbackStashPersistence';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
+import { assertHeadingsNest, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
 import { WIN_CONDITION_REMINDER_FIRST_SENTENCE } from './scenarioGoals';
 import { initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
 
@@ -285,7 +286,7 @@ test('formatTacticalBriefing includes always-on sections and omits standing-orde
     assert.ok(md.includes('## Unit Status and Threats'));
     assert.ok(md.includes('| Unit ID | Type | Hex |'), 'Unit Status includes Type');
     assert.ok(md.includes('## Attention Flags'));
-    assert.ok(md.includes('# Operational Map'));
+    assert.ok(md.includes('## Operational Map'));
     assert.ok(!md.includes('### Unit Roster'), 'tactical omits Unit Roster; Unit Status covers threats');
     assert.ok(!md.includes('Standing order'));
     assert.ok(!md.includes('# Standing Order Status'));
@@ -589,5 +590,31 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(!prompt.includes('When assess_unit reports'));
     assert.ok(!prompt.includes('use estimate_combat to pick'));
     assert.ok(!prompt.includes('prioritize scouting this turn'));
+    const outline = headingOutline(prompt);
+    assertHeadingsNest(outline);
+    const tacticalAlways = [
+      '# Your Command',
+      '# Coordinates',
+      '# Combat and Movement Rules',
+      "# Commander's Briefing",
+      '## Unit Status and Threats',
+      '## Attention Flags',
+      '## Operational Map',
+      '# Battle Context',
+      '# Available Tools',
+      '## How to Use These Tools Effectively',
+      '# Unit Roster',
+      '# Response Format',
+      '## Example Response',
+    ];
+    let cursor = 0;
+    for (const heading of tacticalAlways) {
+      const at = outline.findIndex((line, index) => index >= cursor && line === heading);
+      assert.ok(at >= 0, `missing ${heading}`);
+      cursor = at + 1;
+    }
+    assert.ok(!prompt.split('\n').includes('Strategic context:'));
+    assert.ok(!prompt.split('\n').includes('HOW TO USE THESE TOOLS EFFECTIVELY:'));
+    assertProseLinesWithinLimit(prompt);
   });
 });

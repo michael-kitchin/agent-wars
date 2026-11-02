@@ -1,6 +1,7 @@
 import type { NewGameCommanderInput, NewGameSeatInput } from './ipc/ordersTypes';
 import { MAX_SEATS, MIN_SEATS } from './seatIds';
 import { AI_SEAT_KIND, HUMAN_SEAT_KIND, type SeatKind } from './seatRoster';
+import { defaultAiNickname } from './sideNicknames';
 
 /**
  * One home the new-game screen can assign.
@@ -155,11 +156,25 @@ export interface HomeOptionForRow {
 }
 
 /**
+ * The short name a row shows for one home.
+ *
+ * Purpose: A new row, a home change, and Observe all start from the home's label.
+ * When to use: Before storing a row nickname.
+ * Expected outcome: `defaultAiNickname` of the matching option's label. An unknown key is empty.
+ * Exceptions: None.
+ */
+export function nicknameForHome(homeKey: string, homes: readonly HomeOption[]): string {
+  const home = homes.find((option) => option.key === homeKey);
+  return home ? defaultAiNickname(home.label, '') : '';
+}
+
+/**
  * Builds the starting rows for a map.
  *
  * Purpose: A new tab or map starts from two distinct homes, or keeps the current count when asked.
  * When to use: When the overlay opens, and when the tab or regional map changes.
  * Expected outcome: Human plus AI rows, distinct homes from the front of `homes`, capped by the homes and by four.
+ *   Each AI nickname is the short name of that row's home, even when `defaultCommander` carried another name.
  *   `rowCount` keeps a larger list when enough homes remain.
  * Exceptions: None. Fewer than two homes yields fewer than two rows.
  */
@@ -174,7 +189,7 @@ export function initialSidesState(args: {
   const rows = args.homes.slice(0, count).map((home, index): NewGameSideRow => ({
     kind: index === 0 ? HUMAN_SEAT_KIND : AI_SEAT_KIND,
     homeKey: home.key,
-    commander: index === 0 ? null : args.defaultCommander,
+    commander: index === 0 ? null : { ...args.defaultCommander, nickname: nicknameForHome(home.key, args.homes) },
   }));
   return { mapKind: args.mapKind, observeOnly: false, rows };
 }
@@ -184,19 +199,27 @@ export function initialSidesState(args: {
  *
  * Purpose: Observe replaces "You" with an AI side, and turning it off brings "You" back.
  * When to use: The Observe checkbox.
- * Expected outcome: The first row becomes AI with `defaultCommander` when it had none, or human with a null commander.
- *   Later rows stay as they are.
+ * Expected outcome: The first row becomes AI with the short name of the home it already has, or human with a null commander.
+ *   Later rows stay as they are, including their nicknames.
  * Exceptions: None.
  */
 export function setObserveOnly(
   state: NewGameSidesState,
   on: boolean,
-  defaultCommander: NewGameCommanderInput
+  defaultCommander: NewGameCommanderInput,
+  homes: readonly HomeOption[]
 ): NewGameSidesState {
   if (state.rows.length === 0) return { ...state, observeOnly: on };
   const first = state.rows[0]!;
   const nextFirst: NewGameSideRow = on
-    ? { ...first, kind: AI_SEAT_KIND, commander: first.commander ?? defaultCommander }
+    ? {
+        ...first,
+        kind: AI_SEAT_KIND,
+        commander: {
+          ...(first.commander ?? defaultCommander),
+          nickname: nicknameForHome(first.homeKey ?? '', homes),
+        },
+      }
     : { ...first, kind: HUMAN_SEAT_KIND, commander: null };
   return { ...state, observeOnly: on, rows: [nextFirst, ...state.rows.slice(1)] };
 }
@@ -219,7 +242,9 @@ export function sidesHaveAnyModel(state: NewGameSidesState | null): boolean {
  *
  * Purpose: The add button grows the match by one side.
  * When to use: When `addRowBlockedReason` is null.
- * Expected outcome: The same state when no home is free or four sides are already listed. Otherwise one new AI row whose commander is a copy of the last AI commander, or `defaultCommander` when none exists. The home is the next free home.
+ * Expected outcome: The same state when no home is free or four sides are already listed. Otherwise one new AI row.
+ *   Its model, effort, doctrine, and key come from the last AI commander, or from `defaultCommander` when none exists.
+ *   Its nickname is the new home's short name.
  * Exceptions: None.
  */
 export function addSideRow(
@@ -233,14 +258,13 @@ export function addSideRow(
   if (!free) return state;
   const source = [...state.rows].reverse().find((row) => row.kind === AI_SEAT_KIND && row.commander != null);
   const copied = source?.commander;
-  const commander: NewGameCommanderInput = copied
-    ? {
-        modelId: copied.modelId,
-        reasoningEffort: copied.reasoningEffort,
-        doctrineChoice: copied.doctrineChoice,
-        apiKey: (copied.apiKey ?? '').trim(),
-      }
-    : defaultCommander;
+  const commander: NewGameCommanderInput = {
+    modelId: copied?.modelId ?? defaultCommander.modelId,
+    reasoningEffort: copied?.reasoningEffort ?? defaultCommander.reasoningEffort,
+    doctrineChoice: copied?.doctrineChoice ?? defaultCommander.doctrineChoice,
+    apiKey: copied ? (copied.apiKey ?? '').trim() : defaultCommander.apiKey,
+    nickname: nicknameForHome(free.key, homes),
+  };
   const row: NewGameSideRow = { kind: AI_SEAT_KIND, homeKey: free.key, commander };
   return { ...state, rows: [...state.rows, row] };
 }
@@ -264,14 +288,24 @@ export function removeSideRow(state: NewGameSidesState, index: number): NewGameS
  *
  * Purpose: Two sides cannot share a home.
  * When to use: A home select.
- * Expected outcome: The same state when the home is taken or the index is outside the list. Otherwise that row's home changes.
+ * Expected outcome: The same state when the home is taken, the index is outside the list, or the home is already this row's. Otherwise that row's home changes, and an AI row's nickname becomes the new short name.
  * Exceptions: None.
  */
-export function setRowHome(state: NewGameSidesState, index: number, homeKey: string): NewGameSidesState {
+export function setRowHome(
+  state: NewGameSidesState,
+  index: number,
+  homeKey: string,
+  homes: readonly HomeOption[]
+): NewGameSidesState {
   if (index < 0 || index >= state.rows.length) return state;
+  const current = state.rows[index]!;
+  if (current.homeKey === homeKey) return state;
   const taken = state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === homeKey);
   if (taken) return state;
-  const rows = state.rows.map((row, rowIndex) => (rowIndex === index ? { ...row, homeKey } : row));
+  const commander = current.kind === AI_SEAT_KIND && current.commander
+    ? { ...current.commander, nickname: nicknameForHome(homeKey, homes) }
+    : current.commander;
+  const rows = state.rows.map((row, rowIndex) => (rowIndex === index ? { ...row, homeKey, commander } : row));
   return { ...state, rows };
 }
 
@@ -280,7 +314,7 @@ export function setRowHome(state: NewGameSidesState, index: number, homeKey: str
  *
  * Purpose: The randomize button matches the old home buttons.
  * When to use: A row's randomize button.
- * Expected outcome: That row's home is one of the homes no other row holds. An empty free list leaves the row unchanged.
+ * Expected outcome: That row's home is one of the homes no other row holds. Drawing the home it already has keeps its nickname. An empty free list leaves the row unchanged.
  * Exceptions: None.
  */
 export function randomizeRowHome(
@@ -294,7 +328,7 @@ export function randomizeRowHome(
   const free = homes.filter((home) => home.key === current || !state.rows.some((row, rowIndex) => rowIndex !== index && row.homeKey === home.key));
   if (free.length === 0) return state;
   const picked = free[Math.min(free.length - 1, Math.floor(random() * free.length))]!;
-  return setRowHome(state, index, picked.key);
+  return setRowHome(state, index, picked.key, homes);
 }
 
 /**
@@ -407,7 +441,7 @@ export function startBlockedReason(state: NewGameSidesState | null): string | nu
  *
  * Purpose: Row order is seat order.
  * When to use: The Start click, after `startBlockedReason` is null.
- * Expected outcome: Global rows set `homeRegion`. Regional rows set `sideGroupId`. AI rows include their commander.
+ * Expected outcome: Global rows set `homeRegion`. Regional rows set `sideGroupId`. An AI row includes its commander and its nickname. A human row has no nickname.
  * Exceptions: None.
  */
 export function buildSeatsPayload(state: NewGameSidesState): readonly NewGameSeatInput[] {
@@ -416,7 +450,9 @@ export function buildSeatsPayload(state: NewGameSidesState): readonly NewGameSea
     const seat: NewGameSeatInput = state.mapKind === 'global'
       ? { kind: row.kind, homeRegion: home }
       : { kind: row.kind, sideGroupId: home };
-    if (row.kind === AI_SEAT_KIND && row.commander) return { ...seat, commander: row.commander };
+    if (row.kind === AI_SEAT_KIND && row.commander) {
+      return { ...seat, nickname: row.commander.nickname ?? '', commander: row.commander };
+    }
     return seat;
   });
 }

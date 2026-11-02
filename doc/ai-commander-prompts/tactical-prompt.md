@@ -78,7 +78,7 @@ Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distan
 
 Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bullets and the aggregate armed-units bullet only. **Must not** emit standing-order warning bullets. The armed-units bullet names sub-units that can order a ranged attack or an air strike this beat, and tells the model to copy a Best Options row for each and not invent a target. When an air shooter is on that list, the clause names a ranged or air-strike row. A sub-unit whose only legal fight is melee is left off that bullet.
 
-#### `# Operational Map`
+#### `## Operational Map`
 
 - **Example:** one rendered grid from a single consultation is in [`example-tactical-prompt.md`](example-tactical-prompt.md).
 - **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; when a cell is fortified the legend adds `, F/f fortified city cell (F = yours)` and that cell shows `F` or `f` in place of `U` or `u` (`FORTIFIED_MAP_LEGEND_FRAGMENT`); uppercase means the enclosing cell is AI-controlled; odd rows are indented one space; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
@@ -92,7 +92,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 - **Columns:** identical to strategic, including the `Target Infrastructure` cell contract (`|` is written as a space; an `air strike` row then omits text from `; strike:` onward; a cell with no `; strike:` suffix is otherwise unchanged; an empty cell is an em dash).
 - **Action values in battle:** `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. A unit listed on an `air strike` row is not also listed on a `ferry` row this beat.
 - **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. With the terrain bonus on, that reach includes one cell of the unit's birth terrain that it otherwise could not enter, and nothing past that cell in the same beat. Approach targets omit stay-put friendlies; a cell a friendly is leaving this period is listed. move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact. Ferry targets are other intact airport cells in the footprint.
-- **Per-unit cap:** five target hexes per sub-unit. Each distinct action on a hex is its own row, in the order air strike, ranged, approach, ferry, then move/melee. Identical rows are merged and their sub-unit ids listed together. A sub-unit must not use the same hex as both its move destination and its ranged target.
+- **Per-unit cap:** five target hexes per sub-unit. Each distinct action on a hex is its own row, in the order air strike, ranged, approach, ferry, then move/melee. Identical rows are merged and their sub-unit ids listed together. A sub-unit may use the same hex as its move and its ranged target; the shot resolves first (`buildAttackConstraintsClause`).
 
 #### `## Recent Turn Notes`
 
@@ -113,9 +113,9 @@ Each row states what is omitted and why the model must not be given it.
 | --- | --- |
 | `# Scenario Objective (Required)` | Regional victory is unreachable from inside a beat and would redirect the model away from the fight |
 | Home-region bullets and explored/controlled progress | Same reason; also res1 data in a res4 prompt |
-| `# Standing Order Status` and `## Units Without Standing Orders` | Standing orders do not act in a beat |
-| `# Production Status` and every production clause | No production resolves during a beat |
-| `# Your Strategic Memory` and every memory clause | Memory tools are not callable in battle and memory updates are not accepted |
+| `## Standing Order Status` and `### Units Without Standing Orders` | Standing orders do not act in a beat |
+| `## Production Status` and every production clause | No production resolves during a beat |
+| `## Your Strategic Memory` and every memory clause | Memory tools are not callable in battle and memory updates are not accepted |
 | `## Supplemental Hex Intelligence` | Terrain in the footprint is already on the map and in the option rows |
 | Straight-hop distance caveat | Its gate requires the strategic resolution |
 | Unit-roster subsection | Duplicate of the unit table |
@@ -125,7 +125,7 @@ Each row states what is omitted and why the model must not be given it.
 
 **Forbidden strings.** A tactical prompt must not contain any of these, in any casing: `memoryUpdates`, `productionOrders`, `query_production`, `enemyIntel`, `set_build_queue`. These are the markers a strategic surface leaves behind when it leaks into a battle prompt, and their presence is a defect regardless of how the surrounding sentence reads.
 
-### 2.8 `Strategic context:` block
+### 2.8 `# Battle Context`
 
 Tactical variant, bullets in this order:
 
@@ -209,9 +209,8 @@ Section 3. Always included; the example must match the contract. Example unit id
 4. An entry missing a required field is dropped without comment.
 5. More than one ranged action for the same sub-unit in the same beat is not honoured. When air is present, the same one-action limit applies to air strikes and ferry.
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
-7. A ranged target must not be the acting sub-unit's own move destination.
-8. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
-9. An explicit_move to the sub-unit's current cell is dropped as already arrived.
+7. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
+8. An explicit_move to the sub-unit's current cell is dropped as already arrived.
 
 ## 4. Required tactical coaching
 

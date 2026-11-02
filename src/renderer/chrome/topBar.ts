@@ -226,7 +226,7 @@ function attachUnitCountsTooltip(chip: HTMLElement, seatId: string, state: GameS
  *
  * Purpose: The smoke checks still find the first two names by id.
  * When to use: A chip, and the empty bar.
- * Expected outcome: Text only. The id is set when one was given.
+ * Expected outcome: Text only, with the full name as the tooltip. The id is set when one was given.
  * Exceptions: None.
  */
 function sideName(id: string | undefined, label: string): HTMLElement {
@@ -234,6 +234,7 @@ function sideName(id: string | undefined, label: string): HTMLElement {
   name.className = 'topbar-side-name';
   if (id) name.id = id;
   name.textContent = label;
+  name.title = label;
   return name;
 }
 

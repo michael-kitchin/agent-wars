@@ -21,7 +21,7 @@ export interface KnockoutNoticeInput {
   /**
    * The side that is out, or the word for the human seat.
    *
-   * Contract: A full home name. Ignored when `victimIsHuman` is true.
+   * Contract: The display name the caller supplies. Ignored when `victimIsHuman` is true.
    * When to use: The opening sentence.
    * Expected outcome: "{name} is out of the match."
    * Exceptions: None.
@@ -39,7 +39,7 @@ export interface KnockoutNoticeInput {
   /**
    * The side credited with the knockout.
    *
-   * Contract: A full home name, or null when no seat is credited.
+   * Contract: The display name the caller supplies, or null when no seat is credited.
    * When to use: The home-control sentence.
    * Expected outcome: The name, or "A side" when null.
    * Exceptions: None.

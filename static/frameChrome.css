@@ -321,6 +321,14 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   display: flex;
   align-items: baseline;
   gap: 5px;
+  min-width: 0;
+}
+.battle-force-word {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--chrome-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .battle-force-dot {
   flex: none;
@@ -333,9 +341,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-.battle-force-word {
-  color: var(--chrome-muted);
 }
 .battle-force-caption {
   color: var(--chrome-muted);

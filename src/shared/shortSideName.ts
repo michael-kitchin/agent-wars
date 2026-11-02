@@ -159,10 +159,10 @@ function lettersFromFullName(body: string): string {
 }
 
 /**
- * Makes the short side name used on chips and unit labels.
+ * Makes the short home name used when a seat has no nickname.
  *
  * Purpose: Full home names do not fit on a unit token once a match has three or more seats.
- * When to use: Labels shown to someone other than the unit's owner.
+ * When to use: `defaultAiNickname`. On-screen labels call `sideDisplayName`, which uses this only as that default.
  * Expected outcome: A trailing " (LETTERS)" abbreviation is removed first. The body is cut at the first
  * " & ", ", ", or " and ", then a leading compass word is shortened. "Western Turkey" → "W. Turkey".
  * "Eastern Turkey & Caucasus" → "E. Turkey". "Levant & Cyprus" → "Levant". "Southern Asia" → "S. Asia".

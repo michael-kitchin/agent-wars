@@ -57,6 +57,15 @@ export interface RememberedCommander {
    * Exceptions: None.
    */
   readonly apiKey: string;
+  /**
+   * The name shown for that opponent in the last match.
+   *
+   * Contract: Cleaned by `normalizeSideNickname`. Empty means the snapshot had no nickname, including an older snapshot written before this field existed.
+   * When to use: Copy from last game. A blank value must not replace the target row's current nickname.
+   * Expected outcome: Copied onto the row when it is non-empty.
+   * Exceptions: None.
+   */
+  readonly nickname: string;
 }
 
 /**
@@ -169,7 +178,7 @@ export function prefillFirstAiApiKey(state: NewGameSidesState, apiKey: string): 
   const index = state.rows.findIndex((row) => row.kind === AI_SEAT_KIND);
   if (index < 0) return state;
   const row = state.rows[index]!;
-  const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced' };
+  const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
   const rows = state.rows.map((entry, rowIndex) =>
     rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
   );

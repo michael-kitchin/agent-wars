@@ -37,8 +37,8 @@ export function buildOptionCopyMappingClause(args: {
     `copy a ranged Target Hex or Target Unit into a ranged_attack entry` +
     ferry +
     air +
-    `. Each ${actor} gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; ` +
-    `do not copy overlapping rows that relist the same ${actor}. ` +
+    `.\n\n  Each ${actor} gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; ` +
+    `do not copy overlapping rows that relist the same ${actor}.\n\n  ` +
     `Never copy a Target Hex from a row that does not list that ${actor}; if that ${actor} has no row, call plan_route or leave it idle.`
   );
 }

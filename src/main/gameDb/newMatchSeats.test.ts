@@ -4,6 +4,7 @@ import { AI_SEAT_IDS, HUMAN_SEAT_ID, isSeatId } from '../../shared/seatIds';
 import { playerIdCodeFor } from '../../shared/unitIds';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { DOCTRINES, type Doctrine } from '../../shared/seatRoster';
+import { HUMAN_NICKNAME_DEFAULT } from '../../shared/sideNicknames';
 import {
   dbGetAll,
   dbGetOne,
@@ -168,7 +169,7 @@ test('a random doctrine is drawn from the match seed and hidden until the match 
     {
       kind: 'ai',
       sideGroupId: map.sideGroupIds[1],
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'random' },
+      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'random', nickname: '' },
     },
   ];
   const drawn: Doctrine[] = [];
@@ -259,6 +260,35 @@ test('a regional start rejects the same side group twice', (t) => {
     }, () => {}),
     /different side group/
   );
+});
+
+test('a human nickname is stored on the human seat, and a rejected one becomes Human', () => {
+  const regions = largestHomeRegions(2);
+  const seats: NewGameSeatInput[] = [
+    { kind: 'human', homeRegion: regions[0] },
+    { kind: 'ai', homeRegion: regions[1] },
+  ];
+  withSeatedTempGameDb('aw-human-nick-', { gameMapId: 'global', seats, humanNickname: 'Scout' }, () => {
+    const roster = getSeatRoster();
+    assert.equal(roster.find((seat) => seat.kind === 'human')?.nickname, 'Scout');
+    assert.equal(
+      roster.find((seat) => seat.kind === 'ai')?.nickname,
+      null
+    );
+  });
+  withSeatedTempGameDb('aw-human-nick-you-', { gameMapId: 'global', seats, humanNickname: 'you' }, () => {
+    assert.equal(getSeatRoster().find((seat) => seat.kind === 'human')?.nickname, HUMAN_NICKNAME_DEFAULT);
+  });
+  withSeatedTempGameDb('aw-ai-nick-', {
+    gameMapId: 'global',
+    humanNickname: 'Scout',
+    seats: [
+      seats[0]!,
+      { ...seats[1]!, nickname: 'Grok' },
+    ],
+  }, () => {
+    assert.equal(getSeatRoster().find((seat) => seat.kind === 'ai')?.nickname, 'Grok');
+  });
 });
 
 /**

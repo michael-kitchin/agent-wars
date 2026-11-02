@@ -10,6 +10,7 @@
 import { logDebug, logError } from '../logger';
 import { HUMAN_SEAT_ID, MAX_SEATS, MIN_SEATS, aiSeatIdForIndex } from '../../shared/seatIds';
 import { AI_SEAT_KIND, HUMAN_SEAT_KIND, type SeatRecord } from '../../shared/seatRoster';
+import { HUMAN_NICKNAME_DEFAULT, normalizeSideNickname, storedAiNickname } from '../../shared/sideNicknames';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { installedSideGroups, listScenarioHomeRegions } from '../regionScenario';
 
@@ -38,22 +39,24 @@ export interface ResolvedNewMatchSeat extends Omit<SeatRecord, 'commander'> {
  *
  * Purpose: Regional homes become side-group display names. Global homes stay UN subregion names.
  * When to use: After `ensureGameMapLoaded` so installed groups and the region list are available.
- * Expected outcome: Two to four rows. Throws before any row is written.
+ * Expected outcome: Two to four rows. The human seat stores `humanNickname` when that argument is present, and null when it is not. Throws before any row is written.
  * Exceptions: Throws when the count is outside 2 to 4, when two humans are present, when a side group is unknown or repeated, when a known global region is repeated, or when no unused home remains.
  */
 export function resolveNewMatchSeats(input: {
   readonly mapKind: 'global' | 'regional';
   readonly seats: readonly NewGameSeatInput[];
+  readonly humanNickname?: string;
 }): ResolvedNewMatchSeat[] {
   logDebug('seatResolution resolveNewMatchSeats', {
     mapKind: input.mapKind,
     seatCount: input.seats.length,
+    humanNicknameLength: input.humanNickname === undefined ? null : input.humanNickname.length,
   });
   assertSeatCount(input.seats);
   const homeRegions = input.mapKind === 'regional'
     ? regionalHomeNames(input.seats)
     : globalHomeNames(input.seats);
-  return assignSeatIdentity(input.seats, homeRegions);
+  return assignSeatIdentity(input.seats, homeRegions, input.humanNickname);
 }
 
 /**
@@ -153,23 +156,33 @@ function globalHomeNames(seats: readonly NewGameSeatInput[]): string[] {
  *
  * Purpose: The human is always seat 1. AI ids follow the order of the AI rows, starting at the first AI seat.
  * When to use: After every row has a home name.
- * Expected outcome: Rows in seat order. Outcome fields are empty.
+ * Expected outcome: Rows in seat order. Outcome fields are empty. A passed human nickname is cleaned onto the human seat, and an omitted one leaves that seat null.
+ *   An AI nickname is stored only when it differs from that seat's short home name. Otherwise it stays null.
  * Exceptions: None. The count check already keeps the AI index inside 1 to 4.
  */
 function assignSeatIdentity(
   seats: readonly NewGameSeatInput[],
-  homeRegions: readonly string[]
+  homeRegions: readonly string[],
+  humanNickname: string | undefined
 ): ResolvedNewMatchSeat[] {
   const humanIndexes = seats.flatMap((seat, index) => (seat.kind === HUMAN_SEAT_KIND ? [index] : []));
   const aiIndexes = seats.flatMap((seat, index) => (seat.kind === AI_SEAT_KIND ? [index] : []));
+  const storedHumanNickname = humanNickname === undefined
+    ? null
+    : (normalizeSideNickname(humanNickname) || HUMAN_NICKNAME_DEFAULT);
   return [...humanIndexes, ...aiIndexes].map((sourceIndex, position) => {
     const seat = seats[sourceIndex]!;
     const aiNumber = position - humanIndexes.length + 1;
+    const seatId = seat.kind === HUMAN_SEAT_KIND ? HUMAN_SEAT_ID : aiSeatIdForIndex(aiNumber);
+    const homeRegion = homeRegions[sourceIndex]!;
     return {
-      seatId: seat.kind === HUMAN_SEAT_KIND ? HUMAN_SEAT_ID : aiSeatIdForIndex(aiNumber),
+      seatId,
       seatOrder: position + 1,
       kind: seat.kind,
-      homeRegion: homeRegions[sourceIndex]!,
+      homeRegion,
+      nickname: seat.kind === HUMAN_SEAT_KIND
+        ? storedHumanNickname
+        : storedAiNickname(seat.nickname, homeRegion, seatId),
       commanderInput: seat.kind === HUMAN_SEAT_KIND ? null : (seat.commander ?? null),
       outTurn: null,
       outBy: null,

@@ -291,6 +291,15 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly seats?: readonly NewGameSeatInput[];
+  /**
+   * The name to store on the human seat.
+   *
+   * Contract: Omitted leaves that seat's nickname null. A present string is cleaned, and a blank or rejected value stores `Human`.
+   * When to use: The `game:newGame` handler after it has chosen the stored row or the field text.
+   * Expected outcome: The human seat of the new match carries that name. An AI nickname is stored only when that seat's payload name differs from its short home name.
+   * Exceptions: None.
+   */
+  readonly humanNickname?: string;
 }
 
 /**
@@ -432,6 +441,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   const resolved = resolveNewMatchSeats({
     mapKind,
     seats: options?.seats ?? defaultTwoSeatInputs(),
+    humanNickname: options?.humanNickname,
   }).map(seatRecordFromResolved);
   logDebug('gameDb resetGameForNewMatch: map', {
     mapId,

@@ -26,7 +26,7 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: [],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' }],
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
   });
@@ -53,7 +53,7 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: [],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' }],
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
     unknownBattleLine: unknownSentence,
@@ -101,11 +101,11 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: ['Casualty outcomes at 2 hexes.'],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' }],
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
   });
-  assert.strictEqual(hexAndFallback, '## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.');
+  assert.strictEqual(hexAndFallback, '## E. Turkey Losses\nE. Turkey lost 1 hex to you.');
   assert.ok(!hexAndFallback!.includes('Casualty'));
   const lossesOnly = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },
@@ -120,7 +120,7 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: ['Casualty outcomes at 2 hexes.'],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' }],
       transitions: [],
     },
   });
@@ -140,12 +140,12 @@ function testSectionOrderAndEmptySuppression(): void {
     combatFallbackBullets: [],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey' }],
+      seats: [{ seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai' }],
       transitions: [{ h3Index: 'a', from: 'opponent', to: HUMAN_SEAT_ID }],
     },
   });
   assert.equal(lossesAndHex!.includes('took'), false);
-  assert.ok(lossesAndHex!.startsWith('## Your Losses\nRanged attack: 1st Infantry\n## Eastern Turkey Losses\nE. Turkey lost 1 hex to you.\n## Updates\n2 infantry units deployed'));
+  assert.ok(lossesAndHex!.startsWith('## Your Losses\nRanged attack: 1st Infantry\n## E. Turkey Losses\nE. Turkey lost 1 hex to you.\n## Updates\n2 infantry units deployed'));
   const lossesUpdates = lossesAndHex!.slice(lossesAndHex!.indexOf('## Updates'));
   assert.equal(lossesUpdates.includes('took'), false);
   assert.equal(lossesUpdates.includes('hexes lost'), false);

@@ -20,6 +20,7 @@ import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscript
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import { createPathfindingSession } from '../tools/pathfinding';
 import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools/standingOrders';
+import { moveDefendPostsToExplicitMoveDestinations } from '../tools/standingOrdersDefendPost';
 import { mergeCommanderAttackOrders } from '../tools/tempoRuleAttacks';
 import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
 import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
@@ -424,6 +425,16 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       executeStandingOrders(seatId, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
     }
   }
+  const defendPostsMoved =
+    flags.ordersEnabled && !tacticalBattle
+      ? moveDefendPostsToExplicitMoveDestinations({
+          playerId: seatId,
+          state,
+          moves: validated.filter((order) => llmMovementUnitIds.has(order.unitId)),
+          skipUnitIds: new Set(parsed.standingOrderUnitIds ?? []),
+          latLngByH3,
+        }).length
+      : 0;
 
   const planAfterMove =
     tacticalBattle && validated.length > 0
@@ -566,6 +577,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     ferry: outFerry.length,
     embark: outEmbark.length,
     missileLaunches: outMissile.length,
+    defendPostsMoved,
     dropped: dropReasons.length,
     dropReasons,
   });

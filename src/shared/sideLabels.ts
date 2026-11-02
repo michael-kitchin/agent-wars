@@ -1,5 +1,6 @@
 import { isNeutralOwnerId, isSeatId } from './seatIds';
-import { HUMAN_SEAT_KIND, shortSideName, sortSeatsByOrder, type SeatSnapshot } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
+import { HUMAN_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from './seatRoster';
 
 /**
  * The roster fields a side label needs.
@@ -9,7 +10,7 @@ import { HUMAN_SEAT_KIND, shortSideName, sortSeatsByOrder, type SeatSnapshot } f
  * Expected outcome: `homeRegion` is the full name. `outTurn` null means the seat is still in the match.
  * Exceptions: None.
  */
-export type SideLabelSeat = Pick<SeatSnapshot, 'seatId' | 'seatOrder' | 'homeRegion' | 'outTurn'>;
+export type SideLabelSeat = Pick<SeatSnapshot, 'seatId' | 'seatOrder' | 'homeRegion' | 'outTurn' | 'kind' | 'nickname'>;
 
 /**
  * Home lists a label can read without taking a whole snapshot.
@@ -51,7 +52,7 @@ export function homeSeatIdsAtHex(h3Index: string, lists: HomeHexLists): string[]
  * The human seat when the match has one.
  *
  * Purpose: Observe mode has no human seat, so a label can tell the player's seat from the others.
- * When to use: The home chip and a unit name. The control line names every seat by its short name.
+ * When to use: The home chip and a unit name. The control line names every seat by `sideDisplayName`.
  * Expected outcome: The human seat id, or null when every seat is AI.
  * Exceptions: None.
  */
@@ -60,29 +61,17 @@ export function viewerSeatIdForRoster(seats: readonly Pick<SeatSnapshot, 'seatId
 }
 
 /**
- * Short name of one seat on the control line.
- *
- * Purpose: Hex descriptions and another side's mercenary tooltip use the same cut as the top-bar chips.
- * When to use: Hex control text, and a mercenary tooltip that names another side.
- * Expected outcome: `shortSideName` of the home. A blank or whitespace home returns the seat id.
- * Exceptions: None.
- */
-export function abbreviatedSideName(seat: SideLabelSeat): string {
-  return seat.homeRegion.trim().length > 0 ? shortSideName(seat.homeRegion) : seat.seatId;
-}
-
-/**
  * Controller text before any home suffix.
  *
- * Purpose: A seat reads as its short name. Nobody and Neutral stay the word Neutral.
+ * Purpose: A seat reads as its display name. Nobody and Neutral stay the word Neutral.
  * When to use: `formatHexControlLabel` only.
- * Expected outcome: The short name, the seat id when that seat is missing or its home is blank, or `Neutral`.
+ * Expected outcome: `sideDisplayName`, the seat id when that seat is missing, or `Neutral`.
  * Exceptions: None.
  */
 function controllerSideLabel(controllerId: string | null, seats: readonly SideLabelSeat[]): string {
   if (controllerId == null || !isSeatId(controllerId)) return 'Neutral';
   const seat = seats.find((row) => row.seatId === controllerId);
-  return seat ? abbreviatedSideName(seat) : controllerId;
+  return seat ? sideDisplayName(seat) : controllerId;
 }
 
 /**
@@ -104,12 +93,12 @@ function homesInOrder(homeSeatIds: readonly string[], seats: readonly SideLabelS
 /**
  * "Control:" text for a world hex the viewer can see.
  *
- * Purpose: Names the controller and any home with the short side name.
+ * Purpose: Names the controller and any home with `sideDisplayName`.
  * When to use: After the caller has decided the hex is visible, or that it is a home hex.
- * Expected outcome: The controller's short name. One home that belongs to that same seat ends " (home)",
- *   including after that seat is knocked out. One home of another seat ends " ({short name} home)".
- *   Two or more homes list every short name in seat order, including the controller.
- *   The same short name on two seats still uses the other-side form. A null, Neutral, or non-seat
+ * Expected outcome: The controller's display name. One home that belongs to that same seat ends " (home)",
+ *   including after that seat is knocked out. One home of another seat ends " ({display name} home)".
+ *   Two or more homes list every display name in seat order, including the controller.
+ *   The same display name on two seats still uses the other-side form. A null, Neutral, or non-seat
  *   controller reads "Neutral". No known home means no suffix. A home seat missing from the roster
  *   is left off. A knocked-out seat uses the same words as a living one.
  * Exceptions: None. A hidden hex is the caller's "Unknown", not this function's.
@@ -123,21 +112,21 @@ export function formatHexControlLabel(args: {
   const controllerName = controllerSideLabel(args.controllerId, args.seats);
   if (homes.length === 0) return controllerName;
   if (homes.length >= 2) {
-    const names = homes.map((seat) => abbreviatedSideName(seat));
+    const names = homes.map((seat) => sideDisplayName(seat));
     return `${controllerName} (${names.join(' & ')} homes)`;
   }
   const home = homes[0]!;
-  if (args.controllerId === home.seatId) return `${abbreviatedSideName(home)} (home)`;
-  return `${controllerName} (${abbreviatedSideName(home)} home)`;
+  if (args.controllerId === home.seatId) return `${sideDisplayName(home)} (home)`;
+  return `${controllerName} (${sideDisplayName(home)} home)`;
 }
 
 /**
  * A unit's name as a given viewer should read it.
  *
- * Purpose: A third side needs a short name on units that are not the viewer's. A two-sided match does not.
+ * Purpose: A third side needs its display name on units that are not the viewer's. A two-sided match does not.
  * When to use: Stack rows, hover names, kill labels, and the selection panel.
  * Expected outcome: `baseName` for the viewer's units, for Neutral, and for every seat in a two-seat match.
- *   "{short name} · {baseName}" for another seat when the match has three or more seats.
+ *   "{display name} · {baseName}" for another seat when the match has three or more seats.
  * Exceptions: None.
  */
 export function formatUnitNameForViewer(args: {
@@ -151,7 +140,7 @@ export function formatUnitNameForViewer(args: {
   if (args.seats.length === 2) return args.baseName;
   const seat = args.seats.find((row) => row.seatId === args.ownerId);
   if (!seat) return args.baseName;
-  return `${shortSideName(seat.homeRegion)} · ${args.baseName}`;
+  return `${sideDisplayName(seat)} · ${args.baseName}`;
 }
 
 /**
@@ -159,8 +148,8 @@ export function formatUnitNameForViewer(args: {
  *
  * Purpose: The chip is shorter than the tooltip's control line.
  * When to use: World hexes. Battle cells pass no homes and no Neutral controller.
- * Expected outcome: "Home" for the viewer's home. "{short name} home" for one other home.
- *   Short names joined for a shared home. "Neutral" for Neutral land that is not a home. Null otherwise.
+ * Expected outcome: "Home" for the viewer's home. "{display name} home" for one other home.
+ *   Display names joined for a shared home. "Neutral" for Neutral land that is not a home. Null otherwise.
  * Exceptions: None.
  */
 export function formatHomeChip(args: {
@@ -173,9 +162,9 @@ export function formatHomeChip(args: {
   if (homes.length === 1 && args.viewerSeatId != null && homes[0]!.seatId === args.viewerSeatId) {
     return { kind: 'home', text: 'Home' };
   }
-  if (homes.length === 1) return { kind: 'enemy-home', text: `${shortSideName(homes[0]!.homeRegion)} home` };
+  if (homes.length === 1) return { kind: 'enemy-home', text: `${sideDisplayName(homes[0]!)} home` };
   if (homes.length >= 2) {
-    const names = homes.map((seat) => shortSideName(seat.homeRegion));
+    const names = homes.map((seat) => sideDisplayName(seat));
     return { kind: 'enemy-home', text: `${names.join(' & ')} homes` };
   }
   if (args.controllerId != null && isNeutralOwnerId(args.controllerId)) return { kind: 'enemy-home', text: 'Neutral' };

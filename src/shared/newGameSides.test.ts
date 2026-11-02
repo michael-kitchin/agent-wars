@@ -27,7 +27,7 @@ import {
  * Expected outcome: Balanced, with no model.
  * Exceptions: None.
  */
-const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced' };
+const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
 
 /**
  * Three homes, so a fourth row cannot be added.
@@ -72,6 +72,7 @@ const COPIED_COMMANDER: NewGameCommanderInput = {
   reasoningEffort: 'high',
   doctrineChoice: 'aggressive',
   apiKey: 'test-openrouter-key',
+  nickname: 'Grok',
 };
 
 test('adding a side copies the previous AI commander onto a new object', () => {
@@ -79,7 +80,7 @@ test('adding a side copies the previous AI commander onto a new object', () => {
   const started = initialSidesState({ mapKind: 'global', homes, defaultCommander: COMMANDER });
   const tuned = setRowCommander(started, 1, COPIED_COMMANDER);
   const added = addSideRow(tuned, homes, COMMANDER);
-  assert.deepEqual(added.rows[2]?.commander, COPIED_COMMANDER);
+  assert.deepEqual(added.rows[2]?.commander, { ...COPIED_COMMANDER, nickname: 'Gamma' });
   assert.notEqual(added.rows[2]?.commander, tuned.rows[1]?.commander);
   assert.equal(added.rows[1]?.commander, tuned.rows[1]?.commander);
   assert.equal(added.rows[2]?.homeKey, 'c');
@@ -107,12 +108,12 @@ test('adding a side uses the fallback when no AI commander exists', () => {
     rows: started.rows.map((row) => (row.kind === 'ai' ? { ...row, commander: null } : row)),
   };
   const added = addSideRow(cleared, homes, COMMANDER);
-  assert.equal(added.rows[2]?.commander, COMMANDER);
+  assert.deepEqual(added.rows[2]?.commander, { ...COMMANDER, apiKey: undefined, nickname: 'Gamma' });
 });
 
 test('Observe keeps homes and turns You into Side 1', () => {
   const started = initialSidesState({ mapKind: 'global', homes: THREE, defaultCommander: COMMANDER });
-  const watching = setObserveOnly(started, true, COMMANDER);
+  const watching = setObserveOnly(started, true, COMMANDER, THREE);
   assert.equal(watching.observeOnly, true);
   assert.equal(watching.rows[0]?.kind, 'ai');
   assert.equal(watching.rows[0]?.homeKey, 'a');
@@ -120,7 +121,7 @@ test('Observe keeps homes and turns You into Side 1', () => {
   assert.equal(rowLabel(watching, 0), 'Side 1');
   assert.equal(rowLabel(watching, 1), 'Side 2');
   assert.equal(sidesCaption(watching, THREE), '2 of 3 sides, all AI');
-  const playing = setObserveOnly(watching, false, COMMANDER);
+  const playing = setObserveOnly(watching, false, COMMANDER, THREE);
   assert.equal(playing.rows[0]?.kind, 'human');
   assert.equal(playing.rows[0]?.commander, null);
   assert.equal(playing.rows[0]?.homeKey, 'a');
@@ -133,7 +134,7 @@ test('a taken home is labeled, and removing a row frees it', () => {
   const taken = options.find((option) => option.key === 'a');
   assert.equal(taken?.disabled, true);
   assert.equal(taken?.takenBy, 'You');
-  assert.equal(setRowHome(started, 1, 'a'), started);
+  assert.equal(setRowHome(started, 1, 'a', THREE), started);
   const three = addSideRow(started, THREE, COMMANDER);
   const removed = removeSideRow(three, 1);
   assert.deepEqual(removed.rows.map((row) => row.homeKey), ['a', 'c']);
@@ -170,4 +171,26 @@ test('randomize stays on a free home', () => {
   const next = randomizeRowHome(started, 1, THREE, () => 0.99);
   assert.equal(next.rows[1]?.homeKey, 'c');
   assert.notEqual(next.rows[0]?.homeKey, next.rows[1]?.homeKey);
+});
+
+test('an AI nickname starts as the short home name and resets only when that home changes', () => {
+  const homes: readonly HomeOption[] = [
+    { key: 'west', label: 'Western Turkey' },
+    { key: 'east', label: 'Eastern Turkey' },
+    { key: 'levant', label: 'Levant & Cyprus' },
+  ];
+  const started = initialSidesState({ mapKind: 'global', homes, defaultCommander: COMMANDER });
+  assert.equal(started.rows[1]?.commander?.nickname, 'E. Turkey');
+  const grok = setRowCommander(started, 1, { ...started.rows[1]!.commander!, nickname: 'Grok' });
+  assert.equal(setRowHome(grok, 1, 'east', homes).rows[1]?.commander?.nickname, 'Grok');
+  assert.equal(setRowHome(grok, 1, 'levant', homes).rows[1]?.commander?.nickname, 'Levant');
+  const added = addSideRow(grok, homes, COMMANDER);
+  assert.equal(added.rows[2]?.commander?.nickname, 'Levant');
+  assert.equal(added.rows[2]?.commander?.modelId, grok.rows[1]?.commander?.modelId);
+  const watching = setObserveOnly(started, true, COMMANDER, homes);
+  assert.equal(watching.rows[0]?.commander?.nickname, 'W. Turkey');
+  const payload = buildSeatsPayload(grok);
+  assert.equal(payload[0]?.nickname, undefined);
+  assert.equal(payload[1]?.nickname, 'Grok');
+  assert.equal(payload[1]?.commander?.nickname, 'Grok');
 });

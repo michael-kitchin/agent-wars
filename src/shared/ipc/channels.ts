@@ -24,6 +24,8 @@ export const IPC_GAME = {
   saveGame: 'game:saveGame',
   loadGame: 'game:loadGame',
   setSeatCommander: 'game:setSeatCommander',
+  getHumanNickname: 'game:getHumanNickname',
+  setHumanNickname: 'game:setHumanNickname',
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',

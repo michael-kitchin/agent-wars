@@ -26,6 +26,23 @@ export const STANDING_ORDER_TYPES: readonly string[] = Object.freeze(['defend', 
 export const AIR_INELIGIBLE_ORDER_TYPES: ReadonlySet<string> = new Set(['march', 'pursue', 'patrol']);
 
 /**
+ * Standing-order statuses that mean the mission is stalled and needs a decision.
+ *
+ * Purpose: The briefing Attention column, Action needed, and callback evaluation must agree on which statuses are warnings.
+ * When to use: Any check that used to keep its own copy of this set.
+ * Expected outcome: `blocked`, `target_lost`, `target_out_of_range`, `target_destroyed`, `arrived`, and `contact`.
+ * Exceptions: None.
+ */
+export const STANDING_ORDER_WARNING_STATUSES: ReadonlySet<string> = new Set([
+  'blocked',
+  'target_lost',
+  'target_out_of_range',
+  'target_destroyed',
+  'arrived',
+  'contact',
+]);
+
+/**
  * The sentence `assignOrder` returns when air is given a movement standing order.
  *
  * Purpose: Air repositions by ferry and attacks by air strike, so a stored march would ask for a land route forever.

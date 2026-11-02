@@ -12,8 +12,8 @@ Shown at the bottom of the console's Commanders tab, under an "Activity log" hea
 
 ## Information Displayed
 
-- A filter, "All commanders" or one AI seat by its full name. It shows that seat's lines. Lines with no seat stay hidden while a seat is selected.
-- One line per event, prefixed with the local time. A consult line also starts with the turn tag and the seat's short name, such as "T7 E. Turkey".
+- A filter, "All commanders" or one AI seat by the name `sideDisplayName` returns (`src/shared/sideNicknames.ts`). A null nickname shows the short home name. It shows that seat's lines. Lines with no seat stay hidden while a seat is selected.
+- One line per event, prefixed with the local time. A consult line also starts with the turn tag and the seat's name from `sideDisplayName`, such as "T7 E. Turkey".
 - Error lines use the light-red chrome error text from the [UI style guide](../ui-style-guide.md). Ordinary lines use the chrome text.
 - Lines include consultation results, ignored stale consultations, model-list failures, failures to load or save the reasoning effort, standing-order notices, and a one-line copy of a turn-update toast. That copy is plain text. It has no origin flags, type icons, or opponent number flags.
 - An ordinary line, not an error line, appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, on their first request that carries the schema (normally the first request after the model's first tool call), because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits.
@@ -76,6 +76,7 @@ None.
 
 - `static/index.html` (`#openrouter-log`)
 - `src/renderer/openRouter/openRouterUiHelpers.ts` (`appendOpenRouterLog`, `scrollOpenRouterLogToEnd`)
+- `src/shared/sideNicknames.ts` (`sideDisplayName`)
 - `src/renderer/chrome/consoleFrame.ts`
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/openRouter/openRouterRuntime.ts`

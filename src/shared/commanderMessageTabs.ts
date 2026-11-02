@@ -3,13 +3,12 @@
  *
  * Purpose: One dialog lists every AI opponent. A tab turns on when that opponent sends prose.
  * When to use: The message dialog, before it paints.
- * Expected outcome: Tabs stay in opponent-number order, labeled with the short side name. A later consult from the same seat replaces that tab's message and strategy.
+ * Expected outcome: Tabs stay in opponent-number order, labeled with the name the caller passed. A later consult from the same seat replaces that tab's message and strategy.
  * Exceptions: None. This module does not import the logger.
  */
 
 import type { CommanderAbsenceReason, CommanderConsultTheater, CommanderStatus } from './commanderStatus';
 import { aiIndexForSeatId } from './seatIds';
-import { shortSideName } from './seatRoster';
 
 /**
  * One opponent's tab.
@@ -30,11 +29,11 @@ export interface CommanderMessageTab {
    */
   readonly seatId: string;
   /**
-   * Short side name shown on the tab.
+   * Name shown on the tab.
    *
-   * Contract: `shortSideName` of the string passed in. The caller passes the trimmed home name, or the seat id when that name is blank.
+   * Contract: The caller passes `sideDisplayName`. This function does not shorten it.
    * When to use: The tab button.
-   * Expected outcome: The name the player reads, such as `E. Europe`.
+   * Expected outcome: The name the player reads. A null nickname is Human or the short home name.
    * Exceptions: None.
    */
   readonly label: string;
@@ -136,7 +135,7 @@ function compareCommanderMessageTabs(
  *
  * Purpose: The dialog's first appearance shows every opponent, none of them open yet.
  * When to use: When the toast is hidden or no tab state exists.
- * Expected outcome: Every tab disabled, message and strategy null, and no selection. Each label is `shortSideName` of the name that was passed in.
+ * Expected outcome: Every tab disabled, message and strategy null, and no selection. Each label is the string that was passed in.
  * Exceptions: None.
  */
 export function initialCommanderMessageTabs(
@@ -145,7 +144,7 @@ export function initialCommanderMessageTabs(
   const tabs = seats
     .map((seat) => ({
       seatId: seat.seatId,
-      label: shortSideName(seat.label),
+      label: seat.label,
       enabled: false,
       message: null,
       strategy: null,

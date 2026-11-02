@@ -117,9 +117,12 @@
   margin: 0 0 0.5rem 0;
 }
 #ai-strategy-toast .ai-strategy-tab-bar button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0.35rem 0.75rem;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex-shrink: 1;
   font-size: 12px;
   background: var(--chrome-bg);
   color: var(--button-off-text);

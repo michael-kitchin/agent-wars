@@ -12,6 +12,7 @@ import {
   type ConsoleReportKind,
 } from '../../shared/consoleReportLog';
 import { paletteForOwner } from '../../shared/seatPalette';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { createSideNumberFlag } from './toastInlineMarks';
 import { rendererSharedState as S } from '../core/state';
 import { unavailableTooltipText } from './frameTooltipText';
@@ -125,7 +126,7 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
   }
   const name = document.createElement('span');
   const message = meta.messageText?.trim() ?? '';
-  const home = seat?.homeRegion ?? 'Commander';
+  const home = seat ? sideDisplayName(seat) : 'Commander';
   name.textContent = message.length > 0 ? `${home} "${message}"` : home;
   line.append(mark, name);
   wrap.append(line);
@@ -142,7 +143,7 @@ function messageReportBody(meta: ConsoleReportMeta): HTMLElement {
 /**
  * Fills the Reports sender filter from the roster.
  *
- * Purpose: The select lists every side by its full name.
+ * Purpose: The select lists every side by the name shown during the match.
  * When to use: When the console header refreshes.
  * Expected outcome: "Everyone", then each seat. The current choice is kept.
  * Exceptions: None.
@@ -156,7 +157,7 @@ export function refreshReportSenderFilter(): void {
   }
   const current = select.value;
   select.replaceChildren(filterOption('Everyone', ''));
-  for (const seat of S.gameState?.seats ?? []) select.append(filterOption(seat.homeRegion, seat.seatId));
+  for (const seat of S.gameState?.seats ?? []) select.append(filterOption(sideDisplayName(seat), seat.seatId));
   if ([...select.options].some((row) => row.value === current)) select.value = current;
 }
 

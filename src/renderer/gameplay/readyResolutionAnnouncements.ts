@@ -317,7 +317,7 @@ export function reportViewerSeatId(): string | null {
  *
  * Purpose: A held popup has to name sides the way the launch turn did.
  * When to use: When that popup is stashed, and when a toast is built without a stored roster.
- * Expected outcome: One row per seat, with id, order, and home name. An empty roster is an empty list.
+ * Expected outcome: One row per seat, with id, order, home, kind, and nickname. An empty roster is an empty list.
  * Exceptions: None.
  */
 function launchTurnSeats(): TurnReportSeat[] {
@@ -325,6 +325,8 @@ function launchTurnSeats(): TurnReportSeat[] {
     seatId: seat.seatId,
     seatOrder: seat.seatOrder,
     homeRegion: seat.homeRegion,
+    kind: seat.kind,
+    nickname: seat.nickname,
   }));
 }
 

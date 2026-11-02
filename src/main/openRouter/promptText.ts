@@ -2,13 +2,13 @@ import type { GameStateSnapshot } from '../gameDb';
 import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
-import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
-import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../productionRules';
-import { MERCENARY_ENVELOPE_ROWS_SENTENCE } from './promptSpec/gameRuleMercenaryText';
 import { logDebug, logTrace } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
 import { buildOpeningUserMessage } from './promptSpec/consultationText';
+import { SECTION_TITLE_TOOL_USAGE_GUIDANCE, subHeading } from './promptSpec/sectionHeadings';
+
+export { buildProductionSubmitClause } from './promptSpec/productionSubmitText';
 
 /**
  * Documents the `PromptToolFlags` interface as a named contract surface (export interface PromptToolFlags).
@@ -94,27 +94,6 @@ fallbackMovementEnabled: boolean;
  */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
   ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent" content "this turn\'s objectives") in your final JSON to record your plan.';
-
-/**
- * Condition under which the submit clause requires at least one `set_build_queue`.
- *
- * Purpose: Empty queues were the only mandated write, so cells queued with a capped type (infantry at
- * cap while air could still spawn) never became a required work item.
- * When to use: `buildProductionSubmitClause` when production tools are enabled.
- * Expected outcome: One sentence fragment covering empty queues and replaceable blocked-at-cap queues.
- * Exceptions: None. One replacement this turn is enough; every blocked hex need not be listed.
- */
-const PRODUCTION_REQUIREMENT_BASE =
-  'when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built';
-/**
- * Documents the module-scope binding `PRODUCTION_CAP_GUIDANCE` (PRODUCTION_CAP_GUIDANCE).
- *
- * Purpose: Stops the model from filling empty queues with types that cannot spawn because the player is at cap.
- * When to use: Production tool-guidance, user-message, and submit-clause copy when production tools are enabled.
- * Expected outcome: The sentence is included verbatim in those prompt surfaces.
- * Exceptions: None.
- */
-const PRODUCTION_CAP_GUIDANCE = PRODUCTION_CAP_QUEUE_GUIDANCE;
 
 /**
  * Opening geography clause for strategic AI prompts.
@@ -206,12 +185,29 @@ export interface ToolsIntroRosterGates {
 }
 
 /**
+ * Separates the "Never copy" sentence from the Best Options copy sentence.
+ *
+ * Purpose: The tools intro gives that warning its own paragraph, matching the reading breaks before the numbered list.
+ * When to use: A briefing intro that includes `buildToolsIntroCopySentence`.
+ * Expected outcome: `lead` ends at "per action." `neverCopy` is the following sentence, or empty when that sentence is absent.
+ * Exceptions: None.
+ */
+function splitNeverCopySentence(copy: string): { readonly lead: string; readonly neverCopy: string } {
+  logTrace('promptText splitNeverCopySentence', { length: copy.length });
+  const marker = ' Never copy a Target Hex';
+  const at = copy.indexOf(marker);
+  if (at < 0) return { lead: copy, neverCopy: '' };
+  return { lead: copy.slice(0, at), neverCopy: copy.slice(at + 1) };
+}
+
+/**
  * Builds the intro sentence above the numbered `# Available Tools` list.
  *
  * Purpose: Tells the model when to rely on the briefing and when to call tools, naming only tools it can call.
  * When to use: `buildSystemPromptForTools` after computing flags, briefing presence, and roster gates.
  * Expected outcome: A generic "listed tools only" line when neither planning nor assessment is enabled; otherwise
- * mode- and briefing-specific guidance. A strategic briefing with standing-order tools on says standing-order status
+ * mode- and briefing-specific guidance, with a blank line between paragraphs and before the numbered list.
+ * A strategic briefing with standing-order tools on says standing-order status
  * is already present and limits `query_orders` to a rare detail. Battle intros name `plan_route` only when planning is on.
  * Exceptions: None.
  */
@@ -237,12 +233,13 @@ export function buildAvailableToolsIntro(
       ? 'assess the tactical situation'
       : undefined;
   if (!toolsIntroPurpose) {
-    return 'Use only the tools listed below. Do not call tools that are not in the list.';
+    return 'Use only the tools listed below. Do not call tools that are not in the list.\n';
   }
   if (!hasPrecomputedBriefing) {
     return (
       `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
-      (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
+      (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '') +
+      '\n'
     );
   }
   if (coordinateMode === 'tactical') {
@@ -251,34 +248,40 @@ export function buildAvailableToolsIntro(
       const routing = flags.planningEnabled
         ? ' Destinations must come from the routing tool, not from an absent options table.'
         : '';
-      return `${briefingLead} No options are listed this period.${routing}`;
+      return `${briefingLead} No options are listed this period.${routing}\n`;
     }
-    const copy = buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits });
-    const routing = flags.planningEnabled ? ' Use plan_route only for dests not listed for that sub-unit.' : '';
-    return `${briefingLead} ${copy}${routing}`;
+    const { lead, neverCopy } = splitNeverCopySentence(
+      buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits })
+    );
+    const paragraphs = [`${briefingLead} ${lead}`, neverCopy];
+    if (flags.planningEnabled) paragraphs.push('Use plan_route only for dests not listed for that sub-unit.');
+    return `${paragraphs.filter((paragraph) => paragraph.length > 0).join('\n\n')}\n`;
   }
   const selectiveTools: string[] = [];
   if (flags.memoryEnabled) selectiveTools.push('memory lookup (memory_read)');
   if (flags.productionEnabled) selectiveTools.push('production queue checks/sets');
-  const standingOrderNote = flags.ordersEnabled
-    ? ' Standing-order status is already in the briefing; call query_orders only for a rare detail.'
-    : '';
-  const selective =
-    selectiveTools.length > 0
-      ? ` Use tools selectively for ${selectiveTools.join(' and ')} when needed.`
-      : '';
-  const extra = `${standingOrderNote}${selective}`;
+  const paragraphs: string[] = [];
   if (!hasBestOptionsTable) {
-    return (
-      'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.' +
-      extra
+    paragraphs.push(
+      'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.'
+    );
+  } else {
+    const { lead, neverCopy } = splitNeverCopySentence(
+      buildToolsIntroCopySentence({ coordinateMode: 'strategic', hasAirUnits })
+    );
+    paragraphs.push(
+      `Use the Commander's Briefing above for assessments and possible unit actions. ${lead}`,
+      neverCopy,
+      'Use plan_route only for dests not listed for that unit.'
     );
   }
-  const copy = buildToolsIntroCopySentence({ coordinateMode: 'strategic', hasAirUnits });
-  return (
-    `Use the Commander's Briefing above for assessments and possible unit actions. ${copy} Use plan_route only for dests not listed for that unit.` +
-    extra
-  );
+  if (flags.ordersEnabled) {
+    paragraphs.push('Standing-order status is already in the briefing; call query_orders only for a rare detail.');
+  }
+  if (selectiveTools.length > 0) {
+    paragraphs.push(`Use tools selectively for ${selectiveTools.join(' and ')} when needed.`);
+  }
+  return `${paragraphs.filter((paragraph) => paragraph.length > 0).join('\n\n')}\n`;
 }
 
 /**
@@ -287,7 +290,7 @@ export function buildAvailableToolsIntro(
  * Purpose: The HOW TO USE header owns tool mechanics (when to call which tool). Rules and heuristics come from
  * `buildCoachingBullets` so they have one home and one test.
  * When to use: `buildSystemPromptForTools` after computing flags, briefing presence, and coaching gates.
- * Expected outcome: Markdown bullets under `HOW TO USE THESE TOOLS EFFECTIVELY:`.
+ * Expected outcome: Markdown bullets under `## How to Use These Tools Effectively`.
  * Exceptions: None.
  */
 export function buildToolUsageGuidance(
@@ -357,7 +360,7 @@ export function buildToolUsageGuidance(
   };
   lines.push(...buildCoachingBullets(resolvedGates));
   if (lines.length === 0) return '';
-  return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
+  return '\n\n' + subHeading(SECTION_TITLE_TOOL_USAGE_GUIDANCE) + '\n\n' + lines.join('\n');
 }
 
 /**
@@ -470,27 +473,6 @@ export function getMovementOrderInstruction(
 }
 
 /**
- * Defines the `buildProductionSubmitClause` function shape (export function buildProductionSubmitClause(flags: PromptToolFlags): string).
-
- * Purpose: Supports maintainability by documenting why `buildProductionSubmitClause` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function buildProductionSubmitClause(flags: PromptToolFlags): string {
-  if (!flags.productionEnabled) return '';
-  return (
-    ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
-    ` {"action":"set_build_queue","hex":"<two-char code>","unitType":"${ALL_BUILD_QUEUE_ITEM_TYPES.join('|')}","count":1..99}.` +
-    ' Any productionOrders item missing "action" or required fields is dropped.' +
-    ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
-    ` ${PRODUCTION_CAP_GUIDANCE}` +
-    ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.' +
-    ` ${MERCENARY_ENVELOPE_ROWS_SENTENCE}`
-  );
-}
-
-/**
  * One side's observed units, already formatted as id, type, and cell.
  *
  * Purpose: The roster line groups those summaries under the side's home name, then Neutral.
@@ -553,6 +535,7 @@ export function getInitialUserMessage(
     readonly hasMissileUnits?: boolean;
     readonly hasBestOptionsTable?: boolean;
     readonly includeExitBattle?: boolean;
+    readonly hasProductionAttention?: boolean;
   } = {}
 ): string {
   logDebug('promptText getInitialUserMessage', {
@@ -562,6 +545,7 @@ export function getInitialUserMessage(
     hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
     includeExitBattle: roster.includeExitBattle === true,
+    hasProductionAttention: roster.hasProductionAttention === true,
   });
   return buildOpeningUserMessage({
     coordinateMode,
@@ -575,5 +559,6 @@ export function getInitialUserMessage(
     hasMissileUnits: roster.hasMissileUnits === true,
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
     includeExitBattle: roster.includeExitBattle === true,
+    hasProductionAttention: roster.hasProductionAttention === true,
   });
 }

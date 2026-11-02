@@ -27,7 +27,14 @@ import {
   buildMercenaryUpkeepRule,
   formatMercenaryFundsLine,
 } from './promptSpec/gameRuleMercenaryText';
-import { SECTION_TITLE_MERCENARIES, topLevelHeading } from './promptSpec/sectionHeadings';
+import {
+  SECTION_TITLE_MERCENARIES,
+  SECTION_TITLE_RAISE_OPTIONS,
+  SECTION_TITLE_REHIRE_CANDIDATES,
+  SECTION_TITLE_YOUR_MERCENARIES,
+  subHeading,
+  topLevelHeading,
+} from './promptSpec/sectionHeadings';
 
 /**
  * Builds the Mercenaries section.
@@ -59,15 +66,15 @@ export function buildMercenariesBriefingBlock(
   lines.push('', formatMercenaryFundsLine(economy));
   if (economy.credits < economy.upkeepPerTurn) lines.push(MERCENARY_FUNDS_WARNING);
   if (mercenaries.length > 0) {
-    lines.push('', 'Your mercenaries', '', mercenaryTable(mercenaries, format));
+    lines.push('', subHeading(SECTION_TITLE_YOUR_MERCENARIES), '', mercenaryTable(mercenaries, format));
   }
   if (!options.productionEnabled) return lines.join('\n');
   const orders = listHireOrdersForSeat(ownSeat);
   const orderedRehires = new Set(orders.filter((order) => order.kind === 'rehire').map((order) => order.neutralUnitId));
   const context = buildHireContext(state, ownSeat);
   const ownHexes = state.units.filter((unit) => unit.player === ownSeat).map((unit) => unit.h3Index);
-  lines.push('', 'Rehire candidates', '', rehireTable(state, context, orderedRehires, ownHexes, format));
-  lines.push('', 'Raise options', '', raiseTable(context, orders, ownHexes, format));
+  lines.push('', subHeading(SECTION_TITLE_REHIRE_CANDIDATES), '', rehireTable(state, context, orderedRehires, ownHexes, format));
+  lines.push('', subHeading(SECTION_TITLE_RAISE_OPTIONS), '', raiseTable(context, orders, ownHexes, format));
   return lines.join('\n');
 }
 

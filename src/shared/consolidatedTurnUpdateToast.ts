@@ -135,7 +135,7 @@ export interface ConsolidatedTurnUpdateToastArgs {
    *
    * Contract: Output of `buildTurnLossSummary` with visibility predicate applied for opponent victims.
    * When to use: Required for the per-side loss sections.
-   * Expected outcome: A side with no unit losses is omitted here. A side that lost hexes is added from `turnReport`. The viewer is "Your Losses". Each other side uses its full home name. Neutral is last.
+   * Expected outcome: A side with no unit losses is omitted here. A side that lost hexes is added from `turnReport`. The viewer is "Your Losses". Each other side uses `sideDisplayName`. Neutral is last.
    * Exceptions: None.
    */
   turnLossSummary: TurnLossSummary;

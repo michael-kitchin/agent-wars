@@ -73,6 +73,15 @@ export interface OpeningMessageGates {
    */
   readonly productionEnabled: boolean;
   /**
+   * Whether the Production attention flag names at least one idle hex.
+   *
+   * Contract: Omitted means false. True only for a strategic briefing when production tools are on and `findIdleProductionHexes` returned a hex.
+   * When to use: From the consultation's production injection. Ignored when production is off, the mode is tactical, or there is no briefing.
+   * Expected outcome: True adds the one-clause pointer at the idle hexes. False omits it.
+   * Exceptions: None.
+   */
+  readonly hasProductionAttention?: boolean;
+  /**
    * Whether the adjacent-cell fallback listing is in the system prompt.
    *
    * Contract: Used when planning and standing orders are both off.
@@ -201,11 +210,31 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
 }
 
 /**
+ * Pointer at the Production attention flag.
+ *
+ * Purpose: The opening message may name a system-prompt section. It does not restate which hexes or types to queue.
+ * When to use: `buildOpeningUserMessage`, between the action clause and the envelope clause.
+ * Expected outcome: The production clause when the mode is strategic, a briefing is present, production is on, and the flag is present. Otherwise empty.
+ * Exceptions: None.
+ */
+function buildOpeningProductionClause(gates: OpeningMessageGates): string {
+  if (
+    gates.coordinateMode === 'strategic' &&
+    gates.hasBriefing &&
+    gates.productionEnabled &&
+    gates.hasProductionAttention === true
+  ) {
+    return ' Queue production for every hex named in the Production attention flag.';
+  }
+  return '';
+}
+
+/**
  * Builds the opening user message for this consultation.
  *
  * Purpose: Submit-only: situation, action, envelope fields — no restated rules.
  * When to use: The first user turn after the system prompt.
- * Expected outcome: Three parts in order. Tactical appends `TACTICAL_STANDING_ORDER_PROHIBITION`.
+ * Expected outcome: Situation, action, the production pointer when its gates hold, then the envelope. Tactical appends `TACTICAL_STANDING_ORDER_PROHIBITION`.
  * Exceptions: None.
  */
 export function buildOpeningUserMessage(gates: OpeningMessageGates): string {
@@ -216,10 +245,11 @@ export function buildOpeningUserMessage(gates: OpeningMessageGates): string {
     ? "Use the Commander's Briefing in the system prompt above."
     : 'Use the tools listed in the system prompt above.';
   const action = buildOpeningActionClause(gates);
+  const productionClause = buildOpeningProductionClause(gates);
   const envelopeClause = `Then submit JSON with ${fields}.`;
   const tacticalBan =
     gates.coordinateMode === 'tactical' ? ` ${TACTICAL_STANDING_ORDER_PROHIBITION}` : '';
-  return `${situation} ${action} ${envelopeClause}${tacticalBan}`;
+  return `${situation} ${action}${productionClause} ${envelopeClause}${tacticalBan}`;
 }
 
 /**

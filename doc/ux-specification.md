@@ -62,7 +62,7 @@ Scenes that click units find them through the game state and the main map (`ui-s
 | Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [orders-tab.md](ux/orders-tab.md) |
 | The selection panel | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md) | [selection-panel.md](ux/selection-panel.md) |
 | The Commanders tab's tool groups | [modes-and-transitions.md](ux/modes-and-transitions.md) | [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md) |
-| Start or Stop, its status sentence, or a commander's API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
+| Start or Stop, its status sentence, or a commander's nickname, API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
@@ -114,10 +114,10 @@ Element documents share a fixed heading set:
 - [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, Air strikes, and Missile launches groups on the Orders tab.
 - [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, holds the reticle that aims a ranged attack, an air strike, or a missile launch, and offers Dismiss for one of your mercenaries during strategic planning.
 - [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Commanders tab's Tool groups section.
-- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Start or Stop and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's API key, model, reasoning effort, and doctrine. The new-game popover uses the same model list.
+- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Start or Stop and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's nickname, API key, model, reasoning effort, and doctrine. The new-game popover uses the same model list. A card's name is `sideDisplayName` in `src/shared/sideNicknames.ts`. A null nickname shows that side's short home name. The commander's prompt still uses the full home name.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
-- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it.
+- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it. Game Options holds the human Nickname. Each AI side's Nickname is on that side's commander.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
 - [tactical-entry-markers.md](ux/tactical-entry-markers.md): markers on contested hexes that lead into a tactical battle.
 - [tactical-battles-list.md](ux/tactical-battles-list.md): the list of melee hexes where the player chooses to fight or ignore.

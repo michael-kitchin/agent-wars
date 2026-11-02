@@ -98,7 +98,7 @@ export function regionalWinPathsBullet(share: number): string {
  *
  * Purpose: States how this consultation is won, matching the scenario the snapshot actually carries.
  * When to use: Strategic `buildSystemPromptForTools` after the opening line.
- * Expected outcome: The last-side sentence, the mutual-wipe sentence, and the combat sentence for a regional match or a known victory rule. A turn-limit match also names the limit. Otherwise the generic objective.
+ * Expected outcome: The last-side sentence as its own paragraph, then the mutual-wipe sentence and the combat sentence together. A turn-limit match puts the limit sentence in the paragraph between those two. Otherwise the generic objective, still one paragraph.
  * Exceptions: None.
  */
 export function buildWinConditionReminderClause(args: {
@@ -121,8 +121,8 @@ export function buildWinConditionReminderClause(args: {
   if (args.victoryRule === 'most_city_hexes_at_turn_limit' && typeof args.turnLimit === 'number') {
     parts.push(TURN_LIMIT_GOAL_SENTENCE.replace('{L}', String(args.turnLimit)));
   }
-  parts.push(MUTUAL_WIPE_GOAL_SENTENCE, WIN_CONDITION_REMINDER_SECOND_SENTENCE);
-  return parts.join(' ');
+  parts.push(`${MUTUAL_WIPE_GOAL_SENTENCE} ${WIN_CONDITION_REMINDER_SECOND_SENTENCE}`);
+  return parts.join('\n\n');
 }
 
 /**

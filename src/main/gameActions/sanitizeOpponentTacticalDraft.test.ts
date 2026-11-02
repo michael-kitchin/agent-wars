@@ -13,6 +13,7 @@ import {
   tacticalParentCell,
   tacticalCell,
 } from '../tacticalBattle/testSupport/tacticalHexFixtures';
+import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
 import { sanitizeOpponentTacticalDraftForReadyCommit } from './gameActionsCore';
 
 beforeEach(() => {
@@ -110,4 +111,25 @@ test('sanitize keeps a named seat march and an exit flag when that seat is not t
   }, AI_SEAT_IDS[0]);
   assert.strictEqual(flagged?.exitBattle, true);
   assert.strictEqual(flagged?.movementOrders.length, 0);
+});
+
+test('a tactical armor shot at its move destination is legal from the pre-move cell', () => {
+  const center = tacticalCell(41, 51);
+  const neighbor = firstRingCellDistinctFrom(center);
+  const battle = minimalOpponentMarchBattle(center, [center, neighbor], 'armor');
+  battle.subUnits.push({
+    id: 'hum:01',
+    parentUnitId: 'hum-parent',
+    player: 'human',
+    unitType: 'infantry',
+    h3Index: neighbor,
+    displayName: 'Human',
+  });
+  const result = validateTacticalGroupRangedTarget({
+    snap: battle,
+    uniqueUnitIds: ['opp:01'],
+    targetH3Index: neighbor,
+    tacticalAttackerPlayer: 'opponent',
+  });
+  assert.strictEqual(result.success, true, result.success ? '' : result.reason);
 });

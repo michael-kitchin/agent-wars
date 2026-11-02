@@ -463,7 +463,7 @@ export function formatHireOrderLabel(order: {
 /**
  * Upkeep shown for a mercenary the current player owns.
  *
- * Purpose: That player's own tooltip keeps the cost. Another side's tooltip uses the short name instead.
+ * Purpose: That player's own tooltip keeps the cost. Another side's tooltip uses the display name the caller passes.
  * When to use: `mercenaryTooltipValue` when the owner is the viewer.
  * Expected outcome: The credits symbol, the amount, and `/turn`, with no space before the slash. An upkeep of 0 is `¤0/turn`.
  * Exceptions: None.
@@ -499,7 +499,7 @@ export function neutralUnitOfferedForRehire(input: {
  *
  * Purpose: The same line names the current player's cost, another side, or a unit that can be rehired.
  * When to use: When building a live unit's flag tooltip. Pass `forHire` from `neutralUnitOfferedForRehire`.
- * Expected outcome: `¤N/turn` for the viewer's mercenary. The owner's short name for another side's mercenary. `For Hire` for a Neutral unit that can be rehired. Null when the unit is not one of those, and when another side's short name is blank.
+ * Expected outcome: `¤N/turn` for the viewer's mercenary. The owner's display name for another side's mercenary. `For Hire` for a Neutral unit that can be rehired. Null when the unit is not one of those, and when that display name is blank.
  * Exceptions: None.
  */
 export function mercenaryTooltipValue(input: {

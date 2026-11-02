@@ -251,6 +251,7 @@ function testTwoSeatsGetDifferentProfiles(): void {
       seatOrder: 1,
       kind: 'ai',
       homeRegion: 'Home',
+      nickname: null,
       commander: { modelId, reasoningEffort: effort, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
       outTurn: null,
       outBy: null,

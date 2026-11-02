@@ -1,11 +1,13 @@
 /**
  * `game_config` keys that belong to this machine, not to a match.
  *
- * Purpose: These rows hold this machine's OpenRouter setup, including secrets, not the match. A save file never contains them. A load keeps this machine's values. A new row of this kind must be added here, or saves will carry it.
+ * Purpose: These rows hold this machine's OpenRouter setup, including secrets, and the human nickname, not the match. A save file never contains them. A load keeps this machine's values. A new row of this kind must be added here, or saves will carry it.
  * When to use: When a save is written, when a save is loaded, and when OpenRouter code names one of these rows.
- * Expected outcome: Six stable key names, listed in `MACHINE_LOCAL_CONFIG_KEYS`.
+ * Expected outcome: Seven stable key names, listed in `MACHINE_LOCAL_CONFIG_KEYS`.
  * Exceptions: None.
  */
+
+import { HUMAN_NICKNAME_CONFIG_KEY } from '../../shared/sideNicknames';
 
 /**
  * `game_config` key for this machine's legacy OpenRouter API key.
@@ -72,7 +74,7 @@ export const SEAT_API_KEY_FLAGS_CONFIG_KEY = 'openrouter_seat_api_key_flags';
  *
  * Purpose: Save and load share one list so a new machine-local row cannot be forgotten.
  * When to use: Deleting those rows from a save, and copying this machine's rows into a load.
- * Expected outcome: The six key strings above.
+ * Expected outcome: The seven key strings above.
  * Exceptions: None.
  */
 export const MACHINE_LOCAL_CONFIG_KEYS: readonly string[] = [
@@ -82,4 +84,5 @@ export const MACHINE_LOCAL_CONFIG_KEYS: readonly string[] = [
   COMMANDER_MEMORY_CONFIG_KEY,
   SEAT_API_KEYS_CONFIG_KEY,
   SEAT_API_KEY_FLAGS_CONFIG_KEY,
+  HUMAN_NICKNAME_CONFIG_KEY,
 ];

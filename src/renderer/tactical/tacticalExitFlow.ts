@@ -8,6 +8,7 @@ import {
 import { getTacticalAnnihilationOutcome, getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { updateGameStateSidebar } from '../core/uiState';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { clearAutomaticBattleFrameMemory, frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
@@ -135,8 +136,8 @@ function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
   if (snap.aiOnlyEndReason === 'idle') return 'The battle ended with no orders left to carry out.';
   const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
   if (winner == null || winner === 'mutual') return 'All units destroyed.';
-  const home = S.gameState?.seats?.find((seat) => seat.seatId === winner)?.homeRegion;
-  return `${home && home.length > 0 ? home : winner} wins the battle.`;
+  const winnerSeat = S.gameState?.seats?.find((seat) => seat.seatId === winner);
+  return `${winnerSeat ? sideDisplayName(winnerSeat) : winner} wins the battle.`;
 }
 
 /**

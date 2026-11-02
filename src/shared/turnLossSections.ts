@@ -9,7 +9,8 @@
 
 import { formatPlayerLossLinesMultiline, type TurnLossSummary } from './lossSummary';
 import { NEUTRAL_OWNER_ID } from './seatIds';
-import { sortSeatsByOrder } from './seatRoster';
+import { sortSeatsByOrder, type SeatKind } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
 
 /**
  * An empty hex-line map for a toast that has no territory changes.
@@ -54,7 +55,7 @@ const SECTION_HEADER_PREFIX = '## ';
 /**
  * A seat the section header can name.
  *
- * Purpose: Headers use the full home name, in seat order.
+ * Purpose: Headers use the name shown during the match, in seat order.
  * When to use: `buildTurnLossSections`.
  * Expected outcome: One row per known seat.
  * Exceptions: None.
@@ -82,11 +83,29 @@ export interface TurnLossSectionSeat {
    * Full home name.
    *
    * Contract: Not the shortened name.
-   * When to use: The header `{homeRegion} Losses`.
+   * When to use: The header, through `sideDisplayName`.
    * Expected outcome: The name the roster stores.
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means Human or the short home name.
+   * When to use: `sideDisplayName`.
+   * Expected outcome: The header uses this when it is non-empty after cleaning.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
+  /**
+   * Whether a person or a commander plays the seat.
+   *
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
+   * When to use: The nickname default.
+   * Expected outcome: A human viewer still gets the header Your Losses.
+   * Exceptions: None.
+   */
+  readonly kind: SeatKind;
 }
 
 /**
@@ -157,9 +176,9 @@ function orderedOwners(
 /**
  * The header for one owner.
  *
- * Purpose: The viewer and Neutral keep their fixed headers. Every other owner uses the full home name.
+ * Purpose: The viewer and Neutral keep their fixed headers. Every other owner uses `sideDisplayName`.
  * When to use: Each id from `orderedOwners`.
- * Expected outcome: `Your Losses`, `Neutral Losses`, or `{home} Losses`.
+ * Expected outcome: `Your Losses`, `Neutral Losses`, or `{display name} Losses`.
  * Exceptions: None.
  */
 function headerFor(ownerId: string, viewerSeatId: string | null, seats: readonly TurnLossSectionSeat[]): string {
@@ -187,10 +206,7 @@ export function lossSectionOwnerId(
   if (!headerTitle.endsWith(' Losses')) return null;
   const name = headerTitle.slice(0, -' Losses'.length);
   const matches = sortSeatsByOrder(
-    seats.filter((seat) => {
-      const home = seat.homeRegion.trim();
-      return (home.length > 0 ? home : seat.seatId) === name;
-    })
+    seats.filter((seat) => sideDisplayName(seat) === name)
   );
   return matches[0]?.seatId ?? null;
 }
@@ -200,12 +216,12 @@ export function lossSectionOwnerId(
  *
  * Purpose: A blank home name must not produce a header that is only "Losses".
  * When to use: Each non-viewer owner in `buildTurnLossSections`.
- * Expected outcome: "{home} Losses", or "{seat id} Losses" when the home name is missing or blank.
+ * Expected outcome: "{display name} Losses". An AI seat with a blank home uses its seat id. A human seat still uses Human.
  * Exceptions: None.
  */
 function lossSectionTitle(seat: TurnLossSectionSeat | undefined, ownerId: string): string {
-  const name = seat?.homeRegion.trim() ?? '';
-  return `${name.length > 0 ? name : ownerId} Losses`;
+  if (!seat) return `${ownerId} Losses`;
+  return `${sideDisplayName(seat)} Losses`;
 }
 
 /**

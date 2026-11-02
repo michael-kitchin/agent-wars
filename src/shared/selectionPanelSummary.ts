@@ -259,7 +259,7 @@ export interface SelectionPanelChipInput {
    *
    * Contract: Null outside a home and off Neutral land, and in a battle.
    * When to use: Always. Build it with `formatHomeChip`.
-   * Expected outcome: A `Home`, `{short name} home`, or `Neutral` chip.
+   * Expected outcome: A `Home`, `{display name} home`, or `Neutral` chip.
    * Exceptions: None.
    */
   readonly homeChip: { readonly kind: 'home' | 'enemy-home'; readonly text: string } | null;

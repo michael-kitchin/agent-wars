@@ -6,7 +6,7 @@ import type { MeleeCandidateRow } from '../../shared/ipcTypes';
 import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
-import { shortSideName } from '../../shared/seatRoster';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { fightTooltipText, ignoreTooltipText } from '../chrome/controlTooltipText';
 import { rendererSharedState as S } from '../core/state';
 import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
@@ -136,6 +136,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     for (const label of ['', 'Hex', ...partyHeaders]) {
       const th = document.createElement('th');
       th.textContent = label;
+      if (label) th.title = label;
       hr.appendChild(th);
     }
     thead.appendChild(hr);
@@ -277,7 +278,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
 }
 
 /**
- * The enemy's dot, short name, and unit summary.
+ * The enemy's dot, display name, and unit summary.
  *
  * Purpose: The Enemy cell names one other party.
  * When to use: An eligible row.
@@ -350,17 +351,17 @@ function worldMapParties(row: MeleeCandidateRow): HTMLElement {
 }
 
 /**
- * A short name for a party.
+ * A display name for a party.
  *
- * Purpose: The dialog uses the same short names as the top bar.
+ * Purpose: The dialog uses the same name as the top bar.
  * When to use: Enemy cells and world-map lines.
- * Expected outcome: "Neutral", or the seat's short home name.
+ * Expected outcome: "Neutral", or `sideDisplayName` of that seat. A null nickname is Human or the short home name.
  * Exceptions: None. An unknown id is shown as itself.
  */
 function partyName(ownerId: string): string {
   if (isNeutralOwnerId(ownerId)) return 'Neutral';
   const seat = S.gameState?.seats?.find((row) => row.seatId === ownerId);
-  return seat ? shortSideName(seat.homeRegion) : ownerId;
+  return seat ? sideDisplayName(seat) : ownerId;
 }
 
 /**

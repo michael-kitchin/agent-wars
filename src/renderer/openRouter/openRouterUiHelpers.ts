@@ -19,7 +19,8 @@ import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterTo
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { layoutMapChrome } from '../map/mapChromeLayout';
 import { isObservingRoster } from '../../shared/observeModeControls';
-import { activeAiSeats, shortSideName } from '../../shared/seatRoster';
+import { activeAiSeats } from '../../shared/seatRoster';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { commanderFooterLabel, commanderPlanningSentence, modelNameFromOptionLabel, commanderPlanningStatus } from '../../shared/commanderPlanningStatus';
 
 /**
@@ -207,7 +208,7 @@ export function appendOpenRouterLog(line: string, isError = false, seatId?: stri
 }
 
 /**
- * The turn tag and short name in front of a consult line.
+ * The turn tag and display name in front of a consult line.
  *
  * Purpose: The activity log says which commander the line belongs to.
  * When to use: `appendOpenRouterLog` when the line carries a seat.
@@ -217,7 +218,7 @@ export function appendOpenRouterLog(line: string, isError = false, seatId?: stri
 function activitySeatPrefix(seatId: string | undefined): string {
   if (!seatId) return '';
   const seat = S.gameState?.seats?.find((row) => row.seatId === seatId);
-  const name = seat ? shortSideName(seat.homeRegion) : seatId;
+  const name = seat ? sideDisplayName(seat) : seatId;
   const turn = S.gameState?.turnNumber;
   return `${turn ? `T${turn} ` : ''}${name} `;
 }

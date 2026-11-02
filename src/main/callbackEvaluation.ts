@@ -13,6 +13,7 @@ import type { CallbackSubscription } from './callbackSubscriptions';
 import { gridHopDistanceBetween } from './tools/assessUnitProximity';
 import { isMissileUnitType } from '../shared/missileRules';
 import { getRange } from './combatConstants';
+import { STANDING_ORDER_WARNING_STATUSES } from './tools/standingOrdersShared';
 
 /**
  * Documents the `ResolutionContext` interface as a named contract surface (export interface ResolutionContext).
@@ -282,23 +283,6 @@ type: 'deadman';   /**
 turnsSince: number };
 
 /**
- * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
-
- * Purpose: Supports maintainability by documenting why `WARNING_STATUSES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const WARNING_STATUSES = new Set([
-  'blocked',
-  'target_lost',
-  'target_out_of_range',
-  'target_destroyed',
-  'arrived',
-  'contact',
-]);
-
-/**
  * Documents the module-scope binding `DEADMAN_TURNS` (DEADMAN_TURNS).
 
  * Purpose: Supports maintainability by documenting why `DEADMAN_TURNS` exists.
@@ -485,7 +469,7 @@ export function evaluateMandatoryOverrides(
     const status = unitToStatus.get(unitId);
     if (status === undefined) {
       results.push({ type: 'unordered_unit', unitId });
-    } else if (WARNING_STATUSES.has(status)) {
+    } else if (STANDING_ORDER_WARNING_STATUSES.has(status)) {
       results.push({ type: 'standing_order_blocked', unitId });
     }
   }

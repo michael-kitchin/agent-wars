@@ -366,6 +366,15 @@ export interface NewGameCommanderInput {
    */
   readonly doctrineChoice: DoctrineChoice;
   /**
+   * The name shown for this AI side.
+   *
+   * Contract: Empty means the short home name. This string is not sent to the model.
+   * When to use: The commander popover and the seat payload.
+   * Expected outcome: Copied onto the seat payload. Empty, or a value that only repeats the short home name, stores null on the seat.
+   * Exceptions: None.
+   */
+  readonly nickname: string;
+  /**
    * OpenRouter key for this opponent.
    *
    * Contract: Optional. Missing and blank mean this opponent has no key. A string is trimmed before it is stored.
@@ -412,6 +421,15 @@ export interface NewGameSeatInput {
    * Exceptions: None.
    */
   readonly sideGroupId?: string;
+  /**
+   * The AI seat's nickname.
+   *
+   * Contract: Ignored on a human seat. Empty, missing, or a value that only repeats the short home name stores null after the home is resolved.
+   * When to use: The seat payload from the new-game screen.
+   * Expected outcome: A custom name is stored on that AI seat. Null shows the resolved home's short name.
+   * Exceptions: None.
+   */
+  readonly nickname?: string;
   /**
    * This AI side's model and doctrine.
    *
@@ -540,6 +558,15 @@ aiOnlyBattles?: AiOnlyBattleMode;
    * Exceptions: None.
    */
 sightCues?: boolean;
+  /**
+   * The Game Options field's current text.
+   *
+   * Contract: Missing means the stored row. Present is cleaned again before the human seat is stored.
+   * When to use: The Start click.
+   * Expected outcome: The next match's human seat uses this name. A match already running is unchanged.
+   * Exceptions: None.
+   */
+  humanNickname?: string;
     /**
    * One entry per side, in row order.
    *

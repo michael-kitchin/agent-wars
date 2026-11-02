@@ -4,7 +4,8 @@ import { DOCTRINE_CHOICE_DESCRIPTIONS, DOCTRINE_CHOICE_LABELS } from '../../shar
 import { listSelectableReasoningEfforts } from '../../shared/openRouterReasoningEffort';
 import { placeBelowAnchor } from '../../shared/popoverPlacement';
 import { DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
-import { apiKeyTooltipText, refreshModelsTooltipText } from '../chrome/controlTooltipText';
+import { nicknameFieldValue, SIDE_NICKNAME_MAX_LENGTH } from '../../shared/sideNicknames';
+import { apiKeyTooltipText, commanderNicknameTooltipText, refreshModelsTooltipText } from '../chrome/controlTooltipText';
 import {
   refreshOpenRouterModels,
   reportOpenRouterPopoverLine,
@@ -96,10 +97,19 @@ export interface CommanderPopoverRequest {
    *
    * Contract: A `NewGameCommanderInput`.
    * When to use: The row that was clicked.
-   * Expected outcome: The fields show this key, model, effort, and doctrine.
+   * Expected outcome: The fields show this nickname, key, model, effort, and doctrine.
    * Exceptions: None.
    */
   readonly commander: NewGameCommanderInput;
+  /**
+   * The name shown when the nickname field is cleared.
+   *
+   * Contract: The short home name for this side.
+   * When to use: The nickname field's initial value, and blur or Enter after the player clears it.
+   * Expected outcome: A blank field returns to this name.
+   * Exceptions: None.
+   */
+  readonly defaultNickname: string;
   /**
    * The new-game copy button, or null during a match.
    *
@@ -182,7 +192,7 @@ let applyOpenDraft: ((commander: NewGameCommanderInput) => void) | null = null;
 /**
  * Opens the commander popover under `request.anchor`.
  *
- * Purpose: One place edits a side's key, model, reasoning effort, and doctrine.
+ * Purpose: One place edits a side's nickname, key, model, reasoning effort, and doctrine.
  * When to use: A click on a commander summary button.
  * Expected outcome: Any popover already open closes first. Choosing a model also saves it as the app-wide model.
  * Exceptions: None. A missing model list still opens, with the empty model option.
@@ -196,6 +206,7 @@ export function openCommanderPopover(request: CommanderPopoverRequest): void {
     reasoningEffort: request.commander.reasoningEffort,
     doctrineChoice: request.commander.doctrineChoice,
     apiKey: commanderApiKey(request.commander),
+    nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname),
   };
   const root = document.createElement('div');
   root.className = 'commander-popover';
@@ -310,16 +321,25 @@ function popoverHeader(title: string): HTMLElement {
 }
 
 /**
- * Key, model, reasoning, doctrine, and the optional copy button.
+ * Key, model, reasoning, doctrine, nickname, and the optional copy button.
  *
  * Purpose: The controls write one commander object the caller stores.
  * When to use: `openCommanderPopover`.
- * Expected outcome: A model, reasoning, or doctrine change calls `onChange` with the key field's current value. The key calls `onChange` on blur and Enter only when its trimmed value changed. A model change also updates the app-wide model. The reasoning list stays visible when the model offers no levels: it is disabled and reads "Model default". Every label is as wide as the word Reasoning, so the API key field and the model list start at the reasoning list's left edge.
+ * Expected outcome: A model, reasoning, or doctrine change calls `onChange` with the nickname and key fields' current values. The nickname and the key call `onChange` on blur and Enter only when their stored values changed. Clearing the nickname writes the default name back into the field. A model change also updates the app-wide model. The reasoning list stays visible when the model offers no levels: it is disabled and reads "Model default". Every label is as wide as the word Reasoning, so the nickname field, the API key field, and the model list start at the reasoning list's left edge.
  * Exceptions: None.
  */
 function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'commander-popover-fields';
+  const nicknameInput = document.createElement('input');
+  nicknameInput.id = POPOVER_CONTROL_IDS.nickname;
+  nicknameInput.type = 'text';
+  nicknameInput.maxLength = SIDE_NICKNAME_MAX_LENGTH;
+  nicknameInput.autocomplete = 'off';
+  nicknameInput.spellcheck = false;
+  nicknameInput.setAttribute('aria-label', 'Nickname');
+  nicknameInput.value = draft.nickname;
+  nicknameInput.setAttribute('data-control-tooltip', commanderNicknameTooltipText);
   const keyInput = document.createElement('input');
   keyInput.id = POPOVER_CONTROL_IDS.apiKey;
   keyInput.type = 'password';
@@ -342,6 +362,8 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
   const keyModel = document.createElement('div');
   keyModel.className = 'commander-popover-key-model';
   keyModel.append(
+    fieldLabel(POPOVER_CONTROL_IDS.nickname, 'Nickname'),
+    nicknameInput,
     fieldLabel(POPOVER_CONTROL_IDS.apiKey, 'API key'),
     keyInput,
     fieldLabel(POPOVER_CONTROL_IDS.model, 'Model'),
@@ -351,6 +373,7 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
   reasoning.id = POPOVER_CONTROL_IDS.reasoning;
   reasoning.setAttribute('aria-label', 'Reasoning');
   const current = (): NewGameCommanderInput => {
+    draft.nickname = nicknameFieldValue(nicknameInput.value, request.defaultNickname);
     draft.apiKey = keyInput.value.trim();
     return { ...draft };
   };
@@ -378,6 +401,17 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     request.onChange(current());
   });
   showReasoning();
+  const emitNicknameIfChanged = (): void => {
+    const next = nicknameFieldValue(nicknameInput.value, request.defaultNickname);
+    nicknameInput.value = next;
+    if (next === draft.nickname) return;
+    draft.nickname = next;
+    request.onChange(current());
+  };
+  nicknameInput.addEventListener('blur', emitNicknameIfChanged);
+  nicknameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') emitNicknameIfChanged();
+  });
   const emitKeyIfChanged = (): void => {
     const next = keyInput.value.trim();
     if (next === (draft.apiKey ?? '')) return;
@@ -411,6 +445,8 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     draft.reasoningEffort = commander.reasoningEffort;
     draft.doctrineChoice = commander.doctrineChoice;
     draft.apiKey = commanderApiKey(commander);
+    draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
+    nicknameInput.value = draft.nickname;
     keyInput.value = draft.apiKey ?? '';
     copyModelOptions(model, draft.modelId);
     showReasoning();

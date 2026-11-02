@@ -4,10 +4,12 @@ import { strategicCellAt } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
+import { buildLatLngCoordinateMap } from '../mapData';
 import { getRange } from '../combatConstants';
 import { validateAirStrikeOrder } from '../gameActions/airValidation';
 import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './pathfinding';
+import { refreshDefendPostProgress } from './standingOrdersDefendPost';
 import type { LatLng } from './pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 import {
@@ -214,13 +216,23 @@ function advanceNextMovePastOccupiedCell(playerId: string, row: StandingOrderRow
  * Purpose: Planning briefings and stay-put occupancy read `computed_route` before this turn's route is rebuilt.
  * A step stored when it was queued is the unit's current cell after that step lands.
  * When to use: Before building a strategic briefing, and at the start of standing-order generation.
- * Expected outcome: Arrived marches and pursuits with a missing target are deleted. A next step equal to the
+ * Expected outcome: Arrived marches and pursuits with a missing target are deleted. A defend order is refreshed
+ * to `holding`, `en_route`, or `blocked` with the route the briefing will show. A next step equal to the
  * unit's cell becomes the following cached segment when turns remain. Other rows are unchanged.
  * Exceptions: None. Unresolvable coordinates are left as stored.
  */
 export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void {
   logDebug('standingOrders expireAndUpdateStatus', { playerId, turnNumber: state.turnNumber });
   const existingUnitIds = new Set(state.units.filter((u) => u.player === playerId).map((u) => u.id));
+  let routeSession: PathfindingSession | undefined;
+  const getRouteSession = (): PathfindingSession => {
+    if (!routeSession) {
+      const hexList = state.hexes.map((hex) => hex.h3Index);
+      const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+      routeSession = createPathfindingSession(state, latLngByH3, resolveToH3);
+    }
+    return routeSession;
+  };
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ?',
     [playerId]
@@ -243,6 +255,13 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
         deleteStandingOrder(playerId, row.unit_id);
         continue;
       }
+    }
+    if (row.order_type === 'defend') {
+      const defendUnit = state.units.find((u) => u.id === row.unit_id);
+      if (defendUnit) {
+        refreshDefendPostProgress({ playerId, row, unit: defendUnit, getRouteSession });
+      }
+      continue;
     }
     let removed = false;
     if (row.order_type === 'march') {

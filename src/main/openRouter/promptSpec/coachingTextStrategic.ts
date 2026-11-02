@@ -191,7 +191,9 @@ function tempoBullet(hasAirUnits: boolean): string {
  * Exceptions: None.
  */
 const ORDERLESS_BULLET =
-  '- For every unit listed under ## Units Without Standing Orders, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn\'s movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex. When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. An explicit_move to the unit\'s current Hex is dropped as already arrived and the unit stays idle. Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
+  '- For every unit listed in the Units Without Standing Orders table, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn\'s movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.' +
+  '\n\n  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. An explicit_move to the unit\'s current Hex is dropped as already arrived and the unit stays idle.' +
+  '\n\n  Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
 
 /**
  * Working standing orders should be left alone.
@@ -202,7 +204,10 @@ const ORDERLESS_BULLET =
  * Exceptions: None.
  */
 const LEAVE_MISSIONS_BULLET =
-  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders and marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.';
+  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders, and marches or defend orders whose next move recedes from the nearest enemy.' +
+  '\n\n  A defend order with status en_route walks the unit back to its defend post; to keep the unit where it is, assign defend on its current hex.' +
+  '\n\n  An explicit_move that takes a unit off its defend post moves the post to that destination.' +
+  '\n\n  A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.';
 
 /**
  * Idle air should ferry toward the fight when its base can still launch.
@@ -235,7 +240,7 @@ const NAVAL_ROUTING_BULLET =
  * Exceptions: None.
  */
 const SEALIFT_BULLET =
-  '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the # Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
+  '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
 
 /**
  * Scout when the observed roster is empty.
@@ -257,9 +262,13 @@ const SCOUTING_BULLET =
  * Exceptions: None.
  */
 const PRODUCTION_BULLET =
-  '- When a controlled cell can build and its queue is empty, queue something. ' +
-  PRODUCTION_CAP_QUEUE_GUIDANCE +
-  ' When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.';
+  '- When a controlled cell can build and its queue is empty, queue something.\n\n  ' +
+  PRODUCTION_CAP_QUEUE_GUIDANCE.replace(
+    '. A hex whose available types',
+    '.\n\n  A hex whose available types'
+  ) +
+  '\n\n  When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.' +
+  '\n\n  When the Production attention flag is present, it names each such hex and the types it can still build.';
 
 /**
  * Shared home cells count for every home that lists them.

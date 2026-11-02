@@ -14,6 +14,7 @@ import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { isAiSeatId, type AiSeatId } from '../../shared/seatIds';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { AI_SEAT_KIND, sortSeatsByOrder, type SeatSnapshot } from '../../shared/seatRoster';
+import { sideDisplayName, defaultAiNickname } from '../../shared/sideNicknames';
 import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from './commanderPoolClient';
 import { commanderPopoverIsOpen, openCommanderPopover, reanchorCommanderPopover } from './commanderPopover';
@@ -99,7 +100,7 @@ function syncLogFilter(seats: readonly SeatSnapshot[]): void {
   }
   const current = select.value;
   select.replaceChildren(option('All commanders', ''));
-  for (const seat of seats) select.append(option(seat.homeRegion, seat.seatId));
+  for (const seat of seats) select.append(option(sideDisplayName(seat), seat.seatId));
   if ([...select.options].some((row) => row.value === current)) select.value = current;
 }
 
@@ -141,7 +142,9 @@ function cardElement(seat: SeatSnapshot): HTMLElement {
   dot.style.background = paletteForOwner(seat.seatId, S.gameState?.seats ?? [])?.map ?? '#115E59';
   const name = document.createElement('span');
   name.className = 'commander-card-name';
-  name.textContent = seat.homeRegion;
+  const shownName = sideDisplayName(seat);
+  name.textContent = shownName;
+  name.title = shownName;
   const chip = document.createElement('span');
   chip.className = 'commander-card-chip';
   chip.textContent = presentation.chip;
@@ -239,12 +242,14 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
     modelId: seat.commander.modelId,
     reasoningEffort: seat.commander.reasoningEffort,
     doctrineChoice: seat.commander.doctrineChoice,
+    nickname: sideDisplayName(seat),
     ...(includeKey ? { apiKey } : {}),
   };
   openCommanderPopover({
     anchor,
-    title: `${seat.homeRegion} commander`,
+    title: `${sideDisplayName(seat)} commander`,
     commander,
+    defaultNickname: defaultAiNickname(seat.homeRegion, seat.seatId),
     copyButton: null,
     onChange: (next) => {
       if (!includeKey && (next.apiKey ?? '') === '') {
@@ -252,6 +257,7 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
           modelId: next.modelId,
           reasoningEffort: next.reasoningEffort,
           doctrineChoice: next.doctrineChoice,
+          nickname: next.nickname,
         });
         return;
       }

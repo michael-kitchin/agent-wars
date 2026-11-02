@@ -5,9 +5,9 @@ import { buildTopBarSideChips, type TopBarSideSeat } from './topBarSides';
 
 const secondAi = aiSeatIdForIndex(2);
 const seats: readonly TopBarSideSeat[] = [
-  { seatId: HUMAN_SEAT_ID, seatOrder: 1, kind: 'human', homeRegion: 'Western Turkey', outTurn: null },
-  { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Turkey', outTurn: null },
-  { seatId: secondAi, seatOrder: 3, kind: 'ai', homeRegion: 'Levant & Cyprus', outTurn: null },
+  { seatId: HUMAN_SEAT_ID, seatOrder: 1, kind: 'human', homeRegion: 'Western Turkey', nickname: null, outTurn: null },
+  { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Turkey', nickname: null, outTurn: null },
+  { seatId: secondAi, seatOrder: 3, kind: 'ai', homeRegion: 'Levant & Cyprus', nickname: null, outTurn: null },
 ];
 
 test('buildTopBarSideChips names the human seat and shortens the others', () => {
@@ -16,7 +16,7 @@ test('buildTopBarSideChips names the human seat and shortens the others', () => 
     { seatId: secondAi, status: 'ready' },
   ], HUMAN_SEAT_ID);
   assert.equal(block.observing, false);
-  assert.equal(block.lead?.label, 'Western Turkey');
+  assert.equal(block.lead?.label, 'Human');
   assert.equal(block.lead?.statusIcon, null);
   assert.deepEqual(block.chips.map((chip) => chip.label), ['E. Turkey', 'Levant']);
   assert.equal(block.chips[0]?.statusIcon, 'planning');
@@ -43,6 +43,13 @@ test('buildTopBarSideChips lists every side while observing, and only AI chips s
   const block = buildTopBarSideChips(seats, [], null);
   assert.equal(block.observing, true);
   assert.equal(block.lead, null);
-  assert.deepEqual(block.chips.map((chip) => chip.label), ['W. Turkey', 'E. Turkey', 'Levant']);
+  assert.deepEqual(block.chips.map((chip) => chip.label), ['Human', 'E. Turkey', 'Levant']);
   assert.deepEqual(block.chips.map((chip) => chip.showsUnitCounts), [false, true, true]);
+});
+
+test('a nickname replaces the short name on that chip', () => {
+  const named = seats.map((seat) => (seat.seatId === 'opponent' ? { ...seat, nickname: 'Grok' } : seat));
+  const block = buildTopBarSideChips(named, [], HUMAN_SEAT_ID);
+  assert.equal(block.chips[0]?.label, 'Grok');
+  assert.equal(block.lead?.label, 'Human');
 });

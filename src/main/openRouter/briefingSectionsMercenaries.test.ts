@@ -29,12 +29,12 @@ test('the section names the treasury and the mercenary, and a battle omits it', 
     const block = buildMercenariesBriefingBlock(state, (hex) => hex, 'strategic', { productionEnabled: true });
     assert.ok(block.includes(`# ${SECTION_TITLE_MERCENARIES}`));
     assert.ok(block.includes('Treasury: 40 credits.'));
-    assert.ok(block.includes('Your mercenaries'));
+    assert.ok(block.includes('## Your Mercenaries'));
     assert.equal(buildMercenariesBriefingBlock(state, (hex) => hex, 'tactical', { productionEnabled: true }), '');
     const quiet = buildMercenariesBriefingBlock(state, (hex) => hex, 'strategic', { productionEnabled: false });
     assert.ok(quiet.includes('Treasury: 40 credits.'));
-    assert.ok(quiet.includes('Your mercenaries'));
-    assert.equal(quiet.includes('Rehire candidates'), false);
-    assert.equal(quiet.includes('Raise options'), false);
+    assert.ok(quiet.includes('## Your Mercenaries'));
+    assert.equal(quiet.includes('## Rehire Candidates'), false);
+    assert.equal(quiet.includes('## Raise Options'), false);
   });
 });

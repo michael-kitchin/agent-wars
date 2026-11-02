@@ -225,6 +225,7 @@ export function getFullDdl(): string {
       seat_order INTEGER NOT NULL UNIQUE CHECK (seat_order BETWEEN 1 AND 4),
       kind TEXT NOT NULL CHECK (kind IN ('human', 'ai')),
       home_region TEXT NOT NULL,
+      nickname TEXT,
       model_id TEXT,
       reasoning_effort TEXT,
       doctrine_choice TEXT CHECK (doctrine_choice IN ('aggressive', 'balanced', 'cautious', 'random')),

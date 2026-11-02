@@ -30,7 +30,7 @@ import {
 import {
   SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
   SECTION_TITLE_OPERATIONAL_MAP,
-  topLevelHeading,
+  subHeading,
 } from '../../openRouter/promptSpec/sectionHeadings';
 
 /**
@@ -50,7 +50,7 @@ function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
  *
  * Purpose: Primary entry used by `formatBriefing` when precomputation is enabled.
  * When to use: Strategic consultations where the LLM needs geography without huge action tables.
- * Expected outcome: Markdown fragment including H1/H2 headings per existing briefing style.
+ * Expected outcome: Markdown fragment with the map at H2 and Best Options at H3.
  * Exceptions: None beyond missing registry initialization (handled via `ensureStrategicCoordinateRegistryInitialized`).
  *
  * Map extent: Uses every registered strategic cell (full world) so the LLM sees pole-to-pole and dateline-safe
@@ -77,7 +77,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     return { lat: ll?.[0] ?? 0, lng: ll?.[1] ?? 0 };
   });
   if (aiUnits.length === 0 && enemyUnits.length === 0) {
-    return `${topLevelHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n(No units — map not rendered.)\n`;
+    return `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n(No units — map not rendered.)\n`;
   }
 
   const mapHexes = listStrategicH3Indexes();
@@ -106,7 +106,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
   return (
-    `${topLevelHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
+    `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
     `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
@@ -197,7 +197,7 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
 }
 
 /**
- * Builds the tactical operational map markdown fragment (no leading H1; caller supplies section title).
+ * Builds the tactical operational map markdown fragment (no leading heading; the caller supplies the H2).
  *
  * Purpose: Tactical AI consultations reuse the same ASCII format with a tactical registry scoped to one battle.
  * When to use: `requestOrdersFlow` appends this under a tactical heading after the strategic briefing block.

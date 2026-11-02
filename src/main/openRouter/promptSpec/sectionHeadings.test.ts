@@ -25,6 +25,7 @@ import {
   SECTION_TITLE_STRATEGIC_MEMORY,
   SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE,
   SECTION_TITLE_UNIT_STATUS_AND_THREATS,
+  shiftMarkdownHeadings,
   subHeading,
   topLevelHeading,
 } from './sectionHeadings';
@@ -81,6 +82,12 @@ test('heading helpers add a single hash level and no extra spacing', () => {
   assert.equal(topLevelHeading(SECTION_TITLE_COMMANDERS_BRIEFING), "# Commander's Briefing");
   assert.equal(subHeading(SECTION_TITLE_UNIT_STATUS_AND_THREATS), '## Unit Status and Threats');
   assert.equal(`### ${SECTION_TITLE_BEST_OPTIONS_THIS_TURN}`, '### Best Options This Turn');
+});
+
+test('heading shift clamps and leaves fenced lines alone', () => {
+  const shifted = shiftMarkdownHeadings('# One\n## Two\n```\n# Inside\n```\n# Stay', 1);
+  assert.equal(shifted, '## One\n### Two\n```\n# Inside\n```\n## Stay');
+  assert.equal(shiftMarkdownHeadings('# Stay', -1), '# Stay');
 });
 
 test('assemblers import the title module instead of restating the briefing opener', () => {

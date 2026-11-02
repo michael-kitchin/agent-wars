@@ -282,6 +282,10 @@
   grid-row: 1 / span 2;
 }
 .commander-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
 }
 .commander-card-chip,

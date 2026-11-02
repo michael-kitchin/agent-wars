@@ -9,7 +9,8 @@
 
 import type { CommanderStatus } from './commanderStatus';
 import { SEAT_PALETTES } from './seatPalette';
-import { AI_SEAT_KIND, shortSideName, sortSeatsByOrder, type SeatKind } from './seatRoster';
+import { AI_SEAT_KIND, sortSeatsByOrder, type SeatKind } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
 
 const READY_CHECK_COLOR = '#86EFAC';
 
@@ -58,6 +59,15 @@ export interface TopBarSideSeat {
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means Human for a human seat and the short home name for an AI seat.
+   * When to use: `sideDisplayName`.
+   * Expected outcome: The chip label.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
   /**
    * The turn the seat was knocked out, or null while it plays.
    *
@@ -119,7 +129,7 @@ export interface TopBarSideChip {
   /**
    * The label.
    *
-   * Contract: The full home name for the lead chip, and the short name for every other chip.
+   * Contract: `sideDisplayName` for the lead chip and for every other chip.
    * When to use: The chip's text.
    * Expected outcome: A non-empty name.
    * Exceptions: None.
@@ -187,7 +197,7 @@ export interface TopBarSidesBlock {
    *
    * Contract: True when `viewerSeatId` is null.
    * When to use: The heading is "Observing" and every seat is a chip.
-   * Expected outcome: False shows the viewer's full name, "vs", then the other chips.
+   * Expected outcome: False shows the viewer's display name, "vs", then the other chips.
    * Exceptions: None.
    */
   readonly observing: boolean;
@@ -196,7 +206,7 @@ export interface TopBarSidesBlock {
    *
    * Contract: Null when `observing` is true.
    * When to use: The name before "vs".
-   * Expected outcome: The full home name.
+   * Expected outcome: The viewer's display name.
    * Exceptions: None.
    */
   readonly lead: TopBarSideChip | null;
@@ -205,7 +215,7 @@ export interface TopBarSidesBlock {
    *
    * Contract: Seat order. Does not include `lead`.
    * When to use: After "vs", or after "Observing".
-   * Expected outcome: Short names.
+   * Expected outcome: Each other seat's display name.
    * Exceptions: None.
    */
   readonly chips: readonly TopBarSideChip[];
@@ -232,7 +242,7 @@ export function buildTopBarSideChips(
   }
   return {
     observing: false,
-    lead: { ...chipFor(viewer, statuses, true), label: viewer.homeRegion },
+    lead: { ...chipFor(viewer, statuses, true), label: sideDisplayName(viewer) },
     chips: ordered.filter((seat) => seat !== viewer).map((seat) => chipFor(seat, statuses, false)),
   };
 }
@@ -242,7 +252,7 @@ export function buildTopBarSideChips(
  *
  * Purpose: Icon rules stay in one place.
  * When to use: `buildTopBarSideChips`.
- * Expected outcome: A short name, a seat color, and an icon only for planning or ready. `showsUnitCounts` is passed
+ * Expected outcome: A display name, a seat color, and an icon only for planning or ready. `showsUnitCounts` is passed
  *   through, because only `buildTopBarSideChips` knows whether the match is observed.
  * Exceptions: None.
  */
@@ -253,7 +263,7 @@ function chipFor(seat: TopBarSideSeat, statuses: readonly TopBarCommanderStatus[
   const statusIcon = knockedOut || status === null || status === 'no_model' || status === 'timed_out' || status === 'out' ? null : status;
   return {
     seatId: seat.seatId,
-    label: shortSideName(seat.homeRegion),
+    label: sideDisplayName(seat),
     dotColor: palette.map,
     statusIcon,
     statusColor: statusIcon === 'planning' ? palette.text : statusIcon === 'ready' ? READY_CHECK_COLOR : null,

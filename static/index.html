@@ -158,7 +158,7 @@
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">6</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/missile.svg" alt="Missile" /></span><span id="new-game-size-cap-missile" class="new-game-unit-cap">2</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-missile" class="new-game-unit-cost">$200</span></li>
         </ul>
-        <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Victory rule, turn limit, bonuses, fog of war, and Auto-start AI.">Game Options</button>
+        <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Nickname, victory rule, turn limit, bonuses, fog of war, and Auto-start AI.">Game Options</button>
       </section>
     </div>
     <div id="new-game-panel-footer" class="new-game-panel-footer">
@@ -386,6 +386,10 @@
     <div class="commander-popover-header">
       <h3>Game Options</h3>
       <button type="button" class="commander-popover-close" aria-label="Close">×</button>
+    </div>
+    <div class="new-game-human-nickname">
+      <label for="new-game-human-nickname">Nickname</label>
+      <input id="new-game-human-nickname" type="text" maxlength="16" autocomplete="off" spellcheck="false" />
     </div>
     <section class="new-game-section" aria-labelledby="new-game-section-victory">
       <h2 id="new-game-section-victory" class="new-game-section-title">Victory</h2>

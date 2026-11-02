@@ -4,7 +4,7 @@
  */
 
 import * as assert from 'assert';
-import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
@@ -183,24 +183,24 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('Turn 2:'), 'Section 1 narrative');
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID | Type | Hex |'), 'unit table has Type column');
-  assert.ok(out.includes('# Operational Map'), 'operational map section');
+  assert.ok(out.includes('## Operational Map'), 'operational map section');
   assert.ok(!out.includes('### Unit Roster'), 'no Unit Roster; Unit Status covers threats');
   assert.ok(!out.includes('Standing order + status'), 'no SO column on Unit Status');
   assert.ok(out.includes('| armor |') || out.includes('| armor '), 'unit type on Unit Status');
   assert.ok(!out.includes('## Recent Turn Notes'), 'no recent turn notes on empty history');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(
-    out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('# Operational Map'),
+    out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('## Operational Map'),
     'possible actions table or operational map present'
   );
   assert.ok(out.includes('## Attention Flags'), 'attention flags header');
   assert.ok(
-    out.indexOf('## Attention Flags') < out.indexOf('# Operational Map'),
+    out.indexOf('## Attention Flags') < out.indexOf('## Operational Map'),
     'attention flags appear before operational map'
   );
   assert.ok(out.includes('Your Strategic Memory'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
-  assert.ok(out.includes('# Standing Order Status'), 'standing order block');
+  assert.ok(out.includes('## Standing Order Status'), 'standing order block');
   assert.ok(out.includes('MARCH to AB — en_route'), 'SO detail stays in Standing Order Status');
   assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
   assert.ok(out.includes('engine-forced'), 'empty callbacks state the event-driven consequence');
@@ -236,7 +236,7 @@ function testFormatBriefingProductionSectionFollowsToolFlag(): void {
   const emptyForm = formatBriefing(fixtureState, precomputed, '', '', [], '', {
     includeProductionSection: true,
   });
-  assert.ok(emptyForm.includes('# Production Status'), 'tools on keeps production heading');
+  assert.ok(emptyForm.includes('## Production Status'), 'tools on keeps production heading');
   assert.ok(
     emptyForm.includes('No currently controlled hexes with editable production queues.'),
     'empty queues use the defined empty form'
@@ -254,7 +254,7 @@ function testFormatBriefingProductionSectionFollowsToolFlag(): void {
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   const unitTableStart = out.indexOf('| Unit ID | Type | Hex |');
-  const unitTableEnd = out.indexOf('# Operational Map');
+  const unitTableEnd = out.indexOf('## Operational Map');
   const unitTable = out.slice(unitTableStart, unitTableEnd);
   assert.ok(unitTableStart >= 0, 'expected Unit Status header with Type');
   assert.ok(unitTable.includes('opponent-armor-1') && unitTable.includes('opponent-infantry-1'));
@@ -772,61 +772,6 @@ function testHopCloseIsActionNeededWhenPathEtaIsLonger(): void {
 }
 
 /**
- * A healthy march that recedes from the nearest enemy is a worklist row.
- *
- * Purpose: Turn 18 left in-range naval units on MARCH FU after firing because Attention was no.
- * When to use: After edits to `standingMarchRecedesFromNearestEnemy` / Attention Flags.
- * Expected outcome: Action needed yes; Attention Flags mention receding.
- * Exceptions: None.
- */
-function testRecedingMarchIsActionNeeded(): void {
-  const origin = latLngToCell(40, 0, 1);
-  const ring1 = gridDisk(origin, 1).filter((h) => h !== origin);
-  const neighbor = ring1[0]!;
-  const far = gridDisk(origin, 2).find((h) => h !== origin && !ring1.includes(h));
-  assert.ok(far, 'expected a two-hop dest');
-  const unitLl = cellToLatLng(neighbor);
-  const enemyLl = cellToLatLng(origin);
-  const farLl = cellToLatLng(far!);
-  const assessments: UnitAssessmentResult[] = [
-    {
-      unitId: 'opp-naval-recede',
-      result: {
-        status: 'ok',
-        unit: {
-          unitId: 'opp-naval-recede',
-          type: 'naval',
-          position: [unitLl[0], unitLl[1]],
-          currentStandingOrder: {
-            type: 'march',
-            status: 'en_route',
-            destination: [farLl[0], farLl[1]],
-          },
-        },
-        nearbyEnemies: [
-          {
-            unitId: 'hum-naval-1',
-            hexDistance: 3,
-            estimatedTurnsToReach: 3,
-            position: [enemyLl[0], enemyLl[1]],
-            inRangedRange: false,
-            inMeleeRange: false,
-          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
-        ],
-        threats: [{ description: 'nearby', severity: 'moderate', sourceUnit: 'hum-naval-1' }],
-        canAttackThisTurn: [],
-      } as unknown as UnitAssessmentResult['result'],
-    },
-  ];
-  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
-  const row = table.split('\n').find((l) => l.includes('opp-naval-recede'));
-  assert.ok(row && row.includes('| yes |'), `receding march must read Action needed yes: ${row}`);
-  const flags = buildAttentionFlags(assessments, 'strategic', true);
-  assert.ok(flags.includes('opp-naval-recede'), 'receding march belongs in Attention Flags');
-  assert.ok(flags.includes('recedes'), `Attention Flags must name the receding march: ${flags}`);
-}
-
-/**
  * Verifies the grid-hops honesty line appears only for fog-off strategic snapshots.
  *
  * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
@@ -983,10 +928,6 @@ const tests = [
   {
     name: 'hop close is Action needed when path ETA is longer',
     fn: testHopCloseIsActionNeededWhenPathEtaIsLonger,
-  },
-  {
-    name: 'receding march is Action needed',
-    fn: testRecedingMarchIsActionNeeded,
   },
   {
     name: 'formatBriefing grid proximity honesty line',

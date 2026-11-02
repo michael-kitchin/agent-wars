@@ -17,6 +17,7 @@ export const popoverLabelWidthText = 'Reasoning';
  * Exceptions: None.
  */
 export const POPOVER_CONTROL_IDS = {
+  nickname: 'commander-popover-nickname',
   apiKey: 'commander-popover-api-key',
   model: 'commander-popover-model',
   reasoning: 'commander-popover-reasoning',

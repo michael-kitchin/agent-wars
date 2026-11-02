@@ -27,6 +27,7 @@ function seat(seatId: SeatId, seatOrder: number, outTurn: number | null = null):
     seatOrder,
     kind: seatId === HUMAN_SEAT_ID ? 'human' : 'ai',
     homeRegion: seatId,
+    nickname: null,
     commander: seatId === HUMAN_SEAT_ID
       ? null
       : { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },

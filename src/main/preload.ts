@@ -82,6 +82,8 @@ const IPC_GAME = {
   saveGame: 'game:saveGame',
   loadGame: 'game:loadGame',
   setSeatCommander: 'game:setSeatCommander',
+  getHumanNickname: 'game:getHumanNickname',
+  setHumanNickname: 'game:setHumanNickname',
   startCommanderPlanning: 'game:startCommanderPlanning',
   stopCommanderPlanning: 'game:stopCommanderPlanning',
   readCommanderPool: 'game:readCommanderPool',
@@ -309,16 +311,34 @@ listGameMaps: (): Promise<GameMapListEntry[]> =>
    */
 newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload),
   /**
-   * Saves one AI seat's model, effort, and doctrine choice.
+   * Reads the nickname stored for the human seat.
+   *
+   * Purpose: Game Options shows the name this computer saved.
+   * When to use: When the Nickname field is wired.
+   * Expected outcome: The saved name, or `Human` when the row is missing.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  getHumanNickname: (): Promise<string> => ipcRenderer.invoke(IPC_GAME.getHumanNickname),
+  /**
+   * Saves the Game Options nickname.
+   *
+   * Purpose: The field writes immediately, before the next match starts.
+   * When to use: Each edit of the Nickname field.
+   * Expected outcome: A blank or rejected value restores `Human`.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  setHumanNickname: (nickname: string): Promise<void> => ipcRenderer.invoke(IPC_GAME.setHumanNickname, nickname),
+  /**
+   * Saves one AI seat's model, effort, doctrine choice, and nickname.
    *
    * Purpose: The commander popover writes that seat without changing the other seats.
-   * When to use: When the player changes a commander's model, effort, doctrine, or key.
-   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult. An omitted `apiKey` leaves the stored key.
+   * When to use: When the player changes a commander's model, effort, doctrine, key, or nickname.
+   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult. A nickname change does not. An omitted `apiKey` leaves the stored key. An omitted nickname leaves the stored one.
    * Exceptions: Rejects when the seat is human, missing, or knocked out.
    */
   setSeatCommander: (
     seatId: AiSeatId,
-    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string }
+    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string; nickname?: string }
   ): Promise<SeatSnapshot> => ipcRenderer.invoke('game:setSeatCommander', seatId, commander),
   /**
    * Ends the match by ranking the seats that are still active.

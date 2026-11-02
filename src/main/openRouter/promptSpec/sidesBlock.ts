@@ -12,6 +12,7 @@ import { sortSeatsByOrder } from '../../../shared/seatRoster';
 import type { SeatId } from '../../../shared/seatIds';
 import { logDebug } from '../../logger';
 import { MERCENARY_ID_PREFIX_NOTE } from './gameRuleMercenaryText';
+import { SECTION_TITLE_SIDES, subHeading } from './sectionHeadings';
 
 /**
  * One roster row the Sides table can print.
@@ -96,7 +97,7 @@ export function buildSidesPromptBlock(args: {
   const rest = ordered.filter((seat) => seat.seatId !== args.ownSeatId);
   const rows = own ? [own, ...rest] : rest;
   const lines = [
-    '## Sides',
+    subHeading(SECTION_TITLE_SIDES),
     '',
     '| Side | Unit id prefix | Home region | Status |',
     '| --- | --- | --- | --- |',

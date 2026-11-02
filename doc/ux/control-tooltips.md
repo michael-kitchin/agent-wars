@@ -27,14 +27,16 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Randomize region: Pick one of the listed regions at random, including the region already shown.
 - Observe only: Leave this checked to watch. An AI commander plays every side, including the first.
 - Add another opponent, or Add another side: Add a side on the next free home. While the button is disabled the tip is "Up to 4 sides" or "No free side on this map".
-- Commander button: Change this side's API key, model, reasoning, and doctrine.
+- Commander button: Change this side's nickname, API key, model, reasoning, and doctrine.
+- Nickname, on a commander popover: The name shown for this side during a match. It starts as the short home name and resets when this side's home changes.
 - Victory rule: Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins.
 - Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
 - AI-only battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
 - Sight cues: Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- "Game Options": Victory rule, turn limit, AI-only battles, Sight cues, bonuses, fog of war, and Auto-start AI.
+- "Game Options": Nickname, victory rule, turn limit, AI-only battles, Sight cues, bonuses, fog of war, and Auto-start AI.
+- Nickname: The name shown for you during a match. Saved on this computer, and used the next time a game starts.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Default adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
@@ -198,7 +200,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)

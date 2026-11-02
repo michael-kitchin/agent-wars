@@ -197,7 +197,7 @@ const FRAME_CHECKS = Object.freeze([
     run: (p, el) => {
       const human = el('#topbar-human-side').text;
       const opponent = el('#topbar-second-side').text;
-      return human === 'Southern Europe' && opponent === 'N. Africa' ? null : `sides read "${human}" vs "${opponent}"`;
+      return human === 'Human' && opponent === 'N. Africa' ? null : `sides read "${human}" vs "${opponent}"`;
     },
   },
   {
@@ -347,7 +347,7 @@ const FRAME_CHECKS = Object.freeze([
     run: (p, el) => {
       const text = (selector) => el(selector).text;
       const problems = [];
-      if (!/^\+[\d,]+$/.test(text('#topbar-stat-production'))) problems.push(`production "${text('#topbar-stat-production')}"`);
+      if (!/^\u2692\uFE0E[\d,]+$/.test(text('#topbar-stat-production'))) problems.push(`production "${text('#topbar-stat-production')}"`);
       if (!/^\d+$/.test(text('#topbar-stat-forces')) || text('#topbar-stat-forces-cap') !== '/36') {
         problems.push(`forces "${text('#topbar-stat-forces')}${text('#topbar-stat-forces-cap')}" (cap should be /36)`);
       }

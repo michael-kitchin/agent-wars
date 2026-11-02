@@ -18,8 +18,14 @@ import {
  * Expected outcome: An active seat unless `outTurn` is set.
  * Exceptions: None.
  */
-function seat(seatId: SideLabelSeat['seatId'], seatOrder: number, homeRegion: string, outTurn: number | null = null): SideLabelSeat {
-  return { seatId, seatOrder, homeRegion, outTurn };
+function seat(
+  seatId: SideLabelSeat['seatId'],
+  seatOrder: number,
+  homeRegion: string,
+  outTurn: number | null = null,
+  nickname: string | null = null
+): SideLabelSeat {
+  return { seatId, seatOrder, homeRegion, outTurn, nickname, kind: seatId === HUMAN_SEAT_ID ? 'human' : 'ai' };
 }
 
 const twoSeats = [
@@ -39,7 +45,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
       homeSeatIds: [HUMAN_SEAT_ID],
       seats: twoSeats,
     }),
-    'Iraq (home)'
+    'Human (home)'
   );
   assert.equal(
     formatHexControlLabel({
@@ -55,7 +61,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
       homeSeatIds: [AI_SEAT_IDS[0]],
       seats: twoSeats,
     }),
-    'Iraq (W. Turkey home)'
+    'Human (W. Turkey home)'
   );
   assert.equal(
     formatHexControlLabel({
@@ -95,7 +101,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
       homeSeatIds: [AI_SEAT_IDS[0], HUMAN_SEAT_ID],
       seats: twoSeats,
     }),
-    'W. Turkey (Iraq & W. Turkey homes)'
+    'W. Turkey (Human & W. Turkey homes)'
   );
   assert.equal(
     formatHexControlLabel({
@@ -106,7 +112,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
         seat(AI_SEAT_IDS[0], 2, 'Western Turkey'),
       ],
     }),
-    'W. Turkey (W. Turkey home)'
+    'Human (W. Turkey home)'
   );
   assert.equal(
     formatHexControlLabel({
@@ -114,7 +120,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
       homeSeatIds: [AI_SEAT_IDS[1]],
       seats: twoSeats,
     }),
-    'Iraq'
+    'Human'
   );
   assert.equal(
     formatHexControlLabel({
@@ -130,7 +136,7 @@ test('control labels use short names, and a home suffix only when the hex is a h
       homeSeatIds: [HUMAN_SEAT_ID],
       seats: [seat(HUMAN_SEAT_ID, 1, '   ')],
     }),
-    'human (home)'
+    'Human (home)'
   );
   assert.equal(
     formatHexControlLabel({
@@ -187,6 +193,34 @@ test('unit names stay plain for the viewer, for Neutral, and in a two-seat match
       seats: threeSeats,
     }),
     'W. Turkey · XI Armored'
+  );
+});
+
+test('a nickname replaces the short home name on the control line, the unit prefix, and the home chip', () => {
+  const named = threeSeats.map((row) => (
+    row.seatId === AI_SEAT_IDS[0] ? seat(AI_SEAT_IDS[0], row.seatOrder, 'Western Turkey', row.outTurn, 'Grok') : row
+  ));
+  assert.equal(
+    formatHexControlLabel({ controllerId: AI_SEAT_IDS[0], homeSeatIds: [], seats: named }),
+    'Grok'
+  );
+  assert.equal(
+    formatUnitNameForViewer({
+      baseName: 'XI Armored',
+      ownerId: AI_SEAT_IDS[0],
+      viewerSeatId: HUMAN_SEAT_ID,
+      seats: named,
+    }),
+    'Grok · XI Armored'
+  );
+  assert.deepEqual(
+    formatHomeChip({
+      homeSeatIds: [AI_SEAT_IDS[0]],
+      controllerId: AI_SEAT_IDS[0],
+      viewerSeatId: HUMAN_SEAT_ID,
+      seats: named,
+    }),
+    { kind: 'enemy-home', text: 'Grok home' }
   );
 });
 

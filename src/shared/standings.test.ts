@@ -23,6 +23,7 @@ function seat(row: Pick<StandingsSeatInput, 'seatId' | 'seatOrder' | 'kind' | 'h
     consultationCount: 0,
     costUsd: 0,
     cityHexes: 0,
+    nickname: null,
     commander: null,
     ...row,
   };
@@ -87,24 +88,24 @@ test('buildStandings lists four places, a revealed random doctrine, and the matc
   });
   assert.equal(standings.heading, 'You placed 2nd of 4.');
   assert.equal(standings.dateLine, 'Turn 23 · November 2nd, Year 1');
-  assert.equal(standings.resultLine, 'Western Turkey is the last side standing. It knocked out Iraq & Kuwait on turn 23.');
+  assert.equal(standings.resultLine, 'W. Turkey is the last side standing. It knocked out Human on turn 23.');
   assert.deepEqual(standings.rows.map((row) => row.place), [1, 2, 3, 4]);
-  assert.equal(standings.rows[0]?.name, 'Western Turkey');
+  assert.equal(standings.rows[0]?.name, 'W. Turkey');
   assert.equal(standings.rows[0]?.status, 'Winner');
   assert.equal(standings.rows[0]?.commanderSummary, 'Gemini 3.5 Flash · Minimal · Aggressive');
   assert.equal(standings.rows[0]?.consultationsLabel, '61 consultations');
   assert.equal(standings.rows[0]?.costLabel, '$1.92');
   assert.equal(standings.rows[0]?.dotColor, '#9D174D');
-  assert.equal(standings.rows[1]?.name, 'Iraq & Kuwait (you)');
+  assert.equal(standings.rows[1]?.name, 'Human (you)');
   assert.equal(standings.rows[1]?.status, 'Out, turn 23');
   assert.equal(standings.rows[1]?.commanderSummary, null);
-  assert.equal(standings.rows[1]?.knockedOutBy, 'Knocked out by Western Turkey');
+  assert.equal(standings.rows[1]?.knockedOutBy, 'Knocked out by W. Turkey');
   assert.equal(standings.rows[2]?.status, 'Out, turn 17');
   assert.equal(standings.rows[2]?.commanderSummary, 'Nova Lite 1.0 · Cautious');
   assert.equal(standings.rows[2]?.knockedOutBy, 'Knocked out by you');
   assert.equal(standings.rows[3]?.commanderSummary, 'Claude Haiku 5.5 · Low · Random, drew Balanced');
   assert.equal(standings.rows[3]?.costLabel, '$0.84');
-  assert.equal(standings.rows[3]?.knockedOutBy, 'Knocked out by Western Turkey');
+  assert.equal(standings.rows[3]?.knockedOutBy, 'Knocked out by W. Turkey');
   assert.equal(standings.totalLabel, 'Model cost this match');
   assert.equal(standings.totalCost, '$3.86');
 });
@@ -115,7 +116,7 @@ test('buildStandings names two or three sides that share first', () => {
     seat({ seatId: WEST, seatOrder: 2, kind: 'ai', homeRegion: 'Western Turkey', place: 1, cityHexes: 6, commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', revealedDoctrine: 'balanced' } }),
     seat({ seatId: EAST, seatOrder: 3, kind: 'ai', homeRegion: 'Eastern Turkey', place: 3, cityHexes: 2, outTurn: 9, commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', revealedDoctrine: 'balanced' } }),
   ];
-  const two = 'Iraq & Kuwait and Western Turkey share first place with 6 city hexes each.';
+  const two = 'Human and W. Turkey share first place with 6 city hexes each.';
   assert.equal(buildStandings({ seats: tied, viewerSeatId: HUMAN_SEAT_ID, gameEndReason: 'turn_limit', turnNumber: 30, dateLabel: '', modelLabels: {} }).resultLine, two);
   assert.equal(buildStandings({ seats: tied, viewerSeatId: HUMAN_SEAT_ID, gameEndReason: 'mutual_elimination', turnNumber: 12, dateLabel: '', modelLabels: {} }).resultLine, two);
   assert.equal(buildStandings({ seats: tied, viewerSeatId: HUMAN_SEAT_ID, gameEndReason: 'turn_limit', turnNumber: 30, dateLabel: '', modelLabels: {} }).heading, 'No side won.');
@@ -123,7 +124,7 @@ test('buildStandings names two or three sides that share first', () => {
     ...tied.slice(0, 2),
     seat({ seatId: EAST, seatOrder: 3, kind: 'ai', homeRegion: 'Eastern Turkey', place: 1, cityHexes: 6, commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', revealedDoctrine: 'balanced' } }),
   ];
-  const threeNames = 'Iraq & Kuwait, Western Turkey, and Eastern Turkey share first place with 6 city hexes each.';
+  const threeNames = 'Human, W. Turkey, and E. Turkey share first place with 6 city hexes each.';
   assert.equal(buildStandings({ seats: three, viewerSeatId: HUMAN_SEAT_ID, gameEndReason: 'turn_limit', turnNumber: 30, dateLabel: '', modelLabels: {} }).resultLine, threeNames);
   assert.equal(buildStandings({ seats: three, viewerSeatId: null, gameEndReason: 'mutual_elimination', turnNumber: 12, dateLabel: '', modelLabels: {} }).resultLine, threeNames);
 });
@@ -134,11 +135,11 @@ test('buildStandings names one winner of a mutual wipe and of a watched match', 
     seat({ seatId: EAST, seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Turkey', place: 2, cityHexes: 3, commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', revealedDoctrine: 'balanced' } }),
   ];
   const mutual = buildStandings({ seats, viewerSeatId: null, gameEndReason: 'mutual_elimination', turnNumber: 14, dateLabel: 'June, Year 2', modelLabels: {} });
-  assert.equal(mutual.heading, 'Western Turkey wins.');
-  assert.equal(mutual.resultLine, 'Western Turkey holds the most city hexes.');
+  assert.equal(mutual.heading, 'W. Turkey wins.');
+  assert.equal(mutual.resultLine, 'W. Turkey holds the most city hexes.');
   assert.equal(mutual.rows[0]?.status, '8 city hexes');
   assert.equal(mutual.rows[1]?.status, '3 city hexes');
-  assert.equal(mutual.rows[0]?.name, 'Western Turkey');
+  assert.equal(mutual.rows[0]?.name, 'W. Turkey');
   const watched = buildStandings({
     seats: [
       seats[0]!,
@@ -150,8 +151,8 @@ test('buildStandings names one winner of a mutual wipe and of a watched match', 
     dateLabel: '',
     modelLabels: {},
   });
-  assert.equal(watched.heading, 'Western Turkey wins.');
-  assert.equal(watched.resultLine, 'Western Turkey is the last side standing. It knocked out Eastern Turkey on turn 14.');
+  assert.equal(watched.heading, 'W. Turkey wins.');
+  assert.equal(watched.resultLine, 'W. Turkey is the last side standing. It knocked out E. Turkey on turn 14.');
   const alone = buildStandings({
     seats: [seats[0]!, seat({ ...seats[1]!, outTurn: 4, outBy: null })],
     viewerSeatId: null,
@@ -160,7 +161,7 @@ test('buildStandings names one winner of a mutual wipe and of a watched match', 
     dateLabel: '',
     modelLabels: {},
   });
-  assert.equal(alone.resultLine, 'Western Turkey is the last side standing.');
+  assert.equal(alone.resultLine, 'W. Turkey is the last side standing.');
 });
 
 test('buildStandings says the human ended the match, including a shared first', () => {
@@ -181,13 +182,13 @@ test('buildStandings says the human ended the match, including a shared first', 
     modelLabels: {},
   });
   assert.equal(won.heading, 'You placed 1st of 2.');
-  assert.equal(won.resultLine, 'Iraq & Kuwait holds the most city hexes at the end of turn 30.');
+  assert.equal(won.resultLine, 'Human holds the most city hexes at the end of turn 30.');
   assert.equal(won.rows[0]?.status, '4 city hexes');
 });
 
 test('formatHumanKnockoutDialog names the side or the reason', () => {
   const named = formatHumanKnockoutDialog({
-    outByName: 'Western Turkey',
+    outByName: 'W. Turkey',
     turnNumber: 23,
     place: 2,
     seatCount: 4,
@@ -196,7 +197,7 @@ test('formatHumanKnockoutDialog names the side or the reason', () => {
     controlShareLabel: '75%',
   });
   assert.equal(named.title, "You're out");
-  assert.equal(named.lead, 'Western Turkey knocked you out on turn 23.');
+  assert.equal(named.lead, 'W. Turkey knocked you out on turn 23.');
   assert.equal(named.placeLine, 'You placed 2nd of 4.');
   const unnamed = formatHumanKnockoutDialog({
     outByName: null,
@@ -208,4 +209,28 @@ test('formatHumanKnockoutDialog names the side or the reason', () => {
     controlShareLabel: '',
   });
   assert.equal(unnamed.lead, 'You hold no city hexes. Your home has no cities left.');
+});
+
+test('buildStandings uses a nickname instead of the short home name', () => {
+  const standings = buildStandings({
+    seats: [
+      seat({
+        seatId: WEST,
+        seatOrder: 1,
+        kind: 'ai',
+        homeRegion: 'Western Turkey',
+        nickname: 'Grok',
+        place: 1,
+        cityHexes: 4,
+        commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', revealedDoctrine: 'balanced' },
+      }),
+    ],
+    viewerSeatId: null,
+    gameEndReason: 'last_side_standing',
+    turnNumber: 4,
+    dateLabel: '',
+    modelLabels: {},
+  });
+  assert.equal(standings.heading, 'Grok wins.');
+  assert.equal(standings.rows[0]?.name, 'Grok');
 });

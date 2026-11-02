@@ -133,8 +133,11 @@ export function buildFinalJsonContractInstruction(args: {
     .map((field) => headerSlots[field])
     .join(', ')} }.`;
   const periodNoun = coordinateMode === 'tactical' ? 'beat' : 'turn';
-  const strictSchemaClause =
-    `Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`;
+  const strictSchemaParagraphs = [
+    'Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.',
+    'The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).',
+    `The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`,
+  ];
   const airUnitOrderNote = includeAirActions
     ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
     : '';
@@ -154,14 +157,25 @@ export function buildFinalJsonContractInstruction(args: {
   const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ${rangedReachClause})${sealiftActionClause}`;
   const actorIdClause =
     'Each entry includes "action" and "unitId" or "unitIds" (copy several ids from one Best Options row into unitIds instead of one object per unit)';
-  const ordersClause =
+  const ordersParagraphs =
     coordinateMode === 'tactical'
-      ? `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`
+      ? [
+          `The "orders" array is processed in list order. ${actorIdClause}.`,
+          `Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`,
+        ]
       : standingOrdersIssuable
-        ? `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
-          airUnitOrderNote +
-          `), cancel_order, ${sharedMoveFireClause}. assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.`
-        : `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`;
+        ? [
+            `The "orders" array is processed in list order. ${actorIdClause}.`,
+            `Actions: ${actionList}.`,
+            `assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
+              airUnitOrderNote +
+              `), cancel_order, ${sharedMoveFireClause}.`,
+            'assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.',
+          ]
+        : [
+            `The "orders" array is processed in list order. ${actorIdClause}.`,
+            `Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`,
+          ];
   const airClause = includeAirActions
     ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
     : '';
@@ -174,7 +188,20 @@ export function buildFinalJsonContractInstruction(args: {
     coordinateMode !== 'tactical' && includeMemoryUpdates ? buildMemoryWriteLimitsClause() : '';
   const memoryClause = coordinateMode === 'tactical' ? '' : submitMemoryClause;
   const productionClause = coordinateMode === 'tactical' ? '' : productionSubmitClause;
-  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${missileClause}${invalidOutputClause}${movementOrderInstruction} ${callbacksClause}${memoryClause}${memoryLimits} ${productionClause}`;
+  const memoryParagraph = [memoryClause, memoryLimits].map((part) => part.trim()).filter((part) => part.length > 0).join(' ');
+  const paragraphs = [
+    submitHeader,
+    ...strictSchemaParagraphs,
+    ...ordersParagraphs,
+    airClause.trim(),
+    missileClause.trim(),
+    ...invalidOutputClause.split('\n\n'),
+    movementOrderInstruction.trim(),
+    ...callbacksClause.split('\n\n'),
+    memoryParagraph,
+    ...productionClause.split('\n\n'),
+  ].map((part) => part.trim()).filter((part) => part.length > 0);
+  return paragraphs.join('\n\n');
 }
 
 /**

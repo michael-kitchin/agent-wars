@@ -245,27 +245,26 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
       ? 'More than one ranged or air action for the same unit in the same period is not honoured.'
       : 'More than one ranged action for the same unit in the same period is not honoured.',
     'Raw H3 strings and latitude/longitude pairs are never valid field values.',
-    "A ranged action's target must not be the acting unit's own move destination.",
     'Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.',
   ];
-  if (gates.coordinateMode === 'tactical') {
-    return [
-      ...shared,
-      TACTICAL_STANDING_ORDER_PROHIBITION,
-      'memoryUpdates and productionOrders are not accepted this beat.',
-      'Strategic hex codes are never valid field values this beat.',
-      "An explicit_move to the sub-unit's current cell is dropped as already arrived.",
-    ].join(' ');
-  }
-  return [
-    ...shared,
-    "A march or explicit_move to the unit's current cell is dropped as already arrived.",
-    ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
-    ...(gates.includeMissileActions === true
-      ? ['Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use missileLaunches.']
-      : []),
-    'Infantry cannot be given a strategic ranged_attack.',
-  ].join(' ');
+  const rest = gates.coordinateMode === 'tactical'
+    ? [
+        ...shared.slice(2),
+        TACTICAL_STANDING_ORDER_PROHIBITION,
+        'memoryUpdates and productionOrders are not accepted this beat.',
+        'Strategic hex codes are never valid field values this beat.',
+        "An explicit_move to the sub-unit's current cell is dropped as already arrived.",
+      ]
+    : [
+        ...shared.slice(2),
+        "A march or explicit_move to the unit's current cell is dropped as already arrived.",
+        ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
+        ...(gates.includeMissileActions === true
+          ? ['Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use missileLaunches.']
+          : []),
+        'Infantry cannot be given a strategic ranged_attack.',
+      ];
+  return `${shared[0]} ${shared[1]}\n\n${rest.join(' ')}`;
 }
 
 /**
@@ -282,15 +281,12 @@ export function buildCallbackContractClause(mode: PromptCoordinateMode): string 
   logDebug('promptSpec buildCallbackContractClause', { mode });
   const replaceRule =
     'Each response replaces the whole callbacks list; omit the array or send [] to clear every subscription.';
-  if (mode === 'tactical') {
-    return (
-      'Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) ' +
+  const lead = mode === 'tactical'
+    ? 'Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) ' +
       'for unit-scoped events (e.g. unit_destroyed, unit_engaged); subscriptions are evaluated after each ' +
-      `tactical beat when event-driven mode is on and are cleared when the battle ends. ${replaceRule}` +
-      buildCallbackVocabularyClause(mode)
-    );
-  }
-  return `Include optional "callbacks" for re-consultation planning. ${replaceRule}` + buildCallbackVocabularyClause(mode);
+      `tactical beat when event-driven mode is on and are cleared when the battle ends. ${replaceRule}`
+    : `Include optional "callbacks" for re-consultation planning. ${replaceRule}`;
+  return `${lead}\n\n${buildCallbackVocabularyClause(mode)}`;
 }
 
 /**

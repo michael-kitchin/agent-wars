@@ -513,6 +513,10 @@ aside#sidebar.tactical-strategic-suppress {
   table-layout: fixed;
 }
 .melee-intercept-table th {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: left;
   vertical-align: bottom;
   padding: 4px 6px;

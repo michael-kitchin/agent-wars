@@ -31,10 +31,10 @@ export function buildCoachingBullets(gates: CoachingGates): readonly string[] {
 }
 
 /**
- * Returns the goals, strategy, and message lines for the `Strategic context:` block.
+ * Returns the goals, strategy, and message lines for the Strategic Context and Battle Context sections.
  *
  * Purpose: Those three bullets are doctrine and player-facing guidance, not computed state.
- * When to use: Assembler `Strategic context:` header, before the progress lines.
+ * When to use: Under the Strategic Context or Battle Context heading, before the progress lines.
  * Expected outcome: Strategic five-goal list plus shared strategy and message; tactical one-priority list plus the same strategy and message.
  * Exceptions: None.
  */

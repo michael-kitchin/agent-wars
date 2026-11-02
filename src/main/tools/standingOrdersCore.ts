@@ -207,7 +207,10 @@ function assignOrder(
   }
 
   if (orderType === 'defend') {
-    status = 'holding';
+    const defendHex = paramsObj.defendHex as [number, number] | undefined;
+    const defendH3 =
+      defendHex && defendHex.length >= 2 ? resolveToH3(Number(defendHex[0]), Number(defendHex[1])) : undefined;
+    status = unit.unitType === 'air' || (defendH3 !== undefined && unit.h3Index === defendH3) ? 'holding' : 'en_route';
   }
 
   if (orderType === 'hold_fire') {
@@ -374,12 +377,12 @@ function cancelOrder(playerId: string, unitId: string): Record<string, unknown> 
 }
 
 /**
- * Defines the `getStandingOrderForUnit` function shape (export function getStandingOrderForUnit( playerId: string, unitId: string ): { type: string; destination?: [number, number]; defendHex?: [number, number]).
-
- * Purpose: Supports maintainability by documenting why `getStandingOrderForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: March/defend/patrol geometry and pursue `targetUnitId` when present in stored params.
- * Exceptions: None.
+ * Reads one unit's standing order for assessments and the briefing.
+ *
+ * Purpose: Unit Status and the receding check need the stored goal and this turn's next step without opening the database themselves.
+ * When to use: After `expireAndUpdateStatus` has refreshed defend routes.
+ * Expected outcome: The order type, status, and any stored destination, defend post, waypoints, or pursue target. `nextMoveHex` is set only when the stored route has a real next center.
+ * Exceptions: None. A missing row returns null.
  */
 export function getStandingOrderForUnit(
   playerId: string,
@@ -391,6 +394,15 @@ export function getStandingOrderForUnit(
   waypoints?: [number, number][];
   status: string;
   targetUnitId?: string;
+  /**
+   * The next cell this order will enter, as a lat/lng center.
+   *
+   * Contract: Present when `computed_route.nextMoveHex` is a real center. Absent for a dummy `[0, 0]` or a row with no route.
+   * When to use: Receding checks that compare this turn's step rather than the order's final goal.
+   * Expected outcome: The stored center, or omitted.
+   * Exceptions: None.
+   */
+  nextMoveHex?: [number, number];
 } | null {
   logTrace('standingOrders getStandingOrderForUnit', { playerId, unitId });
   const row = dbGetOne<StandingOrderRow>(
@@ -406,12 +418,18 @@ export function getStandingOrderForUnit(
     waypoints?: [number, number][];
     status: string;
     targetUnitId?: string;
+    nextMoveHex?: [number, number];
   } = {
     type: row.order_type,
     status: row.status,
   };
   if (row.order_type === 'march' && params.destination) out.destination = params.destination as [number, number];
   if (row.order_type === 'defend' && params.defendHex) out.defendHex = params.defendHex as [number, number];
+  const computedRoute = parseStandingOrderComputedRoute(row);
+  if (computedRoute) {
+    const [lat, lng] = computedRoute.nextMoveHex;
+    if (!(lat === 0 && lng === 0)) out.nextMoveHex = computedRoute.nextMoveHex;
+  }
   if (row.order_type === 'patrol' && params.waypoints) out.waypoints = params.waypoints as [number, number][];
   if (row.order_type === 'pursue' && params.targetUnitId) out.targetUnitId = String(params.targetUnitId);
   return out;

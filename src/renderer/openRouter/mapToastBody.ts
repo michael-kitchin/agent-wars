@@ -126,9 +126,9 @@ function appendMapToastBulletLine(
  *
  * Purpose: A hex sentence can name several opponents. Deployment lines and the unknown-battle sentence name none.
  * When to use: When the splitter returns a single plain segment.
- * Expected outcome: The bullet text, with a number flag immediately before each matched short name, and that name still
+ * Expected outcome: The bullet text, with a number flag immediately before each matched display name, and that name still
  *   written after the flag. No flag when the line has no mark. `sectionOwnerId` is the loss header above this bullet,
- *   so a shared short name flags that side as the subject.
+ *   so a shared display name flags that side as the subject.
  * Exceptions: None.
  */
 function appendPlainBullet(

@@ -24,7 +24,7 @@ import { initialSidesState, setObserveOnly, type HomeOption } from './newGameSid
  * Expected outcome: Balanced, with no model and no key.
  * Exceptions: None.
  */
-const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced' };
+const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
 
 /**
  * Four homes, so a match can list opponent 3.
@@ -46,9 +46,9 @@ test('prefill writes the key only onto the first AI row', () => {
   const next = prefillFirstAiApiKey(started, ' test-openrouter-key ');
   assert.equal(commanderApiKey(next.rows[1]?.commander ?? null), 'test-openrouter-key');
   assert.equal(commanderApiKey(next.rows[2]?.commander ?? null), '');
-  assert.equal(next.rows[2]?.commander, COMMANDER);
+  assert.equal(commanderApiKey(next.rows[2]?.commander ?? null), '');
   assert.equal(COMMANDER.apiKey, undefined);
-  const observed = setObserveOnly(started, true, COMMANDER);
+  const observed = setObserveOnly(started, true, COMMANDER, FOUR);
   const watched = prefillFirstAiApiKey(observed, 'test-openrouter-key');
   assert.equal(commanderApiKey(watched.rows[0]?.commander ?? null), 'test-openrouter-key');
   assert.equal(commanderApiKey(watched.rows[1]?.commander ?? null), '');
@@ -66,7 +66,7 @@ test('a later opponent copies the AI row just above it', () => {
 
 test('observe names sides, and the first side waits for a remembered match', () => {
   const started = initialSidesState({ mapKind: 'global', homes: FOUR, defaultCommander: COMMANDER, rowCount: 3 });
-  const observed = setObserveOnly(started, true, COMMANDER);
+  const observed = setObserveOnly(started, true, COMMANDER, FOUR);
   const first = copyButtonState(observed, 0, false);
   assert.equal(first?.label, 'No previous game');
   assert.equal(first?.disabled, true);

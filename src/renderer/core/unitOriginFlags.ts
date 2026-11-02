@@ -11,7 +11,7 @@ import type { TechLevel } from '../../shared/techBonusTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { isHireableUnitType, mercenaryTooltipValue, mercenaryUpkeepFor, neutralUnitOfferedForRehire } from '../../shared/mercenaryRules';
 import { findHumanSeat } from '../../shared/seatRoster';
-import { abbreviatedSideName } from '../../shared/sideLabels';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -158,16 +158,16 @@ function mercenaryTooltipViewerSeatId(): string | null {
 }
 
 /**
- * Short name of the seat that owns a unit.
+ * Display name of the seat that owns a unit.
  *
- * Purpose: Another side's mercenary tooltip uses the same abbreviation as the top bar.
+ * Purpose: Another side's mercenary tooltip uses the same name as the top bar.
  * When to use: `mercenaryValueForLiveUnit` when the owner is not the viewer.
- * Expected outcome: `abbreviatedSideName` of that seat. Null when the owner is not a seat.
+ * Expected outcome: `sideDisplayName` of that seat. Null when the owner is not a seat.
  * Exceptions: None.
  */
-function mercenaryOwnerShortName(ownerId: string): string | null {
+function mercenaryOwnerDisplayName(ownerId: string): string | null {
   const seat = S.gameState?.seats?.find((row) => row.seatId === ownerId);
-  return seat ? abbreviatedSideName(seat) : null;
+  return seat ? sideDisplayName(seat) : null;
 }
 
 /**
@@ -247,7 +247,7 @@ function mercenaryValueForLiveUnit(unitId: string): string | null {
     isMercenary,
     forHire,
     upkeep,
-    ownerShortName: mercenaryOwnerShortName(shown.player),
+    ownerShortName: mercenaryOwnerDisplayName(shown.player),
   });
 }
 

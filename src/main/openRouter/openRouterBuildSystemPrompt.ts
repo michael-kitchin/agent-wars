@@ -42,7 +42,22 @@ import { buildSidesPromptBlock, type SidesPromptSeat } from './promptSpec/sidesB
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
-import { SECTION_TITLE_AVAILABLE_TOOLS, SECTION_TITLE_BEST_OPTIONS_THIS_TURN, topLevelHeading } from './promptSpec/sectionHeadings';
+import {
+  SECTION_TITLE_AVAILABLE_TOOLS,
+  SECTION_TITLE_BATTLE_CONTEXT,
+  SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
+  SECTION_TITLE_COMBAT_AND_MOVEMENT_RULES,
+  SECTION_TITLE_COORDINATES,
+  SECTION_TITLE_EXAMPLE_RESPONSE,
+  SECTION_TITLE_RESPONSE_FORMAT,
+  SECTION_TITLE_STRATEGIC_CONTEXT,
+  SECTION_TITLE_UNIT_ROSTER,
+  SECTION_TITLE_YOUR_COMMAND,
+  shiftMarkdownHeadings,
+  subHeading,
+  topLevelHeading,
+  wrapLongProseLines,
+} from './promptSpec/sectionHeadings';
 import { buildCombatRulesParagraph } from './promptSpec/gameRuleText';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';
@@ -271,10 +286,12 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   }
 
   const contextCoaching = buildContextCoaching(coachingGates);
-  const tacticalContextBlock = `Strategic context:
+  const tacticalContextBlock = `${topLevelHeading(SECTION_TITLE_BATTLE_CONTEXT)}
+
 ${contextCoaching}`;
 
-  const strategicContextBlock = `Strategic context:
+  const strategicContextBlock = `${topLevelHeading(SECTION_TITLE_STRATEGIC_CONTEXT)}
+
 ${contextCoaching}
 - ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
 - ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${regionHomeProgressAndHexBullets}`;
@@ -302,10 +319,11 @@ ${contextCoaching}
         includeMercenaryNote: state.units.some((unit) => unit.isMercenary === true),
       });
   const sidesPrefix = sidesBlock.length > 0 ? `${sidesBlock}\n\n` : '';
+  const standaloneSidesPrefix = sidesBlock.length > 0 ? `${shiftMarkdownHeadings(sidesBlock, -1)}\n\n` : '';
   const scenarioPrefix = scenarioObjectiveBlock.length > 0 ? `${scenarioObjectiveBlock}\n\n` : '';
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${sidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}\n\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${standaloneSidesPrefix}${scenarioPrefix}${coachingContextBlock}\n\n${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${toolsSection}\n\n${topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
   const finalJsonContract = buildFinalJsonContractInstruction({
@@ -357,32 +375,37 @@ ${contextCoaching}
     ordersEnabled: standingOrdersIssuable,
     originBonusSettings: originBonusSettingsFromSnapshot(state),
     hasFortifiedCells: coordinateContext.hasFortifiedCells === true,
+    rangedTargetHint: combatTargetHint,
   });
-  const combatRulesWithToolHints = combatTargetHint
-    ? combatRulesParagraph.replace(
-        'or targetUnitId (not your move destination).',
-        `or targetUnitId (not your move destination)${combatTargetHint}.`
-      )
-    : combatRulesParagraph;
   const dateClause = state.currentDateLabel ? `, date: ${state.currentDateLabel}` : '';
   const turnPhaseHeader =
     coordinateContext.mode === 'tactical'
       ? `Strategic turn: ${state.turnNumber}${dateClause}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
       : `Current turn: ${state.turnNumber}${dateClause}, phase: ${state.phase}.`;
-  const prompt = `You command ${commandedSideName(state)} in a WEGO (simultaneous movement) hex wargame with ${seatCount} sides. Every other side is your enemy, and so are neutral garrisons. ${turnPhaseHeader}
+  const prompt = `${topLevelHeading(SECTION_TITLE_YOUR_COMMAND)}
+
+You command ${commandedSideName(state)} in a WEGO (simultaneous movement) hex wargame with ${seatCount} sides. Every other side is your enemy, and so are neutral garrisons. ${turnPhaseHeader}
 
 ${winConditionReminder}${scoutingDirective}${warning}
 
+${topLevelHeading(SECTION_TITLE_COORDINATES)}
+
 ${latLngBlock}
 
-${combatRulesWithToolHints}${navalPlanRouteHint}${combatAssessHint}
+${topLevelHeading(SECTION_TITLE_COMBAT_AND_MOVEMENT_RULES)}
+
+${[combatRulesParagraph, navalPlanRouteHint.trim(), combatAssessHint.trim()].filter((part) => part.length > 0).join('\n\n')}
 
 ${mainBlock}
 
+${topLevelHeading(SECTION_TITLE_RESPONSE_FORMAT)}
+
 ${finalJsonContract}
 
+${subHeading(SECTION_TITLE_EXAMPLE_RESPONSE)}
+
 ${finalJsonExample}`;
-  return prompt;
+  return wrapLongProseLines(prompt);
 }
 
 /**

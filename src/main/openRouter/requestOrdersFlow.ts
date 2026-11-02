@@ -25,7 +25,11 @@ import {
 import type { GameStateSnapshot } from '../gameDb';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import { getInitialUserMessage } from './promptText';
-import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from './promptSpec/sectionHeadings';
+import {
+  SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
+  SECTION_TITLE_OPERATIONAL_MAP,
+  subHeading,
+} from './promptSpec/sectionHeadings';
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
 import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
 import { recordNoToolCallingNoticeForModel } from './openRouterModelCapabilities';
@@ -239,6 +243,7 @@ export async function requestOrdersFlow(
   for (const g of toolGroupRegistry) toolInvocationCounts[g.id] = 0;
 
   let briefingOverride: string | undefined;
+  let productionAttention: string | null = null;
   if (!tacticalBattle) {
     expireAndUpdateStatus(seatId, planState);
     // Map-first contract: strategic prompts always include the Commander briefing with operational map.
@@ -265,6 +270,7 @@ export async function requestOrdersFlow(
     const memoryText = injection.memoryText;
     const subscriptions = getSubscriptions(seatId);
     const productionBriefing = injection.productionText;
+    productionAttention = injection.productionAttention;
     const possibleActionsIndexed = buildPossibleActionsIndexedState(planState);
     briefingOverride = formatBriefing(
       planState,
@@ -273,9 +279,14 @@ export async function requestOrdersFlow(
       memoryText,
       subscriptions,
       productionBriefing,
-      { latLngByH3, indexedState: possibleActionsIndexed, includeProductionSection: flags.productionEnabled }
+      {
+        latLngByH3,
+        indexedState: possibleActionsIndexed,
+        includeProductionSection: flags.productionEnabled,
+        productionAttention,
+      }
     );
-    if (!briefingOverride.includes('# Operational Map')) {
+    if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {
       logError('openRouter requestOrders: strategic map generation missing from briefing');
       return failRequest('Operational map generation failed for strategic prompt.');
     }
@@ -304,7 +315,7 @@ export async function requestOrdersFlow(
       tacticalBriefChars: tacticalBrief.length,
     });
   }
-  if (!briefingOverride || !briefingOverride.includes('Operational Map')) {
+  if (!briefingOverride || !briefingOverride.includes(SECTION_TITLE_OPERATIONAL_MAP)) {
     logError('openRouter requestOrders: map-first prompt contract violated', {
       tacticalBattleId: tacticalBattle?.battleId ?? null,
       hasBriefingOverride: Boolean(briefingOverride?.length),
@@ -330,6 +341,7 @@ export async function requestOrdersFlow(
       hasMissileUnits: !tacticalBattle && opponentUnits.some((u) => isMissileUnitType(u.unitType)),
       hasBestOptionsTable: hasBriefing && briefingOverride.includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN),
       includeExitBattle,
+      hasProductionAttention: productionAttention !== null,
     }
   );
 

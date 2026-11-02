@@ -8,7 +8,7 @@ import { countBattleForces, countTwoPartyForces } from '../../shared/battleForce
 import { formatBattleHeaderStatus, formatBattleHeaderTitle } from '../../shared/battleHeaderText';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
-import { shortSideName } from '../../shared/seatRoster';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { formatHexNamingCaptionHtml } from '../../shared/hexNamingCaption';
 import { orderTargetHexCode } from '../../shared/orderTargetHexCode';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
@@ -102,10 +102,20 @@ function renderBattleForceBar(battle: TacticalBattleSnapshot): void {
   if (opponentCount) opponentCount.textContent = rightCount.toLocaleString('en-US');
   const leftName = document.getElementById('battle-force-human-name');
   const leadSeat = seats.find((seat) => seat.seatId === leadId);
-  if (leftName) leftName.textContent = leadId != null ? shortSideName(leadSeat?.homeRegion ?? leadId) : 'yours';
+  if (leftName) {
+    const leftLabel = leadId == null ? 'yours' : (leadSeat ? sideDisplayName(leadSeat) : leadId);
+    leftName.textContent = leftLabel;
+    leftName.title = leftLabel;
+  }
   const opposingSeat = seats.find((seat) => seat.seatId === opposingId);
   const nameEl = document.getElementById('battle-force-enemy-name');
-  if (nameEl) nameEl.textContent = opposingId != null && isNeutralOwnerId(opposingId) ? 'Neutral' : shortSideName(opposingSeat?.homeRegion ?? 'Enemy');
+  if (nameEl) {
+    const rightLabel = opposingId != null && isNeutralOwnerId(opposingId)
+      ? 'Neutral'
+      : (opposingSeat ? sideDisplayName(opposingSeat) : 'Enemy');
+    nameEl.textContent = rightLabel;
+    nameEl.title = rightLabel;
+  }
   const dot = document.getElementById('battle-force-enemy-dot');
   const enemyPalette = paletteForOwner(opposingId, seats);
   if (dot) dot.style.background = enemyPalette?.map ?? '#9D174D';

@@ -29,8 +29,8 @@ const input: TopBarStatsInput = {
     { h3Index: 'e', urbanHexCount: 7 },
   ],
   seats: [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Home', outTurn: null },
-    { seatId: 'opponent', seatOrder: 2, homeRegion: 'Enemy', outTurn: null },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Home', nickname: null, kind: 'human', outTurn: null },
+    { seatId: 'opponent', seatOrder: 2, homeRegion: 'Enemy', nickname: null, kind: 'ai', outTurn: null },
   ],
   homeRegionHexesBySeat: {
     [HUMAN_SEAT_ID]: ['a', 'b', 'e', 'a'],
@@ -89,9 +89,9 @@ const secondAi = aiSeatIdForIndex(2);
 const severalSides: TopBarStatsInput = {
   units: [],
   seats: [
-    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Western Turkey', outTurn: null },
-    { seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', outTurn: null },
-    { seatId: secondAi, seatOrder: 3, homeRegion: 'Levant', outTurn: null },
+    { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Western Turkey', nickname: null, kind: 'human', outTurn: null },
+    { seatId: 'opponent', seatOrder: 2, homeRegion: 'Eastern Turkey', nickname: null, kind: 'ai', outTurn: null },
+    { seatId: secondAi, seatOrder: 3, homeRegion: 'Levant', nickname: null, kind: 'ai', outTurn: null },
   ],
   homeRegionHexesBySeat: {
     [HUMAN_SEAT_ID]: ['a', 'b'],
@@ -145,7 +145,7 @@ test('computeTopBarStats ranks city hexes and shares a place on a tie', () => {
   assert.equal(stats.cities?.summary, '2 · 1 of 3');
   assert.equal(
     stats.cities?.tooltip,
-    'City hexes held. Most at the end of turn 30 wins. A tie leaves no single winner. Western Turkey (you) 2; Levant 2; Eastern Turkey 1'
+    'City hexes held. Most at the end of turn 30 wins. A tie leaves no single winner. Human (you) 2; Levant 2; E. Turkey 1'
   );
 });
 

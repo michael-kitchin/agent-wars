@@ -71,6 +71,15 @@ export interface EnvelopeOrderRowsResult {
    * Exceptions: None.
    */
   appliedStandingOrderCount: number;
+  /**
+   * Units whose standing order this response assigned or cancelled.
+   *
+   * Contract: One id per successful non-tactical `assign_order`, and one id per non-tactical `cancel_order`. A rejected assign is absent. A cancel is listed even when the tool reports an error, matching the row loop.
+   * When to use: A later explicit move must not also move that unit's defend post.
+   * Expected outcome: Empty when no standing-order row was applied.
+   * Exceptions: None.
+   */
+  standingOrderUnitIds: string[];
 }
 
 /**
@@ -156,6 +165,7 @@ export function processV3OrdersArray(
     embarkOrders: [],
     dropReasons: [],
     appliedStandingOrderCount: 0,
+    standingOrderUnitIds: [],
   };
   const { movementOrders, rangedAttacks, embarkOrders, dropReasons } = result;
   for (const raw of entries) {
@@ -203,6 +213,7 @@ export function processV3OrdersArray(
         continue;
       }
       result.appliedStandingOrderCount += 1;
+      result.standingOrderUnitIds.push(unitId);
       continue;
     }
     if (action === 'cancel_order') {
@@ -216,6 +227,7 @@ export function processV3OrdersArray(
       logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
       executeStandingOrders(coordinateContextSeatId(context), 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
       result.appliedStandingOrderCount += 1;
+      result.standingOrderUnitIds.push(unitId);
       continue;
     }
     if (action === 'explicit_move') {

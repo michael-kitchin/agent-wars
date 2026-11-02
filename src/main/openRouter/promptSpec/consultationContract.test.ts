@@ -177,6 +177,22 @@ test('corrective message has four clauses, is last-retry only, and does not disa
   assert.match(ordersOnly, /Never return an empty message/i);
 });
 
+test('production attention clause is a strategic briefing pointer only', () => {
+  const clause = 'Queue production for every hex named in the Production attention flag.';
+  assert.ok(buildOpeningUserMessage(strategicOpening({ hasProductionAttention: true })).includes(clause));
+  assert.ok(!buildOpeningUserMessage(strategicOpening({ hasProductionAttention: false })).includes(clause));
+  assert.ok(!buildOpeningUserMessage(strategicOpening()).includes(clause));
+  assert.ok(
+    !buildOpeningUserMessage(strategicOpening({ hasProductionAttention: true, productionEnabled: false })).includes(clause)
+  );
+  assert.ok(
+    !buildOpeningUserMessage({
+      ...strategicOpening({ hasProductionAttention: true }),
+      coordinateMode: 'tactical',
+    }).includes(clause)
+  );
+});
+
 test('corrective message is appended only before the final malformed retry', async () => {
   setMalformedCompletionRetryDelayOverrideForTests(0);
   try {

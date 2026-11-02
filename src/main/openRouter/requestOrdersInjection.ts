@@ -15,7 +15,8 @@ import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import type { AiSeatId } from '../../shared/seatIds';
 import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
-import { buildProductionBriefingBlock } from './briefingSections';
+import { buildProductionBriefing } from './briefingSections';
+import { formatProductionAttentionBullet } from './productionAttention';
 
 /**
  * Gates and snapshot needed to build the three status injection strings.
@@ -114,7 +115,7 @@ export interface StatusInjectionArgs {
  *
  * Purpose: Named result so callers can attach their own separators (`\\n\\n` vs briefing slots).
  * When to use: Return type of `buildStatusInjectionTexts`.
- * Expected outcome: Empty strings, never undefined, when the matching flag is off.
+ * Expected outcome: Text fields are empty strings, never undefined, when the matching flag is off. `productionAttention` is null unless production is on and a hex is idle.
  * Exceptions: None.
  */
 export interface StatusInjectionTexts {
@@ -145,6 +146,15 @@ export interface StatusInjectionTexts {
    * Exceptions: None.
    */
   readonly productionText: string;
+  /**
+   * Production attention bullet, without a leading list marker.
+   *
+   * Contract: Null when production tools are off or no controlled hex is idle. Otherwise the sentence from `formatProductionAttentionBullet`.
+   * When to use: `formatBriefing` appends it after the unit attention bullets. The opening message only needs to know whether it is present.
+   * Expected outcome: Names at most six idle hexes.
+   * Exceptions: None.
+   */
+  readonly productionAttention: string | null;
 }
 
 /**
@@ -169,14 +179,19 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   const standingOrderText = args.ordersEnabled
     ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext)
     : '';
-  const productionText = args.productionEnabled
-    ? buildProductionBriefingBlock({
+  const production = args.productionEnabled
+    ? buildProductionBriefing({
         productionEnabled: true,
         state: args.state,
         latLngByH3: args.latLngByH3,
         resolveToH3: args.resolveToH3,
         formatHexLabel: args.formatHexLabel,
       })
-    : '';
-  return { memoryText, standingOrderText, productionText };
+    : { text: '', idleHexes: [] };
+  return {
+    memoryText,
+    standingOrderText,
+    productionText: production.text,
+    productionAttention: args.productionEnabled ? formatProductionAttentionBullet(production.idleHexes) : null,
+  };
 }

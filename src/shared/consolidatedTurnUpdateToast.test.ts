@@ -133,7 +133,7 @@ test('a seat-controlled strike with nothing to destroy still opens that side sec
     combatFallbackBullets: ['• Combat continued.'],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+      seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' }],
       transitions: [],
     },
     missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike on Osaka: nothing there to destroy.' }],
@@ -149,8 +149,8 @@ test('a seat fortification line follows that side missile sentence and precedes 
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
       seats: [
-        { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-        { seatId: AI_SEAT_IDS[0], seatOrder: 2, homeRegion: 'Western Turkey' },
+        { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' },
+        { seatId: AI_SEAT_IDS[0], seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' },
       ],
       transitions: [{ h3Index: '8928308280fffff', from: HUMAN_SEAT_ID, to: AI_SEAT_IDS[0] }],
     },
@@ -175,7 +175,7 @@ test('a neutral fortification line lands under Neutral Losses', () => {
     combatFallbackBullets: [],
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
-      seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' }],
+      seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' }],
       transitions: [],
     },
     fortificationReportLines: [{ ownerId: NEUTRAL_OWNER_ID, line: 'Fortifications at Vienna absorbed 1 hit; none remain.' }],
@@ -210,8 +210,8 @@ test('a seat-controlled missile line is only in that side section', () => {
     turnReport: {
       viewerSeatId: HUMAN_SEAT_ID,
       seats: [
-        { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant' },
-        { seatId: seat, seatOrder: 2, homeRegion: 'Western Turkey' },
+        { seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' },
+        { seatId: seat, seatOrder: 2, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' },
       ],
       transitions: [],
     },
@@ -221,7 +221,7 @@ test('a seat-controlled missile line is only in that side section', () => {
   assert.equal(
     message,
     [
-      '## Western Turkey Losses',
+      '## W. Turkey Losses',
       'Missile strike on Osaka: 1 city cell destroyed.',
       '## Updates',
       'A battle was fought somewhere you could not see.',

@@ -11,6 +11,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { activeGameMap } from '../../shared/activeGameMap';
 import { formatHumanKnockoutDialog } from '../../shared/knockoutDialogCopy';
 import { isHumanSeatId } from '../../shared/seatIds';
+import { sideDisplayName } from '../../shared/sideNicknames';
 import { setMainUIControlsEnabled } from '../core/uiState';
 import { chooseWatchTheRest } from './observeIntent';
 
@@ -55,7 +56,7 @@ export async function offerHumanKnockoutChoice(
   const outBy = row.outBy === null ? null : seats.find((seat) => seat.seatId === row.outBy);
   const share = activeGameMap().controlWinMinUrbanShare;
   const choice = await openHumanKnockoutDialog(formatHumanKnockoutDialog({
-    outByName: outBy?.homeRegion ?? (row.outBy ? 'A side' : null),
+    outByName: outBy ? sideDisplayName(outBy) : (row.outBy ? 'A side' : null),
     turnNumber: state.turnNumber,
     place: row.place,
     seatCount: Math.max(seats.length, 1),

@@ -83,6 +83,7 @@ function seatInput(seat: SeatSnapshot, counts: ReadonlyMap<string, number>) {
     seatOrder: seat.seatOrder,
     kind: seat.kind,
     homeRegion: seat.homeRegion,
+    nickname: seat.nickname,
     outTurn: seat.outTurn,
     outBy: seat.outBy,
     place: seat.place,

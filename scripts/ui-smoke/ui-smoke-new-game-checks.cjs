@@ -477,7 +477,7 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-options-popover',
     scenes: [SCENES.newGameOptions],
-    needs: ['#new-game-options-popover', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-options-popover', '#new-game-human-nickname', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
     run: (p, el) => {
       if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
       const victory = el('#new-game-victory-select');

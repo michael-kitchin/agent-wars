@@ -111,24 +111,24 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Unit Status and Threats` | Kept — 1.6, uncapped |
 | Omniscient hop line | Kept, re-gated on the meaning of the distances — 1.6 and [`variants.md`](variants.md) 1.2 |
 | `## Attention Flags` | Kept with an explicit overflow contract — 1.6 |
-| `# Operational Map` | Kept — 1.6 |
+| `## Operational Map` | Kept — 1.6 |
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
-| `# Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
+| `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `# Mercenaries` | Added. Treasury, upkeep, and, when production tools are on, rehire and raise tables. Production off keeps the upkeep-only form when the seat has mercenaries. |
 | `## Controlled Hex Queues` | Kept — 1.6 and 2 |
-| `# Your Strategic Memory` | Kept and extended — 1.6 adds write limits |
+| `## Your Strategic Memory` | Kept and extended — 1.6 adds write limits |
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |
 | `## Reminders Triggered This Turn` | Kept — 1.6 |
-| `# Standing Order Status` | Kept — 1.6 |
+| `## Standing Order Status` | Kept — 1.6 |
 | `## Units Without Standing Orders` | Kept — 1.6 |
 | `## Active Callbacks` | Kept, with a detail-cell contract — 1.6 |
 | `# Scenario Objective (Required)` | Kept — 1.7 |
-| `Strategic context:` goals bullets | Kept — 1.8 |
-| `Strategic context:` strategy bullets | Kept as doctrine — 1.8 |
-| `Strategic context:` message bullet | Kept — 1.8 |
-| `Strategic context:` opening sentence about the enemy hunting the model | **Not emitted** — removed from `buildStrategicContextCoaching`; matrix tests forbid the substring |
+| `# Strategic Context` goals bullets | Kept — 1.8 |
+| `# Strategic Context` strategy bullets | Kept as doctrine — 1.8 |
+| `# Strategic Context` message bullet | Kept — 1.8 |
+| `# Strategic Context` opening sentence about the enemy hunting the model | **Not emitted** — removed from `buildStrategicContextCoaching`; matrix tests forbid the substring |
 | `Explored:` and `Controlled:` bullets | Kept — 1.8 |
 | Home-region bullets | Kept — 1.8 |
 | `# Air Operations Status` | Kept, gated on roster instead of emitting a dash row — 1.9 and [`variants.md`](variants.md) 3.1 |
@@ -160,11 +160,11 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | Tactical narrative | Kept — 2.6 |
 | `## Unit Status and Threats` | Kept without a standing-order column — 2.6 |
 | `## Attention Flags` | Kept without standing-order bullets — 2.6 |
-| `# Operational Map` with the tactical legend | Kept — 2.6 |
+| `## Operational Map` with the tactical legend | Kept — 2.6 |
 | `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
 | `## Recent Turn Notes` | Kept, battle-scoped — 2.6 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
-| `Strategic context:` tactical variant | Kept — 2.8 |
+| `# Battle Context` | Kept — 2.8 |
 | `# Air Operations Status`, tactical form | Kept, roster-gated — 2.9 |
 | `# Naval Transport Status`, tactical form | Kept, roster-gated — 2.10 |
 | `# Available Tools`, tactical form | Kept — 2.11 |

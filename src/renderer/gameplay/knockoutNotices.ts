@@ -13,6 +13,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { HUMAN_SEAT_KIND } from '../../shared/seatRoster';
+import { sideDisplayName } from '../../shared/sideNicknames';
 
 /**
  * One knockout row from a Ready result.
@@ -98,9 +99,9 @@ function noticeText(
   const remaining = (before?.units ?? []).filter((unit) => unit.player === row.seatId && !removed.has(unit.id)).length;
   const share = activeGameMap().controlWinMinUrbanShare;
   return formatKnockoutNotice({
-    victimName: victim?.homeRegion ?? row.seatId,
+    victimName: victim ? sideDisplayName(victim) : row.seatId,
     victimIsHuman: victim?.kind === HUMAN_SEAT_KIND,
-    outByName: outBy?.homeRegion ?? null,
+    outByName: outBy ? sideDisplayName(outBy) : null,
     reasons: row.reasons,
     globalHome: share === null,
     controlShareLabel: share === null ? '' : `${Math.round(share * 100)}%`,

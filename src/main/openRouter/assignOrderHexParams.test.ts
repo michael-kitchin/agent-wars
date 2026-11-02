@@ -113,6 +113,7 @@ test('a defend order with a hex code stores coordinates rather than the raw code
       'SELECT order_type, params FROM standing_orders WHERE unit_id = ?',
       [landUnitId]
     );
+    assert.deepEqual(parsed!.standingOrderUnitIds, [landUnitId]);
     assert.equal(row?.order_type, 'defend');
     const defendHex = (JSON.parse(row!.params) as { defendHex?: unknown }).defendHex;
     assert.ok(Array.isArray(defendHex) && defendHex.every((n) => typeof n === 'number'));

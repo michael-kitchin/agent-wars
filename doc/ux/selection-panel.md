@@ -27,7 +27,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
     - The weather, with its icon, while the weather bonus is on and the hex's weather is known.
     - The tech tier of units built there, Basic or Advanced with its icon, while the tech bonus is on and the hex can produce units. Not shown in a battle.
     - The production the hex adds each turn, such as "⚒94/turn" (`PRODUCTION_CAPACITY_SYMBOL`), when it has urban cells and is not on the neutral border. Not shown in a battle.
-    - "Home" in the viewer's home. "{short name} home" in another seat's home, for example "W. Turkey home". "Neutral" on Neutral land that is not a home. Not shown in a battle. The words come from `formatHomeChip` in `src/shared/sideLabels.ts`.
+    - "Home" in the viewer's home. Another seat's home uses that seat's name from `sideDisplayName` (`src/shared/sideNicknames.ts`) and then " home", for example "W. Turkey home". A null nickname shows `Human` for the human seat and the short home name for an AI seat. "Neutral" on Neutral land that is not a home. Not shown in a battle. The words come from `formatHomeChip` in `src/shared/sideLabels.ts`.
   - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md). During strategic planning, while playback is not running, a human mercenary has Dismiss after the name (`mercenaryDismissShown`). Dismiss switches that row to Cancel and Confirm. Cancel changes nothing. Confirm dismisses immediately, and the unit becomes Neutral. There is no success toast. A refusal uses the map toast. The dismiss column's left edge is the right edge of the widest name cell, and a hex code stays in that name cell. A regular row in that selection leaves the dismiss column blank. The order chip stays at the right edge. A selection with no such mercenary keeps the row described above.
   - The reason a greyed-out reticle cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).
@@ -115,6 +115,8 @@ None.
 - `src/shared/selectionBarText.ts`
 - `src/renderer/gameplay/selectionPanelResize.ts`
 - `src/shared/selectionPanelSummary.ts`
+- `src/shared/sideLabels.ts` (`formatHomeChip`, `formatUnitNameForViewer`)
+- `src/shared/sideNicknames.ts` (`sideDisplayName`)
 - `src/shared/economySymbols.ts` (`PRODUCTION_CAPACITY_SYMBOL`)
 - `src/shared/selectionPanelSize.ts`
 - `src/shared/orderTargetHexCode.ts`

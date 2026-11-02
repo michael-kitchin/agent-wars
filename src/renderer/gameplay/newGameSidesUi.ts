@@ -14,6 +14,7 @@ import {
   buildSeatsPayload,
   homeOptionsForRow,
   initialSidesState,
+  nicknameForHome,
   randomizeRowHome,
   removeSideRow,
   rowLabel,
@@ -28,6 +29,7 @@ import {
 } from '../../shared/newGameSides';
 import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
+import { normalizeSideNickname } from '../../shared/sideNicknames';
 import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
 import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameSightCues, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
@@ -152,7 +154,7 @@ function defaultCommander(): NewGameCommanderInput {
   const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
   const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
   const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey: '' };
+  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey: '', nickname: '' };
 }
 
 /**
@@ -194,7 +196,7 @@ export function refreshNewGameSides(options?: { readonly reset?: boolean }): voi
   const mapKind = selectedNewGameTab();
   const commander = defaultCommander();
   let next = initialSidesState({ mapKind, homes, defaultCommander: commander, rowCount: requestedRows });
-  if (!options?.reset && sidesState?.observeOnly) next = setObserveOnly(next, true, commander);
+  if (!options?.reset && sidesState?.observeOnly) next = setObserveOnly(next, true, commander, homes);
   for (let index = 0; index < next.rows.length; index += 1) {
     next = randomizeRowHome(next, index, homes, Math.random);
   }
@@ -218,7 +220,7 @@ export function bindNewGameSides(): void {
     const box = document.getElementById('new-game-observe-only') as HTMLInputElement | null;
     closeCommanderPopover();
     sidesState = prefillFirstAiApiKey(
-      setObserveOnly(sidesState, box?.checked === true, defaultCommander()),
+      setObserveOnly(sidesState, box?.checked === true, defaultCommander(), homesForTab()),
       rememberedCommanders.prefillApiKey
     );
     renderNewGameSides();
@@ -335,15 +337,18 @@ function renderNewGameSides(): void {
  *
  * Purpose: The copy button pulls the last game or the previous opponent, including the key.
  * When to use: The popover's copy click.
- * Expected outcome: The row and the open fields show that commander. A missing source does nothing.
+ * Expected outcome: The row and the open fields show that commander, including its nickname. A blank nickname keeps the name already on the row. A missing source does nothing.
  * Exceptions: None.
  */
 function copyCommanderFrom(index: number, source: 'previous-match' | 'previous-opponent'): void {
   if (!sidesState) return;
   const copied = source === 'previous-match' ? commanderFromLastGame() : commanderFromPreviousRow(index);
-  if (!copied) return;
-  sidesState = setRowCommander(sidesState, index, copied);
-  replaceOpenCommanderDraft(copied);
+  if (!copied || !sidesState) return;
+  const kept = sidesState.rows[index]?.commander?.nickname ?? '';
+  const nickname = normalizeSideNickname(copied.nickname) || kept;
+  const next = { ...copied, nickname };
+  sidesState = setRowCommander(sidesState, index, next);
+  replaceOpenCommanderDraft(next);
   renderNewGameSides();
 }
 
@@ -363,6 +368,7 @@ function commanderFromLastGame(): NewGameCommanderInput | null {
     reasoningEffort: previous.reasoningEffort,
     doctrineChoice: previous.doctrineChoice,
     apiKey: previous.apiKey,
+    nickname: previous.nickname,
   };
 }
 
@@ -405,6 +411,7 @@ function openRowCommander(index: number, button: HTMLButtonElement): void {
     anchor: button,
     title: `${label} commander`,
     commander: row.commander ?? defaultCommander(),
+    defaultNickname: nicknameForHome(row.homeKey ?? '', homesForTab()),
     copyButton: buttonState
       ? {
           label: buttonState.label,
@@ -452,7 +459,7 @@ function renderRow(state: NewGameSidesState, homes: readonly HomeOption[], index
   }
   select.addEventListener('change', () => {
     if (!sidesState) return;
-    sidesState = setRowHome(sidesState, index, select.value);
+    sidesState = setRowHome(sidesState, index, select.value, homesForTab());
     renderNewGameSides();
     void refreshNewGameMapPreview();
   });

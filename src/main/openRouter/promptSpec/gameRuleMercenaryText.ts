@@ -68,11 +68,15 @@ export function buildBuildabilityRule(): string {
  *
  * Purpose: A seat that can produce is also told how hiring works.
  * When to use: The Mercenaries section when production tools are on.
- * Expected outcome: One paragraph. Upkeep lists the basic and Advanced figures.
+ * Expected outcome: Three paragraphs. The first ends at the rehire sentence, the second at the unfilled-count sentence, and the third is upkeep through unit caps. Upkeep lists the basic and Advanced figures.
  * Exceptions: None.
  */
 export function buildMercenaryRule(): string {
-  return `Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see. Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill. After that each mercenary costs its upkeep every turn: ${upkeepList()} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.`;
+  return [
+    'Credits hire mercenaries. Raise new units in an explored cell outside other sides\' home regions that holds no units but yours and no fortifications but yours, up to twice the cell\'s production in unit cost each turn, or rehire a Neutral unit you can see.',
+    'Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill.',
+    `After that each mercenary costs its upkeep every turn: ${upkeepList()} credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.`,
+  ].join('\n\n');
 }
 
 /**

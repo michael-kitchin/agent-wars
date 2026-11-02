@@ -2,17 +2,25 @@
 
 One strategic prompt from a single consultation, laid out for reading on GitHub. The operational map is in a code block so its columns stay aligned. The closing JSON example is indented here; the capture prints that object on one line.
 
-The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation, with the changed sentences (identity, goal, Sides table, home lines, loss labels, legend, roster line, message, cost line, and buildability rule) brought in line with the builders. A live prompt with production on also includes `# Mercenaries` after air operations. This capture has no mercenaries, so that section is the rule in `buildMercenaryRule`, then `To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.`, then `Treasury: 0 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders this turn: 0 credits.` The rehire and raise tables depend on the board and are not reconstructed here. A three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`. The turn-limit number is not in this capture. The reply is [example-strategic-response.md](example-strategic-response.md).
+The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one consultation. Headings, paragraph breaks, and the changed sentences (identity, goal, Sides table, home lines, loss labels, legend, roster line, message, cost line, buildability rule, defend walk-back, and the production attention sentence) follow the builders. A live prompt with production on also includes `# Mercenaries` after air operations. This capture has no mercenaries, so that section is the rule in `buildMercenaryRule`, then `To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.`, then `Treasury: 0 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders this turn: 0 credits.` The rehire and raise tables depend on the board and are not reconstructed here. A three-seat prompt is asserted by `src/main/openRouter/promptSeats.test.ts`. The turn-limit number is not in this capture. The reply is [example-strategic-response.md](example-strategic-response.md).
 
 ---
 
+# Your Command
+
 You command Northern America in a WEGO (simultaneous movement) hex wargame with 2 sides. Every other side is your enemy, and so are neutral garrisons. Current turn: 40, date: April, Year 4, phase: planning.
 
-Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral. If every side would be knocked out on the same turn, none is knocked out and the match ends. The side holding the most city hexes wins. If several sides hold that many, no single side wins. Enemy units can be destroyed through ranged and melee combat, and production capacity can be destroyed through air strikes. Review the rules, below, for how to order this.
+Your goal is to be the last side standing. A side is knocked out when one other side controls its home region (see the share below), when its home region has no cities left, or when it holds no city hexes anywhere. A knocked-out side's units become neutral garrisons and its land becomes neutral.
+
+If every side would be knocked out on the same turn, none is knocked out and the match ends. The side holding the most city hexes wins. If several sides hold that many, no single side wins. Enemy units can be destroyed through ranged and melee combat, and production capacity can be destroyed through air strikes. Review the rules, below, for how to order this.
+
+# Coordinates
 
 Global Earth map, H3 resolution 1. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are hex counts where shown.
 
 Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.
+
+# Combat and Movement Rules
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, melee only; armor: 10 attack / 7 defense, range 1; naval: 7 attack / 7 defense, range 2; air: 10 attack / 3 defense, range 3.
 
@@ -34,7 +42,7 @@ The Unit Status Weather column names the weather where that unit stands. Birth t
 
 Terrain cover: ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands. An air strike on units in a hex whose main terrain is forest needs a roll 1 lower. Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. A city hex uses the higher of its terrain cover and city cover in each column. A rugged hex uses the higher of its terrain cover and rugged ground cover.
 
-This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination). Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
+This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId. A unit may fire at a cell and move into that same cell in the same turn; the shot resolves first. Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
 
 Movement budgets in clear weather: 1 cell for infantry, 2 for armor and naval, and air never marches. When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. A longer route continues on the next turn, and the turn count includes that halt. An explicit_move farther than this turn's budget is dropped, not shortened to the first step.
 
@@ -102,7 +110,7 @@ Best Options This Turn Target Hexes are the one-step destinations already inside
 - a1-i6 faces a moderate threat (nearest enemy: h1-i32, distance 1).
 - 12 unit(s) have a legal attack this turn — copy a Best Options ranged or air-strike row for each and do not invent a target: a1-a4, a1-a5, a1-a6, a1-a7, a1-a8, a1-n4, a1-n5, a1-n6, a1-n7, a1-n8, a1-n9, a1-n10.
 
-# Operational Map
+## Operational Map
 
 Each cell: top = hex code, bottom = terrain + overlay.
 
@@ -251,7 +259,7 @@ Turn 39:
 - Enemy Losses: Ranged attack: h1-i24, h1-i25; Melee attack: h1-i33
 - Your Losses: Melee attack: a1-t7, a1-t8
 
-# Production Status
+## Production Status
 
 Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport), missile cost 200 (min urban 21). fortification cost 20 per city cell (queue unitType "fortification", one cell per item). a credits item costs 20 production points and adds 20 credits to your treasury (queue unitType "credits").
 
@@ -269,7 +277,7 @@ Do not queue types at maximum while other types can still be built; replace bloc
 
 Production progress/spawn resolves after Ready, after combat and control resolution.
 
-## Controlled Hex Queues
+### Controlled Hex Queues
 
 | Hex | Urban Hexes | Fortified | Airports | Seaports | Available Unit Types | Current Queue | Building |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -284,15 +292,15 @@ Production progress/spawn resolves after Ready, after combat and control resolut
 | E3 | 27 | 0/27 | 1 | 0 | armor | 1 air (blocked: at cap) | yes |
 | GF | 27 | 0/27 | 2 | 1 | armor | 1 air (blocked: at cap) | yes |
 
-# Your Strategic Memory
+## Your Strategic Memory
 
-## Persistent (Active Strategic Context)
+### Persistent (Active Strategic Context)
 
 | Key | Updated Turn | Content |
 | --- | --- | --- |
 | — | — | — |
 
-## Reminders Triggered This Turn
+### Reminders Triggered This Turn
 
 | Key | Tier | Recurring | Content |
 | --- | --- | --- | --- |
@@ -303,7 +311,7 @@ A new persistent key replaces the oldest persistent note when all 5 persistent s
 
 Use memory_read to retrieve stored memories by key or tag. To add, update, or remove memories, use "memoryUpdates" in your final JSON (write/delete actions); there are no memory_write or memory_delete tools.
 
-# Standing Order Status
+## Standing Order Status
 
 | Unit ID | Unit Type | Order Type | Destination / Target | Status | Next Move | Turns Remaining | Attention |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -339,7 +347,7 @@ Use memory_read to retrieve stored memories by key or tag. To add, update, or re
 | a1-t5 | armor | DEFEND | FZ | holding | — | — | no |
 | a1-t9 | armor | DEFEND | HV | holding | — | — | no |
 
-## Units Without Standing Orders
+### Units Without Standing Orders
 
 | Unit ID | Unit Type | Suggested Destination |
 | --- | --- | --- |
@@ -368,7 +376,9 @@ Use memory_read to retrieve stored memories by key or tag. To add, update, or re
     (2) Eliminating all urban production (tactical urban hexes) in the enemy home region.
 - Every home-region outline is always visible on the map.
 
-Strategic context:
+# Strategic Context
+
+
 - Your goals are:
     (1) Engage enemy forces to reduce their combat effectiveness
     (2) Disperse your units to maximize visibility
@@ -443,7 +453,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 7. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
 8. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
 
-HOW TO USE THESE TOOLS EFFECTIVELY:
+## How to Use These Tools Effectively
 
 - The Commander's Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.
 - Batch independent tool calls: when you need the same tool for several units or hexes, request all of those calls together in one reply as parallel tool calls instead of one call per reply. Wait for a result only when the next call's arguments depend on it.
@@ -460,15 +470,21 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
 
   Never copy a Target Hex from a row that does not list that unit; if that unit has no row, call plan_route or leave it idle. Call plan_route only for a destination the table does not list for that unit.
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
-- For every unit listed under ## Units Without Standing Orders, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn's movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.
+- For every unit listed in the Units Without Standing Orders table, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn's movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.
 
   When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit's current Hex; that order is dropped as already arrived and the unit stays idle. An explicit_move to the unit's current Hex is dropped as already arrived and the unit stays idle.
 
   Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn's movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.
-- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders and marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.
+- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders, and marches or defend orders whose next move recedes from the nearest enemy.
+
+  A defend order with status en_route walks the unit back to its defend post; to keep the unit where it is, assign defend on its current hex.
+
+  An explicit_move that takes a unit off its defend post moves the post to that destination.
+
+  A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.
 - For every air unit with no strike listed in Best Options, take its ferry Target Hex toward the fighting, but only when Air Operations Status shows that unit's Base Intact and Base Controlled columns as yes. Issue that ferry even when the unit is holding on defend. An air unit cannot strike and ferry on the same turn.
 - Naval units cannot enter land cells; to engage a land target, move to the nearest water or coastal cell within range.
-- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the # Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.
+- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.
 - When a controlled cell can build and its queue is empty, queue something.
 
   Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
@@ -476,13 +492,19 @@ HOW TO USE THESE TOOLS EFFECTIVELY:
   A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up.
 
   When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.
+
+  When the Production attention flag is present, it names each such hex and the types it can still build.
 - Write a short persistent note naming this turn's objectives and the units assigned to them. Include that memoryUpdates write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
 - Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit.
 
+# Unit Roster
+
 Enemy units (currently observed): South America: h1-i31 (infantry) at LP; h1-i32 (infantry) at J0; h1-i34 (infantry) at KQ; h1-i35 (infantry) at LP; h1-i36 (infantry) at LP; h1-i37 (infantry) at LP; h1-i38 (infantry) at LP
+
+# Response Format
 
 Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments).
 
@@ -517,7 +539,7 @@ Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds"
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. A ranged action's target must not be the acting unit's own move destination. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is dropped as already arrived. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
+An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is dropped as already arrived. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
 
 For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there.
 
@@ -532,6 +554,8 @@ Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 
 A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.
+
+## Example Response
 
 Example (illustrative only — use briefing hex codes and unit ids from this operational map, not these placeholders). Emit compact JSON with no markdown fence:
 

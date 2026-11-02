@@ -6,6 +6,8 @@ import { getMaxUnitsPerType, parseGameSize } from './gameSize';
 import { countControlledHexesInRegion } from './homeRegionRules';
 import { ALL_BUILD_UNIT_TYPES, type BuildUnitType } from './ipc/productionTypes';
 import { HUMAN_SEAT_ID, type SeatId } from './seatIds';
+import { type SeatKind } from './seatRoster';
+import { sideDisplayName } from './sideNicknames';
 import { getPlayerUnitCountsByType } from './unitCountsByType';
 import { countCityHexesBySeat, rankSeatsByCityHexes, type VictorySettings } from './victoryRules';
 
@@ -137,6 +139,24 @@ export interface TopBarSeatRow {
    * Exceptions: None.
    */
   readonly homeRegion: string;
+  /**
+   * Stored nickname, or null for the default.
+   *
+   * Contract: Null means Human or the short home name, chosen by `kind`.
+   * When to use: The Cities tooltip.
+   * Expected outcome: Passed to `sideDisplayName`.
+   * Exceptions: None.
+   */
+  readonly nickname: string | null;
+  /**
+   * Whether a person or a commander plays the seat.
+   *
+   * Contract: `HUMAN_SEAT_KIND` or `AI_SEAT_KIND`.
+   * When to use: The nickname default.
+   * Expected outcome: A human seat with no nickname reads Human.
+   * Exceptions: None.
+   */
+  readonly kind: SeatKind;
   /**
    * The turn the seat was knocked out, or null while it plays.
    *
@@ -390,7 +410,7 @@ function citiesReadout(
   });
   const lines = ranked.map((seat) => {
     const you = viewer !== null && seat.seatId === viewer ? ' (you)' : '';
-    return `${seat.homeRegion}${you} ${counts.get(seat.seatId) ?? 0}`;
+    return `${sideDisplayName(seat)}${you} ${counts.get(seat.seatId) ?? 0}`;
   });
   const tooltip = `City hexes held. Most at the end of turn ${turnLimit} wins. A tie leaves no single winner. ${lines.join('; ')}`;
   if (viewer === null) return { summary: null, tooltip };

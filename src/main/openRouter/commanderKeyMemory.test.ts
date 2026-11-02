@@ -82,22 +82,25 @@ interface CommanderKeyMemoryApi {
   /**
    * Stores a new match, or does nothing when `seats` is missing.
    *
-   * Contract: `undefined` does not create a map.
-   * When to use: The skip case and the human-first case.
-   * Expected outcome: AI rows are stored in payload order.
+   * Contract: `undefined` does not create a map. A nickname that only repeats the resolved short home name is stored as empty.
+   * When to use: The skip case, the human-first case, and the default-nickname case.
+   * Expected outcome: AI rows are stored in payload order. A custom nickname is kept.
    * Exceptions: None.
    */
   storeNewMatchCommanderKeys: (
     seats: readonly {
       kind: 'human' | 'ai';
+      homeRegion?: string;
       commander?: {
         modelId: string | null;
         reasoningEffort: string | null;
         doctrineChoice: RememberedCommander['doctrineChoice'];
         apiKey?: string;
+        nickname?: string;
       };
     }[] | undefined,
-    legacyKey: string
+    legacyKey: string,
+    resolvedHomes?: readonly { readonly seatId: string; readonly homeRegion: string }[],
   ) => void;
 }
 
@@ -141,8 +144,8 @@ function installElectronMock(): () => void {
  * Expected outcome: A balanced commander with the given model and key.
  * Exceptions: None.
  */
-function remembered(modelId: string, apiKey: string, reasoningEffort: string | null = null): RememberedCommander {
-  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey };
+function remembered(modelId: string, apiKey: string, reasoningEffort: string | null = null, nickname = ''): RememberedCommander {
+  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey, nickname };
 }
 
 test('commander memory keeps seat keys and the remembered match', () => {
@@ -198,6 +201,12 @@ test('commander memory keeps seat keys and the remembered match', () => {
     assert.equal(stored.prefillApiKey, 'test-openrouter-key');
     assert.equal(stored.previousMatch[1]?.modelId, 'model-b');
     assert.equal(stored.previousMatch[1]?.apiKey, 'test-openrouter-key-b');
+    memory.writeCommanderKeyMemory([remembered('model-a', 'test-openrouter-key', null, 'Grok')]);
+    assert.equal(memory.readCommanderKeyMemory('unused-legacy').previousMatch[0]?.nickname, 'Grok');
+    const olderSnapshot: { nickname?: string } = { ...remembered('model-a', 'test-openrouter-key') };
+    delete olderSnapshot.nickname;
+    memory.writeCommanderKeyMemory([olderSnapshot as RememberedCommander]);
+    assert.equal(memory.readCommanderKeyMemory('unused-legacy').previousMatch[0]?.nickname, '');
 
     memory.writeSeatApiKeys([{ seatId: firstSeat, apiKey: '' }]);
     assert.equal(memory.readSeatApiKey(firstSeat, 'test-openrouter-key'), '');
@@ -219,12 +228,24 @@ test('commander memory keeps seat keys and the remembered match', () => {
       [
         { kind: 'human' },
         { kind: 'ai', commander: remembered('model-a', 'test-openrouter-key') },
-        { kind: 'ai', commander: { modelId: 'model-b', reasoningEffort: 'low', doctrineChoice: 'balanced' } },
+        { kind: 'ai', commander: { modelId: 'model-b', reasoningEffort: 'low', doctrineChoice: 'balanced', nickname: '' } },
       ],
       'legacy-should-not-replace'
     );
     assert.equal(memory.readSeatApiKey(firstSeat, 'legacy-should-not-replace'), 'test-openrouter-key');
     assert.equal(memory.readSeatApiKey(secondSeat, 'legacy-should-not-replace'), 'legacy-should-not-replace');
+    memory.storeNewMatchCommanderKeys(
+      [{ kind: 'ai', commander: remembered('model-a', 'test-openrouter-key', null, 'C. African Republic') }],
+      'legacy-should-not-replace',
+      [{ seatId: firstSeat, homeRegion: 'Central African Republic' }],
+    );
+    assert.equal(memory.readCommanderKeyMemory('unused-legacy').previousMatch[0]?.nickname, '');
+    memory.storeNewMatchCommanderKeys(
+      [{ kind: 'ai', commander: remembered('model-a', 'test-openrouter-key', null, 'Grok') }],
+      'legacy-should-not-replace',
+      [{ seatId: firstSeat, homeRegion: 'Central African Republic' }],
+    );
+    assert.equal(memory.readCommanderKeyMemory('unused-legacy').previousMatch[0]?.nickname, 'Grok');
     const db = require('../gameDb/dbConnection') as {
       getOne: <T>(sql: string, params: unknown[]) => T | undefined;
       run: (sql: string, params: unknown[]) => void;
@@ -239,6 +260,7 @@ test('commander memory keeps seat keys and the remembered match', () => {
     const logged = lines.join('\n');
     assert.equal(logged.includes('test-openrouter-key'), false);
     assert.equal(logged.includes('test-openrouter-key-b'), false);
+    assert.equal(logged.includes('Grok'), false);
   } finally {
     logger.logDebug = originalDebug;
     logger.logError = originalError;

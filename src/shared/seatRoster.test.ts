@@ -20,6 +20,7 @@ import {
 function seat(partial: Pick<SeatRecord, 'seatId' | 'seatOrder' | 'kind'> & Partial<SeatRecord>): SeatRecord {
   return {
     homeRegion: partial.seatId,
+    nickname: null,
     commander: partial.kind === 'ai'
       ? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' }
       : null,

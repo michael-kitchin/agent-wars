@@ -13,7 +13,7 @@ Opens in the Tactical battles list mode, after Ready reports at least one battle
 ## Information Displayed
 
 - A navy panel, using the chrome in the [UI style guide](../ui-style-guide.md), titled "Tactical Battles (N)", where N is the number of battles the player can fight. Under the title: "Choose one battle to fight. The others resolve on the world map."
-- One choice row per eligible hex. The columns are Hex, Yours, and Enemy when the row includes the human seat. The hex cell is the world-hex tooltip, in the same line order as [hex-tooltips.md](hex-tooltips.md): the hex code and place name, a country flag before each country name, then Control, Production, Tech, Features, Terrain, Weather, and Effects. A legend chip comes before each terrain kind. A line that does not apply is left out. The cell shows the hex code while that tooltip loads. Yours is the human seat's unit summary. Enemy is that party's dot and short name, or "Neutral" with the Neutral dot, and its unit summary. A Neutral summary ends ", defends in place". An empty summary shows an em dash. A row with no human seat names both sides: each cell is that side's dot, short name, and summary, and the two headers are those short names, lead seat then the other. An observed match checks that chosen row and scrolls it into view.
+- One choice row per eligible hex. The columns are Hex, Yours, and Enemy when the row includes the human seat. The hex cell is the world-hex tooltip, in the same line order as [hex-tooltips.md](hex-tooltips.md): the hex code and place name, a country flag before each country name, then Control, Production, Tech, Features, Terrain, Weather, and Effects. A legend chip comes before each terrain kind. A line that does not apply is left out. The cell shows the hex code while that tooltip loads. Yours is the human seat's unit summary. Enemy is that party's dot and the name `sideDisplayName` returns (`src/shared/sideNicknames.ts`), or "Neutral" with the Neutral dot, and its unit summary. A null nickname shows the short home name. A Neutral summary ends ", defends in place". An empty summary shows an em dash. A row with no human seat names both sides: each cell is that side's dot, the name `sideDisplayName` returns, and summary, and the two headers are those names, lead seat then the other. A header that does not fit clips with an ellipsis, and the full name is the tooltip. A null nickname shows the short home name. An observed match checks that chosen row and scrolls it into view.
 - Below the choice rows, when any contested hex cannot be fought: "Resolve on the world map this turn", then each such hex. A hex with the human seat and two other sides reads "Three sides: you, {A}, {B}". A hex with two sides reads "{A} vs {B}". Each name has that side's dot.
 - Fight, disabled until a row is chosen.
 - Ignore.
@@ -72,6 +72,7 @@ None.
 ## Code Entry Points
 
 - `src/renderer/gameplay/meleeInterceptModal.ts`
+- `src/shared/sideNicknames.ts` (`sideDisplayName`)
 - `src/renderer/gameplay/meleeInterceptHexTooltip.ts`
 - `src/renderer/gameplay/readyHandler.ts`
 - `src/main/gameActions/aiOnlyBattleOffer.ts` (`buildAiOnlyBattleOffer`)

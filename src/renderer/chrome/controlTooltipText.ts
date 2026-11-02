@@ -33,6 +33,15 @@ export const techBonusSelectTooltipText =
   'Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.';
 
 /**
+ * Purpose: Says the name is for the match, and that it is kept on this computer.
+ * When to use: `#new-game-human-nickname`.
+ * Expected outcome: The control tip and the field title show this sentence.
+ * Exceptions: None.
+ */
+export const humanNicknameFieldTooltipText =
+  'The name shown for you during a match. Saved on this computer, and used the next time a game starts.';
+
+/**
  * Purpose: Says the bonus is for battles and does not stack with the origin bonus.
  * When to use: `#new-game-terrain-bonus-select`.
  * Expected outcome: The control tip shows this sentence.
@@ -222,6 +231,17 @@ export const apiKeyTooltipText =
   'Enter the OpenRouter key for this opponent. Click away or press Enter to keep it. Clear the field and leave it to forget this opponent\'s key.';
 
 /**
+ * The commander popover's nickname field.
+ *
+ * Purpose: Says what the name is for and when a new game puts the short home name back.
+ * When to use: The Nickname field in the commander popover.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const commanderNicknameTooltipText =
+  'The name shown for this side during a match. It starts as the short home name and resets when this side\'s home changes.';
+
+/**
  * Purpose: Says where a failed refresh is reported.
  * When to use: The refresh button beside the model selector in the commander popover.
  * Expected outcome: The control tip shows this sentence.
@@ -263,13 +283,13 @@ export function runButtonTooltipText(enabled: boolean): string {
 /**
  * The new-game commander button's tip.
  *
- * Purpose: The button opens the key, model, reasoning, and doctrine for that side.
+ * Purpose: The button opens the nickname, key, model, reasoning, and doctrine for that side.
  * When to use: Each AI row's commander button.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const newGameCommanderTooltipText =
-  'Change this side\'s API key, model, reasoning, and doctrine.';
+  'Change this side\'s nickname, API key, model, reasoning, and doctrine.';
 
 /**
  * Purpose: Says New opens the new-game screen over the match, which keeps going until a new one starts.
