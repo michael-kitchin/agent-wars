@@ -374,10 +374,11 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   display: flex;
   gap: 8px;
 }
-/* Doctrine takes the left half of its own row. Its description fills the right half. */
+/* Doctrine takes the left half of its own row. Its description fills the right half.
+   The description wraps taller than the control, so the row lines their tops up. */
 .commander-popover-doctrine-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 .commander-popover-doctrine-row > .commander-popover-choice,

@@ -76,7 +76,7 @@ export function choiceSelect<T extends string>(input: {
 /**
  * The doctrine list and the description that sits beside it.
  *
- * Purpose: Doctrine takes the left half of its row. The description fills the right half.
+ * Purpose: Doctrine takes the left half of its row. The description fills the right half, and the row lines their tops up.
  * When to use: The row under Reasoning and Provider.
  * Expected outcome: A `.commander-popover-doctrine-row`. `show` selects the choice and writes its description.
  *   A change calls `onChange` with the choice.
