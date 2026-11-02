@@ -134,7 +134,7 @@ const ALWAYS_PRESENT_FIELDS: ReadonlySet<string> = new Set(['message', 'strategy
  * Tactical prohibition on standing-order actions, worded once for the envelope and the opening message.
  *
  * Purpose: The beat opening message is allowed to repeat this sentence because it is the most common carry-over error.
- * When to use: Invalid-output rules, the tactical orders clause, and the tactical opening user message.
+ * When to use: The tactical orders action list and the tactical opening user message.
  * Expected outcome: Identical wording on every surface that restates the prohibition.
  * Exceptions: None.
  */
@@ -230,13 +230,14 @@ export function legalOrderActionsForMode(
  * Purpose: strategic-prompt.md section 3.4 and tactical-prompt.md section 3.4. The model needs to
  * know what the parser will drop rather than guessing from examples.
  * When to use: Appended to the JSON contract instruction.
- * Expected outcome: Top-level array and legacy field bans in both modes; standing-order and
- * memory/production bans only in tactical; both modes drop a current-cell move as already
- * arrived; both modes name stacking as legal.
+ * Expected outcome: Top-level array and legacy field bans in both modes, unless
+ * `omitSchemaRestatement` is set because the request already attaches the schema. Memory and production
+ * bans only in tactical; both modes drop a current-cell move as already arrived; both modes
+ * name stacking as legal. The standing-order prohibition is on the tactical action list.
  * Exceptions: None.
  */
-export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
-  logDebug('promptSpec buildInvalidOutputRulesClause', { ...gates });
+export function buildInvalidOutputRulesClause(gates: EnvelopeGates, omitSchemaRestatement = false): string {
+  logDebug('promptSpec buildInvalidOutputRulesClause', { ...gates, omitSchemaRestatement });
   const shared = [
     'The top level must be a JSON object; a top-level array is invalid.',
     'Do not use top-level movementOrders or rangedAttacks (legacy).',
@@ -250,8 +251,7 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
   const rest = gates.coordinateMode === 'tactical'
     ? [
         ...shared.slice(2),
-        TACTICAL_STANDING_ORDER_PROHIBITION,
-        'memoryUpdates and productionOrders are not accepted this beat.',
+        'Memory updates and production orders are not accepted this beat.',
         'Strategic hex codes are never valid field values this beat.',
         "An explicit_move to the sub-unit's current cell is dropped as already arrived.",
       ]
@@ -264,7 +264,8 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
           : []),
         'Infantry cannot be given a strategic ranged_attack.',
       ];
-  return `${shared[0]} ${shared[1]}\n\n${rest.join(' ')}`;
+  const drops = rest.join(' ');
+  return omitSchemaRestatement ? drops : `${shared[0]} ${shared[1]}\n\n${drops}`;
 }
 
 /**

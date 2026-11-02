@@ -24,22 +24,24 @@ import { getSubscriptions } from '../callbackSubscriptions';
 import { setAiToolLimitExceededLastTurn } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
-import { getInitialUserMessage } from './promptText';
 import {
-  SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
   SECTION_TITLE_OPERATIONAL_MAP,
   subHeading,
 } from './promptSpec/sectionHeadings';
+import { buildConsultPromptParts } from './consultPromptParts';
+import { buildConsultMessages } from './consultPromptMessages';
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
 import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
-import { recordNoToolCallingNoticeForModel } from './openRouterModelCapabilities';
+import {
+  isSituationMessagesJoinedForModel,
+  isStructuredOutputsRejectedForModel,
+  recordNoToolCallingNoticeForModel,
+} from './openRouterModelCapabilities';
 import type { OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import { buildOrdersEnvelopeResponseFormat } from './promptSpec/envelopeJsonSchema';
-import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
-import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { buildStrategicOperationalMapSectionMarkdown } from '../briefing/map/briefingMapSection';
-import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { coordinateContextForConsultation, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import {
@@ -60,7 +62,7 @@ import {
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
 import { maybeApplyTacticalLightPrecomputeToolAllowlist } from './tacticalLightPrecompute';
-import { filterToolNamesForTacticalBattle } from './openRouterToolGroups';
+import { resolveConsultToolNames } from './openRouterToolGroups';
 
 export type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 
@@ -84,7 +86,6 @@ export async function requestOrdersFlow(
     loadKey,
     getToolFlags,
     toolGroupRegistry,
-    buildSystemPromptForTools,
     buildToolDefinitions,
     postOpenRouterChatWithTimeoutAndRetry,
     resolveOrdersRequestProfile,
@@ -105,19 +106,16 @@ export async function requestOrdersFlow(
   const signal = options?.signal;
   const onLog = options?.onLog;
   const usePrecomputation = tacticalBattle ? false : options?.usePrecomputation === true;
-  const precomputationExcluded = new Set<string>([...ASSESSMENT_TOOL_NAMES, ...COMBAT_ESTIMATION_TOOL_NAMES]);
-  let enabledToolNames: string[] | undefined =
-    usePrecomputation && requestedToolNames !== undefined
-      ? requestedToolNames.filter((n) => !precomputationExcluded.has(n))
-      : usePrecomputation && requestedToolNames === undefined
-        ? toolGroupRegistry.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
-        : requestedToolNames;
+  const allToolNames = toolGroupRegistry.flatMap((group) => [...group.toolNames]);
+  let enabledToolNames = resolveConsultToolNames({
+    requested: requestedToolNames,
+    usePrecomputation,
+    tactical: Boolean(tacticalBattle),
+    allToolNames,
+    groupIdForToolName: getGroupIdForToolName,
+  });
   if (tacticalBattle) {
-    enabledToolNames = filterToolNamesForTacticalBattle(
-      enabledToolNames ?? toolGroupRegistry.flatMap((g) => [...g.toolNames]),
-      getGroupIdForToolName
-    );
-    enabledToolNames = maybeApplyTacticalLightPrecomputeToolAllowlist(tacticalBattle.battleId, enabledToolNames);
+    enabledToolNames = maybeApplyTacticalLightPrecomputeToolAllowlist(tacticalBattle.battleId, enabledToolNames) ?? enabledToolNames;
     logDebug('openRouter requestOrders tactical tool filter applied', {
       battleId: tacticalBattle.battleId,
       enabledToolCount: enabledToolNames?.length ?? 0,
@@ -192,15 +190,7 @@ export async function requestOrdersFlow(
 
   const hexList = planState.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-  const coordinateContext: CoordinateContext = tacticalBattle
-    ? {
-        mode: 'tactical',
-        battleId: tacticalBattle.battleId,
-        tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
-        seatId,
-        hasFortifiedCells: Object.keys(tacticalBattle.tacticalFortificationOwnerByH3 ?? {}).length > 0,
-      }
-    : { mode: 'strategic', seatId };
+  const coordinateContext: CoordinateContext = coordinateContextForConsultation({ seatId, tacticalBattle });
   ensureStrategicCoordinateRegistryInitialized();
   if (tacticalBattle) {
     initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingStrategicH3Index);
@@ -312,6 +302,7 @@ export async function requestOrdersFlow(
       planState,
       latLngByH3,
       tacticalBattle,
+      mentionGetMap: enabledToolNames.includes('get_map'),
     });
     if (tacticalBrief.trim().length === 0 || !tacticalBrief.includes('Operational Map')) {
       logError('openRouter requestOrders: tactical briefing generation failed', {
@@ -333,42 +324,29 @@ export async function requestOrdersFlow(
     return failRequest('Operational map is required for AI prompting and was not generated.', toolInvocationCounts);
   }
   const includeExitBattle = tacticalBattle?.leadPartyId != null;
-  const systemPrompt = buildSystemPromptForTools(
-    planState,
+  const promptParts = buildConsultPromptParts({
+    state: planState,
     coordMap,
     enabledToolNames,
     briefingOverride,
     coordinateContext,
     includeExitBattle,
-  );
-  const hasBriefing = briefingOverride != null && briefingOverride.length > 0;
-  const userMessage = getInitialUserMessage(
-    flags,
-    hasBriefing,
-    tacticalBattle ? 'tactical' : 'strategic',
-    {
-      hasAirUnits: opponentUnits.some((u) => u.unitType === 'air'),
-      hasMissileUnits: !tacticalBattle && opponentUnits.some((u) => isMissileUnitType(u.unitType)),
-      hasBestOptionsTable: hasBriefing && briefingOverride.includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN),
-      includeExitBattle,
-      hasProductionAttention: productionAttention !== null,
-    }
+    tacticalBattle: tacticalBattle ?? null,
+    structuredOutputs: requestProfile.structuredOutputs && !isStructuredOutputsRejectedForModel(modelId),
+    productionAttention,
+  });
+  const messages: RequestOrdersChatMessage[] = buildConsultMessages(
+    promptParts,
+    isSituationMessagesJoinedForModel(modelId)
   );
 
-  const tools = buildToolDefinitions(enabledToolNames);
-
-  const messages: RequestOrdersChatMessage[] = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userMessage },
-  ];
-
-  logDebug('openRouter requestOrders: system prompt prepared', { chars: systemPrompt.length });
-  logDebug('openRouter requestOrders: user message prepared', { chars: userMessage.length });
+  logDebug('openRouter requestOrders: system prompt prepared', { chars: promptParts.staticSystemText.length });
+  logDebug('openRouter requestOrders: user message prepared', { chars: promptParts.situationText.length });
   let fullLogOperationalMapSupplement: string | undefined;
   if (
     isAgentWarsFullPromptLoggingEnabled() &&
     !tacticalBattle &&
-    !systemPrompt.includes('Operational Map')
+    !promptParts.situationText.includes('Operational Map')
   ) {
     try {
       fullLogOperationalMapSupplement = buildStrategicOperationalMapSectionMarkdown({
@@ -382,12 +360,13 @@ export async function requestOrdersFlow(
       logError('openRouter requestOrders: failed to build operational map for full-prompt disk log', err);
     }
   }
-  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt, {
+  const tools = buildToolDefinitions(enabledToolNames);
+  logPromptPreview('openRouter requestOrders: system prompt', promptParts.staticSystemText, {
     artifactKind: coordinateContext.mode,
     aiIndex,
     supplementalDiskOnlyBody: fullLogOperationalMapSupplement,
   });
-  logPromptPreview('openRouter requestOrders: user message', userMessage, {
+  logPromptPreview('openRouter requestOrders: user message', promptParts.situationText, {
     artifactKind: 'user',
     aiIndex,
   });

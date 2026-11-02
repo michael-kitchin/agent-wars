@@ -37,7 +37,7 @@ Example: the const identifier `TOOL2_NAMES` may become `ASSESSMENT_TOOL_NAMES`, 
 | Kind | Examples | Why frozen |
 | --- | --- | --- |
 | IPC channel strings | `'game:submitOrders'`, `'openRouter:listModels'`, `'game:listGameMaps'` in `src/shared/ipc/channels.ts` | Cross-process contract |
-| LLM tool names | `'plan_route'`, `'check_distance'`, `'assess_unit'`, `'assess_hex'`, `'estimate_combat'`, `'memory_read'`, `'query_orders'`, `'query_production'`, `'set_build_queue'` | Prompt and model contract |
+| LLM tool names | `'plan_route'`, `'check_distance'`, `'get_map'`, `'rules'`, `'assess_unit'`, `'assess_hex'`, `'estimate_combat'`, `'memory_read'`, `'query_orders'`, `'query_production'`, `'set_build_queue'` | Prompt and model contract |
 | Standing-order type strings | `'defend'`, `'march'`, `'pursue'`, `'patrol'`, `'hold_fire'` | Persisted and parsed |
 | Envelope action strings | `'assign_order'`, `'cancel_order'` | Parsed JSON from the model |
 | Prompt section heading text | Strings asserted in prompt-spec tests | Model-facing copy |

@@ -9,10 +9,10 @@ const BATTLE_TOOLS = ['plan_route', 'check_distance', 'assess_unit', 'estimate_c
 
 test('battle guidance names assess_unit and estimate_combat when enabled, never assess_hex', () => {
   const guidance = buildToolUsageGuidance(getToolFlags(BATTLE_TOOLS), true, 'tactical');
-  assert.match(guidance, /assess_unit on sub-units/);
-  assert.match(guidance, /one parent on the same cell/);
+  assert.match(guidance, /assess_unit is optional/);
+  assert.match(guidance, /one sub-unit per parent/);
   assert.doesNotMatch(guidance, /results will be identical/);
-  assert.match(guidance, /estimate_combat before any ranged or melee attack/);
+  assert.doesNotMatch(guidance, /estimate_combat before any/);
   assert.ok(!guidance.includes('assess_hex'), guidance);
 });
 
@@ -35,6 +35,7 @@ test('battle tool list uses battle prompt lines; strategic keeps the shared line
   const tactical = getFilteredToolMetadata(['assess_unit', 'estimate_combat'], 'tactical');
   assert.match(tactical[0]!.promptLine, /^assess_unit\(unitId, radius\?\) - Battle briefing on one sub-unit/);
   assert.match(tactical[1]!.promptLine, /Does not cover air strikes/);
+  assert.match(tactical[1]!.promptLine, /Best Options already gives Odds/);
   const strategic = getFilteredToolMetadata(['assess_unit'], 'strategic');
   assert.match(strategic[0]!.promptLine, /one of your units/);
 });

@@ -18,6 +18,7 @@ import { UNIT_COST_BY_TYPE } from '../../productionRules';
 import { ORIGIN_BONUS_OFF } from '../../../shared/originBonusRules';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import { TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE } from '../../../shared/terrainBonusMarch';
+import { combatRuleGatesForPrompt } from './gameRuleSituationGates';
 import {
   buildAirEmploymentRule,
   buildCasualtySortRule,
@@ -429,7 +430,7 @@ test('the combat stats line states the d20, the floor, and the cap', () => {
 
 test('the system-prompt assembler delegates combat-rule prose to this module', () => {
   const assembler = fs.readFileSync(
-    path.resolve(process.cwd(), 'src/main/openRouter/openRouterBuildSystemPrompt.ts'),
+    path.resolve(process.cwd(), 'src/main/openRouter/consultPromptParts.ts'),
     'utf8'
   );
   assert.ok(assembler.includes('buildCombatRulesParagraph'));
@@ -451,4 +452,129 @@ test('the missile rule appears only when the roster has a missile', () => {
   const tactical = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasMissileUnits: true }));
   assert.match(tactical, /Missile sub-units never move or fire/);
   assert.equal(tactical.includes('missileLaunches'), false);
+});
+
+const WEATHER_ON = {
+  originBonusEnabled: false,
+  terrainBonusEnabled: false,
+  weatherBonusEnabled: true,
+} as const;
+
+test('tactical mild weather omits the weather rules', () => {
+  const paragraph = buildCombatRulesParagraph(gates({
+    coordinateMode: 'tactical',
+    originBonusSettings: WEATHER_ON,
+    weatherApplies: false,
+  }));
+  assert.doesNotMatch(paragraph, /snow/);
+  assert.doesNotMatch(paragraph, /strategic ferry/);
+});
+
+test('tactical snow weather keeps the battle budget and drops the strategic weather sentences', () => {
+  const paragraph = buildCombatRulesParagraph(gates({
+    coordinateMode: 'tactical',
+    originBonusSettings: WEATHER_ON,
+    weatherApplies: true,
+    includeWeatherAirSentence: false,
+  }));
+  assert.match(paragraph, /armor's point budget/);
+  assert.doesNotMatch(paragraph, /Armor strategic movement/);
+  assert.doesNotMatch(paragraph, /strategic ferry/);
+});
+
+test('infantry omits the armor terrain-entry sentence and keeps the terrain-bonus dice sentence', () => {
+  const paragraph = buildCombatRulesParagraph(gates({
+    coordinateMode: 'tactical',
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: true, terrainBonusLevel: 'low' },
+    includeArmorTerrainEntry: false,
+  }));
+  assert.doesNotMatch(paragraph, /Terrain bonus movement/);
+  assert.match(paragraph, /matches its birth terrain kind/);
+});
+
+test('an infantry battle omits the mountain line-of-sight sentence and keeps terrain cover', () => {
+  const paragraph = buildCombatRulesParagraph(gates({
+    coordinateMode: 'tactical',
+    includeMountainLineOfSight: false,
+    tacticalTypesPresent: ['infantry'],
+  }));
+  assert.doesNotMatch(paragraph, /between the shooter/);
+  assert.match(paragraph, /forest, mountain/);
+  assert.match(paragraph, /infantry:/);
+  assert.doesNotMatch(paragraph, /armor:/);
+});
+
+test('a roster with no missile omits the hit-last sentence', () => {
+  const paragraph = buildCombatRulesParagraph(gates({ includeMissileCasualty: false }));
+  assert.doesNotMatch(paragraph, /hit last/);
+});
+
+test('a mild strategic map omits weather and one snow hex keeps strategic movement', () => {
+  const mild = buildCombatRulesParagraph(gates({ originBonusSettings: WEATHER_ON, weatherApplies: false }));
+  assert.doesNotMatch(mild, /Weather bonus is on/);
+  const snow = buildCombatRulesParagraph(gates({ originBonusSettings: WEATHER_ON, weatherApplies: true }));
+  assert.match(snow, /Armor strategic movement/);
+});
+
+test('roster and map facts turn the gates off only when the clause cannot apply', () => {
+  const shared = {
+    ownSeat: 'opponent',
+    hasAirUnits: false,
+    hasNavalUnits: false,
+    hasMissileUnits: false,
+    standingOrdersIssuable: false,
+    originBonusSettings: ORIGIN_BONUS_OFF,
+    productionEnabled: false,
+  };
+  const infantry = [{ id: 'a', player: 'opponent', unitType: 'infantry' }];
+  const mildBattle = combatRuleGatesForPrompt({
+    ...shared,
+    units: infantry,
+    coordinateContext: { mode: 'tactical', battleId: 'b', battleWeather: 'mild' },
+  });
+  assert.equal(mildBattle.weatherApplies, false);
+  assert.equal(mildBattle.includeMountainLineOfSight, false);
+  assert.equal(mildBattle.includeMissileCasualty, false);
+  assert.equal(mildBattle.includeArmorTerrainEntry, false);
+  assert.deepEqual(mildBattle.tacticalTypesPresent, ['infantry']);
+  const unknown = combatRuleGatesForPrompt({
+    ...shared,
+    coordinateContext: { mode: 'tactical', battleId: 'b' },
+  });
+  assert.equal(unknown.weatherApplies, true);
+  assert.equal(unknown.includeMountainLineOfSight, true);
+  assert.equal(unknown.includeMissileCasualty, true);
+  assert.equal(unknown.tacticalTypesPresent, undefined);
+  const plainsNaval = combatRuleGatesForPrompt({
+    ...shared,
+    units: [{ id: 'n', player: 'opponent', unitType: 'naval' }],
+    coordinateContext: { mode: 'tactical', battleId: 'b', battleWeather: 'snow' },
+    tacticalSubUnits: [{ id: 'n', origin: { birthTerrainKind: 'plains' } }],
+  });
+  assert.equal(plainsNaval.includeArmorTerrainEntry, false);
+  assert.equal(plainsNaval.weatherApplies, true);
+  const unknownBirth = combatRuleGatesForPrompt({
+    ...shared,
+    units: [{ id: 'n', player: 'opponent', unitType: 'naval' }],
+    coordinateContext: { mode: 'tactical', battleId: 'b' },
+    tacticalSubUnits: [{ id: 'n' }],
+  });
+  assert.equal(unknownBirth.includeArmorTerrainEntry, true);
+  const allMild = combatRuleGatesForPrompt({
+    ...shared,
+    units: infantry,
+    hexes: [{ weather: 'mild' }],
+    strategicInfrastructure: [{ fortifiedCount: 0 }],
+    coordinateContext: { mode: 'strategic' },
+  });
+  assert.equal(allMild.weatherApplies, false);
+  assert.equal(allMild.includeFortificationRule, false);
+  const snowHex = combatRuleGatesForPrompt({
+    ...shared,
+    hexes: [{ weather: 'mild' }, { weather: 'snow' }],
+    coordinateContext: { mode: 'strategic' },
+    productionEnabled: true,
+  });
+  assert.equal(snowHex.weatherApplies, true);
+  assert.equal(snowHex.includeFortificationRule, true);
 });

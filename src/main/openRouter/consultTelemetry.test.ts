@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildConsultTelemetrySummary,
+  cacheTokensFromChatUsage,
   providerFromChatBody,
   type ConsultAttemptRecord,
   type ConsultTelemetrySummary,
@@ -50,6 +51,8 @@ function summarize(attempts: readonly ConsultAttemptRecord[]): ConsultTelemetryS
     inputTokens: 0,
     outputTokens: 0,
     costUsd: 0,
+    cachedTokens: 0,
+    cacheWriteTokens: 0,
     attempts,
     fallbacks: [],
     toolRounds: 0,
@@ -76,6 +79,36 @@ test('a timeout with no provider counts as a timeout and not a failed host', () 
   ]);
   assert.equal(summary.timeouts, 1);
   assert.deepEqual(summary.failedOn, []);
+});
+
+test('cached tokens from a usage object add to the summary', () => {
+  const reported = cacheTokensFromChatUsage({ prompt_tokens_details: { cached_tokens: 10, cache_write_tokens: 4 } });
+  const summary = buildConsultTelemetrySummary({
+    seatId: 'opponent',
+    turnNumber: 1,
+    theater: 'tactical',
+    battleId: null,
+    modelId: 'google/gemini',
+    providerSort: 'throughput',
+    wallClockMs: 10,
+    error: null,
+    cancelReason: null,
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+    cachedTokens: reported.cachedTokens,
+    cacheWriteTokens: reported.cacheWriteTokens,
+    attempts: [],
+    fallbacks: [],
+    toolRounds: 0,
+    outcome: 'finished',
+    wallClockExceeded: false,
+  });
+  assert.equal(summary.cachedTokens, 10);
+  assert.equal(summary.cacheWriteTokens, 4);
+  const missing = cacheTokensFromChatUsage(undefined);
+  assert.equal(missing.cachedTokens, 0);
+  assert.equal(missing.cacheWriteTokens, 0);
 });
 
 test('providerFromChatBody reads a success, an error, and bad JSON', () => {

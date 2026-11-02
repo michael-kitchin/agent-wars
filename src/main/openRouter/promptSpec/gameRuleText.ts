@@ -121,6 +121,69 @@ export interface GameRuleTextGates {
    */
   readonly originBonusSettings: OriginBonusSettings;
   /**
+   * Whether this consultation's map has weather the rules must explain.
+   *
+   * Contract: Omitted includes the weather text when the bonus is on. False omits it.
+   * When to use: Tactical when the battle weather is not mild. Strategic when some hex is not mild, or a hex has no weather.
+   * Expected outcome: False returns no weather paragraph and the briefing hides the Weather column.
+   * Exceptions: None.
+   */
+  readonly weatherApplies?: boolean;
+  /**
+   * Whether the armor and wetlands-naval terrain-entry sentence applies.
+   *
+   * Contract: Omitted includes the sentence. False omits only that sentence, not the terrain-bonus dice clause.
+   * When to use: The consulted side has armor, or naval whose birth terrain grants the entry. Unknown birth includes it.
+   * Expected outcome: The movement sentence is absent when this is false.
+   * Exceptions: None.
+   */
+  readonly includeArmorTerrainEntry?: boolean;
+  /**
+   * Whether a mountain between shooter and target can block a shot.
+   *
+   * Contract: Omitted includes the sentence. False omits it. Infantry baselines and the range-1 cap stay.
+   * When to use: Either side has armor or naval.
+   * Expected outcome: The mountain line-of-sight sentence is absent when this is false.
+   * Exceptions: None.
+   */
+  readonly includeMountainLineOfSight?: boolean;
+  /**
+   * Unit types named on the tactical combat-stats line.
+   *
+   * Contract: Omitted or empty prints every non-missile type, with air still gated by `hasAirUnits`.
+   * When to use: Tactical consultations, from the types present on either side.
+   * Expected outcome: The stats line names only these types.
+   * Exceptions: None.
+   */
+  readonly tacticalTypesPresent?: readonly string[];
+  /**
+   * Whether any unit on either side is a missile.
+   *
+   * Contract: Omitted includes the hit-last sentence. False omits it.
+   * When to use: Set from the roster. Unknown includes the sentence.
+   * Expected outcome: The casualty rule does not say missiles are hit last when this is false.
+   * Exceptions: None.
+   */
+  readonly includeMissileCasualty?: boolean;
+  /**
+   * Whether the fortification combat rule applies.
+   *
+   * Contract: Omitted keeps today's rule: strategic always, tactical only when `hasFortifiedCells`.
+   * When to use: Tactical from the battle's fortified cells. Strategic when production is on or a hex is fortified. Unknown includes it.
+   * Expected outcome: False omits the paragraph. True includes the paragraph for this mode.
+   * Exceptions: None.
+   */
+  readonly includeFortificationRule?: boolean;
+  /**
+   * Whether the consulted side has an air unit the weather sentence should name.
+   *
+   * Contract: Omitted includes the air-strike weather sentence. False omits that sentence only.
+   * When to use: The consulted side has air. Unknown includes the sentence.
+   * Expected outcome: The air-strike penalty sentence is absent when this is false.
+   * Exceptions: None.
+   */
+  readonly includeWeatherAirSentence?: boolean;
+  /**
    * Extra clause inserted after `targetUnitId` in the attack-constraint sentence.
    *
    * Contract: Omitted means empty. The assembler passes the estimate-combat hint when that tool is the way to pick a target.
@@ -167,13 +230,20 @@ function formatReachClause(unitType: string, mode: PromptCoordinateMode): string
  *
  * Purpose: strategic-prompt.md section 1.5 items 1–2. The model cannot choose a target without the stats.
  * When to use: First clause of `buildCombatRulesParagraph`.
- * Expected outcome: The "Combat: d20 per shot" sentence with the hit-number floor, the cap, and engine stats interpolated; air is omitted when `hasAirUnits` is false.
+ * Expected outcome: The "Combat: d20 per shot" sentence with the hit-number floor, the cap, and engine stats interpolated. Air is omitted when `hasAirUnits` is false. A non-empty tactical type list names only those types.
  * Exceptions: None.
  */
-export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = true): string {
-  logDebug('promptSpec buildCombatStatsLine', { mode, hasAirUnits });
-  const types = (hasAirUnits ? ALL_BUILD_UNIT_TYPES : ALL_BUILD_UNIT_TYPES.filter((unitType) => unitType !== 'air'))
-    .filter((unitType) => !isMissileUnitType(unitType));
+export function buildCombatStatsLine(
+  mode: PromptCoordinateMode,
+  hasAirUnits = true,
+  tacticalTypesPresent: readonly string[] = []
+): string {
+  logDebug('promptSpec buildCombatStatsLine', { mode, hasAirUnits, tacticalTypeCount: tacticalTypesPresent.length });
+  const unrestricted = hasAirUnits ? ALL_BUILD_UNIT_TYPES : ALL_BUILD_UNIT_TYPES.filter((unitType) => unitType !== 'air');
+  const narrowed = mode === 'tactical' && tacticalTypesPresent.length > 0
+    ? ALL_BUILD_UNIT_TYPES.filter((unitType) => tacticalTypesPresent.includes(unitType))
+    : unrestricted;
+  const types = (narrowed.length > 0 ? narrowed : unrestricted).filter((unitType) => !isMissileUnitType(unitType));
   const summary = types.map(
     (unitType) =>
       `${unitType}: ${getAttack(unitType)} attack / ${getDefense(unitType)} defense${formatReachClause(unitType, mode)}`
@@ -209,9 +279,20 @@ export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
  * Expected outcome: Mentions lowest defence and lists the imported type order.
  * Exceptions: None.
  */
-export function buildCasualtySortRule(): string {
-  logTrace('promptSpec buildCasualtySortRule', {});
-  return `Hits land on the lowest-defense unit in the target stack first, then in the fixed type order ${CASUALTY_PRIORITY_ORDER.join(', ')}. ${MISSILE_CASUALTY_ORDER_SENTENCE}`;
+export function buildCasualtySortRule(
+  /**
+   * When false, the hit-last sentence is omitted.
+   *
+   * Contract: Omitted includes it.
+   * When to use: Pass false when neither side has a missile.
+   * Expected outcome: The type-order sentence, plus the missile sentence unless this is false.
+   * Exceptions: None.
+   */
+  includeMissileCasualty = true
+): string {
+  logTrace('promptSpec buildCasualtySortRule', { includeMissileCasualty });
+  const order = `Hits land on the lowest-defense unit in the target stack first, then in the fixed type order ${CASUALTY_PRIORITY_ORDER.join(', ')}.`;
+  return includeMissileCasualty ? `${order} ${MISSILE_CASUALTY_ORDER_SENTENCE}` : order;
 }
 
 /**
@@ -247,8 +328,9 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
     );
   }
   if (terrainApplies) {
+    const entry = gates.includeArmorTerrainEntry === false ? '' : ` ${TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE}`;
     parts.push(
-      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind. ${TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE}`
+      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind.${entry}`
     );
   }
   if (originBonusEnabled && terrainApplies) {
@@ -332,13 +414,16 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
  * Expected outcome: Strategic melee-only sentence, or tactical baselines plus the engine cap and LOS rules.
  * Exceptions: None.
  */
-export function buildRangedReachRule(mode: PromptCoordinateMode): string {
-  logTrace('promptSpec buildRangedReachRule', { mode });
+export function buildRangedReachRule(mode: PromptCoordinateMode, includeMountainLineOfSight = true): string {
+  logTrace('promptSpec buildRangedReachRule', { mode, includeMountainLineOfSight });
   if (mode === 'tactical') {
+    const mountain = includeMountainLineOfSight
+      ? 'A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. '
+      : '';
     return (
       `Infantry and armor fire at their tactical baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
       'forest, urban, or rubble on the attacker\'s cell caps infantry and armor to range 1. ' +
-      'A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. ' +
+      mountain +
       'Close to melee when out of range.'
     );
   }
@@ -429,11 +514,11 @@ export function buildIntelStalenessRule(): string {
  * Naval fire, movement domain, and land-target routing.
  *
  * Purpose: strategic-prompt.md section 1.5 item 14. Reach is `getRange('naval')`, not a copied numeral.
- * When to use: Combat paragraph when `hasNavalUnits` is true.
+ * When to use: Combat paragraph when `hasNavalUnits` is true, and the `rules` tool's naval topic.
  * Expected outcome: Fire within engine range, water/coastal movement, route to the nearest water or coastal cell.
  * Exceptions: None.
  */
-function buildNavalClause(mode: PromptCoordinateMode): string {
+export function buildNavalClause(mode: PromptCoordinateMode): string {
   const navalRange = getRange('naval');
   const period = periodNoun(mode);
   return (
@@ -461,7 +546,7 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
   return (
     `At most one ranged_attack per unit from ${period}-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId${hint}. ` +
     `A unit may fire at a cell and move into that same cell in the same ${period}; the shot resolves first. ` +
-    `${buildRangedReachRule(gates.coordinateMode)} ${tempo} Drop invalid attacks before submit.`
+    `${buildRangedReachRule(gates.coordinateMode, gates.includeMountainLineOfSight !== false)} ${tempo} Drop invalid attacks before submit.`
   );
 }
 
@@ -472,8 +557,9 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
  * has one home. Clause order follows strategic-prompt.md section 1.5, with tactical substitutions from 2.5.
  * Resolution order, the pre-move sentence, and the attack constraints stay one paragraph. The other clauses are separate paragraphs.
  * When to use: Once per assembled system prompt, after roster and tool flags are known.
- * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist;
- * the origin bonus sentence only when a flag applies in this mode; the tech sentence only when that option is on, between origin and weather; the terrain cover sentence always, after weather.
+ * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist.
+ * Weather, fortifications, the missile hit-last sentence, the mountain line-of-sight sentence, and the terrain-entry sentence follow the flags on `gates`.
+ * The origin bonus sentence only when a flag applies in this mode; the tech sentence only when that option is on, between origin and weather; the terrain cover sentence always, after weather.
  * Exceptions: None.
  */
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
@@ -487,8 +573,8 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
     buildAttackConstraintsClause(gates),
   ].join(' ');
   const parts: string[] = [
-    buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits),
-    buildCasualtySortRule(),
+    buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits, gates.tacticalTypesPresent ?? []),
+    buildCasualtySortRule(gates.includeMissileCasualty !== false),
     ...(originBonus ? [originBonus] : []),
     ...(techBonus ? [techBonus] : []),
     ...(weatherRule ? [weatherRule] : []),

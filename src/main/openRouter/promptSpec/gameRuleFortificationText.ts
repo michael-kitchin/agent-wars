@@ -3,7 +3,7 @@
  *
  * Purpose: Keeps that wording out of the combat-rules module.
  * When to use: `buildCombatRulesParagraph` and `buildProductionCostRulesLine`.
- * Expected outcome: Strategic consultations always hear the combat rule. Tactical consultations hear it only when a cell is fortified. The queue name and cost appear only on the production line.
+ * Expected outcome: The combat rule is omitted when `includeFortificationRule` is false. When that flag is true, a battle hears the cell sentence and a strategic consult hears the hex sentence. When the flag is omitted, a strategic consult still hears the hex sentence and a battle hears the cell sentence only when a cell is fortified. The queue name and cost appear only on the production line.
  * Exceptions: None. A type import of the gate type avoids a runtime cycle.
  */
 
@@ -20,14 +20,22 @@ const TACTICAL_FORTIFICATION_RULE =
 /**
  * The fortification combat rule for this consultation, or null when this mode should not hear it.
  *
- * Purpose: Strategic play always has the rule. A battle hears it only when a cell in that battle is fortified.
- * When to use: Once per combat-rules paragraph, after the missile sentence.
- * Expected outcome: The strategic paragraph, the tactical paragraph when `hasFortifiedCells` is true, or null.
+ * Purpose: A consultation that cannot fortify, and a battle with no fortified cell, do not hear the rule.
+ * When to use: Once per combat-rules paragraph, after the missile sentence. `rules` passes the flag true.
+ * Expected outcome: Null when `includeFortificationRule` is false. The strategic paragraph or the tactical paragraph when the flag is true. When the flag is omitted, the strategic paragraph, or the tactical paragraph only when `hasFortifiedCells` is true.
  * Exceptions: None.
  */
 export function buildFortificationRule(gates: GameRuleTextGates): string | null {
   const tactical = gates.coordinateMode === 'tactical';
-  logTrace('promptSpec buildFortificationRule', { tactical, hasFortifiedCells: gates.hasFortifiedCells === true });
+  logTrace('promptSpec buildFortificationRule', {
+    tactical,
+    hasFortifiedCells: gates.hasFortifiedCells === true,
+    includeFortificationRule: gates.includeFortificationRule !== false,
+  });
+  if (gates.includeFortificationRule === false) return null;
+  if (gates.includeFortificationRule === true) {
+    return tactical ? TACTICAL_FORTIFICATION_RULE : STRATEGIC_FORTIFICATION_RULE;
+  }
   if (!tactical) return STRATEGIC_FORTIFICATION_RULE;
   return gates.hasFortifiedCells === true ? TACTICAL_FORTIFICATION_RULE : null;
 }

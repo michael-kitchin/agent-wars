@@ -55,6 +55,7 @@ import {
 import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
 import { formatBonusTableCellWithTech } from '../shared/techBonusRules';
 import { ORIGIN_BONUS_OFF, originBonusSettingsFromSnapshot } from '../shared/originBonusRules';
+import { strategicWeatherApplies } from './openRouter/promptSpec/gameRuleSituationGates';
 import type { OriginBonusSettings } from '../shared/originBonusTypes';
 
 /**
@@ -417,7 +418,7 @@ function isQuiet(
  * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in the Standing Order Status section when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
- *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
+ *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that when some assessment carries `weatherTags`, unless `omitWeatherColumn` is set because the weather rules were omitted. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
  *   An air unit in `airStrikeRowUnitIds` is Action needed yes and is not quiet, including a healthy defend order. Callers that omit the set keep the previous cells.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
@@ -469,7 +470,8 @@ export function buildUnitStatusTable(
       a.result.unit?.techLevel === 'basic' ||
       a.result.unit?.techLevel === 'advanced'
   );
-  const showWeather = unitAssessments.some((a) => Array.isArray(a.result.unit?.weatherTags));
+  const showWeather = ctx.omitWeatherColumn !== true
+    && unitAssessments.some((a) => Array.isArray(a.result.unit?.weatherTags));
   const header = `| Unit ID | Type | Hex |${showBonus ? ' Bonus |' : ''}${showWeather ? ' Weather |' : ''} Nearest enemy + distance | Threat severity | Action needed |`;
   const sep = `|---------|------|-----|${showBonus ? '-------|' : ''}${showWeather ? '---------|' : ''}---------------------------|-----------------|---------------|`;
   const rows: string[] = [];
@@ -794,7 +796,11 @@ export function formatBriefing(
     reusedLatLngByH3: Boolean(sharedContext?.latLngByH3),
   });
   ensureStrategicCoordinateRegistryInitialized();
-  const coordCtx: CoordinateContext = { mode: 'strategic' };
+  const originBonusSettings = originBonusSettingsFromSnapshot(state);
+  const coordCtx: CoordinateContext = {
+    mode: 'strategic',
+    omitWeatherColumn: originBonusSettings.weatherBonusEnabled === true && !strategicWeatherApplies(state.hexes),
+  };
   const standingOrdersActive = standingOrderText.trim().length > 0;
   const latLngByH3 =
     sharedContext?.latLngByH3 ??
@@ -846,7 +852,7 @@ export function formatBriefing(
       precomputed.unitAssessments,
       coordCtx,
       standingOrdersActive,
-      originBonusSettingsFromSnapshot(state),
+      originBonusSettings,
       orderlessAction,
       airStrikeRowUnitIds
     )

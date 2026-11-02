@@ -359,7 +359,7 @@ export const eventsTooltipText =
  * Exceptions: None.
  */
 export const planningTooltipText =
-  'Let the opponent plan routes and measure distances. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
+  'Let the opponent plan routes, measure distances, and look up the map and the rules. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says what the opponent can inspect, and that a model without tools ignores the group.

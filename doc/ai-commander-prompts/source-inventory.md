@@ -15,24 +15,24 @@ Every row cites a symbol or file so a later reader can re-verify. Paths are repo
 
 ## 2. Strategic section catalog
 
-Assembled by `buildSystemPromptForTools` in `src/main/openRouter/openRouterBuildSystemPrompt.ts`. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openRouter/promptSpec/gameRuleText.ts`. Weather and terrain cover are `buildWeatherRule` and `buildTerrainCoverRule` in `src/main/openRouter/promptSpec/gameRuleEnvironmentText.ts`. The production submit clause is `buildProductionSubmitClause` in `src/main/openRouter/promptSpec/productionSubmitText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
+Assembled by `buildConsultPromptParts` in `src/main/openRouter/consultPromptParts.ts`. `buildSystemPromptForTools` joins the system message and the situation message. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openRouter/promptSpec/gameRuleText.ts`. Weather and terrain cover are `buildWeatherRule` and `buildTerrainCoverRule` in `src/main/openRouter/promptSpec/gameRuleEnvironmentText.ts`. The production submit clause is `buildProductionSubmitClause` in `src/main/openRouter/promptSpec/productionSubmitText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
 
-### 2.1 Preamble (no headings)
+### 2.1 System message opening
 
-Emitted before `mainBlock`, in this order.
+The system message holds the role, the rules, the tools, and the envelope. The clock, the scouting sentence, and the tool-budget warning are in the situation message.
 
 | Content | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
-| `You command {home region} in a WEGO (simultaneous movement) hex wargame with {N} sides. Every other side is your enemy, and so are neutral garrisons. Current turn: {turnNumber}, date: {currentDateLabel}, phase: {phase}.` | identity sentence plus `turnPhaseHeader` | always | `, date: …` omitted when `currentDateLabel` is absent. `{N}` is the roster length, or 2 when the roster is absent |
+| `You command {home region} in a WEGO (simultaneous movement) hex wargame with {N} sides. Every other side is your enemy, and so are neutral garrisons.` | identity sentence | always, system message | `{N}` is the roster length, or 2 when the roster is absent. The clock is not in this sentence |
 | Win-condition reminder | `buildWinConditionReminderClause` (`scenarioGoals.ts`) | `coordinateContext.mode !== 'tactical'` | generic sentence when `scenarioId` is not `region_vs_region` and no victory rule is set. A known rule uses the last-side sentence, the mutual-wipe sentence, and, for a turn limit, the turn-limit sentence |
-| Scouting directive | `scoutingDirective` | `humanRoster.length === 0` (strategic only) | omitted |
-| Tool-limit warning | `buildToolBudgetExceededWarning` | `getAndClearAiToolLimitExceededLastTurn()` **and** (`planningEnabled` or `ordersEnabled`) | omitted |
+| Scouting sentence | situation message | strategic, and every observed enemy roster is empty | one copy: `With no enemy observed, move to regain contact along plausible approaches rather than holding position.` |
+| Tool-limit warning | `buildToolBudgetExceededWarning` | situation message, when `getAndClearAiToolLimitExceededLastTurn()` is true and planning or standing-order tools are enabled | omitted. Called once, from the situation builder |
 | Coordinate preamble (two paragraphs) | `buildLatLngPreamble` (`promptText.ts`) | always (strategic) | n/a |
 | Combat rules paragraph | `buildCombatRulesParagraph` | always; air, naval, and hold-fire clauses independently gated | n/a |
 | Naval land-target routing hint | `NAVAL_PLAN_ROUTE_LAND_TARGET_HINT` | `hasNaval && planningEnabled` | omitted |
 | Assessment / estimate hints | `combatTargetHint`, `combatAssessHint` | assessment or estimation on **and** no precomputed briefing | omitted when a briefing is attached |
 
-`buildCombatRulesParagraph` joins, in order: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`; missiles are left out of that stats line); `buildCasualtySortRule` (ends with `MISSILE_CASUALTY_ORDER_SENTENCE`); `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (origin bonus on the strategic map, either flag in battle); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on; `buildTerrainCoverRule` always; `buildResolutionOrderRule` (strategic: embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, melee; tactical omits missile launches and puts cargo sync after ferry); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildMissileEmploymentRule` when `hasMissileUnits`; `buildFortificationRule` always on the strategic map and, in a battle, only when `hasFortifiedCells` is true; `buildHoldFireRule` when `ordersEnabled`.
+`buildCombatRulesParagraph` joins, in order, the clauses `combatRuleGatesForPrompt` (`promptSpec/gameRuleSituationGates.ts`) leaves on: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`; missiles are left out of that stats line; a battle with a known roster names only the types present, and an unknown roster keeps the full line); `buildCasualtySortRule` (appends `MISSILE_CASUALTY_ORDER_SENTENCE` only when either side has a missile, or the roster is unknown); `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (origin bonus on the strategic map, either flag in battle; the terrain-entry sentence only when the consulted side has armor, or naval born on wetlands, and when birth terrain cannot be read); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on and `weatherApplies` (`tacticalWeatherApplies` is false only for mild battle weather; `strategicWeatherApplies` is false only when every hex records mild); `buildTerrainCoverRule` always; `buildResolutionOrderRule` (strategic: embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, melee; tactical omits missile launches and puts cargo sync after ferry); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` (the mountain line-of-sight sentence only when either side has armor or naval, or the roster is unknown) plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildMissileEmploymentRule` when `hasMissileUnits`; `buildFortificationRule` when `includeFortificationRule` (a battle only when `hasFortifiedCells` is true; strategic when production tools are on, some hex has `fortifiedCount` above 0, or the infrastructure list is missing); `buildHoldFireRule` when `ordersEnabled`.
 
 Present dice sentence: `Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17.`
 
@@ -68,7 +68,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 Table columns as coded:
 
 - Unit status: `Unit ID` | `Type` | `Hex` | `Nearest enemy + distance` | `Threat severity` | `Action needed`. **No row cap.**
-- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure`. At most 5 target hexes per unit; each distinct action on a hex is then its own row, in the order air strike, ranged, approach, ferry, move/melee. Identical action, hex, and target rows merge. `Target Infrastructure` is the hex feature text. `|` is written as a space. On an `air strike` row, text from `; strike:` onward is then omitted; a cell with no `; strike:` suffix is otherwise unchanged. An empty cell is `—`.
+- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure` | `Odds`. At most 5 target hexes per unit; each distinct action on a hex is then its own row, in the order air strike, ranged, approach, ferry, move/melee. Identical action, hex, and target rows merge. `Target Infrastructure` is the hex feature text. `|` is written as a space. On an `air strike` row, text from `; strike:` onward is then omitted; a cell with no `; strike:` suffix is otherwise unchanged. An empty cell is `—`.
 - Controlled Hex Queues: `Hex` | `Urban Hexes` | `Airports` | `Seaports` | `Available Unit Types` | `Current Queue`. Top 10 plus any further hex with queued entries.
 - Memory persistent: `Key` | `Updated Turn` | `Content`. Reminders: `Key` | `Tier` | `Recurring` | `Content`.
 - Standing Order Status: `Unit ID` | `Unit Type` | `Order Type` | `Destination / Target` | `Status` | `Next Move` | `Turns Remaining` | `Attention`. `Next Move` is the step about to be taken. Before the briefing is built, a step the unit has already entered is replaced by the following stored step when turns remain. A step not yet entered is left as stored. March, pursue, defend, and patrol store that route when they queue a step.
@@ -84,7 +84,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 | Heading | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
 | `# Scenario Objective (Required)` | `buildRegionVsRegionScenarioObjectiveBlock` | `state.scenarioId === 'region_vs_region'` and not tactical | omitted |
-| `# Strategic Context` | `buildContextCoaching` plus progress lines | always (strategic) | n/a |
+| `# Strategic Context` | `buildContextCoaching` | always (strategic) | n/a. Explored, controlled, and home-region bullets are in the situation message |
 | `# Air Operations Status` | `buildAirOperationsBriefingBlock` | opponent has at least one air unit | **section omitted** (empty string, no dash row) |
 | `# Missile Forces` | `buildMissileForcesBriefingBlock` | strategic, and the opponent has at least one missile | **section omitted** in a battle and when the roster has no missile |
 | `# Naval Transport Status` | `buildSealiftBriefingBlock` | opponent has at least one naval unit | **section omitted** |
@@ -95,7 +95,7 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 
 When a strategic briefing is present, planning or assessment tools are on, and standing-order tools are on, the intro says that status is already in the briefing and limits `query_orders` to a rare detail. Memory and production, when those tools are on, are named in the following selective-tools sentence.
 
-`# Strategic Context` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`, `Explored:` land-hex progress, `Controlled:` land-hex progress, then `regionHomeProgressAndHexBullets` when `homePartitions` is non-null. There is **no** unconditional enemy-intent opening sentence.
+`# Strategic Context` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`. `Explored:` land-hex progress, `Controlled:` land-hex progress, and `regionHomeProgressAndHexBullets` are in the situation message after the scenario objective. There is **no** unconditional enemy-intent opening sentence.
 
 Air Operations columns (strategic): `Unit ID` | `Base Hex` | `Base Intact` | `Base Controlled` | `Enemy Unit Targets` | `Strikeable Urban` | `Strikeable Airports` | `Strikeable Seaports` | `Ferry Destinations`. Missile Forces, when present, starts with `missileForcesRulesLine`, then `| Unit ID | Hex |`, then either the target intro and `| Target | Owner | City Cells | Airports | Seaports | Enemy Air Based | In Range Of |` (at most `MISSILE_BRIEFING_TARGET_LIMIT`, 8) or `NO_MISSILE_TARGETS_LINE`. Naval Transport columns: `Unit ID` | `Hex` | `Your control` | `Seaport Here` | `Aboard` | `Capacity Used` | `Nearest Embark Hex`. Embark prose states coastal or land seaport without control, or a water seaport the opponent controls.
 
@@ -130,15 +130,15 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 
 | Surface | Tactical value |
 | --- | --- |
-| Turn header | `Strategic turn: {turnNumber}, date: {currentDateLabel}, tactical beat: {tacticalTurnNumber}, phase: {phase}.` The date clause is omitted when `currentDateLabel` is absent. |
+| Turn header | Situation message, under `# Current Situation`: `Strategic turn: {turnNumber}, date: {currentDateLabel}, tactical beat: {tacticalTurnNumber}, phase: {phase}.` The date clause is omitted when `currentDateLabel` is absent. |
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
-| Combat paragraph | same composer; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; `buildFortificationRule` adds the tactical fortification sentence only when `hasFortifiedCells` is true; no hold-fire (standing orders are not issuable) |
+| Combat paragraph | same composer and the same `combatRuleGatesForPrompt` gates; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production** (no missile launches); a known roster names only the types present; `buildMissileEmploymentRule` adds `Missile sub-units never move or fire.` when the roster has a missile; `buildFortificationRule` adds the tactical fortification sentence only when `hasFortifiedCells` is true; weather text has no strategic movement sentence and no strategic ferry sentence; no hold-fire (standing orders are not issuable) |
 | Coaching | `buildTacticalCoachingBullets` plus `# Battle Context` with engage-priority, doctrine, message |
 | Scenario objective | omitted |
-| Scouting directive | omitted |
+| Scouting sentence | omitted in battle. Strategic only, and only in the situation message |
 | Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes` / `ferryOrders` listed when the roster has air; Best Options may list airport ferry dests |
-| Tools | planning, `assess_unit`, and `estimate_combat` when their groups are enabled, with battle prompt lines (`getFilteredToolMetadata` tactical mode) and battle guidance bullets (`buildToolUsageGuidance`); `assess_hex`, memory, orders, production stripped (`filterToolNamesForTacticalBattle`) |
+| Tools | planning (`plan_route`, `check_distance`, `get_map`, `rules`), `assess_unit`, and `estimate_combat` when their groups are enabled, with battle prompt lines (`getFilteredToolMetadata` tactical mode) and battle guidance bullets (`buildToolUsageGuidance`); `assess_hex`, memory, orders, and production stripped (`filterToolNamesForTacticalBattle`). A strategic consult drops `get_map` (`filterToolNamesForStrategicConsult`) and keeps `rules` |
 
 Always omitted: `## Standing Order Status`, the orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, the strategic own-unit roster line, hop-honesty line, Explored/Controlled bullets, the strategic no-briefing `assess_unit` / `estimate_combat` hints. The tactical prompt does include `# Unit Roster` for the enemy listing.
 
@@ -146,7 +146,7 @@ Forbidden substrings (`TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`): `memoryup
 
 ## 4. Consultation-message catalog
 
-Built in `requestOrdersFlow.ts`. The system prompt is constructed once and is never replaced mid-consultation. The tool-limit warning reaches the model on the **next** consultation's system prompt.
+Built in `requestOrdersFlow.ts`. The system message is constructed once and is never replaced mid-consultation. The tool-limit warning reaches the model on the **next** consultation's situation message.
 
 Loop: at most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (50) rounds (`requestOrdersToolLoop.ts`) and `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (600000) (`requestOrdersFlowSupport.ts`). A single model call aborts after `AI_MODEL_REQUEST_TIMEOUT_MS` (180000) and is not sent again. A network error or HTTP 408, 429, 502, 503, or 504 is sent once more. The round-cap warning quotes `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`. The wall-clock stop does not set that warning.
 
@@ -244,7 +244,7 @@ Every tool round and the repair call go through `postOrdersChatRequest`. `resolv
 
 Unchanged in spirit from the assembler flags: fog, `getToolFlags`, `hasAir` / `hasNaval` / `hasMissile`, empty observed roster, Best Options row count, orderless units, `scenarioId`, `gameSize`, `coordinateContext.mode`, briefing present, previous-consult tool-round exhaustion. Air, naval, and Missile Forces **sections** omit entirely when that arm is absent (not a dash row). Missile Forces is also omitted in a battle. Envelope air tails omit when `hasAir` is false; sealift actions omit when `hasNaval` is false; `missileLaunches` is present only when the commander has a missile and the consult is strategic.
 
-Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, and production tools (`filterToolNamesForTacticalBattle`). `assess_unit` and `estimate_combat` stay when their groups are enabled and run with battle rules.
+Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, and production tools (`filterToolNamesForTacticalBattle`). `assess_unit` and `estimate_combat` stay when their groups are enabled and run with battle rules. `get_map` and `rules` stay in battle when planning is on. A strategic consult drops `get_map` and keeps `rules`.
 
 ## 7. Coaching claim catalog
 

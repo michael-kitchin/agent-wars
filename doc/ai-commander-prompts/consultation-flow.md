@@ -1,6 +1,6 @@
 # Consultation flow
 
-Every message the model sees after the system prompt: the opening instruction, tool results, the corrective message after an unusable reply, and the repair request after unparseable output.
+Every message the model sees after the system message: the fixed lead-in, the situation message, tool results, the corrective message after an unusable reply, and the repair request after unparseable output. The situation message holds the clock, the briefing, the live counts, and the opening instruction.
 
 **One rule governs this whole file.** The system prompt owns every game rule and every heuristic. Messages contracted here are submit-only: they say what to do now and what shape to answer in. They must not add a rule, weaken one, or restate one in different words. A message that needs a rule points at the system section that holds it.
 
@@ -8,16 +8,17 @@ Every message the model sees after the system prompt: the opening instruction, t
 
 Roles in order for a normal consultation:
 
-1. `system` — the prompt assembled by `buildSystemPromptForTools` per [`assembly-contract.md`](assembly-contract.md) and the active mode file. Built once.
-2. `user` — the opening instruction, section 2.
-3. Zero or more rounds of: `assistant` carrying tool calls, then one `tool` message per call, section 3.
-4. `assistant` — the response envelope as text. One captured strategic reply is in [`example-strategic-response.md`](example-strategic-response.md).
+1. `system` — the stable rules, tools, and envelope from `buildConsultPromptParts`. Built once.
+2. `user` — `The current situation is in the next message.`
+3. `user` — `# Current Situation`: the clock, the briefing, and the opening instruction, section 2.
+4. Zero or more rounds of: `assistant` carrying tool calls, then one `tool` message per call, section 3.
+5. `assistant` — the response envelope as text. One captured strategic reply is in [`example-strategic-response.md`](example-strategic-response.md).
 
 Invariants:
 
-1. **The system prompt is never rewritten mid-consultation.** It is not replaced, re-sent, or appended to. Any fact that must reach the model after the first call arrives as a tool result, and any fact that only becomes known between consultations reaches the model in the *next* system prompt. The previous-consultation tool-budget warning is the one example of that, and it belongs to the system prompt, not here.
-2. **Exactly one opening user message.** Additional user messages appear only in the two recovery cases in sections 4 and 5.
-3. **Tool rounds are bounded.** The loop ends after 50 rounds (`REQUEST_ORDERS_MAX_TOOL_ROUNDS`). It also stops when 10 minutes have already elapsed at the start of a round (`REQUEST_ORDERS_MAX_WALL_CLOCK_MS`). Exhausting the round cap produces no orders for the period, sets the flag that puts the warning in the next system prompt, and records the consultation as having produced nothing. Exhausting the wall clock fails the consultation with no orders and does not set that warning. There is no additional prompt in either case. Per-call and outer-wait deadlines are in [hybrid-ai.md](../hybrid-ai.md).
+1. **The system message is never rewritten mid-consultation.** It is not replaced, re-sent, or appended to. Any fact that must reach the model after the first call arrives as a tool result. The previous-consultation tool-budget warning is in the next situation message. A provider rejecting the JSON schema is not a reason to rebuild the system message; the next consult uses the long form.
+2. **The consultation starts with the fixed lead-in and one situation message.** Additional user messages appear only in the two recovery cases in sections 4 and 5. Two user messages in a row can be rejected. That retry puts the lead-in on the first line of the situation message and drops the middle message, and it keeps the cache mark when the error did not mention it. A rejection that names the cache mark retries once without the mark. Neither rejection rebuilds the system message.
+3. **Tool rounds are bounded.** The loop ends after 50 rounds (`REQUEST_ORDERS_MAX_TOOL_ROUNDS`). It also stops when 10 minutes have already elapsed at the start of a round (`REQUEST_ORDERS_MAX_WALL_CLOCK_MS`). Exhausting the round cap produces no orders for the period, sets the flag that puts the warning in the next situation message, and records the consultation as having produced nothing. Exhausting the wall clock fails the consultation with no orders and does not set that warning. There is no additional prompt in either case. Per-call and outer-wait deadlines are in [hybrid-ai.md](../hybrid-ai.md).
 4. **The repair exchange is off to the side.** It runs on a copy of the conversation. Neither the unparseable assistant text nor the repair request and its answer is merged back into the main message list.
 
 ## 2. Opening user message
@@ -26,7 +27,7 @@ Invariants:
 
 The opening message does exactly three things, in this order:
 
-1. Names where the situation is: the briefing in the system prompt above.
+1. Names where the situation is: the briefing above.
 2. Names the action for this period in one clause: use the listed options, and use the routing tool only for something not listed.
 3. Names the response envelope fields to emit, in envelope order, marking the optional tails that this consultation's flags allow.
 
@@ -49,10 +50,10 @@ One contract per branch of the opening-message builder. The gate column names th
 | Gate | Contract |
 | --- | --- |
 | Planning tools on, briefing present, tactical | Point at the briefing for status, flags, and this beat's options. One clause: copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; route only for an unlisted destination. Then name the envelope: message, strategy, orders with the beat's legal actions, and the callbacks tail. State that standing-order assignment and cancellation are not accepted this beat — this is the one prohibition the opening message repeats, because it is the most common carry-over error and the envelope contract already states it identically. |
-| Planning tools on, briefing present, strategic | Point at the briefing for status, flags, options, and hex intelligence. One clause: copy one option row per unit per action into the matching envelope field; route only for an unlisted destination. When standing-order tools are on, one clause: give the units in the orderless table standing orders. When production is on and the Production attention flag is present, one clause points at that flag: queue production for every hex it names. That clause is a pointer to a system-prompt section, which this submit-only message allows. Then name the envelope: message, strategy, orders with the strategic legal actions, plus the callbacks tail and, when their flags are on, the memory and production tails. **No production doctrine paragraph.** The cap and queue rules live in the production section of the system prompt. |
+| Planning tools on, briefing present, strategic | Point at the briefing for status, flags, options, and hex intelligence. One clause: copy one option row per unit per action into the matching envelope field; route only for an unlisted destination. When standing-order tools are on, one clause: give the units in the orderless table standing orders. When production is on and the Production attention flag is present, one clause points at that flag: queue production for every hex it names. That clause points at the briefing, which this submit-only message allows. Then name the envelope: message, strategy, orders with the strategic legal actions, plus the callbacks tail and, when their flags are on, the memory and production tails. **No production doctrine paragraph.** The cap and queue rules live in the production section of the briefing. |
 | Planning tools on, briefing absent | Point at the tools as the way to derive destinations, since there is no options table. Then name the envelope with the same tails as the matching briefing-present branch. |
 | Planning tools off, standing-order tools on | State that movement planning is unavailable and that missions are issued as standing orders in the envelope. Then name the envelope, with `orders` expected to carry standing-order actions and an empty movement set. |
-| Planning tools off, standing-order tools off, fallback movement on | Point at the fallback adjacent-cell listing in the system prompt as the only source of move destinations. Then name the envelope. |
+| Planning tools off, standing-order tools off, fallback movement on | Point at the fallback adjacent-cell listing above as the only source of move destinations. Then name the envelope. |
 | Any remaining combination | Point at the briefing and name the envelope with an empty `orders` array as the acceptable answer. |
 
 `getToolFlags` derives `fallbackMovementEnabled` as the negation of planning and standing-order flags, so the last two rows are the fallback listing versus empty-orders, not dead code.
@@ -119,10 +120,10 @@ Four ways a consultation ends without producing orders. In none of them does ano
 | --- | --- |
 | Unusable replies exhaust the retry budget | Consultation fails; no orders for the period |
 | Repair of text that never parsed fails | Consultation fails; no orders for the period |
-| Tool rounds exhausted | No orders for the period; the next system prompt carries the tool-budget warning |
+| Tool rounds exhausted | No orders for the period; the next situation message carries the tool-budget warning |
 | Wall-clock limit exceeded | Consultation is cancelled; no orders for the period |
 
 Two consequences that belong to the prompt rather than to transport:
 
-1. **The warning is a next-consultation surface.** Its text belongs to the system prompt's situational directives and states the round limit, the fact that nothing was submitted, and the instruction to submit promptly. The quoted limit is `REQUEST_ORDERS_MAX_TOOL_ROUNDS`.
+1. **The warning is a next-consultation surface.** Its text belongs to the next situation message and states the round limit, the fact that nothing was submitted, and the instruction to submit promptly. The quoted limit is `REQUEST_ORDERS_MAX_TOOL_ROUNDS`.
 2. **No orders is not no consequence.** A period with no orders still resolves. Under the strategic layer the engine's own fallbacks act for unordered units; in battle nothing moves, because standing orders are inert there. The prompt does not tell the model about the strategic fallbacks (`TEMPO_SWEEP_SILENCE`).

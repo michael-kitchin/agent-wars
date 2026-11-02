@@ -205,6 +205,16 @@ export const SECTION_TITLE_SCENARIO_OBJECTIVE = 'Scenario Objective (Required)' 
 export const SECTION_TITLE_YOUR_COMMAND = 'Your Command' as const;
 
 /**
+ * Title of the live situation message, without ATX hashes.
+ *
+ * Purpose: The clock, briefing, and opening sit in their own message so the system text can stay stable.
+ * When to use: The first heading of the situation message.
+ * Expected outcome: H1.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_CURRENT_SITUATION = 'Current Situation' as const;
+
+/**
  * Title of the coordinate preamble, without ATX hashes.
  *
  * Purpose: Lat/lng rules are their own block, not a continuation of the role sentence.

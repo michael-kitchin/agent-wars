@@ -22074,7 +22074,7 @@ ${bonuses}`;
   var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
   var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.";
   var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.";
-  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var planningTooltipText = "Let the opponent plan routes, measure distances, and look up the map and the rules. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
   var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
   var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
   var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";

@@ -22,29 +22,26 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 
 | # | Block | Nature |
 | --- | --- | --- |
-| 1 | `# Your Command` — role and clock line | prose, one line |
-| 2 | Goal statement, still under `# Your Command` | prose |
-| 3 | Situational directives (scouting, previous-consult tool-budget warning), still under `# Your Command` | prose, gated |
-| 4 | `# Coordinates` | prose |
-| 5 | `# Combat and Movement Rules` | prose |
-| 6 | `# Commander's Briefing` and its subsections | briefing body |
-| 7 | `# Scenario Objective (Required)` | gated section |
-| 8 | `# Strategic Context`, or `# Battle Context` in a battle | prose bullets |
-| 9 | `# Air Operations Status` | gated section |
-| 10 | `# Missile Forces` | gated section, strategic only |
-| 11 | `# Naval Transport Status` | gated section |
-| 12 | `# Available Tools`, then `## How to Use These Tools Effectively` | section with numbered tool lines and guidance bullets |
-| 13 | `# Unit Roster` | prose roster lines |
-| 14 | `# Response Format` | prose |
-| 15 | `## Example Response` | compact JSON, no fence |
+| 1 | `# Your Command` — role and goal. No clock | system message |
+| 2 | `# Coordinates` | system message |
+| 3 | `# Combat and Movement Rules` | system message |
+| 4 | `# Strategic Context`, or `# Battle Context` in a battle — coaching only | system message |
+| 5 | `# Available Tools`, then `## How to Use These Tools Effectively` | system message |
+| 6 | `# Response Format`, then `## Example Response` | system message, last |
+| 7 | A fixed user message: `The current situation is in the next message.` | between the two |
+| 8 | `# Current Situation` — clock, scouting when no enemy is observed, and the previous-consult tool-budget warning | situation message |
+| 9 | `# Commander's Briefing` and its subsections | situation message |
+| 10 | `# Scenario Objective (Required)`, Sides, and the explored and controlled counts | situation message, strategic |
+| 11 | `# Air Operations Status`, `# Missile Forces`, `# Naval Transport Status` | situation message, gated |
+| 12 | `# Unit Roster` | situation message |
+| 13 | The opening instruction | end of the situation message |
 
 Headings nest: the first is H1, and no heading is more than one level deeper than the one before it. Section builders keep the level they use when they stand alone. `formatBriefing` passes production, memory, and standing-order text through `shiftMarkdownHeadings(markdown, 1)`, so those H1 sections become H2 inside the briefing and their H2 subsections become H3. The operational map is H2 in both briefings. `## Sides` stays H2 when a briefing is present. The no-briefing prompt passes that block through `shiftMarkdownHeadings(sidesBlock, -1)`, so it is H1 beside the other standalone sections. A line of three backticks toggles a fence, and headings inside a fence are not shifted.
 
 Ordering rules that must not be relaxed:
 
-- Rules precede data. Blocks 2 and 5 come before the briefing so the model reads the constraints before the tables it will act on.
-- Data precedes instructions to act. The briefing and the gated status sections come before `# Available Tools` and the envelope contract.
-- The envelope contract is last, immediately followed by its example, because that is what the model must produce.
+- Rules precede data. The system message is rules, tools, and the envelope. The situation message is the clock and the briefing.
+- The envelope contract is last in the system message, immediately followed by its example, because that is what the model must produce.
 - Only one `# Commander's Briefing` block exists per prompt. When a precomputed briefing is supplied it carries the memory, standing-order, and production sections; when it is absent those sections are emitted directly and there is no briefing heading. The two paths must never both emit the same section.
 
 ## 3. Include and omit matrix
@@ -53,7 +50,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 
 | Block | Strategic | Tactical | Empty-state |
 | --- | --- | --- | --- |
-| Role and clock line | always | always | n/a |
+| Role line | always | always | n/a. The clock is `# Current Situation`, not this line |
 | Goal statement | always (win conditions) | always (battle-local goal) | strategic with no scenario set falls back to the generic objective in [`strategic-prompt.md`](strategic-prompt.md) 1.2; never reuse scenario wording |
 | Scouting directive | when no enemy unit is observed | never | omit |
 | Tool-budget warning | when the previous consultation exhausted its tool budget and planning or orders tools are enabled | when the same condition holds | omit |
@@ -107,6 +104,8 @@ Tool inventory and per-consult availability:
 | --- | --- | --- | --- |
 | `plan_route` | planning | when planning tools are enabled | when planning tools are enabled |
 | `check_distance` | planning | when planning tools are enabled | when planning tools are enabled |
+| `get_map` | planning | never | when planning tools are enabled |
+| `rules` | planning | when planning tools are enabled | when planning tools are enabled |
 | `assess_unit` | assessment | when assessment tools are enabled and no precomputed briefing is attached | when assessment tools are enabled |
 | `assess_hex` | assessment | when assessment tools are enabled and no precomputed briefing is attached | never |
 | `estimate_combat` | estimation | when estimation tools are enabled and no precomputed briefing is attached | when estimation tools are enabled |
@@ -169,21 +168,21 @@ The repair schema in [`consultation-flow.md`](consultation-flow.md) must offer e
 
 System-prompt content, both modes. Each item states the rule and why the model needs it; the mode files fix the wording and placement, and the strategic and tactical variants of each must not disagree.
 
-1. **Period-start resolution.** Attacks resolve from positions held at the start of the period, before movement is applied. A unit may therefore fire and move in the same period, and firing costs it nothing. Carries `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
-2. **Resolution order.** The strategic period resolves as embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, then melee. A tactical beat omits missile launches and puts cargo sync after ferry. The model needs this to understand that a unit it moves into contact will fight in melee this same period, that embarked cargo stays with the transport until sync, and that a ferried air unit arrives after ground movement. Carries `WEGO_PHASE_ORDER`.
+1. **Period-start resolution.** Attacks resolve from positions held at the start of the period, before movement is applied. A unit may therefore fire and move in the same period, and firing costs it nothing. A listed ranged or move/melee row whose Odds show wipe below 50% and lose at least 50% is a row the prompt says to skip. An em dash is not that case. Carries `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
+2. **Firing still leaves the move.** Coaching states that a unit that fires can still move, and that a ferried air unit arrives after ground movement. The full resolution order is a rules-block item: the strategic period resolves as embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, then melee, and a tactical beat omits missile launches and puts cargo sync after ferry. Carries `WEGO_PHASE_ORDER`.
 3. **One action per unit.** At most one ranged action per unit per period, and at most one air action when air is present; an air unit that strikes cannot also rebase. The air half of this sentence is omitted when the opponent has no air units. Carries `ATTACK_ONE_PER_UNIT`, `AIR_ORDER_RESTRICTIONS`.
-4. **Target selection.** Hits fall on the lowest-defense defender first, then infantry, armor, naval, air. A missile is hit last and never rolls. Firing into a stack therefore removes its weakest unit. Fortification soak is not the same in both modes, so this shared item does not state it. `buildFortificationRule` does: a strategic hex spends its fortifications before the controller's units, and a battle spends one fortification for that owner's units on that core cell. Carries `CASUALTY_PRIORITY`.
-5. **Friendly stacking is legal; enemy-occupied cells are move/melee contact.** Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee option — copy that Target Hex into the move field to make contact. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest. Carries `LEGAL_DEST_OCCUPANCY`.
-6. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy a ranged row into a ranged action, a move or approach row into the move field, and an air or ferry row into those tails when they are present. Copy them into one envelope entry using `unitIds` when the row lists more than one id; pick one row per unit per action; never copy a Target Hex from a row that does not list that unit; route only for something unlisted. On the strategic map only, an explored enemy fortified hex with no units is the one ranged target that may be ordered without a Best Options row. A battle does not add that target. Carries `BEST_OPTIONS_ROWS`.
-7. **Codes are copied exactly.** Two characters, taken from this prompt. Carries `HEX_IDENTITY`.
-8. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_REPLACE_SEMANTICS`.
-9. **`strategy` is for continuity.** One line naming what this period is trying to achieve, so the next consultation inherits intent rather than re-deriving it. Carries `JSON_ENVELOPE`.
-10. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
-11. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.
+4. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy a ranged row into a ranged action, a move or approach row into the move field, and an air or ferry row into those tails when they are present. Copy them into one envelope entry using `unitIds` when the row lists more than one id; pick one row per unit per action; never copy a Target Hex from a row that does not list that unit; route only for something unlisted. On the strategic map only, an explored enemy fortified hex with no units is the one ranged target that may be ordered without a Best Options row. A battle does not add that target. Carries `BEST_OPTIONS_ROWS`.
+5. **Codes are copied exactly.** Two characters, taken from this prompt. Carries `HEX_IDENTITY`.
+6. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_REPLACE_SEMANTICS`.
+7. **`strategy` is for continuity.** One line naming what this period is trying to achieve, so the next consultation inherits intent rather than re-deriving it. Carries `JSON_ENVELOPE`.
+8. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
+9. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.
+
+Casualty order and friendly stacking are rules-block items, not coaching items. The combat rules paragraph states both. Hits fall on the lowest-defense defender first, then infantry, armor, naval, air, and a missile is hit last. Friendly units may stack on the same cell, and a cell holding an enemy is legal as move/melee contact. Hold fire is in that same paragraph, and only when standing-order tools are on.
 
 Two claims the builders **omit** (matrix tests forbid the substrings):
 
-- Any assertion that an unfired legal shot is damage given up for free. Tempo copy says the model chooses each target; firing does not consume the move. The engine sweep is not described (`TEMPO_SWEEP_SILENCE`).
+- Any assertion that an unfired legal shot is damage given up for free. Tempo copy says the model chooses each target; firing does not use the move. The engine sweep is not described (`TEMPO_SWEEP_SILENCE`).
 - Any unconditional assertion that enemy units remain in play and are hunting the model's forces.
 
 ## 7. Carrier assignment for required items
@@ -194,11 +193,11 @@ Every item marked `required` in [`information-decision-model.md`](information-de
 | --- | --- |
 | `HEX_IDENTITY` | Coordinate preamble; restated in `# Available Tools` |
 | `UNIT_IDENTITY`, `OWN_UNIT_TABLE`, `ACTION_NEEDED_FLAG`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY` | `## Unit Status and Threats` |
-| `SUBUNIT_IDENTITY`, `BATTLE_FRAME` | Role and clock line; coordinate preamble |
-| `TURN_CLOCK` | Role and clock line |
+| `SUBUNIT_IDENTITY`, `BATTLE_FRAME` | Role line; coordinate preamble |
+| `TURN_CLOCK` | `# Current Situation` |
 | `FOG_MODE` | Narrative paragraph |
 | `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES` | `## Operational Map` |
-| `BEST_OPTIONS_ROWS`, `RANGED_LEGAL_TARGETS`, `LEGAL_DEST_OCCUPANCY` | `### Best Options This Turn` plus the options bullet in `# Available Tools` |
+| `BEST_OPTIONS_ROWS`, `BEST_OPTIONS_ODDS`, `RANGED_LEGAL_TARGETS`, `LEGAL_DEST_OCCUPANCY` | `### Best Options This Turn` plus the options bullet in `# Available Tools`. `BEST_OPTIONS_ODDS` is the Odds column |
 | `ENEMY_ROSTER_OBSERVED` | Observed enemy roster line and `## Unit Status and Threats` |
 | `ATTENTION_FLAGS` | `## Attention Flags` |
 | `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER` | Combat and attack rules |
@@ -211,12 +210,12 @@ Every item marked `required` in [`information-decision-model.md`](information-de
 | `MEMORY_*` | `## Your Strategic Memory` |
 | `CALLBACK_ACTIVE_LIST` | `## Active Callbacks` |
 | `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`, `CALLBACK_TACTICAL_SCOPE` | Response envelope contract |
-| `SCENARIO_ID`, `WIN_CONDITIONS`, `HOME_REGION_*`, `HOME_CONTROL_PROGRESS` | `# Scenario Objective (Required)` and `# Strategic Context` |
-| `EXPLORED_CONTROLLED_PROGRESS` | `# Strategic Context` |
+| `SCENARIO_ID`, `WIN_CONDITIONS`, `HOME_REGION_NAMES`, `HOME_REGION_VISIBILITY` | `# Scenario Objective (Required)` and the goal statement |
+| `EXPLORED_CONTROLLED_PROGRESS`, `HOME_CONTROL_PROGRESS`, `HOME_REGION_HEXES`, `HOME_REGION_OVERLAP` | Situation message, after the scenario objective |
 | `RECENT_TURN_NOTES` | `## Recent Turn Notes` |
 | `TERRAIN_KIND_NOTES` | `## Supplemental Hex Intelligence` |
 | `STANDING_ORDERS_INERT_IN_BATTLE` | Tactical guidance bullets |
-| `TOOL_CATALOG`, `TOOL_BUDGET_WARNING` | `# Available Tools`; the warning sits in the situational directives |
+| `TOOL_CATALOG`, `TOOL_BUDGET_WARNING` | `# Available Tools` in the system message; the warning sits in the next situation message |
 | `JSON_ENVELOPE`, `MESSAGE_DISCIPLINE` | Response envelope contract and example |
 | `CONSULT_POLICY` | Response envelope contract, beside the callback clause |
 | `HOP_VS_PATH_CAVEAT` | Distance-basis caveat line |

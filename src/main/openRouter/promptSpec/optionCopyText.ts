@@ -48,7 +48,7 @@ export function buildOptionCopyMappingClause(args: {
  *
  * Purpose: Strategic and tactical bullets share the table, routing, and hold branches, and differ by actor noun and period word.
  * When to use: The option-copy item in each mode's coaching list.
- * Expected outcome: The historical sentence for that mode's noun and period, including the mapping clause when a table is present.
+ * Expected outcome: With planning on, the copy-or-route sentence and the row mapping. An empty Best Options table does not change it. Planning off names the adjacent-cell listing.
  * Exceptions: None.
  */
 export function buildOptionCopyOrRoutingBullet(
@@ -63,31 +63,25 @@ export function buildOptionCopyOrRoutingBullet(
     planningEnabled: gates.planningEnabled,
     hasAirUnits: gates.hasAirUnits,
   });
-  if (gates.hasBestOptionsTable) {
-    const routing = gates.planningEnabled
-      ? ` Call plan_route only for a destination the table does not list for that ${actorNoun}.`
-      : '';
-    return (
-      `- Best Options This Turn Target Hexes are already ${periodWord} legal destinations. ` +
-      buildOptionCopyMappingClause({
-        actorNoun,
-        hasAirUnits: gates.hasAirUnits,
-        includeFerryMapping: gates.hasAirUnits,
-      }) +
-      routing
-    );
+  if (!gates.planningEnabled) {
+    return `- Destinations come only from the adjacent-cell listing; the ${actorNoun}'s own cell means hold.`;
   }
-  if (gates.planningEnabled) {
-    return '- No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
-  }
-  return `- No options are listed this period. Destinations come only from the adjacent-cell listing; the ${actorNoun}'s own cell means hold.`;
+  return (
+    `- When Best Options This Turn lists a target for a ${actorNoun}, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the ${actorNoun} idle. ` +
+    `Best Options This Turn Target Hexes are already ${periodWord} legal destinations. ` +
+    buildOptionCopyMappingClause({
+      actorNoun,
+      hasAirUnits: gates.hasAirUnits,
+      includeFerryMapping: gates.hasAirUnits,
+    })
+  );
 }
 
 /**
  * Builds the short copy-then-submit sentence for `# Available Tools`.
  *
  * Purpose: The intro must name the same mapping as the coaching bullet, including ranged rows.
- * When to use: `buildAvailableToolsIntro` when a Best Options table is present.
+ * When to use: `buildAvailableToolsIntro` when a briefing is present. An empty Best Options table does not change it.
  * Expected outcome: Approach/move into explicit_move, ranged into ranged_attack, optional ferry/air, one-row rule.
  * Exceptions: None.
  */

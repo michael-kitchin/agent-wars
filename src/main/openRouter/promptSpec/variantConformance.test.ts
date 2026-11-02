@@ -251,15 +251,15 @@ test('roster: no observed enemy uses the empty-roster phrasing and scouting coac
   assert.match(line, /currently observed\): none/i);
   assert.match(line, /out of view/i);
   const coaching = buildCoachingBullets(strategicCoaching({ hasObservedEnemy: false })).join('\n');
-  assert.match(coaching, /move to regain contact/i);
+  assert.doesNotMatch(coaching, /move to regain contact/i);
   const withEnemy = buildCoachingBullets(strategicCoaching({ hasObservedEnemy: true })).join('\n');
   assert.doesNotMatch(withEnemy, /move to regain contact/i);
 });
 
 test('roster: no option rows omit copy-from-table wording in coaching and the opening message', () => {
   const coaching = buildCoachingBullets(strategicCoaching({ hasBestOptionsTable: false })).join('\n');
-  assert.match(coaching, /no options are listed this period/i);
-  assert.doesNotMatch(coaching, /Copy a Target Hex from a row listing that unit/i);
+  assert.match(coaching, /When it lists none, call plan_route or leave the unit idle/);
+  assert.match(coaching, /Copy a Target Hex from a row listing that unit/i);
   const opening = buildOpeningUserMessage(strategicOpening({ hasBestOptionsTable: false }));
   assert.match(opening, /No options are listed this period/);
   assert.ok(!opening.includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN));

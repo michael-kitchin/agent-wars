@@ -81,10 +81,10 @@ export const REQUEST_ORDERS_WALL_CLOCK_ERROR = 'AI planning took too long and wa
 export const REQUEST_ORDERS_MAX_TOOL_ROUNDS = 50;
 
 /**
- * Warning appended to the next system prompt after a consultation exhausted its tool budget.
+ * Warning placed in the next situation message after a consultation exhausted its tool budget.
  *
  * Purpose: variants.md consultation-policy row: the model must hear the round limit, that nothing was submitted, and to submit promptly.
- * When to use: `buildSystemPromptForTools` when the previous consultation hit the round cap and planning or orders tools are on.
+ * When to use: `buildConsultPromptParts` when the previous consultation hit the round cap and planning or orders tools are on.
  * Expected outcome: Contains `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`.
  * Exceptions: None.
  */

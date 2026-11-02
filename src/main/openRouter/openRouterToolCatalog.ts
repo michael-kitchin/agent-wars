@@ -2,6 +2,7 @@ import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { ALL_BUILD_QUEUE_ITEM_TYPES } from '../productionRules';
 import { HIREABLE_UNIT_TYPES } from '../../shared/mercenaryRules';
 import { NAVAL_PLAN_ROUTE_PROMPT_SUFFIX } from '../navalMovementMessages';
+import { RULES_TOPICS } from '../tools/referenceTools';
 import { logTrace } from '../logger';
 
 /** JSON Schema `enum` values for tool params that accept a `BuildUnitType`; mirrors `ALL_BUILD_UNIT_TYPES`. */
@@ -133,6 +134,35 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     promptLine: 'check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.',
   },
   {
+    name: 'get_map',
+    description: 'The battle map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
+    parameters: {
+      type: 'object',
+      properties: {
+        center: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Cell to center on, as a briefing hex code' },
+        radius: { type: 'number', description: 'Grid steps from 0 to 8. Default 2.' },
+      },
+      required: ['center'],
+    },
+    promptLine: 'get_map(center, radius?) - The battle map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
+  },
+  {
+    name: 'rules',
+    description: `Full rules for one topic. Topics: ${RULES_TOPICS.join(', ')}.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          enum: [...RULES_TOPICS],
+          description: 'Which rule to print in full',
+        },
+      },
+      required: ['topic'],
+    },
+    promptLine: `rules(topic) - Full rules for one topic. Topics: ${RULES_TOPICS.join(', ')}.`,
+  },
+  {
     name: 'assess_unit',
     description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack now (this turn, or this beat in a battle).',
     parameters: {
@@ -160,7 +190,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   },
   {
     name: 'estimate_combat',
-    description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Melee results average both random attacker/defender role assignments. During a battle, air strikes are not covered. Always check before committing to an attack.',
+    description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Melee results average both random attacker/defender role assignments. During a battle, air strikes are not covered. Best Options already gives Odds for a listed fight. Use this for a fight the table does not list.',
     parameters: {
       type: 'object',
       properties: {
@@ -193,7 +223,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['engagementType', 'attackers', 'targetHex'],
     },
-    promptLine: 'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
+    promptLine: 'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Best Options already gives Odds for a listed fight. Use this for a fight the table does not list.',
   },
   {
     name: 'memory_read',
@@ -290,7 +320,7 @@ const TACTICAL_TOOL_PROMPT_LINES: Readonly<Record<string, string>> = {
   assess_unit:
     'assess_unit(unitId, radius?) - Battle briefing on one sub-unit: enemies and friendlies within radius cells, which enemies it can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each unit.',
   estimate_combat:
-    'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict a ranged or melee engagement under battle range, terrain, and line-of-sight rules, from beat-start positions. Returns win probability, expected casualties, and an assessment. Does not cover air strikes. Always check before committing to an attack.',
+    'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict a ranged or melee engagement under battle range, terrain, and line-of-sight rules, from beat-start positions. Returns win probability, expected casualties, and an assessment. Does not cover air strikes. Best Options already gives Odds for a listed fight. Use this for a fight the table does not list.',
 };
 
 /**

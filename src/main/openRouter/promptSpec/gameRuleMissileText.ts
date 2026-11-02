@@ -3,7 +3,7 @@
  *
  * Purpose: Keeps the missile wording out of the combat-rules module, which is already near the file-size limit.
  * When to use: `buildCombatRulesParagraph` and `buildCasualtySortRule`.
- * Expected outcome: The employment sentence only when the roster has a missile. The casualty sentence always.
+ * Expected outcome: The employment sentence only when the roster has a missile. The hit-last sentence is appended only when `buildCasualtySortRule` is told a missile is present or the roster is unknown.
  * Exceptions: None. A type import of the gate type avoids a runtime cycle.
  */
 

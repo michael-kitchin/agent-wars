@@ -1,5 +1,6 @@
-import { logTrace } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { PATHFINDING_TOOL_NAMES } from '../tools/pathfinding';
+import { REFERENCE_TOOL_NAMES } from '../tools/referenceTools';
 import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
 import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
 import { MEMORY_TOOL_NAMES } from '../tools/memory';
@@ -58,7 +59,7 @@ toolNames: readonly string[];
  */
 export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'precomputation', label: 'Precomputation', toolNames: [] },
-  { id: 'planning', label: 'Planning', toolNames: PATHFINDING_TOOL_NAMES },
+  { id: 'planning', label: 'Planning', toolNames: [...PATHFINDING_TOOL_NAMES, ...REFERENCE_TOOL_NAMES] },
   { id: 'assessment', label: 'Assessment', toolNames: ASSESSMENT_TOOL_NAMES },
   { id: 'estimation', label: 'Estimation', toolNames: COMBAT_ESTIMATION_TOOL_NAMES },
   { id: 'memory', label: 'Memory', toolNames: MEMORY_TOOL_NAMES },
@@ -166,6 +167,50 @@ export function filterToolNamesForTacticalBattle(
   });
   logTrace('openRouter filterToolNamesForTacticalBattle', { requested: toolNames.length, kept });
   return kept;
+}
+
+/**
+ * Drops the battle map tool from a strategic consult.
+ *
+ * Purpose: `get_map` reads a battle footprint. `rules` still applies on the strategic map.
+ * When to use: The strategic branch of `resolveConsultToolNames`.
+ * Expected outcome: Input order preserved, with `get_map` removed.
+ * Exceptions: None.
+ */
+export function filterToolNamesForStrategicConsult(toolNames: readonly string[]): string[] {
+  const kept = toolNames.filter((name) => name !== 'get_map');
+  logTrace('openRouter filterToolNamesForStrategicConsult', { requested: toolNames.length, kept: kept.length });
+  return kept;
+}
+
+/**
+ * Tool names for one consult after precomputation and mode filters.
+ *
+ * Purpose: Strategic consults never offer `get_map`. Battles drop tools that have no battle implementation.
+ * When to use: `requestOrdersFlow` once the precomputation flag and battle snapshot are known.
+ * Expected outcome: A defined list. An omitted request means every registered tool, then the mode filter.
+ * Exceptions: None.
+ */
+export function resolveConsultToolNames(input: {
+  readonly requested: readonly string[] | undefined;
+  readonly usePrecomputation: boolean;
+  readonly tactical: boolean;
+  readonly allToolNames: readonly string[];
+  readonly groupIdForToolName: (toolName: string) => string | undefined;
+}): string[] {
+  const excluded = new Set<string>([...ASSESSMENT_TOOL_NAMES, ...COMBAT_ESTIMATION_TOOL_NAMES]);
+  const base = input.usePrecomputation
+    ? (input.requested ?? input.allToolNames).filter((name) => !excluded.has(name))
+    : input.requested;
+  const names = input.tactical
+    ? filterToolNamesForTacticalBattle(base ?? input.allToolNames, input.groupIdForToolName)
+    : filterToolNamesForStrategicConsult(base ?? input.allToolNames);
+  logDebug('openRouter resolveConsultToolNames', {
+    tactical: input.tactical,
+    usePrecomputation: input.usePrecomputation,
+    count: names.length,
+  });
+  return names;
 }
 
 /**

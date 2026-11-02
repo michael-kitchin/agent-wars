@@ -63,7 +63,7 @@ export interface RequestOrdersFlowDeps {
    *
    * Contract: Deterministic for identical inputs; never embeds secrets beyond the passed state.
    * When to use: Once per outer request before the tool loop begins.
-   * Expected outcome: Non-empty markdown/text suitable for OpenRouter `system` role. The last argument is true only for a battle between two AI seats, and it is the only way this prompt names `exitBattle`.
+   * Expected outcome: Non-empty markdown/text suitable for OpenRouter `system` role. `includeExitBattle` is true only for a battle between two AI seats, and it is the only way this prompt names `exitBattle`. The battle snapshot carries birth terrain the plan state drops.
    * Exceptions: None.
    */
   buildSystemPromptForTools: (
@@ -76,7 +76,8 @@ export interface RequestOrdersFlowDeps {
     enabledToolNames?: string[],
     briefingOverride?: string,
     coordinateContext?: CoordinateContext,
-    includeExitBattle?: boolean
+    includeExitBattle?: boolean,
+    tacticalBattle?: TacticalBattleSnapshot | null
   ) => string;
   /**
    * Builds OpenAI-style tool definitions for the enabled tool names.

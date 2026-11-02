@@ -11,6 +11,16 @@ import { logDebug, logTrace } from '../../logger';
 import type { HexGrid, GridCell } from './hexGridProjection';
 
 /**
+ * Overlay character for a discovered cell with no feature and no units.
+ *
+ * Purpose: Water already uses `.` in the terrain slot, so the empty overlay must be a different character.
+ * When to use: The renderer and both map legends.
+ * Expected outcome: Bare land renders `x-` and bare water renders `.-`.
+ * Exceptions: None.
+ */
+export const emptyOverlayGlyph = '-';
+
+/**
  * Per-hex tactical/strategic snapshot fields required for map symbology.
  *
  * Purpose: Decouples rendering from full `GameStateSnapshot` to keep the renderer testable.
@@ -148,7 +158,7 @@ export function renderHexAsciiMap(grid: HexGrid, gameState: Map<string, HexMapCe
     if (s) return upper ? 'S' : 's';
     if (st.features.fortifiedByAi !== undefined) return st.features.fortifiedByAi ? 'F' : 'f';
     if (u) return upper ? 'U' : 'u';
-    return '.';
+    return emptyOverlayGlyph;
   };
 
   const presenceOverlay = (st: HexMapCellState): string | null => {
@@ -163,7 +173,8 @@ export function renderHexAsciiMap(grid: HexGrid, gameState: Map<string, HexMapCe
   for (let r = 0; r < grid.numRows; r++) {
     let top = '';
     let bot = '';
-    if (r % 2 === 1) {
+    const indentThisRow = grid.indentFirstRow === true ? r % 2 === 0 : r % 2 === 1;
+    if (indentThisRow) {
       top += ' ';
       bot += ' ';
     }
@@ -182,7 +193,7 @@ export function renderHexAsciiMap(grid: HexGrid, gameState: Map<string, HexMapCe
         const presence = presenceOverlay(st);
         const struct = structuralOverlay(st);
         const overlayCh = presence ?? struct;
-        if (presence && struct !== '?' && struct !== '.') {
+        if (presence && struct !== '?' && struct !== emptyOverlayGlyph) {
           displacedFeatures.push({ code: cell.code, feature: struct });
         }
         top += `${cell.code}`;
@@ -193,8 +204,8 @@ export function renderHexAsciiMap(grid: HexGrid, gameState: Map<string, HexMapCe
         bot += ' ';
       }
     }
-    linesTop.push(top);
-    linesBot.push(bot);
+    linesTop.push(top.trimEnd());
+    linesBot.push(bot.trimEnd());
   }
   const mapString = linesTop.map((t, i) => `${t}\n${linesBot[i]}`).join('\n');
   logTrace('hex-map-renderer renderHexAsciiMap: done', { lines: linesTop.length * 2, displaced: displacedFeatures.length });

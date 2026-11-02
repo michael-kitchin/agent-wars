@@ -62,6 +62,20 @@ test('the Weather column names the weather where the unit stands and its tags', 
   assert.ok(rowB?.includes('| Snow |'), rowB);
 });
 
+test('a mild battle omits the Weather column and a snow battle keeps it', () => {
+  const tagged = assessment('opp-a');
+  tagged.result.unit.weatherHere = 'mild';
+  tagged.result.unit.weatherTags = ['heat'];
+  const mild = buildUnitStatusTable([tagged], { mode: 'tactical', battleId: 'b', omitWeatherColumn: true }, false);
+  assert.equal(mild.includes('| Weather |'), false);
+  const snow = assessment('opp-b');
+  snow.result.unit.weatherHere = 'snow';
+  snow.result.unit.weatherTags = [];
+  const shown = buildUnitStatusTable([snow], { mode: 'tactical', battleId: 'b' }, false);
+  assert.ok(shown.includes('| Weather |'));
+  assert.ok(shown.includes('| Snow |'));
+});
+
 test('the table is unchanged when no assessment carries origin bonus reasons', () => {
   const table = buildUnitStatusTable([assessment('opp-a')], { mode: 'strategic' }, true);
   assert.equal(

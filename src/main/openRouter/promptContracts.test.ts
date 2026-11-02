@@ -90,7 +90,7 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
  *
  * Purpose: Regression for tactical AI prompts: planning + explicit_move must mention terrain-weighted reachability.
  * When to use: After edits to `getMovementOrderInstruction`.
- * Expected outcome: Tactical mode appends reachability/drop guidance; planning dests may copy Best Options Target Hexes or plan_route orderToHexCode.
+ * Expected outcome: Planning dests may copy Best Options Target Hexes or plan_route orderToHexCode. The first-leg clamp stays in the combat rules, not this sentence.
  * Exceptions: Assertion failure on contract drift.
  */
 function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
@@ -98,8 +98,8 @@ function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
   assert.ok(flags.planningEnabled);
   const tactical = getMovementOrderInstruction(flags, 'tactical');
   assert.ok(tactical.includes('orderToHexCode'));
-  assert.ok(tactical.includes('terrain'));
-  assert.ok(tactical.includes('first leg'));
+  assert.ok(!tactical.includes('first leg'));
+  assert.ok(!tactical.includes('one-step fallback'));
   const strategic = getMovementOrderInstruction(flags, 'strategic');
   assert.ok(strategic.includes('orderToHexCode'));
   assert.ok(!strategic.includes('first leg'));
@@ -310,7 +310,8 @@ function testBriefingGuidanceDoesNotNameUncallableAssessmentTools(): void {
     withoutBriefing.includes('assess_unit') || withoutBriefing.includes('estimate_combat'),
     'no-briefing guidance may still name callable assessment tools'
   );
-  assert.match(withoutBriefing, /differ by type and birth country/);
+  assert.match(withoutBriefing, /cannot tell what that unit can reach or shoot/);
+  assert.doesNotMatch(withoutBriefing, /Do not guess at combat odds/);
   assert.doesNotMatch(withoutBriefing, /results will be identical/);
 }
 

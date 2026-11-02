@@ -42,24 +42,41 @@ function formatOrList(items: readonly string[]): string {
  *
  * Purpose: The model must know movement and attack are reduced, and that tags cancel the reduction.
  * When to use: Combat paragraph after the tech sentence, or after the origin sentence when tech is off.
- * Expected outcome: Null when the flag is off, so the combat rules stay unchanged. Otherwise five paragraphs: the date rule, the movement budgets, the attack penalties, the tag exemption, and the Weather column. The argument is only `originBonusSettings`, which `GameRuleTextGates` already carries, so this file does not import that gate type.
+ * Expected outcome: Null when the weather bonus is off or `weatherApplies` is false. Otherwise the date rule, the movement budgets, the attack penalties, the tag exemption, and the Weather column. Tactical text omits the strategic movement sentence and the strategic ferry sentence. The air-strike sentence is omitted when `includeWeatherAirSentence` is false.
  * Exceptions: None.
  */
-export function buildWeatherRule(gates: { readonly originBonusSettings: OriginBonusSettings }): string | null {
+export function buildWeatherRule(gates: {
+  readonly originBonusSettings: OriginBonusSettings;
+  readonly coordinateMode?: PromptCoordinateMode;
+  readonly weatherApplies?: boolean;
+  readonly includeWeatherAirSentence?: boolean;
+}): string | null {
   const level = weatherBonusLevelOf(gates.originBonusSettings);
-  logTrace('promptSpec buildWeatherRule', { level });
+  const tactical = gates.coordinateMode === 'tactical';
+  logTrace('promptSpec buildWeatherRule', {
+    level,
+    tactical,
+    weatherApplies: gates.weatherApplies !== false,
+    includeWeatherAirSentence: gates.includeWeatherAirSentence !== false,
+  });
+  if (gates.weatherApplies === false) return null;
   if (gates.originBonusSettings.weatherBonusEnabled !== true || level === 'off') return null;
   const armor = formatOrList(WEATHER_SLOWING_STATES[level].armor ?? []);
   const naval = formatOrList(WEATHER_SLOWING_STATES[level].naval ?? []);
   const budget = TACTICAL_WEATHER_BUDGET_CAP[level];
   const penalty = WEATHER_ATTACK_PENALTY_BY_LEVEL[level];
+  const movement = tactical
+    ? `In battle, armor's point budget is ${budget} in ${armor} and naval's is ${budget} in ${naval}; infantry pays 2 to enter open ground in snow or rain.`
+    : `Armor strategic movement is 1 in ${armor}, and naval strategic movement is 1 in ${naval}. ` +
+      `In battle, armor's point budget is ${budget} in ${armor} and naval's is ${budget} in ${naval}; infantry pays 2 to enter open ground in snow or rain.`;
+  const airStrike = gates.includeWeatherAirSentence === false
+    ? ''
+    : ` An air strike is ${penalty} lower once when its base or its target is snow, rain, or heat the unit lacks.`;
+  const ferry = tactical ? '' : ' A strategic ferry into snow is 2 hexes.';
   return [
     'Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex\'s weather.',
-    `Armor strategic movement is 1 in ${armor}, and naval strategic movement is 1 in ${naval}. ` +
-      `In battle, armor's point budget is ${budget} in ${armor} and naval's is ${budget} in ${naval}; infantry pays 2 to enter open ground in snow or rain.`,
-    `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire. ` +
-      `An air strike is ${penalty} lower once when its base or its target is snow, rain, or heat the unit lacks. ` +
-      'A strategic ferry into snow is 2 hexes.',
+    movement,
+    `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire.${airStrike}${ferry}`,
     'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
       'Weather does not change defense, melee, or casualty order.',
     'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.',

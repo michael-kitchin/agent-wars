@@ -1,7 +1,7 @@
 /**
  * Strategic coaching items from strategic-prompt.md section 4, plus the context-block doctrine.
  *
- * Purpose: Nineteen gated bullets live here so the composer stays small and this file stays under the size limit.
+ * Purpose: The gated strategic bullets live here so the composer stays small and this file stays under the size limit.
  * When to use: Only via `buildCoachingBullets` / `buildContextCoaching`.
  * Expected outcome: Strategic-only items (win paths, production, memory, ferry, home overlap) never leak into tactical.
  * Exceptions: None.
@@ -11,11 +11,6 @@ import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
 import { logTrace } from '../../logger';
 import { regionalWinPathsBullet } from '../scenarioGoals';
 import { buildDoctrineBlock } from './doctrineText';
-import {
-  buildCasualtySortRule,
-  buildDestinationOccupancyRule,
-  buildHoldFireRule,
-} from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 
@@ -44,7 +39,7 @@ ${MESSAGE_BLOCK}`;
  *
  * Purpose: One list the composer can concatenate; each item is omitted when its gate is off.
  * When to use: `buildCoachingBullets` in strategic mode.
- * Expected outcome: Markdown bullets. Copy-row vs routing-tool is selected by `hasBestOptionsTable`.
+ * Expected outcome: Markdown bullets. The copy-or-route sentence stays the same when Best Options has no rows. Planning off uses the adjacent-cell sentence.
  * Exceptions: None.
  */
 export function buildStrategicCoachingBullets(gates: CoachingGates): readonly string[] {
@@ -57,11 +52,8 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
     bullets.push(gates.turnLimitVictory ? `${winPaths}${TURN_LIMIT_WIN_SENTENCE}` : winPaths);
   }
   if ((gates.seatCount ?? 0) >= 3) bullets.push(FREE_FOR_ALL_BULLET);
-  bullets.push(RESOLUTION_ORDER_BULLET, tempoBullet(gates.hasAirUnits));
-  if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
-  bullets.push(`- ${buildCasualtySortRule()}`);
+  bullets.push(FIRE_STILL_MOVES_BULLET, tempoBullet(gates.hasAirUnits));
   bullets.push(buildOptionCopyOrRoutingBullet(gates, 'this-turn', 'unit'));
-  bullets.push(`- ${buildDestinationOccupancyRule(gates.coordinateMode)}`);
   if (gates.ordersEnabled) {
     bullets.push(ORDERLESS_BULLET);
     bullets.push(LEAVE_MISSIONS_BULLET);
@@ -71,7 +63,6 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
     bullets.push(NAVAL_ROUTING_BULLET);
     bullets.push(SEALIFT_BULLET);
   }
-  if (!gates.hasObservedEnemy) bullets.push(SCOUTING_BULLET);
   if (gates.productionEnabled) bullets.push(PRODUCTION_BULLET);
   if (gates.includeScenarioWinPaths && gates.homeRegionsOverlap) bullets.push(SHARED_HOME_BULLET);
   if (gates.memoryEnabled) bullets.push(MEMORY_BULLET);
@@ -163,23 +154,25 @@ const TURN_LIMIT_WIN_SENTENCE = ' If the turn limit arrives first, the most city
  *
  * Purpose: Firing-then-closing and ferry-after-movement cannot be inferred from "ranged uses pre-move positions" alone.
  * When to use: Always in strategic coaching.
- * Expected outcome: Embark, air strikes, ranged fire, movement, cargo sync, ferry, melee.
+ * Expected outcome: A unit that fires can still move, and a ferried air unit arrives after ground movement. The full resolution order stays in the combat rules.
  * Exceptions: None.
  */
-const RESOLUTION_ORDER_BULLET =
-  '- This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
+const FIRE_STILL_MOVES_BULLET =
+  '- A unit that fires can still move, and a ferried air unit arrives after ground movement.';
 
 /**
  * A listed shot costs no movement, so copy it from Best Options.
  *
  * Purpose: The model copies listed rows and must not invent a target. The sentence does not describe the engine filling omitted shots.
  * When to use: Always in strategic coaching.
- * Expected outcome: Names an air-strike row only when an air unit exists. Tells the model not to invent a target. Mentions that firing does not consume the move.
+ * Expected outcome: Names an air-strike row only when an air unit exists. Tells the model to skip a row whose Odds show wipe below 50% and lose at least 50%, and not to invent a target. Mentions that firing does not use the move.
  * Exceptions: None.
  */
 function tempoBullet(hasAirUnits: boolean): string {
-  const listedRows = hasAirUnits ? 'a ranged or air-strike row' : 'a ranged row';
-  return `- Every unit with ${listedRows} in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. Do not invent a target the table does not list.`;
+  const listed = hasAirUnits
+    ? 'Copy a listed shot, including an air-strike row, from Best Options'
+    : 'Copy a listed shot from Best Options';
+  return `- ${listed} unless its Odds show wipe below 50% and lose at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.`;
 }
 
 /**
@@ -241,17 +234,6 @@ const NAVAL_ROUTING_BULLET =
  */
 const SEALIFT_BULLET =
   '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
-
-/**
- * Scout when the observed roster is empty.
- *
- * Purpose: Holding still when blind never restores contact.
- * When to use: When no enemy unit is observed.
- * Expected outcome: Move to regain contact rather than hold.
- * Exceptions: None.
- */
-const SCOUTING_BULLET =
-  '- With no enemy observed, move to regain contact along plausible approaches rather than holding position.';
 
 /**
  * Keep production queued, including the cap-swap rule.

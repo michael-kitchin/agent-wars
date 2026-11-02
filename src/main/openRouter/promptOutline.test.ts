@@ -37,16 +37,17 @@ const STRATEGIC_ALWAYS_PRESENT: readonly string[] = [
   '# Your Command',
   '# Coordinates',
   '# Combat and Movement Rules',
+  '# Strategic Context',
+  '# Available Tools',
+  '## How to Use These Tools Effectively',
+  '# Response Format',
+  '## Example Response',
+  '# Current Situation',
   "# Commander's Briefing",
   '## Unit Status and Threats',
   '## Attention Flags',
   '## Operational Map',
-  '# Strategic Context',
-  '# Available Tools',
-  '## How to Use These Tools Effectively',
   '# Unit Roster',
-  '# Response Format',
-  '## Example Response',
 ];
 
 /**

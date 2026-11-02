@@ -41,7 +41,7 @@ import {
  *
  * Purpose: Production-off seats still see upkeep. They are not shown hire tables.
  * When to use: While assembling the system prompt, with the seat's own snapshot.
- * Expected outcome: The section text, or `''` when this view should not include it.
+ * Expected outcome: The section text, or `''` when this view should not include it. A production seat with 0 credits, no mercenary, and nobody to rehire gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -61,6 +61,15 @@ export function buildMercenariesBriefingBlock(
   if (mode === 'tactical' || !economy) return '';
   const mercenaries = state.units.filter((unit) => unit.player === ownSeat && unit.isMercenary === true);
   if (!options.productionEnabled && mercenaries.length === 0) return '';
+  if (options.productionEnabled && economy.credits === 0 && mercenaries.length === 0) {
+    const orders = listHireOrdersForSeat(ownSeat);
+    const orderedRehires = new Set(orders.filter((order) => order.kind === 'rehire').map((order) => order.neutralUnitId));
+    const context = buildHireContext(state, ownSeat);
+    if (!hasRehireCandidate(state, context, orderedRehires)) {
+      logDebug('briefingSectionsMercenaries buildMercenariesBriefingBlock empty treasury', { ownSeat });
+      return `${topLevelHeading(SECTION_TITLE_MERCENARIES)}\n\nTreasury: 0 credits. No one to rehire.`;
+    }
+  }
   const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', options.productionEnabled ? buildMercenaryRule() : buildMercenaryUpkeepRule()];
   if (options.productionEnabled) lines.push('', MERCENARY_ENVELOPE_ROWS_SENTENCE);
   lines.push('', formatMercenaryFundsLine(economy));
@@ -111,6 +120,25 @@ function mercenaryTable(
  * Expected outcome: A table, or the none-line.
  * Exceptions: None.
  */
+/**
+ * True when a Neutral unit can still be rehired.
+ *
+ * Purpose: An empty treasury with nothing to rehire does not need the hire tables.
+ * When to use: Before the full Mercenaries section, when credits are 0 and the seat owns no mercenary.
+ * Expected outcome: False when every visible Neutral hex has no unordered rehire candidate.
+ * Exceptions: None.
+ */
+function hasRehireCandidate(
+  state: GameStateSnapshot,
+  context: ReturnType<typeof buildHireContext>,
+  orderedRehires: ReadonlySet<string | null>
+): boolean {
+  const hexes = state.units.filter((unit) => unit.player === NEUTRAL_OWNER_ID).map((unit) => unit.h3Index);
+  return hexes.some((h3Index) =>
+    evaluateHexHire(context, h3Index).rehireCandidates.some((candidate) => !orderedRehires.has(candidate.unitId))
+  );
+}
+
 function rehireTable(
   state: GameStateSnapshot,
   context: ReturnType<typeof buildHireContext>,

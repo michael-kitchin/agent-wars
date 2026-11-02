@@ -161,7 +161,7 @@ export interface StatusInjectionTexts {
  * Builds the three status injection strings from one flag-and-snapshot object.
  *
  * Purpose: The assembler (no briefing) and `formatBriefing` (with briefing) must not compute these independently.
- * When to use: Once per consultation before assembling the system prompt or briefing override.
+ * When to use: Once, from `requestOrdersFlow`, before the briefing. The prompt assembler calls it only when it has no briefing and no supplied attention sentence.
  * Expected outcome: Each string is empty iff its tool group is off.
  * Exceptions: None.
  */

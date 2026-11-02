@@ -204,6 +204,24 @@ export interface ConsultTelemetrySummary {
    */
   readonly costUsd: number;
   /**
+   * Cached prompt tokens accumulated on the consult.
+   *
+   * Contract: Sum of `usage.prompt_tokens_details.cached_tokens`. Missing reports are zero.
+   * When to use: The info line.
+   * Expected outcome: Zero when no body reported a cache read.
+   * Exceptions: None.
+   */
+  readonly cachedTokens: number;
+  /**
+   * Cache-write prompt tokens accumulated on the consult.
+   *
+   * Contract: Sum of `usage.prompt_tokens_details.cache_write_tokens`. Missing reports are zero.
+   * When to use: The info line.
+   * Expected outcome: Zero when no body reported a cache write.
+   * Exceptions: None.
+   */
+  readonly cacheWriteTokens: number;
+  /**
    * Fallbacks in record order.
    *
    * Contract: The kinds passed to `recordFallback`.
@@ -244,6 +262,8 @@ export function buildConsultTelemetrySummary(input: {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly costUsd: number;
+  readonly cachedTokens: number;
+  readonly cacheWriteTokens: number;
   readonly attempts: readonly ConsultAttemptRecord[];
   readonly fallbacks: readonly ConsultFallbackKind[];
   readonly toolRounds: number;
@@ -272,6 +292,8 @@ export function buildConsultTelemetrySummary(input: {
     inputTokens: input.inputTokens,
     outputTokens: input.outputTokens,
     costUsd: input.costUsd,
+    cachedTokens: input.cachedTokens,
+    cacheWriteTokens: input.cacheWriteTokens,
     fallbacks: [...input.fallbacks],
     attempts: input.attempts.map((attempt) => ({ ...attempt })),
   };

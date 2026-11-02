@@ -36,7 +36,7 @@ export type ConsultAttemptOutcome = 'ok' | 'http' | 'timeout' | 'network' | 'str
  *
  * Purpose: The summary lists why a later attempt happened, in the order they were recorded.
  * When to use: `recordFallback` at the existing retry site.
- * Expected outcome: One of the seven fallback names.
+ * Expected outcome: One of the fallback names.
  * Exceptions: None.
  */
 export type ConsultFallbackKind =
@@ -46,7 +46,9 @@ export type ConsultFallbackKind =
   | 'toolChoiceAuto'
   | 'structuredOutputDropped'
   | 'malformedCompletion'
-  | 'parseRepair';
+  | 'parseRepair'
+  | 'cacheBreakpointDropped'
+  | 'situationMessagesJoined';
 
 /**
  * One model call inside a consultation.
@@ -224,6 +226,24 @@ export interface ConsultTelemetryUsage {
    * Exceptions: None.
    */
   readonly totalOutputTokens: number;
+  /**
+   * Prompt tokens served from cache.
+   *
+   * Contract: Optional. Missing means none were reported.
+   * When to use: The tool loop and the repair exchange add `prompt_tokens_details.cached_tokens`.
+   * Expected outcome: The summary reads zero when the field was never set.
+   * Exceptions: None.
+   */
+  readonly totalCachedTokens?: number;
+  /**
+   * Prompt tokens written into the cache.
+   *
+   * Contract: Optional. Missing means none were reported.
+   * When to use: The tool loop and the repair exchange add `prompt_tokens_details.cache_write_tokens`.
+   * Expected outcome: The summary reads zero when the field was never set.
+   * Exceptions: None.
+   */
+  readonly totalCacheWriteTokens?: number;
 }
 
 /**
@@ -293,6 +313,8 @@ export function createConsultTelemetry(input: {
         inputTokens: input.usage.totalInputTokens,
         outputTokens: input.usage.totalOutputTokens,
         costUsd: input.usage.requestCost,
+        cachedTokens: input.usage.totalCachedTokens ?? 0,
+        cacheWriteTokens: input.usage.totalCacheWriteTokens ?? 0,
         attempts,
         fallbacks,
         toolRounds,
@@ -314,6 +336,29 @@ export function createConsultTelemetry(input: {
  */
 export function logConsultTelemetrySummary(summary: ConsultTelemetrySummary): void {
   logInfo('consult telemetry', summary);
+}
+
+/**
+ * Reads cache counters from one chat usage object.
+ *
+ * Purpose: OpenRouter reports cache hits and cache writes beside the prompt-token total.
+ * When to use: The tool loop and the repair exchange, once per response body.
+ * Expected outcome: The two counters, or zero when `prompt_tokens_details` is missing.
+ * Exceptions: None.
+ */
+export function cacheTokensFromChatUsage(usage: {
+  readonly prompt_tokens_details?: {
+    readonly cached_tokens?: number;
+    readonly cache_write_tokens?: number;
+  };
+} | undefined): { readonly cachedTokens: number; readonly cacheWriteTokens: number } {
+  logTrace('consultTelemetry cacheTokensFromChatUsage', {
+    hasDetails: usage?.prompt_tokens_details !== undefined,
+  });
+  return {
+    cachedTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    cacheWriteTokens: usage?.prompt_tokens_details?.cache_write_tokens ?? 0,
+  };
 }
 
 /**

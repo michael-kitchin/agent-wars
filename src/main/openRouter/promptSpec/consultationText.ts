@@ -82,11 +82,11 @@ export interface OpeningMessageGates {
    */
   readonly hasProductionAttention?: boolean;
   /**
-   * Whether the adjacent-cell fallback listing is in the system prompt.
+   * Whether the adjacent-cell fallback listing is in the situation message.
    *
    * Contract: Used when planning and standing orders are both off.
    * When to use: From `getToolFlags().fallbackMovementEnabled`.
-   * Expected outcome: True points at the fallback listing; false accepts an empty `orders` array.
+   * Expected outcome: True points at the listing above the opening; false accepts an empty `orders` array.
    * Exceptions: None.
    */
   readonly fallbackMovementEnabled: boolean;
@@ -204,7 +204,7 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
     return 'Movement planning is unavailable; issue missions as standing orders in the envelope and leave movement empty.';
   }
   if (!gates.planningEnabled && !gates.ordersEnabled && gates.fallbackMovementEnabled) {
-    return 'Use the fallback adjacent-cell listing in the system prompt as the only source of move destinations.';
+    return 'Use the fallback adjacent-cell listing above as the only source of move destinations.';
   }
   return 'Point at the briefing and submit an empty orders array if you have no legal moves.';
 }
@@ -233,7 +233,7 @@ function buildOpeningProductionClause(gates: OpeningMessageGates): string {
  * Builds the opening user message for this consultation.
  *
  * Purpose: Submit-only: situation, action, envelope fields — no restated rules.
- * When to use: The first user turn after the system prompt.
+ * When to use: The end of the situation message.
  * Expected outcome: Situation, action, the production pointer when its gates hold, then the envelope. Tactical appends `TACTICAL_STANDING_ORDER_PROHIBITION`.
  * Exceptions: None.
  */
@@ -242,8 +242,8 @@ export function buildOpeningUserMessage(gates: OpeningMessageGates): string {
   const envelope = envelopeGatesFromOpening(gates);
   const fields = formatQuotedEnvelopeFields(envelope);
   const situation = gates.hasBriefing
-    ? "Use the Commander's Briefing in the system prompt above."
-    : 'Use the tools listed in the system prompt above.';
+    ? "Use the Commander's Briefing above."
+    : 'Use the tools listed above.';
   const action = buildOpeningActionClause(gates);
   const productionClause = buildOpeningProductionClause(gates);
   const envelopeClause = `Then submit JSON with ${fields}.`;

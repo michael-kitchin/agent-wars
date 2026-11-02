@@ -11,7 +11,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `HEX_IDENTITY` | [`assembly-contract.md`](assembly-contract.md) | Identity and coordinates |
 | `UNIT_IDENTITY` | [`assembly-contract.md`](assembly-contract.md) | Identity and coordinates |
 | `SUBUNIT_IDENTITY` | [`tactical-prompt.md`](tactical-prompt.md) | Battle framing |
-| `TURN_CLOCK` | both mode files | Role and clock line |
+| `TURN_CLOCK` | both mode files | `# Current Situation` |
 | `BATTLE_FRAME` | [`tactical-prompt.md`](tactical-prompt.md) | Battle framing |
 | `FOG_MODE` | [`variants.md`](variants.md) | Fog of war |
 | `MAP_GRID` | both mode files | Operational map |
@@ -20,7 +20,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `INFRA_PRESENCE` | [`strategic-prompt.md`](strategic-prompt.md) | Operational map |
 | `CONTROL_STATE` | [`strategic-prompt.md`](strategic-prompt.md) | Operational map |
 | `DISPLACED_FEATURES` | both mode files | Operational map |
-| `EXPLORED_CONTROLLED_PROGRESS` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic context block |
+| `EXPLORED_CONTROLLED_PROGRESS` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, after the scenario objective |
 | `ENEMY_ROSTER_OBSERVED` | both mode files | Observed enemy roster line |
 | `NEAREST_ENEMY_DISTANCE` | both mode files | Unit status table |
 | `CONTACT_FLAGS` | both mode files | Unit status table |
@@ -37,7 +37,8 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `EMBARK_STATE` | both mode files | Naval transport status |
 | `STANDING_ORDERS_INERT_IN_BATTLE` | [`tactical-prompt.md`](tactical-prompt.md) | Battle framing; required coaching |
 | `BEST_OPTIONS_ROWS` | both mode files | Best options subsection |
-| `LEGAL_DEST_OCCUPANCY` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
+| `BEST_OPTIONS_ODDS` | both mode files | Best options Odds column |
+| `LEGAL_DEST_OCCUPANCY` | [`assembly-contract.md`](assembly-contract.md) | Combat and attack rules |
 | `RANGED_LEGAL_TARGETS` | both mode files | Best options subsection |
 | `AIR_STRIKE_ENVELOPE` | both mode files | Air operations status |
 | `FERRY_DESTINATIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Air operations status |
@@ -48,23 +49,23 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `ATTACK_ONE_PER_UNIT` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
 | `WEGO_PHASE_ORDER` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
 | `TEMPO_RANGED_SHOT` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
-| `CASUALTY_PRIORITY` | [`assembly-contract.md`](assembly-contract.md) | Shared coaching |
+| `CASUALTY_PRIORITY` | [`assembly-contract.md`](assembly-contract.md) | Combat and attack rules |
 | `ORIGIN_BONUS` | both mode files | Combat and attack rules; Unit Status `Bonus` column |
 | `TECH_BONUS` | both mode files | Combat and attack rules; Unit Status `Bonus` column |
 | `TERRAIN_COVER` | both mode files | Combat and attack rules |
-| `HOLD_FIRE_SEMANTICS` | [`strategic-prompt.md`](strategic-prompt.md) | Required coaching item 4 |
+| `HOLD_FIRE_SEMANTICS` | [`strategic-prompt.md`](strategic-prompt.md) | Combat and attack rules, when standing orders are on |
 | `MOVE_BUDGET` | [`strategic-prompt.md`](strategic-prompt.md) | Combat and attack rules |
 | `TACTICAL_MP_RULES` | [`tactical-prompt.md`](tactical-prompt.md) | Battle framing; combat rules |
 | `FIRST_LEG_TRUNCATION` | [`tactical-prompt.md`](tactical-prompt.md) | Combat rules; required coaching |
 | `NAVAL_MOVEMENT_DOMAIN` | [`strategic-prompt.md`](strategic-prompt.md) | Combat rules; required coaching |
 | `ORDER_TYPE_LEGALITY` | [`strategic-prompt.md`](strategic-prompt.md) | Legal actions table |
-| `MARCH_CURRENT_HEX_RULE` | both mode files | Legal actions; invalid-output rules; strategic coaching item 8 |
+| `MARCH_CURRENT_HEX_RULE` | both mode files | Legal actions; invalid-output rules; strategic coaching item 5 |
 | `AIR_ORDER_RESTRICTIONS` | both mode files | Air operations status; legal actions |
 | `EMBARK_LEGALITY` | both mode files | Naval transport status |
 | `PRODUCTION_QUEUES` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_RULES_COSTS` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_CAPS` | [`variants.md`](variants.md) | Game size and large rosters |
-| `PRODUCTION_CAP_QUEUE_RULE` | [`strategic-prompt.md`](strategic-prompt.md) | Production status; coaching item 14 |
+| `PRODUCTION_CAP_QUEUE_RULE` | [`strategic-prompt.md`](strategic-prompt.md) | Production status; coaching item 11 |
 | `PRODUCTION_INCOME` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_TIMING` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `MEMORY_PERSISTENT` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic memory |
@@ -81,9 +82,9 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `SCENARIO_ID` | [`variants.md`](variants.md) | Scenarios |
 | `WIN_CONDITIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Goal statement; scenario objective |
 | `HOME_REGION_NAMES` | [`strategic-prompt.md`](strategic-prompt.md) | Scenario objective |
-| `HOME_REGION_HEXES` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic context block |
+| `HOME_REGION_HEXES` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, after the scenario objective |
 | `HOME_REGION_OVERLAP` | [`variants.md`](variants.md) | Scenarios; combinations |
-| `HOME_CONTROL_PROGRESS` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic context block |
+| `HOME_CONTROL_PROGRESS` | [`strategic-prompt.md`](strategic-prompt.md) | Situation message, after the scenario objective |
 | `HOME_REGION_VISIBILITY` | [`strategic-prompt.md`](strategic-prompt.md) | Scenario objective |
 | `TOOL_CATALOG` | [`assembly-contract.md`](assembly-contract.md) | Tools versus envelope writes |
 | `TOOL_BUDGET_WARNING` | [`variants.md`](variants.md) | Consultation policy |
@@ -100,10 +101,10 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 
 | Existing heading or block | Disposition |
 | --- | --- |
-| Role and clock line | Kept — [`strategic-prompt.md`](strategic-prompt.md) 1.1 |
+| Role line | Kept in the system message — [`strategic-prompt.md`](strategic-prompt.md) 1.1. The clock is `# Current Situation` |
 | Win-condition reminder | Kept — 1.2, with an added generic form for a missing scenario |
-| Scouting directive | Kept — 1.3 |
-| Tool-limit warning | Kept — 1.3 |
+| Scouting directive | Kept as one situation sentence — 1.3 |
+| Tool-limit warning | Kept in the situation message — 1.3 |
 | Coordinate preamble | Kept — 1.4 |
 | Combat stats paragraph | Kept and extended — 1.5 adds casualty priority, resolution order, movement budgets, and occupancy |
 | `# Commander's Briefing` | Kept — 1.6 |
@@ -129,7 +130,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `# Strategic Context` strategy bullets | Kept as doctrine — 1.8 |
 | `# Strategic Context` message bullet | Kept — 1.8 |
 | `# Strategic Context` opening sentence about the enemy hunting the model | **Not emitted** — removed from `buildStrategicContextCoaching`; matrix tests forbid the substring |
-| `Explored:` and `Controlled:` bullets | Kept — 1.8 |
+| `Explored:` and `Controlled:` bullets | Kept in the situation message, after the scenario objective |
 | Home-region bullets | Kept — 1.8 |
 | `# Air Operations Status` | Kept, gated on roster instead of emitting a dash row — 1.9 and [`variants.md`](variants.md) 3.1 |
 | `# Naval Transport Status` | Kept, same gating change — 1.10 and [`variants.md`](variants.md) 3.2 |
@@ -150,7 +151,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 
 | Existing heading or block | Disposition |
 | --- | --- |
-| Role and clock line with the beat number | Kept — [`tactical-prompt.md`](tactical-prompt.md) 2.1 |
+| Role line | Kept in the system message — [`tactical-prompt.md`](tactical-prompt.md) 2.1. The beat clock is `# Current Situation` |
 | Battle goal clause | Kept — 2.2 |
 | Tactical coordinate preamble | Kept — 2.4 |
 | Combat paragraph with res4 ranges | Kept and extended — 2.5 adds casualty priority and the resolution order |
@@ -180,6 +181,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 
 | Message | Contract |
 | --- | --- |
+| Fixed lead-in, then the situation message | [`consultation-flow.md`](consultation-flow.md): `The current situation is in the next message.`, then the clock, briefing, and opening |
 | Opening user message, every branch | [`consultation-flow.md`](consultation-flow.md) 2.1 and 2.2 |
 | Opening message is submit-only | [`consultation-flow.md`](consultation-flow.md) 2.3 |
 | Tool result, success | 3, items 3 and 4 |

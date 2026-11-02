@@ -30,6 +30,7 @@ import {
   buildTacticalBriefingNarrative,
 } from './tacticalBriefingAssessments';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
+import { tacticalWeatherApplies } from './promptSpec/gameRuleSituationGates';
 
 /**
  * Builds the full tactical briefing override for `buildSystemPromptForTools`.
@@ -43,6 +44,15 @@ export function formatTacticalBriefing(args: {
   planState: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   tacticalBattle: TacticalBattleSnapshot;
+  /**
+   * Whether the cropped map may name `get_map`.
+   *
+   * Contract: True only when that tool is on the consult's enabled list.
+   * When to use: `requestOrdersFlow` after the tool list is filtered.
+   * Expected outcome: The Shown line gains the lookup sentence when the window is smaller than the footprint.
+   * Exceptions: None.
+   */
+  mentionGetMap?: boolean;
 }): string {
   const { planState, latLngByH3, tacticalBattle } = args;
   logDebug('formatTacticalBriefing', {
@@ -54,6 +64,9 @@ export function formatTacticalBriefing(args: {
     mode: 'tactical',
     battleId: tacticalBattle.battleId,
     tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
+    battleWeather: tacticalBattle.weather,
+    omitWeatherColumn:
+      tacticalBattle.weatherBonusEnabled === true && !tacticalWeatherApplies(tacticalBattle.weather),
   };
   const ownSeat = briefingOwnSeatId(planState);
   const assessments = buildLightweightTacticalUnitAssessments(
@@ -76,6 +89,7 @@ export function formatTacticalBriefing(args: {
     state: planState,
     latLngByH3,
     tacticalBattle,
+    mentionGetMap: args.mentionGetMap === true,
   });
   if (operational.trim().length === 0) {
     logDebug('formatTacticalBriefing: empty operational map', { battleId: tacticalBattle.battleId });

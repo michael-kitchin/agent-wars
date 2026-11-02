@@ -596,16 +596,17 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
       '# Your Command',
       '# Coordinates',
       '# Combat and Movement Rules',
+      '# Battle Context',
+      '# Available Tools',
+      '## How to Use These Tools Effectively',
+      '# Response Format',
+      '## Example Response',
+      '# Current Situation',
       "# Commander's Briefing",
       '## Unit Status and Threats',
       '## Attention Flags',
       '## Operational Map',
-      '# Battle Context',
-      '# Available Tools',
-      '## How to Use These Tools Effectively',
       '# Unit Roster',
-      '# Response Format',
-      '## Example Response',
     ];
     let cursor = 0;
     for (const heading of tacticalAlways) {

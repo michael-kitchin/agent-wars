@@ -28,6 +28,7 @@ import {
   SECTION_TITLE_STRATEGIC_MEMORY,
 } from './promptSpec/sectionHeadings';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
+import { CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 
 /**
  * Documents the `ChatResponse` type alias (type ChatResponse).
@@ -268,9 +269,11 @@ async function run(): Promise<void> {
       const enabledToolNames = openRouter.getToolNamesForEnabledGroups(enabledUiIds as unknown as string[]);
       const usePrecomputation = enabledUiIds.includes('precomputation');
       const precomputationExcluded = new Set(['assess_unit', 'assess_hex', 'estimate_combat']);
-      const effectiveToolSet = new Set(
-        usePrecomputation ? enabledToolNames.filter((n) => !precomputationExcluded.has(n)) : enabledToolNames
-      );
+      const strategicExcluded = new Set(['get_map']);
+      const afterPrecomputation = usePrecomputation
+        ? enabledToolNames.filter((name) => !precomputationExcluded.has(name))
+        : enabledToolNames;
+      const effectiveToolSet = new Set(afterPrecomputation.filter((name) => !strategicExcluded.has(name)));
 
       const capturedRef: { value: CapturedPayload | null } = { value: null };
       const fakeResponse: ChatResponse = {
@@ -295,8 +298,12 @@ async function run(): Promise<void> {
       if (!capturedRef.value) throw new Error(`no API payload captured for mask=${mask}`);
       const captured = capturedRef.value;
 
-      const systemPrompt = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'system')?.content ?? '';
-      const userPrompt = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'user')?.content ?? '';
+      const systemMessage = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'system')?.content ?? '';
+      const userMessages = (captured.messages ?? []).filter((m: { role: string }) => m.role === 'user');
+      const situationMessage = userMessages[1]?.content ?? userMessages[0]?.content ?? '';
+      assert.equal(userMessages[0]?.content, CONSULT_SITUATION_LEAD_IN, `lead-in missing for mask=${mask}`);
+      const systemPrompt = `${systemMessage}\n\n${situationMessage}`;
+      const userPrompt = situationMessage;
       const payloadTools = captured.tools ?? [];
       const payloadToolNames = new Set(payloadTools.map((t: { function: { name: string } }) => t.function.name));
       const memoryOn = enabledUiIds.includes('memory');

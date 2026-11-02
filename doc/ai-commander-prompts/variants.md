@@ -2,7 +2,7 @@
 
 What changes, surface by surface, for every gate the engine can present. Rows describe **emitted** behaviour. A surface that does not change says `unchanged`.
 
-Surfaces in every table: **system** (the system prompt), **user** (the opening message), **tools** (the enabled tool list), **envelope** (the response object), **coaching** (rules and heuristics), and **empty-state**.
+Surfaces in every table: **system** (the stable system message), **user** (the opening at the end of the situation message), **tools** (the enabled tool list), **envelope** (the response object), **coaching** (rules and heuristics inside the system message), and **empty-state**. The situation message also holds the clock, the briefing, and the live counts. A system row that names one of those says so.
 
 ## 1. Fog of war
 
@@ -86,7 +86,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 | Surface | Contract |
 | --- | --- |
-| system | With planning off and standing orders also off, include the fallback adjacent-cell listing: one line per own unit that names its legal empty neighbours and tells the model to omit explicit_move to stay. The schema block adds that a destination on the unit's current cell is dropped as already arrived. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
+| system | With planning off and standing orders also off, the situation message includes the fallback adjacent-cell listing under the unit roster: one line per own unit that names its legal empty neighbours and tells the model to omit explicit_move to stay. The response format, which stays in the system message, adds that a destination on the unit's current cell is dropped as already arrived. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
 | user | Point at the fallback listing as the only source of move destinations when it is present; otherwise point at the tools. |
 | tools | The routing and distance tools disappear with the planning group; the assessment and estimate tools disappear with theirs. |
 | envelope | unchanged in shape. Movement remains legal, but the destination rule changes to the fallback listing. |
@@ -257,7 +257,7 @@ Gate: which consultation entry point runs — every period, or only when an even
 
 | Surface | Contract |
 | --- | --- |
-| system | Include the tool-budget warning in the situational directives: the round limit, the fact that nothing was submitted last period, and the instruction to submit promptly once information is gathered. Include it only when planning or standing-order tools are enabled, since without them there is little to over-spend on. |
+| situation | Include the tool-budget warning in the situation message: the round limit, the fact that nothing was submitted last period, and the instruction to submit promptly once information is gathered. Include it only when planning or standing-order tools are enabled, since without them there is little to over-spend on. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
@@ -292,7 +292,7 @@ Gate: `state.originBonusEnabled` and `state.terrainBonusEnabled` with their leve
 
 | Surface | Contract |
 | --- | --- |
-| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. In battle with the terrain bonus on, its terrain clause ends with `TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE`. The Unit Status table gains a `Bonus` column after `Hex`. With the origin bonus on, Supplemental Hex Intelligence bullets append `; origin` and the place id. |
+| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. In battle with the terrain bonus on, its terrain clause ends with `TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE` when the consulted side has armor or naval born on wetlands. Unknown birth terrain includes that sentence. The Unit Status table gains a `Bonus` column after `Hex`. With the origin bonus on, Supplemental Hex Intelligence bullets append `; origin` and the place id. |
 | user | unchanged |
 | tools | Tool names stay the same. `estimate_combat` reports effective values and `originBonus` (2 or 4); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthOrigin` (the place label, not the place id), and in battle `birthTerrain`; `assess_hex` adds `origin` (the place id). In battle with the terrain bonus on, `plan_route`, `check_distance`, and the `assess_unit` beat estimates count terrain-bonus stops, and Best Options lists a stop cell as a this-beat destination. |
 | envelope | unchanged |
@@ -305,7 +305,7 @@ Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read thro
 
 | Surface | Contract |
 | --- | --- |
-| system | The turn line names the date. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present. The Unit Status table gains a Weather column when an assessment carries `weatherTags`. The cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` count uses each unit's ferry range to each airport, so an airport in snow the unit lacks counts only within 2 hexes. Best Options ferry rows are that same owned-airport set, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
+| system | The turn line names the date. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present, when the battle weather is not mild or some strategic hex is not mild. Missing weather includes the rules. A mild battle, and a map whose every hex is mild, omit the paragraph and the Weather column. Tactical weather text omits the strategic movement sentence and the strategic ferry sentence. The air-strike weather sentence is included only when the consulted side has air. When the column is shown, the cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` count uses each unit's ferry range to each airport, so an airport in snow the unit lacks counts only within 2 hexes. Best Options ferry rows are that same owned-airport set, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
 | tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged, return-fire, and air-strike thresholds as resolution. |
 | empty-state | A unit with no tags has `weatherTags: []`. The Unit Status cell is the weather where it stands, with no parentheses. The unit tooltip omits Weather when the unit has no tags. |
 

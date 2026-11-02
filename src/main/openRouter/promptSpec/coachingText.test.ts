@@ -69,18 +69,20 @@ function joined(gates: CoachingGates): string {
 test('strategic coaching includes every required item when its gate is on', () => {
   const text = joined(strategicGates());
   assert.match(text, /last side standing/i);
-  assert.match(text, /missile launches, then air strikes/i);
-  assert.match(text, /cargo sync/i);
-  assert.match(text, /does not consume the move/i);
-  assert.match(text, /suppresses automatic engagement/i);
-  assert.match(text, /lowest-defense/i);
+  assert.match(text, /A unit that fires can still move/i);
+  assert.match(text, /ferried air unit arrives after ground movement/i);
+  assert.doesNotMatch(text, /missile launches, then air strikes/i);
+  assert.doesNotMatch(text, /cargo sync/i);
+  assert.match(text, /does not use the move/i);
+  assert.doesNotMatch(text, /suppresses automatic engagement/i);
+  assert.doesNotMatch(text, /lowest-defense/i);
+  assert.doesNotMatch(text, /Friendly units may stack/i);
+  assert.doesNotMatch(text, /1\/2 point/);
   assert.match(text, /Copy a Target Hex from a row listing that unit/i);
   assert.match(text, /unitIds/);
-  assert.match(text, /friendly/i);
-  assert.match(text, /stack/i);
   assert.doesNotMatch(text, /not a legal destination/i);
-  assert.match(text, /stay-put/i);
-  assert.match(text, /leaving this period/i);
+  assert.doesNotMatch(text, /stay-put/i);
+  assert.doesNotMatch(text, /leaving this period/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
   assert.doesNotMatch(text, /already holds a legal hex/i);
@@ -121,11 +123,9 @@ test('strategic conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /cannot enter land cells/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /embark at a legal cell/i);
   assert.doesNotMatch(joined(strategicGates({ homeRegionsOverlap: false })), /more than one home region/i);
-  assert.doesNotMatch(joined(strategicGates({ hasBestOptionsTable: false })), /Copy a Target Hex from a row listing that unit/i);
-  assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /no options are listed this period/i);
-  assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /routing tool/i);
+  assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /When it lists none, call plan_route or leave the unit idle/);
   assert.doesNotMatch(joined(strategicGates({ hasObservedEnemy: true })), /move to regain contact/i);
-  assert.match(joined(strategicGates({ hasObservedEnemy: false })), /move to regain contact/i);
+  assert.doesNotMatch(joined(strategicGates({ hasObservedEnemy: false })), /move to regain contact/i);
   assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false })), /last side standing/i);
   assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false, homeRegionsOverlap: true })), /more than one home region/i);
   assert.doesNotMatch(
@@ -149,26 +149,27 @@ test('absent scenario id drops home-region goals from the context block', () => 
 
 test('tactical coaching includes every required item when its gate is on', () => {
   const text = joined(tacticalGates({ hasAirUnits: true, hasNavalUnits: true, hasBestOptionsTable: true }));
-  assert.match(text, /does not consume the move/i);
+  assert.match(text, /does not use the move/i);
   assert.match(text, /Standing orders do not move sub-units/i);
   assert.match(text, /Copy a Target Hex from a row listing that sub-unit/i);
   assert.match(text, /unitIds/);
   assert.match(text, /clamped to the first reachable leg/i);
-  assert.match(text, /for every terrain, for infantry and armor/);
-  assert.match(text, /does not open blocked terrain/);
+  assert.match(text, /the move is dropped unless the step enters a cell that holds an enemy/i);
+  assert.doesNotMatch(text, /for every terrain, for infantry and armor/);
+  assert.doesNotMatch(text, /does not open blocked terrain/);
   assert.doesNotMatch(text, /blocked terrain\. A unit may enter that cell/);
   assert.doesNotMatch(text, /Urban and rubble cells cost more/);
-  assert.match(text, /urban or rubble/i);
-  assert.match(text, /Infantry and armor fire at tactical baselines/i);
+  assert.doesNotMatch(text, /urban or rubble/i);
+  assert.doesNotMatch(text, /Infantry and armor fire at tactical baselines/i);
+  assert.doesNotMatch(text, /1\/2 point/);
+  assert.doesNotMatch(text, /lowest-defense/i);
+  assert.doesNotMatch(text, /Friendly units may stack/i);
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /ferryOrders/);
   assert.match(text, /intact airport/i);
-  assert.match(text, /lowest-defense/i);
-  assert.match(text, /friendly/i);
-  assert.match(text, /stack/i);
   assert.doesNotMatch(text, /not a legal destination/i);
-  assert.match(text, /stay-put/i);
-  assert.match(text, /leaving this period/i);
+  assert.doesNotMatch(text, /stay-put/i);
+  assert.doesNotMatch(text, /leaving this period/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /embark/i);
   assert.match(text, /sub-unit ids/i);
@@ -186,8 +187,7 @@ test('tactical conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airStrikes/);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /ferryOrders/);
   assert.doesNotMatch(joined(tacticalGates({ hasNavalUnits: false })), /Naval Transport Status/i);
-  assert.doesNotMatch(joined(tacticalGates({ hasBestOptionsTable: false })), /Copy a Target Hex from a row listing that sub-unit/i);
-  assert.match(joined(tacticalGates({ hasBestOptionsTable: false, planningEnabled: true })), /routing tool/i);
+  assert.match(joined(tacticalGates({ hasBestOptionsTable: false })), /When it lists none, call plan_route or leave the sub-unit idle/);
   assert.doesNotMatch(joined(tacticalGates()), /toward the fighting/i);
   assert.doesNotMatch(joined(tacticalGates()), /home region/i);
   assert.doesNotMatch(joined(tacticalGates()), /productionOrders/i);
@@ -208,10 +208,11 @@ test('option copy maps ranged rows and picks one row per actor per action in bot
 });
 
 test('tempo coaching names air strike only when air is present', () => {
-  assert.match(joined(strategicGates({ hasAirUnits: true })), /or air-strike row/);
-  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /or air-strike row/);
-  assert.match(joined(tacticalGates({ hasAirUnits: true })), /or air-strike row/);
-  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /or air-strike row/);
+  assert.match(joined(strategicGates({ hasAirUnits: true })), /air-strike row/);
+  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /air-strike row/);
+  assert.match(joined(tacticalGates({ hasAirUnits: true })), /air-strike row/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /air-strike row/);
+  assert.match(joined(strategicGates()), /wipe below 50%/);
 });
 
 test('callback coaching states the empty-list event-driven consequence', () => {
@@ -222,14 +223,10 @@ test('callback coaching states the empty-list event-driven consequence', () => {
 test('option-copy bullets keep the mode noun and the absent-table sentences', () => {
   const strategic = joined(strategicGates());
   assert.match(strategic, /already this-turn legal destinations/);
-  assert.match(strategic, /Call plan_route only for a destination the table does not list for that unit\./);
+  assert.match(strategic, /When it lists none, call plan_route or leave the unit idle/);
   const tactical = joined(tacticalGates());
   assert.match(tactical, /already this-beat legal destinations/);
-  assert.match(tactical, /Call plan_route only for a destination the table does not list for that sub-unit\./);
-  const absent =
-    'No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
-  assert.ok(joined(strategicGates({ hasBestOptionsTable: false })).includes(absent));
-  assert.ok(joined(tacticalGates({ hasBestOptionsTable: false })).includes(absent));
+  assert.match(tactical, /When it lists none, call plan_route or leave the sub-unit idle/);
   assert.ok(
     joined(strategicGates({ hasBestOptionsTable: false, planningEnabled: false })).includes(
       "the unit's own cell means hold."

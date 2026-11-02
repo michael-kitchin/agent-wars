@@ -45,6 +45,12 @@ export function decodeOpenRouterToolArgsForExecution(
       }
       return out;
     }
+    if (toolName === 'get_map') {
+      const center = a.center;
+      if (typeof center === 'string' && HEX_CODE_PATTERN.test(center)) {
+        return { ...a, center: codeToLatLngRounded(center, context) };
+      }
+    }
     if (toolName === 'assess_hex') {
       const pos = a.position;
       if (typeof pos === 'string' && HEX_CODE_PATTERN.test(pos)) {

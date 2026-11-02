@@ -301,8 +301,11 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
     includeMemoryUpdates: true,
     includeProductionOrders: true,
   });
-  assert.ok(tactical.includes('assign_order'));
-  assert.ok(tactical.includes('cancel_order'));
+  assert.ok(!tactical.includes('assign_order'));
+  assert.ok(!tactical.includes('cancel_order'));
+  assert.ok(tactical.includes('Memory updates and production orders are not accepted this beat.'));
+  assert.ok(!tactical.toLowerCase().includes('memoryupdates'));
+  assert.ok(!tactical.toLowerCase().includes('productionorders'));
   assert.ok(tactical.includes("sub-unit's current cell"));
   assert.ok(tactical.includes('already arrived'));
   assert.match(tactical, /stack/i);

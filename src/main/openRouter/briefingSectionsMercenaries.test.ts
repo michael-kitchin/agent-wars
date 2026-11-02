@@ -38,3 +38,25 @@ test('the section names the treasury and the mercenary, and a battle omits it', 
     assert.equal(quiet.includes('## Raise Options'), false);
   });
 });
+
+test('zero credits with nothing to rehire is one line, and an owned mercenary keeps upkeep', () => {
+  withTempGameDb('aw-brief-merc-empty-', () => {
+    const seat = AI_SEAT_IDS[0];
+    setTreasuryCredits(seat, 0);
+    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const empty = { ...loaded, units: loaded.units.filter((unit) => unit.player === seat) };
+    const short = buildMercenariesBriefingBlock(empty, (hex) => hex, 'strategic', { productionEnabled: true });
+    assert.equal(short, `# ${SECTION_TITLE_MERCENARIES}\n\nTreasury: 0 credits. No one to rehire.`);
+    assert.equal(short.includes('desert'), false);
+    const home = getSeatRoster().find((row) => row.seatId === seat);
+    assert.ok(home);
+    const h3 = getScenarioHomeRegionHexes(home.homeRegion)[0];
+    assert.ok(h3);
+    createStrategicUnit({ owner: seat, unitType: 'infantry', h3Index: h3, turnNumber: 1, isMercenary: true });
+    const owned = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const full = buildMercenariesBriefingBlock(owned, (hex) => hex, 'strategic', { productionEnabled: true });
+    assert.ok(full.includes('each mercenary costs its upkeep'));
+    assert.ok(full.includes('## Your Mercenaries'));
+    assert.equal(full.includes('No one to rehire.'), false);
+  });
+});

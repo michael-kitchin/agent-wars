@@ -2,11 +2,22 @@ import { logDebug, logInfo } from '../logger';
 import type { ConsultTelemetry } from './consultTelemetry';
 import type { OpenRouterChatTransport, OpenRouterChatTransportResult } from './openRouterChatTransport';
 import {
+  isCacheBreakpointDroppedForModel,
   isRequiredToolChoiceRejectedForModel,
+  isSituationMessagesJoinedForModel,
   isStructuredOutputsRejectedForModel,
+  markCacheBreakpointDroppedForModel,
   markRequiredToolChoiceRejectedForModel,
+  markSituationMessagesJoinedForModel,
   markStructuredOutputsRejectedForModel,
 } from './openRouterModelCapabilities';
+import {
+  applySystemCacheBreakpoint,
+  isCacheBreakpointRejection,
+  isConsecutiveUserMessageRejection,
+  joinOpeningUserMessages,
+  modelUsesExplicitPromptCache,
+} from './promptCacheBreakpoint';
 import { applyProviderSortToChatBody } from './openRouterProviderRouting';
 import type { OrdersRequestProfile } from './ordersRequestProfile';
 
@@ -164,15 +175,85 @@ export async function postOrdersChatRequest(args: {
     return retry;
   };
 
-  if (!useStructuredOutputs) return sendRecoveringToolChoice(requestBody);
+  /**
+   * Copies the body with the session's cache mark and, when needed, one opening user message.
+   *
+   * Purpose: The transcript the tool loop keeps is unchanged. Only this HTTP body carries the mark or the join.
+   * When to use: Every send, including a schema retry.
+   * Expected outcome: A google or anthropic model that has not rejected the mark gets it on the system message.
+   * Exceptions: None.
+   */
+  const prepareCachedBody = (body: Record<string, unknown>): Record<string, unknown> => {
+    const joined = isSituationMessagesJoinedForModel(modelId) ? joinOpeningUserMessages(body) : body;
+    if (!modelUsesExplicitPromptCache(modelId) || isCacheBreakpointDroppedForModel(modelId)) return joined;
+    return applySystemCacheBreakpoint(joined);
+  };
+
+  /**
+   * Sends one body, then retries once for a cache-mark rejection and once for consecutive user messages.
+   *
+   * Purpose: Those two refusals are not schema refusals, and each is tried at most once.
+   * When to use: The plain request, the schema request, and the schema-free retry.
+   * Expected outcome: A cache rejection resends without the mark. A role rejection resends with the lead-in
+   * on the first line of the situation and keeps the mark when the error did not mention it.
+   * Exceptions: None. An aborted signal returns Cancelled before the next send.
+   */
+  const sendPrepared = async (body: Record<string, unknown>): Promise<OpenRouterChatTransportResult> => {
+    let result = await sendRecoveringToolChoice(prepareCachedBody(body));
+    if (!result.ok && isCacheBreakpointRejection(result) && !isCacheBreakpointDroppedForModel(modelId)) {
+      logInfo('ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected', {
+        requestLabel,
+        modelId,
+        error: result.error,
+      });
+      if (signal?.aborted) return { ok: false, error: 'Cancelled' };
+      onLog?.('Model rejected the prompt cache mark; retrying once without it.', false);
+      settings.telemetry?.recordFallback('cacheBreakpointDropped');
+      markCacheBreakpointDroppedForModel(modelId);
+      result = await sendRecoveringToolChoice(prepareCachedBody(body));
+    }
+    if (!result.ok && isConsecutiveUserMessageRejection(result) && !isSituationMessagesJoinedForModel(modelId)) {
+      logInfo('ordersChatRequestHelpers postOrdersChatRequest: consecutive user messages rejected', {
+        requestLabel,
+        modelId,
+        error: result.error,
+      });
+      if (signal?.aborted) return { ok: false, error: 'Cancelled' };
+      onLog?.('Model rejected two user messages; retrying once with the situation joined.', false);
+      settings.telemetry?.recordFallback('situationMessagesJoined');
+      markSituationMessagesJoinedForModel(modelId);
+      result = await sendRecoveringToolChoice(prepareCachedBody(body));
+    }
+    if (!result.ok && isCacheBreakpointRejection(result) && !isCacheBreakpointDroppedForModel(modelId)) {
+      logInfo('ordersChatRequestHelpers postOrdersChatRequest: cache breakpoint rejected after join', {
+        requestLabel,
+        modelId,
+        error: result.error,
+      });
+      if (signal?.aborted) return { ok: false, error: 'Cancelled' };
+      onLog?.('Model rejected the prompt cache mark; retrying once without it.', false);
+      settings.telemetry?.recordFallback('cacheBreakpointDropped');
+      markCacheBreakpointDroppedForModel(modelId);
+      result = await sendRecoveringToolChoice(prepareCachedBody(body));
+    }
+    return result;
+  };
+
+  if (!useStructuredOutputs) return sendPrepared(requestBody);
 
   const withSchema = {
     ...requestBody,
     response_format: settings.responseFormat,
     plugins: [RESPONSE_HEALING_PLUGIN],
   };
-  const first = await sendRecoveringToolChoice(withSchema);
-  if (first.ok || first.status === undefined || !STRUCTURED_OUTPUT_REJECTION_STATUSES.has(first.status)) {
+  const first = await sendPrepared(withSchema);
+  if (
+    first.ok
+    || first.status === undefined
+    || !STRUCTURED_OUTPUT_REJECTION_STATUSES.has(first.status)
+    || isCacheBreakpointRejection(first)
+    || isConsecutiveUserMessageRejection(first)
+  ) {
     return first;
   }
   logInfo('ordersChatRequestHelpers postOrdersChatRequest: structured output request rejected', {
@@ -184,7 +265,7 @@ export async function postOrdersChatRequest(args: {
   if (signal?.aborted) return { ok: false, error: 'Cancelled' };
   onLog?.('Model rejected the structured JSON request; retrying once without it.', false);
   settings.telemetry?.recordFallback('structuredOutputDropped');
-  const retry = await sendRecoveringToolChoice(requestBody);
+  const retry = await sendPrepared(requestBody);
   if (retry.ok) markStructuredOutputsRejectedForModel(modelId);
   return retry;
 }

@@ -3,7 +3,7 @@
  *
  * Purpose: Locks prompt map scope without coupling to OpenRouter; run via `npm test` after `build:main`.
  * When to use: After changes to `briefingMapSection`, grid projection, or registry selection.
- * Expected outcome: Strategic map includes every strategic code; tactical map includes every tactical code in the battle; fog hides enemy markers when hexes are not visible.
+ * Expected outcome: Strategic map includes every strategic code; the tactical map is the window around units and listed targets; fog hides enemy markers when hexes are not visible.
  * Exceptions: None; failures indicate regressions in briefing map assembly.
  */
 
@@ -16,7 +16,15 @@ import { buildTacticalAiPlanState } from '../../tacticalBattle/buildTacticalAiPl
 import { tacticalParentCell, tacticalUnderCorner } from '../../tacticalBattle/testSupport/tacticalHexFixtures';
 import { buildStrategicOperationalMapSectionMarkdown, buildTacticalOperationalMapSectionMarkdown } from './briefingMapSection';
 import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicH3Indexes } from './hexCoordinates';
-import { projectTacticalFootprintToAsciiGrid } from './tacticalAsciiGridProjection';
+import {
+  projectTacticalFootprintToAsciiGrid,
+  projectTacticalMapWindow,
+  selectTacticalMapWindowCells,
+  tacticalMapWindowIndentsFirstRow,
+} from './tacticalAsciiGridProjection';
+import { emptyOverlayGlyph, renderHexAsciiMap, type HexMapCellState } from './hexMapRenderer';
+import { renderDisplacedFeaturesLine } from './briefingTables';
+import type { HexGrid } from './hexGridProjection';
 
 /**
  * Documents the module-scope binding `STRATEGIC_CTX` (STRATEGIC_CTX).
@@ -198,14 +206,14 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
 }
 
 /**
- * Defines the `testTacticalOperationalMapIncludesAllTacticalCodes` function shape.
+ * Defines the `testTacticalOperationalMapWindow` function shape.
  *
- * Purpose: Locks tactical prompt map to the full battle tactical footprint (all children in snapshot).
+ * Purpose: Locks the tactical prompt map to the cells around units and listed targets.
  * When to use: When tactical briefing or `buildTacticalAiPlanState` selection changes.
- * Expected outcome: Fence map tokens match tactical registry size for every tactical child listed on the battle.
+ * Expected outcome: The fence lists fewer codes than the footprint, includes the unit's code, and states how many cells are shown.
  * Exceptions: None.
  */
-function testTacticalOperationalMapIncludesAllCodes(): void {
+function testTacticalOperationalMapWindow(): void {
   const parentCell = tacticalParentCell(12, 34);
   const tacticalChildren = [...cellToChildren(parentCell, 4)];
   assert.ok(tacticalChildren.length > 1, 'fixture should include multiple res4 cells');
@@ -245,13 +253,74 @@ function testTacticalOperationalMapIncludesAllCodes(): void {
   const body = firstFenceBody(md);
   const tokens = collectCodeTokensFromMapAscii(body);
   const tacticalCtx = { mode: 'tactical' as const, battleId: tactical.battleId };
-  const expectedCodes = new Set(
-    tacticalChildren.map((h3) => getHexCodeForContext(h3, tacticalCtx)).filter(Boolean) as string[]
-  );
-  assert.strictEqual(tokens.size, expectedCodes.size, 'tactical map should list each battle res4 code once');
-  for (const code of expectedCodes) {
-    assert.ok(tokens.has(code), `missing tactical code ${code} in operational map`);
+  const unitCode = getHexCodeForContext(tacticala, tacticalCtx);
+  assert.ok(unitCode, 'unit cell should have a tactical code');
+  assert.ok(tokens.has(unitCode), 'window should include the unit cell');
+  assert.ok(tokens.size < tacticalChildren.length, 'window should omit cells far from the unit');
+  const shown = md.match(/Shown: (\d+) of (\d+) cells around your units and the listed targets\./);
+  assert.ok(shown, 'a cropped map should say how many cells are shown');
+  assert.strictEqual(Number(shown[1]), tokens.size);
+  assert.strictEqual(Number(shown[2]), tacticalChildren.length);
+}
+
+/**
+ * Locks that a listed target outside the unit radius stays on the map.
+ *
+ * Purpose: A shot the table recommends must be visible even when it is more than two steps away.
+ * When to use: After `selectTacticalMapWindowCells` changes.
+ * Expected outcome: The far cell is absent until it is passed as a target, then present.
+ * Exceptions: None.
+ */
+function testTacticalMapWindowKeepsListedTarget(): void {
+  const center = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+  const footprint = gridDisk(center, 3);
+  const near = new Set(gridDisk(center, 2));
+  const far = footprint.find((cell) => !near.has(cell));
+  assert.ok(far, 'a radius-3 disk should contain a cell beyond radius 2');
+  const withoutTarget = selectTacticalMapWindowCells({
+    footprint,
+    occupiedH3: [center],
+    targetH3: [],
+  });
+  assert.ok(withoutTarget.includes(center));
+  assert.ok(!withoutTarget.includes(far!));
+  assert.ok(withoutTarget.length < footprint.length);
+  const withTarget = selectTacticalMapWindowCells({
+    footprint,
+    occupiedH3: [center],
+    targetH3: [far!],
+  });
+  assert.ok(withTarget.includes(far!));
+}
+
+/**
+ * Locks row indent when the crop starts on a row the full map indented.
+ *
+ * Purpose: Shifting the window back to row zero must not flip which rows are indented.
+ * When to use: After `projectTacticalMapWindow` changes.
+ * Expected outcome: An odd row delta sets `indentFirstRow`, and the rendered first row starts with a space.
+ * Exceptions: None.
+ */
+function testTacticalMapWindowKeepsRowIndent(): void {
+  assert.strictEqual(tacticalMapWindowIndentsFirstRow(1, 0), true);
+  assert.strictEqual(tacticalMapWindowIndentsFirstRow(2, 0), false);
+  const parentCell = tacticalParentCell(12, 34);
+  const footprint = [...cellToChildren(parentCell, 4)];
+  const context = { mode: 'tactical' as const, battleId: 'indent-window' };
+  initTacticalCoordinateRegistry(context.battleId, parentCell);
+  let indented: HexGrid | undefined;
+  for (const cell of footprint) {
+    const grid = projectTacticalMapWindow({ footprint, window: [cell], context });
+    if (grid.indentFirstRow === true) {
+      indented = grid;
+      break;
+    }
   }
+  assert.ok(indented, 'some one-cell window of a res4 footprint should start on an indented row');
+  const game = new Map(indented!.cells.map((cell) => [cell.h3Index, blankCell('land')]));
+  const rendered = renderHexAsciiMap(indented!, game);
+  const firstRow = rendered.mapString.split('\n')[0] ?? '';
+  assert.ok(firstRow.startsWith(' '), 'an indented window should print a leading space on row 0');
 }
 
 /**
@@ -336,7 +405,8 @@ function testTacticalMapShowsChildTerrainAndUrban(): void {
     return undefined;
   };
   assert.equal(glyphUnder(landCode)?.[0], 'x');
-  assert.equal(glyphUnder(waterCode)?.[0], '.');
+  assert.equal(glyphUnder(waterCode), `.-`);
+  assert.equal(emptyOverlayGlyph, '-');
   assert.match(glyphUnder(urbanCode) ?? '', /^x[Uu]$/);
   assert.match(glyphUnder(portCode) ?? '', /^x[Bb]$/);
 }
@@ -349,6 +419,71 @@ function testTacticalMapShowsChildTerrainAndUrban(): void {
  * Expected outcome: Row count comfortably above 3, one cell per footprint index, unique grid slots.
  * Exceptions: None.
  */
+/**
+ * Builds a discovered cell with no features and no units.
+ *
+ * Purpose: The overlay tests start from a blank cell and set only the field under test.
+ * When to use: Direct `renderHexAsciiMap` fixtures in this file.
+ * Expected outcome: A discovered cell of the given land or water band.
+ * Exceptions: None.
+ */
+function blankCell(terrain: 'land' | 'water'): HexMapCellState {
+  return {
+    terrain,
+    isDiscovered: true,
+    features: { hasAirport: false, hasSeaport: false, urbanCount: 0 },
+    controlledByAI: true,
+    aiUnitCount: 0,
+    enemyUnitCount: 0,
+  };
+}
+
+/**
+ * Locks the empty overlay glyph, the displaced-feature footnote, and first-row indent.
+ *
+ * Purpose: `.` is water, so an empty overlay must be `-`, and a cropped grid must be able to indent row 0.
+ * When to use: After changes to `renderHexAsciiMap`.
+ * Expected outcome: Bare land is `x-`, bare water is `.-`, a unit on a feature is footnoted, and `indentFirstRow` indents row 0 only.
+ * Exceptions: None.
+ */
+function testEmptyOverlayGlyphAndFirstRowIndent(): void {
+  const grid: HexGrid = {
+    cells: [
+      { h3Index: 'land', code: 'AA', row: 0, col: 0, lat: 0, lng: 0 },
+      { h3Index: 'water', code: 'AB', row: 0, col: 1, lat: 0, lng: 1 },
+      { h3Index: 'own', code: 'AC', row: 0, col: 2, lat: 0, lng: 2 },
+      { h3Index: 'port', code: 'AD', row: 0, col: 3, lat: 0, lng: 3 },
+      { h3Index: 'row1', code: 'AE', row: 1, col: 0, lat: 1, lng: 0 },
+    ],
+    numRows: 2,
+    numCols: 4,
+    indentFirstRow: true,
+  };
+  const own = blankCell('land');
+  own.aiUnitCount = 1;
+  const port = blankCell('land');
+  port.aiUnitCount = 1;
+  port.features = { hasAirport: true, hasSeaport: false, urbanCount: 0 };
+  const game = new Map<string, HexMapCellState>([
+    ['land', blankCell('land')],
+    ['water', blankCell('water')],
+    ['own', own],
+    ['port', port],
+    ['row1', blankCell('land')],
+  ]);
+  const rendered = renderHexAsciiMap(grid, game);
+  const lines = rendered.mapString.split('\n');
+  const row0Bottom = lines[1]?.slice(1) ?? '';
+  assert.equal(row0Bottom.slice(0, 2), 'x-');
+  assert.equal(row0Bottom.slice(3, 5), '.-');
+  assert.equal(row0Bottom.slice(6, 8), 'x*');
+  const footnote = renderDisplacedFeaturesLine(rendered.displacedFeatures);
+  assert.equal(footnote.includes('AC('), false);
+  assert.ok(footnote.includes('AD(A)'), footnote);
+  assert.equal(lines[0]?.startsWith(' '), true);
+  assert.equal(lines[2]?.startsWith(' '), false);
+}
+
 function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
   const strategic = tacticalParentCell(12, 34);
   const tacticalChildren = [...cellToChildren(strategic, 4)];
@@ -379,8 +514,11 @@ const tests = [
     fn: testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty,
   },
   { name: 'strategic fog hides enemy markers in fenced map', fn: testStrategicFogHidesEnemyMarkersOnMap },
-  { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllCodes },
+  { name: 'tactical operational map windows around units', fn: testTacticalOperationalMapWindow },
+  { name: 'tactical map window keeps a listed target', fn: testTacticalMapWindowKeepsListedTarget },
+  { name: 'tactical map window keeps row indent', fn: testTacticalMapWindowKeepsRowIndent },
   { name: 'tactical map uses child land/water and urban overlay', fn: testTacticalMapShowsChildTerrainAndUrban },
+  { name: 'empty overlay is a dash and the first row can be indented', fn: testEmptyOverlayGlyphAndFirstRowIndent },
   {
     name: 'tactical ascii grid uses many rows (IJ projection not latitude ribbon)',
     fn: testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon,

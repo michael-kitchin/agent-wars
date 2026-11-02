@@ -86,6 +86,7 @@ test('opening message omits system-owned rules for every gate combination', () =
   ];
   for (const gates of samples) {
     const text = buildOpeningUserMessage(gates);
+    assert.ok(!text.includes('system prompt'), text);
     for (const banned of SYSTEM_OWNED_RULES) {
       assert.ok(!text.includes(banned), `opening message restates a system rule: ${banned.slice(0, 48)}`);
     }

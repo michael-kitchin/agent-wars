@@ -19,6 +19,8 @@ import { executeRequestOrdersTool } from './requestOrdersToolDispatch';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import { isRequiredToolChoiceRejectedForModel } from './openRouterModelCapabilities';
+import { cacheTokensFromChatUsage } from './consultTelemetry';
+import { parseOrdersChatCompletion } from './ordersChatCompletion';
 import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import {
@@ -68,6 +70,24 @@ export interface RequestOrdersUsageTotals {
    * Exceptions: None.
    */
   totalOutputTokens: number;
+  /**
+   * Cached prompt tokens accumulated on this consultation.
+   *
+   * Contract: Optional. Absent until a body reports `cached_tokens`.
+   * When to use: Added next to `totalInputTokens`.
+   * Expected outcome: Sum of reported cache reads.
+   * Exceptions: None.
+   */
+  totalCachedTokens?: number;
+  /**
+   * Cache-write tokens accumulated on this consultation.
+   *
+   * Contract: Optional. Absent until a body reports `cache_write_tokens`.
+   * When to use: Added next to `totalInputTokens`.
+   * Expected outcome: Sum of reported cache writes.
+   * Exceptions: None.
+   */
+  totalCacheWriteTokens?: number;
 }
 
 /**
@@ -423,27 +443,8 @@ export async function runRequestOrdersToolLoop(
       logError('openRouter requestOrders: seat has no opponent index; response log uses opponent 1', { seatId: responseSeatId });
     }
     logResponsePreview('openRouter requestOrders: raw response body', chatResponse.bodyText, responseAiIndex ?? 1);
-    let json: {
-      choices?: Array<{
-        message?: {
-          content?: string | null;
-          tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
-        };
-      }>;
-      usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
-    };
-    try {
-      const responseText = chatResponse.bodyText;
-      json = JSON.parse(responseText) as {
-        choices?: Array<{
-          message?: {
-            content?: string | null;
-            tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
-          };
-        }>;
-        usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
-      };
-    } catch {
+    const json = parseOrdersChatCompletion(chatResponse.bodyText);
+    if (json === null) {
       const errorMessage = 'AI response was not valid JSON. Please try again.';
       if (onLog) onLog(errorMessage, true);
       return { kind: 'fail', error: errorMessage };
@@ -451,6 +452,9 @@ export async function runRequestOrdersToolLoop(
     usage.requestCost += json.usage?.cost ?? 0;
     usage.totalInputTokens += json.usage?.prompt_tokens ?? 0;
     usage.totalOutputTokens += json.usage?.completion_tokens ?? 0;
+    const cacheTokens = cacheTokensFromChatUsage(json.usage);
+    usage.totalCachedTokens = (usage.totalCachedTokens ?? 0) + cacheTokens.cachedTokens;
+    usage.totalCacheWriteTokens = (usage.totalCacheWriteTokens ?? 0) + cacheTokens.cacheWriteTokens;
     const head = json.choices?.[0] as { finish_reason?: string; native_finish_reason?: string } | undefined;
     const finishReason = head?.finish_reason;
     const nativeFinish = head?.native_finish_reason;

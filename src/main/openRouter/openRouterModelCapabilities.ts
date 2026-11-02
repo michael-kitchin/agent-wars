@@ -34,6 +34,26 @@ const structuredOutputsRejectedModelIds = new Set<string>();
 const requiredToolChoiceRejectedModelIds = new Set<string>();
 
 /**
+ * Model ids whose provider rejected the explicit prompt-cache mark this session.
+ *
+ * Purpose: A later consult skips the mark instead of failing the same way on every call.
+ * When to use: Written when a response mentions `cache_control`; read before marking a body.
+ * Expected outcome: Cleared only on app restart, or by the test reset.
+ * Exceptions: None.
+ */
+const cacheBreakpointDroppedModelIds = new Set<string>();
+
+/**
+ * Model ids whose provider rejected two user messages in a row this session.
+ *
+ * Purpose: Later consults start with the lead-in on the first line of the situation.
+ * When to use: Written when a response rejects consecutive user roles; read when building messages.
+ * Expected outcome: Cleared only on app restart, or by the test reset.
+ * Exceptions: None.
+ */
+const situationMessagesJoinedModelIds = new Set<string>();
+
+/**
  * Model ids whose activity-log notice about missing tool support was already shown this session.
  *
  * Purpose: A model without tool support is consulted every turn; the player needs the notice once, not every turn.
@@ -172,6 +192,58 @@ export function isStructuredOutputsRejectedForModel(modelId: string): boolean {
 }
 
 /**
+ * Records that a model's provider rejected the prompt-cache mark.
+ *
+ * Purpose: Later requests for that model go out without the mark.
+ * When to use: After a response whose error mentions `cache_control`.
+ * Expected outcome: `isCacheBreakpointDroppedForModel(modelId)` returns true afterward.
+ * Exceptions: None.
+ */
+export function markCacheBreakpointDroppedForModel(modelId: string): void {
+  logDebug('openRouterModelCapabilities markCacheBreakpointDroppedForModel', { modelId });
+  cacheBreakpointDroppedModelIds.add(modelId);
+}
+
+/**
+ * Reports whether the cache mark was already rejected for a model this session.
+ *
+ * Purpose: Lets the chat request skip a mark that is known to fail.
+ * When to use: Before applying the breakpoint to an HTTP body.
+ * Expected outcome: True after `markCacheBreakpointDroppedForModel(modelId)`.
+ * Exceptions: None.
+ */
+export function isCacheBreakpointDroppedForModel(modelId: string): boolean {
+  logTrace('openRouterModelCapabilities isCacheBreakpointDroppedForModel', { modelId });
+  return cacheBreakpointDroppedModelIds.has(modelId);
+}
+
+/**
+ * Records that a model's provider rejected two user messages in a row.
+ *
+ * Purpose: Later consults start with the lead-in joined onto the situation.
+ * When to use: After a response that says the roles must alternate.
+ * Expected outcome: `isSituationMessagesJoinedForModel(modelId)` returns true afterward.
+ * Exceptions: None.
+ */
+export function markSituationMessagesJoinedForModel(modelId: string): void {
+  logDebug('openRouterModelCapabilities markSituationMessagesJoinedForModel', { modelId });
+  situationMessagesJoinedModelIds.add(modelId);
+}
+
+/**
+ * Reports whether this model should start a consult with one situation message.
+ *
+ * Purpose: A joined first user message changes every call, so sticky routing misses, but the consult still runs.
+ * When to use: `buildConsultMessages` and the HTTP body copy.
+ * Expected outcome: True after `markSituationMessagesJoinedForModel(modelId)`.
+ * Exceptions: None.
+ */
+export function isSituationMessagesJoinedForModel(modelId: string): boolean {
+  logTrace('openRouterModelCapabilities isSituationMessagesJoinedForModel', { modelId });
+  return situationMessagesJoinedModelIds.has(modelId);
+}
+
+/**
  * Records that a model's provider rejected `tool_choice: required`.
  *
  * Purpose: Later rounds use `auto` instead of failing the same way on every consultation.
@@ -218,7 +290,7 @@ export function recordNoToolCallingNoticeForModel(modelId: string): boolean {
  *
  * Purpose: Test isolation for modules that read this state.
  * When to use: At the start of each test that depends on capabilities, rejections, or notices.
- * Expected outcome: The capability cache, both rejection sets, and the missing-tool-support notice set are empty.
+ * Expected outcome: The capability cache, the rejection sets, and the missing-tool-support notice set are empty.
  * Exceptions: None.
  */
 export function resetOpenRouterModelCapabilitiesForTests(): void {
@@ -226,5 +298,7 @@ export function resetOpenRouterModelCapabilitiesForTests(): void {
   modelsById.clear();
   structuredOutputsRejectedModelIds.clear();
   requiredToolChoiceRejectedModelIds.clear();
+  cacheBreakpointDroppedModelIds.clear();
+  situationMessagesJoinedModelIds.clear();
   noToolCallingNoticeModelIds.clear();
 }

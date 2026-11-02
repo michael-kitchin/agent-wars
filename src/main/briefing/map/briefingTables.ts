@@ -11,6 +11,7 @@ import { buildPromptTableLines } from '../../promptTableHelpers';
 import { logDebug, logTrace } from '../../logger';
 import type { PossibleActionTableRow } from '../../openRouter/possibleUnitActionsTableAssembly';
 import { bestOptionsActionLabels, selectTopRowsPerUnit } from '../../openRouter/possibleUnitActionsTableAssembly';
+import type { BestOptionsOddsRow } from './bestOptionsOdds';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hexCodeTranslator';
 import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openRouter/promptSpec/sectionHeadings';
@@ -34,22 +35,19 @@ function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow, acti
 }
 
 /**
- * Merges option rows that offer the identical action and target into one row listing every unit that shares it.
+ * Merges option rows that offer the same action and target into one row listing every unit that shares it.
  *
- * Purpose: Units stacked on one hex each produce the same handful of options, so the per-unit table repeats itself
- * once per unit. A captured turn listed 518 rows carrying only 67 distinct options, and that redundancy dominated the
- * prompt. Collapsing it keeps every unit addressable while cutting the block to roughly a quarter of its size.
- * When to use: `renderThisTurnOptionsTableMarkdown`, after the per-unit cap has already chosen which options survive.
- * Expected outcome: One entry per distinct `(action, hex, target units, infrastructure)` tuple, in first-appearance
- * order, with `unitIds` in the order those units were encountered so the table stays stable turn to turn.
+ * Purpose: Stacked units repeat the same options. Collapsing them keeps every unit addressable, and keeps `targetH3` for the odds call.
+ * When to use: After the per-unit cap has chosen which options survive.
+ * Expected outcome: One entry per distinct action, hex, target text, and infrastructure, in first-appearance order. `targetH3` is the first row's cell.
  * Exceptions: None.
  */
 function groupThisTurnOptionRowsByTarget(
-  rows: readonly { unitId: string; action: string; hex: string; targetUnits: string; infrastructure: string }[]
-): Array<{ unitIds: string[]; action: string; hex: string; targetUnits: string; infrastructure: string }> {
+  rows: readonly { unitId: string; action: string; hex: string; targetH3: string; targetUnits: string; infrastructure: string }[]
+): Array<{ unitIds: string[]; action: string; hex: string; targetH3: string; targetUnits: string; infrastructure: string }> {
   const byTarget = new Map<
     string,
-    { unitIds: string[]; action: string; hex: string; targetUnits: string; infrastructure: string }
+    { unitIds: string[]; action: string; hex: string; targetH3: string; targetUnits: string; infrastructure: string }
   >();
   for (const row of rows) {
     const key = [row.action, row.hex, row.targetUnits, row.infrastructure].join('\u0000');
@@ -62,6 +60,7 @@ function groupThisTurnOptionRowsByTarget(
       unitIds: [row.unitId],
       action: row.action,
       hex: row.hex,
+      targetH3: row.targetH3,
       targetUnits: row.targetUnits,
       infrastructure: row.infrastructure,
     });
@@ -74,13 +73,17 @@ function groupThisTurnOptionRowsByTarget(
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; an air-strike row drops text from `; strike:` onward when that suffix is present); at most five target hexes per unit, with each distinct action on a hex kept as its own row; units sharing an identical option are listed together in `Unit IDs`.
+ * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units`, `Target Infrastructure`, and `Odds`. At most five target hexes per unit. An absent odds resolver fills Odds with an em dash.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
+const BEST_OPTIONS_ODDS_LINE =
+  'Odds is the chance this row wipes out the defenders, and the chance you lose a unit, if every listed unit takes part. An em dash is not a fight, or it could not be estimated.';
+
 export function renderThisTurnOptionsTableMarkdown(
   rows: PossibleActionTableRow[],
   latLngByH3: Map<string, [number, number]>,
-  context: CoordinateContext
+  context: CoordinateContext,
+  resolveOdds?: (row: BestOptionsOddsRow) => string
 ): string {
   logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', {
     rowCount: rows.length,
@@ -96,6 +99,7 @@ export function renderThisTurnOptionsTableMarkdown(
       unitId: r.unitId,
       action,
       hex,
+      targetH3: r.targetH3,
       targetUnits,
       infrastructure: infrastructureCellForThisTurnOptionsRow(r, action),
     }));
@@ -106,12 +110,19 @@ export function renderThisTurnOptionsTableMarkdown(
     groupedRowCount: grouped.length,
     mode: context.mode,
   });
-  const body = grouped.map((g) => [g.unitIds.join(', '), g.action, g.hex, g.targetUnits, g.infrastructure]);
+  const body = grouped.map((g) => [
+    g.unitIds.join(', '),
+    g.action,
+    g.hex,
+    g.targetUnits,
+    g.infrastructure,
+    resolveOdds ? resolveOdds(g) : '—',
+  ]);
   const lines = buildPromptTableLines(
-    ['Unit IDs', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure'],
+    ['Unit IDs', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure', 'Odds'],
     body
   );
-  return `${lines.join('\n')}\n`;
+  return `${lines.join('\n')}\n\n${BEST_OPTIONS_ODDS_LINE}\n`;
 }
 
 /**

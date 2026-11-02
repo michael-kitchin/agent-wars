@@ -83,6 +83,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   coordinateMode?: 'strategic' | 'tactical';
+  /**
+   * When true, the request already attaches the JSON schema, so the prose does not restate it.
+   *
+   * Contract: Omitted means false. The field meanings, the action list, and the example stay.
+   * When to use: A consult whose profile will attach structured outputs and whose model has not rejected them.
+   * Expected outcome: The skeleton, the strict-schema line, and the legacy top-level-array sentence are absent.
+   * Exceptions: None.
+   */
+  structuredOutputs?: boolean;
 }): string {
   const {
     includeMemoryUpdates,
@@ -96,6 +105,7 @@ export function buildFinalJsonContractInstruction(args: {
     submitMemoryClause,
     productionSubmitClause,
     coordinateMode = 'strategic',
+    structuredOutputs = false,
   } = args;
   logDebug('promptContracts buildFinalJsonContractInstruction', {
     includeMemoryUpdates,
@@ -106,6 +116,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeMissileActions,
     includeExitBattle,
     coordinateMode,
+    structuredOutputs,
   });
   const gates: EnvelopeGates = {
     coordinateMode,
@@ -183,15 +194,15 @@ export function buildFinalJsonContractInstruction(args: {
     ? 'Optional top-level missile launches: missileLaunches[] entries use { "unitId" or "unitIds", "targetHexCode" }; each missile launches once and is spent. '
     : '';
   const callbacksClause = buildCallbackContractClause(coordinateMode);
-  const invalidOutputClause = buildInvalidOutputRulesClause(gates);
+  const invalidOutputClause = buildInvalidOutputRulesClause(gates, structuredOutputs);
   const memoryLimits =
     coordinateMode !== 'tactical' && includeMemoryUpdates ? buildMemoryWriteLimitsClause() : '';
   const memoryClause = coordinateMode === 'tactical' ? '' : submitMemoryClause;
   const productionClause = coordinateMode === 'tactical' ? '' : productionSubmitClause;
   const memoryParagraph = [memoryClause, memoryLimits].map((part) => part.trim()).filter((part) => part.length > 0).join(' ');
   const paragraphs = [
-    submitHeader,
-    ...strictSchemaParagraphs,
+    ...(structuredOutputs ? [] : [submitHeader]),
+    ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
     ...ordersParagraphs,
     airClause.trim(),
     missileClause.trim(),

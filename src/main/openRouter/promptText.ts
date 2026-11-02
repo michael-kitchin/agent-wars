@@ -244,37 +244,32 @@ export function buildAvailableToolsIntro(
   }
   if (coordinateMode === 'tactical') {
     const briefingLead = 'Use the Commander\'s Briefing above for assessments and possible unit actions.';
-    if (!hasBestOptionsTable) {
-      const routing = flags.planningEnabled
-        ? ' Destinations must come from the routing tool, not from an absent options table.'
-        : '';
-      return `${briefingLead} No options are listed this period.${routing}\n`;
-    }
     const { lead, neverCopy } = splitNeverCopySentence(
       buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits })
     );
-    const paragraphs = [`${briefingLead} ${lead}`, neverCopy];
-    if (flags.planningEnabled) paragraphs.push('Use plan_route only for dests not listed for that sub-unit.');
+    const paragraphs = [
+      `${briefingLead} When Best Options This Turn lists a target for a sub-unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the sub-unit idle. ${lead}`,
+      neverCopy,
+    ];
+    if (!flags.planningEnabled) {
+      return `${briefingLead} ${lead}\n\n${neverCopy}\n`;
+    }
     return `${paragraphs.filter((paragraph) => paragraph.length > 0).join('\n\n')}\n`;
   }
   const selectiveTools: string[] = [];
   if (flags.memoryEnabled) selectiveTools.push('memory lookup (memory_read)');
   if (flags.productionEnabled) selectiveTools.push('production queue checks/sets');
   const paragraphs: string[] = [];
-  if (!hasBestOptionsTable) {
-    paragraphs.push(
-      'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.'
-    );
-  } else {
-    const { lead, neverCopy } = splitNeverCopySentence(
-      buildToolsIntroCopySentence({ coordinateMode: 'strategic', hasAirUnits })
-    );
-    paragraphs.push(
-      `Use the Commander's Briefing above for assessments and possible unit actions. ${lead}`,
-      neverCopy,
-      'Use plan_route only for dests not listed for that unit.'
-    );
-  }
+  const { lead, neverCopy } = splitNeverCopySentence(
+    buildToolsIntroCopySentence({ coordinateMode: 'strategic', hasAirUnits })
+  );
+  const copyLead = flags.planningEnabled
+    ? `When Best Options This Turn lists a target for a unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the unit idle. ${lead}`
+    : lead;
+  paragraphs.push(
+    `Use the Commander's Briefing above for assessments and possible unit actions. ${copyLead}`,
+    neverCopy
+  );
   if (flags.ordersEnabled) {
     paragraphs.push('Standing-order status is already in the briefing; call query_orders only for a rare detail.');
   }
@@ -312,20 +307,14 @@ export function buildToolUsageGuidance(
         : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
     );
     if (coordinateMode === 'tactical' && flags.assessmentEnabled) {
-      lines.push('- Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. Sub-units of one parent on the same cell match, so assess one of them; assess another sub-unit on that cell when its parent differs.');
-    }
-    if (coordinateMode === 'tactical' && flags.estimationEnabled) {
-      lines.push('- Use estimate_combat before any ranged or melee attack. Do not guess at combat odds.');
+      lines.push('- assess_unit is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.');
     }
   } else {
     if (flags.ordersEnabled || flags.memoryEnabled) {
       lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
     }
     if (flags.assessmentEnabled) {
-      lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. Units that share a hex can differ by type and birth country, so assess each one.');
-    }
-    if (flags.estimationEnabled) {
-      lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
+      lines.push('- assess_unit is optional. Call it only when you cannot tell what that unit can reach or shoot.');
     }
     if (flags.planningEnabled) {
       lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
@@ -412,7 +401,7 @@ export function buildAdjacentCellsFallbackBlock(
 
  * Purpose: When planning tools are on and a briefing is present, approach/move/melee dests may be copied from Best Options This Turn Target Hexes into explicit_move, or from plan_route orderToHexCode. Without a briefing, dests come from plan_route only.
  * When to use: `buildFinalJsonContractInstruction` after computing tool flags.
- * Expected outcome: One or more sentences appended to the final JSON schema block; tactical mode also describes first-leg truncation. The fallback sentence tells the model to copy a listed move hex and to omit explicit_move to stay.
+ * Expected outcome: One or more sentences appended to the final JSON schema block. Tactical mode tells the model which hex code to copy. The first-leg clamp stays in the combat rules. The fallback sentence tells the model to copy a listed move hex and to omit explicit_move to stay.
  * Exceptions: None.
  */
 export function getMovementOrderInstruction(
@@ -422,7 +411,9 @@ export function getMovementOrderInstruction(
    */
   coordinateMode: 'strategic' | 'tactical' = 'strategic',
   /**
-   * When false, there is no Best Options table; dests must come from plan_route orderToHexCode.
+   * When false, this consultation has no briefing, so a destination comes from plan_route.
+   * When true, a listed Best Options target is copied, and plan_route covers a destination the table does not list.
+   * Whether that table has rows does not change this sentence.
    */
   hasPrecomputedBriefing = true
 ): string {
@@ -437,8 +428,8 @@ export function getMovementOrderInstruction(
   const tacticalMarchReachabilityClause =
     coordinateMode === 'tactical'
       ? hasPrecomputedBriefing
-        ? ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy a Best Options This Turn approach or move/melee Target Hex for that unit, or plan_route\'s orderToHexCode, not a guessed adjacent code.'
-        : ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy plan_route\'s orderToHexCode exactly, not a guessed adjacent code.'
+        ? " Copy a Best Options This Turn approach or move/melee Target Hex for that unit, or plan_route's orderToHexCode, not a guessed adjacent code."
+        : " Copy plan_route's orderToHexCode exactly, not a guessed adjacent code."
       : '';
   if (flags.planningEnabled) {
     if (!hasPrecomputedBriefing) {

@@ -12,6 +12,7 @@ import { logDebug, logError } from '../logger';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
 import { buildRepairRequestMessage } from './promptSpec/consultationText';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
+import { cacheTokensFromChatUsage } from './consultTelemetry';
 import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import { logResponsePreview } from './requestOrdersFlowSupport';
@@ -220,7 +221,12 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
   logResponsePreview('openRouter requestOrders repair: raw response body', repairText, args.aiIndex);
   const repairJson = JSON.parse(repairText) as {
     choices?: Array<{ message?: { content?: string | null } }>;
-    usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
+    usage?: {
+      cost?: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+    };
   };
   const repairHead = repairJson.choices?.[0] as { finish_reason?: string; native_finish_reason?: string } | undefined;
   if (repairHead?.finish_reason === 'length' || repairHead?.native_finish_reason === 'MAX_TOKENS') {
@@ -235,6 +241,9 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
   usage.requestCost += repairJson.usage?.cost ?? 0;
   usage.totalInputTokens += repairJson.usage?.prompt_tokens ?? 0;
   usage.totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
+  const repairCacheTokens = cacheTokensFromChatUsage(repairJson.usage);
+  usage.totalCachedTokens = (usage.totalCachedTokens ?? 0) + repairCacheTokens.cachedTokens;
+  usage.totalCacheWriteTokens = (usage.totalCacheWriteTokens ?? 0) + repairCacheTokens.cacheWriteTokens;
   const repairContent = repairJson.choices?.[0]?.message?.content;
   if (typeof repairContent === 'string' && repairContent.trim()) {
     if (onLog) onLog(`Repair assistant text received (${repairContent.length} chars); parsing orders…`);

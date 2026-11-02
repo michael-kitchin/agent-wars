@@ -16,6 +16,7 @@ import { executeCombatEstimation } from '../tools/combatEstimation';
 import { executeMemory } from '../tools/memory';
 import { executeMercenaryTools, isMercenaryToolName } from '../tools/mercenaryTools';
 import { executePathfinding, type PathfindingSession } from '../tools/pathfinding';
+import { executeReferenceTool, REFERENCE_TOOL_NAMES } from '../tools/referenceTools';
 import { executeProductionTools } from '../tools/productionTools';
 import { executeStandingOrders } from '../tools/standingOrders';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -42,7 +43,16 @@ export function executeRequestOrdersTool(args: {
 }): unknown {
   const { toolName, execArgs, actingSeatId, toolState, latLngByH3, resolveToH3, tacticalBattle } = args;
   logDebug('requestOrdersToolDispatch executeRequestOrdersTool', { toolName, actingSeatId });
-  const result = isMercenaryToolName(toolName)
+  const result = (REFERENCE_TOOL_NAMES as readonly string[]).includes(toolName)
+    ? executeReferenceTool({
+        toolName,
+        execArgs,
+        state: toolState,
+        coordinateContext: args.coordinateContext,
+        tacticalBattle,
+        resolveToH3,
+      })
+    : isMercenaryToolName(toolName)
     ? executeMercenaryTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
     : toolName.includes('order') || toolName.includes('standing')
       ? executeStandingOrders(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)

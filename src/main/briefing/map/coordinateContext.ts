@@ -1,5 +1,7 @@
 import { AI_SEAT_IDS, type AiSeatId } from '../../../shared/seatIds';
-import { logTrace } from '../../logger';
+import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
+import type { WeatherState } from '../../../shared/weatherBonusTypes';
+import { logDebug, logTrace } from '../../logger';
 
 /**
  * Describes which coordinate namespace applies when translating 2-character briefing codes.
@@ -74,6 +76,54 @@ export interface CoordinateContext {
    * Exceptions: None.
    */
   hasFortifiedCells?: boolean;
+  /**
+   * Weather of the enclosing strategic hex for this battle.
+   *
+   * Contract: Set only for a tactical consultation. Absent when the battle did not record weather.
+   * When to use: The combat-rules weather gate. Mild omits the weather rules; absent includes them.
+   * Expected outcome: The battle's single weather value, or absent.
+   * Exceptions: None.
+   */
+  battleWeather?: WeatherState;
+  /**
+   * Hides the Unit Status Weather column for this briefing.
+   *
+   * Contract: True only when the weather rules are omitted. Absent leaves the column on its tag check.
+   * When to use: Strategic and tactical briefing builders, from the same weather gate as the combat rules.
+   * Expected outcome: The table has no Weather column.
+   * Exceptions: None.
+   */
+  omitWeatherColumn?: boolean;
+}
+
+/**
+ * Builds the coordinate context for one consultation.
+ *
+ * Purpose: The order flow stays small, and tactical weather travels with the battle id.
+ * When to use: Once at the start of `requestOrders`, from the seat and the optional battle.
+ * Expected outcome: Strategic context is the seat only. Tactical context carries the battle id, beat, fortification flag, and weather.
+ * Exceptions: None.
+ */
+export function coordinateContextForConsultation(input: {
+  readonly seatId: AiSeatId;
+  readonly tacticalBattle?: TacticalBattleSnapshot | null;
+}): CoordinateContext {
+  const battle = input.tacticalBattle ?? null;
+  logDebug('coordinateContext coordinateContextForConsultation', {
+    seatId: input.seatId,
+    mode: battle ? 'tactical' : 'strategic',
+    battleId: battle?.battleId ?? null,
+    battleWeather: battle?.weather ?? null,
+  });
+  if (!battle) return { mode: 'strategic', seatId: input.seatId };
+  return {
+    mode: 'tactical',
+    battleId: battle.battleId,
+    tacticalTurnNumber: battle.tacticalTurnNumber,
+    seatId: input.seatId,
+    hasFortifiedCells: Object.keys(battle.tacticalFortificationOwnerByH3 ?? {}).length > 0,
+    battleWeather: battle.weather,
+  };
 }
 
 /**

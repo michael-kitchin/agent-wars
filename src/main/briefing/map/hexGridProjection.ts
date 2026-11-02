@@ -116,6 +116,15 @@ export interface HexGrid {
    * Exceptions: None.
    */
   numCols: number;
+  /**
+   * Whether displayed row 0 is indented.
+   *
+   * Contract: Absent or false indents odd row indexes, which is the full-map layout. True indents even row indexes.
+   * When to use: A cropped tactical grid whose first absolute row was odd on the full footprint.
+   * Expected outcome: A row that is indented on the full map stays indented in the crop.
+   * Exceptions: None.
+   */
+  indentFirstRow?: boolean;
 }
 
 /**
