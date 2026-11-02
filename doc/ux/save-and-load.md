@@ -41,7 +41,7 @@ A load when no match is loaded, or when the match is over, does not ask. Canceli
 
 The app also keeps the last five automatic saves (`AUTOSAVE_KEEP_COUNT`) in an `autosaves` folder under that version's user-data directory. Each file is one strategic turn, or one tactical turn inside a battle, named `autosave-YYYYMMDD-HHMMSS-mmm-turn-N.agentwars`, with `-battle-turn-T` during a battle, in local time. The player does not choose these files. They can be opened with Load game…, because the Open dialog can start in that folder.
 
-A file does not contain this machine's API keys, the remembered commanders, or the app-wide model and reasoning choices. Each seat's model, reasoning effort, and doctrine stay in the file. The full list is in [save-files.md](../save-files.md).
+A file does not contain this machine's API keys, the remembered commanders, or the app-wide model and reasoning choices. Each seat's model, reasoning effort, provider choice, and doctrine stay in the file. The full list is in [save-files.md](../save-files.md).
 
 ## Inputs and Responses
 

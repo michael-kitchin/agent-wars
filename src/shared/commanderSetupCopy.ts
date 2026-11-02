@@ -9,6 +9,7 @@
  */
 
 import type { NewGameCommanderInput } from './ipc/ordersTypes';
+import { DEFAULT_PROVIDER_SORT, type ProviderSortChoice } from './openRouterProviderSort';
 import { type NewGameSidesState, rowLabel } from './newGameSides';
 import { AI_SEAT_KIND, type DoctrineChoice } from './seatRoster';
 
@@ -39,6 +40,15 @@ export interface RememberedCommander {
    * Exceptions: None.
    */
   readonly reasoningEffort: string | null;
+  /**
+   * How OpenRouter picks a host for that opponent.
+   *
+   * Contract: One of `PROVIDER_SORT_CHOICES`. A snapshot written before this field reads as `throughput`.
+   * When to use: Copy from last game.
+   * Expected outcome: Copied onto the row as `providerSort`.
+   * Exceptions: None.
+   */
+  readonly providerSort: ProviderSortChoice;
   /**
    * Doctrine choice stored for that opponent.
    *
@@ -178,11 +188,36 @@ export function prefillFirstAiApiKey(state: NewGameSidesState, apiKey: string): 
   const index = state.rows.findIndex((row) => row.kind === AI_SEAT_KIND);
   if (index < 0) return state;
   const row = state.rows[index]!;
-  const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
+  const commander = row.commander ?? {
+    modelId: null,
+    reasoningEffort: null,
+    providerSort: DEFAULT_PROVIDER_SORT,
+    doctrineChoice: 'balanced',
+    nickname: '',
+  };
   const rows = state.rows.map((entry, rowIndex) =>
     rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
   );
   return { ...state, rows };
+}
+
+/**
+ * Copies a remembered commander onto a new-game row.
+ *
+ * Purpose: Copy from last game keeps every commander field, including the provider choice.
+ * When to use: The first AI row's copy button.
+ * Expected outcome: A `NewGameCommanderInput` with the remembered model, effort, provider, doctrine, key, and nickname.
+ * Exceptions: None.
+ */
+export function commanderFromRemembered(remembered: RememberedCommander): NewGameCommanderInput {
+  return {
+    modelId: remembered.modelId,
+    reasoningEffort: remembered.reasoningEffort,
+    providerSort: remembered.providerSort,
+    doctrineChoice: remembered.doctrineChoice,
+    apiKey: remembered.apiKey,
+    nickname: remembered.nickname,
+  };
 }
 
 /**

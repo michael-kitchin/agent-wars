@@ -4,7 +4,7 @@ The Tool groups section of the console's Commanders tab: the tool groups the com
 
 ## Purpose
 
-Let the player turn tool groups on or off and see how many times each group was used since the last Ready.
+Let the player turn tool groups on or off and see how many times each group was used in the current consult, across every commander.
 
 ## Availability
 
@@ -12,8 +12,8 @@ Shown while the console's Commanders tab is selected and the console is expanded
 
 ## Information Displayed
 
-- A "Tool groups" heading, with "uses since last Ready, all" beside it.
-- One cell per tool group, in two columns. A cell shows a count of uses since the counters were reset, then the group's label.
+- A "Tool groups" heading, with "uses this consult, all" beside it.
+- One cell per tool group, in two columns. A cell shows the count of uses in the current consult, then the group's label. The count is `toolInvocationCounts` on the commander pool snapshot (`commanderToolCountSum` in `src/main/openRouter/commanderToolCounts.ts`): the sum of that group's uses by every commander who has reported in this consult.
 - The group list comes from the app. If that list has no Events group, Events is added.
 - What the groups do is described in [AI tools](../ai-tools.md).
 - Control tips for these cells are in [control-tooltips.md](control-tooltips.md).
@@ -34,7 +34,7 @@ Shown while the console's Commanders tab is selected and the console is expanded
 
 - All groups start on.
 - When the selected model does not support tool calls, consultations run as if every group of model-callable tools were off. Events still follows its cell, because it decides when consultations happen rather than offering the model a tool. The cells keep their pressed state, and the groups apply again once a model with tool support is selected. The AI activity log says so once per app session for each such model. See [ai-activity-log.md](ai-activity-log.md).
-- Ready resets the counts to zero at click time, then restores the counts from the consultation that just ran. See [modes-and-transitions.md](modes-and-transitions.md).
+- A parallel consult sets every count to zero when the first commander in that consult launches. The previous total stays until then. Strategic planning, tactical planning, and the consult after a turn or a beat are each their own consult. A commander who returns no counts adds nothing. A failed or cancelled consult that reports the tools it already used still adds those uses. The cells update from the pool snapshot as commanders finish.
 
 ## States
 
@@ -50,7 +50,7 @@ Shown while the console's Commanders tab is selected and the console is expanded
 
 ## Strategic and Tactical Differences
 
-The same section is used in both theaters. Counts reset on both strategic Ready and tactical Ready.
+The same section is used in both theaters. A strategic consult and a tactical consult each start their own total at zero.
 
 ## Related Documents
 
@@ -75,3 +75,6 @@ None.
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/openRouter/openRouterRuntime.ts`
 - `src/renderer/openRouter/openRouterUiHelpers.ts`
+- `src/renderer/openRouter/openRouterToolCountLabels.ts` (`applyCommanderToolCountSum`)
+- `src/renderer/openRouter/commanderPoolClient.ts`
+- `src/main/openRouter/commanderToolCounts.ts` (`commanderToolCountSum`)

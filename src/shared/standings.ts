@@ -8,6 +8,7 @@
  */
 
 import { formatCommanderSummary } from './commanderSummary';
+import { formatThinkTimeLabel } from './thinkTimeLabel';
 import { formatPlaceOrdinal } from './placeOrdinal';
 import { paletteForOwner } from './seatPalette';
 import type { SeatId } from './seatIds';
@@ -114,6 +115,15 @@ export interface StandingsSeatInput {
    * Exceptions: None.
    */
   readonly costUsd: number;
+  /**
+   * Settled consult time for this AI seat, in milliseconds.
+   *
+   * Contract: Zero for a human seat. Includes timed-out and failed consults. The consultation count does not.
+   * When to use: The think-time label.
+   * Expected outcome: A non-negative number.
+   * Exceptions: None.
+   */
+  readonly thinkTimeMs: number;
   /**
    * City hexes this seat held when the match ended.
    *
@@ -285,6 +295,15 @@ export interface StandingsRow {
    * Exceptions: None.
    */
   readonly costLabel: string | null;
+  /**
+   * Accumulated think time, or null for the human seat.
+   *
+   * Contract: Null hides it. Otherwise `formatThinkTimeLabel`, including `0:00 thinking`.
+   * When to use: Between the consultation count and the cost.
+   * Expected outcome: The seat's `thinkTimeMs`.
+   * Exceptions: None.
+   */
+  readonly thinkTimeLabel: string | null;
   /**
    * Who knocked the seat out, or null.
    *
@@ -476,6 +495,7 @@ function standingsRow(seat: StandingsSeatInput, input: StandingsInput, singleWin
     status: statusFor(seat, input.gameEndReason, singleWinner),
     commanderSummary: ai ? commanderSummary(seat, input.modelLabels) : null,
     consultationsLabel: ai ? consultationPhrase(seat.consultationCount) : null,
+    thinkTimeLabel: ai ? formatThinkTimeLabel(seat.thinkTimeMs) : null,
     costLabel: ai ? formatMatchCost(seat.costUsd) : null,
     knockedOutBy: knockedOutBy(seat, input),
   };

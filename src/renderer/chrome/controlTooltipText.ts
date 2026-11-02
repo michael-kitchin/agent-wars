@@ -341,7 +341,7 @@ export const tacticalBattlesCheckboxTooltipText =
  * Exceptions: None.
  */
 export const precomputationTooltipText =
-  'Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.';
+  'Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.';
 
 /**
  * Purpose: Says when a background plan still runs and that the number is a use count.
@@ -350,7 +350,7 @@ export const precomputationTooltipText =
  * Exceptions: None.
  */
 export const eventsTooltipText =
-  'Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.';
+  'Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.';
 
 /**
  * Purpose: Says what the opponent can do, and that a model without tools ignores the group.
@@ -359,7 +359,7 @@ export const eventsTooltipText =
  * Exceptions: None.
  */
 export const planningTooltipText =
-  'Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent plan routes and measure distances. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says what the opponent can inspect, and that a model without tools ignores the group.
@@ -368,7 +368,7 @@ export const planningTooltipText =
  * Exceptions: None.
  */
 export const assessmentTooltipText =
-  'Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says the opponent can estimate fight odds, and that a model without tools ignores the group.
@@ -377,7 +377,7 @@ export const assessmentTooltipText =
  * Exceptions: None.
  */
 export const estimationTooltipText =
-  'Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says the opponent can read saved notes, and that a model without tools ignores the group.
@@ -386,7 +386,7 @@ export const estimationTooltipText =
  * Exceptions: None.
  */
 export const memoryTooltipText =
-  'Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says the opponent can look up standing orders, and that a model without tools ignores the group.
@@ -395,7 +395,7 @@ export const memoryTooltipText =
  * Exceptions: None.
  */
 export const ordersTooltipText =
-  'Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Purpose: Says build queues change on the world map only, and that a model without tools ignores the group.
@@ -404,7 +404,7 @@ export const ordersTooltipText =
  * Exceptions: None.
  */
 export const productionTooltipText =
-  'Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
+  'Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.';
 
 /**
  * Returns a tool group's tip.

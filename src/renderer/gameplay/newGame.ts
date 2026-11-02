@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
 import { clearOpenRouterLog, hideAiStrategyToast } from '../openRouter/openRouterUiHelpers';
+import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
 import { clearConsoleReports } from '../chrome/consoleReports';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
@@ -375,6 +376,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.pendingDeferredStrategicPostResolutionConsult = false;
       S.pendingDeferredTacticalPostBeatConsult = false;
       clearOpenRouterLog();
+      await readCommanderPoolAndApply(false);
       hideAiStrategyToast();
       clearConsoleReports();
       deps.updateOpenRouterCostLabel();

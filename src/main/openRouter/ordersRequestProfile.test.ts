@@ -41,7 +41,7 @@ function reasoningModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterMod
  */
 function testUnknownModelGetsBaseline(): void {
   assert.deepEqual(
-    resolveOrdersRequestProfile({ modelId: 'x', model: undefined, persistedReasoningEffort: 'high', baseCompletionMaxTokens: BASE }),
+    resolveOrdersRequestProfile({ modelId: 'x', model: undefined, persistedProviderSort: 'throughput', persistedReasoningEffort: 'high', baseCompletionMaxTokens: BASE }),
     BASELINE_ORDERS_REQUEST_PROFILE
   );
 }
@@ -58,7 +58,7 @@ function testEveryEffortUsesAdvertisedOutputLimit(): void {
   const minimal = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ top_provider: { max_completion_tokens: 4096 } }),
-    persistedReasoningEffort: 'minimal',
+    persistedProviderSort: 'throughput', persistedReasoningEffort: 'minimal',
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(minimal.reasoningEffort, 'minimal');
@@ -66,7 +66,7 @@ function testEveryEffortUsesAdvertisedOutputLimit(): void {
   const high = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ top_provider: { max_completion_tokens: 128000 } }),
-    persistedReasoningEffort: 'high',
+    persistedProviderSort: 'throughput', persistedReasoningEffort: 'high',
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(high.reasoningEffort, 'high');
@@ -74,7 +74,7 @@ function testEveryEffortUsesAdvertisedOutputLimit(): void {
   const max = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ top_provider: { max_completion_tokens: 20000 } }),
-    persistedReasoningEffort: 'max',
+    persistedProviderSort: 'throughput', persistedReasoningEffort: 'max',
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(max.preferredCompletionMaxTokens, 20000);
@@ -93,7 +93,7 @@ function testUnusableAdvertisedLimitKeepsBaseBudget(): void {
     resolveOrdersRequestProfile({
       modelId: 'r',
       model: reasoningModel({ top_provider: { max_completion_tokens: maxCompletionTokens } }),
-      persistedReasoningEffort: 'low',
+      persistedProviderSort: 'throughput', persistedReasoningEffort: 'low',
       baseCompletionMaxTokens: BASE,
     }).preferredCompletionMaxTokens;
   assert.equal(budgetFor(0), BASE);
@@ -117,7 +117,7 @@ function testDefaultEffortIsNotSentAndBudgetFollowsAdvertisedLimit(): void {
       reasoning: { default_effort: 'xhigh', supported_efforts: null },
       top_provider: { max_completion_tokens: 128000 },
     }),
-    persistedReasoningEffort: '',
+    persistedProviderSort: 'throughput', persistedReasoningEffort: '',
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(withLimit.reasoningEffort, null);
@@ -126,7 +126,7 @@ function testDefaultEffortIsNotSentAndBudgetFollowsAdvertisedLimit(): void {
   const withoutLimit = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ reasoning: { default_effort: 'xhigh', supported_efforts: null } }),
-    persistedReasoningEffort: '',
+    persistedProviderSort: 'throughput', persistedReasoningEffort: '',
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(withoutLimit.preferredCompletionMaxTokens, BASE);
@@ -169,7 +169,7 @@ function testStructuredOutputsFollowAdvertisedParameters(): void {
       resolveOrdersRequestProfile({
         modelId,
         model: { id: modelId, supported_parameters: supportedParameters },
-        persistedReasoningEffort: '',
+        persistedProviderSort: 'throughput', persistedReasoningEffort: '',
         baseCompletionMaxTokens: BASE,
       }).structuredOutputs;
     const both = ['response_format', 'structured_outputs'];
@@ -193,7 +193,7 @@ function testEnvironmentFlagDisablesStructuredOutputs(): void {
     resolveOrdersRequestProfile({
       modelId: model.id,
       model,
-      persistedReasoningEffort: '',
+      persistedProviderSort: 'throughput', persistedReasoningEffort: '',
       baseCompletionMaxTokens: BASE,
     }).structuredOutputs;
   withStructuredOutputsFlag('1', () => assert.equal(structuredOutputs(), false));
@@ -213,7 +213,7 @@ function testToolSupportFollowsAdvertisedParameters(): void {
     const profile = resolveOrdersRequestProfile({
       modelId: 'm',
       model: { id: 'm', supported_parameters: supportedParameters },
-      persistedReasoningEffort: '',
+      persistedProviderSort: 'throughput', persistedReasoningEffort: '',
       baseCompletionMaxTokens: BASE,
     });
     return { toolCalling: profile.toolCalling, toolChoice: profile.toolChoice };
@@ -245,23 +245,31 @@ function testTwoSeatsGetDifferentProfiles(): void {
     reasoningModel({ id: 'small', top_provider: { max_completion_tokens: 4096 } }),
     reasoningModel({ id: 'large', top_provider: { max_completion_tokens: 20000 } }),
   ]);
-  const seatFor = (seatId: 'opponent' | 'opponent2', modelId: string, effort: string): SeatRecord =>
+  const seatFor = (
+    seatId: 'opponent' | 'opponent2',
+    modelId: string,
+    effort: string,
+    providerSort: 'latency' | 'nitro',
+  ): SeatRecord =>
     ({
       seatId,
       seatOrder: 1,
       kind: 'ai',
       homeRegion: 'Home',
       nickname: null,
-      commander: { modelId, reasoningEffort: effort, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
+      commander: { modelId, reasoningEffort: effort, providerSort, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
       outTurn: null,
       outBy: null,
       outReasons: [],
       place: null,
       consultationCount: 0,
       costUsd: 0,
+      thinkTimeMs: 0,
     }) as SeatRecord;
-  const first = resolveSeatOrdersRequestProfile(seatFor('opponent', 'small', 'minimal'));
-  const second = resolveSeatOrdersRequestProfile(seatFor('opponent2', 'large', 'high'));
+  const first = resolveSeatOrdersRequestProfile(seatFor('opponent', 'small', 'minimal', 'latency'));
+  const second = resolveSeatOrdersRequestProfile(seatFor('opponent2', 'large', 'high', 'nitro'));
+  assert.equal(first.providerSort, 'latency');
+  assert.equal(second.providerSort, 'nitro');
   assert.equal(first.reasoningEffort, 'minimal');
   assert.equal(first.preferredCompletionMaxTokens, 4096);
   assert.equal(second.reasoningEffort, 'high');

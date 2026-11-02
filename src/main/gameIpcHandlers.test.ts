@@ -466,6 +466,7 @@ async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> 
   updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
     modelId: 'model-a',
     reasoningEffort: null,
+    providerSort: 'throughput',
     doctrineChoice: 'balanced',
   });
   setCommanderConsultRunnerForTests(async () => {

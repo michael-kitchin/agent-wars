@@ -1,14 +1,17 @@
-import { URL } from 'node:url';
-import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import {
   AI_MODEL_REQUEST_RETRY_COUNT,
   AI_MODEL_REQUEST_TIMEOUT_MS,
 } from '../../shared/aiConsultationLimits';
 import { logDebug, logError } from '../logger';
+import {
+  providerFromChatBody,
+  type ConsultAttemptOutcome,
+  type ConsultAttemptRecord,
+  type ConsultTelemetry,
+} from './consultTelemetry';
 import { formatModelCallFailureLine } from './modelCallAttemptMessages';
 import { readModelHangSimulationMs, shouldSimulateModelHang } from './modelHangSimulation';
-import { openRouterChatRequestHeaders } from './openRouterAttributionHeaders';
-import { requestOpenRouterHttps } from './openRouterHttpsRequest';
+import { postChatViaHttps } from './openRouterHttpsChatPost';
 import {
   formatOpenRouterChatApiError,
   noteOpenRouterAffordableMaxTokens,
@@ -21,13 +24,12 @@ import {
  * HTTPS chat completion transport, timeouts, retries, and test overrides for OpenRouter.
  */
 
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 /**
  * Aborts an OpenRouter chat POST when the full response has not arrived.
  *
  * Purpose: Local name for `AI_MODEL_REQUEST_TIMEOUT_MS` so this transport does not grow a second deadline.
  * When to use: The abort timer and the socket timeout in `defaultPostOpenRouterChatWithTimeoutAndRetry` / `postChatViaHttps`.
- * Expected outcome: A single model call is destroyed after 90s and retried once.
+ * Expected outcome: A single model call is destroyed after 180s and is not sent again.
  * Exceptions: None.
  */
 const OPENROUTER_REQUEST_TIMEOUT_MS = AI_MODEL_REQUEST_TIMEOUT_MS;
@@ -43,7 +45,7 @@ const OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS = 15_000;
 /**
  * Documents the module-scope binding `OPENROUTER_RESPONSE_HARD_TIMEOUT_MS` (OPENROUTER_RESPONSE_HARD_TIMEOUT_MS).
 
- * Purpose: Caps how long a response body may take after headers arrive, using the same 90s budget as the request abort.
+ * Purpose: Caps how long a response body may take after headers arrive, using the same 180s budget as the request abort.
  * When to use: The response hard timer in `postChatViaHttps`.
  * Expected outcome: A body that has started cannot outlive `AI_MODEL_REQUEST_TIMEOUT_MS`.
  * Exceptions: None.
@@ -54,21 +56,31 @@ const OPENROUTER_RESPONSE_HARD_TIMEOUT_MS = AI_MODEL_REQUEST_TIMEOUT_MS;
 
  * Purpose: Local name for `AI_MODEL_REQUEST_RETRY_COUNT` so the retry loop and the consultation wait budget stay in step.
  * When to use: The network-attempt loop in `defaultPostOpenRouterChatWithTimeoutAndRetry`.
- * Expected outcome: One retry after a timeout or retryable failure.
+ * Expected outcome: One retry after a network error or a retryable HTTP status. A timeout is not sent again.
  * Exceptions: None.
  */
 const OPENROUTER_REQUEST_RETRY_COUNT = AI_MODEL_REQUEST_RETRY_COUNT;
 
 /**
- * Defines the `isRetryableStatus` function shape (function isRetryableStatus(status: number): boolean).
+ * HTTP statuses worth one more send.
+ *
+ * Purpose: A gateway timeout, a rate limit, and a short upstream failure are often another host a moment later. A 500 from the router is not.
+ * When to use: `isRetryableStatus`.
+ * Expected outcome: 408, 429, 502, 503, and 504.
+ * Exceptions: None.
+ */
+const RETRYABLE_HTTP_STATUSES: ReadonlySet<number> = new Set([408, 429, 502, 503, 504]);
 
- * Purpose: Supports maintainability by documenting why `isRetryableStatus` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Reports whether one failed response should be sent again.
+ *
+ * Purpose: The retry loop and the activity line share one allow-list.
+ * When to use: After a response that is not a success and not a credit-cap retry.
+ * Expected outcome: True only for `RETRYABLE_HTTP_STATUSES`.
  * Exceptions: None.
  */
 function isRetryableStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
+  return RETRYABLE_HTTP_STATUSES.has(status);
 }
 
 /**
@@ -142,6 +154,39 @@ function applySessionAffordableMaxTokensToBody(body: Record<string, unknown>): R
 }
 
 /**
+ * Records one send on the consult recorder and in the debug log.
+ *
+ * Purpose: Every attempt that entered the try is visible, including one that was not retried.
+ * When to use: The attempt's `finally`, after the outcome was stored.
+ * Expected outcome: One `openRouter chat attempt` debug line. A missing recorder does nothing else.
+ * Exceptions: None.
+ */
+function noteChatAttempt(payload: OpenRouterChatTransportPayload, record: ConsultAttemptRecord): void {
+  payload.telemetry?.recordAttempt(record);
+  logDebug('openRouter chat attempt', record);
+}
+
+/**
+ * Copies an attempt with `retried` set.
+ *
+ * Purpose: The retry flag is known only after the delay, and a cancel during that delay must stay false.
+ * When to use: Immediately before the loop continues into the next send.
+ * Expected outcome: The same attempt, with `retried` true.
+ * Exceptions: None.
+ */
+function markAttemptRetried(record: ConsultAttemptRecord): ConsultAttemptRecord {
+  return {
+    requestLabel: record.requestLabel,
+    attempt: record.attempt,
+    outcome: record.outcome,
+    httpStatus: record.httpStatus,
+    durationMs: record.durationMs,
+    provider: record.provider,
+    retried: true,
+  };
+}
+
+/**
  * Posts an OpenRouter chat completion with timeouts, network retries, and one credit-cap `max_tokens` retry.
  *
  * Purpose: Central transport for order-flow completions; learns affordable caps from 402 bodies so depleted prepaid
@@ -160,6 +205,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
   let sendOrdinal = 0;
   const maxAttempts = 1 + OPENROUTER_REQUEST_RETRY_COUNT;
   while (networkAttempt <= OPENROUTER_REQUEST_RETRY_COUNT) {
+    if (payload.signal?.aborted) return { ok: false, error: 'Cancelled' };
     const controller = new AbortController();
     const parentSignal = payload.signal;
     const onParentAbort = () => controller.abort();
@@ -173,8 +219,33 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
     sendOrdinal += 1;
     const attempt = networkAttempt + 1;
     const willRetry = networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT;
+    const startedAt = Date.now();
+    let pending: ConsultAttemptRecord | null = null;
+    /**
+     * Stores this send's outcome for the finally block.
+     *
+     * Purpose: A return and a continue each record once, after the outcome is known and before any retry wait.
+     * When to use: Every path that finishes the send.
+     * Expected outcome: `pending` is this send. A timeout, stall, or cancel after the send started stores a null provider. A cancel before the send starts records nothing.
+     * Exceptions: None.
+     */
+    const remember = (
+      outcome: ConsultAttemptOutcome,
+      httpStatus: number | null,
+      bodyText: string | null,
+      retried: boolean
+    ): void => {
+      pending = {
+        requestLabel: payload.requestLabel,
+        attempt: sendOrdinal,
+        outcome,
+        httpStatus,
+        durationMs: Date.now() - startedAt,
+        provider: bodyText === null ? null : providerFromChatBody(bodyText, outcome === 'ok'),
+        retried,
+      };
+    };
     try {
-      if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
       requestBody = applySessionAffordableMaxTokensToBody(requestBody);
       logDebug(`openRouter ${payload.requestLabel}: request attempt start`, {
         attempt: sendOrdinal,
@@ -206,6 +277,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
         status: chatResponse.status,
       });
       if (chatResponse.status >= 200 && chatResponse.status < 300) {
+        remember('ok', chatResponse.status, chatResponse.bodyText, false);
         return { ok: true, status: chatResponse.status, headers: chatResponse.headers, bodyText: chatResponse.bodyText };
       }
       lastError = formatOpenRouterChatApiError(chatResponse.status, chatResponse.bodyText);
@@ -227,9 +299,14 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
             previousMaxTokens: currentMax,
             affordableMaxTokens: affordable,
           });
+          remember('http', chatResponse.status, chatResponse.bodyText, false);
+          if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
           if (payload.onLog) {
             payload.onLog(`OpenRouter credit headroom: retrying with max_tokens=${affordable}.`);
           }
+          payload.telemetry?.recordFallback('creditClamp');
+          const creditAttempt = pending;
+          if (creditAttempt !== null) pending = markAttemptRetried(creditAttempt);
           continue;
         }
       }
@@ -253,37 +330,50 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
           status: chatResponse.status,
           retryInMs: waitMs,
         });
-        networkAttempt += 1;
+        remember('http', chatResponse.status, chatResponse.bodyText, false);
         await delayMs(waitMs, parentSignal);
         if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
+        payload.telemetry?.recordFallback('httpStatusRetry');
+        const httpAttempt = pending;
+        if (httpAttempt !== null) pending = markAttemptRetried(httpAttempt);
+        networkAttempt += 1;
         continue;
       }
+      remember('http', chatResponse.status, chatResponse.bodyText, false);
       return { ok: false, error: lastError, status: chatResponse.status };
     } catch (err) {
-      if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
-      const timeoutLike = controller.signal.aborted;
+      if (parentSignal?.aborted) {
+        remember('cancelled', null, null, false);
+        return { ok: false, error: 'Cancelled' };
+      }
+      const reported = String(err);
+      // The abort timer and `HTTPS_TIMEOUT_` are the same cap. Either one is a timeout and is not sent again.
+      const timeoutLike = controller.signal.aborted || reported.includes('HTTPS_TIMEOUT_');
       const isResponseStreamStall =
-        String(err).includes('HTTPS_RESPONSE_IDLE_TIMEOUT_') ||
-        String(err).includes('HTTPS_RESPONSE_SOCKET_TIMEOUT_') ||
-        String(err).includes('HTTPS_RESPONSE_HARD_TIMEOUT_');
+        reported.includes('HTTPS_RESPONSE_IDLE_TIMEOUT_') ||
+        reported.includes('HTTPS_RESPONSE_SOCKET_TIMEOUT_') ||
+        reported.includes('HTTPS_RESPONSE_HARD_TIMEOUT_');
       if (timeoutLike) {
+        const timeoutSeconds = Math.round(attemptTimeoutMs / 1000);
         if (payload.onLog) {
           payload.onLog(
             formatModelCallFailureLine({
               cause: 'timeout',
-              attempt,
+              attempt: sendOrdinal,
               maxAttempts,
-              willRetry,
+              willRetry: false,
               timeoutMs: attemptTimeoutMs,
             }),
             true
           );
         }
-        if (!willRetry) lastError = `Model call timed out after ${maxAttempts} attempts.`;
+        lastError = `Model call timed out after ${timeoutSeconds}s.`;
         logError(`openRouter ${payload.requestLabel}: timeout`, {
           timeoutMs: attemptTimeoutMs,
-          attempt,
+          attempt: sendOrdinal,
         });
+        remember('timeout', null, null, false);
+        return { ok: false, error: lastError };
       } else if (isResponseStreamStall) {
         const line = formatModelCallFailureLine({
           cause: 'streamStall',
@@ -296,6 +386,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
           attempt,
           error: String(err),
         });
+        remember('streamStall', null, null, false);
         return { ok: false, error: line };
       } else {
         if (payload.onLog) {
@@ -313,13 +404,19 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
           attempt: sendOrdinal,
           retryInMs: waitMs,
         });
-        networkAttempt += 1;
+        remember('network', null, null, false);
         await delayMs(waitMs, parentSignal);
         if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
+        payload.telemetry?.recordFallback('networkRetry');
+        const networkAttemptRecord = pending;
+        if (networkAttemptRecord !== null) pending = markAttemptRetried(networkAttemptRecord);
+        networkAttempt += 1;
         continue;
       }
+      remember('network', null, null, false);
       return { ok: false, error: lastError };
     } finally {
+      if (pending) noteChatAttempt(payload, pending);
       clearTimeout(timeoutId);
       if (parentSignal) parentSignal.removeEventListener('abort', onParentAbort);
     }
@@ -381,6 +478,15 @@ export interface OpenRouterChatTransportPayload {
    * Exceptions: None.
    */
   readonly requestLabel: string;
+  /**
+   * Consult recorder, or omitted when the caller is not a consultation.
+   *
+   * Contract: Optional. Absent means attempts are only debug-logged.
+   * When to use: Order-flow chat posts.
+   * Expected outcome: Each send appends one attempt.
+   * Exceptions: None.
+   */
+  readonly telemetry?: ConsultTelemetry;
 }
 
 /**
@@ -452,111 +558,6 @@ export function setOpenRouterPostChatForTests(override: typeof postChatViaHttps 
   postChatForAttempt = override ?? postChatViaHttps;
 }
 
-/**
- * Posts one chat completion over HTTPS and decodes the body.
- *
- * Purpose: One attempt of the OpenRouter chat call, including the socket timeout and gzip decoding.
- * When to use: The default attempt poster. Retries call it again.
- * Expected outcome: Request headers come from `openRouterChatRequestHeaders`. The promise resolves with status, response headers, and decoded body text.
- * Exceptions: Rejects on socket errors, abort, and body-decode failure.
- */
-async function postChatViaHttps(args: {
-  key: string;
-  requestBody: Record<string, unknown>;
-  signal: AbortSignal;
-  timeoutMs: number;
-  responseIdleTimeoutMs: number;
-  responseHardTimeoutMs: number;
-  attempt: number;
-  requestLabel: string;
-}): Promise<{ status: number; headers: Record<string, string>; bodyText: string }> {
-  const url = new URL(OPENROUTER_CHAT_URL);
-  return new Promise((resolve, reject) => {
-    const req = requestOpenRouterHttps(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: `${url.pathname}${url.search}`,
-        method: 'POST',
-        headers: openRouterChatRequestHeaders(args.key),
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        let responseIdleTimer: ReturnType<typeof setTimeout> | null = null;
-        let responseHardTimer: ReturnType<typeof setTimeout> | null = null;
-        const resetResponseIdleTimer = () => {
-          if (responseIdleTimer) clearTimeout(responseIdleTimer);
-          responseIdleTimer = setTimeout(() => {
-            req.destroy(new Error(`HTTPS_RESPONSE_IDLE_TIMEOUT_${args.responseIdleTimeoutMs}`));
-          }, args.responseIdleTimeoutMs);
-        };
-        responseHardTimer = setTimeout(() => {
-          req.destroy(new Error(`HTTPS_RESPONSE_HARD_TIMEOUT_${args.responseHardTimeoutMs}`));
-        }, args.responseHardTimeoutMs);
-        resetResponseIdleTimer();
-        res.setTimeout(args.responseIdleTimeoutMs, () => {
-          res.destroy(new Error(`HTTPS_RESPONSE_SOCKET_TIMEOUT_${args.responseIdleTimeoutMs}`));
-        });
-        res.on('data', (chunk: Buffer) => {
-          chunks.push(chunk);
-          resetResponseIdleTimer();
-        });
-        res.on('end', () => {
-          try {
-            if (responseIdleTimer) clearTimeout(responseIdleTimer);
-            if (responseHardTimer) clearTimeout(responseHardTimer);
-            const raw = Buffer.concat(chunks);
-            const contentEncodingHeader = Array.isArray(res.headers['content-encoding'])
-              ? res.headers['content-encoding'][0] ?? ''
-              : (res.headers['content-encoding'] ?? '');
-            const contentEncoding = String(contentEncodingHeader).toLowerCase();
-            let decoded = raw;
-            if (contentEncoding.includes('gzip')) decoded = gunzipSync(raw);
-            else if (contentEncoding.includes('deflate')) decoded = inflateSync(raw);
-            else if (contentEncoding.includes('br')) decoded = brotliDecompressSync(raw);
-            const responseHeaders: Record<string, string> = {};
-            for (const [name, value] of Object.entries(res.headers)) {
-              if (typeof value === 'string') responseHeaders[name] = value;
-              else if (Array.isArray(value) && value.length > 0) responseHeaders[name] = value.join(', ');
-            }
-            resolve({
-              status: res.statusCode ?? 0,
-              headers: responseHeaders,
-              bodyText: decoded.toString('utf-8'),
-            });
-          } catch (decodeErr) {
-            logError('openRouterChatTransport: response body decode failed', decodeErr);
-            reject(decodeErr);
-          }
-        });
-        res.on('error', (err) => {
-          if (responseIdleTimer) clearTimeout(responseIdleTimer);
-          if (responseHardTimer) clearTimeout(responseHardTimer);
-          reject(err);
-        });
-      }
-    );
-    const onAbort = () => req.destroy(new Error('AbortError'));
-    if (args.signal.aborted) {
-      onAbort();
-      return;
-    }
-    args.signal.addEventListener('abort', onAbort, { once: true });
-    req.setTimeout(args.timeoutMs, () => {
-      req.destroy(new Error(`HTTPS_TIMEOUT_${args.timeoutMs}`));
-    });
-    req.on('error', (err) => {
-      args.signal.removeEventListener('abort', onAbort);
-      reject(err);
-    });
-    req.on('close', () => {
-      args.signal.removeEventListener('abort', onAbort);
-    });
-    req.write(JSON.stringify(args.requestBody));
-    req.end();
-  });
-}
 /**
  * Returns the chat transport to use for the current request (test override or default HTTPS implementation).
  */

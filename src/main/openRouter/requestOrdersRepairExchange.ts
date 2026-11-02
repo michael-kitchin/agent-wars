@@ -194,6 +194,7 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
     },
   ];
   const repairMaxTokens = resolveOrderFlowMaxTokens();
+  requestSettings.telemetry?.recordFallback('parseRepair');
   const repairResponse = await postOrdersChatRequest({
     post: postOpenRouterChatWithTimeoutAndRetry,
     key: args.key,

@@ -13,15 +13,9 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { coordinateContextSeatId, type CoordinateContext } from '../briefing/map/coordinateContext';
 import { aiIndexForSeatId } from '../../shared/seatIds';
-import { createPathfindingSession, executePathfinding } from '../tools/pathfinding';
-import { executeAssessment } from '../tools/assessment';
-import { executeCombatEstimation } from '../tools/combatEstimation';
-import { executeMemory } from '../tools/memory';
-import { executeStandingOrders } from '../tools/standingOrders';
-import { executeProductionTools } from '../tools/productionTools';
-import { executeMercenaryTools, isMercenaryToolName } from '../tools/mercenaryTools';
+import { createPathfindingSession } from '../tools/pathfinding';
 import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
-import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
+import { executeRequestOrdersTool } from './requestOrdersToolDispatch';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import { isRequiredToolChoiceRejectedForModel } from './openRouterModelCapabilities';
@@ -30,6 +24,7 @@ import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import {
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
+  REQUEST_ORDERS_WALL_CLOCK_ERROR,
   logResponsePreview,
   summarizeToolCallNamesForAiLog,
   type AiPathfindingSessionMetrics,
@@ -368,7 +363,8 @@ export async function runRequestOrdersToolLoop(
       return { kind: 'fail', error: 'Cancelled' };
     }
     if (Date.now() - wallClockStart > REQUEST_ORDERS_MAX_WALL_CLOCK_MS) {
-      const timeoutMsg = 'AI planning took too long and was cancelled. Please try again.';
+      const timeoutMsg = REQUEST_ORDERS_WALL_CLOCK_ERROR;
+      requestSettings.telemetry?.noteWallClockExceeded();
       if (onLog) onLog(timeoutMsg, true);
       logError('openRouter requestOrders: wall-clock budget exceeded', {
         maxWallClockMs: REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
@@ -378,6 +374,7 @@ export async function runRequestOrdersToolLoop(
       return { kind: 'fail', error: timeoutMsg };
     }
     iteration++;
+    requestSettings.telemetry?.setToolRounds(iteration);
     if (onLog) {
       onLog(
         `AI round ${iteration}: calling model with ${messages.length} message(s) in context` +
@@ -495,6 +492,7 @@ export async function runRequestOrdersToolLoop(
     });
     if (malformedOutcome.status === 'fail') return { kind: 'fail', error: malformedOutcome.error };
     if (malformedOutcome.status === 'retry') {
+      requestSettings.telemetry?.recordFallback('malformedCompletion');
       malformedRetryCount = malformedOutcome.retryCount;
       if (malformedOutcome.correctiveMessage) {
         messages.push({ role: 'user', content: malformedOutcome.correctiveMessage });
@@ -552,36 +550,19 @@ export async function runRequestOrdersToolLoop(
         if (toolName === 'plan_route') aiPathfindingSessionMetrics.planRouteToolCalls += 1;
         if (toolName === 'check_distance') aiPathfindingSessionMetrics.checkDistanceToolCalls += 1;
         aiPathfindingSessionMetrics.totalToolCalls += 1;
-        const toolState = tacticalBattle ? planState : state;
         const actingSeatId = coordinateContextSeatId(coordinateContext);
-        const result =
-          isMercenaryToolName(toolName)
-            ? executeMercenaryTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
-            : toolName.includes('order') || toolName.includes('standing')
-            ? executeStandingOrders(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
-            : toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production')
-              ? executeProductionTools(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
-              : toolName.includes('memory')
-                ? executeMemory(actingSeatId, toolName, execArgs, toolState, latLngByH3, resolveToH3)
-                : toolName.includes('estimate')
-                  ? executeCombatEstimation(toolName, execArgs, toolState, latLngByH3, resolveToH3, tacticalBattle)
-                  : toolName.includes('assess')
-                    ? executeAssessment(toolName, execArgs, toolState, latLngByH3, resolveToH3, tacticalBattle)
-                    : executePathfinding(
-                        toolName,
-                        execArgs,
-                        toolState,
-                        latLngByH3,
-                        resolveToH3,
-                        isPathfindingTool && !tacticalBattle
-                          ? getOrCreateAiPlanningPathfindingSession()
-                          : undefined,
-                        tacticalBattle
-                      );
-        const encoded =
-          typeof result === 'object' && result !== null && !Array.isArray(result)
-            ? encodeOpenRouterToolResultForLlm(toolName, result as Record<string, unknown>, coordinateContext, resolveToH3)
-            : (result as Record<string, unknown>);
+        const encoded = executeRequestOrdersTool({
+          toolName,
+          execArgs,
+          actingSeatId,
+          toolState: tacticalBattle ? planState : state,
+          latLngByH3,
+          resolveToH3,
+          coordinateContext,
+          tacticalBattle,
+          pathfindingSession:
+            isPathfindingTool && !tacticalBattle ? getOrCreateAiPlanningPathfindingSession() : undefined,
+        });
         const resultStr = JSON.stringify(encoded);
         messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
         const groupId = getGroupIdForToolName(toolName);

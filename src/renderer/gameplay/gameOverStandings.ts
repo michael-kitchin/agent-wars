@@ -89,6 +89,7 @@ function seatInput(seat: SeatSnapshot, counts: ReadonlyMap<string, number>) {
     place: seat.place,
     consultationCount: seat.consultationCount,
     costUsd: seat.costUsd,
+    thinkTimeMs: seat.thinkTimeMs,
     cityHexes: counts.get(seat.seatId) ?? 0,
     commander: commander
       ? {
@@ -211,7 +212,7 @@ function rowElement(row: StandingsRow): HTMLLIElement {
 }
 
 /**
- * The commander, consultation, and cost line.
+ * The commander, consultation, think-time, and cost line.
  *
  * Purpose: A human row has none of those.
  * When to use: `rowElement`.
@@ -219,7 +220,7 @@ function rowElement(row: StandingsRow): HTMLLIElement {
  * Exceptions: None.
  */
 function metaLine(row: StandingsRow): HTMLParagraphElement | null {
-  const parts = [row.commanderSummary, row.consultationsLabel, row.costLabel].filter((part): part is string => part !== null);
+  const parts = [row.commanderSummary, row.consultationsLabel, row.thinkTimeLabel, row.costLabel].filter((part): part is string => part !== null);
   if (parts.length === 0) return null;
   const meta = document.createElement('p');
   meta.className = 'game-over-standings-meta';

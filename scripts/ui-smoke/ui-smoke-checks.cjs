@@ -48,7 +48,7 @@ function probePage(selectors) {
    * When to use: For each selector passed to `probePage`.
    * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, top
    *   border color, background color, and pointer events, its control tip sentence, and selected attributes, including
-   *   its accessible name, and the trimmed text of every match, or null when the selector matches nothing.
+   *   its accessible name, a select's value and option texts, and the trimmed text of every match, or null when the selector matches nothing.
    * Exceptions: None.
    */
   const describe = (selector) => {
@@ -78,6 +78,8 @@ function probePage(selectors) {
       pressed: el.getAttribute('aria-pressed'),
       checked: el instanceof HTMLInputElement ? el.checked : null,
       optionCount: el instanceof HTMLSelectElement ? el.options.length : null,
+      selectValue: el instanceof HTMLSelectElement ? el.value : null,
+      selectOptions: el instanceof HTMLSelectElement ? Array.from(el.options, (option) => option.text) : null,
       label: el.getAttribute('aria-label'),
       fontSize: getComputedStyle(el).fontSize,
       borderColor: getComputedStyle(el).borderTopColor,

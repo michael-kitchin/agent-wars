@@ -34,7 +34,7 @@ import {
   repairStrandedStrategicResolutionPhaseWhenDbOpen,
 } from './gameDb/databaseBootstrap';
 import { ensureHireOrderReservedCreditsColumn } from './gameDb/mercenaryState';
-import { ensureSeatNicknameColumn } from './gameDb/seatRosterStore';
+import { ensureSeatAddedColumns } from './gameDb/seatRosterStore';
 import { getFullDdl } from './gameDb/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -145,7 +145,7 @@ export {
  * SQLite `user_version` that the current schema DDL produces.
  *
  * Purpose: Detects match databases created by an older schema. Bumping it also makes every saved game from an earlier version unloadable. Changing the shape of any JSON a save carries in `game_config`, without bumping this number, does the same, because an older or newer app would misread it.
- * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatNicknameColumn` adds on open. See `doc/save-files.md`.
+ * When to use: Bump whenever `getFullDdl` changes, and whenever a saved JSON value changes shape, except a column that `ensureHireOrderReservedCreditsColumn` or `ensureSeatAddedColumns` adds on open. See `doc/save-files.md`.
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created. A save from another version is refused.
  * Exceptions: None.
  */
@@ -243,7 +243,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   applyGameDbPragmas(database);
   database.exec(getFullDdl());
   ensureHireOrderReservedCreditsColumn(gameDbOps);
-  ensureSeatNicknameColumn(gameDbOps);
+  ensureSeatAddedColumns(gameDbOps);
   ensureStrategicInfrastructureSyncTriggers();
   ensureTurnStateRow();
   database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
@@ -284,7 +284,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     setDbHandle(d);
     d = null;
     ensureHireOrderReservedCreditsColumn(gameDbOps);
-    ensureSeatNicknameColumn(gameDbOps);
+    ensureSeatAddedColumns(gameDbOps);
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
@@ -486,7 +486,7 @@ export function openExistingGameDatabaseAt(canonicalPath: string): OpenExistingG
     setDbHandle(pending);
     pending = null;
     ensureHireOrderReservedCreditsColumn(gameDbOps);
-    ensureSeatNicknameColumn(gameDbOps);
+    ensureSeatAddedColumns(gameDbOps);
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();

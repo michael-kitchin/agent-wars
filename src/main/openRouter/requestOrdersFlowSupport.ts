@@ -53,12 +53,22 @@ const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
 /**
  * Documents the module-scope binding `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (REQUEST_ORDERS_MAX_WALL_CLOCK_MS).
 
- * Purpose: Local name for `AI_CONSULTATION_WALL_CLOCK_MS` so the tool loop and the outer waiters share one 5-minute cap.
+ * Purpose: Local name for `AI_CONSULTATION_WALL_CLOCK_MS` so the tool loop and the outer waiters share one 10-minute cap.
  * When to use: Main polling loop in `requestOrdersFlow` compares elapsed time against this constant.
- * Expected outcome: Orders request aborts with a timeout-shaped error after 5 minutes already spent in the loop.
+ * Expected outcome: Orders request aborts with a timeout-shaped error after 10 minutes already spent in the loop.
  * Exceptions: None.
  */
 export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = AI_CONSULTATION_WALL_CLOCK_MS;
+
+/**
+ * Player-facing text when a consultation exceeds the wall clock.
+ *
+ * Purpose: The tool-loop log and the returned error must be the same sentence.
+ * When to use: The wall-clock return in `runRequestOrdersToolLoop`, and the consult outcome.
+ * Expected outcome: `AI planning took too long and was cancelled. Please try again.`
+ * Exceptions: None.
+ */
+export const REQUEST_ORDERS_WALL_CLOCK_ERROR = 'AI planning took too long and was cancelled. Please try again.';
 
 /**
  * Maximum model rounds in one consultation, including tool calls.

@@ -30,13 +30,14 @@ function seat(seatId: SeatId, seatOrder: number, outTurn: number | null = null):
     nickname: null,
     commander: seatId === HUMAN_SEAT_ID
       ? null
-      : { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
+      : { modelId: null, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' },
     outTurn,
     outBy: null,
     outReasons: [],
     place: outTurn === null ? null : seatOrder,
     consultationCount: 0,
     costUsd: 0,
+    thinkTimeMs: 0,
   };
 }
 

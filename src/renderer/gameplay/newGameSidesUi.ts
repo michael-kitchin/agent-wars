@@ -2,10 +2,12 @@ import type { NewGameCommanderInput, NewGameSeatInput } from '../../shared/ipc/o
 import type { CommanderKeyMemoryView } from '../../shared/commanderSetupCopy';
 import {
   commanderApiKey,
+  commanderFromRemembered,
   copyButtonState,
   prefillFirstAiApiKey,
   previousAiRowIndex,
 } from '../../shared/commanderSetupCopy';
+import { DEFAULT_PROVIDER_SORT } from '../../shared/openRouterProviderSort';
 import { formatCommanderButtonLabel } from '../../shared/commanderSummary';
 import { modelNameFromOptionLabel } from '../../shared/commanderPlanningStatus';
 import {
@@ -154,7 +156,7 @@ function defaultCommander(): NewGameCommanderInput {
   const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
   const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
   const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-  return { modelId, reasoningEffort, doctrineChoice: 'balanced', apiKey: '', nickname: '' };
+  return { modelId, reasoningEffort, providerSort: DEFAULT_PROVIDER_SORT, doctrineChoice: 'balanced', apiKey: '', nickname: '' };
 }
 
 /**
@@ -363,13 +365,7 @@ function copyCommanderFrom(index: number, source: 'previous-match' | 'previous-o
 function commanderFromLastGame(): NewGameCommanderInput | null {
   const previous = rememberedCommanders.previousMatch[0];
   if (!previous) return null;
-  return {
-    modelId: previous.modelId,
-    reasoningEffort: previous.reasoningEffort,
-    doctrineChoice: previous.doctrineChoice,
-    apiKey: previous.apiKey,
-    nickname: previous.nickname,
-  };
+  return commanderFromRemembered(previous);
 }
 
 /**

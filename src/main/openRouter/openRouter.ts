@@ -25,6 +25,7 @@ import {
 } from '../oneStepMoveDestinations';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { DEFAULT_PROVIDER_SORT } from '../../shared/openRouterProviderSort';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
 import { readSeatHasApiKey } from '../gameDb/seatApiKeyFlags';
 import {
@@ -315,6 +316,7 @@ export function applyAppWideCommanderToLegacySeat(): void {
     updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
       modelId: modelId || null,
       reasoningEffort: effort || null,
+      providerSort: DEFAULT_PROVIDER_SORT,
       doctrineChoice: seat.commander.doctrineChoice,
     });
     cancelModelCalls('model_changed', 'all', AI_SEAT_IDS[0]);
@@ -559,6 +561,7 @@ function resolveSelectedModelOrdersRequestProfile(modelId: string, seatId: AiSea
     modelId,
     model,
     persistedReasoningEffort,
+    persistedProviderSort: DEFAULT_PROVIDER_SORT,
     baseCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
   });
 }

@@ -4,6 +4,7 @@ import {
   resolveEffectiveReasoningEffort,
   resolveRequestedReasoningEffort,
 } from '../../shared/openRouterReasoningEffort';
+import { DEFAULT_PROVIDER_SORT, providerSortOrDefault, type ProviderSortChoice } from '../../shared/openRouterProviderSort';
 import type { SeatRecord } from '../../shared/seatRoster';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
 import {
@@ -81,6 +82,15 @@ export interface OrdersRequestProfile {
    * Exceptions: None.
    */
   readonly preferredCompletionMaxTokens: number;
+  /**
+   * How OpenRouter picks a host for this consultation.
+   *
+   * Contract: One of `PROVIDER_SORT_CHOICES`. Copied from the seat, or `DEFAULT_PROVIDER_SORT` when the roster cannot be read.
+   * When to use: `applyProviderSortToChatBody` on every post in this consultation.
+   * Expected outcome: The same choice on every round and the repair call.
+   * Exceptions: None.
+   */
+  readonly providerSort: ProviderSortChoice;
 }
 
 /**
@@ -99,6 +109,7 @@ export const BASELINE_ORDERS_REQUEST_PROFILE: OrdersRequestProfile = Object.free
   toolCalling: true,
   toolChoice: true,
   preferredCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+  providerSort: DEFAULT_PROVIDER_SORT,
 });
 
 /**
@@ -130,15 +141,17 @@ function completionMaxTokensFromAdvertisedLimit(
  * When to use: Once per consultation, before the first chat request.
  * Expected outcome: The baseline (with the given base budget) for unknown models; otherwise a profile whose
  * reasoning effort is valid for the model and whose budget is the model's advertised output limit when known.
+ * `providerSort` is `persistedProviderSort` for both.
  * Exceptions: None.
  */
 export function resolveOrdersRequestProfile(input: {
   readonly modelId: string;
   readonly model: OpenRouterModel | undefined;
   readonly persistedReasoningEffort: string;
+  readonly persistedProviderSort: ProviderSortChoice;
   readonly baseCompletionMaxTokens: number;
 }): OrdersRequestProfile {
-  const { modelId, model, persistedReasoningEffort, baseCompletionMaxTokens } = input;
+  const { modelId, model, persistedReasoningEffort, persistedProviderSort, baseCompletionMaxTokens } = input;
   const effectiveReasoningEffort = model ? resolveEffectiveReasoningEffort(model, persistedReasoningEffort) : null;
   const profile: OrdersRequestProfile = model
     ? {
@@ -151,8 +164,13 @@ export function resolveOrdersRequestProfile(input: {
           baseCompletionMaxTokens,
           model.top_provider?.max_completion_tokens
         ),
+        providerSort: persistedProviderSort,
       }
-    : { ...BASELINE_ORDERS_REQUEST_PROFILE, preferredCompletionMaxTokens: baseCompletionMaxTokens };
+    : {
+        ...BASELINE_ORDERS_REQUEST_PROFILE,
+        preferredCompletionMaxTokens: baseCompletionMaxTokens,
+        providerSort: persistedProviderSort,
+      };
   logDebug('ordersRequestProfile resolveOrdersRequestProfile', {
     modelId,
     knownModel: model !== undefined,
@@ -164,6 +182,7 @@ export function resolveOrdersRequestProfile(input: {
     toolCalling: profile.toolCalling,
     toolChoice: profile.toolChoice,
     preferredCompletionMaxTokens: profile.preferredCompletionMaxTokens,
+    providerSort: profile.providerSort,
   });
   return profile;
 }
@@ -179,12 +198,18 @@ export function resolveOrdersRequestProfile(input: {
 export function resolveSeatOrdersRequestProfile(seat: SeatRecord): OrdersRequestProfile {
   const modelId = seat.commander?.modelId?.trim() ?? '';
   const effort = seat.commander?.reasoningEffort?.trim() ?? '';
-  logDebug('ordersRequestProfile resolveSeatOrdersRequestProfile', { seatId: seat.seatId, hasModel: modelId.length > 0 });
-  if (!modelId) return { ...BASELINE_ORDERS_REQUEST_PROFILE };
+  const providerSort = providerSortOrDefault(seat.commander?.providerSort);
+  logDebug('ordersRequestProfile resolveSeatOrdersRequestProfile', {
+    seatId: seat.seatId,
+    hasModel: modelId.length > 0,
+    providerSort,
+  });
+  if (!modelId) return { ...BASELINE_ORDERS_REQUEST_PROFILE, providerSort };
   return resolveOrdersRequestProfile({
     modelId,
     model: getOpenRouterModelCapabilities(modelId),
     persistedReasoningEffort: effort,
+    persistedProviderSort: providerSort,
     baseCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
   });
 }

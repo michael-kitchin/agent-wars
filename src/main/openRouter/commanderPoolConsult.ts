@@ -78,7 +78,13 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       return emptyConsultOutcome({ timedOut: attempt.timedOut, modelId: usedModelId });
     }
     if (!attempt.value.success) {
-      return emptyConsultOutcome({ errorMessage: attempt.value.error, modelId: usedModelId });
+      return emptyConsultOutcome({
+        errorMessage: attempt.value.error,
+        modelId: usedModelId,
+        ...(attempt.value.toolInvocationCounts
+          ? { toolInvocationCounts: attempt.value.toolInvocationCounts }
+          : {}),
+      });
     }
     const value = attempt.value;
     if (value.absenceReason) {
@@ -108,6 +114,7 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       tacticalPlan: request.theater === 'tactical' ? tacticalOpponentPlanFromRequestOrdersSuccess(value) : null,
       errorMessage: null,
       absenceReason: null,
+      ...(value.toolInvocationCounts ? { toolInvocationCounts: value.toolInvocationCounts } : {}),
     };
   } catch (err) {
     logError('commanderPoolConsult runCommanderConsult failed', err);

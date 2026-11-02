@@ -58,7 +58,7 @@ function testBlindLandMarchAndOrderlessAirDefendCells(): void {
       chain,
       units: [{ id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! }],
     }),
-    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
+    seats: [{ seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null }, { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null }], homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
   });
   const landRow = orderlessRow(landText, 'opponent-inf-idle');
   assert.ok(landRow.includes(homeCode), `land row must name the home hex ${homeCode}: ${landRow}`);

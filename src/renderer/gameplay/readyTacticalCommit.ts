@@ -3,7 +3,7 @@
  *
  * Purpose: A beat commit updates the battle, starts playback, and may latch a post-beat consult. That sequence stays
  * out of the world-map Ready path.
- * When to use: `handleReadyButtonClick` after the shared guards and the tool-count snapshot.
+ * When to use: `handleReadyButtonClick` after the shared guards.
  * Expected outcome: `runTacticalReadyCommit` returns false outside tactical planning. Inside it, the beat is committed
  * or the failure is shown, and the caller does not also resolve the world-map turn.
  * Exceptions: None. A failed refresh of the strategic snapshot is logged and the beat commit still finishes.
@@ -18,7 +18,6 @@ import { reconcileSelectionToCurrentState } from '../core/selection';
 import { rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
-import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 import {
   applyTacticalPostBeatConsultSideEffects,
   isTacticalPostBeatConsultOnCommit,
@@ -40,7 +39,7 @@ import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
  *
  * Purpose: One argument so the beat-commit path does not grow a long parameter list.
  * When to use: Pass this from `handleReadyButtonClick` into `runTacticalReadyCommit`.
- * Expected outcome: The commit uses the same deps, tool-count snapshot, and match epoch as the click that started it.
+ * Expected outcome: The commit uses the same deps and match epoch as the click that started it.
  * Exceptions: None.
  */
 export interface TacticalReadyCommitContext {
@@ -54,24 +53,6 @@ export interface TacticalReadyCommitContext {
    */
   deps: ReadyHandlerDeps;
   /**
-   * Tool-invocation counts from before this Ready click zeroed them.
-   *
-   * Contract: A shallow copy of `S.toolInvocationCounts` taken before the click resets the counters.
-   * When to use: When the tactical commit fails before a beat result exists.
-   * Expected outcome: `rollbackReadyToolCounts` restores this snapshot.
-   * Exceptions: None.
-   */
-  toolCountsBeforeReadyClick: Readonly<Record<string, number>>;
-  /**
-   * Prefetch tool counts captured when the click started, if a prefetch result was already stored.
-   *
-   * Contract: A copy of `S.precomputedToolInvocationCounts`, or null when none was stored.
-   * When to use: After a successful commit, when this beat did not report its own tool counts.
-   * Expected outcome: The OpenRouter labels keep the prefetch counts while Run is on.
-   * Exceptions: None.
-   */
-  cachedPrecomputedToolCountsAtReadyStart: Readonly<Record<string, number>> | null;
-  /**
    * Renderer match epoch captured when this Ready click began.
    *
    * Contract: The value of `currentRendererMatchEpoch()` at the start of the click.
@@ -80,22 +61,6 @@ export interface TacticalReadyCommitContext {
    * Exceptions: None.
    */
   matchEpoch: number;
-}
-
-/**
- * Restores tool invocation counts captured before Ready and refreshes the OpenRouter count labels.
- *
- * Purpose: One restore path for Ready aborts that already zeroed `S.toolInvocationCounts`.
- * When to use: When a Ready or tactical-commit path returns after the pre-click snapshot was taken.
- * Expected outcome: `S.toolInvocationCounts` matches `snapshot` and labels are updated.
- * Exceptions: None.
- */
-export function rollbackReadyToolCounts(
-  deps: ReadyHandlerDeps,
-  snapshot: Readonly<typeof S.toolInvocationCounts>
-): void {
-  S.toolInvocationCounts = snapshot;
-  deps.updateOpenRouterToolCountLabels();
 }
 
 /**
@@ -108,14 +73,13 @@ export function rollbackReadyToolCounts(
  * Exceptions: A failed strategic-state refresh is logged and the beat commit still finishes, unless a newer match has started. A newer match epoch skips the snapshot apply and the playback writes.
  */
 export async function runTacticalReadyCommit(context: TacticalReadyCommitContext): Promise<boolean> {
-  const { deps, toolCountsBeforeReadyClick, cachedPrecomputedToolCountsAtReadyStart, matchEpoch } = context;
+  const { deps, matchEpoch } = context;
   if (!(S.tacticalBattleSnapshot && S.tacticalPhasePlanning)) return false;
   if (!window.gameApi) return true;
   // The beat this commit resolves; its reports are filed under it after the battle moves on to the next beat.
   const beatReportTag = currentConsoleReportTag();
   const commit = window.gameApi.commitHumanTacticalDraftOrders;
   if (!commit) {
-    rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
     deps.showSidebarError('Tactical commit is not available in this build.');
     deps.updateReadyButtonState();
     return true;
@@ -139,7 +103,6 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   })) as CommitHumanTacticalDraftOrdersIpcResult;
   if (!rendererMatchEpochCurrent(matchEpoch)) return true;
   if (!commitResult.success) {
-    rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
     deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
     deps.updateReadyButtonState();
     return true;
@@ -236,12 +199,6 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     }
     void readCommanderPoolAndApply(true);
   }
-  // Same rule as strategic Ready: prefer this beat's consult counts, else keep prefetch telemetry visible.
-  applyToolInvocationCountsAfterReady({
-    fromResult: commitResult.toolInvocationCounts,
-    cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
-    allowPrecomputedFallback: S.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null,
-  });
   // Replaces pending rows from the successful commit (continuations plus cleared ranged/air/ferry/embark).
   const previousPendingMarches = new Map(S.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
   S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length

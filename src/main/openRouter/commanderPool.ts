@@ -17,6 +17,12 @@ import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelType
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getGameState, getSeatRoster } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
+import {
+  beginCommanderToolCountWave,
+  commanderToolCountSum,
+  currentCommanderToolCountWaveId,
+  resetCommanderToolCounts,
+} from './commanderToolCounts';
 import { applyConsultOutcome, expireConsult, type ConsultSettleContext } from './commanderPoolSettle';
 import {
   cancelSeatTimers,
@@ -80,6 +86,15 @@ export type PoolSeat = {
   settled: boolean;
   generation: number;
   launchId: number;
+  /**
+   * The consult wave this launch belongs to.
+   *
+   * Purpose: A result is counted only while this wave is still current.
+   * When to use: Set in `launch`. Read when the consult settles.
+   * Expected outcome: The wave id captured at launch. Zero on an idle entry.
+   * Exceptions: None.
+   */
+  toolCountWaveId: number;
   timers: { cancel: () => void }[];
   /**
    * Why the last unfinished consult produced no prose.
@@ -240,6 +255,7 @@ export function resetCommanderPool(seats: readonly SeatRecord[]): void {
   entries.clear();
   dispatches.length = 0;
   tacticalDrafts.clear();
+  resetCommanderToolCounts();
   for (const seat of seats) {
     if (seat.kind !== AI_SEAT_KIND || !isAiSeatId(seat.seatId)) continue;
     entries.set(seat.seatId, idlePoolSeat(seat.seatId, rosterBlocksConsult(seat) ?? 'ready', generation));
@@ -260,11 +276,16 @@ export function startStrategicPlanning(onlySeatIds?: readonly AiSeatId[]): void 
   if (turnNumber === null) return;
   const roster = getSeatRoster();
   logDebug('commanderPool startStrategicPlanning', { turnNumber, seatCount: roster.length, onlySeatIds: onlySeatIds?.length ?? null });
+  let openToolCountWave = true;
   for (const seat of roster) {
     if (!isAiSeatId(seat.seatId)) continue;
     if (onlySeatIds !== undefined && !onlySeatIds.includes(seat.seatId)) continue;
     rememberRosterStatus(seat);
     if (!canLaunch(seat)) continue;
+    if (openToolCountWave) {
+      beginCommanderToolCountWave();
+      openToolCountWave = false;
+    }
     launch(seat.seatId, 'strategic', null, turnNumber);
   }
 }
@@ -274,21 +295,28 @@ export function startStrategicPlanning(onlySeatIds?: readonly AiSeatId[]): void 
  *
  * Purpose: A post-beat consult and a later planning start must not call the same seat twice.
  * When to use: `startTacticalPlanning` for each AI party in the battle.
- * Expected outcome: No launch when the seat is ineligible or its stored draft already has an order or Exit Battle. An all-empty draft is replaced.
+ * Expected outcome: False when the seat is ineligible or its stored draft already has an order or Exit Battle. True after a launch. The first launch in a batch opens a tool-count wave when asked. An all-empty draft is replaced.
  * Exceptions: None.
  */
-function launchTacticalSeatIfDraftEmpty(battle: TacticalBattleSnapshot, party: TacticalBattleSnapshot['opposingPartyId'], turnNumber: number): void {
-  if (party === undefined || isNeutralOwnerId(party) || !isAiSeatId(party)) return;
+function launchTacticalSeatIfDraftEmpty(
+  battle: TacticalBattleSnapshot,
+  party: TacticalBattleSnapshot['opposingPartyId'],
+  turnNumber: number,
+  openToolCountWave: boolean
+): boolean {
+  if (party === undefined || isNeutralOwnerId(party) || !isAiSeatId(party)) return false;
   const stored = tacticalDrafts.get(tacticalDraftKey(party, battle.battleId));
   if (tacticalDraftAlreadyDecided(stored)) {
     logDebug('commanderPool skipped tactical launch because a draft is stored', { seatId: party, battleId: battle.battleId });
-    return;
+    return false;
   }
   const seat = getSeatRoster().find((row) => row.seatId === party);
-  if (!seat) return;
+  if (!seat) return false;
   rememberRosterStatus(seat);
-  if (!canLaunch(seat)) return;
+  if (!canLaunch(seat)) return false;
+  if (openToolCountWave) beginCommanderToolCountWave();
   launch(party, 'tactical', battle, turnNumber);
+  return true;
 }
 
 /**
@@ -307,8 +335,11 @@ export function startTacticalPlanning(battle: TacticalBattleSnapshot): void {
   });
   const turnNumber = readTurnNumber();
   if (turnNumber === null) return;
-  if (battle.leadPartyId != null) launchTacticalSeatIfDraftEmpty(battle, battle.leadPartyId, turnNumber);
-  launchTacticalSeatIfDraftEmpty(battle, battle.opposingPartyId, turnNumber);
+  let openToolCountWave = true;
+  if (battle.leadPartyId != null && launchTacticalSeatIfDraftEmpty(battle, battle.leadPartyId, turnNumber, openToolCountWave)) {
+    openToolCountWave = false;
+  }
+  launchTacticalSeatIfDraftEmpty(battle, battle.opposingPartyId, turnNumber, openToolCountWave);
 }
 
 /**
@@ -404,8 +435,14 @@ export function readCommanderPoolSnapshot(drain: boolean): CommanderPoolSnapshot
     .map((seat) => commanderStatusRow(seat, isAiSeatId(seat.seatId) ? entries.get(seat.seatId) : undefined, currentTiming().nowMs()));
   const copy = dispatches.slice();
   if (drain) dispatches.length = 0;
-  logTrace('commanderPool readCommanderPoolSnapshot', { drain, statusCount: statuses.length, dispatchCount: copy.length });
-  return { statuses, dispatches: copy };
+  const toolInvocationCounts = commanderToolCountSum();
+  logTrace('commanderPool readCommanderPoolSnapshot', {
+    drain,
+    statusCount: statuses.length,
+    dispatchCount: copy.length,
+    toolGroupCount: Object.keys(toolInvocationCounts).length,
+  });
+  return { statuses, dispatches: copy, toolInvocationCounts };
 }
 
 /**
@@ -497,20 +534,28 @@ function canLaunch(seat: SeatRecord): seat is SeatRecord & { seatId: AiSeatId } 
  *
  * Purpose: A post-resolution or post-beat consult uses this pool's status and timeout without replacing the planning runner.
  * When to use: Once per active AI seat after a turn, and once for the opposing seat after a tactical beat.
- * Expected outcome: The seat stays `planning` until the runner settles. False when the turn cannot be read, or the seat is out, has no model, or is already planning.
+ * Expected outcome: The seat stays `planning` until the runner settles. False when the turn cannot be read, or the seat is out, has no model, or is already planning. When `openToolCountWave` is true and this seat launches, the tool-count total starts at zero.
  * Exceptions: Logs and returns false when the match turn cannot be read.
  */
 export function launchCommanderConsult(
   seatId: AiSeatId,
   theater: 'strategic' | 'tactical',
   battle: TacticalBattleSnapshot | null,
-  runner: CommanderConsultRunner
+  runner: CommanderConsultRunner,
+  openToolCountWave = false
 ): boolean {
   const turnNumber = readTurnNumber();
   if (turnNumber === null) return false;
   const seat = getSeatRoster().find((row) => row.seatId === seatId);
-  logDebug('commanderPool launchCommanderConsult', { seatId, theater, battleId: battle?.battleId ?? null, found: Boolean(seat) });
+  logDebug('commanderPool launchCommanderConsult', {
+    seatId,
+    theater,
+    battleId: battle?.battleId ?? null,
+    found: Boolean(seat),
+    openToolCountWave,
+  });
   if (!seat || !canLaunch(seat)) return false;
+  if (openToolCountWave) beginCommanderToolCountWave();
   launch(seatId, theater, battle, turnNumber, runner);
   return true;
 }
@@ -550,6 +595,7 @@ function launch(
   entry.controller = controller;
   entry.generation = launchedGeneration;
   entry.launchId = launchId;
+  entry.toolCountWaveId = currentCommanderToolCountWaveId();
   entry.timers = [];
   entries.set(seatId, entry);
   if (!runner) {
@@ -610,6 +656,7 @@ function settleContext(): ConsultSettleContext {
     tacticalDrafts,
     cancelTimers: cancelSeatTimers,
     notify: () => notifyWaiters(waiters),
+    nowMs: () => currentTiming().nowMs(),
   };
 }
 

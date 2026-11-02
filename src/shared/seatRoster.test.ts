@@ -22,7 +22,7 @@ function seat(partial: Pick<SeatRecord, 'seatId' | 'seatOrder' | 'kind'> & Parti
     homeRegion: partial.seatId,
     nickname: null,
     commander: partial.kind === 'ai'
-      ? { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' }
+      ? { modelId: null, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', hasApiKey: false, doctrine: 'balanced' }
       : null,
     outTurn: null,
     outBy: null,
@@ -30,6 +30,7 @@ function seat(partial: Pick<SeatRecord, 'seatId' | 'seatOrder' | 'kind'> & Parti
     place: null,
     consultationCount: 0,
     costUsd: 0,
+    thinkTimeMs: 0,
     ...partial,
   };
 }
@@ -107,7 +108,7 @@ describe('toSeatSnapshot', () => {
       seatId: 'opponent',
       seatOrder: 2,
       kind: 'ai',
-      commander: { modelId: 'model', reasoningEffort: null, doctrineChoice: 'random', hasApiKey: false, doctrine: 'cautious' },
+      commander: { modelId: 'model', reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'random', hasApiKey: false, doctrine: 'cautious' },
     });
     assert.equal(toSeatSnapshot(randomSeat, false, false).commander?.doctrine, null);
     assert.equal(toSeatSnapshot(randomSeat, true, false).commander?.doctrine, 'cautious');
@@ -116,7 +117,7 @@ describe('toSeatSnapshot', () => {
       seatId: 'opponent2',
       seatOrder: 3,
       kind: 'ai',
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'aggressive', hasApiKey: true, doctrine: 'aggressive' },
+      commander: { modelId: null, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'aggressive', hasApiKey: true, doctrine: 'aggressive' },
     });
     assert.equal(toSeatSnapshot(chosenSeat, false, true).commander?.doctrine, 'aggressive');
     assert.equal(toSeatSnapshot(chosenSeat, false, true).commander?.hasApiKey, true);

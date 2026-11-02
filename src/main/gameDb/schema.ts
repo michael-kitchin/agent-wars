@@ -228,6 +228,7 @@ export function getFullDdl(): string {
       nickname TEXT,
       model_id TEXT,
       reasoning_effort TEXT,
+      provider_sort TEXT CHECK (provider_sort IN ('throughput', 'price', 'latency', 'nitro')),
       doctrine_choice TEXT CHECK (doctrine_choice IN ('aggressive', 'balanced', 'cautious', 'random')),
       doctrine TEXT CHECK (doctrine IN ('aggressive', 'balanced', 'cautious')),
       out_turn INTEGER,
@@ -235,7 +236,8 @@ export function getFullDdl(): string {
       out_reasons TEXT NOT NULL DEFAULT '[]',
       place INTEGER,
       consultation_count INTEGER NOT NULL DEFAULT 0,
-      cost_usd REAL NOT NULL DEFAULT 0
+      cost_usd REAL NOT NULL DEFAULT 0,
+      think_time_ms INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS turn_notes_history (

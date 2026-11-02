@@ -432,6 +432,7 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
     updateSeatCommander({ run: dbRun, getAll: dbGetAll }, AI_SEAT_IDS[0], {
       modelId: 'test-model',
       reasoningEffort: null,
+      providerSort: 'throughput',
       doctrineChoice: 'balanced',
     });
     const merge = await runEventDrivenAfterTacticalBeatConsultation({

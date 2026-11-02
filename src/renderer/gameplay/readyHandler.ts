@@ -13,13 +13,12 @@ import {
   isDeferredResolutionPlaybackConsultPending,
   isWaitingForPrecomputedAiOrders,
 } from '../openRouter/aiPlanningState';
-import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
-import { rollbackReadyToolCounts, runTacticalReadyCommit } from './readyTacticalCommit';
+import { runTacticalReadyCommit } from './readyTacticalCommit';
 import {
   announceResolutionTurnUpdate,
   deriveCombatVisibilityClassification,
@@ -117,27 +116,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
   const matchEpoch = currentRendererMatchEpoch();
-  const toolCountsBeforeReadyClick = { ...S.toolInvocationCounts };
-  const cachedPrecomputedToolCountsAtReadyStart = S.precomputedToolInvocationCounts
-    ? { ...S.precomputedToolInvocationCounts }
-    : null;
-  S.toolInvocationCounts = Object.fromEntries(S.openRouterToolGroups.map((g) => [g.id, 0]));
-  deps.updateOpenRouterToolCountLabels();
   deps.updateReadyButtonState();
   try {
     if (isWaitingForPrecomputedAiOrders()) {
-      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.startBackgroundRequestIfAllowed();
       deps.showMapToast('AI planning is still running. Ready will unlock when it finishes.', { isError: false });
       deps.updateReadyButtonState();
       return;
     }
-    if (await runTacticalReadyCommit({
-      deps,
-      toolCountsBeforeReadyClick,
-      cachedPrecomputedToolCountsAtReadyStart,
-      matchEpoch,
-    })) return;
+    if (await runTacticalReadyCommit({ deps, matchEpoch })) return;
     // The turn this Ready resolves; its reports are filed under it after the snapshot moves on to the next turn.
     const turnReportTag = currentConsoleReportTag();
     const hasPendingDraftOrders =
@@ -164,9 +151,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;
-    const cachedPrecomputedToolCounts =
-      cachedPrecomputedToolCountsAtReadyStart ??
-      (S.precomputedToolInvocationCounts ? { ...S.precomputedToolInvocationCounts } : null);
     const readyPayload = buildReadyPayload({
       enabledToolGroupsPayload,
       useEventDriven,
@@ -177,7 +161,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (!rendererMatchEpochCurrent(matchEpoch)) return;
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
-      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       const reason = readyResult.reason ?? 'Ready failed';
       stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
       deps.showSidebarError(reason);
@@ -187,7 +170,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
 
     if (readyResult.awaitingMeleeDecision) {
       if (!window.gameApi.resolveMeleeIntercept) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError('Melee intercept resolve is not available in this build.');
         deps.updateReadyButtonState();
         return;
@@ -223,7 +205,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       });
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!resolveResult.success) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         const reason = resolveResult.reason ?? 'Melee resolve failed';
         stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
         deps.showSidebarError(reason);
@@ -265,11 +246,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
     const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
 
-    applyToolInvocationCountsAfterReady({
-      fromResult: readyResult.toolInvocationCounts,
-      cachedPrecomputed: cachedPrecomputedToolCounts,
-      allowPrecomputedFallback: cachedPrecomputedToolCounts != null,
-    });
     deps.updateOpenRouterCostLabel();
     if (readyResult.aiConsulted === false) {
       deps.appendOpenRouterLog('AI executing standing orders (no event fired).');

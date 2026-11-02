@@ -8,6 +8,7 @@
  * Exceptions: None. This module does not import the main-process logger.
  */
 
+import type { ProviderSortChoice } from './openRouterProviderSort';
 import { isAiSeatId, type AiSeatId, type SeatId } from './seatIds';
 
 /**
@@ -101,7 +102,7 @@ export const DEFAULT_DOCTRINE: Doctrine = 'balanced';
 export type SeatOutReason = 'home_control' | 'no_city_hexes' | 'home_cities_destroyed';
 
 /**
- * An AI seat's model, effort, and doctrine.
+ * An AI seat's model, effort, provider choice, and doctrine.
  *
  * Purpose: The human seat has no commander. Each AI seat has one.
  * When to use: Consults and the commander summary.
@@ -128,6 +129,15 @@ export interface SeatCommander {
    * Exceptions: None.
    */
   readonly reasoningEffort: string | null;
+  /**
+   * How OpenRouter picks a host for this commander.
+   *
+   * Contract: One of `PROVIDER_SORT_CHOICES`. A null column is read as `throughput` before it reaches this object.
+   * When to use: The request profile and the commander popover.
+   * Expected outcome: `throughput`, `price`, `latency`, or `nitro`.
+   * Exceptions: None.
+   */
+  readonly providerSort: ProviderSortChoice;
   /**
    * The doctrine the human picked, including Random.
    *
@@ -276,6 +286,15 @@ export interface SeatRecord {
    * Exceptions: None.
    */
   readonly costUsd: number;
+  /**
+   * Milliseconds of settled consults for this AI seat.
+   *
+   * Contract: Zero for a human seat and at the start of a match. Includes finished, failed, and timed-out consults. A player stop adds nothing.
+   * When to use: The result row. The consultation count is a different number.
+   * Expected outcome: A non-negative integer.
+   * Exceptions: None.
+   */
+  readonly thinkTimeMs: number;
 }
 
 /**
@@ -427,6 +446,7 @@ export function toSeatSnapshot(seat: SeatRecord, revealDoctrine: boolean, hasApi
     commander: {
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
+      providerSort: seat.commander.providerSort,
       doctrineChoice: seat.commander.doctrineChoice,
       hasApiKey,
       doctrine: hideRandomDoctrine ? null : seat.commander.doctrine,

@@ -27,7 +27,13 @@ import {
  * Expected outcome: Balanced, with no model.
  * Exceptions: None.
  */
-const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
+const COMMANDER: NewGameCommanderInput = {
+  modelId: null,
+  reasoningEffort: null,
+  providerSort: 'throughput',
+  doctrineChoice: 'balanced',
+  nickname: '',
+};
 
 /**
  * Three homes, so a fourth row cannot be added.
@@ -70,6 +76,7 @@ test('a three-home map caps at three rows and the caption counts them', () => {
 const COPIED_COMMANDER: NewGameCommanderInput = {
   modelId: 'test-model',
   reasoningEffort: 'high',
+  providerSort: 'price',
   doctrineChoice: 'aggressive',
   apiKey: 'test-openrouter-key',
   nickname: 'Grok',

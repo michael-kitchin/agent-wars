@@ -8,6 +8,7 @@
  */
 
 import { logDebug, logError, logTrace } from '../logger';
+import { providerSortOrDefault } from '../../shared/openRouterProviderSort';
 import { isSeatId, type AiSeatId, type SeatId } from '../../shared/seatIds';
 import {
   AI_SEAT_KIND,
@@ -25,18 +26,20 @@ import {
 import type { BasicDbOps, DbReadOps, DbWriteOps } from './dbOps';
 
 /**
- * Adds `seats.nickname` when an older match file does not have it.
+ * Adds seat columns that arrived after the match-file version stopped changing.
  *
- * Purpose: A nickname column can arrive without making every earlier save unloadable.
- * When to use: On open, next to `ensureHireOrderReservedCreditsColumn`. A fresh database already has the column.
- * Expected outcome: The column exists. A second call does nothing.
+ * Purpose: A nickname, a provider choice, or think time can arrive without making every earlier save unloadable.
+ * When to use: On open, next to `ensureHireOrderReservedCreditsColumn`. A fresh database already has these columns.
+ * Expected outcome: `nickname`, `provider_sort`, and `think_time_ms` exist. A second call does nothing. A null `provider_sort` stays null until a later write. `think_time_ms` starts at 0.
  * Exceptions: Propagates SQLite errors from the alter.
  */
-export function ensureSeatNicknameColumn(ops: BasicDbOps): void {
-  logDebug('seatRosterStore ensureSeatNicknameColumn');
+export function ensureSeatAddedColumns(ops: BasicDbOps): void {
+  logDebug('seatRosterStore ensureSeatAddedColumns');
   const columns = ops.getAll<{ name: string } & Record<string, unknown>>('PRAGMA table_info(seats)');
-  if (columns.some((column) => column.name === 'nickname')) return;
-  ops.run('ALTER TABLE seats ADD COLUMN nickname TEXT');
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has('nickname')) ops.run('ALTER TABLE seats ADD COLUMN nickname TEXT');
+  if (!names.has('provider_sort')) ops.run('ALTER TABLE seats ADD COLUMN provider_sort TEXT');
+  if (!names.has('think_time_ms')) ops.run('ALTER TABLE seats ADD COLUMN think_time_ms INTEGER NOT NULL DEFAULT 0');
 }
 
 /**
@@ -55,6 +58,7 @@ type SeatRow = {
   readonly nickname: string | null;
   readonly model_id: string | null;
   readonly reasoning_effort: string | null;
+  readonly provider_sort: string | null;
   readonly doctrine_choice: string | null;
   readonly doctrine: string | null;
   readonly out_turn: number | null;
@@ -63,6 +67,7 @@ type SeatRow = {
   readonly place: number | null;
   readonly consultation_count: number;
   readonly cost_usd: number;
+  readonly think_time_ms: number;
 };
 
 const SEAT_OUT_REASONS: readonly SeatOutReason[] = ['home_control', 'no_city_hexes', 'home_cities_destroyed'];
@@ -144,6 +149,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
       : {
           modelId: row.model_id,
           reasoningEffort: row.reasoning_effort,
+          providerSort: providerSortOrDefault(row.provider_sort),
           doctrineChoice: isDoctrineChoice(row.doctrine_choice) ? row.doctrine_choice : doctrine,
           hasApiKey: false,
           doctrine,
@@ -154,6 +160,7 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
     place: row.place,
     consultationCount: row.consultation_count,
     costUsd: row.cost_usd,
+    thinkTimeMs: row.think_time_ms,
   };
 }
 
@@ -168,8 +175,9 @@ function seatFromRow(row: SeatRow): SeatRecord | null {
 export function readSeatRoster(ops: Pick<DbReadOps, 'getAll'>): SeatRecord[] {
   logTrace('seatRosterStore readSeatRoster');
   const rows = ops.getAll<SeatRow>(
-    `SELECT seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, doctrine_choice, doctrine,
-            out_turn, out_by, out_reasons, place, consultation_count, cost_usd
+    `SELECT seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, provider_sort,
+            doctrine_choice, doctrine, out_turn, out_by, out_reasons, place, consultation_count, cost_usd,
+            think_time_ms
      FROM seats
      ORDER BY seat_order`
   );
@@ -193,9 +201,10 @@ export function replaceSeatRoster(ops: Pick<DbWriteOps, 'run'>, seats: readonly 
   for (const seat of seats) {
     ops.run(
       `INSERT INTO seats (
-         seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, doctrine_choice, doctrine,
-         out_turn, out_by, out_reasons, place, consultation_count, cost_usd
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         seat_id, seat_order, kind, home_region, nickname, model_id, reasoning_effort, provider_sort,
+         doctrine_choice, doctrine, out_turn, out_by, out_reasons, place, consultation_count, cost_usd,
+         think_time_ms
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         seat.seatId,
         seat.seatOrder,
@@ -204,6 +213,7 @@ export function replaceSeatRoster(ops: Pick<DbWriteOps, 'run'>, seats: readonly 
         seat.nickname,
         seat.commander?.modelId ?? null,
         seat.commander?.reasoningEffort ?? null,
+        seat.commander?.providerSort ?? null,
         seat.commander?.doctrineChoice ?? null,
         seat.commander?.doctrine ?? null,
         seat.outTurn,
@@ -212,6 +222,7 @@ export function replaceSeatRoster(ops: Pick<DbWriteOps, 'run'>, seats: readonly 
         seat.place,
         seat.consultationCount,
         seat.costUsd,
+        seat.thinkTimeMs,
       ]
     );
   }
@@ -240,6 +251,24 @@ export function writeSeatKnockout(
     `UPDATE seats SET out_turn = ?, out_by = ?, out_reasons = ?, place = ? WHERE seat_id = ?`,
     [knockout.outTurn, knockout.outBy, JSON.stringify(knockout.outReasons), knockout.place, knockout.seatId]
   );
+}
+
+/**
+ * Adds one consult's elapsed time to an AI seat.
+ *
+ * Purpose: Think time is launch-to-settle for every consult the pool settles, including a timeout or a failure.
+ * When to use: The settle write. Do not call it for a player stop.
+ * Expected outcome: `think_time_ms` increases by the finite positive elapsed time, or by zero. The consultation count is unchanged.
+ * Exceptions: Propagates SQLite errors. A missing seat updates nothing.
+ */
+export function recordSeatThinkTime(
+  ops: Pick<DbWriteOps, 'run'>,
+  seatId: AiSeatId,
+  elapsedMs: number
+): void {
+  const added = Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0;
+  logDebug('seatRosterStore recordSeatThinkTime', { seatId, elapsedMs: added });
+  ops.run('UPDATE seats SET think_time_ms = think_time_ms + ? WHERE seat_id = ?', [added, seatId]);
 }
 
 /**
@@ -291,7 +320,7 @@ function doctrineAfterChoice(choice: DoctrineChoice, stored: Doctrine): Doctrine
 }
 
 /**
- * Updates one AI seat's model, effort, and doctrine choice.
+ * Updates one AI seat's model, effort, provider choice, and doctrine choice.
  *
  * Purpose: Commander settings belong on the seat. The app-wide model and effort are copied into the first AI seat.
  * When to use: The commander IPC, and when the app-wide model or effort changes during a match.
@@ -301,11 +330,12 @@ function doctrineAfterChoice(choice: DoctrineChoice, stored: Doctrine): Doctrine
 export function updateSeatCommander(
   ops: Pick<DbReadOps, 'getAll'> & Pick<DbWriteOps, 'run'>,
   seatId: SeatId,
-  commander: Pick<SeatCommander, 'modelId' | 'reasoningEffort' | 'doctrineChoice'>
+  commander: Pick<SeatCommander, 'modelId' | 'reasoningEffort' | 'providerSort' | 'doctrineChoice'>
 ): SeatRecord {
   logDebug('seatRosterStore updateSeatCommander', {
     seatId,
     hasModel: Boolean(commander.modelId?.trim()),
+    providerSort: commander.providerSort,
     doctrineChoice: commander.doctrineChoice,
   });
   const seat = readSeatRoster(ops).find((row) => row.seatId === seatId);
@@ -318,13 +348,21 @@ export function updateSeatCommander(
   const nextCommander: SeatCommander = {
     modelId: commander.modelId,
     reasoningEffort: commander.reasoningEffort,
+    providerSort: commander.providerSort,
     doctrineChoice: commander.doctrineChoice,
     hasApiKey: false,
     doctrine: doctrineAfterChoice(commander.doctrineChoice, seat.commander.doctrine),
   };
   ops.run(
-    `UPDATE seats SET model_id = ?, reasoning_effort = ?, doctrine_choice = ?, doctrine = ? WHERE seat_id = ?`,
-    [nextCommander.modelId, nextCommander.reasoningEffort, nextCommander.doctrineChoice, nextCommander.doctrine, seatId]
+    `UPDATE seats SET model_id = ?, reasoning_effort = ?, provider_sort = ?, doctrine_choice = ?, doctrine = ? WHERE seat_id = ?`,
+    [
+      nextCommander.modelId,
+      nextCommander.reasoningEffort,
+      nextCommander.providerSort,
+      nextCommander.doctrineChoice,
+      nextCommander.doctrine,
+      seatId,
+    ]
   );
   return { ...seat, commander: nextCommander };
 }

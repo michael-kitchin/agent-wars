@@ -104,14 +104,14 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - New game in the game menu while the new-game screen is open, on its tip host: The new-game screen is already open.
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
 - Offer tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
-- Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.
-- Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you click Start, or when you turn this on, and the number counts uses since the last Ready.
-- Planning: Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
-- Assessment: Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
-- Estimation: Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
-- Memory: Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
-- Orders: Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
-- Production: Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
+- Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.
+- Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.
+- Planning: Let the opponent plan routes and measure distances. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
+- Assessment: Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
+- Estimation: Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
+- Memory: Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
+- Orders: Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
+- Production: Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
 - Terrain style: Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.
 - Build marker: `Build Units`, or `Build/Hire Units` when the hex is in the human hire set (`buildEntryTooltipTextFor` in `src/renderer/chrome/controlTooltipText.ts`).
 - Tactical entry marker: Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.

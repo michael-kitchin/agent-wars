@@ -6,6 +6,11 @@ import { AI_SEAT_IDS, aiIndexForSeatId } from '../../shared/seatIds';
 import { readSeatApiKey } from './commanderKeyMemory';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
+import { createConsultTelemetry, logConsultTelemetrySummary } from './consultTelemetry';
+import {
+  markSuccessfulConsultation as recordSuccessfulConsultation,
+  settleConsultFailure,
+} from './requestOrdersConsultationMarks';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
 import { createPathfindingSession } from '../tools/pathfinding';
@@ -16,12 +21,7 @@ import { formatTacticalBriefing } from './formatTacticalBriefing';
 import { resetHexControllerParityCheckDedupForTurn } from '../snapshotDbParity';
 import { buildPossibleActionsIndexedState } from './possibleUnitActions';
 import { getSubscriptions } from '../callbackSubscriptions';
-import {
-  clearAiLossEventsSinceConsultation,
-  setAiLastConsultationTurn,
-  setAiToolLimitExceededLastTurn,
-  upsertTurnStrategyNote,
-} from '../gameDb';
+import { setAiToolLimitExceededLastTurn } from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import { getInitialUserMessage } from './promptText';
@@ -53,6 +53,7 @@ import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersChatMessage, RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 import {
   finalizeRequestOrdersPathfindingMetrics,
+  REQUEST_ORDERS_WALL_CLOCK_ERROR,
   getAiPathfindingTurnAggregateMetrics,
   isAgentWarsFullPromptLoggingEnabled,
   logPromptPreview,
@@ -142,8 +143,17 @@ export async function requestOrdersFlow(
     tacticalAiBattle: tacticalBattle ? tacticalBattle.battleId : null,
   });
   const key = readSeatApiKey(seatId, loadKey());
-  const failRequest = (error: string): RequestOrdersError => {
-    return { success: false, error };
+  /**
+   * Returns a failed order request, keeping tool counts when the consult already recorded some.
+   *
+   * Purpose: A parse failure or cancel can happen after tools have run, and the consult total includes those uses.
+   * When to use: Any return that does not produce orders. Pass `counts` only after that map exists.
+   * Expected outcome: `{ success: false, error }`, plus `toolInvocationCounts` when `counts` is passed.
+   * Exceptions: None.
+   */
+  const failRequest = (error: string, counts?: Readonly<Record<string, number>>): RequestOrdersError => {
+    logDebug('openRouter requestOrders failRequest', { error, hasCounts: counts != null });
+    return counts ? { success: false, error, toolInvocationCounts: counts } : { success: false, error };
   };
   if (!key) {
     logError('openRouter requestOrders: no API key');
@@ -288,7 +298,7 @@ export async function requestOrdersFlow(
     );
     if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {
       logError('openRouter requestOrders: strategic map generation missing from briefing');
-      return failRequest('Operational map generation failed for strategic prompt.');
+      return failRequest('Operational map generation failed for strategic prompt.', toolInvocationCounts);
     }
     logDebug('openRouter requestOrders: strategic briefing prepared', {
       briefingLength: briefingOverride.length,
@@ -307,7 +317,7 @@ export async function requestOrdersFlow(
       logError('openRouter requestOrders: tactical briefing generation failed', {
         battleId: tacticalBattle.battleId,
       });
-      return failRequest('Operational map generation failed for tactical prompt.');
+      return failRequest('Operational map generation failed for tactical prompt.', toolInvocationCounts);
     }
     briefingOverride = tacticalBrief;
     logDebug('openRouter requestOrders: tactical briefing prepared', {
@@ -320,7 +330,7 @@ export async function requestOrdersFlow(
       tacticalBattleId: tacticalBattle?.battleId ?? null,
       hasBriefingOverride: Boolean(briefingOverride?.length),
     });
-    return failRequest('Operational map is required for AI prompting and was not generated.');
+    return failRequest('Operational map is required for AI prompting and was not generated.', toolInvocationCounts);
   }
   const includeExitBattle = tacticalBattle?.leadPartyId != null;
   const systemPrompt = buildSystemPromptForTools(
@@ -413,6 +423,9 @@ export async function requestOrdersFlow(
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
     includeExitBattle,
   };
+  const wallClockStart = Date.now();
+  const usage: RequestOrdersUsageTotals = { requestCost: 0, totalInputTokens: 0, totalOutputTokens: 0 };
+  const telemetry = createConsultTelemetry({ seatId, turnNumber: state.turnNumber, theater: tacticalBattle ? 'tactical' : 'strategic', battleId: tacticalBattle?.battleId ?? null, modelId, providerSort: requestProfile.providerSort, usage });
   /**
    * Optional request parameters shared by every tool-loop round and the repair call.
    *
@@ -420,26 +433,17 @@ export async function requestOrdersFlow(
    * whether the schema is attached.
    * When to use: Passed to the tool loop and the repair exchange.
    * Expected outcome: Baseline settings for models missing from the capability cache.
+   * Exceptions: None.
    */
   const requestSettings: OrdersChatRequestSettings = {
     profile: requestProfile,
     responseFormat: requestProfile.structuredOutputs ? buildOrdersEnvelopeResponseFormat(envelopeGates) : null,
+    telemetry,
   };
-
-  const wallClockStart = Date.now();
-  const usage: RequestOrdersUsageTotals = { requestCost: 0, totalInputTokens: 0, totalOutputTokens: 0 };
-  const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void => {
-    setAiLastConsultationTurn(seatId, state.turnNumber);
-    clearAiLossEventsSinceConsultation(seatId);
-    if (tacticalBattle) {
-      upsertTurnStrategyNote(seatId, 'tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, {
-        strategyText,
-        messageText,
-      });
-    } else {
-      upsertTurnStrategyNote(seatId, 'strategic', '', state.turnNumber, { strategyText, messageText });
-    }
-  };
+  const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void =>
+    recordSuccessfulConsultation({ seatId, turnNumber: state.turnNumber, tacticalBattle, strategyText, messageText });
+  const failSettled = (error: string): RequestOrdersError =>
+    settleConsultFailure(telemetry, error, REQUEST_ORDERS_WALL_CLOCK_ERROR, (failure) => failRequest(failure, toolInvocationCounts));
   try {
     const loopResult = await runRequestOrdersToolLoop({
       messages,
@@ -466,8 +470,9 @@ export async function requestOrdersFlow(
       getOrCreateAiPlanningPathfindingSession,
       aiPathfindingSessionMetrics,
     });
-    if (loopResult.kind === 'fail') return failRequest(loopResult.error);
+    if (loopResult.kind === 'fail') return failSettled(loopResult.error);
     if (loopResult.kind === 'budgetExceeded') {
+      telemetry.setOutcome('budgetExceeded');
       setAiToolLimitExceededLastTurn(seatId);
       markSuccessfulConsultation(null, null);
       if (onLog) {
@@ -487,7 +492,7 @@ export async function requestOrdersFlow(
         outputTokens: usage.totalOutputTokens > 0 ? usage.totalOutputTokens : undefined,
       };
     }
-    if (signal?.aborted) return failRequest('Cancelled');
+    if (signal?.aborted) return failSettled('Cancelled');
     const content = loopResult.content;
     const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
     /**
@@ -549,9 +554,10 @@ export async function requestOrdersFlow(
     }
     if (!parsed) {
       if (onLog) onLog('Invalid response: could not parse orders JSON after normal and repair attempts.', true);
-      return failRequest('Invalid response: could not parse orders');
+      return failSettled('Invalid response: could not parse orders');
     }
 
+    telemetry.setOutcome('finished');
     return applyParsedRequestOrders({
       parsed,
       ordersEnabled: flags.ordersEnabled,
@@ -575,12 +581,13 @@ export async function requestOrdersFlow(
   } catch (err) {
     if (isLikelyAbortError(err)) {
       logDebug('openRouter requestOrders: cancelled', { turnNumber: state.turnNumber });
-      return failRequest('Cancelled');
+      return failSettled('Cancelled');
     }
     logError('openRouter requestOrders: exception', err);
     if (onLog) onLog(String(err), true);
-    return failRequest(String(err));
+    return failSettled(String(err));
   } finally {
+    logConsultTelemetrySummary(telemetry.summary());
     finalizeRequestOrdersPathfindingMetrics({
       turnNumber: state.turnNumber,
       modelId,

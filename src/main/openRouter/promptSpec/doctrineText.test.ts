@@ -58,7 +58,14 @@ function promptState(doctrine: 'aggressive' | 'balanced' | 'cautious'): GameStat
         kind: 'ai',
         homeRegion: 'Eastern Europe',
         outTurn: null,
-        commander: { modelId: null, reasoningEffort: null, doctrineChoice: doctrine, hasApiKey: false, doctrine },
+        commander: {
+          modelId: null,
+          reasoningEffort: null,
+          providerSort: 'throughput',
+          doctrineChoice: doctrine,
+          hasApiKey: false,
+          doctrine,
+        },
       },
     ],
   } as unknown as GameStateSnapshot;

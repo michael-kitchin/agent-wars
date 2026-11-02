@@ -3,7 +3,7 @@
  *
  * Purpose: Timeouts, retries, and cancel can be exercised without a slow model.
  * When to use: The chat transport, on every attempt, reading the environment again.
- * Expected outcome: `off` leaves the real request alone. `first` hangs only attempt 0. `all` hangs every attempt.
+ * Expected outcome: `off` leaves the real request alone. `first` hangs only attempt 0. `all` hangs every attempt. A hang is a timeout, so it does not by itself reach a later attempt.
  * Exceptions: Any other value is off. The hang length is clamped to 100ms through the real request timeout.
  */
 
@@ -55,9 +55,9 @@ export function readModelHangSimulationMs(): number {
 /**
  * True when this network attempt should wait on the abort timer instead of posting.
  *
- * Purpose: `first` still lets the retry call OpenRouter. `all` hangs every attempt.
+ * Purpose: `first` hangs only the first send. A later send is reached only when an earlier send failed with a retryable error. `all` hangs every send, including that retry.
  * When to use: Before `postChatViaHttps`, with the zero-based network attempt index (credit-cap retries do not advance it).
- * Expected outcome: True for `all`, or for `first` when `networkAttemptIndex` is 0.
+ * Expected outcome: True for `all`, or for `first` when `networkAttemptIndex` is 0. A timeout does not advance the index.
  * Exceptions: None.
  */
 export function shouldSimulateModelHang(networkAttemptIndex: number): boolean {

@@ -369,10 +369,21 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   box-sizing: border-box;
   font-size: 13px;
 }
-/* Reasoning and Doctrine share the next line. Each pair is half the row. The invisible sizer makes both labels as wide as "Reasoning". */
+/* Reasoning and Provider share this line. Each pair is half the row. The invisible sizer makes both labels as wide as "Reasoning". */
 .commander-popover-choices {
   display: flex;
   gap: 8px;
+}
+/* Doctrine takes the left half of its own row. Its description fills the right half. */
+.commander-popover-doctrine-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.commander-popover-doctrine-row > .commander-popover-choice,
+.commander-popover-doctrine-row > .commander-popover-doctrine {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .commander-popover-choice {
   display: grid;

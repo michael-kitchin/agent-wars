@@ -224,6 +224,15 @@ export type CommanderConsultOutcome = {
    * Exceptions: None.
    */
   readonly absenceReason: CommanderAbsenceReason | null;
+  /**
+   * How many times each tool group ran during this seat's consult.
+   *
+   * Contract: Present when the model call returned a map, including an unfinished consult. Absent when the call returned none.
+   * When to use: The pool adds this seat into the current wave's total.
+   * Expected outcome: The counts `requestOrders` returned. A missing map adds nothing.
+   * Exceptions: None.
+   */
+  readonly toolInvocationCounts?: Readonly<Record<string, number>>;
 };
 
 /**

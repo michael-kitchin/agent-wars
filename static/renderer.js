@@ -14909,9 +14909,9 @@
   }
 
   // src/shared/aiConsultationLimits.ts
-  var AI_MODEL_REQUEST_TIMEOUT_MS = 9e4;
+  var AI_MODEL_REQUEST_TIMEOUT_MS = 18e4;
   var AI_MODEL_REQUEST_RETRY_COUNT = 1;
-  var AI_CONSULTATION_WALL_CLOCK_MS = 3e5;
+  var AI_CONSULTATION_WALL_CLOCK_MS = 6e5;
   var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
 
   // src/renderer/core/constants.ts
@@ -21155,6 +21155,18 @@ ${bonuses}`;
     return api.getGameState(matchViewArgument());
   }
 
+  // src/renderer/openRouter/openRouterToolCountLabels.ts
+  function updateOpenRouterToolCountLabels() {
+    for (const group of rendererSharedState.openRouterToolGroups) {
+      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
+      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+    }
+  }
+  function applyCommanderToolCountSum(counts) {
+    rendererSharedState.toolInvocationCounts = { ...counts };
+    updateOpenRouterToolCountLabels();
+  }
+
   // src/shared/newGameBannerText.ts
   function newGameBannerText(kind, tab) {
     if (kind === "startup") return `Start the ${tab} game when ready.`;
@@ -21794,6 +21806,21 @@ ${bonuses}`;
     return { top, left };
   }
 
+  // src/shared/openRouterProviderSort.ts
+  var PROVIDER_SORT_CHOICES = Object.freeze([
+    "throughput",
+    "price",
+    "latency",
+    "nitro"
+  ]);
+  var PROVIDER_SORT_LABELS = Object.freeze({
+    throughput: "Highest Throughput",
+    price: "Lowest Price",
+    latency: "Lowest Latency",
+    nitro: "Priority Service (Nitro)"
+  });
+  var DEFAULT_PROVIDER_SORT = "throughput";
+
   // src/shared/newGameSides.ts
   function nicknameForHome(homeKey, homes) {
     const home = homes.find((option2) => option2.key === homeKey);
@@ -21836,6 +21863,7 @@ ${bonuses}`;
     const commander = {
       modelId: copied?.modelId ?? defaultCommander2.modelId,
       reasoningEffort: copied?.reasoningEffort ?? defaultCommander2.reasoningEffort,
+      providerSort: copied?.providerSort ?? defaultCommander2.providerSort,
       doctrineChoice: copied?.doctrineChoice ?? defaultCommander2.doctrineChoice,
       apiKey: copied ? (copied.apiKey ?? "").trim() : defaultCommander2.apiKey,
       nickname: nicknameForHome(free.key, homes)
@@ -21927,11 +21955,27 @@ ${bonuses}`;
     const index = state.rows.findIndex((row2) => row2.kind === AI_SEAT_KIND);
     if (index < 0) return state;
     const row = state.rows[index];
-    const commander = row.commander ?? { modelId: null, reasoningEffort: null, doctrineChoice: "balanced", nickname: "" };
+    const commander = row.commander ?? {
+      modelId: null,
+      reasoningEffort: null,
+      providerSort: DEFAULT_PROVIDER_SORT,
+      doctrineChoice: "balanced",
+      nickname: ""
+    };
     const rows = state.rows.map(
       (entry, rowIndex) => rowIndex === index ? { ...entry, commander: { ...commander, apiKey: apiKey.trim() } } : entry
     );
     return { ...state, rows };
+  }
+  function commanderFromRemembered(remembered) {
+    return {
+      modelId: remembered.modelId,
+      reasoningEffort: remembered.reasoningEffort,
+      providerSort: remembered.providerSort,
+      doctrineChoice: remembered.doctrineChoice,
+      apiKey: remembered.apiKey,
+      nickname: remembered.nickname
+    };
   }
   function previousAiRowIndex(state, index) {
     if (index < 0 || index >= state.rows.length) return null;
@@ -21951,20 +21995,6 @@ ${bonuses}`;
     }
     return { label: `Copy from ${rowLabel(state, previous)}`, disabled: false, source: "previous-opponent" };
   }
-
-  // src/shared/doctrineDescriptions.ts
-  var DOCTRINE_CHOICE_LABELS = {
-    aggressive: "Aggressive",
-    balanced: "Balanced",
-    cautious: "Cautious",
-    random: "Random"
-  };
-  var DOCTRINE_CHOICE_DESCRIPTIONS = {
-    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
-    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
-    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
-    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
-  };
 
   // src/shared/openRouterReasoningEffort.ts
   var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
@@ -22042,14 +22072,14 @@ ${bonuses}`;
   var newGameCommanderTooltipText = "Change this side's nickname, API key, model, reasoning, and doctrine.";
   var newGameItemOpenTooltipText = "The new-game screen is already open.";
   var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
-  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
-  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.";
-  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
-  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses in this consult, for every commander, and the button stays pressed while this is on.";
+  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses in this consult, for every commander.";
+  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
+  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.";
   function toolGroupTooltipText(groupId) {
     switch (groupId) {
       case "precomputation":
@@ -22116,6 +22146,20 @@ ${bonuses}`;
     reportLine?.(line, isError);
   }
 
+  // src/shared/doctrineDescriptions.ts
+  var DOCTRINE_CHOICE_LABELS = {
+    aggressive: "Aggressive",
+    balanced: "Balanced",
+    cautious: "Cautious",
+    random: "Random"
+  };
+  var DOCTRINE_CHOICE_DESCRIPTIONS = {
+    aggressive: "Attacks early, accepts losses, and strikes cities it does not plan to hold.",
+    balanced: "Uses speed and surprise, attacks weak points, and avoids the enemy's strengths.",
+    cautious: "Guards its home, fights only at an advantage, and grows its forces before attacking.",
+    random: "Draws Aggressive, Balanced, or Cautious when the game starts. The draw is revealed when the game ends."
+  };
+
   // src/renderer/openRouter/commanderPopoverLabels.ts
   var popoverLabelWidthText = "Reasoning";
   var POPOVER_CONTROL_IDS = {
@@ -22123,6 +22167,7 @@ ${bonuses}`;
     apiKey: "commander-popover-api-key",
     model: "commander-popover-model",
     reasoning: "commander-popover-reasoning",
+    provider: "commander-popover-provider",
     doctrine: "commander-popover-doctrine"
   };
   function fieldLabel(id, text) {
@@ -22143,6 +22188,58 @@ ${bonuses}`;
     pair.className = "commander-popover-choice";
     pair.append(fieldLabel(id, text), control);
     return pair;
+  }
+
+  // src/renderer/openRouter/commanderPopoverChoices.ts
+  function choiceSelect(input) {
+    const select = document.createElement("select");
+    select.id = input.id;
+    select.setAttribute("aria-label", input.label);
+    for (const choice of input.options) select.appendChild(new Option(input.optionLabel(choice), choice));
+    select.value = input.selected;
+    select.addEventListener("change", () => {
+      input.onChange(select.value);
+    });
+    return {
+      pair: choicePair(input.id, input.label, select),
+      show: (next) => {
+        select.value = next;
+      }
+    };
+  }
+  function doctrineChoiceControl(input) {
+    const description = document.createElement("p");
+    description.className = "commander-popover-doctrine";
+    const control = choiceSelect({
+      id: POPOVER_CONTROL_IDS.doctrine,
+      label: "Doctrine",
+      options: DOCTRINE_CHOICES,
+      optionLabel: (choice) => DOCTRINE_CHOICE_LABELS[choice],
+      selected: input.selected,
+      onChange: (choice) => {
+        description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[choice];
+        input.onChange(choice);
+      }
+    });
+    const show = (next) => {
+      control.show(next);
+      description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[next];
+    };
+    show(input.selected);
+    const row = document.createElement("div");
+    row.className = "commander-popover-doctrine-row";
+    row.append(control.pair, description);
+    return { row, show };
+  }
+  function providerChoiceControl(input) {
+    return choiceSelect({
+      id: POPOVER_CONTROL_IDS.provider,
+      label: "Provider",
+      options: PROVIDER_SORT_CHOICES,
+      optionLabel: (choice) => PROVIDER_SORT_LABELS[choice],
+      selected: input.selected,
+      onChange: input.onChange
+    });
   }
 
   // src/renderer/openRouter/openRouterModelCatalog.ts
@@ -22200,6 +22297,7 @@ ${bonuses}`;
     const draft = {
       modelId: request.commander.modelId,
       reasoningEffort: request.commander.reasoningEffort,
+      providerSort: request.commander.providerSort,
       doctrineChoice: request.commander.doctrineChoice,
       apiKey: commanderApiKey(request.commander),
       nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname)
@@ -22378,13 +22476,27 @@ ${bonuses}`;
       copyModelOptions(model, draft.modelId);
       showReasoning();
     });
-    const doctrine = doctrineField(draft, request, current);
+    const provider = providerChoiceControl({
+      selected: draft.providerSort,
+      onChange: (choice) => {
+        draft.providerSort = choice;
+        request.onChange(current());
+      }
+    });
+    const doctrine = doctrineChoiceControl({
+      selected: draft.doctrineChoice,
+      onChange: (choice) => {
+        draft.doctrineChoice = choice;
+        request.onChange(current());
+      }
+    });
     const choices = document.createElement("div");
     choices.className = "commander-popover-choices";
-    choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), doctrine.pair);
+    choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), provider.pair);
     applyOpenDraft = (commander) => {
       draft.modelId = commander.modelId;
       draft.reasoningEffort = commander.reasoningEffort;
+      draft.providerSort = commander.providerSort;
       draft.doctrineChoice = commander.doctrineChoice;
       draft.apiKey = commanderApiKey(commander);
       draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
@@ -22392,10 +22504,11 @@ ${bonuses}`;
       keyInput.value = draft.apiKey ?? "";
       copyModelOptions(model, draft.modelId);
       showReasoning();
-      doctrine.show();
+      provider.show(commander.providerSort);
+      doctrine.show(commander.doctrineChoice);
     };
     const copy = copyButton(request.copyButton);
-    fields.append(keyModel, choices, doctrine.description);
+    fields.append(keyModel, choices, doctrine.row);
     if (copy) fields.append(copy);
     return fields;
   }
@@ -22424,28 +22537,6 @@ ${bonuses}`;
       select.appendChild(new Option(modelId, modelId));
     }
     select.value = modelId ?? "";
-  }
-  function doctrineField(draft, request, current) {
-    const select = document.createElement("select");
-    select.id = POPOVER_CONTROL_IDS.doctrine;
-    select.setAttribute("aria-label", "Doctrine");
-    for (const choice of DOCTRINE_CHOICES) {
-      select.appendChild(new Option(DOCTRINE_CHOICE_LABELS[choice], choice));
-    }
-    select.value = draft.doctrineChoice;
-    const description = document.createElement("p");
-    description.className = "commander-popover-doctrine";
-    const show = () => {
-      select.value = draft.doctrineChoice;
-      description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[draft.doctrineChoice];
-    };
-    select.addEventListener("change", () => {
-      draft.doctrineChoice = select.value;
-      show();
-      request.onChange(current());
-    });
-    show();
-    return { pair: choicePair(POPOVER_CONTROL_IDS.doctrine, "Doctrine", select), description, show };
   }
   function saveAppWideModel(modelId) {
     const select = document.getElementById("openrouter-model");
@@ -22681,7 +22772,7 @@ ${bonuses}`;
 
   // src/renderer/openRouter/commanderPoolClient.ts
   var POLL_MS = 1e3;
-  var snapshot = { statuses: [], dispatches: [] };
+  var snapshot = { statuses: [], dispatches: [], toolInvocationCounts: {} };
   var pollTimer = null;
   var showToast = null;
   var fileMessage = null;
@@ -22732,6 +22823,7 @@ ${bonuses}`;
         const next = await window.gameApi.startCommanderPlanning({ mode });
         if (!poolReplyIsCurrent(matchEpoch)) return;
         snapshot = next;
+        applyCommanderToolCountSum(next.toolInvocationCounts);
       } catch (err) {
         console.error("startCommanderPlanning failed", err);
       }
@@ -22768,6 +22860,7 @@ ${bonuses}`;
       const next = await window.gameApi.readCommanderPool(drain);
       if (!poolReplyIsCurrent(matchEpoch)) return;
       snapshot = next;
+      applyCommanderToolCountSum(next.toolInvocationCounts);
       const consultFinished = wasPlanning && !anyCommanderIsPlanning();
       if (drain && (next.dispatches.length > 0 || consultFinished)) {
         messageLines(next.dispatches);
@@ -23062,6 +23155,7 @@ ${bonuses}`;
     const commander = {
       modelId: seat.commander.modelId,
       reasoningEffort: seat.commander.reasoningEffort,
+      providerSort: seat.commander.providerSort,
       doctrineChoice: seat.commander.doctrineChoice,
       nickname: sideDisplayName(seat),
       ...includeKey ? { apiKey } : {}
@@ -23077,6 +23171,7 @@ ${bonuses}`;
           void saveCommander(seatId, {
             modelId: next.modelId,
             reasoningEffort: next.reasoningEffort,
+            providerSort: next.providerSort,
             doctrineChoice: next.doctrineChoice,
             nickname: next.nickname
           });
@@ -23147,13 +23242,6 @@ ${bonuses}`;
       readyBtn.replaceChildren(label);
     }
     if (label.textContent !== text) label.textContent = text;
-  }
-
-  // src/shared/openRouterToolInvocationCounts.ts
-  function resolveToolInvocationCountsAfterReady(args) {
-    if (args.fromResult) return { ...args.fromResult };
-    if (args.allowPrecomputedFallback && args.cachedPrecomputed) return { ...args.cachedPrecomputed };
-    return null;
   }
 
   // src/shared/consoleReportLog.ts
@@ -23390,20 +23478,6 @@ ${bonuses}`;
     if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
     const cost = document.getElementById("commander-status-cost");
     if (cost) cost.textContent = formatOpenRouterCost(commanderSeatCostUsd());
-  }
-  function updateOpenRouterToolCountLabels() {
-    for (const group of rendererSharedState.openRouterToolGroups) {
-      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
-      if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-    }
-  }
-  function applyToolInvocationCountsAfterReady(args) {
-    const next = resolveToolInvocationCountsAfterReady(args);
-    if (next) {
-      rendererSharedState.toolInvocationCounts = next;
-      updateOpenRouterToolCountLabels();
-    }
-    rendererSharedState.precomputedToolInvocationCounts = null;
   }
   function formatOpenRouterCost(dollars) {
     return new Intl.NumberFormat("en-US", {
@@ -29034,7 +29108,7 @@ ${bonuses}`;
     const modelId = modelSelect?.value?.trim() ? modelSelect.value : null;
     const effortHidden = effortSelect == null || effortSelect.hidden || effortSelect.parentElement?.hidden === true;
     const reasoningEffort = !effortHidden && effortSelect?.value ? effortSelect.value : null;
-    return { modelId, reasoningEffort, doctrineChoice: "balanced", apiKey: "", nickname: "" };
+    return { modelId, reasoningEffort, providerSort: DEFAULT_PROVIDER_SORT, doctrineChoice: "balanced", apiKey: "", nickname: "" };
   }
   function commanderButtonLabel(commander) {
     const modelSelect = document.getElementById("openrouter-model");
@@ -29162,13 +29236,7 @@ ${bonuses}`;
   function commanderFromLastGame() {
     const previous = rememberedCommanders.previousMatch[0];
     if (!previous) return null;
-    return {
-      modelId: previous.modelId,
-      reasoningEffort: previous.reasoningEffort,
-      doctrineChoice: previous.doctrineChoice,
-      apiKey: previous.apiKey,
-      nickname: previous.nickname
-    };
+    return commanderFromRemembered(previous);
   }
   function commanderFromPreviousRow(index) {
     if (!sidesState) return null;
@@ -29277,6 +29345,18 @@ ${bonuses}`;
     return wrap;
   }
 
+  // src/shared/thinkTimeLabel.ts
+  var THINK_TIME_HOUR_MS = 36e5;
+  function formatThinkTimeLabel(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "0:00 thinking";
+    if (ms < THINK_TIME_HOUR_MS) return `${formatCommanderClock(ms)} thinking`;
+    const totalSeconds = Math.floor(ms / 1e3);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor(totalSeconds % 3600 / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} thinking`;
+  }
+
   // src/shared/placeOrdinal.ts
   function formatPlaceOrdinal(place) {
     const mod100 = place % 100;
@@ -29349,6 +29429,7 @@ ${bonuses}`;
       status: statusFor(seat, input.gameEndReason, singleWinner),
       commanderSummary: ai ? commanderSummary(seat, input.modelLabels) : null,
       consultationsLabel: ai ? consultationPhrase(seat.consultationCount) : null,
+      thinkTimeLabel: ai ? formatThinkTimeLabel(seat.thinkTimeMs) : null,
       costLabel: ai ? formatMatchCost(seat.costUsd) : null,
       knockedOutBy: knockedOutBy(seat, input)
     };
@@ -29430,6 +29511,7 @@ ${bonuses}`;
       place: seat.place,
       consultationCount: seat.consultationCount,
       costUsd: seat.costUsd,
+      thinkTimeMs: seat.thinkTimeMs,
       cityHexes: counts.get(seat.seatId) ?? 0,
       commander: commander ? {
         modelId: commander.modelId,
@@ -29513,7 +29595,7 @@ ${bonuses}`;
     return item;
   }
   function metaLine(row) {
-    const parts = [row.commanderSummary, row.consultationsLabel, row.costLabel].filter((part) => part !== null);
+    const parts = [row.commanderSummary, row.consultationsLabel, row.thinkTimeLabel, row.costLabel].filter((part) => part !== null);
     if (parts.length === 0) return null;
     const meta = document.createElement("p");
     meta.className = "game-over-standings-meta";
@@ -36101,6 +36183,7 @@ ${bonuses}`;
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
         clearOpenRouterLog();
+        await readCommanderPoolAndApply(false);
         hideAiStrategyToast();
         clearConsoleReports();
         deps.updateOpenRouterCostLabel();
@@ -38351,10 +38434,6 @@ ${bonuses}`;
       deps.startBackgroundRequestIfAllowed();
     }
     void readCommanderPoolAndApply(true);
-    if (payload2.toolInvocationCounts) {
-      rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload2.toolInvocationCounts };
-      deps.updateOpenRouterToolCountLabels();
-    }
     if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
       void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
     }
@@ -38616,18 +38695,13 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/readyTacticalCommit.ts
-  function rollbackReadyToolCounts(deps, snapshot2) {
-    rendererSharedState.toolInvocationCounts = snapshot2;
-    deps.updateOpenRouterToolCountLabels();
-  }
   async function runTacticalReadyCommit(context) {
-    const { deps, toolCountsBeforeReadyClick, cachedPrecomputedToolCountsAtReadyStart, matchEpoch } = context;
+    const { deps, matchEpoch } = context;
     if (!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning)) return false;
     if (!window.gameApi) return true;
     const beatReportTag = currentConsoleReportTag();
     const commit = window.gameApi.commitHumanTacticalDraftOrders;
     if (!commit) {
-      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.showSidebarError("Tactical commit is not available in this build.");
       deps.updateReadyButtonState();
       return true;
@@ -38651,7 +38725,6 @@ ${bonuses}`;
     });
     if (!rendererMatchEpochCurrent(matchEpoch)) return true;
     if (!commitResult.success) {
-      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
       deps.updateReadyButtonState();
       return true;
@@ -38717,11 +38790,6 @@ ${bonuses}`;
       }
       void readCommanderPoolAndApply(true);
     }
-    applyToolInvocationCountsAfterReady({
-      fromResult: commitResult.toolInvocationCounts,
-      cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
-      allowPrecomputedFallback: rendererSharedState.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null
-    });
     const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
     rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
       battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
@@ -38973,25 +39041,15 @@ ${bonuses}`;
     deps.clearSidebarError();
     rendererSharedState.readyRequestInFlight = true;
     const matchEpoch = currentRendererMatchEpoch();
-    const toolCountsBeforeReadyClick = { ...rendererSharedState.toolInvocationCounts };
-    const cachedPrecomputedToolCountsAtReadyStart = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
-    rendererSharedState.toolInvocationCounts = Object.fromEntries(rendererSharedState.openRouterToolGroups.map((g) => [g.id, 0]));
-    deps.updateOpenRouterToolCountLabels();
     deps.updateReadyButtonState();
     try {
       if (isWaitingForPrecomputedAiOrders()) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.startBackgroundRequestIfAllowed();
         deps.showMapToast("AI planning is still running. Ready will unlock when it finishes.", { isError: false });
         deps.updateReadyButtonState();
         return;
       }
-      if (await runTacticalReadyCommit({
-        deps,
-        toolCountsBeforeReadyClick,
-        cachedPrecomputedToolCountsAtReadyStart,
-        matchEpoch
-      })) return;
+      if (await runTacticalReadyCommit({ deps, matchEpoch })) return;
       const turnReportTag = currentConsoleReportTag();
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingMissileLaunches.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
       if (hasPendingDraftOrders) {
@@ -39013,7 +39071,6 @@ ${bonuses}`;
       }
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
-      const cachedPrecomputedToolCounts = cachedPrecomputedToolCountsAtReadyStart ?? (rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null);
       const readyPayload = buildReadyPayload({
         enabledToolGroupsPayload,
         useEventDriven,
@@ -39024,7 +39081,6 @@ ${bonuses}`;
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         const reason = readyResult.reason ?? "Ready failed";
         stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
         deps.showSidebarError(reason);
@@ -39033,7 +39089,6 @@ ${bonuses}`;
       }
       if (readyResult.awaitingMeleeDecision) {
         if (!window.gameApi.resolveMeleeIntercept) {
-          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError("Melee intercept resolve is not available in this build.");
           deps.updateReadyButtonState();
           return;
@@ -39065,7 +39120,6 @@ ${bonuses}`;
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!resolveResult.success) {
-          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           const reason = resolveResult.reason ?? "Melee resolve failed";
           stopObserveAutoAdvance(reason, deps.appendOpenRouterLog);
           deps.showSidebarError(reason);
@@ -39105,11 +39159,6 @@ ${bonuses}`;
       const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
       const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
       const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
-      applyToolInvocationCountsAfterReady({
-        fromResult: readyResult.toolInvocationCounts,
-        cachedPrecomputed: cachedPrecomputedToolCounts,
-        allowPrecomputedFallback: cachedPrecomputedToolCounts != null
-      });
       deps.updateOpenRouterCostLabel();
       if (readyResult.aiConsulted === false) {
         deps.appendOpenRouterLog("AI executing standing orders (no event fired).");
@@ -40200,10 +40249,6 @@ ${bonuses}`;
       }
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
       void readCommanderPoolAndApply(true);
-      if (payload2.toolInvocationCounts) {
-        rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload2.toolInvocationCounts };
-        deps.updateOpenRouterToolCountLabels();
-      }
       if (typeof payload2.cost === "number" && Number.isFinite(payload2.cost)) {
         void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
       }
@@ -40232,7 +40277,6 @@ ${bonuses}`;
       rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
       applyTacticalPostBeatConsultSideEffects(fields, {
         startBackgroundRequestIfAllowed: deps.startBackgroundRequestIfAllowed,
-        updateOpenRouterToolCountLabels: deps.updateOpenRouterToolCountLabels,
         appendOpenRouterLog: deps.appendOpenRouterLog,
         redraw: deps.requestRedraw,
         updateReadyButtonState: deps.updateReadyButtonState
@@ -40285,7 +40329,13 @@ ${bonuses}`;
           }
           rendererSharedState.openRouterToolGroups = withEvents;
           rendererSharedState.enabledToolGroups = new Set(withEvents.map((g) => g.id));
-          rendererSharedState.toolInvocationCounts = Object.fromEntries(withEvents.map((g) => [g.id, 0]));
+          const preserved = rendererSharedState.toolInvocationCounts;
+          rendererSharedState.toolInvocationCounts = Object.fromEntries(
+            withEvents.map((group) => {
+              const current = preserved[group.id];
+              return [group.id, typeof current === "number" && Number.isFinite(current) ? current : 0];
+            })
+          );
           deps.syncEventDrivenFromTools();
         }
       } finally {

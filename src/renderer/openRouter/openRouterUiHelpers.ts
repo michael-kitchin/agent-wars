@@ -15,13 +15,13 @@ import {
 import { commanderSeatCostUsd, commanderPoolStatuses, longestPlanningElapsedMs } from './commanderPoolClient';
 import { markCommanderLogLine, renderCommanderCards } from './commanderCardsUi';
 import { setReadyButtonLabelAiWait, setReadyButtonLabelReady } from './readyButtonLabel';
-import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 import { layoutMapChrome } from '../map/mapChromeLayout';
 import { isObservingRoster } from '../../shared/observeModeControls';
 import { activeAiSeats } from '../../shared/seatRoster';
 import { sideDisplayName } from '../../shared/sideNicknames';
 import { commanderFooterLabel, commanderPlanningSentence, modelNameFromOptionLabel, commanderPlanningStatus } from '../../shared/commanderPlanningStatus';
+export { updateOpenRouterToolCountLabels } from './openRouterToolCountLabels';
 
 /**
  * Enables Ready and sets its label from the match and the commander pool.
@@ -113,45 +113,6 @@ export function renderOpponentStatus(): void {
   if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? '');
   const cost = document.getElementById('commander-status-cost');
   if (cost) cost.textContent = formatOpenRouterCost(commanderSeatCostUsd());
-}
-
-/**
- * Writes each tool group's invocation count onto its toggle.
- *
- * Purpose: The Commanders tab shows how often each tool group ran this consult.
- * When to use: After counts are replaced, and when the toggles are first painted.
- * Expected outcome: Each toggle shows that group's count, or 0 when the group has none. A missing toggle is skipped.
- * Exceptions: None.
- */
-export function updateOpenRouterToolCountLabels(): void {
-  for (const group of S.openRouterToolGroups) {
-    const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
-    if (btn) btn.textContent = String(S.toolInvocationCounts[group.id] ?? 0);
-  }
-}
-
-/**
- * Applies tool-group counts after strategic Ready or tactical commit, with precomputed fallback.
- *
- * Purpose: Ready zeros the UI counters at click time; strategic Ready restores from the IPC result or cached
- * precomputed counts. Tactical commit must use the same rule so prefetch tool usage is not wiped when post-beat
- * consultation omits or defers `toolInvocationCounts`.
- * When to use: After a successful strategic `ready` / melee resolve, or after a successful tactical draft commit.
- * Expected outcome: Replaces `S.toolInvocationCounts` from `fromResult` when present; otherwise restores
- * `cachedPrecomputed` when `allowPrecomputedFallback` is true; always clears `S.precomputedToolInvocationCounts`.
- * Exceptions: None.
- */
-export function applyToolInvocationCountsAfterReady(args: {
-  fromResult?: Record<string, number>;
-  cachedPrecomputed: Record<string, number> | null;
-  allowPrecomputedFallback: boolean;
-}): void {
-  const next = resolveToolInvocationCountsAfterReady(args);
-  if (next) {
-    S.toolInvocationCounts = next;
-    updateOpenRouterToolCountLabels();
-  }
-  S.precomputedToolInvocationCounts = null;
 }
 
 /**

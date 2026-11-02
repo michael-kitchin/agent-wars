@@ -13,6 +13,7 @@ import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelType
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { rendererSharedState as S } from '../core/state';
+import { applyCommanderToolCountSum } from './openRouterToolCountLabels';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 
@@ -26,7 +27,7 @@ const POLL_MS = 1000;
  * Expected outcome: Empty until the first successful read.
  * Exceptions: None.
  */
-let snapshot: CommanderPoolSnapshot = { statuses: [], dispatches: [] };
+let snapshot: CommanderPoolSnapshot = { statuses: [], dispatches: [], toolInvocationCounts: {} };
 
 /**
  * The one-second poll, or null when the screen is not watching the pool.
@@ -192,6 +193,7 @@ export async function startCommanderPlanningIfAllowed(): Promise<void> {
       const next = await window.gameApi.startCommanderPlanning({ mode });
       if (!poolReplyIsCurrent(matchEpoch)) return;
       snapshot = next;
+      applyCommanderToolCountSum(next.toolInvocationCounts);
     } catch (err) {
       console.error('startCommanderPlanning failed', err);
     }
@@ -255,6 +257,7 @@ export async function readCommanderPoolAndApply(drain: boolean, showMessages = t
     const next = await window.gameApi.readCommanderPool(drain);
     if (!poolReplyIsCurrent(matchEpoch)) return;
     snapshot = next;
+    applyCommanderToolCountSum(next.toolInvocationCounts);
     const consultFinished = wasPlanning && !anyCommanderIsPlanning();
     if (drain && (next.dispatches.length > 0 || consultFinished)) {
       messageLines(next.dispatches);

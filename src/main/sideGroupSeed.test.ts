@@ -81,6 +81,7 @@ function sideGroupRoster(firstHome: string, secondHome: string): SeatRecord[] {
     place: null,
     consultationCount: 0,
     costUsd: 0,
+    thinkTimeMs: 0,
   };
   return [
     { seatId: HUMAN_SEAT_ID, seatOrder: 1, kind: 'human', homeRegion: firstHome, nickname: null, commander: null, ...empty },
@@ -90,7 +91,7 @@ function sideGroupRoster(firstHome: string, secondHome: string): SeatRecord[] {
       kind: 'ai',
       homeRegion: secondHome,
       nickname: null,
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: DEFAULT_DOCTRINE },
+      commander: { modelId: null, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', hasApiKey: false, doctrine: DEFAULT_DOCTRINE },
       ...empty,
     },
   ];

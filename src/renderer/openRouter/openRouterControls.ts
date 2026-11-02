@@ -106,9 +106,9 @@ startBackgroundRequestIfAllowed: () => void;
     /**
    * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
 
-   * Contract: Refreshes per-tool invocation count labels after consultation telemetry merges.
-   * When to use: After merging `toolInvocationCounts` from Ready or tactical commit results.
-   * Expected outcome: Sidebar counts match the latest consultation pass.
+   * Contract: Repaints the tool-group count labels from the counts the pool last applied.
+   * When to use: When a caller needs the toggles redrawn. A pool read already does this through `applyCommanderToolCountSum`.
+   * Expected outcome: Each toggle shows the current consult's total for that group.
    * Exceptions: None.
    */
 updateOpenRouterToolCountLabels: () => void;
@@ -161,7 +161,7 @@ function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps):
  *
  * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
  * When to use: Once from `initOpenRouterUI`.
- * Expected outcome: Push payloads apply strategy toasts and tool counts. A successful strategic consult does not start
+ * Expected outcome: Push payloads clear the latch and read the pool, which carries the tool-count total. A successful strategic consult does not start
  * another strategic consult; those orders are already pending for the next Ready. When a tactical battle is
  * already in planning, that battle's consult starts then, because it was held while this consult ran.
  * Exceptions: Stale `planningTurnNumber` merges log, clear the strategic latch, and still start that battle request.
@@ -190,10 +190,6 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     }
     S.pendingDeferredStrategicPostResolutionConsult = false;
     void readCommanderPoolAndApply(true);
-    if (payload.toolInvocationCounts) {
-      S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
-      deps.updateOpenRouterToolCountLabels();
-    }
     if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
       void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
     }
@@ -225,7 +221,6 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     S.pendingDeferredTacticalPostBeatConsult = false;
     applyTacticalPostBeatConsultSideEffects(fields, {
       startBackgroundRequestIfAllowed: deps.startBackgroundRequestIfAllowed,
-      updateOpenRouterToolCountLabels: deps.updateOpenRouterToolCountLabels,
       appendOpenRouterLog: deps.appendOpenRouterLog,
       redraw: deps.requestRedraw,
       updateReadyButtonState: deps.updateReadyButtonState,
@@ -298,7 +293,13 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         }
         S.openRouterToolGroups = withEvents;
         S.enabledToolGroups = new Set(withEvents.map((g) => g.id));
-        S.toolInvocationCounts = Object.fromEntries(withEvents.map((g) => [g.id, 0]));
+        const preserved = S.toolInvocationCounts;
+        S.toolInvocationCounts = Object.fromEntries(
+          withEvents.map((group) => {
+            const current = preserved[group.id];
+            return [group.id, typeof current === 'number' && Number.isFinite(current) ? current : 0];
+          })
+        );
         deps.syncEventDrivenFromTools();
       }
     } finally {

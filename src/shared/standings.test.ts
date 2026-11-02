@@ -22,6 +22,7 @@ function seat(row: Pick<StandingsSeatInput, 'seatId' | 'seatOrder' | 'kind' | 'h
     outBy: null,
     consultationCount: 0,
     costUsd: 0,
+    thinkTimeMs: 0,
     cityHexes: 0,
     nickname: null,
     commander: null,
@@ -58,6 +59,7 @@ test('buildStandings lists four places, a revealed random doctrine, and the matc
         place: 1,
         consultationCount: 61,
         costUsd: 1.92,
+        thinkTimeMs: 90_000,
         commander: { modelId: 'gemini', reasoningEffort: 'minimal', doctrineChoice: 'aggressive', revealedDoctrine: 'aggressive' },
       }),
       seat({
@@ -94,14 +96,17 @@ test('buildStandings lists four places, a revealed random doctrine, and the matc
   assert.equal(standings.rows[0]?.status, 'Winner');
   assert.equal(standings.rows[0]?.commanderSummary, 'Gemini 3.5 Flash · Minimal · Aggressive');
   assert.equal(standings.rows[0]?.consultationsLabel, '61 consultations');
+  assert.equal(standings.rows[0]?.thinkTimeLabel, '1:30 thinking');
   assert.equal(standings.rows[0]?.costLabel, '$1.92');
   assert.equal(standings.rows[0]?.dotColor, '#9D174D');
   assert.equal(standings.rows[1]?.name, 'Human (you)');
   assert.equal(standings.rows[1]?.status, 'Out, turn 23');
   assert.equal(standings.rows[1]?.commanderSummary, null);
+  assert.equal(standings.rows[1]?.thinkTimeLabel, null);
   assert.equal(standings.rows[1]?.knockedOutBy, 'Knocked out by W. Turkey');
   assert.equal(standings.rows[2]?.status, 'Out, turn 17');
   assert.equal(standings.rows[2]?.commanderSummary, 'Nova Lite 1.0 · Cautious');
+  assert.equal(standings.rows[2]?.thinkTimeLabel, '0:00 thinking');
   assert.equal(standings.rows[2]?.knockedOutBy, 'Knocked out by you');
   assert.equal(standings.rows[3]?.commanderSummary, 'Claude Haiku 5.5 · Low · Random, drew Balanced');
   assert.equal(standings.rows[3]?.costLabel, '$0.84');

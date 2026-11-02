@@ -1,9 +1,7 @@
 import type { NewGameCommanderInput } from '../../shared/ipc/ordersTypes';
 import { commanderApiKey } from '../../shared/commanderSetupCopy';
-import { DOCTRINE_CHOICE_DESCRIPTIONS, DOCTRINE_CHOICE_LABELS } from '../../shared/doctrineDescriptions';
 import { listSelectableReasoningEfforts } from '../../shared/openRouterReasoningEffort';
 import { placeBelowAnchor } from '../../shared/popoverPlacement';
-import { DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
 import { nicknameFieldValue, SIDE_NICKNAME_MAX_LENGTH } from '../../shared/sideNicknames';
 import { apiKeyTooltipText, commanderNicknameTooltipText, refreshModelsTooltipText } from '../chrome/controlTooltipText';
 import {
@@ -11,6 +9,7 @@ import {
   reportOpenRouterPopoverLine,
   setOpenRouterModelListListener,
 } from './openRouterModelRefresh';
+import { doctrineChoiceControl, providerChoiceControl } from './commanderPopoverChoices';
 import { choicePair, fieldLabel, POPOVER_CONTROL_IDS, popoverLabelWidthText } from './commanderPopoverLabels';
 import { openRouterModelById } from './openRouterModelCatalog';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
@@ -204,6 +203,7 @@ export function openCommanderPopover(request: CommanderPopoverRequest): void {
   const draft: CommanderDraft = {
     modelId: request.commander.modelId,
     reasoningEffort: request.commander.reasoningEffort,
+    providerSort: request.commander.providerSort,
     doctrineChoice: request.commander.doctrineChoice,
     apiKey: commanderApiKey(request.commander),
     nickname: nicknameFieldValue(request.commander.nickname, request.defaultNickname),
@@ -325,7 +325,7 @@ function popoverHeader(title: string): HTMLElement {
  *
  * Purpose: The controls write one commander object the caller stores.
  * When to use: `openCommanderPopover`.
- * Expected outcome: A model, reasoning, or doctrine change calls `onChange` with the nickname and key fields' current values. The nickname and the key call `onChange` on blur and Enter only when their stored values changed. Clearing the nickname writes the default name back into the field. A model change also updates the app-wide model. The reasoning list stays visible when the model offers no levels: it is disabled and reads "Model default". Every label is as wide as the word Reasoning, so the nickname field, the API key field, and the model list start at the reasoning list's left edge.
+ * Expected outcome: A model, reasoning, provider, or doctrine change calls `onChange` with the nickname and key fields' current values. The nickname and the key call `onChange` on blur and Enter only when their stored values changed. Clearing the nickname writes the default name back into the field. A model change also updates the app-wide model. The reasoning list stays visible when the model offers no levels: it is disabled and reads "Model default". Every label is as wide as the word Reasoning, so the nickname field, the API key field, and the model list start at the reasoning list's left edge.
  * Exceptions: None.
  */
 function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest): HTMLElement {
@@ -436,13 +436,27 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     copyModelOptions(model, draft.modelId);
     showReasoning();
   });
-  const doctrine = doctrineField(draft, request, current);
+  const provider = providerChoiceControl({
+    selected: draft.providerSort,
+    onChange: (choice) => {
+      draft.providerSort = choice;
+      request.onChange(current());
+    },
+  });
+  const doctrine = doctrineChoiceControl({
+    selected: draft.doctrineChoice,
+    onChange: (choice) => {
+      draft.doctrineChoice = choice;
+      request.onChange(current());
+    },
+  });
   const choices = document.createElement('div');
   choices.className = 'commander-popover-choices';
-  choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), doctrine.pair);
+  choices.append(choicePair(POPOVER_CONTROL_IDS.reasoning, popoverLabelWidthText, reasoning), provider.pair);
   applyOpenDraft = (commander) => {
     draft.modelId = commander.modelId;
     draft.reasoningEffort = commander.reasoningEffort;
+    draft.providerSort = commander.providerSort;
     draft.doctrineChoice = commander.doctrineChoice;
     draft.apiKey = commanderApiKey(commander);
     draft.nickname = nicknameFieldValue(commander.nickname, request.defaultNickname);
@@ -450,10 +464,11 @@ function popoverFields(draft: CommanderDraft, request: CommanderPopoverRequest):
     keyInput.value = draft.apiKey ?? '';
     copyModelOptions(model, draft.modelId);
     showReasoning();
-    doctrine.show();
+    provider.show(commander.providerSort);
+    doctrine.show(commander.doctrineChoice);
   };
   const copy = copyButton(request.copyButton);
-  fields.append(keyModel, choices, doctrine.description);
+  fields.append(keyModel, choices, doctrine.row);
   if (copy) fields.append(copy);
   return fields;
 }
@@ -500,41 +515,6 @@ function copyModelOptions(select: HTMLSelectElement, modelId: string | null): vo
     select.appendChild(new Option(modelId, modelId));
   }
   select.value = modelId ?? '';
-}
-
-/**
- * The doctrine select and its description.
- *
- * Purpose: The description follows the choice.
- * When to use: `popoverFields`.
- * Expected outcome: A change stores the choice and calls `onChange` with the current key. `show` refreshes the description after a copy.
- * Exceptions: None.
- */
-function doctrineField(
-  draft: CommanderDraft,
-  request: CommanderPopoverRequest,
-  current: () => NewGameCommanderInput
-): { pair: HTMLElement; description: HTMLElement; show: () => void } {
-  const select = document.createElement('select');
-  select.id = POPOVER_CONTROL_IDS.doctrine;
-  select.setAttribute('aria-label', 'Doctrine');
-  for (const choice of DOCTRINE_CHOICES) {
-    select.appendChild(new Option(DOCTRINE_CHOICE_LABELS[choice], choice));
-  }
-  select.value = draft.doctrineChoice;
-  const description = document.createElement('p');
-  description.className = 'commander-popover-doctrine';
-  const show = (): void => {
-    select.value = draft.doctrineChoice;
-    description.textContent = DOCTRINE_CHOICE_DESCRIPTIONS[draft.doctrineChoice];
-  };
-  select.addEventListener('change', () => {
-    draft.doctrineChoice = select.value as DoctrineChoice;
-    show();
-    request.onChange(current());
-  });
-  show();
-  return { pair: choicePair(POPOVER_CONTROL_IDS.doctrine, 'Doctrine', select), description, show };
 }
 
 /**

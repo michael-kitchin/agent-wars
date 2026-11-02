@@ -1,6 +1,7 @@
 import type { BonusLevel } from '../bonusLevel';
 import type { MissileLaunchOrder } from './missileTypes';
 import type { GameSize } from '../gameSize';
+import type { ProviderSortChoice } from '../openRouterProviderSort';
 import type { DoctrineChoice, SeatKind } from '../seatRoster';
 import type { AiOnlyBattleMode } from '../aiOnlyBattles';
 import type { VictoryRule } from '../victoryRules';
@@ -356,6 +357,15 @@ export interface NewGameCommanderInput {
    * Exceptions: None.
    */
   readonly reasoningEffort: string | null;
+  /**
+   * How OpenRouter picks a host for this commander.
+   *
+   * Contract: One of `PROVIDER_SORT_CHOICES`. A missing stored value is read as `throughput` before it reaches this object.
+   * When to use: The provider control and the new-game payload.
+   * Expected outcome: Stored as `provider_sort`.
+   * Exceptions: None.
+   */
+  readonly providerSort: ProviderSortChoice;
   /**
    * Doctrine the human picked, including Random.
    *

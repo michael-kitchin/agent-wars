@@ -756,3 +756,69 @@ test('a tactical consult keeps the consulted seat\'s march and drops the other s
     fs.rmSync(userData, { recursive: true, force: true });
   }
 });
+
+/**
+ * A consult that fails after using tools still reports those uses.
+ *
+ * Purpose: The Commanders tab adds a failed or cancelled consult's counts into the current total.
+ * When to use: After `requestOrders` can return `success: false` with a count map.
+ * Expected outcome: `consulted` stays false. The counts are present when the model result had them, and absent when it did not.
+ * Exceptions: Skips when the regional pack is not extracted.
+ */
+test('a failed consult keeps the tool counts it recorded', async (t) => {
+  const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
+  if (!map) {
+    t.skip('western_asia_north is not extracted');
+    return;
+  }
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orders-failed-counts-'));
+  const restoreElectron = installElectronMock(userData);
+  try {
+    await withThreeSeatMatch(async () => {
+      const state = getGameState();
+      const deps = {
+        modelId: 'test-model',
+        enabledToolNames: [] as string[],
+        hasKey: () => true,
+      };
+      const failed = await afterResolution(
+        state,
+        { success: true },
+        {
+          ...deps,
+          requestOrders: async () => ({ success: false, error: 'Invalid response', toolInvocationCounts: { planning: 2 } }),
+        },
+        'opponent'
+      );
+      assert.equal(failed.consulted, false);
+      assert.equal(failed.absenceReason, 'consult_failed');
+      assert.deepEqual(failed.toolInvocationCounts, { planning: 2 });
+      const cancelled = await afterResolution(
+        state,
+        { success: true },
+        {
+          ...deps,
+          requestOrders: async () => ({ success: false, error: 'Cancelled', toolInvocationCounts: { events: 1 } }),
+        },
+        'opponent'
+      );
+      assert.equal(cancelled.consulted, false);
+      assert.equal(cancelled.absenceReason, undefined);
+      assert.deepEqual(cancelled.toolInvocationCounts, { events: 1 });
+      const bare = await afterResolution(
+        state,
+        { success: true },
+        {
+          ...deps,
+          requestOrders: async () => ({ success: false, error: 'No API key set' }),
+        },
+        'opponent'
+      );
+      assert.equal(bare.consulted, false);
+      assert.equal(bare.toolInvocationCounts, undefined);
+    });
+  } finally {
+    restoreElectron();
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});

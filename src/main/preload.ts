@@ -10,6 +10,7 @@ import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from '../shared/ipc/saveLoadTypes';
 import type { AiSeatId } from '../shared/seatIds';
 import type { CommanderKeyMemoryView } from '../shared/commanderSetupCopy';
+import type { ProviderSortChoice } from '../shared/openRouterProviderSort';
 import type { DoctrineChoice, SeatSnapshot } from '../shared/seatRoster';
 import type {
   SubmitOrdersIpcPayload,
@@ -329,16 +330,23 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    */
   setHumanNickname: (nickname: string): Promise<void> => ipcRenderer.invoke(IPC_GAME.setHumanNickname, nickname),
   /**
-   * Saves one AI seat's model, effort, doctrine choice, and nickname.
+   * Saves one AI seat's model, effort, provider choice, doctrine choice, and nickname.
    *
    * Purpose: The commander popover writes that seat without changing the other seats.
-   * When to use: When the player changes a commander's model, effort, doctrine, key, or nickname.
-   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's consult. A nickname change does not. An omitted `apiKey` leaves the stored key. An omitted nickname leaves the stored one.
-   * Exceptions: Rejects when the seat is human, missing, or knocked out.
+   * When to use: When the player changes a commander's model, effort, provider, doctrine, key, or nickname.
+   * Expected outcome: The updated snapshot. A model, effort, or provider change cancels that seat's consult. A nickname change does not. An omitted `apiKey` leaves the stored key. An omitted nickname leaves the stored one.
+   * Exceptions: Rejects when the seat is human, missing, or knocked out, or when the provider choice is missing.
    */
   setSeatCommander: (
     seatId: AiSeatId,
-    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string; nickname?: string }
+    commander: {
+      modelId: string | null;
+      reasoningEffort: string | null;
+      providerSort: ProviderSortChoice;
+      doctrineChoice: DoctrineChoice;
+      apiKey?: string;
+      nickname?: string;
+    }
   ): Promise<SeatSnapshot> => ipcRenderer.invoke('game:setSeatCommander', seatId, commander),
   /**
    * Ends the match by ranking the seats that are still active.

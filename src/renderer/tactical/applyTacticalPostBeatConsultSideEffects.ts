@@ -10,12 +10,11 @@ import { updateOpenRouterCostLabel } from '../openRouter/openRouterUiHelpers';
  *
  * Purpose: Keeps `readyHandler` wiring explicit while sharing the same contract the removed preload listener used.
  * When to use: Passed from tactical Ready success handling when `isTacticalPostBeatConsultOnCommit` is true.
- * Expected outcome: The next battle consult, the message dialog, tool counts, redraw, and Ready stay aligned with main.
+ * Expected outcome: The next battle consult, the message dialog, redraw, and Ready stay aligned with main. Tool counts come from the pool read.
  * Exceptions: None.
  */
 export type TacticalPostBeatConsultSideEffectDeps = {
   startBackgroundRequestIfAllowed: () => void;
-  updateOpenRouterToolCountLabels: () => void;
   appendOpenRouterLog: (line: string, isError?: boolean, seatId?: string) => void;
   redraw: () => void;
   updateReadyButtonState: () => void;
@@ -60,10 +59,6 @@ export function applyTacticalPostBeatConsultSideEffects(
     deps.startBackgroundRequestIfAllowed();
   }
   void readCommanderPoolAndApply(true);
-  if (payload.toolInvocationCounts) {
-    S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
-    deps.updateOpenRouterToolCountLabels();
-  }
   if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
     void refreshCommanderSeatCosts().then(() => updateOpenRouterCostLabel());
   }

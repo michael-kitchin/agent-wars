@@ -190,6 +190,7 @@ function assignSeatIdentity(
       place: null,
       consultationCount: 0,
       costUsd: 0,
+      thinkTimeMs: 0,
     };
   });
 }

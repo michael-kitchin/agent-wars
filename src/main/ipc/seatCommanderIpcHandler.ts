@@ -3,12 +3,13 @@
  *
  * Purpose: The Commanders tab writes model, effort, doctrine, key, and nickname without growing the main entry file.
  * When to use: `registerIpcHandlers`.
- * Expected outcome: The updated seat snapshot. A model or effort change cancels that seat's consult. A nickname change does not.
+ * Expected outcome: The updated seat snapshot. A model, effort, or provider change cancels that seat's consult. A nickname change does not.
  * Exceptions: Throws when the seat cannot be updated or the payload is not a commander.
  */
 
 import type { IpcMain } from 'electron';
 import { aiIndexForSeatId, isAiSeatId, isSeatId } from '../../shared/seatIds';
+import { isProviderSortChoice } from '../../shared/openRouterProviderSort';
 import { DOCTRINE_CHOICES, toSeatSnapshot, type DoctrineChoice } from '../../shared/seatRoster';
 import { normalizeSideNickname, storedAiNickname } from '../../shared/sideNicknames';
 import { IPC_GAME } from '../../shared/ipc/channels';
@@ -27,9 +28,9 @@ import { loadKey } from '../openRouter/openRouter';
  * When to use: Once, from `registerIpcHandlers`.
  * Expected outcome: A valid patch returns the updated snapshot. An omitted nickname leaves the stored one.
  *   A nickname that only repeats the short home name stores null. An omitted key leaves the stored key.
- *   Only a model or effort change cancels planning.
+ *   A model, effort, or provider change cancels planning.
  * Exceptions: Throws `Invalid commander update`, `Invalid commander model`, `Invalid commander effort`,
- *   `Invalid commander key`, `Invalid commander doctrine`, or `Invalid commander nickname`.
+ *   `Invalid commander provider sort`, `Invalid commander key`, `Invalid commander doctrine`, or `Invalid commander nickname`.
  *   A missing, human, or knocked-out seat throws from the roster update.
  */
 export function registerSeatCommanderIpcHandler(ipcMain: IpcMain): void {
@@ -42,12 +43,14 @@ export function registerSeatCommanderIpcHandler(ipcMain: IpcMain): void {
     const patch = commander as {
       modelId?: unknown;
       reasoningEffort?: unknown;
+      providerSort?: unknown;
       doctrineChoice?: unknown;
       apiKey?: unknown;
       nickname?: unknown;
     };
     if (patch.modelId !== null && typeof patch.modelId !== 'string') throw new Error('Invalid commander model');
     if (patch.reasoningEffort !== null && typeof patch.reasoningEffort !== 'string') throw new Error('Invalid commander effort');
+    if (!isProviderSortChoice(patch.providerSort)) throw new Error('Invalid commander provider sort');
     if (patch.apiKey !== undefined && typeof patch.apiKey !== 'string') throw new Error('Invalid commander key');
     if (patch.nickname !== undefined && typeof patch.nickname !== 'string') throw new Error('Invalid commander nickname');
     if (!(DOCTRINE_CHOICES as readonly string[]).includes(String(patch.doctrineChoice))) {
@@ -58,6 +61,7 @@ export function registerSeatCommanderIpcHandler(ipcMain: IpcMain): void {
     let updated = updateSeatCommander(ops, seatId, {
       modelId: patch.modelId,
       reasoningEffort: patch.reasoningEffort,
+      providerSort: patch.providerSort,
       doctrineChoice: patch.doctrineChoice as DoctrineChoice,
     });
     if (typeof patch.nickname === 'string') {
@@ -70,6 +74,7 @@ export function registerSeatCommanderIpcHandler(ipcMain: IpcMain): void {
       updateRememberedCommander(aiNumber, {
         modelId: typeof patch.modelId === 'string' ? patch.modelId : null,
         reasoningEffort: typeof patch.reasoningEffort === 'string' ? patch.reasoningEffort : null,
+        providerSort: patch.providerSort,
         doctrineChoice: patch.doctrineChoice as DoctrineChoice,
         apiKey: suppliedKey ?? readSeatApiKey(seatId, loadKey()),
         nickname: normalizeSideNickname(updated.nickname ?? ''),
@@ -77,10 +82,18 @@ export function registerSeatCommanderIpcHandler(ipcMain: IpcMain): void {
     }
     const modelChanged = (before?.commander?.modelId ?? null) !== patch.modelId;
     const effortChanged = (before?.commander?.reasoningEffort ?? null) !== patch.reasoningEffort;
-    if (modelChanged || effortChanged) cancelModelCalls('model_changed', 'all', seatId);
+    const providerChanged = (before?.commander?.providerSort ?? null) !== patch.providerSort;
+    if (modelChanged || effortChanged || providerChanged) cancelModelCalls('model_changed', 'all', seatId);
     const hasApiKey = readSeatHasApiKey(seatId);
     const nicknameChanged = (before?.nickname ?? null) !== (updated.nickname ?? null);
-    logDebug('seatCommanderIpcHandler setSeatCommander', { seatId, modelChanged, effortChanged, nicknameChanged, hasApiKey });
+    logDebug('seatCommanderIpcHandler setSeatCommander', {
+      seatId,
+      modelChanged,
+      effortChanged,
+      providerChanged,
+      nicknameChanged,
+      hasApiKey,
+    });
     return toSeatSnapshot(updated, getGameState().gameOver === true, hasApiKey);
   });
 }

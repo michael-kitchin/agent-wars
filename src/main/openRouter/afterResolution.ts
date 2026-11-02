@@ -8,7 +8,7 @@
 import { isLikelyAbortError } from '../../shared/abortError';
 import type { CommanderAbsenceReason } from '../../shared/commanderStatus';
 import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatIds';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   getAiLastConsultationTurn,
@@ -138,11 +138,11 @@ strategy?: string;
    * Exceptions: None.
    */
 message?: string;
-    /**
+  /**
    * How many times each tool group ran during the consult.
    *
-   * Contract: Omitted when the model result has no counts.
-   * When to use: The Ready tool-count labels.
+   * Contract: Omitted when the model result has no counts. Present on a failed or cancelled consult when tools had already run.
+   * When to use: The post-resolution runner copies this onto the pool outcome.
    * Expected outcome: The counts `requestOrders` returned.
    * Exceptions: None.
    */
@@ -168,11 +168,27 @@ cost?: number;
 }
 
 /**
+ * Copies tool counts off a model result that did not store a plan.
+ *
+ * Purpose: A failed or cancelled consult can still have used tools, and the pool total includes them.
+ * When to use: The cancel and failure returns of the post-resolution and post-beat consults.
+ * Expected outcome: `{ toolInvocationCounts }` when the result has a map; otherwise an empty object.
+ * Exceptions: None.
+ */
+function reportedToolCounts(
+  result: RequestAiOrdersResult
+): { toolInvocationCounts?: Record<string, number> } {
+  logTrace('afterResolution reportedToolCounts', { hasCounts: result.toolInvocationCounts != null });
+  if (!result.toolInvocationCounts) return {};
+  return { toolInvocationCounts: result.toolInvocationCounts };
+}
+
+/**
  * Consults one AI seat after a strategic turn and stores the orders it returns.
  *
  * Purpose: Event-driven mode plans the next turn from the resolution that just finished.
  * When to use: The post-resolution runner, once per active AI seat. `seatId` is required and selects that seat's losses, subscriptions, and stored orders.
- * Expected outcome: When consultation runs, pending orders for `seatId` are stored (including empty movement lists) and `strategy` / `toolInvocationCounts` are returned for Ready IPC telemetry—same success gate as `afterTacticalBeatResolution`.
+ * Expected outcome: When consultation succeeds, pending orders for `seatId` are stored (including empty movement lists). `toolInvocationCounts` is returned whenever the model result includes them, including a failed or cancelled consult.
  * Exceptions: Does not throw. A model failure is logged and returns `consulted: false`.
  */
 export async function afterResolution(
@@ -242,7 +258,7 @@ export async function afterResolution(
       });
       if (deps.signal?.aborted || ('error' in result && result.error === 'Cancelled')) {
         logDebug('afterResolution: consultation cancelled', { turnNumber: state.turnNumber });
-        return { consulted: false };
+        return { consulted: false, ...reportedToolCounts(result) };
       }
       if (result.success === true) {
         if (result.absenceReason) {
@@ -279,10 +295,11 @@ export async function afterResolution(
         };
       }
       logDebug('afterResolution: requestOrders failed', {
-        error: (result as { error?: string }).error,
+        error: result.error,
+        hasToolInvocationCounts: result.toolInvocationCounts != null,
       });
       clearAiPendingOrders(seatId);
-      return { consulted: false, absenceReason: 'consult_failed' };
+      return { consulted: false, absenceReason: 'consult_failed', ...reportedToolCounts(result) };
     } catch (err) {
       if (deps.signal?.aborted || isLikelyAbortError(err)) {
         logDebug('afterResolution: consultation cancelled', { turnNumber: state.turnNumber });
@@ -417,9 +434,9 @@ export interface AfterTacticalBeatResolutionResult {
   /**
    * Tool invocation counts for the tactical consultation pass, when collected.
    *
-   * Contract: Map of tool name to non-negative invocation count for that single pass.
-   * When to use: Debugging parity with strategic `afterResolution` telemetry.
-   * Expected outcome: Undefined when consultation did not run tools or counts were not captured.
+   * Contract: Omitted when the model result has no counts. Present on a failed or cancelled consult when tools had already run.
+   * When to use: The post-beat runner copies this onto the pool outcome.
+   * Expected outcome: The counts `requestOrders` returned.
    * Exceptions: None.
    */
   toolInvocationCounts?: Record<string, number>;
@@ -457,7 +474,7 @@ export interface AfterTacticalBeatResolutionResult {
  *
  * Purpose: Mirrors strategic `afterResolution` for tactical battles without writing strategic `setAiPendingOrders`.
  * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags. `requestedSeatId` is required and selects that seat's sub-units.
- * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC.
+ * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC. A failed or cancelled call still returns `toolInvocationCounts` when the model result includes them.
  * Exceptions: Swallows LLM failures after logging. Skip and failure paths leave strategic pending orders in place.
  * Annihilation: When `getTacticalAnnihilationOutcome(tacticalBattle.subUnits)` is non-null, skips immediately so no LLM runs while the renderer shows the tactical game-over modal.
  */
@@ -576,7 +593,7 @@ export async function afterTacticalBeatResolution(
     });
     if (deps.signal?.aborted || ('error' in result && result.error === 'Cancelled')) {
       logDebug('afterTacticalBeatResolution: consultation cancelled', { turnNumber: state.turnNumber });
-      return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+      return { consulted: false, attachTacticalOpponentPlanToIpc: false, ...reportedToolCounts(result) };
     }
     if (result.success === true) {
       if (result.absenceReason) {
@@ -608,8 +625,16 @@ export async function afterTacticalBeatResolution(
         ...(typeof result.cost === 'number' && Number.isFinite(result.cost) ? { cost: result.cost } : {}),
       };
     }
-    logDebug('afterTacticalBeatResolution: requestOrders failed', { success: result.success });
-    return { consulted: false, attachTacticalOpponentPlanToIpc: true, absenceReason: 'consult_failed' };
+    logDebug('afterTacticalBeatResolution: requestOrders failed', {
+      success: result.success,
+      hasToolInvocationCounts: result.toolInvocationCounts != null,
+    });
+    return {
+      consulted: false,
+      attachTacticalOpponentPlanToIpc: true,
+      absenceReason: 'consult_failed',
+      ...reportedToolCounts(result),
+    };
   } catch (err) {
     if (deps.signal?.aborted || isLikelyAbortError(err)) {
       logDebug('afterTacticalBeatResolution: consultation cancelled', { turnNumber: state.turnNumber });

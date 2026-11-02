@@ -357,4 +357,14 @@ success: false;   /**
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-error: string };
+error: string;
+  /**
+   * How many times each tool group ran before this request failed.
+   *
+   * Contract: Present when the consult recorded counts before the failure. Omitted when no tools had run.
+   * When to use: The commander pool adds these into the current consult total.
+   * Expected outcome: The same map a successful result would have returned.
+   * Exceptions: None.
+   */
+  toolInvocationCounts?: Record<string, number>;
+};

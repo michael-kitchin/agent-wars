@@ -10,6 +10,7 @@
 import type { CommanderKeyMemoryView, RememberedCommander } from '../../shared/commanderSetupCopy';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS, aiSeatIdForIndex } from '../../shared/seatIds';
+import { DEFAULT_PROVIDER_SORT, providerSortOrDefault } from '../../shared/openRouterProviderSort';
 import { AI_SEAT_KIND, DOCTRINE_CHOICES, type DoctrineChoice } from '../../shared/seatRoster';
 import { normalizeSideNickname, storedAiNickname } from '../../shared/sideNicknames';
 import { logDebug, logError, logTrace } from '../logger';
@@ -26,7 +27,14 @@ import { readSecretString, readStoredSecret, writeSecretString } from './secretC
  * Exceptions: None.
  */
 function emptyRememberedCommander(): RememberedCommander {
-  return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', apiKey: '', nickname: '' };
+  return {
+    modelId: null,
+    reasoningEffort: null,
+    providerSort: DEFAULT_PROVIDER_SORT,
+    doctrineChoice: 'balanced',
+    apiKey: '',
+    nickname: '',
+  };
 }
 
 /**
@@ -54,6 +62,7 @@ function rememberedFromUnknown(value: unknown): RememberedCommander {
   return {
     modelId: typeof record.modelId === 'string' ? record.modelId : null,
     reasoningEffort: typeof record.reasoningEffort === 'string' ? record.reasoningEffort : null,
+    providerSort: providerSortOrDefault(record.providerSort),
     doctrineChoice: doctrineChoiceOf(record.doctrineChoice),
     apiKey: typeof record.apiKey === 'string' ? record.apiKey.trim() : '',
     nickname: normalizeSideNickname(record.nickname),
@@ -340,6 +349,7 @@ export function storeNewMatchCommanderKeys(
     remembered.push({
       modelId: seat.commander?.modelId ?? null,
       reasoningEffort: seat.commander?.reasoningEffort ?? null,
+      providerSort: providerSortOrDefault(seat.commander?.providerSort),
       doctrineChoice: doctrineChoiceOf(seat.commander?.doctrineChoice),
       apiKey,
       nickname: rememberedNickname(seat, aiSeatIdForIndex(aiNumber), resolvedHomes),

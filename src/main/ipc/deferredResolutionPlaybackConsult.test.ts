@@ -199,7 +199,7 @@ async function testDeferredConsultFinishesTwoSeats(): Promise<void> {
   const seats: NewGameSeatInput[] = [0, 1].map((index) => ({
     kind: 'ai',
     sideGroupId: map.sideGroups[index]?.id ?? '',
-    commander: { modelId: 'model-a', reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' },
+    commander: { modelId: 'model-a', reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', nickname: '' },
   }));
   const called: string[] = [];
   await withSeatedTempGameDbAsync('aw-deferred-two-', { gameMapId: map.id, fogOfWarEnabled: false, seats }, async () => {

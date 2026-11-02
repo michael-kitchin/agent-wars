@@ -9,9 +9,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   commanderApiKey,
+  commanderFromRemembered,
   copyButtonState,
   prefillFirstAiApiKey,
   previousAiRowIndex,
+  type RememberedCommander,
 } from './commanderSetupCopy';
 import type { NewGameCommanderInput } from './ipc/ordersTypes';
 import { initialSidesState, setObserveOnly, type HomeOption } from './newGameSides';
@@ -24,7 +26,13 @@ import { initialSidesState, setObserveOnly, type HomeOption } from './newGameSid
  * Expected outcome: Balanced, with no model and no key.
  * Exceptions: None.
  */
-const COMMANDER: NewGameCommanderInput = { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' };
+const COMMANDER: NewGameCommanderInput = {
+  modelId: null,
+  reasoningEffort: null,
+  providerSort: 'throughput',
+  doctrineChoice: 'balanced',
+  nickname: '',
+};
 
 /**
  * Four homes, so a match can list opponent 3.
@@ -75,6 +83,20 @@ test('observe names sides, and the first side waits for a remembered match', () 
   assert.equal(second?.label, 'Copy from Side 1');
   assert.equal(second?.source, 'previous-opponent');
   assert.equal(copyButtonState(observed, 0, true)?.label, 'Copy from Last Game (Side 1)');
+});
+
+test('copy from last game keeps the provider choice and the nickname', () => {
+  const remembered: RememberedCommander = {
+    modelId: 'model-a',
+    reasoningEffort: 'low',
+    providerSort: 'latency',
+    doctrineChoice: 'cautious',
+    apiKey: 'test-openrouter-key',
+    nickname: 'Grok',
+  };
+  const copied = commanderFromRemembered(remembered);
+  assert.equal(copied.providerSort, 'latency');
+  assert.equal(copied.nickname, 'Grok');
 });
 
 test('a missing key reads as empty', () => {

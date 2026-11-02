@@ -107,6 +107,7 @@ export function idlePoolSeat(seatId: AiSeatId, status: CommanderStatus, generati
     settled: true,
     generation,
     launchId: 0,
+    toolCountWaveId: 0,
     timers: [],
     absenceReason: null,
   };

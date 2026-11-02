@@ -21,6 +21,7 @@ export const POPOVER_CONTROL_IDS = {
   apiKey: 'commander-popover-api-key',
   model: 'commander-popover-model',
   reasoning: 'commander-popover-reasoning',
+  provider: 'commander-popover-provider',
   doctrine: 'commander-popover-doctrine',
 } as const;
 
@@ -47,10 +48,10 @@ export function fieldLabel(id: string, text: string): HTMLLabelElement {
 }
 
 /**
- * One reasoning or doctrine pair: the label and its list.
+ * One reasoning, provider, or doctrine pair: the label and its list.
  *
- * Purpose: The two pairs share one line and the same label width and list width.
- * When to use: The reasoning and doctrine rows of the commander popover.
+ * Purpose: The pairs share the same label width and list width.
+ * When to use: The reasoning, provider, and doctrine rows of the commander popover.
  * Expected outcome: A grid row whose label points at `control`.
  * Exceptions: None.
  */

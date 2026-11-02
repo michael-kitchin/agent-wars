@@ -13,6 +13,7 @@ import { persistRegionVsRegionScenarioId } from './scenarioState';
 import { replaceSeatRoster } from './seatRosterStore';
 import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolution';
 import { createSeededRng } from '../seededRng';
+import { DEFAULT_PROVIDER_SORT } from '../../shared/openRouterProviderSort';
 import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
 import { aiOnlyBattlesForRequest, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY, sightCuesForRequest } from '../../shared/sightCueSettings';
@@ -372,11 +373,19 @@ function drawRandomDoctrines(deps: ResetGameDeps): void {
  */
 function commanderForNewAiSeat(input: NewGameSeatInput['commander'] | null): SeatCommander {
   if (!input) {
-    return { modelId: null, reasoningEffort: null, doctrineChoice: 'balanced', hasApiKey: false, doctrine: DEFAULT_DOCTRINE };
+    return {
+      modelId: null,
+      reasoningEffort: null,
+      providerSort: DEFAULT_PROVIDER_SORT,
+      doctrineChoice: 'balanced',
+      hasApiKey: false,
+      doctrine: DEFAULT_DOCTRINE,
+    };
   }
   return {
     modelId: input.modelId,
     reasoningEffort: input.reasoningEffort,
+    providerSort: input.providerSort,
     doctrineChoice: input.doctrineChoice,
     hasApiKey: false,
     doctrine: input.doctrineChoice === 'random' ? DEFAULT_DOCTRINE : input.doctrineChoice,

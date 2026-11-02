@@ -454,6 +454,7 @@ export async function runEventDrivenAfterResolutionConsultation(
         strategy: result.strategy ?? null,
         modelId,
         absenceReason: result.consulted ? null : (result.absenceReason ?? null),
+        ...(result.toolInvocationCounts ? { toolInvocationCounts: result.toolInvocationCounts } : {}),
       });
     } catch (err) {
       logError(args.errorLogMessage, err);
@@ -506,7 +507,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
     if (!modelId) return emptyConsultOutcome({ absenceReason: 'consult_failed' });
     try {
       const state = getGameStateForPlayer(request.seatId, { maskUnexploredTerrain: false });
-      post = await afterTacticalBeatResolution(
+      const result = await afterTacticalBeatResolution(
         state,
         args.tacticalBattle,
         args.tacticalResolutionPlayback,
@@ -520,23 +521,27 @@ export async function runEventDrivenAfterTacticalBeatConsultation(
         },
         request.seatId
       );
-      if (!post.tacticalOpponentPlan) {
+      post = result;
+      const toolCounts = result.toolInvocationCounts ? { toolInvocationCounts: result.toolInvocationCounts } : {};
+      if (!result.tacticalOpponentPlan) {
         return emptyConsultOutcome({
-          costUsd: finiteCost(post.cost),
+          costUsd: finiteCost(result.cost),
           modelId,
-          message: post.message ?? null,
-          strategy: post.strategy ?? null,
-          absenceReason: post.consulted ? null : (post.absenceReason ?? null),
+          message: result.message ?? null,
+          strategy: result.strategy ?? null,
+          absenceReason: result.consulted ? null : (result.absenceReason ?? null),
+          ...toolCounts,
         });
       }
       return emptyConsultOutcome({
         finished: true,
-        tacticalPlan: post.tacticalOpponentPlan,
-        costUsd: finiteCost(post.cost),
+        tacticalPlan: result.tacticalOpponentPlan,
+        costUsd: finiteCost(result.cost),
         modelId,
-        message: post.message ?? null,
-        strategy: post.strategy ?? null,
+        message: result.message ?? null,
+        strategy: result.strategy ?? null,
         absenceReason: null,
+        ...toolCounts,
       });
     } catch (err) {
       logError(args.errorLogMessage, err);
@@ -601,7 +606,7 @@ function finiteCost(cost: number | undefined): number {
  *
  * Purpose: The pool's own timers are the deadline. This wait does not start a second, shorter race.
  * When to use: Post-resolution and post-beat consults.
- * Expected outcome: Resolves when each launched seat has left `planning`, or when `timeoutMs` elapses.
+ * Expected outcome: Resolves when each launched seat has left `planning`, or when `timeoutMs` elapses. The first seat that launches starts the tool-count total at zero.
  * Exceptions: Does not throw. A seat that cannot launch is omitted from the wait.
  */
 async function consultSeatsThroughPool(
@@ -612,8 +617,12 @@ async function consultSeatsThroughPool(
   runner: CommanderConsultRunner
 ): Promise<void> {
   const launched: AiSeatId[] = [];
+  let openToolCountWave = true;
   for (const seatId of seatIds) {
-    if (launchCommanderConsult(seatId, theater, battle, runner)) launched.push(seatId);
+    if (launchCommanderConsult(seatId, theater, battle, runner, openToolCountWave)) {
+      openToolCountWave = false;
+      launched.push(seatId);
+    }
   }
   logDebug('readyIpcResolutionMapping consultSeatsThroughPool', { theater, launchedCount: launched.length, timeoutMs });
   if (launched.length === 0) return;

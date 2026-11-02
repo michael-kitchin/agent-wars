@@ -22,6 +22,7 @@ import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderS
 import type { ModelCallCancelReason } from './modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from './saveLoadTypes';
 import type { AiSeatId } from '../seatIds';
+import type { ProviderSortChoice } from '../openRouterProviderSort';
 import type { DoctrineChoice, SeatSnapshot } from '../seatRoster';
 import type { GameMapListEntry } from '../gameMapList';
 import type { NewGameMapPreview, NewGameMapPreviewRequest } from '../newGameMapPreviewTypes';
@@ -248,16 +249,23 @@ newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
    */
   setHumanNickname: (nickname: string) => Promise<void>;
   /**
-   * Saves one AI seat's model, effort, doctrine choice, and nickname.
+   * Saves one AI seat's model, effort, provider choice, doctrine choice, and nickname.
    *
-   * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset. `apiKey`, when present, replaces that seat's key. `nickname`, when present, replaces that seat's name. An omitted nickname leaves the stored one.
+   * Contract: `seatId` is an AI seat that is still active. `modelId` and `reasoningEffort` are null when unset. `providerSort` is one of the four stored choices. `apiKey`, when present, replaces that seat's key. `nickname`, when present, replaces that seat's name. An omitted nickname leaves the stored one.
    * When to use: The commander popover.
-   * Expected outcome: The updated snapshot. A model or effort change cancels that seat's in-flight consult. A nickname change does not. An omitted `apiKey` leaves the stored key.
-   * Exceptions: Rejects when the seat is human, missing, or knocked out.
+   * Expected outcome: The updated snapshot. A model, effort, or provider change cancels that seat's in-flight consult. A nickname change does not. An omitted `apiKey` leaves the stored key.
+   * Exceptions: Rejects when the seat is human, missing, or knocked out, or when `providerSort` is missing.
    */
   setSeatCommander: (
     seatId: AiSeatId,
-    commander: { modelId: string | null; reasoningEffort: string | null; doctrineChoice: DoctrineChoice; apiKey?: string; nickname?: string }
+    commander: {
+      modelId: string | null;
+      reasoningEffort: string | null;
+      providerSort: ProviderSortChoice;
+      doctrineChoice: DoctrineChoice;
+      apiKey?: string;
+      nickname?: string;
+    }
   ) => Promise<SeatSnapshot>;
   /**
    * Ends the match by ranking the seats that are still active.

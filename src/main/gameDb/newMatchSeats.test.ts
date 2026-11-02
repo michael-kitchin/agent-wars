@@ -169,7 +169,7 @@ test('a random doctrine is drawn from the match seed and hidden until the match 
     {
       kind: 'ai',
       sideGroupId: map.sideGroupIds[1],
-      commander: { modelId: null, reasoningEffort: null, doctrineChoice: 'random', nickname: '' },
+      commander: { modelId: null, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'random', nickname: '' },
     },
   ];
   const drawn: Doctrine[] = [];

@@ -241,6 +241,7 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
   const commander: NewGameCommanderInput = {
     modelId: seat.commander.modelId,
     reasoningEffort: seat.commander.reasoningEffort,
+    providerSort: seat.commander.providerSort,
     doctrineChoice: seat.commander.doctrineChoice,
     nickname: sideDisplayName(seat),
     ...(includeKey ? { apiKey } : {}),
@@ -256,6 +257,7 @@ async function openSeatCommander(seat: SeatSnapshot, anchor: HTMLElement): Promi
         void saveCommander(seatId, {
           modelId: next.modelId,
           reasoningEffort: next.reasoningEffort,
+          providerSort: next.providerSort,
           doctrineChoice: next.doctrineChoice,
           nickname: next.nickname,
         });

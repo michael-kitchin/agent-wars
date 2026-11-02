@@ -77,7 +77,7 @@ function aiSeat(sideGroupId: string, modelId: string | null): NewGameSeatInput {
   return {
     kind: 'ai',
     sideGroupId,
-    commander: { modelId, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' },
+    commander: { modelId, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', nickname: '' },
   };
 }
 
@@ -336,6 +336,9 @@ describe('commander pool', { concurrency: 1 }, () => {
       });
       startStrategicPlanning();
       await flushWrites();
+      const earlyRoster = getSeatRoster();
+      assert.equal(earlyRoster.find((seat) => seat.seatId === AI_SEAT_IDS[0])?.thinkTimeMs, 0);
+      assert.equal(earlyRoster.find((seat) => seat.seatId === AI_SEAT_IDS[2])?.thinkTimeMs, 0);
       assert.equal(readCommanderPoolSnapshot(false).statuses.find((row) => row.seatId === AI_SEAT_IDS[0])?.status, 'ready');
       assert.equal(readCommanderPoolSnapshot(false).statuses.find((row) => row.seatId === AI_SEAT_IDS[2])?.status, 'ready');
       now += 40;
@@ -350,6 +353,7 @@ describe('commander pool', { concurrency: 1 }, () => {
       const hung = snapshot.statuses.find((row) => row.seatId === AI_SEAT_IDS[1]);
       assert.equal(hung?.status, 'timed_out');
       assert.equal(hung?.timedOutTurn, getGameState().turnNumber);
+      assert.equal(getSeatRoster().find((seat) => seat.seatId === AI_SEAT_IDS[1])?.thinkTimeMs, 40);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[1]), null);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[0])?.movementOrders.length, 1);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[2])?.movementOrders.length, 1);
@@ -364,6 +368,49 @@ describe('commander pool', { concurrency: 1 }, () => {
    * Expected outcome: That signal is aborted. The other seats store orders. The cancelled seat stores none.
    * Exceptions: Skips when no regional map is installed.
    */
+  /**
+   * Every commander's tool counts are added, and the next consult starts from zero.
+   *
+   * Purpose: The Commanders tab shows one total for the consult that is running.
+   * When to use: After a planning start stores counts from more than one seat.
+   * Expected outcome: The first wave adds both seats and drops a non-finite count. The next wave is empty until those seats finish, then shows only the new counts.
+   * Exceptions: Skips when no regional map is installed.
+   */
+  test('tool counts add across commanders and the next consult starts at zero', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    await withMatch(['model-a', 'model-a', null], async () => {
+      setCommanderConsultRunnerForTests(async (request) => {
+        if (request.seatId === AI_SEAT_IDS[0]) {
+          return { ...finishedConsult(request.seatId), toolInvocationCounts: { planning: 2, events: 1 } };
+        }
+        return { ...emptyConsultOutcome(), toolInvocationCounts: { planning: 3, events: Number.NaN } };
+      });
+      startStrategicPlanning();
+      await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+      await flushWrites();
+      assert.deepEqual(readCommanderPoolSnapshot(false).toolInvocationCounts, { planning: 5, events: 1 });
+
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      setCommanderConsultRunnerForTests(async (request) => {
+        await gate;
+        const assessment = request.seatId === AI_SEAT_IDS[0] ? 4 : 1;
+        return { ...finishedConsult(request.seatId), toolInvocationCounts: { assessment } };
+      });
+      startStrategicPlanning();
+      assert.deepEqual(readCommanderPoolSnapshot(false).toolInvocationCounts, {});
+      release();
+      await waitForSeatsSettled([AI_SEAT_IDS[0], AI_SEAT_IDS[1]], 5_000);
+      await flushWrites();
+      assert.deepEqual(readCommanderPoolSnapshot(false).toolInvocationCounts, { assessment: 5 });
+    });
+  });
+
   test('cancelling one commander aborts only that consult', async (t) => {
     if (!regionalMap()) {
       t.skip('no regional map with three side groups is extracted');
@@ -390,12 +437,43 @@ describe('commander pool', { concurrency: 1 }, () => {
       assert.equal(signals.get(AI_SEAT_IDS[2])?.aborted, false);
       await waitForSeatsSettled(SEAT_IDS, 5_000);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[1]), null);
+      assert.equal(getSeatRoster().find((seat) => seat.seatId === AI_SEAT_IDS[1])?.thinkTimeMs, 0);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[0])?.movementOrders.length, 1);
       assert.equal(getAiPendingOrders(AI_SEAT_IDS[2])?.movementOrders.length, 1);
       assert.equal(
         readCommanderPoolSnapshot(false).statuses.find((row) => row.seatId === AI_SEAT_IDS[1])?.status,
         'ready'
       );
+    });
+  });
+
+  test('a finished consult records its think time', async (t) => {
+    if (!regionalMap()) {
+      t.skip('no regional map with three side groups is extracted');
+      return;
+    }
+    await withMatch(['model-a', null, null], async () => {
+      let now = 1_000;
+      setCommanderPoolTimingForTests({
+        nowMs: () => now,
+        wallClockMs: 60_000,
+        waitTimeoutMs: 120_000,
+        schedule: () => ({ cancel: () => undefined }),
+      });
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      setCommanderConsultRunnerForTests(async (request) => {
+        await gate;
+        return finishedConsult(request.seatId);
+      });
+      startStrategicPlanning();
+      now += 2_500;
+      release();
+      await waitForSeatsSettled([AI_SEAT_IDS[0]], 5_000);
+      await flushWrites();
+      assert.equal(getSeatRoster().find((seat) => seat.seatId === AI_SEAT_IDS[0])?.thinkTimeMs, 2_500);
     });
   });
 });

@@ -218,4 +218,13 @@ export type CommanderPoolSnapshot = {
    * Exceptions: None.
    */
   readonly dispatches: readonly CommanderDispatch[];
+  /**
+   * Tool-group totals for the consult wave that is current.
+   *
+   * Contract: The sum of every seat that has reported counts since this wave began. An empty object before any seat reports.
+   * When to use: The Commanders tab, after a pool read or a planning start.
+   * Expected outcome: One number per group that any seat used. A new wave replaces the previous total with an empty object until seats report.
+   * Exceptions: None.
+   */
+  readonly toolInvocationCounts: Readonly<Record<string, number>>;
 };

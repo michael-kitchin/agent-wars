@@ -45,7 +45,7 @@ function aiSeat(sideGroupId: string, modelId: string | null): NewGameSeatInput {
   return {
     kind: 'ai',
     sideGroupId,
-    commander: { modelId, reasoningEffort: null, doctrineChoice: 'balanced', nickname: '' },
+    commander: { modelId, reasoningEffort: null, providerSort: 'throughput', doctrineChoice: 'balanced', nickname: '' },
   };
 }
 

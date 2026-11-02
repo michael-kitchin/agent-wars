@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import type { OpenRouterChatTransport, OpenRouterChatTransportResult } from './openRouterChatTransport';
 import { resetOpenRouterModelCapabilitiesForTests } from './openRouterModelCapabilities';
+import { createConsultTelemetry } from './consultTelemetry';
 import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
 
@@ -119,15 +120,38 @@ function postFor(post: OpenRouterChatTransport, settings: OrdersChatRequestSetti
  * Expected outcome: The helper's transport result.
  * Exceptions: None.
  */
-function postRequiredToolRound(post: OpenRouterChatTransport): Promise<OpenRouterChatTransportResult> {
+function postRequiredToolRound(
+  post: OpenRouterChatTransport,
+  telemetry?: OrdersChatRequestSettings['telemetry']
+): Promise<OpenRouterChatTransportResult> {
   return postOrdersChatRequest({
     post,
     key: 'k',
     modelId: 'm',
     baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
-    settings: structuredSettings(),
+    settings: { ...structuredSettings(), telemetry },
     attachResponseFormat: false,
     requestLabel: 'test',
+  });
+}
+
+/**
+ * A recorder for one helper case.
+ *
+ * Purpose: The fallback tests need a consult recorder without a real consult.
+ * When to use: The tool-choice and structured-output retries.
+ * Expected outcome: An empty recorder.
+ * Exceptions: None.
+ */
+function telemetryRecorder(): ReturnType<typeof createConsultTelemetry> {
+  return createConsultTelemetry({
+    seatId: null,
+    turnNumber: 1,
+    theater: 'strategic',
+    battleId: null,
+    modelId: 'm',
+    providerSort: 'throughput',
+    usage: { requestCost: 0, totalInputTokens: 0, totalOutputTokens: 0 },
   });
 }
 
@@ -186,8 +210,10 @@ async function testSchemaWithheldWhenNotRequested(): Promise<void> {
 async function testRejectionRetriesAndMarksModel(): Promise<void> {
   resetOpenRouterModelCapabilitiesForTests();
   const first = fakeTransport([REJECTED_RESULT, OK_RESULT]);
-  const result = await postFor(first.post, structuredSettings());
+  const telemetry = telemetryRecorder();
+  const result = await postFor(first.post, { ...structuredSettings(), telemetry });
   assert.equal(result.ok, true);
+  assert.deepEqual(telemetry.summary().fallbacks, ['structuredOutputDropped']);
   assert.equal(first.bodies.length, 2);
   assert.ok(!('response_format' in first.bodies[1]));
   assert.ok(!('plugins' in first.bodies[1]));
@@ -208,12 +234,17 @@ async function testRejectionRetriesAndMarksModel(): Promise<void> {
 async function testRequiredToolChoiceRetriesWithAuto(): Promise<void> {
   resetOpenRouterModelCapabilitiesForTests();
   const first = fakeTransport([TOOL_CHOICE_REJECTED_RESULT, OK_RESULT]);
-  const result = await postRequiredToolRound(first.post);
+  const telemetry = telemetryRecorder();
+  const result = await postRequiredToolRound(first.post, telemetry);
   assert.equal(result.ok, true);
+  assert.deepEqual(telemetry.summary().fallbacks, ['toolChoiceAuto']);
   assert.deepEqual(
     first.bodies.map((body) => body.tool_choice),
     ['required', 'auto']
   );
+  assert.equal(first.bodies[0]?.model, 'm');
+  assert.deepEqual(first.bodies[0]?.provider, { sort: 'throughput' });
+  assert.deepEqual(first.bodies[1]?.provider, { sort: 'throughput' });
   assert.ok(first.bodies.every((body) => !('response_format' in body)));
   const later = fakeTransport([OK_RESULT]);
   await postRequiredToolRound(later.post);

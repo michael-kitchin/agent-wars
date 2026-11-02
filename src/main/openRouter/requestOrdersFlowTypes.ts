@@ -213,6 +213,15 @@ export interface RequestOrdersError {
    * Exceptions: None.
    */
   error: string;
+  /**
+   * How many times each tool group ran before this request failed.
+   *
+   * Contract: Present when the consult recorded counts before the failure. Omitted when no tools had run.
+   * When to use: The commander pool adds these into the current consult total.
+   * Expected outcome: The same map a successful result would have returned.
+   * Exceptions: None.
+   */
+  toolInvocationCounts?: Readonly<Record<string, number>>;
 }
 
 /**

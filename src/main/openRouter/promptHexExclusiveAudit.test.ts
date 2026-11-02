@@ -88,8 +88,8 @@ function buildFixtureState(hexes: string[]): GameStateSnapshot {
     scenarioId: 'region_vs_region',
     playerPerspective: 'opponent',
     seats: [
-      { seatId: 'human', seatOrder: 1, kind: 'human', homeRegion: 'Northern America', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null },
-      { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Europe', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, commander: null },
+      { seatId: 'human', seatOrder: 1, kind: 'human', homeRegion: 'Northern America', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
+      { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Europe', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
     ],
     homeRegionHexesBySeat: {
       human: [hexes[1]!, hexes[2]!],

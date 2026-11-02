@@ -1,4 +1,5 @@
 import { logDebug, logInfo } from '../logger';
+import type { ConsultTelemetry } from './consultTelemetry';
 import type { OpenRouterChatTransport, OpenRouterChatTransportResult } from './openRouterChatTransport';
 import {
   isRequiredToolChoiceRejectedForModel,
@@ -6,6 +7,7 @@ import {
   markRequiredToolChoiceRejectedForModel,
   markStructuredOutputsRejectedForModel,
 } from './openRouterModelCapabilities';
+import { applyProviderSortToChatBody } from './openRouterProviderRouting';
 import type { OrdersRequestProfile } from './ordersRequestProfile';
 
 /**
@@ -37,6 +39,15 @@ export interface OrdersChatRequestSettings {
    * Exceptions: None.
    */
   readonly responseFormat: Readonly<Record<string, unknown>> | null;
+  /**
+   * Consult recorder, or omitted in a test that only checks the request body.
+   *
+   * Contract: Optional. Production passes the consult's recorder.
+   * When to use: Tool-choice and structured-output retries, and the transport payload.
+   * Expected outcome: Those retries append a fallback. Each send records an attempt.
+   * Exceptions: None.
+   */
+  readonly telemetry?: ConsultTelemetry;
 }
 
 /**
@@ -117,7 +128,14 @@ export async function postOrdersChatRequest(args: {
     toolChoice: requestBody.tool_choice ?? null,
   });
   const send = (body: Record<string, unknown>): Promise<OpenRouterChatTransportResult> =>
-    post({ key, body, signal, onLog, requestLabel });
+    post({
+      key,
+      body: applyProviderSortToChatBody(body, settings.profile.providerSort),
+      signal,
+      onLog,
+      requestLabel,
+      telemetry: settings.telemetry,
+    });
 
   /**
    * Sends one body, and when the provider refuses `tool_choice: required`, sends it again with `auto`.
@@ -138,7 +156,9 @@ export async function postOrdersChatRequest(args: {
       status: result.status,
       error: result.error,
     });
+    if (signal?.aborted) return { ok: false, error: 'Cancelled' };
     onLog?.('Model rejected a required tool call; retrying once with automatic tool choice.', false);
+    settings.telemetry?.recordFallback('toolChoiceAuto');
     const retry = await send({ ...body, tool_choice: 'auto' });
     if (retry.ok) markRequiredToolChoiceRejectedForModel(modelId);
     return retry;
@@ -161,7 +181,9 @@ export async function postOrdersChatRequest(args: {
     status: first.status,
     error: first.error,
   });
+  if (signal?.aborted) return { ok: false, error: 'Cancelled' };
   onLog?.('Model rejected the structured JSON request; retrying once without it.', false);
+  settings.telemetry?.recordFallback('structuredOutputDropped');
   const retry = await sendRecoveringToolChoice(requestBody);
   if (retry.ok) markStructuredOutputsRejectedForModel(modelId);
   return retry;

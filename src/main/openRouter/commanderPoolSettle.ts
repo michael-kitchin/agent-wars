@@ -12,8 +12,9 @@ import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { clearAiPendingOrders, setAiPendingOrders } from '../gameDb';
 import { gameDbOps } from '../gameDb/dbConnection';
-import { recordSeatConsultation } from '../gameDb/seatRosterStore';
-import { logDebug, logError } from '../logger';
+import { recordSeatConsultation, recordSeatThinkTime } from '../gameDb/seatRosterStore';
+import { logDebug, logError, logInfo } from '../logger';
+import { recordCommanderToolCounts } from './commanderToolCounts';
 import type { PoolSeat } from './commanderPool';
 import { enqueueCommanderPoolWrite, tacticalDraftKey, type CommanderConsultOutcome } from './commanderPoolSupport';
 import { cancelModelCalls } from './modelCallControl';
@@ -73,6 +74,15 @@ export type ConsultSettleContext = {
    * Exceptions: None.
    */
   readonly notify: () => void;
+  /**
+   * Clock the pool uses for planning elapsed time.
+   *
+   * Contract: Milliseconds. Tests replace it.
+   * When to use: Think time for a consult that is settling.
+   * Expected outcome: The same clock `launch` used for `planningStartedAt`.
+   * Exceptions: None.
+   */
+  readonly nowMs: () => number;
 };
 
 /**
@@ -95,9 +105,16 @@ export function expireConsult(
   context.cancelTimers(entry);
   entry.controller?.abort();
   cancelModelCalls('teardown', entry.theater, seatId);
-  logDebug('commanderPool consult timed out', { seatId, turnNumber: entry.turnNumber });
+  const now = context.nowMs();
+  const elapsedMs = Math.max(0, now - (entry.planningStartedAt ?? now));
+  logInfo('commanderPool consult timed out; standing orders will run', {
+    seatId,
+    turnNumber: entry.turnNumber,
+    elapsedMs,
+  });
   enqueueCommanderPoolWrite(() => {
     if (!sameLaunch(entry, launchId, launchedGeneration, context)) return;
+    recordSettledThinkTime(entry, context);
     clearAiPendingOrders(seatId);
     entry.status = 'timed_out';
     entry.timedOutTurn = entry.turnNumber;
@@ -130,6 +147,8 @@ export function applyConsultOutcome(
   entry.controller = null;
   enqueueCommanderPoolWrite(() => {
     if (!sameLaunch(entry, launchId, launchedGeneration, context)) return;
+    recordSettledThinkTime(entry, context);
+    recordCommanderToolCounts(seatId, entry.toolCountWaveId, outcome.toolInvocationCounts);
     if (outcome.timedOut) {
       clearAiPendingOrders(seatId);
       if (outcome.costUsd > 0) recordSeatConsultation(gameDbOps, seatId, outcome.costUsd);
@@ -190,6 +209,20 @@ export function applyConsultOutcome(
     entry.planningStartedAt = null;
     context.notify();
   });
+}
+
+/**
+ * Adds this consult's elapsed time to the seat.
+ *
+ * Purpose: Finished, failed, and timed-out consults all count. A player stop does not call this.
+ * When to use: The database write of `expireConsult` and `applyConsultOutcome`, once.
+ * Expected outcome: `think_time_ms` grows by the milliseconds since `planningStartedAt`, or by zero.
+ * Exceptions: A database error is logged by the write queue.
+ */
+function recordSettledThinkTime(entry: PoolSeat, context: ConsultSettleContext): void {
+  const now = context.nowMs();
+  const elapsedMs = Math.max(0, now - (entry.planningStartedAt ?? now));
+  recordSeatThinkTime(gameDbOps, entry.seatId, elapsedMs);
 }
 
 /**

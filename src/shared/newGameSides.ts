@@ -243,7 +243,7 @@ export function sidesHaveAnyModel(state: NewGameSidesState | null): boolean {
  * Purpose: The add button grows the match by one side.
  * When to use: When `addRowBlockedReason` is null.
  * Expected outcome: The same state when no home is free or four sides are already listed. Otherwise one new AI row.
- *   Its model, effort, doctrine, and key come from the last AI commander, or from `defaultCommander` when none exists.
+ *   Its model, effort, provider, doctrine, and key come from the last AI commander, or from `defaultCommander` when none exists.
  *   Its nickname is the new home's short name.
  * Exceptions: None.
  */
@@ -261,6 +261,7 @@ export function addSideRow(
   const commander: NewGameCommanderInput = {
     modelId: copied?.modelId ?? defaultCommander.modelId,
     reasoningEffort: copied?.reasoningEffort ?? defaultCommander.reasoningEffort,
+    providerSort: copied?.providerSort ?? defaultCommander.providerSort,
     doctrineChoice: copied?.doctrineChoice ?? defaultCommander.doctrineChoice,
     apiKey: copied ? (copied.apiKey ?? '').trim() : defaultCommander.apiKey,
     nickname: nicknameForHome(free.key, homes),

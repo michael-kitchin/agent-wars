@@ -3,7 +3,7 @@
  *
  * Purpose: The activity log says which attempt failed and whether another attempt will run.
  * When to use: The chat transport, on a timeout, HTTP failure, network error, or stalled body.
- * Expected outcome: One sentence. Timeouts and network errors end with `Retrying...` or `No retries left.`
+ * Expected outcome: One sentence. A timeout always ends with `Not retried.` A network error ends with `Retrying...` or `No retries left.`
  * A stalled body, and an HTTP status that will not be retried before the last attempt, end with `Not retried.`
  * Exceptions: None.
  */
@@ -35,7 +35,7 @@ export function formatModelCallFailureLine(args: {
   const attemptLabel = `(attempt ${args.attempt} of ${args.maxAttempts})`;
   if (args.cause === 'timeout') {
     const seconds = Math.round((args.timeoutMs ?? 0) / 1000);
-    return `Model call timed out after ${seconds}s ${attemptLabel}. ${ending}`;
+    return `Model call timed out after ${seconds}s ${attemptLabel}. Not retried.`;
   }
   if (args.cause === 'httpStatus') {
     return `Model call failed with HTTP ${args.httpStatus ?? 0} ${attemptLabel}. ${ending}`;

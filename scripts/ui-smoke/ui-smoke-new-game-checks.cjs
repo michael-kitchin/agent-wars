@@ -413,6 +413,55 @@ const NEW_GAME_CHECKS = Object.freeze([
     },
   },
   {
+    name: 'commander-popover-provider',
+    scenes: [SCENES.newGameFourSides],
+    needs: [
+      'select[aria-label="Reasoning"]',
+      'select[aria-label="Provider"]',
+      'select[aria-label="Doctrine"]',
+      '.commander-popover-doctrine',
+    ],
+    run: (_probe, el) => {
+      const reasoning = el('select[aria-label="Reasoning"]');
+      const provider = el('select[aria-label="Provider"]');
+      const doctrine = el('select[aria-label="Doctrine"]');
+      const description = el('.commander-popover-doctrine');
+      const expectedOptions = ['Highest Throughput', 'Lowest Price', 'Lowest Latency', 'Priority Service (Nitro)'];
+      if (JSON.stringify(provider.selectOptions) !== JSON.stringify(expectedOptions)) {
+        return `Provider options are ${JSON.stringify(provider.selectOptions)}, expected ${JSON.stringify(expectedOptions)}`;
+      }
+      if (provider.selectValue !== 'throughput') return `Provider value is "${provider.selectValue}", expected "throughput"`;
+      if (Math.abs(reasoning.y - provider.y) > 2) {
+        return `Reasoning top is ${reasoning.y} and Provider top is ${provider.y}, expected them within 2`;
+      }
+      if (Math.abs(reasoning.w - provider.w) > 8) {
+        return `Reasoning width is ${reasoning.w} and Provider width is ${provider.w}, expected them within 8`;
+      }
+      if (doctrine.y < reasoning.y + 20) {
+        return `Doctrine top is ${doctrine.y} and Reasoning top is ${reasoning.y}, expected Doctrine at least 20 below`;
+      }
+      if (Math.abs(doctrine.x - reasoning.x) > 4) {
+        return `Doctrine left is ${doctrine.x} and Reasoning left is ${reasoning.x}, expected them within 4`;
+      }
+      if (Math.abs(doctrine.w - reasoning.w) > 8) {
+        return `Doctrine width is ${doctrine.w} and Reasoning width is ${reasoning.w}, expected them within 8`;
+      }
+      const doctrineCenter = doctrine.y + doctrine.h / 2;
+      const descriptionCenter = description.y + description.h / 2;
+      if (Math.abs(descriptionCenter - doctrineCenter) > 8) {
+        return `the description center is ${descriptionCenter} and the Doctrine center is ${doctrineCenter}, expected them within 8`;
+      }
+      const doctrineMiddle = doctrine.x + doctrine.w / 2;
+      if (!(description.x > doctrineMiddle)) {
+        return `the description left is ${description.x}, expected it to the right of the Doctrine center ${doctrineMiddle}`;
+      }
+      const expectedText = 'Uses speed and surprise, attacks weak points, and avoids the enemy\'s strengths.';
+      return description.text === expectedText
+        ? null
+        : `the doctrine description reads "${description.text}", expected "${expectedText}"`;
+    },
+  },
+  {
     name: 'new-game-three-sides',
     scenes: [SCENES.newGameThreeSides],
     needs: ['.new-game-side-label', 'select[aria-label="You home"]'],
