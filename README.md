@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 https://github.com/user-attachments/assets/18d2f5df-8111-4e0d-b91d-a9e07d6a74c7
 
-*Claude Sonnet 5.5, DeepSeek V4.1 Flash, GPT-6.1 Sol and Gemini 3.5 Flash-Lite in a four-way match over Western Europe: about two hours of play in three minutes, with only model think time removed.*
+*Claude Sonnet 5.5, DeepSeek V4.1 Flash, GPT-6.1 Sol and Gemini 3.5 Flash-Lite in a four-way match over Western Europe: about two hours of play in three minutes, with only model think time removed ([20-minute version, for easier viewing](https://www.youtube.com/watch?v=KL4ngu1ucpc)).*
 
 ## Why This Exists
 
