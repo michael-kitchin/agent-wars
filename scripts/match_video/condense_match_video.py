@@ -49,7 +49,7 @@ from scripts.match_video.keep_plan import (
     CondenseError,
     TimeSpan,
     build_keep_intervals,
-    build_select_filter,
+    build_keep_filter,
     covers_full_timeline,
     finish_freezes,
     format_timestamp,
@@ -443,7 +443,7 @@ def _write_output(
             command.extend(["-map", "0:v:0", "-c:v", "copy", "-an", str(output)])
             run_ffmpeg(command, "Copied", info.duration_seconds)
             return False
-        graph_path = write_filter_file(build_select_filter(spans, info.frames_per_second, info.duration_seconds))
+        graph_path = write_filter_file(build_keep_filter(spans, info.frames_per_second, info.duration_seconds))
         try:
             _encode_selected_frames(source, output, graph_path, span_seconds(spans), config, tools)
         finally:
@@ -469,7 +469,7 @@ def _encode_selected_frames(
     Why this exists:
         Re-encode the kept frames so the frozen tails disappear from the timeline.
     When to use:
-        When at least one frozen tail was cut. ``graph_path`` holds the select graph.
+        When at least one frozen tail was cut. ``graph_path`` holds the keep graph.
     What to expect:
         An output file with no audio. Kept motion plays at the probed frame rate.
         If this ffmpeg cannot read a filter file, a short graph is retried inline.
@@ -484,12 +484,12 @@ def _encode_selected_frames(
     except OSError as exc:
         LOGGER.error("Could not read the filter graph %s: %s", graph_path, exc)
         raise CondenseError("Could not read the temporary filter file.") from exc
-    file_command = _encode_command(tools.ffmpeg, source, output, config, ["-/vf", str(graph_path)])
+    file_command = _encode_command(tools.ffmpeg, source, output, config, ["-/filter_complex", str(graph_path)])
     stamp = output_stamp(output)
     try:
         run_ffmpeg(file_command, "Encoded", planned_seconds)
     except CondenseError as exc:
-        if "Unrecognized option '/vf'" not in str(exc) and 'Unrecognized option "/vf"' not in str(exc):
+        if "Unrecognized option '/filter_complex'" not in str(exc) and 'Unrecognized option "/filter_complex"' not in str(exc):
             raise
         discard_changed_output(output, stamp)
         if len(graph) > _INLINE_FILTER_LIMIT:
@@ -498,8 +498,8 @@ def _encode_selected_frames(
                 "This ffmpeg cannot read a filter from a file, and the cut plan is too long for the command line. "
                 "Install a current ffmpeg build and try again."
             ) from exc
-        LOGGER.error("ffmpeg rejected -/vf. Retrying with an inline filter. %s", exc)
-        inline = _encode_command(tools.ffmpeg, source, output, config, ["-vf", graph])
+        LOGGER.error("ffmpeg rejected -/filter_complex. Retrying with an inline filter. %s", exc)
+        inline = _encode_command(tools.ffmpeg, source, output, config, ["-filter_complex", graph])
         run_ffmpeg(inline, "Encoded", planned_seconds)
 
 
@@ -516,12 +516,12 @@ def _encode_command(
     When to use:
         From ``_encode_selected_frames``.
     What to expect:
-        A command that maps only the first video stream, drops audio, and writes H.264.
+        A command that maps the ``[out]`` label, drops audio, and writes H.264.
     """
 
     LOGGER.debug("Building the encode command for %s.", output)
     command = _output_command(ffmpeg, source, output, config.force)
-    command.extend(["-map", "0:v:0"])
+    command.extend(["-map", "[out]"])
     command.extend(filter_args)
     command.extend([
         "-an",

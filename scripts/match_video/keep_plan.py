@@ -217,7 +217,7 @@ def covers_full_timeline(spans: Sequence[TimeSpan], duration_seconds: float, fra
     return span.start_seconds <= frame_seconds and span.end_seconds >= duration_seconds - frame_seconds
 
 
-def build_select_filter(
+def build_keep_filter(
     spans: Sequence[TimeSpan],
     frames_per_second: Fraction,
     duration_seconds: float,
@@ -227,32 +227,44 @@ def build_select_filter(
         Ask ffmpeg to keep the planned stretches in one decode and close the gaps.
     When to use:
         When the plan does not cover the full timeline, so the picture must be re-encoded.
+        A long match can have hundreds of stretches. One ``select`` expression runs out of
+        memory while ffmpeg initializes it, so each stretch is its own ``trim``.
     What to expect:
-        A ``select`` plus ``setpts`` graph. Commas inside ``select`` are escaped.
-        The span that reaches the end of the file is padded by one frame so rounding does not
-        drop the last source frame.
+        A ``filter_complex`` graph labeled ``[out]``. Each stretch is ``trim`` then
+        ``setpts``, and ``concat`` joins them. The span that reaches the end of the file
+        is padded by one frame so rounding does not drop the last source frame.
+        Kept frames are retimed to ``frames_per_second``.
     Exceptions:
         ``ValueError`` when nothing remains or the frame rate is not positive.
     """
 
-    LOGGER.debug("Building a select filter for %d span(s).", len(spans))
+    LOGGER.debug("Building a keep filter for %d span(s).", len(spans))
     if not spans:
         raise ValueError("No video remains after removing frozen stretches.")
     if frames_per_second <= 0:
         raise ValueError("frames_per_second must be positive.")
     frame_seconds = 1.0 / float(frames_per_second)
-    terms: list[str] = []
-    for span in spans:
+    chains: list[str] = []
+    labels: list[str] = []
+    for index, span in enumerate(spans):
         end_seconds = span.end_seconds
         if duration_seconds - end_seconds <= frame_seconds:
             end_seconds += frame_seconds
-        terms.append(f"gte(t\\,{span.start_seconds:.6f})*lt(t\\,{end_seconds:.6f})")
+        label = f"v{index}"
+        labels.append(f"[{label}]")
+        chains.append(
+            f"[0:v]trim=start={span.start_seconds:.6f}:end={end_seconds:.6f},setpts=PTS-STARTPTS[{label}]"
+        )
     rate = format(float(frames_per_second), ".10f")
-    graph = f"select={'+'.join(terms)},setpts=N/({rate}*TB)"
+    joined = "".join(labels)
+    graph = (
+        ";".join(chains)
+        + f";{joined}concat=n={len(spans)}:v=1:a=0,setpts=N/({rate}*TB)[out]"
+    )
     if len(graph) <= 500:
-        LOGGER.debug("Select filter: %s", graph)
+        LOGGER.debug("Keep filter: %s", graph)
     else:
-        LOGGER.debug("Select filter length: %d characters.", len(graph))
+        LOGGER.debug("Keep filter length: %d characters.", len(graph))
     return graph
 
 

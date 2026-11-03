@@ -9,7 +9,7 @@ from scripts.match_video.keep_plan import (
     FreezeEvent,
     TimeSpan,
     build_keep_intervals,
-    build_select_filter,
+    build_keep_filter,
     covers_full_timeline,
     finish_freezes,
     parse_freezedetect_log,
@@ -64,15 +64,22 @@ class KeepPlanTests(unittest.TestCase):
         spans = build_keep_intervals(10.0, [], 1.0, 0.1)
         self.assertEqual(_spans(spans), [(0.0, 10.0)])
 
-    def test_select_filter_escapes_commas_and_pads_the_final_frame(self) -> None:
-        graph = build_select_filter(
+    def test_keep_filter_trims_each_span_and_pads_the_final_frame(self) -> None:
+        graph = build_keep_filter(
             [TimeSpan(0.0, 1.0), TimeSpan(5.0, 6.0)],
             Fraction(10, 1),
             6.0,
         )
-        self.assertIn(r"gte(t\,0.000000)*lt(t\,1.000000)", graph)
-        self.assertIn(r"gte(t\,5.000000)*lt(t\,6.100000)", graph)
-        self.assertIn("setpts=N/(10.0000000000*TB)", graph)
+        self.assertIn("trim=start=0.000000:end=1.000000", graph)
+        self.assertIn("trim=start=5.000000:end=6.100000", graph)
+        self.assertIn("concat=n=2:v=1:a=0", graph)
+        self.assertIn("setpts=N/(10.0000000000*TB)[out]", graph)
+
+    def test_long_plan_stays_a_concat_graph(self) -> None:
+        spans = [TimeSpan(float(index), float(index) + 0.4) for index in range(200)]
+        graph = build_keep_filter(spans, Fraction(10, 1), 200.0)
+        self.assertIn("concat=n=200:v=1:a=0", graph)
+        self.assertNotIn("select=", graph)
 
     def test_bad_duration_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
