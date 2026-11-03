@@ -20,7 +20,7 @@ The default output is `<stem>.condensed.mp4` beside the source. `--output` choos
 
 A freeze that is still running when the recording ends is closed at the container duration (`finish_freezes`).
 
-When the plan still covers the whole timeline, the video track is copied and the audio is removed. When a frozen tail is cut, the picture is re-encoded with libx264 and `yuv420p`, and those spans are joined in order. `--crf` defaults to 20 (0 through 51). `--preset` defaults to `medium` and must be one of `_X264_PRESETS`. `.mp4` and `.mov` are written with `+faststart`.
+When the plan still covers the whole timeline, the video track is copied and the audio is removed. When a frozen tail is cut, the picture is re-encoded with libx264 and `yuv420p`. `build_keep_filter` in `scripts/match_video/keep_plan.py` gives each kept span its own `trim` and joins them with `concat`. A single `select` expression runs out of memory once a recording has hundreds of cuts. `--crf` defaults to 20 (0 through 51). `--preset` defaults to `medium` and must be one of `_X264_PRESETS`. `.mp4` and `.mov` are written with `+faststart`.
 
 ## Which pixels count as frozen
 
