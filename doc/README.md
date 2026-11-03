@@ -2,7 +2,35 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **2.15.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left. Release **2.8.0** adds matches of two to four sides, each AI side with its own commander. Release **2.8.1** lines up the commander popover and collapses the console when a match starts. Release **2.8.2** puts hex changes in each side's turn report and opens the new-game screen at the top. Release **2.8.3** keeps that report to the hexes each side lost. Release **2.8.4** replaces an unreadable short home name with a letter form of that name. Release **2.8.5** names who holds a hex with each side's short name. Release **2.9.0** adds player-facing save and load: a match can be written to an `.agentwars` file and opened again, and the last five turn starts are kept automatically. See [save-files.md](save-files.md) and [ux/save-and-load.md](ux/save-and-load.md). Release **2.10.0** adds ballistic missiles. Release **2.12.0** adds fortifications, a credit treasury, and mercenary hiring, and a missile destroys a cell on a roll of 10 or less. Release **2.13.0** lets an observing match fight tactical battles with AI commanders, frames the visible units while turns advance on their own, names strategic units destroyed in a battle, and names the app to OpenRouter on chat and model-list requests. Release **2.14.0** lets you name your side and each opponent, draws lines to the units an observing commander could see, shows your unit counts from the top bar, and keeps units that would trade hexes from slipping past each other. Release **2.15.0** lets each commander choose an OpenRouter host, gives a model call twice as long before it times out, and shows each commander's think time on the result screen. Turn replay is not built. Later polish, diplomacy, and async multiplayer remain unbuilt.
+Shipping version as of this writing: **2.15.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+
+Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
+
+Release **2.8.0** adds matches of two to four sides, each AI side with its own commander.
+
+Release **2.8.1** lines up the commander popover and collapses the console when a match starts.
+
+Release **2.8.2** puts hex changes in each side's turn report and opens the new-game screen at the top.
+
+Release **2.8.3** keeps that report to the hexes each side lost.
+
+Release **2.8.4** replaces an unreadable short home name with a letter form of that name.
+
+Release **2.8.5** names who holds a hex with each side's short name.
+
+Release **2.9.0** adds player-facing save and load: a match can be written to an `.agentwars` file and opened again, and the last five turn starts are kept automatically. See [save-files.md](save-files.md) and [ux/save-and-load.md](ux/save-and-load.md).
+
+Release **2.10.0** adds ballistic missiles.
+
+Release **2.12.0** adds fortifications, a credit treasury, and mercenary hiring, and a missile destroys a cell on a roll of 10 or less.
+
+Release **2.13.0** lets an observing match fight tactical battles with AI commanders, frames the visible units while turns advance on their own, names strategic units destroyed in a battle, and names the app to OpenRouter on chat and model-list requests.
+
+Release **2.14.0** lets you name your side and each opponent, draws lines to the units an observing commander could see, shows your unit counts from the top bar, and keeps units that would trade hexes from slipping past each other.
+
+Release **2.15.0** lets each commander choose an OpenRouter host, gives a model call twice as long before it times out, and shows each commander's think time on the result screen.
+
+Turn replay is not built. Later polish, diplomacy, and async multiplayer remain unbuilt.
 
 ## How to read `doc/`
 
@@ -16,6 +44,7 @@ Shipping version as of this writing: **2.15.0** (`package.json`). Phase 0 (hybri
 | [hybrid-ai.md](hybrid-ai.md) | Hybrid opponent loop, callbacks, consult bounds | **Current engine behavior.** Prompt copy lives in the prompt package. |
 | [ai-tools.md](ai-tools.md) | The six tool groups the model (and host) can invoke | **Current.** Names from `PATHFINDING_TOOL_NAMES` and sibling `*_TOOL_NAMES` consts. |
 | [terrain-pipeline.md](terrain-pipeline.md) | What the app loads from `data/generated/` | **Current runtime.** Regeneration runbooks stay in [scripts/terrain_pipeline/README.md](../scripts/terrain_pipeline/README.md), [scripts/weather_pipeline/README.md](../scripts/weather_pipeline/README.md), and [scripts/naming_pipeline/README.md](../scripts/naming_pipeline/README.md). Data, flag, and library credits are in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) at the repository root. |
+| [match-video.md](match-video.md) | How a recorded match is shortened: audio removed, frozen stretches cut to a still buffer | **Current tool.** `scripts/condense_match_video.py`. The output stays outside the game. |
 | [game-vision-v2.md](game-vision-v2.md) | Product intent and why the game is shaped this way | **Intent, with an implementation-status note.** Where a roster, fog, or phase claim disagrees with the engine, the combat rules (and the code) win. |
 | [ui-style-guide.md](ui-style-guide.md) | Map-first UI character, chrome, and interaction | **Target aesthetic plus an implementation-status note.** Save and load are live. Unbuilt surfaces (diplomacy, async multiplayer) are marked. |
 | [naming-conventions.md](naming-conventions.md) | How files, directories, and exported symbols are named | **Living index.** Points at the contract and the signed rename ledger. |
