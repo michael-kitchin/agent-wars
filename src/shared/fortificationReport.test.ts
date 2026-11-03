@@ -1,7 +1,7 @@
 /**
  * Fortification report sentences and who may see them.
  *
- * Purpose: The turn report names the hits and the remainder, and fog hides a hex the viewer does not own.
+ * Purpose: The turn report names the hits, and fog hides a hex the viewer does not own.
  * When to use: After changing `formatFortificationReportLine` or `fortificationReportVisibleToViewer`.
  * Expected outcome: The cases below.
  * Exceptions: None.
@@ -21,18 +21,14 @@ const report: FortificationReport = {
   remaining: 0,
 };
 
-test('a fortification sentence names one or many hits and what remains', () => {
+test('a fortification sentence names the hits and not what remains', () => {
   assert.equal(
-    formatFortificationReportLine({ placeName: 'Vienna', lost: 1, remaining: 0 }),
-    'Fortifications at Vienna absorbed 1 hit; none remain.'
+    formatFortificationReportLine({ placeName: 'Vienna', lost: 1 }),
+    'Fortifications at Vienna absorbed 1 hit.'
   );
   assert.equal(
-    formatFortificationReportLine({ placeName: 'Vienna', lost: 4, remaining: 1 }),
-    'Fortifications at Vienna absorbed 4 hits; 1 remains.'
-  );
-  assert.equal(
-    formatFortificationReportLine({ placeName: 'Vienna', lost: 4, remaining: 16 }),
-    'Fortifications at Vienna absorbed 4 hits; 16 remain.'
+    formatFortificationReportLine({ placeName: 'Vienna', lost: 4 }),
+    'Fortifications at Vienna absorbed 4 hits.'
   );
 });
 

@@ -66,20 +66,17 @@ export function formatFortifiedTooltipValue(fortified: number, intactCityCells: 
 /**
  * Formats one strategic-map fortification loss line.
  *
- * Purpose: The turn report names the hex, the hits absorbed, and what remains.
+ * Purpose: The turn report names the hex and the hits absorbed.
  * When to use: Once per hex that lost fortifications on the strategic map this turn.
- * Expected outcome: A sentence. Remaining 0 reads `none remain`.
+ * Expected outcome: `Fortifications at Vienna absorbed 1 hit.` or `hits.` The sentence does not say how many remain.
  * Exceptions: None.
  */
 export function formatFortificationReportLine(args: {
   readonly placeName: string;
   readonly lost: number;
-  readonly remaining: number;
 }): string {
   const hitWord = args.lost === 1 ? 'hit' : 'hits';
-  const remainingPhrase =
-    args.remaining === 0 ? 'none remain' : args.remaining === 1 ? '1 remains' : `${args.remaining} remain`;
-  return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}; ${remainingPhrase}.`;
+  return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}.`;
 }
 
 /**

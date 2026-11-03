@@ -181,7 +181,7 @@ function observingLabel(): HTMLElement {
  *
  * Purpose: The dot, the name, the knockout mark, and the status icon stay together.
  * When to use: The lead chip and each other chip.
- * Expected outcome: A knocked-out name is struck through and reads "out T{N}". Planning and ready add an icon.
+ * Expected outcome: A knocked-out name is struck through and reads "(T{N})". Planning and ready add an icon.
  *   When the chip shows unit counts, its name gets the unit-count tip.
  * Exceptions: None.
  */
@@ -198,7 +198,7 @@ function chipElement(chip: TopBarSideChip, nameId: string | undefined, state: Ga
   if (chip.outTurn !== null) {
     const out = document.createElement('span');
     out.className = 'topbar-side-out';
-    out.textContent = `out T${chip.outTurn}`;
+    out.textContent = `(T${chip.outTurn})`;
     row.append(out);
   }
   const icon = statusIcon(chip);

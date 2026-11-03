@@ -126,8 +126,8 @@ export function isMalformedModelCompletion(completion: ModelCompletionShape): bo
  * Purpose: A plain re-send usually clears a one-off malformed reply; when it does not, naming the defect
  * gives the model a chance to choose a valid shape instead of repeating itself.
  * When to use: Only for the last retry, so earlier attempts keep the conversation byte-identical.
- * Pass the round's `answerShape`, so the note does not offer an envelope the provider will refuse while
- * `tool_choice` is `required`, or a tool call when no tools are offered.
+ * Pass the round's `answerShape`, so the note does not offer an envelope a forced tool call would refuse,
+ * or a tool call when no tools are offered. The order loop passes `orders` or `toolCallOrOrders`.
  * Expected outcome: A short user-role instruction valid for both strategic and tactical consultations. The answer
  * clause asks for a tool call, for the orders object, or for exactly one of the two.
  * Exceptions: None.

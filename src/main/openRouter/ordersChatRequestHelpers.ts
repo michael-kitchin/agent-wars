@@ -102,9 +102,10 @@ function isRequiredToolChoiceRejection(result: OpenRouterChatTransportResult): b
  * When to use: Every tool-loop round, the final orders call, and the repair call.
  * Expected outcome: Adds `reasoning: { effort }` when the profile has an override. When `attachResponseFormat` is true,
  * `responseFormat` is set, and the model has not rejected it this session, adds `response_format` and the healing
- * plugin. If that request fails with 400, 404, or 422, retries once without those two fields. If a request that sent
- * `tool_choice: required` fails because the provider rejected that choice, retries once with `auto`. A model is marked only when the retry that
- * dropped the rejected option succeeds. Both refusals are common, so they reach `onLog` as ordinary lines and the
+ * plugin. If that request fails with 400, 404, or 422, retries once without those two fields. If a body still
+ * carries `tool_choice: required` and the provider rejects that choice, retries once with `auto`. The order loop
+ * sends `auto`, so that second retry is a recovery for a body that still asks for `required`. A model is marked only
+ * when the retry that dropped the rejected option succeeds. These refusals reach `onLog` as ordinary lines and the
  * debug log at info level. Returns the transport result of the last request made.
  * Exceptions: None; transport failures resolve as `{ ok: false }`.
  */

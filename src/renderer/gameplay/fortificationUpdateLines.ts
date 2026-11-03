@@ -73,7 +73,7 @@ export async function fortificationReportLinesFor(
     }
     lines.push({
       ownerId: report.ownerId,
-      line: formatFortificationReportLine({ placeName, lost: report.lost, remaining: report.remaining }),
+      line: formatFortificationReportLine({ placeName, lost: report.lost }),
     });
   }
   return lines;

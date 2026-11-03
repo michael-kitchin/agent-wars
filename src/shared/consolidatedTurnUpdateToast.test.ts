@@ -155,14 +155,14 @@ test('a seat fortification line follows that side missile sentence and precedes 
       transitions: [{ h3Index: '8928308280fffff', from: HUMAN_SEAT_ID, to: AI_SEAT_IDS[0] }],
     },
     missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike on Vienna: 1 city cell destroyed.' }],
-    fortificationReportLines: [{ ownerId: HUMAN_SEAT_ID, line: 'Fortifications at Vienna absorbed 1 hit; none remain.' }],
+    fortificationReportLines: [{ ownerId: HUMAN_SEAT_ID, line: 'Fortifications at Vienna absorbed 1 hit.' }],
   });
   assert.equal(
     message,
     [
       '## Your Losses',
       'Missile strike on Vienna: 1 city cell destroyed.',
-      'Fortifications at Vienna absorbed 1 hit; none remain.',
+      'Fortifications at Vienna absorbed 1 hit.',
       'You lost 1 hex to W. Turkey.',
     ].join('\n')
   );
@@ -178,9 +178,9 @@ test('a neutral fortification line lands under Neutral Losses', () => {
       seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' }],
       transitions: [],
     },
-    fortificationReportLines: [{ ownerId: NEUTRAL_OWNER_ID, line: 'Fortifications at Vienna absorbed 1 hit; none remain.' }],
+    fortificationReportLines: [{ ownerId: NEUTRAL_OWNER_ID, line: 'Fortifications at Vienna absorbed 1 hit.' }],
   });
-  assert.equal(message, ['## Neutral Losses', 'Fortifications at Vienna absorbed 1 hit; none remain.'].join('\n'));
+  assert.equal(message, ['## Neutral Losses', 'Fortifications at Vienna absorbed 1 hit.'].join('\n'));
 });
 
 test('a fortification line with no owner lands in Updates', () => {
@@ -188,14 +188,14 @@ test('a fortification line with no owner lands in Updates', () => {
     readyResult: { success: true },
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
-    fortificationReportLines: [{ ownerId: null, line: 'Fortifications at Vienna absorbed 1 hit; none remain.' }],
+    fortificationReportLines: [{ ownerId: null, line: 'Fortifications at Vienna absorbed 1 hit.' }],
     fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
   });
   assert.equal(
     message,
     [
       '## Updates',
-      'Fortifications at Vienna absorbed 1 hit; none remain.',
+      'Fortifications at Vienna absorbed 1 hit.',
       'Every city cell at Prague is fortified, so its build queue is paused.',
     ].join('\n')
   );

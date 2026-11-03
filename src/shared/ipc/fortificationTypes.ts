@@ -1,7 +1,7 @@
 /**
  * Strategic-map fortification losses for one turn.
  *
- * Purpose: The turn report names the hex, who owned it, and how many fortifications remain.
+ * Purpose: The turn report names the hex and who owned it. `remaining` is the count left after fighting; the loss sentence does not print it.
  * When to use: `ReadyResult.fortificationReports`, omitted when the list is empty.
  * Expected outcome: One row per hex that lost at least one fortification.
  * Exceptions: None.
@@ -47,8 +47,8 @@ export interface FortificationReport {
    * Fortifications left after fighting and before production.
    *
    * Contract: Zero or more.
-   * When to use: The remainder in the sentence.
-   * Expected outcome: Zero reads as none remaining.
+   * When to use: The report records the count. The loss sentence does not print it.
+   * Expected outcome: The fortified count still on the hex before production. Zero means none are left.
    * Exceptions: None.
    */
   readonly remaining: number;

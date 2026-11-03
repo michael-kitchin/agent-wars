@@ -18,7 +18,6 @@ import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
 import { executeRequestOrdersTool } from './requestOrdersToolDispatch';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
-import { isRequiredToolChoiceRejectedForModel } from './openRouterModelCapabilities';
 import { parseOrdersChatCompletion, addOrdersChatUsageToTotals } from './ordersChatCompletion';
 import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
@@ -284,8 +283,8 @@ export interface RequestOrdersToolLoopArgs {
    *
    * Contract: Same settings object the repair exchange receives.
    * When to use: Passed to `postOrdersChatRequest` on each round, and read for `tool_choice` support.
-   * Expected outcome: The reasoning option is identical on every round; the schema is attached only on rounds that
-   * `resolveOrderFlowRoundShape` allows.
+   * Expected outcome: The reasoning option is identical on every round. The schema is attached on every round;
+   * `resolveOrderFlowRoundShape` still omits `tool_choice` when the model does not accept it.
    * Exceptions: None.
    */
   readonly requestSettings: OrdersChatRequestSettings;
@@ -386,7 +385,6 @@ export async function runRequestOrdersToolLoop(
   } = args;
   let iteration = 0;
   let malformedRetryCount = 0;
-  let hasCalledTool = false;
   while (iteration < REQUEST_ORDERS_MAX_TOOL_ROUNDS) {
     if (signal?.aborted) {
       logDebug('openRouter requestOrders: round skipped because the call was cancelled', { iteration, turnNumber });
@@ -414,8 +412,6 @@ export async function runRequestOrdersToolLoop(
     const completionMaxTokens = resolveOrderFlowMaxTokens();
     const roundShape = resolveOrderFlowRoundShape({
       toolCount: tools.length,
-      hasCalledTool,
-      requiredToolChoiceRejected: isRequiredToolChoiceRejectedForModel(modelId),
       toolChoiceSupported: requestSettings.profile.toolChoice,
     });
     logDebug('openRouter requestOrders: round request shape', {
@@ -424,7 +420,6 @@ export async function runRequestOrdersToolLoop(
       attachResponseFormat: roundShape.attachResponseFormat,
       answerShape: roundShape.answerShape,
       toolCount: tools.length,
-      hasCalledTool,
     });
     const chatResponse = await postOrdersChatRequest({
       post: postOpenRouterChatWithTimeoutAndRetry,
@@ -510,7 +505,6 @@ export async function runRequestOrdersToolLoop(
     }
 
     if (toolCalls && toolCalls.length > 0) {
-      hasCalledTool = true;
       if (onLog) {
         onLog(
           `AI round ${iteration}: model requested ${toolCalls.length} tool call(s)${usageFrag}: ${summarizeToolCallNamesForAiLog(toolCalls, 24)}.`

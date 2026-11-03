@@ -166,7 +166,7 @@ export interface TopBarSideChip {
    * The knockout turn, or null while the seat plays.
    *
    * Contract: Null means the chip is not struck through.
-   * When to use: "out T{N}" and the dimmed name.
+   * When to use: "(T{N})" and the dimmed name.
    * Expected outcome: A turn number, or null.
    * Exceptions: None.
    */

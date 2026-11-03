@@ -218,7 +218,7 @@ const SCENARIO_CHECKS = Object.freeze([
       if (!el('#console-panel-reports').shown) return 'the Reports panel is not shown';
       if (el('#console-title').text !== 'Reports') return `the console title reads "${el('#console-title').text}"`;
       const mark = el('.topbar-side-out').text;
-      if (mark !== 'out T1') return `the knockout mark reads "${mark}", expected "out T1"`;
+      if (mark !== '(T1)') return `the knockout mark reads "${mark}", expected "(T1)"`;
       return el('#reports-empty').shown ? null : 'the empty reports sentence is hidden';
     },
   },

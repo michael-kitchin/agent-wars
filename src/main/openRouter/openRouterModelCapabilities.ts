@@ -26,8 +26,9 @@ const structuredOutputsRejectedModelIds = new Set<string>();
  * Model ids whose provider rejected `tool_choice: required` during this session.
  *
  * Purpose: Forcing a tool call is not supported by every endpoint. Amazon Bedrock's Claude endpoint rejects
- * OpenRouter's translation of `required` (`tool_choice` type `any`).
- * When to use: Written after a retry with `auto` succeeds; read before choosing `tool_choice`.
+ * OpenRouter's translation of `required` (`tool_choice` type `any`). The order loop sends `auto`, so this set
+ * matters only when a body still carries `required`.
+ * When to use: Written after a retry with `auto` succeeds; read by the chat helper before sending that body.
  * Expected outcome: Cleared only on app restart (or by the test reset).
  * Exceptions: None.
  */
@@ -246,7 +247,7 @@ export function isSituationMessagesJoinedForModel(modelId: string): boolean {
 /**
  * Records that a model's provider rejected `tool_choice: required`.
  *
- * Purpose: Later rounds use `auto` instead of failing the same way on every consultation.
+ * Purpose: A later body that still carries `required` is sent as `auto` instead of failing the same way.
  * When to use: After a retry with `tool_choice: auto` succeeded.
  * Expected outcome: `isRequiredToolChoiceRejectedForModel(modelId)` returns `true` afterward.
  * Exceptions: None.
@@ -259,8 +260,8 @@ export function markRequiredToolChoiceRejectedForModel(modelId: string): void {
 /**
  * Reports whether `tool_choice: required` was already rejected for a model this session.
  *
- * Purpose: Lets the tool loop avoid a request that is known to fail.
- * When to use: When choosing `tool_choice` for a round.
+ * Purpose: Lets the chat helper rewrite a body that still carries `required` before sending it.
+ * When to use: `postOrdersChatRequest`, before the request body is sent. The order loop does not send `required`.
  * Expected outcome: `true` after `markRequiredToolChoiceRejectedForModel(modelId)`.
  * Exceptions: None.
  */

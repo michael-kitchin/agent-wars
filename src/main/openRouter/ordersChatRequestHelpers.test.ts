@@ -113,9 +113,9 @@ function postFor(post: OpenRouterChatTransport, settings: OrdersChatRequestSetti
 }
 
 /**
- * Posts a forced-tool round for model `m`: `tool_choice: required` and no schema.
+ * Posts a body that still carries `tool_choice: required` and no schema.
  *
- * Purpose: Matches the tool loop's request before the model's first tool call.
+ * Purpose: The order loop sends `auto`. This exercises the helper's recovery when a body still asks for `required`.
  * When to use: Tool-choice fallback cases.
  * Expected outcome: The helper's transport result.
  * Exceptions: None.
@@ -176,7 +176,7 @@ async function testCapableModelGetsAllOptions(): Promise<void> {
 /**
  * Verifies a request whose caller does not ask for the schema goes out without it.
  *
- * Purpose: Rounds that force a tool call must not carry the schema, even for a model that supports it.
+ * Purpose: The helper omits the schema when the caller passes `attachResponseFormat: false`, even for a model that supports it.
  * When to use: After changing how `attachResponseFormat` gates the schema.
  * Expected outcome: One post with the reasoning override and neither `response_format` nor `plugins`.
  * Exceptions: None.
@@ -226,7 +226,7 @@ async function testRejectionRetriesAndMarksModel(): Promise<void> {
 /**
  * Verifies a provider that rejects `tool_choice: required` is retried with `auto` and then stays there.
  *
- * Purpose: Some endpoints cannot force a tool call; the forced-tool round carries no schema, so `auto` is the only fix.
+ * Purpose: An endpoint that rejects `required` is retried with `auto`, and later bodies that still ask for `required` stay on `auto`.
  * When to use: After changing the tool-choice fallback.
  * Expected outcome: Two posts, `required` then `auto`, neither with the schema. The next call sends `auto` once.
  * Exceptions: None.

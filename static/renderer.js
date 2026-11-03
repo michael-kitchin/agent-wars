@@ -126,8 +126,7 @@
   }
   function formatFortificationReportLine(args) {
     const hitWord = args.lost === 1 ? "hit" : "hits";
-    const remainingPhrase = args.remaining === 0 ? "none remain" : args.remaining === 1 ? "1 remains" : `${args.remaining} remain`;
-    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}; ${remainingPhrase}.`;
+    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}.`;
   }
   function formatFortificationsBuiltLine(count) {
     return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
@@ -30584,7 +30583,7 @@ ${bonuses}`;
     if (chip.outTurn !== null) {
       const out = document.createElement("span");
       out.className = "topbar-side-out";
-      out.textContent = `out T${chip.outTurn}`;
+      out.textContent = `(T${chip.outTurn})`;
       row.append(out);
     }
     const icon = statusIcon(chip);
@@ -36652,7 +36651,7 @@ ${bonuses}`;
       }
       lines.push({
         ownerId: report.ownerId,
-        line: formatFortificationReportLine({ placeName, lost: report.lost, remaining: report.remaining })
+        line: formatFortificationReportLine({ placeName, lost: report.lost })
       });
     }
     return lines;
