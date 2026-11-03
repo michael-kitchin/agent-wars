@@ -283,10 +283,31 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 ## Status
 
 - **Version:** 2.16.0, distributed as side-load builds only (no store, signing, or notarization).
-- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Release 2.6.0 redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left. Release 2.8.0 adds matches of two to four sides, each AI side with its own commander. Release 2.8.1 lines up the commander popover and collapses the console when a match starts. Release 2.8.2 puts hex changes in each side's turn report and opens the new-game screen at the top. Release 2.8.3 keeps that report to the hexes each side lost. Release 2.8.4 replaces an unreadable short home name with a letter form of that name. Release 2.8.5 names who holds a hex with each side's short name. Release 2.9.0 adds player-facing save and load. See [doc/save-files.md](doc/save-files.md). Release 2.10.0 adds ballistic missiles. Release 2.12.0 adds fortifications, a credit treasury, and mercenary hiring, and a missile destroys a cell on a roll of 10 or less. Release 2.13.0 lets an observing match fight tactical battles with AI commanders, frames the visible units while turns advance on their own, names strategic units destroyed in a battle, and names the app to OpenRouter on chat and model-list requests. Release 2.14.0 lets you name your side and each opponent, draws lines to the units an observing commander could see, shows your unit counts from the top bar, and keeps units that would trade hexes from slipping past each other. Release 2.15.0 lets each commander choose an OpenRouter host, gives a model call twice as long before it times out, and shows each commander's think time on the result screen. Release 2.16.0 shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
+- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
-- **Security:** To report a vulnerability or other security problem, see [SECURITY.md](SECURITY.md).
+- **Security:** to report a vulnerability or other security problem, see [SECURITY.md](SECURITY.md).
+
+### Releases After 2.5.0
+
+Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
+
+- **2.16.0** shortens commander prompts. A tactical briefing lists the odds of each fight it already shows. Planning stops after 20 tool rounds, then asks once more for orders with the tools withheld. A planning round can submit orders without a tool call. A knocked-out side shows the turn in parentheses, and a fortification loss names the place and how many hits it absorbed.
+- **2.15.0** lets each commander choose an OpenRouter host, gives a model call twice as long before it times out, and shows each commander's think time on the result screen.
+- **2.14.0** lets you name your side and each opponent, draws lines to the units an observing commander could see, shows your unit counts from the top bar, and keeps units that would trade hexes from slipping past each other.
+- **2.13.0** lets an observing match fight tactical battles with AI commanders, frames the visible units while turns advance on their own, names strategic units destroyed in a battle, and names the app to OpenRouter on chat and model-list requests.
+- **2.12.0** adds fortifications, a credit treasury, and mercenary hiring. A missile destroys a cell on a roll of 10 or less. Open sea inside a coastal hex stays water in a battle, and a launch, a strike, and a ranged shot use the same arrows as a queued order.
+- **2.10.0** adds ballistic missiles.
+- **2.9.0** adds player-facing save and load. See [doc/save-files.md](doc/save-files.md).
+- **2.8.5** names who holds a hex with that side's short name. The same build includes:
+  - **2.8.4** replaces an unreadable short home name with a letter form of that name.
+  - **2.8.3** keeps each side's turn report to the hexes that side lost. The 2.8.2 report had also listed hexes taken.
+  - **2.8.2** opens the new-game screen at the top.
+  - **2.8.1** lines up the commander popover and collapses the console when a match starts.
+  - **2.8.0** adds matches of two to four sides, each AI side with its own commander.
+- **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
+- **2.5.2** names armored movement and blocked terrain on a march preview, and the strategic prompt names the loaded map.
+- **2.5.1** stops a running plan when Run is turned off or the model changes, lets you start a new game during a match, and leaves a battle while a world-map plan that is already running keeps going.
 
 ## License
 
