@@ -354,7 +354,7 @@ test('consultation policy: both modes state skipped periods issue nothing, and t
   assert.doesNotMatch(tactical, /consulted only when/i);
   const warning = buildToolBudgetExceededWarning();
   assert.ok(warning.includes(String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)));
-  assert.match(warning, /submitted no explicit orders/i);
+  assert.match(warning, /before you submitted orders/i);
 });
 
 test('headings used by omit-gates keep their contracted spelling', () => {

@@ -140,7 +140,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
-- Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit.
+- Rounds are limited. After the last round, tools are withdrawn and you get one reply to submit orders; once destinations are chosen, submit.
 
 # Response Format
 

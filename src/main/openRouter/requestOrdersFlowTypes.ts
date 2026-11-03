@@ -323,7 +323,7 @@ export type RequestOrdersChatMessage =
        * User-turn role.
        *
        * Contract: Exactly `'user'`.
-       * When to use: Opening message, malformed-completion correction, and repair request.
+       * When to use: Opening message, malformed-completion correction, the final orders request, and the repair request.
        * Expected outcome: The current instruction for this user turn.
        * Exceptions: None.
        */
@@ -332,7 +332,7 @@ export type RequestOrdersChatMessage =
        * User message body.
        *
        * Contract: Plain text.
-       * When to use: Opening and repair user turns.
+       * When to use: Opening, the final orders request, and repair user turns.
        * Expected outcome: The model treats this as the current instruction.
        * Exceptions: None.
        */

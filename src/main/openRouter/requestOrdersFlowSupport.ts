@@ -78,12 +78,12 @@ export const REQUEST_ORDERS_WALL_CLOCK_ERROR = 'AI planning took too long and wa
  * Expected outcome: Changing this value updates both the hard stop and the warning text.
  * Exceptions: None.
  */
-export const REQUEST_ORDERS_MAX_TOOL_ROUNDS = 50;
+export const REQUEST_ORDERS_MAX_TOOL_ROUNDS = 20;
 
 /**
- * Warning placed in the next situation message after a consultation exhausted its tool budget.
+ * Warning placed in the next situation message after a consultation reached the tool-round limit before it submitted orders.
  *
- * Purpose: variants.md consultation-policy row: the model must hear the round limit, that nothing was submitted, and to submit promptly.
+ * Purpose: variants.md consultation-policy row: the model must hear the round limit, that the limit was reached before orders were submitted, and to submit promptly.
  * When to use: `buildConsultPromptParts` when the previous consultation hit the round cap and planning or orders tools are on.
  * Expected outcome: Contains `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`.
  * Exceptions: None.
@@ -93,8 +93,8 @@ export function buildToolBudgetExceededWarning(): string {
     maxToolRounds: REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   });
   return (
-    `\n\nWARNING: Last turn's planning exceeded the tool-call limit (${REQUEST_ORDERS_MAX_TOOL_ROUNDS} rounds). ` +
-    'You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
+    `\n\nWARNING: Last turn's planning reached the tool-call limit (${REQUEST_ORDERS_MAX_TOOL_ROUNDS} rounds) ` +
+    'before you submitted orders. Submit your final orders JSON promptly after gathering the information you need.\n'
   );
 }
 

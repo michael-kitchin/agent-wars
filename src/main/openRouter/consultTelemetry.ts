@@ -47,6 +47,7 @@ export type ConsultFallbackKind =
   | 'structuredOutputDropped'
   | 'malformedCompletion'
   | 'parseRepair'
+  | 'finalOrdersRound'
   | 'cacheBreakpointDropped'
   | 'situationMessagesJoined';
 

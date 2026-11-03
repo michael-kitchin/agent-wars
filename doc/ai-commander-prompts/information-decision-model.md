@@ -186,7 +186,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `TOOL_CATALOG` | Which tools exist this consult and what each returns | `getFilteredToolMetadata`, `getToolFlags` | n/a | 10, 25, 26 | consult-only | required |
-| `TOOL_BUDGET_WARNING` | The previous consultation burned its tool budget and submitted nothing | `getAndClearAiToolLimitExceededLastTurn` | n/a | 10 | consult-only | conditional — flag set and planning or orders enabled |
+| `TOOL_BUDGET_WARNING` | The previous consultation reached the tool-round limit before it submitted orders | `getAndClearAiToolLimitExceededLastTurn` | n/a | 10 | consult-only | conditional — flag set and planning or orders enabled |
 | `JSON_ENVELOPE` | The exact response object: field names, order, which are optional, which actions are legal | `buildFinalJsonContractInstruction`, `parseOrdersResponse` | n/a | 3, 5, 6, 7, 8, 9, 11, 12 | both | required |
 | `SUBMIT_INSTRUCTION` | What to do now: read the briefing, then emit the envelope | `getInitialUserMessage` | n/a | all | consult-only | required |
 | `MESSAGE_DISCIPLINE` | `message` is player-facing psychological warfare and must not leak cells, ids, or intent | `COACHING_MESSAGE_BLOCK` | n/a | 12 | both | required |

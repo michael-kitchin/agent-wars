@@ -17,7 +17,10 @@ import {
   envelopeFieldsForGates,
   type EnvelopeGates,
 } from './envelopeContract';
+import { TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS } from '../tacticalPromptProjection';
+import { REQUEST_ORDERS_MAX_TOOL_ROUNDS } from '../requestOrdersFlowSupport';
 import {
+  buildFinalOrdersRequestMessage,
   buildOpeningUserMessage,
   buildRepairRequestMessage,
   type OpeningMessageGates,
@@ -158,6 +161,16 @@ test('repair request is schema-only and inlines buildRepairSchemaText', () => {
   assert.match(text, /orders\[\] only; no movementOrders\/rangedAttacks; never a top-level array/);
   assert.ok(!text.includes(PRODUCTION_CAP_QUEUE_GUIDANCE));
   assert.ok(!text.includes('home region'));
+});
+
+test('final orders request names the round cap and withdraws tools without a game rule', () => {
+  const text = buildFinalOrdersRequestMessage(REQUEST_ORDERS_MAX_TOOL_ROUNDS);
+  assert.match(text, new RegExp(`${REQUEST_ORDERS_MAX_TOOL_ROUNDS} tool rounds`));
+  assert.match(text, /no longer available/);
+  const lower = text.toLowerCase();
+  for (const marker of TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS) {
+    assert.equal(lower.includes(marker), false, marker);
+  }
 });
 
 test('corrective message has four clauses, is last-retry only, and does not disable tools', () => {

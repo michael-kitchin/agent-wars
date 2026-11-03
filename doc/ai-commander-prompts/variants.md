@@ -253,15 +253,15 @@ Gate: which consultation entry point runs — every period, or only when an even
 | coaching | The consulted prompt must state that an unconsulted beat is one in which its sub-units do not move, so the model does not defer a move to a beat it may never be asked about. |
 | empty-state | n/a. |
 
-### 6.4 Previous consultation exhausted its tool budget
+### 6.4 Previous consultation reached the tool-round limit
 
 | Surface | Contract |
 | --- | --- |
-| situation | Include the tool-budget warning in the situation message: the round limit, the fact that nothing was submitted last period, and the instruction to submit promptly once information is gathered. Include it only when planning or standing-order tools are enabled, since without them there is little to over-spend on. |
+| situation | Include the tool-budget warning in the situation message: the round limit, that the limit was reached before orders were submitted, and the instruction to submit promptly once information is gathered. Include it only when planning or standing-order tools are enabled, since without them there is little to over-spend on. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | The spend-budget-on-unknowns rule is always present; the warning is the situational reinforcement of it. |
+| coaching | Strategic coaching always includes the spend-budget-on-unknowns rule; the warning is the situational reinforcement of it. Tactical coaching does not include that rule. |
 | empty-state | Omit the warning entirely when the flag is not set. |
 
 ## 7. Combinations that must not fight

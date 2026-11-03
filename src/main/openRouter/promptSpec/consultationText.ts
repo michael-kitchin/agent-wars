@@ -1,9 +1,10 @@
 /**
- * Submit-only user messages for the opening turn and the parse-repair request.
+ * Submit-only user messages for the opening turn, the parse-repair request, and the final orders request.
  *
  * Purpose: The system prompt owns every rule. These messages only say what to do now and which envelope
  * fields to emit. consultation-flow.md sections 2 and 5.
- * When to use: `requestOrdersFlow` for the opening user turn; `runParseRepairExchange` for the repair copy.
+ * When to use: `requestOrdersFlow` for the opening user turn; `runParseRepairExchange` for the repair copy;
+ * `runFinalOrdersRound` for the request after the tool-round cap.
  * Expected outcome: No production doctrine, cap rules, memory-write instruction, or option-copy mapping
  * beyond one action clause. The tactical opening repeats `TACTICAL_STANDING_ORDER_PROHIBITION` identically.
  * Exceptions: None.
@@ -250,6 +251,23 @@ export function buildOpeningUserMessage(gates: OpeningMessageGates): string {
   const tacticalBan =
     gates.coordinateMode === 'tactical' ? ` ${TACTICAL_STANDING_ORDER_PROHIBITION}` : '';
   return `${situation} ${action}${productionClause} ${envelopeClause}${tacticalBan}`;
+}
+
+/**
+ * Builds the user note sent once the tool-round cap is reached.
+ *
+ * Purpose: The model must stop calling tools and submit the orders object. consultation-flow owns this wording.
+ * When to use: Replaces a trailing user message, or is appended, immediately before the final orders call.
+ * Expected outcome: Names the round count, says tools are no longer available, and points at the system prompt's
+ * response format. States no game rule.
+ * Exceptions: None.
+ */
+export function buildFinalOrdersRequestMessage(maxToolRounds: number): string {
+  logDebug('promptSpec buildFinalOrdersRequestMessage', { maxToolRounds });
+  return (
+    `You have used all ${maxToolRounds} tool rounds, and tools are no longer available. ` +
+    'Reply now with your final orders as one JSON object in the response format from the system prompt.'
+  );
 }
 
 /**

@@ -207,7 +207,7 @@ From [`source-inventory.md`](source-inventory.md) section 3, derived from code o
 | Game size | 5 |
 | Consultation policy | 6.1 and 6.2 |
 | Tactical beat consulted or skipped | 6.3 |
-| Previous consultation exhausted its tool budget | 6.4 |
+| Previous consultation reached the tool-round limit | 6.4 |
 | Briefing present or absent | 7, combinations |
 | Origin bonus and terrain bonus levels | 8 |
 | Weather bonus level | 9 |

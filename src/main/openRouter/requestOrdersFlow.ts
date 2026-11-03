@@ -450,6 +450,8 @@ export async function requestOrdersFlow(
       aiPathfindingSessionMetrics,
     });
     if (loopResult.kind === 'fail') return failSettled(loopResult.error);
+    // A stop that arrived with the last reply must not warn or record an empty success.
+    if (signal?.aborted) return failSettled('Cancelled');
     if (loopResult.kind === 'budgetExceeded') {
       telemetry.setOutcome('budgetExceeded');
       setAiToolLimitExceededLastTurn(seatId);
@@ -471,7 +473,7 @@ export async function requestOrdersFlow(
         outputTokens: usage.totalOutputTokens > 0 ? usage.totalOutputTokens : undefined,
       };
     }
-    if (signal?.aborted) return failSettled('Cancelled');
+    const capReached = loopResult.afterRoundCap;
     const content = loopResult.content;
     const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
     /**
@@ -531,11 +533,15 @@ export async function requestOrdersFlow(
         if (repaired) parsed = repaired;
       }
     }
+    // A stop during the repair must not apply the earlier text or set the warning.
+    if (signal?.aborted) return failSettled('Cancelled');
     if (!parsed) {
+      if (capReached) setAiToolLimitExceededLastTurn(seatId);
       if (onLog) onLog('Invalid response: could not parse orders JSON after normal and repair attempts.', true);
       return failSettled('Invalid response: could not parse orders');
     }
 
+    if (capReached) setAiToolLimitExceededLastTurn(seatId);
     telemetry.setOutcome('finished');
     return applyParsedRequestOrders({
       parsed,

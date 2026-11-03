@@ -1,4 +1,6 @@
 import { logDebug, logError } from '../logger';
+import { cacheTokensFromChatUsage } from './consultTelemetry';
+import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
 
 /**
  * One order-flow chat completion body.
@@ -27,6 +29,31 @@ export type OrdersChatCompletion = {
     };
   };
 };
+
+/**
+ * Adds one chat response's usage into a consultation's running totals.
+ *
+ * Purpose: The tool loop and the final orders call must count cost and tokens the same way.
+ * When to use: After a chat body has been parsed and its `usage` object is available.
+ * Expected outcome: Cost, prompt tokens, completion tokens, cached tokens, and cache-write tokens increase by the
+ * reported amounts. Missing fields add nothing.
+ * Exceptions: None.
+ */
+export function addOrdersChatUsageToTotals(
+  totals: RequestOrdersUsageTotals,
+  usage: OrdersChatCompletion['usage']
+): void {
+  logDebug('ordersChatCompletion addOrdersChatUsageToTotals', {
+    promptTokens: usage?.prompt_tokens ?? 0,
+    completionTokens: usage?.completion_tokens ?? 0,
+  });
+  totals.requestCost += usage?.cost ?? 0;
+  totals.totalInputTokens += usage?.prompt_tokens ?? 0;
+  totals.totalOutputTokens += usage?.completion_tokens ?? 0;
+  const cacheTokens = cacheTokensFromChatUsage(usage);
+  totals.totalCachedTokens = (totals.totalCachedTokens ?? 0) + cacheTokens.cachedTokens;
+  totals.totalCacheWriteTokens = (totals.totalCacheWriteTokens ?? 0) + cacheTokens.cacheWriteTokens;
+}
 
 /**
  * Parses one chat completion body.

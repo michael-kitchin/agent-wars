@@ -27,7 +27,7 @@ Emit order. Each entry states purpose, the information items it carries, include
 These sit in the situation message, under the clock. They are not in the system message, and the coaching bullets do not repeat them.
 
 - **Scouting directive.** One sentence when no enemy unit is observed: `With no enemy observed, move to regain contact along plausible approaches rather than holding position.` **Omit** when any enemy is observed.
-- **Tool-budget warning.** Include when the previous consultation exhausted its tool-call budget and submitted nothing, and planning or standing-order tools are enabled. State the round limit, that no orders were submitted last turn, and that the model must submit promptly after gathering what it needs. **Omit** otherwise. `getAndClearAiToolLimitExceededLastTurn` is called once, from the situation builder.
+- **Tool-budget warning.** Include when the previous consultation reached the tool-round limit before it submitted orders, and planning or standing-order tools are enabled. State the round limit, that the limit was reached before orders were submitted, and that the model must submit promptly after gathering what it needs. **Omit** otherwise. `getAndClearAiToolLimitExceededLastTurn` is called once, from the situation builder.
 - **Items:** `ENEMY_ROSTER_OBSERVED`, `TOOL_BUDGET_WARNING`.
 - **Model use:** overrides the default of standing still, and caps tool spending.
 
@@ -345,7 +345,7 @@ System-prompt content only. Each item is a rule the model must be told, with the
 13. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Include that `memoryUpdates` write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
 14. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Omitting `callbacks` or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
 15. **Keep the player-facing line clean.** The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent. Carries `MESSAGE_DISCIPLINE`.
-16. **Spend the tool budget on unknowns only.** Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit. Carries `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
+16. **Spend the tool budget on unknowns only.** Rounds are limited. After the last round, tools are withdrawn and you get one reply to submit orders; once destinations are chosen, submit. Carries `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
 
 Claims the builders **omit** from strategic coaching (tests forbid the substrings):
 

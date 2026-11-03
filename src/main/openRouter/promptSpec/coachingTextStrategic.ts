@@ -308,12 +308,12 @@ export const MESSAGE_DISCIPLINE_BULLET =
   '- The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.';
 
 /**
- * Tool rounds are limited and exhaustion submits nothing.
+ * Tool rounds are limited, and the last chance to submit is one reply with tools withdrawn.
  *
- * Purpose: Spending the budget on known facts loses the turn.
+ * Purpose: Spending the budget on known facts leaves only that last reply.
  * When to use: Always in strategic coaching.
- * Expected outcome: Mentions that exhausting them submits nothing; submit once destinations are chosen.
+ * Expected outcome: Says tools are withdrawn for one reply after the last round, and to submit once destinations are chosen.
  * Exceptions: None.
  */
 const TOOL_BUDGET_BULLET =
-  '- Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit.';
+  '- Rounds are limited. After the last round, tools are withdrawn and you get one reply to submit orders; once destinations are chosen, submit.';

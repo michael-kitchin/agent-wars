@@ -111,7 +111,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /Omit the array or send \[\]/i);
   assert.match(text, /consulted when a subscribed event fires/i);
   assert.match(text, /taunt or threat/i);
-  assert.match(text, /exhausting them submits nothing/i);
+  assert.match(text, /tools are withdrawn and you get one reply/i);
 });
 
 test('strategic conditional items disappear when their gate is off', () => {

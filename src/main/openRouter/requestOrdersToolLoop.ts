@@ -4,8 +4,8 @@
  * Purpose: `requestOrdersFlow` must stay under the file-size limit; the round bound, wall-clock stop,
  * malformed-completion retry, and tool execution live here so the orchestrator only handles parse and apply.
  * When to use: After the system and opening user messages are on the transcript.
- * Expected outcome: Final assistant text, a caller-facing failure, or tool-budget exhaustion. Mutates the
- * transcript, usage totals, and tool counts in place. Log lines and message order match the previous inline loop.
+ * Expected outcome: Final assistant text, a caller-facing failure, or tool-budget exhaustion. At the round cap,
+ * one more call runs with tools withheld. Mutates the transcript, usage totals, and tool counts in place.
  * Exceptions: Transport failures and unusable replies return `{ kind: 'fail' }` rather than throwing.
  */
 
@@ -19,8 +19,7 @@ import { executeRequestOrdersTool } from './requestOrdersToolDispatch';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import { isRequiredToolChoiceRejectedForModel } from './openRouterModelCapabilities';
-import { cacheTokensFromChatUsage } from './consultTelemetry';
-import { parseOrdersChatCompletion } from './ordersChatCompletion';
+import { parseOrdersChatCompletion, addOrdersChatUsageToTotals } from './ordersChatCompletion';
 import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import {
@@ -32,6 +31,7 @@ import {
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
 import { resolveOrderFlowRoundShape } from './orderFlowRoundShape';
+import { startFinalOrdersRound } from './requestOrdersFinalOrdersRound';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -322,6 +322,15 @@ export type RequestOrdersToolLoopResult =
       readonly kind: 'finalContent';
       readonly content: string;
       readonly iteration: number;
+      /**
+       * Whether this text came from the call made after the tool-round cap.
+       *
+       * Contract: `true` only for the tools-withheld final orders call.
+       * When to use: The orchestrator sets the next-turn tool-budget warning when this is true.
+       * Expected outcome: A normal tool-loop reply is `false`.
+       * Exceptions: None.
+       */
+      readonly afterRoundCap: boolean;
     }
   | {
       readonly kind: 'fail';
@@ -337,8 +346,9 @@ export type RequestOrdersToolLoopResult =
  *
  * Purpose: Isolates the bounded tool conversation from parse/apply so both stay reviewable.
  * When to use: Once per consultation after the opening messages are on `args.messages`.
- * Expected outcome: `{ kind: 'finalContent' }` with the assistant text that should be parsed; the repair
- * exchange is a separate call and must not run inside this loop.
+ * Expected outcome: `{ kind: 'finalContent' }` with the assistant text that should be parsed. At the round cap,
+ * one final call runs with tools withheld and its text is returned the same way. The repair exchange is a
+ * separate call and must not run inside this loop.
  * Exceptions: Does not throw on transport `{ ok: false }`; returns `{ kind: 'fail' }`.
  */
 export async function runRequestOrdersToolLoop(
@@ -449,12 +459,7 @@ export async function runRequestOrdersToolLoop(
       if (onLog) onLog(errorMessage, true);
       return { kind: 'fail', error: errorMessage };
     }
-    usage.requestCost += json.usage?.cost ?? 0;
-    usage.totalInputTokens += json.usage?.prompt_tokens ?? 0;
-    usage.totalOutputTokens += json.usage?.completion_tokens ?? 0;
-    const cacheTokens = cacheTokensFromChatUsage(json.usage);
-    usage.totalCachedTokens = (usage.totalCachedTokens ?? 0) + cacheTokens.cachedTokens;
-    usage.totalCacheWriteTokens = (usage.totalCacheWriteTokens ?? 0) + cacheTokens.cacheWriteTokens;
+    addOrdersChatUsageToTotals(usage, json.usage);
     const head = json.choices?.[0] as { finish_reason?: string; native_finish_reason?: string } | undefined;
     const finishReason = head?.finish_reason;
     const nativeFinish = head?.native_finish_reason;
@@ -588,7 +593,7 @@ export async function runRequestOrdersToolLoop(
     if (onLog) {
       onLog(`AI round ${iteration}: model returned final text (${content.length} chars)${usageFrag}; parsing orders…`);
     }
-    return { kind: 'finalContent', content, iteration };
+    return { kind: 'finalContent', content, iteration, afterRoundCap: false };
   }
-  return { kind: 'budgetExceeded', iteration };
+  return startFinalOrdersRound(args, iteration);
 }

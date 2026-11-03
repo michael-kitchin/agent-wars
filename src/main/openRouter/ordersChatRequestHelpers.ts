@@ -99,7 +99,7 @@ function isRequiredToolChoiceRejection(result: OpenRouterChatTransportResult): b
  *
  * Purpose: One place that adds `reasoning`, `response_format`, and response healing, and recovers when a provider
  * rejects the schema.
- * When to use: Every tool-loop round and the repair call.
+ * When to use: Every tool-loop round, the final orders call, and the repair call.
  * Expected outcome: Adds `reasoning: { effort }` when the profile has an override. When `attachResponseFormat` is true,
  * `responseFormat` is set, and the model has not rejected it this session, adds `response_format` and the healing
  * plugin. If that request fails with 400, 404, or 422, retries once without those two fields. If a request that sent

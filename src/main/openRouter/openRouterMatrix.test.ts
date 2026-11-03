@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-function-type -- dynamic require + Module._load typing for Electron mock */
+/* eslint-disable @typescript-eslint/no-require-imports -- dynamic require of the order-flow module */
 /**
  * Matrix tests for requestOrders prompt/tool payload construction across all 8 UI toggles:
  * precomputation, events, planning, assessment, estimation, memory, orders, production.
@@ -14,7 +14,6 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import Module = require('module');
 import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import {
@@ -29,6 +28,7 @@ import {
 } from './promptSpec/sectionHeadings';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
 import { CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
+import { buildFixtureState, installElectronMock } from './openRouterTestHelpers';
 
 /**
  * Documents the `ChatResponse` type alias (type ChatResponse).
@@ -67,92 +67,6 @@ choices: Array<{ message?: { content?: string; tool_calls?: unknown[] } }>;
    */
 usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
 };
-
-/**
- * Defines the `installElectronMock` function shape (function installElectronMock(userDataDir: string): () => void).
-
- * Purpose: Supports maintainability by documenting why `installElectronMock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function installElectronMock(userDataDir: string): () => void {
-  const originalLoad = (Module as unknown as { _load: Function })._load;
-  (Module as unknown as { _load: Function })._load = function patchedLoad(
-    request: string,
-    parent: unknown,
-    isMain: boolean
-  ) {
-    if (request === 'electron') {
-      return {
-        app: {
-          getPath: (name: string) => (name === 'userData' ? userDataDir : userDataDir),
-        },
-        safeStorage: {
-          isEncryptionAvailable: () => false,
-          encryptString: (s: string) => Buffer.from(s, 'utf8'),
-          decryptString: (b: Buffer) => b.toString('utf8'),
-        },
-      };
-    }
-    return originalLoad.call(this, request, parent, isMain);
-  };
-  return () => {
-    (Module as unknown as { _load: Function })._load = originalLoad;
-  };
-}
-
-/**
- * Defines the `buildFixtureState` function shape (function buildFixtureState(hexes: string[]): { hexes: { h3Index: string; terrain: string; terrainKind: string }[]; units: { id: string; player: string; un).
-
- * Purpose: Supports maintainability by documenting why `buildFixtureState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildFixtureState(hexes: string[]): {
-  hexes: { h3Index: string; terrain: string; terrainKind: string }[];
-  units: { id: string; player: string; unitType: string; h3Index: string }[];
-  exploredHexes: string[];
-  strategicControl: { h3Index: string; controllerPlayerId: string | null }[];
-  scenarioId: 'region_vs_region';
-  playerPerspective: string;
-  seats: { seatId: string; seatOrder: number; kind: 'human' | 'ai'; homeRegion: string; outTurn: null; commander: null }[];
-  homeRegionHexesBySeat: Record<string, string[]>;
-  intersectingHomeRegionHexes: string[];
-  phase: 'planning';
-  turnNumber: number;
-  pendingOrders: { unitId: string; toH3Index: string }[];
-} {
-  return {
-    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
-    units: [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexes[0]! },
-      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: hexes[0]! },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
-    ],
-    exploredHexes: [hexes[0]!, hexes[1]!, hexes[2]!],
-    strategicControl: [
-      { h3Index: hexes[0]!, controllerPlayerId: 'opponent' },
-      { h3Index: hexes[1]!, controllerPlayerId: 'opponent' },
-      { h3Index: hexes[2]!, controllerPlayerId: 'human' },
-    ],
-    scenarioId: 'region_vs_region',
-    playerPerspective: 'opponent',
-    seats: [
-      { seatId: 'human', seatOrder: 1, kind: 'human', homeRegion: 'Northern America', outTurn: null, commander: null },
-      { seatId: 'opponent', seatOrder: 2, kind: 'ai', homeRegion: 'Eastern Europe', outTurn: null, commander: null },
-    ],
-    homeRegionHexesBySeat: {
-      human: [hexes[1]!, hexes[2]!],
-      opponent: [hexes[0]!, hexes[1]!],
-    },
-    intersectingHomeRegionHexes: [hexes[1]!],
-    phase: 'planning',
-    turnNumber: 7,
-    pendingOrders: [],
-  };
-}
 
 /**
  * Documents the `CapturedPayload` type alias (type CapturedPayload).
