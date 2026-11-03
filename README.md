@@ -12,13 +12,9 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![Tactical battle in Colombia and Venezuela](doc/media/front-page-battle-1-large.png)
+https://github.com/user-attachments/assets/18d2f5df-8111-4e0d-b91d-a9e07d6a74c7
 
-*Tactical battle in Colombia and Venezuela during combat resolution, showing hits, movement, and dice rolls. Human/teal units face an LLM/orange opponent (in this case, Gemini Flash Lite), with losses displayed in the corner.*
-
-![4-way regional "deathmatch" in east Asia (1 human, 3 AIs)](doc/media/front-page-battle-2-large.png)
-
-*4-way regional "deathmatch" in east Asia (1 human, 3 AIs). "Fog of war" has been turned off, revealing every unit on the map.*
+*Claude Sonnet 5.5, DeepSeek V4.1 Flash, GPT-6.1 Sol and Gemini 3.5 Flash-Lite in a four-way match over Western Europe: about two hours of play in three minutes, with only model think time removed.*
 
 ## Why This Exists
 
