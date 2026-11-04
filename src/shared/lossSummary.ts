@@ -236,12 +236,24 @@ function isKnownLossType(unitType: string): unitType is LostUnitType {
 }
 
 /**
+ * Writes one collapsed type total for a popup loss line.
+ *
+ * Purpose: Cause lines and the destroyed-in-battle sentence share one spelling, including the `x`.
+ * When to use: When a type has more victims than `LOSS_TYPE_NAME_LIST_MAX`.
+ * Expected outcome: `4x Infantry` when the count is 4 and the type is infantry.
+ * Exceptions: None.
+ */
+export function formatCollapsedTypeCount(count: number, unitType: LostUnitType): string {
+  return `${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`;
+}
+
+/**
  * Formats victim entries for one popup cause line.
  *
  * Purpose: Names a type that lost three or fewer units, and collapses a type that lost more.
  * When to use: `formatPlayerLossLinesMultiline` only. Prompt lines use `formatLossEntriesForPrompt`.
- * Expected outcome: Named units first, in input order, then `4x Infantry` groups in naval, air, armor, infantry order.
- *   A type outside those four stays a name. An empty list is an empty string.
+ * Expected outcome: Named units first, in input order, then `4x Infantry` groups in naval, air, armor, infantry, then missile order.
+ *   A type that is not one of those stays a name. An empty list is an empty string.
  * Exceptions: None.
  */
 export function formatLossEntries(units: readonly LostUnit[]): string {
@@ -258,7 +270,7 @@ export function formatLossEntries(units: readonly LostUnit[]): string {
   }
   for (const unitType of GROUP_ORDER) {
     const count = counts[unitType];
-    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
+    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(formatCollapsedTypeCount(count, unitType));
   }
   return parts.join(', ');
 }

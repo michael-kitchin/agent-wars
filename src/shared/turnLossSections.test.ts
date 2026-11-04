@@ -151,7 +151,7 @@ test('lossSectionOwnerId reads the header and breaks a shared name by seat order
 });
 
 test('a section with only the battle sentence is that header and that sentence', () => {
-  const battle = 'III Infantry, 6 Armored destroyed in battle.';
+  const battle = 'III Infantry, 6x Armored destroyed in battle.';
   const lines = buildTurnLossSections(
     { byOwner: {} },
     HUMAN_SEAT_ID,

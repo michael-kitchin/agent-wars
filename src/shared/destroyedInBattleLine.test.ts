@@ -31,14 +31,27 @@ test('one named infantry and six armor collapse only the armor', () => {
       parent(id, HUMAN_SEAT_ID, 'armor', `${index} Armored`, 'a')
     ),
   ];
-  assert.equal(formatDestroyedInBattleLine(units), 'III Infantry, 6 Armored destroyed in battle.');
+  assert.equal(formatDestroyedInBattleLine(units), 'III Infantry, 6x Armored destroyed in battle.');
+});
+
+test('two collapsed types keep naval before infantry and both use the x', () => {
+  const naval = ['I Fleet', 'II Fleet', 'III Fleet', 'IV Fleet'].map((name, index) =>
+    parent(`n${index}`, HUMAN_SEAT_ID, 'naval', name, 'a')
+  );
+  const infantry = ['I Infantry', 'II Infantry', 'III Infantry', 'IV Infantry'].map((name, index) =>
+    parent(`i${index}`, HUMAN_SEAT_ID, 'infantry', name, 'a')
+  );
+  assert.equal(
+    formatDestroyedInBattleLine([...infantry, ...naval]),
+    '4x Naval, 4x Infantry destroyed in battle.'
+  );
 });
 
 test('four infantry collapse, and three infantry stay named', () => {
   const four = ['I Infantry', 'II Infantry', 'III Infantry', 'IV Infantry'].map((name, index) =>
     parent(`i${index}`, HUMAN_SEAT_ID, 'infantry', name, 'a')
   );
-  assert.equal(formatDestroyedInBattleLine(four), '4 Infantry destroyed in battle.');
+  assert.equal(formatDestroyedInBattleLine(four), '4x Infantry destroyed in battle.');
   const three = four.slice(0, 3);
   assert.equal(
     formatDestroyedInBattleLine(three),

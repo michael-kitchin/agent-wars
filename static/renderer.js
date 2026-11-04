@@ -15923,6 +15923,9 @@
   function isKnownLossType(unitType) {
     return isBuildUnitType(unitType);
   }
+  function formatCollapsedTypeCount(count, unitType) {
+    return `${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`;
+  }
   function formatLossEntries(units) {
     if (units.length === 0) return "";
     const counts = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
@@ -15937,7 +15940,7 @@
     }
     for (const unitType of GROUP_ORDER) {
       const count = counts[unitType];
-      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(`${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
+      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(formatCollapsedTypeCount(count, unitType));
     }
     return parts.join(", ");
   }
@@ -15971,7 +15974,6 @@
     Missile: "missile"
   };
   var GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
-  var BATTLE_GROUP_TOKEN = /^(\d+) (Naval|Air|Armored|Infantry|Missile)$/;
   var DESTROYED_IN_BATTLE_SUFFIX = " destroyed in battle.";
   var VICTIM_SEPARATOR = ", ";
   var BULLET_PREFIX = "\u2022 ";
@@ -15997,19 +15999,10 @@
     if (bullet.length > 0) segments.push({ text: bullet, unitDisplayName: null });
     tokens.forEach((token, index) => {
       if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
-      segments.push(battleVictimSegment(token, knownDisplayNames));
+      segments.push(victimSegment(token, knownDisplayNames));
     });
     segments.push({ text: DESTROYED_IN_BATTLE_SUFFIX, unitDisplayName: null });
     return segments;
-  }
-  function battleVictimSegment(token, knownDisplayNames) {
-    if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
-    const match = BATTLE_GROUP_TOKEN.exec(token);
-    const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ""] : void 0;
-    if (match && unitType) {
-      return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
-    }
-    return { text: token, unitDisplayName: null };
   }
   function victimSegment(token, knownDisplayNames) {
     if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
@@ -36593,7 +36586,11 @@ ${bonuses}`;
         named.push(unit.displayName);
       }
     }
-    const groups = GROUP_ORDER2.filter((unitType) => grouped.has(unitType)).map((unitType) => `${counts.get(unitType) ?? 0} ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
+    const groups = GROUP_ORDER2.flatMap((unitType) => {
+      if (!grouped.has(unitType)) return [];
+      const count = counts.get(unitType);
+      return count == null ? [] : [formatCollapsedTypeCount(count, unitType)];
+    });
     return `${[...named, ...groups].join(", ")} destroyed in battle.`;
   }
   function destroyedInBattleLinesByOwner(units) {

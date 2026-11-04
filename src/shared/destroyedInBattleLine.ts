@@ -1,6 +1,6 @@
 import type { DestroyedBattleParent } from './destroyedBattleParent';
 import { isBuildUnitType, type BuildUnitType } from './ipc/productionTypes';
-import { LOSS_TYPE_NAME_LIST_MAX, UNIT_GROUP_LABEL_BY_TYPE } from './lossSummary';
+import { formatCollapsedTypeCount, LOSS_TYPE_NAME_LIST_MAX } from './lossSummary';
 
 /**
  * The order collapsed types follow on the battle sentence.
@@ -34,7 +34,7 @@ export function visibleDestroyedParents(
  *
  * Purpose: The loss section names the strategic units a battle removed, after the other causes.
  * When to use: Once per side, with that side's visible units in their original order.
- * Expected outcome: An empty string when `units` is empty. Otherwise names, then collapsed groups, then ` destroyed in battle.` A type with more than `LOSS_TYPE_NAME_LIST_MAX` units becomes `${count} ${label}`, such as `6 Armored`. Fewer stay named.
+ * Expected outcome: An empty string when `units` is empty. Otherwise names, then collapsed groups, then ` destroyed in battle.` A type with more than `LOSS_TYPE_NAME_LIST_MAX` units becomes the same count the other loss lines use, such as `6x Armored`. Fewer stay named.
  * Exceptions: None.
  */
 export function formatDestroyedInBattleLine(
@@ -53,9 +53,11 @@ export function formatDestroyedInBattleLine(
       named.push(unit.displayName);
     }
   }
-  const groups = GROUP_ORDER
-    .filter((unitType) => grouped.has(unitType))
-    .map((unitType) => `${counts.get(unitType) ?? 0} ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`);
+  const groups = GROUP_ORDER.flatMap((unitType) => {
+    if (!grouped.has(unitType)) return [];
+    const count = counts.get(unitType);
+    return count == null ? [] : [formatCollapsedTypeCount(count, unitType)];
+  });
   return `${[...named, ...groups].join(', ')} destroyed in battle.`;
 }
 

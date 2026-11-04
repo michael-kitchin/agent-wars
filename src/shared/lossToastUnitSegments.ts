@@ -60,20 +60,10 @@ const GROUP_TYPE_BY_LABEL: Readonly<Record<string, LostUnitType>> = {
  *
  * Purpose: Matches `4x Infantry` and not the older `3 Infantry` form.
  * When to use: `victimSegment`.
- * Expected outcome: The count and one of the four labels.
+ * Expected outcome: The count and one of Naval, Air, Armored, Infantry, or Missile.
  * Exceptions: None.
  */
 const GROUP_TOKEN = /^(\d+)x (Naval|Air|Armored|Infantry|Missile)$/;
-
-/**
- * A collapsed group on the destroyed-in-battle sentence.
- *
- * Purpose: That sentence writes `6 Armored`, without the `x` the other cause lines use.
- * When to use: `battleLineSegments`.
- * Expected outcome: The count and one of the five labels.
- * Exceptions: None.
- */
-const BATTLE_GROUP_TOKEN = /^(\d+) (Naval|Air|Armored|Infantry|Missile)$/;
 
 /**
  * The ending of a destroyed-in-battle sentence, including the leading space and the period.
@@ -114,7 +104,7 @@ const BULLET_PREFIX = '\u2022 ';
  *   comma-separated token is its own segment, marked as a unit name only when it is in `knownDisplayNames`
  *   (older totals such as `3 Infantry` stay plain). A token `4x Infantry` that is not a known name
  *   carries `group`, so a loss section can paint a type icon even when no origin flag exists.
- *   A sentence ending in ` destroyed in battle.` splits the same way, and a token such as `6 Armored` carries `group` without the `x`.
+ *   A sentence ending in ` destroyed in battle.` splits the same way, and a token such as `6x Armored` carries `group`. A count without the `x` stays plain.
  *   Any other line is one plain segment. The segments' text always concatenates back to `line`.
  * Exceptions: None.
  */
@@ -142,7 +132,7 @@ export function splitLossCauseLineForUnitFlags(
  *
  * Purpose: Flags and the type icon use the same painters as the other loss lines.
  * When to use: When the body ends with ` destroyed in battle.`.
- * Expected outcome: The ending, including its leading space and period, is one plain segment. Known names are unit segments. A token such as `6 Armored` is a group.
+ * Expected outcome: The ending, including its leading space and period, is one plain segment. Known names are unit segments. A token such as `6x Armored` is a group. A count without the `x` stays plain.
  * Exceptions: None.
  */
 function battleLineSegments(
@@ -156,35 +146,17 @@ function battleLineSegments(
   if (bullet.length > 0) segments.push({ text: bullet, unitDisplayName: null });
   tokens.forEach((token, index) => {
     if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
-    segments.push(battleVictimSegment(token, knownDisplayNames));
+    segments.push(victimSegment(token, knownDisplayNames));
   });
   segments.push({ text: DESTROYED_IN_BATTLE_SUFFIX, unitDisplayName: null });
   return segments;
 }
 
 /**
- * One token of a destroyed-in-battle sentence.
- *
- * Purpose: A known name gets a flag, and a count such as `6 Armored` gets the type icon.
- * When to use: `battleLineSegments`.
- * Expected outcome: A unit segment, a group segment, or a plain segment. A known name wins over the group pattern.
- * Exceptions: None.
- */
-function battleVictimSegment(token: string, knownDisplayNames: ReadonlySet<string>): LossLineSegment {
-  if (knownDisplayNames.has(token)) return { text: token, unitDisplayName: token };
-  const match = BATTLE_GROUP_TOKEN.exec(token);
-  const unitType = match ? GROUP_TYPE_BY_LABEL[match[2] ?? ''] : undefined;
-  if (match && unitType) {
-    return { text: token, unitDisplayName: null, group: { unitType, count: Number(match[1]) } };
-  }
-  return { text: token, unitDisplayName: null };
-}
-
-/**
  * One victim token as a unit name, a collapsed group, or plain text.
  *
  * Purpose: A known display name wins even when it looks like `4x Infantry`.
- * When to use: Each comma-separated token of a cause line.
+ * When to use: Each comma-separated token of a cause line, and the current count on a destroyed-in-battle sentence.
  * Expected outcome: A unit segment, a group segment, or a plain segment. `group` is omitted unless it is a group.
  * Exceptions: None.
  */
