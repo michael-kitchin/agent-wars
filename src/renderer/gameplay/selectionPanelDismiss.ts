@@ -189,12 +189,14 @@ function cancelMercenaryDismiss(unitId: string, deps: MercenaryDismissCellDeps):
 function clearDismissedUnitDrafts(unitIds: readonly string[]): void {
   S.pendingRangedAttacks = draftsWithoutUnits(S.pendingRangedAttacks, unitIds);
   S.pendingAirStrikes = draftsWithoutUnits(S.pendingAirStrikes, unitIds);
+  S.pendingAirDrops = draftsWithoutUnits(S.pendingAirDrops, unitIds);
   S.pendingMissileLaunches = draftsWithoutUnits(S.pendingMissileLaunches, unitIds);
   S.pendingFerryOrders = draftsWithoutUnits(S.pendingFerryOrders, unitIds);
   S.pendingEmbarkOrders = draftsWithoutUnits(S.pendingEmbarkOrders, unitIds);
   S.hoverRoutePreview = null;
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
+  S.airDropModeActive = false;
   S.missileLaunchModeActive = false;
 }
 

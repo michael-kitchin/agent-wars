@@ -4,6 +4,9 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { findAirportFerryRoute } from '../../shared/airportFerryRoute';
+import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
@@ -11,9 +14,9 @@ import {
   effectiveTacticalMovementPointBudgetForMarchLeg,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
-import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
-import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
+import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { logInfo, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
@@ -25,10 +28,10 @@ import { airBaseHasIntactAirport, getInfra, type PossibleActionsIndexedState } f
  * Purpose: Ferry rows must match the ferry orders validation accepts, including the shorter range into snow the unit
  *   lacks when the weather bonus is on.
  * When to use: From `collectAggregatedPossibleActionRows` for strategic air units.
- * Expected outcome: Hexes other than the base that the unit's player controls, that have an airport, and that are
- *   within that unit's ferry range of the base. Callers must not re-apply range checks. Empty for non-air units and
- *   when the base airport is damaged. Falls back to scanning every known hex when the ferry disk cannot be built.
- * Exceptions: None; a failed disk is logged and handled by the fallback scan.
+ * Expected outcome: Hexes other than the base that a chain of the owner's intact airports can reach, one hop at a time.
+ *   An unmeasured hop still counts when the disk fallback includes it. Callers must not re-apply range checks. Empty
+ *   for non-air units and when the base airport is damaged.
+ * Exceptions: None.
  */
 export function collectLegalFerryDestinationHexes(
   unit: { id: string; h3Index: string; player: string; unitType: string; weatherTags?: readonly WeatherState[] },
@@ -38,38 +41,36 @@ export function collectLegalFerryDestinationHexes(
   logTrace('possibleUnitActions collectLegalFerryDestinationHexes', { unitId: unit.id, h3Index: unit.h3Index });
   if (unit.unitType !== 'air') return [];
   if (!airBaseHasIntactAirport(indexed, unit.h3Index)) return [];
-  let candidates: string[];
-  try {
-    candidates = gridDisk(unit.h3Index, AIR_FERRY_RANGE_HEXES).filter((h3) => indexed.hexSet.has(h3) && h3 !== unit.h3Index);
-  } catch (err) {
-    logInfo('possibleUnitActions collectLegalFerryDestinationHexes: gridDisk failed, scanning all hexes', {
-      unitId: unit.id,
-      h3Index: unit.h3Index,
-      err,
-    });
-    candidates = [];
-    for (const h3 of indexed.hexSet) {
-      if (h3 === unit.h3Index) continue;
-      if (isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry disk fallback', strategicFerryRangeOnState(unit, h3, state))) {
-        candidates.push(h3);
-      }
-    }
-  }
-  const out = new Set<string>();
-  for (const h3 of candidates) {
-    if (!isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry', strategicFerryRangeOnState(unit, h3, state))) continue;
-    if (getInfra(indexed, h3).airport <= 0) continue;
-    const snapshotController = indexed.controlByHex.get(h3) ?? null;
-    if (snapshotController !== unit.player) continue;
-    logHexControllerParityMismatch({
+  const nodes = [...indexed.hexSet]
+    .filter((h3) => getInfra(indexed, h3).airport > 0)
+    .map((h3) => ({
       h3Index: h3,
-      snapshotController,
+      owner: indexed.controlByHex.get(h3) ?? '',
+      intact: true,
+      neutralBorder: isNeutralBorderHex(h3),
+    }));
+  const out: string[] = [];
+  for (const node of nodes) {
+    if (node.h3Index === unit.h3Index || node.owner !== unit.player) continue;
+    const route = findAirportFerryRoute({
+      originH3Index: unit.h3Index,
+      destinationH3Index: node.h3Index,
+      owner: unit.player,
+      nodes,
+      gridDistance: computeGridDistancePure,
+      unmeasuredHopWithinRange: isWithinGridRangePure,
+      hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(unit, destinationH3Index, state),
+    });
+    if (!route.reachable) continue;
+    logHexControllerParityMismatch({
+      h3Index: node.h3Index,
+      snapshotController: node.owner,
       context: 'possibleUnitActions ferry destination',
       unitId: unit.id,
     });
-    out.add(h3);
+    out.push(node.h3Index);
   }
-  return [...out];
+  return out;
 }
 
 /**

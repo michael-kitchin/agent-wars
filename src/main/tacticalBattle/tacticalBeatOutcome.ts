@@ -6,7 +6,7 @@
  * Expected outcome: The stored battle plus the phase results the commit turns into playback.
  */
 
-import type { AirStrikeAnimationMove } from '../../shared/ipcTypes';
+import type { AirDropAnimationMove, AirStrikeAnimationMove } from '../../shared/ipcTypes';
 import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
@@ -104,6 +104,15 @@ export interface TacticalBeatOutcome {
    * Exceptions: None.
    */
   readonly airStrikePlaybackMoves: AirStrikeAnimationMove[];
+  /**
+   * Air-drop animation rows.
+   *
+   * Contract: Present when a drop resolved this beat. Missing means none.
+   * When to use: Playback assembly.
+   * Expected outcome: The air unit returns when it survived. The infantry id is set only when it landed.
+   * Exceptions: None.
+   */
+  readonly airDropPlaybackMoves?: readonly AirDropAnimationMove[];
   /**
    * Cells an air strike targeted.
    *

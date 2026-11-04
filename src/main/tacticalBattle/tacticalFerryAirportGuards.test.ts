@@ -138,6 +138,70 @@ test('applyTacticalFerryPhaseOnBattle destroys air when dest is illegal and orig
   assert.equal(next.removedUnits[0]!.id, unitId);
 });
 
+test('applyTacticalFerryPhaseOnBattle moves embarked infantry with the air unit and destroys that infantry with a lost origin', () => {
+  const moved = airFerryBattle({
+    battleId: 'tb-ferry-cargo-move',
+    originAirport: true,
+    destAirport: true,
+    player: 'human',
+  });
+  const carried = {
+    ...moved.battle,
+    subUnits: [
+      ...moved.battle.subUnits,
+      {
+        id: 'inf-1',
+        parentUnitId: 'p-inf-1',
+        player: 'human' as const,
+        unitType: 'infantry' as const,
+        h3Index: moved.origin,
+        displayName: 'Infantry',
+        embarkedOnSubUnitId: moved.unitId,
+      },
+    ],
+  };
+  const arrived = applyTacticalFerryPhaseOnBattle(
+    carried,
+    [{ unitId: moved.unitId, destinationH3Index: moved.dest }],
+    'human'
+  );
+  const infantry = arrived.battle.subUnits.find((unit) => unit.id === 'inf-1');
+  assert.equal(infantry?.h3Index, moved.dest);
+  assert.equal(infantry?.embarkedOnSubUnitId, moved.unitId);
+  assert.equal(arrived.removedUnits.length, 0);
+
+  const lost = airFerryBattle({
+    battleId: 'tb-ferry-cargo-destroy',
+    originAirport: true,
+    destAirport: false,
+    originRubble: true,
+    player: 'human',
+  });
+  const doomed = {
+    ...lost.battle,
+    subUnits: [
+      ...lost.battle.subUnits,
+      {
+        id: 'inf-1',
+        parentUnitId: 'p-inf-1',
+        player: 'human' as const,
+        unitType: 'infantry' as const,
+        h3Index: lost.origin,
+        displayName: 'Infantry',
+        embarkedOnSubUnitId: lost.unitId,
+      },
+    ],
+  };
+  const destroyed = applyTacticalFerryPhaseOnBattle(
+    doomed,
+    [{ unitId: lost.unitId, destinationH3Index: lost.dest }],
+    'human'
+  );
+  assert.equal(destroyed.battle.subUnits.some((unit) => unit.id === lost.unitId || unit.id === 'inf-1'), false);
+  assert.equal(destroyed.removedUnits.some((unit) => unit.id === lost.unitId), true);
+  assert.equal(destroyed.removedUnits.some((unit) => unit.id === 'inf-1'), true);
+});
+
 test('applyTacticalFerryPhaseOnBattle ferries air to an intact airport cell in the footprint', () => {
   const { battle, dest, unitId } = airFerryBattle({
     battleId: 'tb-ferry-ok-ap',

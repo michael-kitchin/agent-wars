@@ -17,6 +17,7 @@ import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherB
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
 import type { TerrainCover } from '../../shared/terrainCoverRules';
+import { embarkedLandIdsForCarriers } from './tacticalEmbarkedCargoSync';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
 
@@ -149,26 +150,24 @@ export interface TacticalAirStrikeOnUnitsInput {
 }
 
 /**
- * Lists tactical sub-unit ids to remove for one casualty, including cargo embarked on that naval sub.
+ * Lists tactical sub-unit ids to remove for one casualty, including cargo embarked on that naval or air sub.
  *
- * Purpose: Keeps naval sub-unit loss aligned with sealift cargo without expanding to sibling sub-units.
+ * Purpose: Keeps ship and air-unit loss aligned with embarked cargo without expanding to sibling sub-units.
  * When to use: `markTacticalSubUnitCasualty` when building the removal set for one strike victim.
- * Expected outcome: Victim id plus zero or more embarked land ids when the victim is naval.
+ * Expected outcome: Victim id plus embarked land ids when the victim is a naval or air sub-unit.
  * Exceptions: None.
  */
 function expandedRemovalIdsForVictim(subUnits: readonly TacticalSubUnitSnapshot[], victimId: string): string[] {
   const victim = subUnits.find((u) => u.id === victimId);
   const out = new Set<string>([victimId]);
-  if (victim?.unitType === 'naval') {
-    for (const u of subUnits) {
-      if (u.embarkedOnSubUnitId === victimId) out.add(u.id);
-    }
+  if (victim?.unitType === 'naval' || victim?.unitType === 'air') {
+    for (const id of embarkedLandIdsForCarriers(subUnits, new Set([victimId]))) out.add(id);
   }
   return [...out];
 }
 
 /**
- * Marks one tactical sub-unit (and land cargo embarked on that naval sub) for snapshot removal.
+ * Marks one tactical sub-unit (and land cargo embarked on that naval or air sub) for snapshot removal.
  *
  * Purpose: Enforces per-sub-unit tactical casualties without removing sibling sub-units of the same strategic parent.
  * When to use: Air strike and AA paths before `flushAirCasualties`; infra counterattacks pass empty killers to skip kill ledger rows.

@@ -98,6 +98,32 @@ test('human embark validation keeps the pre-database reasons', () => {
   );
 });
 
+test('an air sub-unit boards one infantry sub-unit and refuses a second', () => {
+  const first = validateTacticalHumanEmbarkOrder(
+    { unitId: 'inf-1', navalUnitId: 'air-1' },
+    [subUnit('inf-1', 'human', 'infantry', 'cell'), subUnit('air-1', 'human', 'air', 'cell')],
+    enclosing
+  );
+  assert.deepEqual(first, { valid: true });
+  const armor = validateTacticalHumanEmbarkOrder(
+    { unitId: 'arm-1', navalUnitId: 'air-1' },
+    [subUnit('arm-1', 'human', 'armor', 'cell'), subUnit('air-1', 'human', 'air', 'cell')],
+    enclosing
+  );
+  assert.equal(armor.valid, false);
+  const second = validateTacticalHumanEmbarkOrder(
+    { unitId: 'inf-2', navalUnitId: 'air-1' },
+    [
+      subUnit('inf-1', 'human', 'infantry', 'cell', 'air-1'),
+      subUnit('inf-2', 'human', 'infantry', 'cell'),
+      subUnit('air-1', 'human', 'air', 'cell'),
+    ],
+    enclosing
+  );
+  assert.equal(second.valid, false);
+  if (!second.valid) assert.equal(second.reason, 'An air unit has only one infantry slot.');
+});
+
 test('opponent embark validation keeps the pre-database reasons', () => {
   assertPreDatabaseOutcomes(
     validateTacticalOpponentEmbarkOrder,

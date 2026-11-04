@@ -57,7 +57,11 @@ export type MainMapDoubleClickDeps = {
   commitGroupedMarchOrders: (selectedIds: string[], destinationH3: string) => Promise<boolean>;
   showMapToast: (message: string, options?: { isError?: boolean }) => void;
   formatTargetingValidationReason: (reason: string | undefined, fallbackMessage: string) => string;
-  replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;
+  replacePendingFerryOrdersForSelected: (
+    selectedIds: string[],
+    destinationH3Index: string,
+    pathsByUnitId?: Readonly<Record<string, readonly string[]>>
+  ) => void;
   /**
    * Queues one air strike per snapshot unit, replacing any previous strike for those ids.
    *
@@ -71,6 +75,15 @@ export type MainMapDoubleClickDeps = {
     targetH3Index: string,
     targetType: AirStrikeTargetType
   ) => void;
+  /**
+   * Queues one air drop per snapshot unit, replacing a strike or ferry for those ids.
+   *
+   * Purpose: The double-click commit path records the drop.
+   * When to use: After `validateGroupAirDropTarget` succeeds.
+   * Expected outcome: `pendingAirDrops` holds the new rows for `selectedIds`.
+   * Exceptions: None.
+   */
+  replacePendingAirDropsForSelected: (selectedIds: string[], targetH3Index: string) => void;
   /**
    * Queues one ranged attack per snapshot unit, replacing any previous attack for those ids.
    *
@@ -159,7 +172,7 @@ export async function handleMainMapDoubleClick(
     deps.pointerHitsDrawnUnitIcon(event.clientX, event.clientY, destinationH3);
 
   const decisionInput: MapDoubleClickDecisionInput = {
-    targetingModeActive: S.rangedModeActive || S.airStrikeModeActive || S.missileLaunchModeActive,
+    targetingModeActive: S.rangedModeActive || S.airStrikeModeActive || S.airDropModeActive || S.missileLaunchModeActive,
     pointerHasHit: clickHit !== null,
     hasDestination: destinationH3 !== null,
     composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
@@ -172,6 +185,7 @@ export async function handleMainMapDoubleClick(
 
   let action = resolveMapDoubleClickAction(decisionInput);
   let ferryRejectionReason: string | undefined;
+  let ferryPathsByUnitId: Readonly<Record<string, readonly string[]>> | undefined;
 
   if (action.kind === 'ignore') {
     emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
@@ -198,6 +212,7 @@ export async function handleMainMapDoubleClick(
       destinationH3Index: destinationH3,
     });
     ferryRejectionReason = validation.reason;
+    ferryPathsByUnitId = validation.ferryPathsByUnitId;
     // Re-resolving with a settled `ferryEligible` cannot reach `ignore`: nothing else in the input changed.
     action = resolveMapDoubleClickAction({ ...decisionInput, ferryEligible: validation.success });
   }
@@ -266,6 +281,52 @@ export async function handleMainMapDoubleClick(
       }
       S.selectedHexIndex = clickHit;
       const idsAtStart = [...selectedIds];
+      if (S.airDropModeActive) {
+        if (!window.gameApi?.validateGroupAirDropTarget) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'support_target_api_missing' });
+          return;
+        }
+        const validation = await window.gameApi.validateGroupAirDropTarget({
+          unitIds: idsAtStart,
+          targetH3Index: clickHit,
+        });
+        if (!S.airDropModeActive || selectionUnitIdSetsDiffer(idsAtStart, S.selectedUnitIds)) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+            reason: 'targeting_changed_during_validation',
+            selectedCount: idsAtStart.length,
+          });
+          return;
+        }
+        if (!validation.success) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
+            reason: 'air_drop_target_rejected',
+            selectedCount: idsAtStart.length,
+            destinationH3: clickHit,
+          });
+          deps.showMapToast(
+            deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot drop infantry there.'),
+            { isError: true }
+          );
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
+        }
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {
+          ...acceptedDetails,
+          destinationH3: clickHit,
+          hasAirSelection: true,
+        });
+        deps.replacePendingAirDropsForSelected(idsAtStart, clickHit);
+        S.airDropModeActive = false;
+        deps.clearSelection();
+        S.hoverRoutePreview = null;
+        S.hoverPreviewRequestSeq++;
+        deps.updateRangedSidebar();
+        deps.hideStackCallout();
+        deps.updateSidebar();
+        deps.redraw();
+        return;
+      }
       if (S.missileLaunchModeActive) {
         await planMissileLaunchFromDoubleClick({ deps, clickHit, idsAtStart, acceptedDetails });
         return;
@@ -376,7 +437,7 @@ export async function handleMainMapDoubleClick(
         ...acceptedDetails,
         hasAirSelection: true,
       });
-      deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
+      deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3, ferryPathsByUnitId);
       deps.clearCommittedOrderDraftState();
       deps.updatePendingOrdersSidebar();
       deps.updateSidebar();

@@ -112,7 +112,7 @@ const REACH_BULLET =
  * Exceptions: None.
  */
 const AIR_STRIKE_BULLET =
-  '- An air sub-unit may strike any cell in the footprint or ferry to an intact airport cell in the footprint; it cannot strike and ferry in the same beat.';
+  '- An air sub-unit may strike or drop anywhere in the footprint, or ferry one hop to an intact airport cell. It carries one infantry sub-unit. A drop onto a cell fortified by the other side is illegal. It cannot strike and drop, or drop and ferry, in the same beat.';
 
 /**
  * Sealift still works inside the footprint.

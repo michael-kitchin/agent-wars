@@ -15,7 +15,6 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
-import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import {
   REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET,
   REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET,
@@ -286,9 +285,8 @@ async function run(): Promise<void> {
       if (hasAir) {
         assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
         assert.ok(
-          systemPrompt.includes(
-            `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
-          ),
+          systemPrompt.includes('hopping controlled intact airports') &&
+            systemPrompt.includes('plan_route confirms the chain'),
           `air-ops rules guidance missing for mask=${mask}`
         );
         assert.ok(
@@ -303,12 +301,15 @@ async function run(): Promise<void> {
         assert.ok(!systemPrompt.includes('# Air Operations Status'), `air-ops section must be omitted when roster has no air, mask=${mask}`);
         assert.ok(!systemPrompt.includes('airStrikes'), `airStrikes must be omitted when roster has no air, mask=${mask}`);
       }
-      if (hasNaval) {
+      if (hasNaval || hasAir) {
         assert.ok(systemPrompt.includes('# Naval Transport Status'), `naval transport missing for mask=${mask}`);
+      } else {
+        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when roster has no naval and no air, mask=${mask}`);
+      }
+      if (hasNaval) {
         assert.ok(systemPrompt.includes('transport_move'), `sealift actions missing for mask=${mask}`);
       } else {
-        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when roster has no naval, mask=${mask}`);
-        assert.ok(!systemPrompt.includes('transport_move'), `sealift actions must be omitted when roster has no naval, mask=${mask}`);
+        assert.ok(!systemPrompt.includes('transport_move'), `transport_move must be omitted when roster has no naval, mask=${mask}`);
       }
       assert.ok(
         systemPrompt.includes(`Global Earth map, H3 resolution ${mapData.H3_RESOLUTION}`),

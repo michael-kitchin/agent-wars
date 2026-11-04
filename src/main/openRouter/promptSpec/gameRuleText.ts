@@ -37,6 +37,7 @@ import {
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalTransportLink';
 import { originHitBonusForSource } from '../../../shared/originBonusRules';
+import { strategicFerryRangeHexes } from '../../../shared/weatherBonusRules';
 import { TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE } from '../../../shared/terrainBonusMarch';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import { buildTerrainCoverRule, buildWeatherRule } from './gameRuleEnvironmentText';
@@ -260,15 +261,15 @@ export function buildCombatStatsLine(
  * Purpose: The model cannot reason about firing then closing, ferry arriving after ground movement,
  * or cargo remaining on the transport until sync, from "ranged uses pre-move positions" alone.
  * When to use: Combat paragraph after the casualty rule.
- * Expected outcome: Strategic names embark, missile launches, air strikes, ranged fire, movement, cargo sync, ferry, then melee. Tactical omits missile launches, puts cargo sync after ferry, and notes that the beat has no production.
+ * Expected outcome: Both theaters name air drops immediately after air strikes. Strategic names embark, missile launches, air strikes, air drops, ranged fire, movement, ferry, cargo sync, then melee. Tactical omits missile launches and notes that the beat has no production.
  * Exceptions: None.
  */
 export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
   logTrace('promptSpec buildResolutionOrderRule', { mode });
   if (mode === 'tactical') {
-    return `This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step.`;
+    return `This beat resolves as embark, then air strikes, then air drops, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step.`;
   }
-  return 'This turn resolves as embark, then missile launches, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee.';
+  return 'This turn resolves as embark, then missile launches, then air strikes, then air drops, then ranged fire, then movement, then ferry, then cargo sync, then melee.';
 }
 
 /**
@@ -442,11 +443,15 @@ export function buildAirEmploymentRule(gates: GameRuleTextGates): string {
   logTrace('promptSpec buildAirEmploymentRule', { ...gates });
   if (!gates.hasAirUnits) return '';
   if (gates.coordinateMode === 'tactical') {
-    return 'An air unit may strike anywhere in the battle or ferry to an intact airport cell in the footprint; the strategic strike radius and 4-cell ferry hop do not apply. It cannot strike and ferry in the same beat.';
+    return 'An air unit strikes and drops anywhere in the battle footprint and ferries one hop between intact airport cells. An air sub-unit carries one infantry sub-unit. A drop onto a cell fortified by the other side is illegal. A drop onto an enemy cell is fought in melee if both remain.';
   }
+  const snowHop = strategicFerryRangeHexes({ weatherAtDestination: 'snow', tags: [], enabled: true });
   return (
-    `An air unit may strike a target within ${AIR_STRIKE_RANGE_HEXES} cells of its base (strike radius of ${AIR_STRIKE_RANGE_HEXES}) ` +
-    `and may ferry up to ${AIR_FERRY_RANGE_HEXES} cells. It cannot strike and ferry in the same turn.`
+    `An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${snowHop} into snow when the unit lacks the snow tag. ` +
+    `It strikes within ${AIR_STRIKE_RANGE_HEXES} hexes of its current airport. It does not strike from the end of a ferry on the same turn. ` +
+    `It carries one infantry unit. embark with that air unit's id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed. ` +
+    `airDrops lands that infantry on a land hex within ${AIR_STRIKE_RANGE_HEXES} of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered. ` +
+    'When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.'
   );
 }
 

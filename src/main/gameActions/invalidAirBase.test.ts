@@ -57,9 +57,29 @@ test('destroyAirUnitsWithInvalidBase still removes sole stranded human air on en
       'air',
       h,
     ]);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'human-inf-aboard',
+      'human',
+      'infantry',
+      h,
+    ]);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'human-inf-free',
+      'human',
+      'infantry',
+      h,
+    ]);
+    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'human-inf-aboard',
+      'human-air-stranded-solo',
+    ]);
     const removed = destroyAirUnitsWithInvalidBase();
     assert.ok(removed.some((u) => u.id === 'human-air-stranded-solo'));
+    assert.ok(removed.some((u) => u.id === 'human-inf-aboard'));
+    assert.equal(removed.some((u) => u.id === 'human-inf-free'), false);
     const gone = dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE id = ?', ['human-air-stranded-solo']);
     assert.strictEqual(gone?.c, 0);
+    assert.equal(dbGetOne('SELECT id FROM units WHERE id = ?', ['human-inf-aboard']), undefined);
+    assert.ok(dbGetOne('SELECT id FROM units WHERE id = ?', ['human-inf-free']));
   });
 });

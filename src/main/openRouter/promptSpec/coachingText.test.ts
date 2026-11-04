@@ -99,7 +99,8 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /recedes from the nearest enemy/i);
   assert.match(text, /move\/melee Target Hex is such an override/i);
   assert.match(text, /toward the fighting/i);
-  assert.match(text, /even when the unit is holding on defend/i);
+  assert.match(text, /no strike and no drop/i);
+  assert.match(text, /Prefer airlift when an airport chain reaches/i);
   assert.match(text, /cannot enter land cells/i);
   assert.match(text, /embark at a legal cell/i);
   assert.match(text, /queue is empty, queue something/i);
@@ -164,7 +165,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.doesNotMatch(text, /1\/2 point/);
   assert.doesNotMatch(text, /lowest-defense/i);
   assert.doesNotMatch(text, /Friendly units may stack/i);
-  assert.match(text, /strike any cell in the footprint/i);
+  assert.match(text, /strike or drop anywhere in the footprint/i);
   assert.match(text, /ferryOrders/);
   assert.match(text, /intact airport/i);
   assert.doesNotMatch(text, /not a legal destination/i);
@@ -183,7 +184,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
 });
 
 test('tactical conditional items disappear when their gate is off', () => {
-  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /strike any cell in the footprint/i);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /strike or drop anywhere in the footprint/i);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airStrikes/);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /ferryOrders/);
   assert.doesNotMatch(joined(tacticalGates({ hasNavalUnits: false })), /Naval Transport Status/i);

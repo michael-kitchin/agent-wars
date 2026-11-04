@@ -442,7 +442,7 @@ function testCanManualDebarkFromHexCoastalWaterPortAndOpenWater(): void {
 
  * Purpose: Ensures renderer selection guards can read embark state from strategic snapshots.
  * When to use: After edits to `unitSnapshotRead` or transport assignment schema.
- * Expected outcome: Embarked land unit row includes `embarkedOnNavalUnitId`; debarked land omits it.
+ * Expected outcome: Embarked land unit row includes `embarkedOnCarrierUnitId`; debarked land omits it.
  * Exceptions: None.
  */
 function testGameStateSnapshotIncludesEmbarkedOnNavalUnitId(): void {
@@ -456,10 +456,10 @@ function testGameStateSnapshotIncludesEmbarkedOnNavalUnitId(): void {
       'human-naval-snap',
     ]);
     const embarked = getGameState().units.find((u) => u.id === 'human-inf-snap');
-    assert.strictEqual(embarked?.embarkedOnNavalUnitId, 'human-naval-snap');
+    assert.strictEqual(embarked?.embarkedOnCarrierUnitId, 'human-naval-snap');
     clearEmbarkAssignmentForLandUnit('human-inf-snap');
     const debarked = getGameState().units.find((u) => u.id === 'human-inf-snap');
-    assert.ok(!debarked?.embarkedOnNavalUnitId);
+    assert.ok(!debarked?.embarkedOnCarrierUnitId);
   });
 }
 

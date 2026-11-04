@@ -88,12 +88,14 @@ test('capacity drops a type that costs more than twice the city cells', () => {
   assert.equal(unitCostFor('armor') > 20, true);
 });
 
-test('a missile, an embarked unit, a loaded ship, and a fortified Neutral hex are not candidates', () => {
+test('a missile, an embarked unit, a loaded ship, a loaded air unit, and a fortified Neutral hex are not candidates', () => {
   const evaluation = evaluateHexHire(buildHireContext(board({
     units: [
       unit('n-missile', NEUTRAL_OWNER_ID, 'missile', HEX),
       unit('n-rider', NEUTRAL_OWNER_ID, 'infantry', HEX, 'n-ship'),
       unit('n-ship', NEUTRAL_OWNER_ID, 'naval', HEX),
+      unit('n-air-rider', NEUTRAL_OWNER_ID, 'infantry', HEX, 'n-air'),
+      unit('n-air', NEUTRAL_OWNER_ID, 'air', HEX),
       unit('n-fort', NEUTRAL_OWNER_ID, 'infantry', OTHER),
     ],
     strategicControl: [{ h3Index: OTHER, controllerPlayerId: NEUTRAL_OWNER_ID }],
@@ -158,9 +160,9 @@ function unit(
   player: string,
   unitType: string,
   h3Index: string,
-  embarkedOnNavalUnitId?: string
+  embarkedOnCarrierUnitId?: string
 ): GameStateSnapshot['units'][number] {
-  return { id, player, unitType, h3Index, ...(embarkedOnNavalUnitId ? { embarkedOnNavalUnitId } : {}) };
+  return { id, player, unitType, h3Index, ...(embarkedOnCarrierUnitId ? { embarkedOnCarrierUnitId } : {}) };
 }
 
 /**

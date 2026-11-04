@@ -214,7 +214,7 @@ function testAboardCountsAssignedCargoNotCoLocatedLand(): void {
  *
  * Purpose: Happy path for embarked armor on the strategic sealift table.
  * When to use: After edits to strategic sealift row assembly.
- * Expected outcome: Armor 1 and capacity 2/2 when `embarkedOnNavalUnitId` points at the ship.
+ * Expected outcome: Armor 1 and capacity 2/2 when `embarkedOnCarrierUnitId` points at the ship.
  * Exceptions: Propagates assertion errors.
  */
 function testAboardShowsEmbarkedArmor(): void {
@@ -228,7 +228,7 @@ function testAboardShowsEmbarkedArmor(): void {
           player: 'opponent',
           unitType: 'armor',
           h3Index: WATER_NO_PORT,
-          embarkedOnNavalUnitId: 'opponent-naval-1',
+          embarkedOnCarrierUnitId: 'opponent-naval-1',
         },
       ],
     }),

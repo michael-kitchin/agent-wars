@@ -47,7 +47,7 @@ export interface EnvelopeGates {
    *
    * Contract: The air tails are only legal when there is an air unit that could fill them.
    * When to use: Set from the opponent roster the system prompt already inspected.
-   * Expected outcome: False omits `airStrikes` and `ferryOrders` from every envelope surface.
+   * Expected outcome: False omits `airStrikes`, `ferryOrders`, and `airDrops` from every envelope surface.
    * Exceptions: None.
    */
   readonly includeAirActions: boolean;
@@ -56,7 +56,7 @@ export interface EnvelopeGates {
    *
    * Contract: Omitted means false. Tactical mode never keeps the field even when this is true.
    * When to use: True only for a strategic consult whose roster includes a missile.
-   * Expected outcome: `missileLaunches` appears after `ferryOrders` when this is true and the mode is strategic.
+   * Expected outcome: `missileLaunches` appears after `airDrops` when this is true and the mode is strategic.
    * Exceptions: None.
    */
   readonly includeMissileActions?: boolean;
@@ -96,6 +96,15 @@ export interface EnvelopeGates {
    * Exceptions: None.
    */
   readonly includeExitBattle?: boolean;
+  /**
+   * Whether the opponent roster includes a naval unit.
+   *
+   * Contract: Omitted means true, so older callers still advertise ship movement.
+   * When to use: Set from the roster. False with no air omits embark, disembark, and transport_move.
+   * Expected outcome: `transport_move` stays only when this is true. Embark and disembark also stay when air is present.
+   * Exceptions: None.
+   */
+  readonly includeNavalActions?: boolean;
 }
 
 /**
@@ -113,6 +122,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'exitBattle',
   'airStrikes',
   'ferryOrders',
+  'airDrops',
   'missileLaunches',
   'callbacks',
   'memoryUpdates',
@@ -169,16 +179,6 @@ const SHARED_ORDER_ACTIONS: readonly string[] = [
 ];
 
 /**
- * Sealift verbs that are only legal when the opponent roster includes a naval unit.
- *
- * Purpose: Teaching embark/transport/disembark with no ship invites orders the model cannot fill.
- * When to use: Filtered out of `legalOrderActionsForMode` when `includeNavalActions` is false.
- * Expected outcome: These three names appear in the action list only when a naval unit exists.
- * Exceptions: None.
- */
-const SEALIFT_ORDER_ACTIONS: ReadonlySet<string> = new Set(['embark', 'transport_move', 'disembark']);
-
-/**
  * Returns the envelope keys that this consultation may advertise, in canonical order.
  *
  * Purpose: The system-prompt header, the example object, and the repair schema must name the same
@@ -194,7 +194,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
   return ENVELOPE_FIELD_ORDER.filter((field) => {
     if (ALWAYS_PRESENT_FIELDS.has(field)) return true;
     if (field === 'exitBattle') return gates.includeExitBattle === true;
-    if (field === 'airStrikes' || field === 'ferryOrders') return gates.includeAirActions;
+    if (field === 'airStrikes' || field === 'ferryOrders' || field === 'airDrops') return gates.includeAirActions;
     if (field === 'missileLaunches') return gates.coordinateMode !== 'tactical' && gates.includeMissileActions === true;
     if (field === 'memoryUpdates') return includeMemory;
     if (field === 'productionOrders') return includeProduction;
@@ -214,14 +214,24 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
 export function legalOrderActionsForMode(
   mode: PromptCoordinateMode,
   includeNavalActions = true,
-  includeStandingOrderActions = true
+  includeStandingOrderActions = true,
+  includeAirActions = false
 ): readonly string[] {
-  logTrace('promptSpec legalOrderActionsForMode', { mode, includeNavalActions, includeStandingOrderActions });
+  logTrace('promptSpec legalOrderActionsForMode', {
+    mode,
+    includeNavalActions,
+    includeStandingOrderActions,
+    includeAirActions,
+  });
   const includeStanding = mode === 'strategic' && includeStandingOrderActions;
   const actions = includeStanding
     ? [...STRATEGIC_ONLY_ORDER_ACTIONS, ...SHARED_ORDER_ACTIONS]
     : SHARED_ORDER_ACTIONS;
-  return includeNavalActions ? actions : actions.filter((action) => !SEALIFT_ORDER_ACTIONS.has(action));
+  return actions.filter((action) => {
+    if (action === 'transport_move') return includeNavalActions;
+    if (action === 'embark' || action === 'disembark') return includeNavalActions || includeAirActions;
+    return true;
+  });
 }
 
 /**
@@ -383,6 +393,8 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
       example.airStrikes = [{ unitId: 'a1-a1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {
       example.ferryOrders = [{ unitId: 'a1-a2', destination: 'CJ' }];
+    } else if (field === 'airDrops') {
+      example.airDrops = [{ unitId: 'a1-a2', destination: 'CK' }];
     } else if (field === 'missileLaunches') {
       example.missileLaunches = EXAMPLE_MISSILE_LAUNCHES;
     } else if (field === 'callbacks') {

@@ -58,7 +58,10 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
     bullets.push(ORDERLESS_BULLET);
     bullets.push(LEAVE_MISSIONS_BULLET);
   }
-  if (gates.hasAirUnits) bullets.push(IDLE_AIR_BULLET);
+  if (gates.hasAirUnits) {
+    bullets.push(IDLE_AIR_BULLET);
+    bullets.push(AIRLIFT_PREFERENCE_BULLET);
+  }
   if (gates.hasNavalUnits) {
     bullets.push(NAVAL_ROUTING_BULLET);
     bullets.push(SEALIFT_BULLET);
@@ -211,7 +214,7 @@ const LEAVE_MISSIONS_BULLET =
  * Exceptions: None.
  */
 const IDLE_AIR_BULLET =
-  '- For every air unit with no strike listed in Best Options, take its ferry Target Hex toward the fighting, but only when Air Operations Status shows that unit\'s Base Intact and Base Controlled columns as yes. Issue that ferry even when the unit is holding on defend. An air unit cannot strike and ferry on the same turn.';
+  '- For every air unit with no strike and no drop, ferry along owned airports toward the fighting, but only when Air Operations Status shows that unit\'s Base Intact and Base Controlled columns as yes. Air-drop embarked infantry onto the fight when the target is within 3 and a land march cannot reach it this turn. An air unit cannot strike and drop, or drop and ferry, on the same turn.';
 
 /**
  * Naval units reach land targets from water or coastal cells.
@@ -234,6 +237,17 @@ const NAVAL_ROUTING_BULLET =
  */
 const SEALIFT_BULLET =
   '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
+
+/**
+ * Airlift is the faster crossing when an airport chain already reaches.
+ *
+ * Purpose: A ship remains available. The model should not wait on it when air can arrive sooner.
+ * When to use: When the roster has air, including a roster with no ships.
+ * Expected outcome: One sentence. Ship embark coaching stays on its own bullet.
+ * Exceptions: None.
+ */
+const AIRLIFT_PREFERENCE_BULLET =
+  '- Prefer airlift when an airport chain reaches and a ship would take longer.';
 
 /**
  * Keep production queued, including the cap-swap rule.

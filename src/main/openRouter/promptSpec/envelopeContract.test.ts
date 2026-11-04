@@ -70,7 +70,7 @@ function isSubsequence(actual: readonly string[], expected: readonly string[]): 
   return true;
 }
 
-test('ENVELOPE_FIELD_ORDER is the canonical ten-field sequence', () => {
+test('ENVELOPE_FIELD_ORDER is the canonical field sequence', () => {
   assert.deepEqual(ENVELOPE_FIELD_ORDER, [
     'message',
     'strategy',
@@ -78,6 +78,7 @@ test('ENVELOPE_FIELD_ORDER is the canonical ten-field sequence', () => {
     'exitBattle',
     'airStrikes',
     'ferryOrders',
+    'airDrops',
     'missileLaunches',
     'callbacks',
     'memoryUpdates',
@@ -175,6 +176,10 @@ test('legalOrderActionsForMode omits standing-order actions in tactical', () => 
   assert.ok(!noNaval.includes('embark'));
   assert.ok(!noNaval.includes('transport_move'));
   assert.ok(!noNaval.includes('disembark'));
+  const airWithoutShips = legalOrderActionsForMode('strategic', false, true, true);
+  assert.ok(airWithoutShips.includes('embark'));
+  assert.ok(airWithoutShips.includes('disembark'));
+  assert.ok(!airWithoutShips.includes('transport_move'));
   assert.ok(noNaval.includes('explicit_move'));
   const noStanding = legalOrderActionsForMode('strategic', true, false);
   assert.ok(!noStanding.includes('assign_order'));
@@ -340,7 +345,8 @@ test('missileLaunches is strategic and only present when the flag is on', () => 
     includeProductionOrders: false,
   });
   assert.ok(on.includes('missileLaunches'));
-  assert.equal(on.indexOf('missileLaunches'), on.indexOf('ferryOrders') + 1);
+  assert.equal(on.indexOf('airDrops'), on.indexOf('ferryOrders') + 1);
+  assert.equal(on.indexOf('missileLaunches'), on.indexOf('airDrops') + 1);
   const off = envelopeFieldsForGates({
     coordinateMode: 'strategic',
     includeAirActions: true,

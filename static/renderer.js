@@ -15413,6 +15413,15 @@
        */
     pendingAirStrikes: [],
     /**
+     * Queued air drops the next Ready will send.
+     *
+     * Purpose: Holds a drop until Ready submits it, or until that air unit is given a strike or a ferry.
+     * When to use: Written when a drop is planned or cancelled. Read by the Orders tab and the map arrow.
+     * Expected outcome: Empty until the player double-clicks a land hex while air-drop aiming is on.
+     * Exceptions: None.
+     */
+    pendingAirDrops: [],
+    /**
     * Queued missile launches the next Ready will send.
     *
     * Purpose: Holds the human's aimed launches until Ready submits them or a new game clears them.
@@ -15475,6 +15484,15 @@
        * Exceptions: None.
        */
     airStrikeModeActive: false,
+    /**
+     * Whether the next double-click queues an air drop.
+     *
+     * Purpose: The air-drop button aims this. It is separate from the strike reticle.
+     * When to use: Set by that button. Cleared by a second click, an empty selection, or a queued drop.
+     * Expected outcome: True only while the player is choosing a landing hex.
+     * Exceptions: None.
+     */
+    airDropModeActive: false,
     /**
     * Whether the reticle is aiming a missile launch.
     *
@@ -20788,7 +20806,7 @@ ${bonuses}`;
     return controller !== viewerSeatId2;
   }
   function shipIsCarryingCargo(unitId) {
-    return (rendererSharedState.gameState?.units ?? []).some((unit) => unit.embarkedOnNavalUnitId === unitId);
+    return (rendererSharedState.gameState?.units ?? []).some((unit) => unit.embarkedOnCarrierUnitId === unitId);
   }
   function tooltipUnitFacts(unitId) {
     const battle = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
@@ -20809,7 +20827,7 @@ ${bonuses}`;
     const forHire = placed != null && neutralUnitOfferedForRehire({
       ownerId: placed.player,
       unitType: placed.unitType,
-      embarked: (placed.embarkedOnNavalUnitId ?? "").length > 0,
+      embarked: (placed.embarkedOnCarrierUnitId ?? "").length > 0,
       carryingCargo: shipIsCarryingCargo(placed.id),
       fortifiedByAnotherSide: hexFortifiedByAnotherSide(placed.h3Index, viewerSeatId2)
     });
@@ -22046,6 +22064,9 @@ ${bonuses}`;
   var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
   var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
   var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
+  var airDropAimTooltipText = "Aim an air drop. Double-click a land hex within strike range. The carried infantry lands there, and the air unit returns to its airport.";
+  var airDropStopTooltipText = "Stop aiming an air drop. Drops already in the list stay there.";
+  var airDropDisabledTooltipText = "Air drop needs every selected air unit to be carrying infantry.";
   var launchAimTooltipText = "Aim a missile launch. Turn this on, then double-click any explored hex in range. Each missile launches once.";
   var launchStopTooltipText = "Stop aiming a missile launch. Launches already in the list stay there.";
   function supportButtonTooltipText(kind, aiming) {
@@ -23623,7 +23644,7 @@ ${bonuses}`;
     }
     const unit = rendererSharedState.gameState?.units.find((u) => u.id === unitId);
     if (!unit || unit.unitType !== "infantry" && unit.unitType !== "armor") return false;
-    return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+    return !!(unit.embarkedOnCarrierUnitId && unit.embarkedOnCarrierUnitId.length > 0);
   }
   function shouldBlockEmbarkedLandUnitSelect(unitId) {
     if (!isEmbarkedLandUnitBlockedForSelection(unitId)) return false;
@@ -23660,6 +23681,7 @@ ${bonuses}`;
       rendererSharedState.hoverPreviewRequestSeq++;
       rendererSharedState.rangedModeActive = false;
       rendererSharedState.airStrikeModeActive = false;
+      rendererSharedState.airDropModeActive = false;
       rendererSharedState.missileLaunchModeActive = false;
       return;
     }
@@ -26717,8 +26739,9 @@ ${bonuses}`;
     if (low.includes("database not initialized") || low.includes("unavailable") || low.includes("no selected units")) {
       return null;
     }
-    if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
+    if (low.includes("out of range") || low.includes("out of ferry range") || low.includes("within ferry range")) return "Blocked: Range";
     if (low.includes("ferry destination must be a human-controlled airport")) return "Blocked: Invalid";
+    if (low.includes("controlled by unit owner")) return "Blocked: Invalid";
     if (low.includes("ferry destination must have an intact airport")) return "Blocked: Invalid";
     if (low.includes("destination airport is not intact")) return "Blocked: Invalid";
     if (low.includes("origin airport is not intact")) return "Blocked: Invalid";
@@ -27201,7 +27224,9 @@ ${bonuses}`;
           noneOption.value = "";
           noneOption.textContent = "(none)";
           select.appendChild(noneOption);
-          for (const option2 of state.landOptions) {
+          const carrierType2 = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
+          const options = carrierType2 === "air" ? state.landOptions.filter((option2) => option2.unitType === "infantry") : state.landOptions;
+          for (const option2 of options) {
             const opt = document.createElement("option");
             opt.value = option2.unitId;
             opt.textContent = buildSealiftUnitLabel(option2.unitId, option2.unitType);
@@ -27318,7 +27343,10 @@ ${bonuses}`;
           right.appendChild(slotRow);
         };
         addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
-        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+        const carrierType = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
+        if (carrierType !== "air") {
+          addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+        }
         rowEl.appendChild(right);
         section.appendChild(rowEl);
       }
@@ -31259,7 +31287,7 @@ ${bonuses}`;
     });
   }
   function renderSelectionBarState() {
-    const aim = rendererSharedState.missileLaunchModeActive ? "launch" : rendererSharedState.airStrikeModeActive ? "strike" : rendererSharedState.rangedModeActive ? "ranged" : null;
+    const aim = rendererSharedState.missileLaunchModeActive ? "launch" : rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive ? "strike" : rendererSharedState.rangedModeActive ? "ranged" : null;
     const panel = document.getElementById("selection-panel");
     if (panel) {
       if (aim) panel.dataset.aim = aim;
@@ -31337,12 +31365,14 @@ ${bonuses}`;
   function clearDismissedUnitDrafts(unitIds) {
     rendererSharedState.pendingRangedAttacks = draftsWithoutUnits(rendererSharedState.pendingRangedAttacks, unitIds);
     rendererSharedState.pendingAirStrikes = draftsWithoutUnits(rendererSharedState.pendingAirStrikes, unitIds);
+    rendererSharedState.pendingAirDrops = draftsWithoutUnits(rendererSharedState.pendingAirDrops, unitIds);
     rendererSharedState.pendingMissileLaunches = draftsWithoutUnits(rendererSharedState.pendingMissileLaunches, unitIds);
     rendererSharedState.pendingFerryOrders = draftsWithoutUnits(rendererSharedState.pendingFerryOrders, unitIds);
     rendererSharedState.pendingEmbarkOrders = draftsWithoutUnits(rendererSharedState.pendingEmbarkOrders, unitIds);
     rendererSharedState.hoverRoutePreview = null;
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
+    rendererSharedState.airDropModeActive = false;
     rendererSharedState.missileLaunchModeActive = false;
   }
   async function confirmMercenaryDismiss(unitId, deps) {
@@ -32460,12 +32490,15 @@ ${bonuses}`;
       humanStandingOrders: [...rendererSharedState.humanStandingOrders],
       pendingRangedAttacks: [...rendererSharedState.pendingRangedAttacks],
       pendingAirStrikes: [...rendererSharedState.pendingAirStrikes],
+      pendingAirDrops: [...rendererSharedState.pendingAirDrops],
       pendingMissileLaunches: [...rendererSharedState.pendingMissileLaunches],
       pendingFerryOrders: [...rendererSharedState.pendingFerryOrders]
     };
     rendererSharedState.humanStandingOrders = [];
     rendererSharedState.pendingRangedAttacks = [];
     rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingAirDrops = [];
+    rendererSharedState.airDropModeActive = false;
     rendererSharedState.pendingMissileLaunches = [];
     rendererSharedState.pendingFerryOrders = [];
     rendererSharedState.pendingEmbarkOrders = [];
@@ -32491,6 +32524,10 @@ ${bonuses}`;
     );
     rendererSharedState.pendingAirStrikes = restoreDraftRowsForLivingUnits(
       strategicOrderDraftStash.pendingAirStrikes,
+      livingUnitIds
+    );
+    rendererSharedState.pendingAirDrops = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingAirDrops,
       livingUnitIds
     );
     rendererSharedState.pendingMissileLaunches = restoreDraftRowsForLivingUnits(
@@ -32639,6 +32676,9 @@ ${bonuses}`;
   }
   function formatPendingRangedAttackSidebarLabel(state, order, battle) {
     return formatUnitToTargetDetail(state, order.unitId, order.targetH3Index, battle, null);
+  }
+  function formatPendingAirDropSidebarLabel(state, order, battle) {
+    return formatUnitToTargetDetail(state, order.unitId, order.targetH3Index, battle, "Air drop");
   }
   function formatPendingAirStrikeSidebarLabel(state, order, battle) {
     return formatUnitToTargetDetail(
@@ -33864,6 +33904,26 @@ ${bonuses}`;
         });
         return;
       }
+      if (rendererSharedState.airDropModeActive) {
+        const validateDrop = window.gameApi?.validateGroupAirDropTarget;
+        if (!validateDrop) {
+          publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+          return;
+        }
+        const validation = await validateDrop({ unitIds, targetH3Index: hoveredH3 });
+        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+        publishGroupedSupportTargetingPreview({
+          deps,
+          hoveredH3,
+          unitIds,
+          validation,
+          supportKind: "air",
+          originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
+          allowBlockingOrderTooltip
+        });
+        return;
+      }
       if (rendererSharedState.airStrikeModeActive) {
         const validateAir = getValidateGroupAirStrikeTarget();
         if (!validateAir) {
@@ -33940,6 +34000,26 @@ ${bonuses}`;
       });
       return;
     }
+    if (rendererSharedState.airDropModeActive) {
+      const validateDrop = window.gameApi?.validateGroupAirDropTarget;
+      if (!validateDrop) {
+        publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const validation = await validateDrop({ unitIds, targetH3Index: hoveredH3 });
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
+        deps,
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: "air",
+        originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
+        allowBlockingOrderTooltip
+      });
+      return;
+    }
     if (rendererSharedState.airStrikeModeActive) {
       const validateAir = getValidateGroupAirStrikeTarget();
       if (!validateAir) {
@@ -33999,6 +34079,46 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/tacticalOrders.ts
+  function infantryAboardCountByCarrier() {
+    const counts = /* @__PURE__ */ new Map();
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      for (const unit of battle.subUnits) {
+        if (unit.unitType !== "infantry" || !unit.embarkedOnSubUnitId) continue;
+        counts.set(unit.embarkedOnSubUnitId, (counts.get(unit.embarkedOnSubUnitId) ?? 0) + 1);
+      }
+      return counts;
+    }
+    for (const unit of rendererSharedState.gameState?.units ?? []) {
+      if (unit.unitType !== "infantry" || !unit.embarkedOnCarrierUnitId) continue;
+      counts.set(unit.embarkedOnCarrierUnitId, (counts.get(unit.embarkedOnCarrierUnitId) ?? 0) + 1);
+    }
+    return counts;
+  }
+  function selectedHumanUnits() {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    return rendererSharedState.selectedUnitIds.flatMap((id) => {
+      if (battle) {
+        const unit2 = battle.subUnits.find((row) => row.id === id && row.player === HUMAN_SEAT_ID);
+        return unit2 ? [{ id: unit2.id, unitType: unit2.unitType }] : [];
+      }
+      const unit = rendererSharedState.gameState?.units.find((row) => row.id === id && row.player === HUMAN_SEAT_ID);
+      return unit ? [{ id: unit.id, unitType: unit.unitType }] : [];
+    });
+  }
+  function airDropButtonState() {
+    const selected = selectedHumanUnits();
+    if (selected.length === 0 || selected.some((unit) => unit.unitType !== "air")) {
+      return { visible: false, enabled: false };
+    }
+    const counts = infantryAboardCountByCarrier();
+    const carrying = selected.filter((unit) => (counts.get(unit.id) ?? 0) >= 1);
+    return { visible: carrying.length > 0, enabled: carrying.length === selected.length };
+  }
+  function forgetAirDropsFor(unitIds) {
+    const ids = new Set(unitIds);
+    rendererSharedState.pendingAirDrops = rendererSharedState.pendingAirDrops.filter((row) => !ids.has(row.unitId));
+  }
   var SUPPORT_BUTTON_NAMES = Object.freeze({
     ranged: "Ranged attack",
     strike: "Air strike",
@@ -34030,6 +34150,20 @@ ${bonuses}`;
       selectedIds,
       (unitId) => ({ unitId, targetH3Index, targetType })
     );
+    forgetAirDropsFor(selectedIds);
+  }
+  function replacePendingAirDropsForSelected(selectedIds, targetH3Index) {
+    const ids = new Set(selectedIds);
+    rendererSharedState.pendingAirStrikes = rendererSharedState.pendingAirStrikes.filter((row) => !ids.has(row.unitId));
+    rendererSharedState.pendingFerryOrders = rendererSharedState.pendingFerryOrders.filter((row) => !ids.has(row.unitId));
+    replacePendingOrdersForSelected(
+      () => rendererSharedState.pendingAirDrops,
+      (next) => {
+        rendererSharedState.pendingAirDrops = next;
+      },
+      selectedIds,
+      (unitId) => ({ unitId, targetH3Index })
+    );
   }
   function replacePendingMissileLaunchesForSelected(selectedIds, targetH3Index) {
     replacePendingOrdersForSelected(
@@ -34041,7 +34175,7 @@ ${bonuses}`;
       (unitId) => ({ unitId, targetH3Index })
     );
   }
-  function replacePendingFerryOrdersForSelected(selectedIds, destinationH3Index) {
+  function replacePendingFerryOrdersForSelected(selectedIds, destinationH3Index, pathsByUnitId) {
     const alreadyBased = new Set(
       selectedIds.filter(
         (unitId) => rendererSharedState.gameState?.units.some((unit) => unit.id === unitId && unit.h3Index === destinationH3Index)
@@ -34054,14 +34188,21 @@ ${bonuses}`;
         rendererSharedState.pendingFerryOrders = next;
       },
       movingIds,
-      (unitId) => ({ unitId, destinationH3Index })
+      (unitId) => ({
+        unitId,
+        destinationH3Index,
+        pathH3Indexes: pathsByUnitId?.[unitId]
+      })
     );
+    forgetAirDropsFor(movingIds);
   }
   function clearPendingTacticalOrders() {
     rendererSharedState.pendingRangedAttacks = [];
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.pendingAirStrikes = [];
     rendererSharedState.airStrikeModeActive = false;
+    rendererSharedState.pendingAirDrops = [];
+    rendererSharedState.airDropModeActive = false;
     rendererSharedState.pendingMissileLaunches = [];
     rendererSharedState.missileLaunchModeActive = false;
     rendererSharedState.pendingFerryOrders = [];
@@ -34096,6 +34237,11 @@ ${bonuses}`;
   function cancelAirStrikeForUnit(unitId, deps) {
     rendererSharedState.pendingAirStrikes = rendererSharedState.pendingAirStrikes.filter((r) => r.unitId !== unitId);
     rendererSharedState.airStrikeModeActive = false;
+    finishTargetingDraftCancel(unitId, deps);
+  }
+  function cancelAirDropForUnit(unitId, deps) {
+    rendererSharedState.pendingAirDrops = rendererSharedState.pendingAirDrops.filter((row) => row.unitId !== unitId);
+    rendererSharedState.airDropModeActive = false;
     finishTargetingDraftCancel(unitId, deps);
   }
   function cancelMissileLaunchForUnit(unitId, deps) {
@@ -34148,14 +34294,24 @@ ${bonuses}`;
     if (strikeListEl) {
       renderSidebarOrderGroup(
         "strike",
-        rendererSharedState.pendingAirStrikes.map(
-          (strike) => sidebarOrderRowArgs(
-            strike.unitId,
-            formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, battle),
-            () => cancelAirStrikeForUnit(strike.unitId, deps),
-            deps
+        [
+          ...rendererSharedState.pendingAirStrikes.map(
+            (strike) => sidebarOrderRowArgs(
+              strike.unitId,
+              formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, battle),
+              () => cancelAirStrikeForUnit(strike.unitId, deps),
+              deps
+            )
+          ),
+          ...rendererSharedState.pendingAirDrops.map(
+            (drop) => sidebarOrderRowArgs(
+              drop.unitId,
+              formatPendingAirDropSidebarLabel(rendererSharedState.gameState, drop, battle),
+              () => cancelAirDropForUnit(drop.unitId, deps),
+              deps
+            )
           )
-        )
+        ]
       );
     }
     if (launchListEl) {
@@ -34175,6 +34331,7 @@ ${bonuses}`;
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const rangedWasActive = rendererSharedState.rangedModeActive;
       const strikeWasActive = rendererSharedState.airStrikeModeActive;
+      const dropWasActive = rendererSharedState.airDropModeActive;
       const launchWasActive = rendererSharedState.missileLaunchModeActive;
       const unitTypes = selectedUnitTypes();
       const mode = selectionSupportButtonMode(unitTypes, !!tb);
@@ -34214,7 +34371,27 @@ ${bonuses}`;
         rendererSharedState.missileLaunchModeActive = false;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
       }
-      const targetingModeCleared = rangedWasActive && !rendererSharedState.rangedModeActive || strikeWasActive && !rendererSharedState.airStrikeModeActive || launchWasActive && !rendererSharedState.missileLaunchModeActive;
+      const dropButton = document.getElementById("air-drop-btn");
+      const dropHost = document.getElementById("air-drop-tip-host");
+      const dropState = airDropButtonState();
+      if (!dropState.visible) rendererSharedState.airDropModeActive = false;
+      if (dropButton && dropHost) {
+        dropHost.style.display = dropState.visible ? "" : "none";
+        dropButton.disabled = !dropState.enabled;
+        dropButton.setAttribute("aria-pressed", String(rendererSharedState.airDropModeActive));
+        dropButton.setAttribute("aria-label", "Air drop");
+        if (!dropState.enabled) {
+          dropHost.setAttribute("data-control-tooltip", airDropDisabledTooltipText);
+          dropButton.removeAttribute("data-control-tooltip");
+        } else {
+          dropHost.removeAttribute("data-control-tooltip");
+          dropButton.setAttribute(
+            "data-control-tooltip",
+            rendererSharedState.airDropModeActive ? airDropStopTooltipText : airDropAimTooltipText
+          );
+        }
+      }
+      const targetingModeCleared = rangedWasActive && !rendererSharedState.rangedModeActive || strikeWasActive && !rendererSharedState.airStrikeModeActive || dropWasActive && !rendererSharedState.airDropModeActive || launchWasActive && !rendererSharedState.missileLaunchModeActive;
       if (targetingModeCleared) {
         rendererSharedState.hoverRoutePreview = null;
         showOrderBlockHexTooltip(null);
@@ -34787,17 +34964,11 @@ ${bonuses}`;
       const unit = units.find((u) => u.id === ferry.unitId);
       if (!unit) continue;
       if (unit.h3Index === ferry.destinationH3Index) continue;
-      const [originLat, originLng] = cellToLatLng(unit.h3Index);
-      const [destLat, destLng] = cellToLatLng(ferry.destinationH3Index);
-      drawHumanMarchStyleRouteSegments(ctx, [
-        {
-          turn: 1,
-          hexes: [
-            [originLat, originLng],
-            [destLat, destLng]
-          ]
-        }
-      ]);
+      const points = (ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2 ? ferry.pathH3Indexes : [unit.h3Index, ferry.destinationH3Index]).map((hex) => {
+        const [lat, lng] = cellToLatLng(hex);
+        return [lat, lng];
+      });
+      drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
     }
   }
   function buildResolutionPlaybackMoves(moves, units) {
@@ -34838,6 +35009,42 @@ ${bonuses}`;
       toH3Index: move.fromH3Index
     }));
   }
+  function buildAirDropOutboundPlaybackMoves(moves) {
+    if (!moves || moves.length === 0) return [];
+    const outbound = [];
+    for (const move of moves) {
+      outbound.push({
+        unitId: move.unitId,
+        player: move.player,
+        unitType: "air",
+        fromH3Index: move.fromH3Index,
+        toH3Index: move.targetH3Index
+      });
+      if (move.infantryUnitId) {
+        outbound.push({
+          unitId: move.infantryUnitId,
+          player: move.player,
+          unitType: "infantry",
+          fromH3Index: move.fromH3Index,
+          toH3Index: move.targetH3Index
+        });
+      }
+    }
+    return outbound;
+  }
+  function buildAirDropReturnPlaybackMoves(moves) {
+    if (!moves || moves.length === 0) return [];
+    return moves.filter((move) => move.returnsToBase).map((move) => ({
+      unitId: move.unitId,
+      player: move.player,
+      unitType: "air",
+      fromH3Index: move.targetH3Index,
+      toH3Index: move.fromH3Index
+    }));
+  }
+  function drawAirDropLines(ctx, drops, units, hexList) {
+    drawPendingSupportOrderLines(ctx, "airStrike", drops, units, hexList);
+  }
 
   // src/renderer/rendering/orderOverlayStages.ts
   function drawPendingSupportOrderOverlays(ctx, width, height, state, hexList) {
@@ -34847,6 +35054,9 @@ ${bonuses}`;
     }
     if (rendererSharedState.pendingAirStrikes.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
       drawAirStrikeLines(ctx, rendererSharedState.pendingAirStrikes, unitsForOrderLines, hexList);
+    }
+    if (rendererSharedState.pendingAirDrops.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
+      drawAirDropLines(ctx, rendererSharedState.pendingAirDrops, unitsForOrderLines, hexList);
     }
     if (rendererSharedState.pendingMissileLaunches.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
       drawMissileLaunchLines(ctx, rendererSharedState.pendingMissileLaunches, unitsForOrderLines, hexList);
@@ -34966,11 +35176,11 @@ ${bonuses}`;
   // src/renderer/rendering/rangePerimeterOverlay.ts
   var rangePerimeterAnimationTickInFlight = false;
   function isRangePerimeterModeActive() {
-    return rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive;
+    return rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive;
   }
   function buildRangePerimeterSignature() {
     if (!isRangePerimeterModeActive()) return "";
-    const mode = rendererSharedState.airStrikeModeActive ? "air" : "ranged";
+    const mode = rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive ? "air" : "ranged";
     const battleKey = rendererSharedState.tacticalBattleSnapshot?.enclosingStrategicH3Index ?? "strategic";
     const ids = [...rendererSharedState.selectedUnitIds].sort().join(",");
     return `${mode}|${battleKey}|${ids}`;
@@ -34983,7 +35193,7 @@ ${bonuses}`;
       const selected2 = tactical.subUnits.filter((s) => rendererSharedState.selectedUnitIds.includes(s.id));
       if (selected2.length === 0) return null;
       try {
-        if (rendererSharedState.airStrikeModeActive) return buildTacticalAirStrikeRangeSet(footprint2);
+        if (rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive) return buildTacticalAirStrikeRangeSet(footprint2);
         return buildTacticalRangedRangeSet(tactical, selected2, footprint2);
       } catch (err) {
         console.error("computeSelectedRangeHexSetFromState tactical failed", err);
@@ -34999,7 +35209,7 @@ ${bonuses}`;
       unitType: u.unitType
     }));
     try {
-      if (rendererSharedState.airStrikeModeActive) return buildStrategicAirStrikeRangeSet(units);
+      if (rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive) return buildStrategicAirStrikeRangeSet(units);
       return buildStrategicRangedRangeSet(units);
     } catch (err) {
       console.error("computeSelectedRangeHexSetFromState strategic failed", err);
@@ -35070,7 +35280,7 @@ ${bonuses}`;
     refreshRangePerimeterCacheIfNeeded();
     const loops = rendererSharedState.rangePerimeterLoopsLatLng;
     if (!loops?.length) return;
-    const style = rangePerimeterStaticLineStyle(rendererSharedState.airStrikeModeActive ? "airStrike" : "ranged", "perimeter");
+    const style = rangePerimeterStaticLineStyle(rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive ? "airStrike" : "ranged", "perimeter");
     const patternLength = style.dash[0] + style.dash[1];
     const phase = patternLength > 0 ? -(performance.now() / 1e3 * RANGE_PERIMETER_FLOW_PX_PER_SEC % patternLength) : 0;
     const refLng = resolveReferenceLngForPerimeter();
@@ -38402,7 +38612,7 @@ ${bonuses}`;
   // src/shared/ipc/tacticalOpponentPlanMerge.ts
   function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
     if (plan == null) return false;
-    return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + plan.ferryOrders.length + plan.embarkOrders.length > 0;
+    return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + (plan.airDropOrders?.length ?? 0) + plan.ferryOrders.length + plan.embarkOrders.length > 0;
   }
   function tacticalDraftAlreadyDecided(plan) {
     return tacticalOpponentPlanPayloadHasAnyOrders(plan) || plan?.exitBattle === true;
@@ -38714,6 +38924,7 @@ ${bonuses}`;
       movementOrders,
       rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
       airStrikes: [...rendererSharedState.pendingAirStrikes],
+      airDropOrders: [...rendererSharedState.pendingAirDrops],
       ferryOrders: [...rendererSharedState.pendingFerryOrders],
       embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
       useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
@@ -38743,8 +38954,14 @@ ${bonuses}`;
         unitType: u.unitType,
         h3Index: u.h3Index
       })) : void 0;
-      const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
-      const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
+      const airStrikeOutboundMoves = [
+        ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
+        ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves)
+      ];
+      const airStrikeReturnMoves = [
+        ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
+        ...buildAirDropReturnPlaybackMoves(playback.airDropMoves)
+      ];
       rendererSharedState.resolutionMoveAnimation = {
         moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
         startTime: Date.now(),
@@ -38794,11 +39011,13 @@ ${bonuses}`;
     }) : [];
     rendererSharedState.pendingRangedAttacks = [];
     rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingAirDrops = [];
     rendererSharedState.pendingMissileLaunches = [];
     rendererSharedState.pendingFerryOrders = [];
     rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
+    rendererSharedState.airDropModeActive = false;
     rendererSharedState.missileLaunchModeActive = false;
     try {
       const refreshedStrategic = await fetchMatchSnapshot();
@@ -39047,14 +39266,15 @@ ${bonuses}`;
       }
       if (await runTacticalReadyCommit({ deps, matchEpoch })) return;
       const turnReportTag = currentConsoleReportTag();
-      const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingMissileLaunches.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
+      const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingMissileLaunches.length > 0 || rendererSharedState.pendingFerryOrders.length > 0 || rendererSharedState.pendingAirDrops.length > 0;
       if (hasPendingDraftOrders) {
         const submitResult = await window.gameApi.submitOrders({
           movementOrders: [],
           rangedAttacks: rendererSharedState.pendingRangedAttacks,
           airStrikes: rendererSharedState.pendingAirStrikes,
           missileLaunches: rendererSharedState.pendingMissileLaunches,
-          ferryOrders: rendererSharedState.pendingFerryOrders
+          ferryOrders: rendererSharedState.pendingFerryOrders,
+          airDropOrders: rendererSharedState.pendingAirDrops
         });
         if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!submitResult.success) {
@@ -39153,8 +39373,14 @@ ${bonuses}`;
       );
       const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
       const strikeMoves = [...readyResult.airStrikeMoves ?? [], ...buildMissilePlaybackMoves(visibleMissileLaunches)];
-      const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
-      const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
+      const airStrikeOutboundMoves = [
+        ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
+        ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves)
+      ];
+      const airStrikeReturnMoves = [
+        ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
+        ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves)
+      ];
       deps.updateOpenRouterCostLabel();
       if (readyResult.aiConsulted === false) {
         deps.appendOpenRouterLog("AI executing standing orders (no event fired).");
@@ -41355,8 +41581,8 @@ ${bonuses}`;
         rendererSharedState.hoverRoutePreview.hoveredH3Index ?? null
       ) : /* @__PURE__ */ new Map();
       if (!tb && state) {
-        const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID);
-        for (const unit of selectedHumanUnits) {
+        const selectedHumanUnits2 = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === HUMAN_SEAT_ID);
+        for (const unit of selectedHumanUnits2) {
           const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
           const movementRange = strategicMovementHexesFor({
             unitType: unit.unitType,
@@ -41632,7 +41858,7 @@ ${bonuses}`;
     const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
     const iconHit = destinationH3 !== null && destinationH3 === clickHit && deps.pointerHitsDrawnUnitIcon(event.clientX, event.clientY, destinationH3);
     const decisionInput = {
-      targetingModeActive: rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || rendererSharedState.missileLaunchModeActive,
+      targetingModeActive: rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive || rendererSharedState.missileLaunchModeActive,
       pointerHasHit: clickHit !== null,
       hasDestination: destinationH3 !== null,
       composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
@@ -41642,6 +41868,7 @@ ${bonuses}`;
     };
     let action = resolveMapDoubleClickAction(decisionInput);
     let ferryRejectionReason;
+    let ferryPathsByUnitId;
     if (action.kind === "ignore") {
       emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
         reason: ignoreReasonFor(decisionInput),
@@ -41661,6 +41888,7 @@ ${bonuses}`;
         destinationH3Index: destinationH3
       });
       ferryRejectionReason = validation.reason;
+      ferryPathsByUnitId = validation.ferryPathsByUnitId;
       action = resolveMapDoubleClickAction({ ...decisionInput, ferryEligible: validation.success });
     }
     const acceptedDetails = {
@@ -41718,6 +41946,52 @@ ${bonuses}`;
         }
         rendererSharedState.selectedHexIndex = clickHit;
         const idsAtStart = [...selectedIds];
+        if (rendererSharedState.airDropModeActive) {
+          if (!window.gameApi?.validateGroupAirDropTarget) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "support_target_api_missing" });
+            return;
+          }
+          const validation2 = await window.gameApi.validateGroupAirDropTarget({
+            unitIds: idsAtStart,
+            targetH3Index: clickHit
+          });
+          if (!rendererSharedState.airDropModeActive || selectionUnitIdSetsDiffer(idsAtStart, rendererSharedState.selectedUnitIds)) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+              reason: "targeting_changed_during_validation",
+              selectedCount: idsAtStart.length
+            });
+            return;
+          }
+          if (!validation2.success) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
+              reason: "air_drop_target_rejected",
+              selectedCount: idsAtStart.length,
+              destinationH3: clickHit
+            });
+            deps.showMapToast(
+              deps.formatTargetingValidationReason(validation2.reason, "Selected air units cannot drop infantry there."),
+              { isError: true }
+            );
+            deps.updateRangedSidebar();
+            deps.redraw();
+            return;
+          }
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
+            ...acceptedDetails,
+            destinationH3: clickHit,
+            hasAirSelection: true
+          });
+          deps.replacePendingAirDropsForSelected(idsAtStart, clickHit);
+          rendererSharedState.airDropModeActive = false;
+          deps.clearSelection();
+          rendererSharedState.hoverRoutePreview = null;
+          rendererSharedState.hoverPreviewRequestSeq++;
+          deps.updateRangedSidebar();
+          deps.hideStackCallout();
+          deps.updateSidebar();
+          deps.redraw();
+          return;
+        }
         if (rendererSharedState.missileLaunchModeActive) {
           await planMissileLaunchFromDoubleClick({ deps, clickHit, idsAtStart, acceptedDetails });
           return;
@@ -41827,7 +42101,7 @@ ${bonuses}`;
           ...acceptedDetails,
           hasAirSelection: true
         });
-        deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
+        deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3, ferryPathsByUnitId);
         deps.clearCommittedOrderDraftState();
         deps.updatePendingOrdersSidebar();
         deps.updateSidebar();
@@ -42143,7 +42417,7 @@ ${bonuses}`;
         deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
         return;
       }
-      if ((rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || rendererSharedState.missileLaunchModeActive) && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
+      if ((rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || rendererSharedState.airDropModeActive || rendererSharedState.missileLaunchModeActive) && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         return;
       }
       rendererSharedState.selectedHexIndex = hit;
@@ -42279,6 +42553,7 @@ ${bonuses}`;
         formatTargetingValidationReason: deps.formatTargetingValidationReason,
         replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
         replacePendingAirStrikesForSelected: deps.replacePendingAirStrikesForSelected,
+        replacePendingAirDropsForSelected: deps.replacePendingAirDropsForSelected,
         replacePendingRangedAttacksForSelected: deps.replacePendingRangedAttacksForSelected,
         clearSelection: deps.clearSelection,
         hideStackCallout: deps.hideStackCallout,
@@ -42436,7 +42711,24 @@ ${bonuses}`;
     deps.updateRangedSidebar();
     deps.initNewGameButton();
     deps.updateReadyButtonState();
+    document.getElementById("air-drop-btn")?.addEventListener("click", () => {
+      if (rendererSharedState.airDropModeActive) {
+        rendererSharedState.airDropModeActive = false;
+        hideOrderSlowerHexTooltip();
+        void deps.refreshHoverRoutePreview();
+      } else if (rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
+        rendererSharedState.airDropModeActive = true;
+        rendererSharedState.airStrikeModeActive = false;
+        rendererSharedState.rangedModeActive = false;
+        rendererSharedState.missileLaunchModeActive = false;
+        hideOrderSlowerHexTooltip();
+        void deps.refreshHoverRoutePreview();
+      }
+      deps.updateRangedSidebar();
+      deps.redraw();
+    });
     document.getElementById("ranged-attack-btn")?.addEventListener("click", () => {
+      rendererSharedState.airDropModeActive = false;
       if (rendererSharedState.airStrikeModeActive || rendererSharedState.rangedModeActive || rendererSharedState.missileLaunchModeActive) {
         rendererSharedState.airStrikeModeActive = false;
         rendererSharedState.rangedModeActive = false;
@@ -43033,6 +43325,7 @@ ${bonuses}`;
       formatTargetingValidationReason: formatTargetingValidationReason3,
       showMapToast,
       replacePendingAirStrikesForSelected,
+      replacePendingAirDropsForSelected,
       replacePendingRangedAttacksForSelected,
       clearSelection,
       hideStackCallout,

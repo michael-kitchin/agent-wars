@@ -1,4 +1,5 @@
 import type { AirStrikeAnimationMove, FerryAnimationMove } from './ordersTypes';
+import type { AirDropAnimationMove } from './airDropTypes';
 import type { FortificationReport } from './fortificationTypes';
 import type { MissileLaunchRecord } from './missileTypes';
 import type { SightCueBeam } from './sightCueTypes';
@@ -292,7 +293,7 @@ aiMovesLog?: string[];
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
+aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string; player?: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Specifies the contract for the `humanMoves` member (humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 
@@ -301,7 +302,7 @@ aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string; player?: str
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Specifies the contract for the `combatHexes` member (combatHexes?: string[];).
 
@@ -446,6 +447,15 @@ airStrikeRemovedUnits?: RemovedUnitSnapshot[];
    * Exceptions: None.
    */
 airStrikeMoves?: AirStrikeAnimationMove[];
+  /**
+   * Air drops that flew this turn.
+   *
+   * Contract: Playback sends the air unit out and back, and the infantry one way, when the drop survived.
+   * When to use: After Ready. Absent when no drop flew.
+   * Expected outcome: Each row is one carrier. `infantryUnitId` is set only when the infantry landed.
+   * Exceptions: None.
+   */
+  airDropMoves?: AirDropAnimationMove[];
     /**
    * Specifies the contract for the `airStrikeAttemptCount` member (airStrikeAttemptCount?: number;).
 

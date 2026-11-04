@@ -20,8 +20,8 @@ Rules are divided into two layers: **strategic** (the primary game) and **tactic
 - **Simultaneous resolution:** The engine resolves all combat and movement in a defined phase sequence. No mid-combat input, except the melee-intercept choice to enter a tactical battle or continue strategic melee.
 - **Dice-based hits:** Each unit rolls one d20; a hit is scored when the result is **less than or equal to** that unit's hit number (A&A style). The attack hit number is `min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`; the defense hit number is `min(17, defense + origin bonus + tech defense bonus)` (§4.9). Penalties and cover never take an attack below 2 before either bonus, and a roll of 18 to 20 always misses.
 - **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`). A missile is always last (`compareCasualtyOrder`). A missile never rolls. A hit that would remove the hex controller's unit strips one fortification instead, until none remain (§4.9).
-- **Resolution order (strategic):** embark → missile launches → air strikes → ranged → head-on contact → ground/naval movement → cargo sync → ferry → melee. Head-on contact (§4.3) only removes move orders, from the positions after ranged fire. A siege of an enemy fortified hex is the last part of that melee step (§4.6). Production, control, and fog refresh run after melee. Control does not change a hex while `fortifiedCount` is above 0.
-- **Resolution order (tactical beat):** embark → air strikes → ranged → head-on contact → movement → ferry → cargo sync → melee. No production step.
+- **Resolution order (strategic):** embark → missile launches → air strikes → air drops → ranged → head-on contact → ground/naval movement → ferry → cargo sync → melee. Head-on contact (§4.3) only removes move orders, from the positions after ranged fire. A siege of an enemy fortified hex is the last part of that melee step (§4.6). Production, control, and fog refresh run after melee. Control does not change a hex while `fortifiedCount` is above 0.
+- **Resolution order (tactical beat):** embark → air strikes → air drops → ranged → head-on contact → movement → ferry → cargo sync → melee. No production step.
 - **Participant IDs:** At the start of combat resolution, each side with at least one unit in any combat is assigned a unique random integer ID from the game RNG. Melee ordering uses these IDs.
 - **RNG:** A single game seed plus turn number produces deterministic replay for a given order set.
 - **Infrastructure destruction is permanent.** Destroyed urban cells, airports, and seaports do not rebuild.
@@ -53,7 +53,7 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 - **Range 1:** Unit can attack an enemy in any **adjacent** hex (H3 grid distance 1; includes land–water boundary; see §6 for coastal bombardment).
 - **Range 2:** Unit can attack enemies in hexes at distance 1 or 2. Range is H3 grid distance (same metric as movement).
 - **Range 3 (air only):** Unit can strike any hex within 3 hexes of its base airport. Air units do not use incremental movement — they strike from their base and return in the same phase.
-- **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike range (3). A ferry into snow can be 2 hexes when the weather bonus is on (§4.9).
+- **Move 0 (air):** Air units have no incremental movement. They reposition by hopping controlled intact airports. Each hop is at most `AIR_FERRY_RANGE_HEXES` (4), or 2 into snow when the weather bonus is on and the unit lacks the snow tag (`strategicFerryRangeHexes`). There is no hop-count cap. Strikes and drops stay within `AIR_STRIKE_RANGE_HEXES` (3) of the airport the unit occupies when that phase runs. An air unit carries one infantry unit (`AIRLIFT_INFANTRY_CAPACITY` in `src/shared/carrierCargoRules.ts`).
 - **Move 0 (missile):** A missile never moves, never rolls, and sees nothing (`VISION_RANGE_BY_UNIT_TYPE`). It is built with a `hold_fire` order that cannot be cancelled, and it takes no other standing order. It launches once, from the hex where it stands, at any explored hex in `gridDisk` of `missileRangeHexes()` (the disk includes its own hex), and is then removed. That removal is not a combat loss. See §8.6.
 - **Cost:** Each strategic hex generates production points equal to its tactical urban-cell count per turn (`buildProductionIncomeRule`). On the global map those are res1 hexes and res4 cells. Points accumulate toward the queued unit; when accumulated points meet or exceed the cost, the unit spawns and excess carries over immediately. A hex produces as many units per turn as its rate and caps allow. Air also requires an airport at the hex; naval requires a seaport. A neutral-border hex produces nothing and cannot host an air or naval base. Urban cells on that hex stay on the map.
 
@@ -113,7 +113,7 @@ A raise or a rehire is placed during planning and reserves its fee from the trea
 ### 3.4 Air
 
 - **Strengths:** Attack 10, strike range 3 from base. Can target enemy units **or** infrastructure. Grants a 3-hex visibility radius around its base (see §6). A missile also destroys infrastructure; see §3.6 and §8.6.
-- **Weaknesses:** Defense 3. No incremental movement; ferry consumes the unit's entire turn. Cannot participate in melee. Destroyed if an enemy ground unit captures its base airport hex, or if a strike hits that hex's airport.
+- **Weaknesses:** Defense 3. No incremental movement; one air action consumes the unit's turn. Destroyed if an enemy ground unit captures its base airport hex, or if a strike hits that hex's airport. Infantry it is carrying is destroyed with it (§9.4).
 - **Role:** Reconnaissance, deep strike, infrastructure destruction, air superiority via airport strikes.
 
 ### 3.5 Cross-domain and terrain (summary)
@@ -122,7 +122,7 @@ A raise or a rehire is placed during planning and reserves its fee from the trea
 - **Naval vs. naval:** In water hexes, naval units can melee (same hex) or use range 2.
 - **Naval vs. land:** Naval can use range 2 to hit land units within 2 hexes. Armor in a land hex may attack naval in an adjacent water hex; infantry may not on the strategic map. See §6 (Coastal bombardment).
 - **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending units with **strategic** range ≥ 1 in the target hex (armor, naval, and air based there) may return fire at their attack value — no range-to-base check. Embarked land units on a water hex do not. Infantry cannot return fire against air on the strategic map. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies.
-- **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
+- **Ground vs. air (base attack):** If an enemy ground unit enters a hex containing an airport with a based air unit, they share that hex in melee. The air unit is destroyed after melee when the hex is no longer its own (see §6). Infantry aboard it is destroyed with it (§9.4).
 - **Strategic terrain combat modifiers:** Terrain cover (§4.9, "Terrain cover"), plus city cover of 2 against ground and naval fire and 1 against air strikes, and rugged cover of 2 against ground and naval fire. Each column uses the higher of those values. A target hex whose main terrain is forest, mountain, or wetlands lowers ranged and air-strike hit numbers. Strategic ranged and air strikes are not blocked by terrain or intervening units.
 - **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble range cap, road/rail enter costs, mountain LOS).
 
@@ -155,7 +155,9 @@ Using the **current** (pre-movement) positions:
 - Resolve all air strikes. Apply casualties to targets. Evaluate counter-fire against each striking air unit. Remove eliminated units and destroyed infrastructure. Process strikes in deterministic order (by striking air unit's base hex H3 index ascending).
 - Air units destroyed during this phase do not execute their own strike if they haven't been processed yet.
 
-**One action per turn:** An air unit may either strike or ferry in a given turn, never both. An air unit with both a strike and a ferry has the ferry dropped.
+**One action per turn:** An air unit may strike, drop, or ferry, and only one of those. An explicit strike drops the ferry and the drop. An explicit drop drops the ferry. A generated strike does not replace an explicit ferry or drop.
+
+**Air drop:** `resolveAirDropPhase` runs after air-strike transport losses and before the ranged-fire list is built. The air unit stays on its airport. One embarked infantry unit lands on a land hex within strike range, including a hex another side occupies. There is no attack roll against the defenders. Units on that hex may shoot the air unit down the way they counter an air strike. If they do, the infantry is lost and never lands. Anti-air dice join `airStrikeDiceRolls` with `kind: 'antiAir'`. Strategic infantry does not shoot (`getRange` is 0). Armor does. In a battle, a drop covers the footprint, a cell fortified by the other side is illegal, and a drop onto an enemy cell is fought in that beat's melee if both remain. Tactical infantry can shoot a drop down.
 
 ### 4.2 Ranged phase (pre-move positions)
 
@@ -176,23 +178,23 @@ Move every ground and naval unit that has a movement order to its destination. P
 
 **Head-on contact.** Before any unit moves, the engine compares every side's moves. When units of two different owners would trade hexes, so that one ends where an enemy started and that enemy ends where the first started, neither move happens as ordered. Every unit moving between those two hexes, of any owner, takes part. A 50/50 roll seeded from the match seed, the turn, and the two hexes (`createHeadOnInitiativePicker` in `src/main/headOnInitiative.ts`) picks one of them. Units moving out of that hex stay in it, and units moving into it complete their moves. The hex then holds both sides and fights in the melee phase (§4.6), which can pause for the melee intercept as usual. Only exact trades count: paths that cross partway, and rings of three or more hexes, still move as ordered. The rule is `resolveHeadOnContacts` in `src/shared/headOnContact.ts`. A unit destroyed before movement does not take part.
 
-### 4.4 Cargo sync (strategic; after movement, before ferry)
+### 4.4 Cargo sync (after ferry)
 
-Embarked land units that did not receive an independent move are moved to stay with their naval carrier. Strategic order: cargo sync **before** ferry. Tactical beats run ferry **before** cargo sync.
+Embarked land units that did not receive an independent move are moved to stay with their carrier. `syncEmbarkedLandToNavalHex` follows a naval unit or an air unit. Both theaters run ferry **before** cargo sync, so infantry aboard an air unit arrives at the ferry destination. A drop clears the assignment before that sync, so landed infantry is not pulled back.
 
 ### 4.5 Ferry movement (post ground/naval movement)
 
 For each air unit with a ferry order:
 1. Check the destination airport: is it still owned by the air unit's player, and is the airport still intact?
 2. **If yes:** The air unit relocates to the destination airport.
-3. **If no:** Ferry aborts. If the origin airport is still owned and intact, the air unit stays. If the origin is also lost, the air unit is destroyed.
+3. **If no:** Ferry aborts. If the origin airport is still owned and intact, the air unit stays. If the origin is also lost, the air unit is destroyed, and infantry aboard it is destroyed with it.
 
-A ferry whose destination is the air unit's current hex is rejected (`Air unit is already based at that airport`). Resolution skips that order, so the unit is not moved and is not destroyed. A group ferry to an airport where only some of the selected air units are already based still proceeds for the others; the units already there are left out of the order. Ferry range: maximum 4 hexes (H3 grid distance) between origin and destination airports. With the weather bonus on, a destination in snow is 2 hexes when the unit lacks the snow tag (§4.9). Tactical ferry is unchanged. Both airports must be in hexes owned by the air unit's player at order time; destination validation occurs at resolution time.
+A ferry whose destination is the air unit's current hex is rejected (`Air unit is already based at that airport`). Resolution skips that order, so the unit is not moved and is not destroyed. A group ferry to an airport where only some of the selected air units are already based still proceeds for the others; the units already there are left out of the order. Strategic ferry is a chain of the owner's intact airports (`findAirportFerryRoute`). Each hop is at most 4 hexes, or 2 into snow when the weather bonus is on and the unit lacks the snow tag (§4.9). The path is the origin, the intermediate airports, and the destination. Neighbors are ordered by `<` on the H3 string. Tactical ferry is one hop between intact airport cells in the footprint and does not search that chain. A destination that is missing, wrecked, or on a neutral border is `Destination airport is not intact`. A destination another side controls is `Destination airport must be controlled by unit owner`. No chain is `No chain of your airports stays within ferry range.` An unreachable ferry stays when the origin airport is still intact and owned, and deletes the unit when that origin is gone. Infantry aboard follows a completed ferry and is deleted with the air unit when that ferry deletes it.
 
 ### 4.6 Melee phase (post-move positions)
 
 Using the **post-movement** positions:
-- Build melee combats: each hex that has ground/naval units from two or more sides is one melee engagement. Air units do **not** participate in melee.
+- Build melee combats: each hex that has units from two or more sides is one melee engagement. An air unit on that hex takes part. Infantry embarked on an air unit does not. Ship cargo on open water does not. Ship cargo on a coast does.
 - If a contested hex is eligible, the engine may **pause** here for a melee-intercept dialog (Fight tactical battle / Ignore and resolve strategically). See §12.1.
 - Resolve remaining same-hex combats in a deterministic order.
 - Two sides in one hex: the side with the lower participant id rolls attack values and the other rolls defense values. Three or more sides: every unit rolls once, the first side in the shuffled order rolling attack values and the others rolling defense values. Each side then assigns its hits one at a time. A hit picks an enemy side at random, weighted by how many of that side's units are not yet casualties, and removes that side's next casualty. Hits left after every enemy unit is gone are lost. One side left holds the hex, unless any fortification remains: `resolveStrategicControlAfterCombatAndMovement` does not change the controller while `fortifiedCount` is above 0, including when movement enters an empty fortified hex. Knockout still sets the hex to Neutral (`NEUTRAL_OWNER_ID`). Otherwise the hex stays contested.
@@ -332,13 +334,13 @@ Single-roll hit chances, useful for checking tests and play.
 
 ### 4.10 Elimination
 
-When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step. If a naval unit carrying cargo is destroyed, embarked units are destroyed with it (see §9.4). The controller's units are not chosen while a fortification remains to soak the hit (§4.9). Control of the hex waits for the same condition (§4.6).
+When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step. If a naval unit or an air unit carrying cargo is destroyed, the embarked units are destroyed with it (see §9.4). The controller's units are not chosen while a fortification remains to soak the hit (§4.9). Control of the hex waits for the same condition (§4.6).
 
 ---
 
 ## 5. Detailed resolution flow (single resolution phase)
 
-High-level flow: **embark → missile launches → air strikes → ranged at pre-move positions → head-on contact → ground/naval movement → cargo sync → ferry → melee at post-move positions** (strategic). Tactical beats omit missile launches, run head-on contact on each sub-unit's first-leg stop, put cargo sync after ferry, and omit production.
+High-level flow: **embark → missile launches → air strikes → air drops → ranged at pre-move positions → head-on contact → ground/naval movement → ferry → cargo sync → melee at post-move positions** (strategic). Tactical beats omit missile launches, add air drops after air strikes, run head-on contact on each sub-unit's first-leg stop, and omit production.
 
 Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Neutral ship that is already on a landing hex, or gives one that is not a march toward a landing. `buildNeutralTurnOrders` then adds Neutral's movement, ranged, and air orders from the omniscient snapshot. A caller cannot submit Neutral orders.
 
@@ -379,11 +381,13 @@ Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Ne
 8. Cargo sync (strategic): embarked land follows the carrier unless it
    received an independent move. Tactical: this step runs after ferry.
 9. Apply ferry movement orders (destination airport owned and intact;
-   else abort to origin or destroy if origin is also lost).
+   else abort to origin, or destroy the air unit and infantry aboard it
+   if the origin is also lost).
 10. Melee phase (post-move positions):
    Optionally pause for melee intercept on contested hexes.
-   Build melee combats: hexes that have ground/naval units from two or more
-   sides. Air units do not participate. Process hexes in H3 index order.
+   Build melee combats: hexes that have units from two or more sides.
+   An air unit on the hex takes part. Infantry embarked on an air unit
+   does not. Process hexes in H3 index order.
    For each melee hex: order sides by participant ID; resolve one round
    (attacker rolls attack, defender rolls defense); assign hits by casualty
    priority. A hit on the controller is soaked by a fortification first (§4.9).
@@ -391,7 +395,8 @@ Before positions are read, `prepareNeutralTransportsForTurn` unloads a loaded Ne
    exactly one non-controller player. Each rolling unit rolls attack once;
    each hit strips one fortification (§4.6).
 11. Post-melee air unit check: if an airport hex is no longer owned by the
-    air unit's player, the based air unit is destroyed.
+    air unit's player, the based air unit is destroyed, and infantry
+    aboard it is destroyed with it.
 12. Production, then mercenary payroll and hires (§2.1), then the game-over
     check and knockouts, then clear pending orders, advance the turn, refresh
     fog, and set phase back to planning (strategic only). Production spends a
@@ -416,7 +421,7 @@ No player input during steps 2–12 except the melee-intercept dialog at step 10
 - **Cover never blocks:** terrain cover (§4.9) lowers hit numbers but never makes a shot illegal.
 - **Line of sight (tactical):** A mountain cell strictly between the shooter and the target blocks armor and naval shots. The shooter's cell and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. The target cell still applies its cover. See §12.5.
 - **Reproducibility:** A single RNG seed for the entire game so that replay is deterministic.
-- **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed during the post-melee check. The air unit does not fight in melee.
+- **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit, that air unit is in the melee on that hex. If it is still there after melee and the hex is no longer its own, the post-melee check destroys it, and infantry aboard it is destroyed with it.
 - **Air unit destroyed during air strike phase:** If air unit A strikes air unit B's airport and destroys it, and air unit B has not yet resolved its own strike (higher H3 index), air unit B is destroyed before it can act.
 - **Multiple air units at same airport:** Multiple air units may be based at the same airport. A strike that hits that hex's airport destroys all of them, even when another airport cell remains.
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has air units. No stacking limit for air units at airports.
@@ -523,7 +528,7 @@ Naval units can transport land units across water. Transport uses an explicit ca
 
 ### 9.1 Cargo assignment
 
-Each land unit has an `embarkedOn` field (strategic: `embarkedOnNavalUnitId`; tactical: `embarkedOnSubUnitId`). Assignment requires the land unit and the naval unit to be in the same hex, and that hex must be a legal embark hex (`canEmbarkAtHex`): coastal or land seaport unconditionally; naval-transit terrain with a seaport **only when that hex is controlled** by the embarking player. Armor units are assigned before infantry (priority order). Players can reassign cargo via the stack popup UI; the LLM assigns cargo via the order format.
+Each land unit has an `embarkedOn` field (strategic: `embarkedOnCarrierUnitId`; tactical: `embarkedOnSubUnitId`). The SQL column stays `naval_unit_id` and may name a naval unit or an air unit. An air unit carries one infantry unit and no armor. A ship still carries one armor or two infantry. Air cargo never fights. Ship cargo still melees on a coast and sits out combat only on water. When the carrier is destroyed, its cargo is destroyed with it (§9.4). An air unit debarks on the hex it occupies, with no port check. `disembark` then marches the infantry. A destination of the current hex unloads and stays. Neutral air with cargo unloads in place and defends. An air unit boards one infantry unit on the same hex and does not require a port. A ship assignment requires the land unit and the naval unit to be in the same hex, and that hex must be a legal embark hex (`canEmbarkAtHex`): coastal or land seaport unconditionally; naval-transit terrain with a seaport **only when that hex is controlled** by the embarking player. Armor units are assigned before infantry (priority order). Players can reassign cargo via the stack popup UI; the LLM assigns cargo via the order format.
 
 ### 9.2 Embark and disembark
 
@@ -531,11 +536,14 @@ Embark requires a legal embark hex as above. Manual debark is permitted at any c
 
 ### 9.3 Embarked unit combat
 
-Embarked units can participate in melee on coastal hexes but cannot use ranged attacks while embarked. On water hexes, embarked units cannot participate in combat at all — they are cargo.
+Ship cargo can melee on a coastal hex and cannot use ranged fire while embarked. On a water hex it cannot fight at all. Infantry aboard an air unit cannot fight on any terrain.
 
 ### 9.4 Transport loss
 
-If a naval unit carrying cargo is destroyed, all embarked units are destroyed with it (fatal transport loss), regardless of terrain. Manually debarked co-located land units survive because they no longer have an `embarkedOn` assignment.
+A destroyed carrier takes the land units assigned to it. A land unit that has already debarked is not assigned, so it stays.
+
+- **Strategic.** `applyTransportLossForRemovedNavalUnits` deletes every land unit assigned to a naval or air unit removed by an air strike, a shot-down drop, ranged fire, melee, a ferry whose origin airport is gone, or `destroyAirUnitsWithInvalidBase`. A lost base lists that infantry with the removed air unit. The ferry delete removes the infantry from the match and does not add a playback row.
+- **Tactical.** An air strike, a shot-down drop, and ranged fire do the same for a ship or an air sub-unit. The loss is recorded with that carrier's killers. Melee removes infantry embarked on an air sub-unit the melee removed, with that air sub-unit's killers. Ship cargo that fought in the melee is removed only when the melee itself removed it. A ferry that destroys an air sub-unit because the origin airport is gone also removes its infantry.
 
 ---
 
@@ -556,13 +564,13 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **Terrain cover:** The target's forest, mountain, or wetlands (plus urban and rubble in battles) lowers ranged and air-strike attack (§4.9).
 - **Origin bonus and terrain bonus (optional):** +2 (Default) or +4 (High) to that value for a unit rolling in its birth country; in battles, also on its birth terrain kind. The two never stack; the larger amount applies. In battles the terrain bonus also lets armor, and naval units born on wetlands, enter one cell of birth terrain they otherwise cannot enter, ending that beat there (§4.9).
 - **Caps:** Small 12/8/8/6 infantry/armor/naval/air, scaled by game size. Global costs are 20 / 40 / 100 / 60. A fortification costs the same as one infantry unit (`fortificationCostPerCell`) and is not capped. A regional map uses the costs in its manifest.
-- **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. One action per turn: strike or ferry (range 4).
+- **Air strikes and drops:** Air units strike or drop from the airport they occupy (range 3). A ferry may hop any number of owned intact airports in the same turn, each hop at most 4 hexes. One of strike, drop, or ferry.
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes and by missile launches. A pick that lands on a fortified cell clears the fortification and keeps the facility. No rebuilding.
 - **Fortifications:** The controller's units are soaked one hit per fortification. Control does not change while any remain. One player alone in an enemy fortified hex sieges it. An empty explored enemy fortified hex is a legal ranged target.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only on the strategic map. Return fire uses planning-parity reverse reach.
 - **Fog:** Infantry vision 1, armor 2, naval 2, air 3. Stale intel lasts 2 turns.
 - **Sealift:** Explicit cargo assignment. Fatal transport loss when the carrier is destroyed. LLM opponent movement orders auto-debark.
-- **WEGO:** embark → missile launches → air strike → ranged → movement → cargo sync → ferry → melee → siege; automatic casualty assignment; tempo sweep fires unordered legal shots unless `hold_fire`. A missile never rolls and is removed last. Production then fortifies queued cells.
+- **WEGO:** embark → missile launches → air strike → air drop → ranged → movement → ferry → cargo sync → melee → siege; automatic casualty assignment; tempo sweep fires unordered legal shots unless `hold_fire`. A missile never rolls and is removed last. Production then fortifies queued cells.
 
 ---
 
@@ -647,7 +655,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - **Infantry:** 2 res4 hexes.
 - **Armor:** 5 res4 hexes.
 - **Naval:** 10 res4 hexes.
-- **Air:** Strike anywhere in the battle footprint (the strategic 3-hex radius does not apply). One air action per unit per beat.
+- **Air:** Strike or drop anywhere in the battle footprint (the strategic 3-hex radius does not apply). One air action per sub-unit per beat: a strike, a drop, or a ferry.
 
 **Terrain caps and LOS** (`tacticalTerrainCombatModifiers.ts`):
 
@@ -668,15 +676,16 @@ Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignm
 
 The tactical game uses **WEGO** simultaneous resolution — the same model as the strategic game. Each beat:
 
-1. **Planning:** Both sides issue movement, ranged, air strike, ferry, and sealift orders. The LLM is consulted at most once per beat under event-driven policy. An AI-only battle consults each of its two commanders at most once. `tacticalTurnNumber` increments each beat.
+1. **Planning:** Both sides issue movement, ranged, air strike, air drop, ferry, and sealift orders. The LLM is consulted at most once per beat under event-driven policy. An AI-only battle consults each of its two commanders at most once. `tacticalTurnNumber` increments each beat.
 2. **Embark.**
 3. **Air strike phase.**
-4. **Ranged phase.**
-5. **Movement phase** (first-leg truncation as in §12.4). Head-on contact (§4.3) runs first, comparing each sub-unit's start cell with the cell its first leg stops on this beat, for both sides. The roll's seed also includes the battle id and the beat.
-6. **Ferry** (tactical air ferry is only between intact airport cells of the enclosing hex, not a neighbor airport in the margin, and not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit is destroyed; if the origin is still intact, it stays.
-7. **Cargo sync.**
-8. **Melee phase.**
-9. Casualties removed. Next beat, or battle end.
+4. **Air drops.** The air sub-unit stays on its cell. One embarked infantry sub-unit lands on a land cell in the footprint, including an enemy cell. A cell fortified by the other side is illegal. A shot-down drop destroys that infantry, and it does not land.
+5. **Ranged phase.**
+6. **Movement phase** (first-leg truncation as in §12.4). Head-on contact (§4.3) runs first, comparing each sub-unit's start cell with the cell its first leg stops on this beat, for both sides. The roll's seed also includes the battle id and the beat.
+7. **Ferry** (tactical air ferry is only between intact airport cells of the enclosing hex, not a neighbor airport in the margin, and not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit and infantry embarked on it are destroyed; if the origin is still intact, it stays. Infantry aboard a completed hop moves with the air unit and stays aboard.
+8. **Cargo sync.**
+9. **Melee phase.** An air sub-unit on a contested cell takes part. Infantry embarked on an air sub-unit does not. If the melee removes that air sub-unit, the infantry is removed with it (§9.4).
+10. Casualties removed. Next beat, or battle end.
 
 There is no production step in a beat.
 

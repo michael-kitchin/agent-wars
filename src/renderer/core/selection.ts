@@ -20,7 +20,7 @@ export function isEmbarkedLandUnitBlockedForSelection(unitId: string): boolean {
   }
   const unit = S.gameState?.units.find((u) => u.id === unitId);
   if (!unit || (unit.unitType !== 'infantry' && unit.unitType !== 'armor')) return false;
-  return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+  return !!(unit.embarkedOnCarrierUnitId && unit.embarkedOnCarrierUnitId.length > 0);
 }
 
 /**
@@ -90,6 +90,7 @@ export function replaceSelection(unitIds: string[]): void {
     S.hoverPreviewRequestSeq++;
     S.rangedModeActive = false;
     S.airStrikeModeActive = false;
+    S.airDropModeActive = false;
     S.missileLaunchModeActive = false;
     return;
   }

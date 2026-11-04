@@ -59,7 +59,7 @@ function testSupportOverlayStrokeWidthsByMapLayer(): void {
     'rangePerimeterStaticLineStyle should resolve width from getCurrentRangeOverlayLineWidth'
   );
   assert.ok(
-    overlay.includes("rangePerimeterStaticLineStyle(S.airStrikeModeActive ? 'airStrike' : 'ranged', 'perimeter')") &&
+    overlay.includes("rangePerimeterStaticLineStyle(S.airStrikeModeActive || S.airDropModeActive ? 'airStrike' : 'ranged', 'perimeter')") &&
       hover.includes('strokeSupportOrderLines'),
     'perimeter overlay should request perimeter width; hover should draw through the shared support-line drawer'
   );

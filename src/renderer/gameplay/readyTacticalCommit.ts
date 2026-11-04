@@ -10,6 +10,7 @@
  */
 
 import type { CommitHumanTacticalDraftOrdersIpcResult, GameStateSnapshot } from '../../shared/ipcTypes';
+import { buildAirDropOutboundPlaybackMoves, buildAirDropReturnPlaybackMoves } from '../rendering/orderDrawing';
 import { currentConsoleReportTag } from '../chrome/consoleReports';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -96,6 +97,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     movementOrders,
     rangedAttacks: [...S.pendingRangedAttacks],
     airStrikes: [...S.pendingAirStrikes],
+    airDropOrders: [...S.pendingAirDrops],
     ferryOrders: [...S.pendingFerryOrders],
     embarkOrders: [...S.pendingEmbarkOrders],
     useEventDrivenConsultation: S.useEventDrivenConsultation,
@@ -151,8 +153,14 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
           h3Index: u.h3Index,
         })) as GameStateSnapshot['units'])
       : undefined;
-    const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
-    const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(playback.airDropMoves),
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves),
+      ...buildAirDropReturnPlaybackMoves(playback.airDropMoves),
+    ];
     S.resolutionMoveAnimation = {
       moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
       startTime: Date.now(),
@@ -210,11 +218,13 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
     : [];
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
+  S.pendingAirDrops = [];
   S.pendingMissileLaunches = [];
   S.pendingFerryOrders = [];
   S.pendingEmbarkOrders = [];
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
+  S.airDropModeActive = false;
   S.missileLaunchModeActive = false;
   try {
     const refreshedStrategic = await fetchMatchSnapshot();

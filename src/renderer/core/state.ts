@@ -8,6 +8,7 @@ import type {
   HumanStandingOrderSnapshot,
   RangedAttackOrder,
   AirStrikeOrder,
+  AirDropOrder,
   MissileLaunchOrder,
   EmbarkOrder,
   FerryOrder,
@@ -439,6 +440,15 @@ pendingRangedAttacks: [] as RangedAttackOrder[],
    * Exceptions: None.
    */
 pendingAirStrikes: [] as AirStrikeOrder[],
+  /**
+   * Queued air drops the next Ready will send.
+   *
+   * Purpose: Holds a drop until Ready submits it, or until that air unit is given a strike or a ferry.
+   * When to use: Written when a drop is planned or cancelled. Read by the Orders tab and the map arrow.
+   * Expected outcome: Empty until the player double-clicks a land hex while air-drop aiming is on.
+   * Exceptions: None.
+   */
+  pendingAirDrops: [] as AirDropOrder[],
     /**
    * Queued missile launches the next Ready will send.
    *
@@ -502,6 +512,15 @@ rangedModeActive: false,
    * Exceptions: None.
    */
 airStrikeModeActive: false,
+  /**
+   * Whether the next double-click queues an air drop.
+   *
+   * Purpose: The air-drop button aims this. It is separate from the strike reticle.
+   * When to use: Set by that button. Cleared by a second click, an empty selection, or a queued drop.
+   * Expected outcome: True only while the player is choosing a landing hex.
+   * Exceptions: None.
+   */
+  airDropModeActive: false,
     /**
    * Whether the reticle is aiming a missile launch.
    *

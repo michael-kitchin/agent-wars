@@ -373,7 +373,7 @@ export function buildAdjacentCellsFallbackBlock(
   for (const u of opponentUnits.filter((unit) => latLngByH3.has(unit.h3Index))) {
     const current = format(u.h3Index);
     const snapshotUnit = state.units.find((row) => row.id === u.id);
-    const assumeDebarkedForReachability = !!snapshotUnit?.embarkedOnNavalUnitId;
+    const assumeDebarkedForReachability = !!snapshotUnit?.embarkedOnCarrierUnitId;
     const dests = (
       assumeDebarkedForReachability
         ? getValidDestinations(

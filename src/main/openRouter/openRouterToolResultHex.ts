@@ -159,6 +159,20 @@ function redactPlanRouteResult(
   delete out.orderToXY;
   delete out.orderToH3;
   delete out.pathH3Indexes;
+  const airportPath = out.airportPathH3Indexes;
+  if (Array.isArray(airportPath)) {
+    delete out.airportPathH3Indexes;
+    const codes: string[] = [];
+    for (const h3 of airportPath) {
+      if (typeof h3 !== 'string') continue;
+      try {
+        codes.push(h3ToCode(h3, context));
+      } catch (err) {
+        logDebug('openRouterToolResultHex redactPlanRouteResult: airport hop could not be encoded', { h3, err });
+      }
+    }
+    out.airportHexCodes = codes;
+  }
   if (orderH3) {
     try {
       out.orderToHexCode = h3ToCode(orderH3, context);

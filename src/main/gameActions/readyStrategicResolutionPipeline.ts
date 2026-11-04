@@ -7,7 +7,7 @@
  * Exceptions: Propagates unexpected errors to the caller for outer `try/catch` handling.
  */
 
-import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getSeatRoster, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getGameSeed, getGameStateForPlayer, getSeatRoster, listUnitsForSnapshot } from '../gameDb';
 import { readAiOnlyBattles } from '../gameDb/gameConfigKv';
 import { buildSightCuesForReady } from '../sightCues/sightCueReadyStage';
 import { buildAiOnlyBattleOffer } from './aiOnlyBattleOffer';
@@ -15,8 +15,10 @@ import { withoutStrategicHeadOnHolderMoves } from './strategicHeadOnContact';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from '../combatResolution';
 import { logDebug, logError } from '../logger';
-import type { FerryAnimationMove, ReadyResult, AirStrikeTargetType } from '../../shared/ipcTypes';
+import type { ReadyResult, AirStrikeTargetType } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
+import { resolveStrategicFerryOrders, airCargoFollowMoves } from './airFerryResolution';
+import { resolveAirDropPhase, reconcileHumanAirActions } from './airDropResolution';
 import { resolveMissileLaunchPhase } from './missileLaunchResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
@@ -33,10 +35,10 @@ import {
   applyEmbarkOrdersForPlayer,
   applyTransportOutcomeForRemovedStrategicUnits,
   autoDebarkNonHumanLandUnitIfMovingIndependently,
-  isEmbarkedLandUnitOnWater,
   shouldSkipEmbarkedLandIndependentMove,
   syncEmbarkedLandUnitPositionsWithNaval,
 } from './sealift';
+import { landUnitSitsOutCombat } from './airlift';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { createStrategicFortificationHooks } from './fortificationCombatLedger';
 import type { FortificationLossTally } from '../fortificationCombat';
@@ -64,8 +66,6 @@ import {
 } from './ownerTurnOrders';
 import { buildNeutralTurnOrders, prepareNeutralTransportsForTurn } from './neutralTurn';
 import { generateOrdersForStandingOrders } from '../tools/standingOrders';
-import { isWithinAirFerryGridRange } from './gridRange';
-import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 
 /**
@@ -145,11 +145,11 @@ function toCombatUnit(unit: {
 }
 
 /**
- * Drops embarked infantry and armor that are still on water.
+ * Drops land units that sit out this combat.
  *
- * Purpose: Ranged fire and post-move melee both ignore land units riding naval transports at sea.
+ * Purpose: Ranged fire and post-move melee ignore ship cargo on water and air cargo on every terrain.
  * When to use: Immediately before projecting those lists to `CombatUnit`.
- * Expected outcome: Non-land rows pass through. Land rows stay only when they are not embarked on water.
+ * Expected outcome: Non-land rows pass through. Land rows stay only when `landUnitSitsOutCombat` is false.
  * Exceptions: None.
  */
 function withoutEmbarkedLandOnWater<T extends { readonly id: string; readonly unitType: string }>(
@@ -157,7 +157,7 @@ function withoutEmbarkedLandOnWater<T extends { readonly id: string; readonly un
 ): T[] {
   return units.filter((u) => {
     if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-    return !isEmbarkedLandUnitOnWater(u.id);
+    return !landUnitSitsOutCombat(u.id);
   });
 }
 
@@ -207,6 +207,9 @@ export function executeReadyStrategicTurn(
   const humanFerryOrders = dbGetAll<{ unit_id: string; destination_h3_index: string }>(
     'SELECT unit_id, destination_h3_index FROM pending_ferry_orders ORDER BY unit_id, destination_h3_index'
   ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
+  const humanDropOrders = dbGetAll<{ unit_id: string; target_h3_index: string }>(
+    'SELECT unit_id, target_h3_index FROM pending_air_drop_orders ORDER BY unit_id'
+  ).map((row) => ({ unitId: row.unit_id, targetH3Index: row.target_h3_index }));
   const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
   const preMoveState = dbBackedStateSnapshot();
   const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
@@ -220,18 +223,12 @@ export function executeReadyStrategicTurn(
     unitId,
     targetH3Index,
   }));
-  const mergedHumanAir = new Map<string, { targetH3Index: string; targetType: AirStrikeTargetType }>();
-  for (const a of generatedHuman.airStrikes) {
-    mergedHumanAir.set(a.unitId, { targetH3Index: a.targetH3Index, targetType: a.targetType });
-  }
-  for (const a of humanAirStrikes) {
-    mergedHumanAir.set(a.unitId, { targetH3Index: a.targetH3Index, targetType: a.targetType });
-  }
-  const mergedHumanAirStrikes = [...mergedHumanAir.entries()].map(([unitId, strike]) => ({
-    unitId,
-    targetH3Index: strike.targetH3Index,
-    targetType: strike.targetType,
-  }));
+  const humanAir = reconcileHumanAirActions({
+    generatedStrikes: generatedHuman.airStrikes,
+    explicitStrikes: humanAirStrikes,
+    ferryOrders: humanFerryOrders,
+    dropOrders: humanDropOrders,
+  });
   const neutralOrders = buildNeutralTurnOrders({ latLngByH3, resolveToH3 });
   if (
     neutralOrders.movementOrders.length > 0
@@ -240,20 +237,38 @@ export function executeReadyStrategicTurn(
   ) {
     ordersForOwners.set(NEUTRAL_OWNER_ID, keepOrdersOfOwnedUnits(NEUTRAL_OWNER_ID, neutralOrders, unitOwnerById));
   }
-  const allAirStrikes = listsInResolutionOrder(mergedHumanAirStrikes, ordersForOwners, (orders) => orders.airStrikeOrders);
+  const allAirStrikes = listsInResolutionOrder(humanAir.strikes, ordersForOwners, (orders) => orders.airStrikeOrders);
   const allMissileLaunches = listsInResolutionOrder(
     humanMissileLaunches,
     ordersForOwners,
     (orders) => orders.missileLaunchOrders
   );
   const strikeUnitIds = new Set(allAirStrikes.map((s) => s.unitId));
-  const mergedFerryOrders = listsInResolutionOrder(humanFerryOrders, ordersForOwners, (orders) => orders.ferryOrders);
-  const allFerryOrders = mergedFerryOrders.filter((f) => !strikeUnitIds.has(f.unitId));
-  const droppedFerryForStrikeCount = mergedFerryOrders.length - allFerryOrders.length;
+  const mergedDropOrders = listsInResolutionOrder(humanAir.dropOrders, ordersForOwners, (orders) => orders.airDropOrders ?? []);
+  const allDropOrders = mergedDropOrders.filter((drop) => !strikeUnitIds.has(drop.unitId));
+  const droppedDropForStrikeCount = mergedDropOrders.length - allDropOrders.length;
+  if (droppedDropForStrikeCount > 0) {
+    logDebug('ready: dropped air drop orders for units that also strike', {
+      droppedDropForStrikeCount,
+      strikeUnitCount: strikeUnitIds.size,
+    });
+  }
+  const dropUnitIds = new Set(allDropOrders.map((drop) => drop.unitId));
+  const mergedFerryOrders = listsInResolutionOrder(humanAir.ferryOrders, ordersForOwners, (orders) => orders.ferryOrders);
+  const ferriesAfterStrikes = mergedFerryOrders.filter((ferry) => !strikeUnitIds.has(ferry.unitId));
+  const allFerryOrders = ferriesAfterStrikes.filter((ferry) => !dropUnitIds.has(ferry.unitId));
+  const droppedFerryForStrikeCount = mergedFerryOrders.length - ferriesAfterStrikes.length;
+  const droppedFerryForDropCount = ferriesAfterStrikes.length - allFerryOrders.length;
   if (droppedFerryForStrikeCount > 0) {
     logDebug('ready: dropped ferry orders for units that also strike', {
       droppedFerryForStrikeCount,
       strikeUnitCount: strikeUnitIds.size,
+    });
+  }
+  if (droppedFerryForDropCount > 0) {
+    logDebug('ready: dropped ferry orders for units that also drop', {
+      droppedFerryForDropCount,
+      dropUnitCount: dropUnitIds.size,
     });
   }
   for (const owner of ownersInResolutionOrder(ordersForOwners)) {
@@ -305,11 +320,20 @@ export function executeReadyStrategicTurn(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
   );
+  const airDropResult = resolveAirDropPhase(allDropOrders, next, originHitBonusAt, techHitBonusAt);
+  for (const roll of airDropResult.diceRolls) airStrikeResult.diceRolls.push(roll);
+  const removedBeforeRanged = new Set<string>([
+    ...missileLaunchResult.removedUnitIds,
+    ...airStrikeResult.removedUnitIds,
+    ...airStrikeTransportLosses.map((unit) => unit.id),
+    ...airDropResult.removedUnitIds,
+  ]);
+  const listedForRanged = listUnitsForSnapshot().filter((unit) => !removedBeforeRanged.has(unit.id));
   const rangedInputUnits = withTechHitBonus(withOriginHitBonus(
-    withoutEmbarkedLandOnWater(listedForWeather).map(toCombatUnit),
+    withoutEmbarkedLandOnWater(listedForRanged).map(toCombatUnit),
     originHitBonusAt
   ).map((unit) => {
-    const source = listedForWeather.find((candidate) => candidate.id === unit.id);
+    const source = listedForRanged.find((candidate) => candidate.id === unit.id);
     const penalty = weatherPenaltyForRoll({
       unitType: unit.unitType,
       kind: 'ranged',
@@ -352,12 +376,17 @@ export function executeReadyStrategicTurn(
     gameSeed,
   });
   const allOrders = headOn.orders;
-  const humanMoves = Array.from(mergedHuman.entries())
+  const humanMoves: Array<{
+    unitId: string;
+    fromH3Index: string;
+    toH3Index: string;
+    pathH3Indexes?: readonly string[];
+  }> = Array.from(mergedHuman.entries())
     .filter(([unitId]) => !headOn.cancelledUnitIds.has(unitId))
     .map(([unitId, toH3Index]) => {
-      const fromH3Index = unitsBeforeMove.find((u) => u.id === unitId)?.h3Index;
-      if (!fromH3Index || fromH3Index === toH3Index) return null;
-      return { unitId, fromH3Index, toH3Index };
+      const unit = unitsBeforeMove.find((u) => u.id === unitId);
+      if (!unit || unit.unitType === 'air' || unit.h3Index === toH3Index) return null;
+      return { unitId, fromH3Index: unit.h3Index, toH3Index };
     })
     .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null);
   const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
@@ -403,12 +432,23 @@ export function executeReadyStrategicTurn(
     });
     hadStrategicMarchResolutionBySeat[seat.seatId] = traversed || marched;
   }
-  const aiMoves = allOrders.flatMap((order) => {
+  const aiMoves: Array<{
+    unitId: string;
+    fromH3Index: string;
+    toH3Index: string;
+    player?: string;
+    pathH3Indexes?: readonly string[];
+  }> = allOrders.flatMap((order) => {
     const unit = unitsBeforeMove.find((candidate) => candidate.id === order.unitId);
-    if (!unit || unit.player === HUMAN_SEAT_ID || unit.h3Index === order.toH3Index) return [];
+    if (!unit || unit.player === HUMAN_SEAT_ID || unit.unitType === 'air' || unit.h3Index === order.toH3Index) return [];
     return [{ unitId: order.unitId, fromH3Index: unit.h3Index, toH3Index: order.toH3Index, player: unit.player }];
   });
   for (const order of allOrders) {
+    const movingUnit = unitsBeforeMove.find((unit) => unit.id === order.unitId);
+    if (movingUnit?.unitType === 'air') {
+      logDebug('readyStrategicResolutionPipeline skip air ground move', { unitId: order.unitId });
+      continue;
+    }
     autoDebarkNonHumanLandUnitIfMovingIndependently(order.unitId, order.toH3Index);
     if (shouldSkipEmbarkedLandIndependentMove(order.unitId, order.toH3Index)) {
       logDebug('readyStrategicResolutionPipeline skip embarked independent move', {
@@ -423,50 +463,12 @@ export function executeReadyStrategicTurn(
     }
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
   }
-  syncEmbarkedLandUnitPositionsWithNaval();
 
-  const resolvedFerryMoves: FerryAnimationMove[] = [];
-  for (const ferry of allFerryOrders) {
-    const unit = dbGetOne<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
-      'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE id = ?',
-      [ferry.unitId]
-    );
-    if (!unit || unit.unit_type !== 'air') continue;
-    const originH3Index = unit.h3_index;
-    if (originH3Index === ferry.destinationH3Index) {
-      logDebug('readyStrategicResolutionPipeline skip ferry to current base', {
-        unitId: ferry.unitId,
-        h3Index: originH3Index,
-      });
-      continue;
-    }
-    const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [ferry.unitId])?.birth_h3_index;
-    const ferryRange = strategicFerryRangeOnState(
-      { weatherTags: weatherTagsForBirthHex(birth) },
-      ferry.destinationH3Index,
-      { weatherBonusEnabled: weatherSettings.weatherBonusEnabled, turnNumber, startMonth: weatherSettings.startMonth }
-    );
-    const withinFerryRange = isWithinAirFerryGridRange(originH3Index, ferry.destinationH3Index, 'ready ferry', ferryRange);
-    if (!withinFerryRange) continue;
-    const destinationInfra = getStrategicInfrastructureForHex(ferry.destinationH3Index);
-    const destinationController = getHexController(ferry.destinationH3Index);
-    if (destinationInfra.airportCount > 0 && destinationController === unit.player) {
-      rememberStrategicHexBeforeMove(ferry.unitId, originH3Index, ferry.destinationH3Index);
-      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [ferry.destinationH3Index, ferry.unitId]);
-      resolvedFerryMoves.push({
-        unitId: ferry.unitId,
-        player: unit.player,
-        fromH3Index: originH3Index,
-        toH3Index: ferry.destinationH3Index,
-      });
-      continue;
-    }
-    const originInfra = getStrategicInfrastructureForHex(originH3Index);
-    const originController = getHexController(originH3Index);
-    if (!(originInfra.airportCount > 0 && originController === unit.player)) {
-      dbRun('DELETE FROM units WHERE id = ?', [ferry.unitId]);
-    }
-  }
+  const resolvedFerryMoves = resolveStrategicFerryOrders(allFerryOrders);
+  const airCargo = airCargoFollowMoves(resolvedFerryMoves);
+  humanMoves.push(...airCargo.humanMoves);
+  aiMoves.push(...airCargo.aiMoves);
+  syncEmbarkedLandUnitPositionsWithNaval();
 
   const unitsAfterMove = listUnitsForSnapshot();
   const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
@@ -522,6 +524,7 @@ export function executeReadyStrategicTurn(
       combatUnitsBefore: combatUnitsBefore.map((u) => ({ ...u })),
       rangedResult,
       airStrikeResult,
+      airDropResult,
       missileLaunchResult,
       sightCues,
       airStrikeTransportLosses,
@@ -561,6 +564,7 @@ export function executeReadyStrategicTurn(
     meleeResult,
     rangedResult,
     airStrikeResult,
+    airDropResult,
     missileLaunchResult,
     sightCues,
     airStrikeTransportLosses,

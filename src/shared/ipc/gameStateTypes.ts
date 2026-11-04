@@ -127,7 +127,7 @@ units: {
      * Expected outcome: When set, the land unit cannot receive independent movement until debarked.
      * Exceptions: None.
      */
-    embarkedOnNavalUnitId?: string | null;
+    embarkedOnCarrierUnitId?: string | null;
     /**
      * Tactical-only: land unit embarked on a naval sub-unit id for in-memory sealift parity.
      *

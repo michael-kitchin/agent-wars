@@ -2,6 +2,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AirDropOrder } from '../../shared/ipc/airDropTypes';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { GuardedDbOps } from './dbOps';
 import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
@@ -131,6 +132,15 @@ embarkOrders: EmbarkOrder[];
    * Exceptions: None.
    */
   missileLaunchOrders: MissileLaunchOrder[];
+  /**
+   * Air drops stored with the other extra orders.
+   *
+   * Contract: Missing JSON becomes an empty list.
+   * When to use: Decode and encode of `strategy_text`.
+   * Expected outcome: An older save with no `airDropOrders` field loads as an empty list.
+   * Exceptions: None.
+   */
+  airDropOrders?: AirDropOrder[];
 }
 
 /**
@@ -196,6 +206,15 @@ export interface AiPendingOrderSet {
    * Exceptions: None.
    */
   readonly missileLaunchOrders: readonly MissileLaunchOrder[];
+  /**
+   * Air drops for the seat.
+   *
+   * Contract: May be empty. A missing stored array decodes as empty.
+   * When to use: The extra payload.
+   * Expected outcome: Stored inside `strategy_text`.
+   * Exceptions: None.
+   */
+  readonly airDropOrders?: readonly AirDropOrder[];
 }
 
 /**
@@ -222,6 +241,7 @@ function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtra
     ferryOrders?: unknown;
     embarkOrders?: unknown;
     missileLaunchOrders?: unknown;
+    airDropOrders?: unknown;
   } | null;
   const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
   const ferryOrders = Array.isArray(payload?.ferryOrders) ? (payload.ferryOrders as FerryOrder[]) : [];
@@ -229,7 +249,8 @@ function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtra
   const missileLaunchOrders = Array.isArray(payload?.missileLaunchOrders)
     ? (payload.missileLaunchOrders as MissileLaunchOrder[])
     : [];
-  return { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders };
+  const airDropOrders = Array.isArray(payload?.airDropOrders) ? (payload.airDropOrders as AirDropOrder[]) : [];
+  return { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders, airDropOrders };
 }
 
 /**
@@ -242,13 +263,13 @@ function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtra
  */
 function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrdersExtraPayload {
   if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
-    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [], airDropOrders: [] };
   }
   try {
     return coerceAiPendingOrdersExtraPayload(JSON.parse(strategyText));
   } catch (err) {
     logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
-    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [], missileLaunchOrders: [], airDropOrders: [] };
   }
 }
 
@@ -511,8 +532,8 @@ export function getAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId): AiPen
   try {
     const movementOrders = JSON.parse(row.movement_orders) as MovementOrder[];
     const rangedOrders = JSON.parse(row.ranged_orders) as RangedAttackOrder[];
-    const { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
-    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders };
+    const { airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders, airDropOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
+    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders, embarkOrders, missileLaunchOrders, airDropOrders };
   } catch (err) {
     logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
     return null;
@@ -543,6 +564,7 @@ export function setAiPendingOrders(ops: AiStateDbOps, playerId: AiSeatId, orders
     ferryOrders: [...orders.ferryOrders],
     embarkOrders: [...orders.embarkOrders],
     missileLaunchOrders: [...orders.missileLaunchOrders],
+    airDropOrders: [...(orders.airDropOrders ?? [])],
   });
   ops.run(
     'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',

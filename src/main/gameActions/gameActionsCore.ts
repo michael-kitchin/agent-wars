@@ -88,6 +88,7 @@ export {
   validateGroupRangedTarget,
   validateRangedAttack,
 } from './strategicOrderValidation';
+export { validateGroupAirDropTarget } from './airDropValidation';
 export {
   commitHumanTacticalDraftOrders,
   sanitizeOpponentTacticalDraftForReadyCommit,

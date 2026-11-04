@@ -18,8 +18,6 @@ import type { FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { validateFerryOrder } from '../gameActions/airValidation';
-import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
-import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { logDebug, logTrace } from '../logger';
 import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
@@ -149,8 +147,6 @@ export function collectTempoRuleFerries(args: TempoRuleFerryArgs): FerryOrder[] 
     let best: { h3Index: string; distance: number } | null = null;
     for (const base of bases) {
       if (base === unit.h3Index) continue;
-      const ferryRange = strategicFerryRangeOnState(unit, base, state);
-      if (!isWithinAirFerryGridRange(unit.h3Index, base, 'tempoRuleAirFerry', ferryRange)) continue;
       const baseDistance = distanceToEnemy(base);
       if (baseDistance === null || baseDistance >= currentDistance) continue;
       if (best === null || baseDistance < best.distance) best = { h3Index: base, distance: baseDistance };
@@ -202,6 +198,15 @@ export type StrategicOpponentFerryArgs = {
   readonly modelFerryOrders: readonly FerryOrder[];
   /** Units with an air strike this turn, after the attack merge. */
   readonly airStrikeUnitIds: ReadonlySet<string>;
+  /**
+   * Units the model is dropping.
+   *
+   * Contract: Optional. These units are skipped by the idle ferry sweep.
+   * When to use: After the model's drop rows are deduplicated.
+   * Expected outcome: A dropping unit does not also receive a generated ferry.
+   * Exceptions: None.
+   */
+  readonly airDropUnitIds?: ReadonlySet<string>;
   /** Renders a unit id as the player-facing label used in drop reasons. */
   readonly displayLabelForUnit: (unitId: string) => string;
 };
@@ -247,7 +252,11 @@ export function buildStrategicOpponentFerryOrders(args: StrategicOpponentFerryAr
   const sweep = collectTempoRuleFerries({
     playerId,
     state,
-    unavailableAirUnitIds: new Set([...airStrikeUnitIds, ...ferryOrders.map((f) => f.unitId)]),
+    unavailableAirUnitIds: new Set([
+      ...airStrikeUnitIds,
+      ...(args.airDropUnitIds ?? []),
+      ...ferryOrders.map((f) => f.unitId),
+    ]),
   });
   logDebug('tempoRuleAirFerry buildStrategicOpponentFerryOrders: result', {
     playerId,

@@ -12,6 +12,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { getRange } from '../combatConstants';
 import { dbGetOne, getGameStateForPlayer, getMapHexSet, isDbReady } from '../gameDb';
+import { resolveStrategicAirportFerry } from './airFerryRoute';
 import { logDebug, logError } from '../logger';
 import { isLandSeaportSpawnHex, normalizeMovementTerrain } from '../movementTerrain';
 import {
@@ -32,7 +33,8 @@ import type { SubmitOrdersResult } from './gameActionsTypes';
 import { isWithinGridRangeSafe } from './gridRange';
 import { getLandMovementBlockReason, isLandUnitType } from './landMovementConstraints';
 import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
-import { isEmbarkedLandUnit, isEmbarkedLandUnitOnWater } from './sealift';
+import { isEmbarkedLandUnit } from './sealift';
+import { landUnitSitsOutCombat } from './airlift';
 import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
 import { validateTacticalHumanAirStrikeGroup } from './tacticalHumanAirStrikeValidation';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -255,7 +257,7 @@ export function validateRangedAttack(
   const range = getRange(unit.unit_type);
   if (unit.unit_type === 'air') return { valid: false, reason: 'Air units use Strike mode, not ranged attack mode' };
   if (range < 1) return { valid: false, reason: `${unit.unit_type} has no ranged attack (melee only)` };
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && isEmbarkedLandUnitOnWater(unitId)) {
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && landUnitSitsOutCombat(unitId)) {
     return { valid: false, reason: 'Embarked land units cannot attack while at sea.' };
   }
 
@@ -421,7 +423,7 @@ export function validateGroupFerryTarget(
     destinationH3Index,
     tacticalAttackerPlayer,
   });
-  return validateGroupTarget({
+  const checked = validateGroupTarget({
     logName: 'validateGroupFerryTarget',
     unitIds,
     emptySelectionReason: 'No selected units for ferry targeting',
@@ -434,6 +436,24 @@ export function validateGroupFerryTarget(
       }),
     ignorableReason: FERRY_REASON_ALREADY_BASED,
   });
+  if (!checked.success || isTacticalBattleActive()) return checked;
+  const ferryPathsByUnitId: Record<string, readonly string[]> = {};
+  for (const unitId of unitIds) {
+    const unit = dbGetOne<{ h3_index: string; player: string; unit_type: string }>(
+      'SELECT h3_index, player, unit_type FROM units WHERE id = ?',
+      [unitId]
+    );
+    if (!unit || unit.unit_type !== 'air' || unit.h3_index === destinationH3Index) continue;
+    const route = resolveStrategicAirportFerry({
+      unitId,
+      originH3Index: unit.h3_index,
+      destinationH3Index,
+      owner: unit.player,
+    });
+    if (!route.reachable) return { success: false, reason: route.reason };
+    ferryPathsByUnitId[unitId] = route.pathH3Indexes;
+  }
+  return { ...checked, ferryPathsByUnitId };
 }
 
 /**

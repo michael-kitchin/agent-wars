@@ -14,7 +14,7 @@ When the player double-clicks a destination with a non-air selection, and target
 
 ### Ferry
 
-When the player double-clicks with an all-air selection, and Strike targeting is off, the game checks whether a ferry is legal. A legal ferry is queued. An illegal ferry on empty ground clears the selection. An illegal ferry on a unit icon shows an error toast and keeps the selection. Legality is in the [combat rules](../combat-rules-v3.md). While Strike targeting is on, that double-click places the strike instead.
+When the player double-clicks with an all-air selection, and Strike targeting and air-drop aiming are off, the game checks whether a ferry is legal. A legal strategic ferry is a chain of that player's intact airports, each hop within ferry range, and the queued line uses that path. An illegal ferry on empty ground clears the selection. An illegal ferry on a unit icon shows an error toast and keeps the selection. Legality is in the [combat rules](../combat-rules-v3.md). While Strike targeting is on, that double-click places the strike instead. While air-drop aiming is on, it places the drop instead.
 
 ### Ranged attack
 
@@ -23,6 +23,10 @@ When Ranged targeting is on, a double-click on a hex validates the target for ev
 ### Air strike
 
 When Strike targeting is on, a double-click validates the target and the chosen target type: Enemy Units, Production, Airports, or Seaports. A single click does not queue the strike. Success queues the strikes, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves strike targeting on, the same as a failed ranged double-click.
+
+### Air drop
+
+When the air-drop button is pressed, a double-click validates one land hex within strike range for every selected air unit. The button is on only when every selected unit is air and every one of them carries infantry. Success queues one drop per selected air unit, turns aiming off, and clears the selection. The air unit stays at its airport. Failure shows an error toast, queues nothing, and leaves aiming on. One illegal target queues nothing. The rows sit in the Air strikes group, and each detail ends with "Air drop".
 
 ### Missile launch
 
@@ -44,9 +48,9 @@ A confirmed dismiss (`executeDismissMercenary`) drops that unit's queued drafts 
 
 ## Lifecycle
 
-- Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, air strikes, and missile launches are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
+- Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, air strikes, and missile launches are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way. Air drops are rows in the Air strikes group.
 - Hover preview: while units are selected and the pointer is over a legal destination, the map draws a preview of the route or shot. The preview is dropped when the selection changes, when targeting turns off, when Ready finishes, and when a newer pointer position supersedes it. A preview that started before targeting turned off must not appear after the button has changed.
-- Commit: Ready submits pending ranged attacks, air strikes, missile launches, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, and ferries for the current beat. Missile launches are not part of a beat. A successful grouped march or ferry commit clears the draft selection immediately, before Ready.
+- Commit: Ready submits pending ranged attacks, air strikes, air drops, missile launches, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, air drops, and ferries for the current beat. Missile launches are not part of a beat. A successful grouped march, ferry, or air drop clears the draft selection immediately, before Ready.
 - Rows: each row can select its unit and cancel that order. Cancel removes that order only.
 - Resolution: after a successful Ready, queued drafts that were submitted are cleared. Tactical march continuations can come back as pending movement for the next beat. Playback then animates the resolved turn. See [resolution-playback.md](resolution-playback.md) and [modes-and-transitions.md](modes-and-transitions.md).
 
@@ -73,7 +77,7 @@ A confirmed dismiss (`executeDismissMercenary`) drops that unit's queued drafts 
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged, Strike, or Launch target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, entering a battle, or a confirmed dismiss. The close control clears targeting the same way right-click does, and queued orders stay queued. A confirmed dismiss turns targeting off and drops queued orders only for the units that became Neutral. A single click does not turn it off.
+- A rejected Ranged, Strike, Launch, or air-drop target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle or the pressed air-drop button, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire or drop, entering a battle, or a confirmed dismiss. The close control clears targeting the same way right-click does, and queued orders stay queued. A confirmed dismiss turns targeting off and drops queued orders only for the units that became Neutral. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
 - Every queued order that Ready will submit is visible in one of the four order groups.
 - Sealift assignment is never a pending order.

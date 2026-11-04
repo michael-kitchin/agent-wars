@@ -13,6 +13,17 @@ test('syncEmbarkedLandToNavalHex moves cargo onto its naval carrier without muta
   assert.equal(cargo.h3Index, 'b');
 });
 
+test('syncEmbarkedLandToNavalHex moves infantry onto its air carrier', () => {
+  const cargo = { id: 'l1', unitType: 'infantry', h3Index: 'b', embarkedOnSubUnitId: 'a1' };
+  const input = [
+    { id: 'a1', unitType: 'air', h3Index: 'a', embarkedOnSubUnitId: null },
+    cargo,
+  ];
+  const out = syncEmbarkedLandToNavalHex(input);
+  assert.equal(out[1]?.h3Index, 'a');
+  assert.equal(cargo.h3Index, 'b');
+});
+
 test('syncEmbarkedLandToNavalHex keeps a row whose carrier is missing or is not naval', () => {
   const missing = { id: 'l1', unitType: 'infantry', h3Index: 'b', embarkedOnSubUnitId: 'gone' };
   const landCarrier = { id: 'l2', unitType: 'infantry', h3Index: 'c', embarkedOnSubUnitId: 'l3' };

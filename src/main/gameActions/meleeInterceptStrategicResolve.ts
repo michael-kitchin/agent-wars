@@ -76,6 +76,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     meleeResult,
     rangedResult: pending.rangedResult,
     airStrikeResult: pending.airStrikeResult,
+    airDropResult: pending.airDropResult,
     missileLaunchResult: pending.missileLaunchResult,
     sightCues: pending.sightCues,
     airStrikeTransportLosses: pending.airStrikeTransportLosses,

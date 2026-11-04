@@ -38,6 +38,7 @@ export const IPC_GAME = {
   commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
+  validateGroupAirDropTarget: 'game:validateGroupAirDropTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',
   validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
   cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',

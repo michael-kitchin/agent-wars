@@ -19,7 +19,7 @@ import { tacticalLogQuery } from './tacticalLogging';
  * Purpose: Mirrors `isEmbarkedLandUnitOnWater` using tactical terrain and sealift links instead of the strategic DB.
  * When to use: Building `CombatUnit[]` for `runRangedPhase` on a tactical snapshot, anti-air eligibility, and ranged
  * estimates or assessments in battle tools.
- * Expected outcome: True only for infantry/armor embarked on a naval unit whose cell resolves to water terrain.
+ * Expected outcome: True for infantry or armor embarked on an air unit, and for infantry or armor embarked on a naval unit whose cell is water.
  * Exceptions: None.
  */
 export function tacticalEmbarkedLandExcludedFromRangedInput(
@@ -30,13 +30,23 @@ export function tacticalEmbarkedLandExcludedFromRangedInput(
   if (u.unitType !== 'infantry' && u.unitType !== 'armor') return false;
   const emb = u.embarkedOnSubUnitId;
   if (!emb) return false;
-  const naval = subUnits.find((x) => x.id === emb);
-  if (!naval || naval.unitType !== 'naval') return false;
-  const kind = battle.tacticalTerrainKindByH3?.[naval.h3Index] ?? battle.strategicHexTerrainKind ?? 'plains';
+  const carrier = subUnits.find((x) => x.id === emb);
+  if (!carrier) return false;
+  if (carrier.unitType === 'air') {
+    tacticalLogQuery('tacticalCombatInput tacticalEmbarkedLandExcludedFromRangedInput', {
+      battleId: battle.battleId,
+      subUnitId: u.id,
+      carrierId: carrier.id,
+      carrierTerrain: 'air',
+    });
+    return true;
+  }
+  if (carrier.unitType !== 'naval') return false;
+  const kind = battle.tacticalTerrainKindByH3?.[carrier.h3Index] ?? battle.strategicHexTerrainKind ?? 'plains';
   tacticalLogQuery('tacticalCombatInput tacticalEmbarkedLandExcludedFromRangedInput', {
     battleId: battle.battleId,
     subUnitId: u.id,
-    carrierId: naval.id,
+    carrierId: carrier.id,
     carrierTerrain: kind,
   });
   return kind === 'water';

@@ -215,6 +215,15 @@ airStrikes?: AirStrikeOrder[];
        */
 ferryOrders?: FerryOrder[];
   /**
+   * Air drops the consultation accepted.
+   *
+   * Contract: Omitted when none remain. Each row is one air unit and one H3 target.
+   * When to use: Storing pending orders after a strategic consult.
+   * Expected outcome: Absent on a failure result and when the model dropped nothing.
+   * Exceptions: None.
+   */
+  airDropOrders?: import('./airDropTypes').AirDropOrder[];
+  /**
    * Missile launches the consultation accepted.
    *
    * Contract: Omitted when none remain. Each row is one missile and one H3 target.

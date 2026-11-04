@@ -198,7 +198,7 @@ export function isStackCalloutTargetInsideDialog(target: EventTarget | null): bo
 /**
  * Reloads strategic state after sealift embark/debark so selection uses current embark flags.
  *
- * Purpose: Stack sealift mutates transport assignments without Ready; client must refresh `embarkedOnNavalUnitId`.
+ * Purpose: Stack sealift mutates transport assignments without Ready; client must refresh `embarkedOnCarrierUnitId`.
  * When to use: After successful strategic `updateSealiftSlot` in `renderSealiftSection`.
  * Expected outcome: Debarked land units become selectable/movable same turn; embark cancels refresh standing orders when requested.
  * Exceptions: None (errors logged inside the module helper).

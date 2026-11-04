@@ -244,7 +244,7 @@ function embarkedAtSeaError(unitId: string, engagementType: CombatEstimationEnga
  * Purpose: Strategic reach tables, airport-gated air return fire, and the strategic resolution rule that land units
  * embarked at sea take part in neither ranged nor melee combat.
  * When to use: Every `estimate_combat` call outside a tactical battle.
- * Expected outcome: A theater over `state.units`; embarked-at-sea means `embarkedOnNavalUnitId` is set, the unit is
+ * Expected outcome: A theater over `state.units`; embarked-at-sea means `embarkedOnCarrierUnitId` is set, the unit is
  * infantry or armor, and its hex terrain is `water`.
  * Exceptions: None.
  */
@@ -255,7 +255,7 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
   });
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain] as const));
   const isEmbarkedAtSea = (u: GameStateSnapshot['units'][number]): boolean =>
-    !!u.embarkedOnNavalUnitId &&
+    !!u.embarkedOnCarrierUnitId &&
     (u.unitType === 'infantry' || u.unitType === 'armor') &&
     terrainByH3.get(u.h3Index) === 'water';
   const toCombatUnit = (u: GameStateSnapshot['units'][number]): CombatUnit => ({

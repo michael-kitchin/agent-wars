@@ -394,7 +394,24 @@ export function wireInitCore(deps: InitCoreDeps): void {
 
   // The reticle is a toggle: a click while a ranged attack or an air strike is aimed stops aiming, and otherwise starts
   // aiming the attack the selection can make.
+  document.getElementById('air-drop-btn')?.addEventListener('click', () => {
+    if (S.airDropModeActive) {
+      S.airDropModeActive = false;
+      hideOrderSlowerHexTooltip();
+      void deps.refreshHoverRoutePreview();
+    } else if (S.selectedUnitIds.length > 0 && S.gameState) {
+      S.airDropModeActive = true;
+      S.airStrikeModeActive = false;
+      S.rangedModeActive = false;
+      S.missileLaunchModeActive = false;
+      hideOrderSlowerHexTooltip();
+      void deps.refreshHoverRoutePreview();
+    }
+    deps.updateRangedSidebar();
+    deps.redraw();
+  });
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
+    S.airDropModeActive = false;
     if (S.airStrikeModeActive || S.rangedModeActive || S.missileLaunchModeActive) {
       S.airStrikeModeActive = false;
       S.rangedModeActive = false;

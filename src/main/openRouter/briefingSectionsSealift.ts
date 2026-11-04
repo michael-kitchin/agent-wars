@@ -3,7 +3,7 @@
  *
  * Purpose: Moved out of `briefingSections.ts` so production, air, and naval each have one home.
  * When to use: `buildSystemPromptForTools` after the Commander's Briefing.
- * Expected outcome: Empty string when the opponent has no naval units. Otherwise a heading, rules, and table.
+ * Expected outcome: Empty string when the opponent has neither naval nor air units. Air without ships is the heading plus the airlift sentence. Ships add the embark table.
  * Exceptions: None.
  */
 
@@ -62,7 +62,7 @@ function findNearestOpponentEmbarkHex(
  *
  * Purpose: Shared shell sealift section; tactical uses `embarkedOnSubUnitId` and omits empty battles.
  * When to use: `buildSystemPromptForTools` for both modes.
- * Expected outcome: Empty string when the opponent has no naval units. Otherwise a heading, rules, and table.
+ * Expected outcome: Empty string when the opponent has neither naval nor air units. Air without ships is the heading plus the airlift sentence. Ships add the embark table.
  * Exceptions: None.
  */
 export function buildSealiftBriefingBlock(
@@ -82,7 +82,15 @@ export function buildSealiftBriefingBlock(
     opponentNavalCount: opponentNaval.length,
   });
 
-  if (opponentNaval.length === 0) return '';
+  const opponentAir = state.units.filter((unit) => unit.player === ownSeat && unit.unitType === 'air');
+  const airliftSentence =
+    mode === 'tactical'
+      ? 'An air sub-unit carries one infantry sub-unit, boarded with embark, unloaded with disembark or airDrops.'
+      : 'An air unit carries one infantry unit, boarded with embark, moved with ferryOrders, unloaded with disembark or airDrops.';
+  if (opponentNaval.length === 0 && opponentAir.length === 0) return '';
+  if (opponentNaval.length === 0) {
+    return [topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS), '', airliftSentence].join('\n');
+  }
 
   if (mode === 'tactical') {
     lines.push(topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS));
@@ -101,6 +109,7 @@ export function buildSealiftBriefingBlock(
       navalRows.push([naval.id, format(naval.h3Index), aboardIds, `${capacityUsed}/2`]);
     }
     lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Aboard', 'Capacity Used'], navalRows));
+    if (opponentAir.length > 0) lines.push('', airliftSentence);
     return lines.join('\n');
   }
 
@@ -118,7 +127,7 @@ export function buildSealiftBriefingBlock(
     const infra = infraByHex.get(naval.h3Index);
     const hasPort = (infra?.seaportCount ?? 0) > 0;
     const controlled = controlByHex.get(naval.h3Index) === ownSeat;
-    const embarked = opponentLand.filter((land) => land.embarkedOnNavalUnitId === naval.id);
+    const embarked = opponentLand.filter((land) => land.embarkedOnCarrierUnitId === naval.id);
     const armor = embarked.filter((unit) => unit.unitType === 'armor').length;
     const infantry = embarked.filter((unit) => unit.unitType === 'infantry').length;
     const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format, ownSeat);
@@ -140,5 +149,6 @@ export function buildSealiftBriefingBlock(
       navalRows
     )
   );
+  if (opponentAir.length > 0) lines.push('', airliftSentence);
   return lines.join('\n');
 }

@@ -2,14 +2,12 @@ import { type SeatId, HUMAN_SEAT_ID } from '../../../shared/seatIds';
 import { cellToLatLng } from 'h3-js';
 import {
   getGameStateForPlayer,
-  getHexController,
   getStrategicInfrastructureForHex,
   isDbReady,
 } from '../../gameDb';
 import { executePlanRouteWithSession } from '../../tools/pathfinding';
 import { logDebug, logError, logTrace } from '../../logger';
 import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSession';
-import { formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
 import { strategicFerryRangeOnState, strategicRangeOnState } from '../../weather/weatherMatch';
 import {
   buildHumanOrderGroupPreviewEnvelope,
@@ -17,7 +15,7 @@ import {
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
 import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
-import { isWithinAirFerryGridRange } from '../gridRange';
+import { resolveStrategicAirportFerry } from '../airFerryRoute';
 import {
   isEmbarkedLandUnit,
 } from '../sealift';
@@ -632,49 +630,43 @@ function computeHumanMarchPreviewForUnit(
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
   let result: HumanOrderPreviewResult;
   if (unit.unitType === 'air') {
-    const controller = getHexController(hoveredH3Index);
-    if (controller !== HUMAN_SEAT_ID) {
+    const originInfra = getStrategicInfrastructureForHex(unit.h3Index);
+    if (originInfra.airportCount <= 0) {
       return {
         valid: false,
         showInvalidMarker: true,
-        invalidReason: 'Ferry destination must be a human-controlled airport hex.',
+        invalidReason: 'Origin airport is not intact',
         segments: [],
       };
     }
-    const destinationInfra = getStrategicInfrastructureForHex(hoveredH3Index);
-    if (destinationInfra.airportCount <= 0) {
+    const route = resolveStrategicAirportFerry({
+      unitId,
+      originH3Index: unit.h3Index,
+      destinationH3Index: hoveredH3Index,
+      owner: unit.player,
+    });
+    if (!route.reachable) {
       return {
         valid: false,
         showInvalidMarker: true,
-        invalidReason: 'Ferry destination must have an intact airport.',
+        invalidReason: route.reason,
         segments: [],
       };
     }
-    const ferryRange = strategicFerryRangeOnState(unit, hoveredH3Index, context.state);
-    const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, hoveredH3Index, 'preview ferry', ferryRange);
-    if (!withinFerryRange) {
-      return {
-        valid: false,
-        showInvalidMarker: true,
-        invalidReason: `${formatFerryOutOfRangeReason(ferryRange)}.`,
-        segments: [],
-      };
-    }
-    const originLatLng = context.latLngByH3.get(unit.h3Index) ?? cellToLatLng(unit.h3Index);
-    const destinationLatLng = context.latLngByH3.get(hoveredH3Index) ?? cellToLatLng(hoveredH3Index);
+    const points = route.pathH3Indexes.map((hex) => {
+      const latLng = context.latLngByH3.get(hex) ?? cellToLatLng(hex);
+      return [latLng[0], latLng[1]] as [number, number];
+    });
+    const snowHop = route.pathH3Indexes.slice(1).some(
+      (hex) => strategicFerryRangeOnState(unit, hex, context.state) === 2
+    );
+    const destinationLatLng = points[points.length - 1] ?? cellToLatLng(hoveredH3Index);
     result = {
       valid: true,
       showInvalidMarker: false,
       arrowLatLng: [destinationLatLng[0], destinationLatLng[1]],
-      segments: [
-        {
-          turn: 1,
-          hexes: [
-            [originLatLng[0], originLatLng[1]],
-            [destinationLatLng[0], destinationLatLng[1]],
-          ],
-        },
-      ],
+      segments: [{ turn: 1, hexes: points }],
+      orderPreviewTerrainImpact: snowHop ? { slower: ['Snow'], roadRail: false } : null,
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
     logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');

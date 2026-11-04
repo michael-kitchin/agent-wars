@@ -2,7 +2,7 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AirDropOrder, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
@@ -32,6 +32,7 @@ import {
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
 import { withoutTacticalHeadOnHolderMoves } from './tacticalHeadOnContact';
+import { withoutFerryForDroppedUnits } from './tacticalAirDrop';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
   applyTacticalEmbarkPhaseOnBattle,
@@ -488,6 +489,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
   movementOrders: readonly { unitId: string; toH3Index: string }[];
   rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
   airStrikes?: readonly AirStrikeOrder[];
+  airDropOrders?: readonly AirDropOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
   /**
@@ -539,13 +541,16 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
     const afterOpponentEmbark = applyTacticalEmbarkPhaseOnBattle(cur, holds ? undefined : opp?.embarkOrders, party);
     const mergedAir = [...(args.airStrikes ?? []), ...(opp?.airStrikes ?? [])];
     const mergedRanged = [...(args.rangedAttacks ?? []), ...(opp?.rangedAttacks ?? [])];
+    const mergedDrops = [...(args.airDropOrders ?? []), ...(opp?.airDropOrders ?? [])];
+    const strikeUnitIds = new Set(mergedAir.map((order) => order.unitId));
     const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
       afterOpponentEmbark,
       mergedAir,
       mergedRanged,
       HUMAN_SEAT_ID,
       rawNext,
-      'mergedHumanThenOpponent'
+      'mergedHumanThenOpponent',
+      mergedDrops
     );
     const oppMarch = holds ? [] : (opp?.movementOrders ?? []);
     const headOn = withoutTacticalHeadOnHolderMoves({
@@ -570,10 +575,14 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       }
     }
     const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterBothMoves, args.embarkOrders, HUMAN_SEAT_ID);
-    const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, HUMAN_SEAT_ID);
+    const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(
+      bAfterHumanEmbark,
+      withoutFerryForDroppedUnits(args.ferryOrders, args.airDropOrders, strikeUnitIds),
+      HUMAN_SEAT_ID
+    );
     const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(
       bAfterHumanFerry.battle,
-      holds ? undefined : opp?.ferryOrders,
+      holds ? undefined : withoutFerryForDroppedUnits(opp?.ferryOrders, opp?.airDropOrders, strikeUnitIds),
       party
     );
     const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry.battle);
@@ -599,6 +608,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
       airStrikeAttemptCount: acc.airStrikeAttemptCount,
       airStrikePlaybackMoves: acc.airStrikePlaybackMoves,
+      airDropPlaybackMoves: acc.airDropPlaybackMoves,
       airStrikePlaybackStrikeHexes: acc.airStrikePlaybackStrikeHexes,
       airStrikePlaybackCasualtyHexes: acc.airStrikePlaybackCasualtyHexes,
       airStrikePlaybackRemovedUnits: acc.airStrikePlaybackRemovedUnits,

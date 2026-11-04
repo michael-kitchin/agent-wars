@@ -126,6 +126,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
     includeMissileActions: coordinateMode !== 'tactical' && includeMissileActions,
     includeExitBattle,
+    includeNavalActions,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -135,6 +136,7 @@ export function buildFinalJsonContractInstruction(args: {
     exitBattle: '"exitBattle": false',
     airStrikes: '"airStrikes": [ ... ]',
     ferryOrders: '"ferryOrders": [ ... ]',
+    airDrops: '"airDrops": [ ... ]',
     missileLaunches: '"missileLaunches": [ ... ]',
     callbacks: '"callbacks": [...]',
     memoryUpdates: '"memoryUpdates": [...]',
@@ -150,17 +152,20 @@ export function buildFinalJsonContractInstruction(args: {
     `The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`,
   ];
   const airUnitOrderNote = includeAirActions
-    ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
+    ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, airDrops to land embarked infantry, or a "defend" order to keep striking targets in range'
     : '';
   const standingOrdersIssuable = coordinateMode !== 'tactical' && includeStandingOrderActions;
   const actionList = legalOrderActionsForMode(
     coordinateMode,
     includeNavalActions,
-    standingOrdersIssuable
+    standingOrdersIssuable,
+    includeAirActions
   ).join(', ');
   const sealiftActionClause = includeNavalActions
     ? ', transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
-    : '';
+    : includeAirActions
+      ? ', disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
+      : '';
   const rangedReachClause =
     coordinateMode === 'tactical'
       ? 'every type with a tactical reach, infantry included'
@@ -188,7 +193,7 @@ export function buildFinalJsonContractInstruction(args: {
             `Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`,
           ];
   const airClause = includeAirActions
-    ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
+    ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }, airDrops[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
     : '';
   const missileClause = includeMissileActions && coordinateMode !== 'tactical'
     ? 'Optional top-level missile launches: missileLaunches[] entries use { "unitId" or "unitIds", "targetHexCode" }; each missile launches once and is spent. '
@@ -350,6 +355,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
         ],
     airStrikes: [],
     ferryOrders: [],
+    airDrops: [],
     missileLaunches: EXAMPLE_MISSILE_LAUNCHES,
     callbacks: EXAMPLE_CALLBACKS,
     memoryUpdates: EXAMPLE_MEMORY_UPDATES,

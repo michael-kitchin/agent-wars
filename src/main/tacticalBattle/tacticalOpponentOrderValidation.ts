@@ -147,6 +147,18 @@ function validateTacticalEmbarkOrderForPlayer(args: {
   if (land.player !== player || naval.player !== player) {
     return tacticalInvalidResult(wrongPlayerReason);
   }
+  if (naval.unitType === 'air') {
+    if (land.unitType !== 'infantry') return tacticalInvalidResult('An air unit can carry only infantry.');
+    if (land.h3Index !== naval.h3Index) return tacticalInvalidResult('Embark requires co-located land and air units');
+    if (land.embarkedOnSubUnitId === order.navalUnitId) return tacticalValidResult();
+    if (land.embarkedOnSubUnitId) return tacticalInvalidResult('Land unit already embarked on a different carrier');
+    const aboard = subUnits.filter(
+      (unit) => unit.embarkedOnSubUnitId === order.navalUnitId && unit.unitType === 'infantry'
+    ).length;
+    if (aboard >= 1) return tacticalInvalidResult('An air unit has only one infantry slot.');
+    tacticalLogQuery(`${logLabel} ok`, { unitId: order.unitId, carrier: 'air' });
+    return tacticalValidResult();
+  }
   if (!(land.unitType === 'infantry' || land.unitType === 'armor') || naval.unitType !== 'naval') {
     return tacticalInvalidResult('Embark requires infantry or armor and a naval carrier');
   }

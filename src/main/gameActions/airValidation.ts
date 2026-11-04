@@ -1,21 +1,14 @@
-import {
-  dbGetOne,
-  getHexController,
-  getMapHexSet,
-  getStrategicInfrastructureForHex,
-} from '../gameDb';
+import { getMapHexSet, getStrategicInfrastructureForHex } from '../gameDb';
 import { airStrikeInfrastructureGapReason } from '../../shared/airStrikeInfrastructure';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
-import { AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
+import { AIR_STRIKE_RANGE_HEXES, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
-import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
+import { isWithinAirStrikeGridRange } from './gridRange';
 import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
-import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
-import { strategicFerryRangeOnState } from '../weather/weatherMatch';
-import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
+import { resolveStrategicAirportFerry } from './airFerryRoute';
 
 /**
  * Documents the `ValidationResult` type alias (export type ValidationResult).
@@ -120,21 +113,14 @@ export function validateFerryOrder(
     return { valid: false, reason: FERRY_REASON_ALREADY_BASED };
   }
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
-  const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
-  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
-  const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [unitId])?.birth_h3_index;
-  const ferryRange = strategicFerryRangeOnState(
-    { weatherTags: weatherTagsForBirthHex(birth) },
-    destinationH3Index,
-    { weatherBonusEnabled: weatherSettings.weatherBonusEnabled, turnNumber, startMonth: weatherSettings.startMonth }
-  );
-  const withinFerryRange = isWithinAirFerryGridRange(unit.h3_index, destinationH3Index, 'validateFerryOrder', ferryRange);
-  if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(ferryRange) };
   const origin = getStrategicInfrastructureForHex(unit.h3_index);
   if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };
-  const destination = getStrategicInfrastructureForHex(destinationH3Index);
-  if (isNeutralBorderHex(destinationH3Index) || destination.airportCount <= 0) return { valid: false, reason: 'Destination airport is not intact' };
-  const controller = getHexController(destinationH3Index);
-  if (controller !== unit.player) return { valid: false, reason: 'Destination airport must be controlled by unit owner' };
+  const route = resolveStrategicAirportFerry({
+    unitId,
+    originH3Index: unit.h3_index,
+    destinationH3Index,
+    owner: unit.player,
+  });
+  if (!route.reachable) return { valid: false, reason: route.reason };
   return { valid: true };
 }

@@ -394,7 +394,9 @@ function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
     const result = previewHumanMarchOrders([airUnitId], airportPair!.destinationH3);
     const outOfRangeReason = result.invalidReason ?? null;
     const hasExpectedOutOfRangeReason =
-      outOfRangeReason?.includes('out of range') || outOfRangeReason?.includes('out of ferry range');
+      outOfRangeReason?.includes('out of range') ||
+      outOfRangeReason?.includes('out of ferry range') ||
+      outOfRangeReason === 'No chain of your airports stays within ferry range.';
     assert.ok(hasExpectedOutOfRangeReason, `expected out-of-range ferry reason, got: ${outOfRangeReason}`);
   });
 }

@@ -351,7 +351,12 @@ function rangedAttackRowSchemas(allProperties: Readonly<Record<string, unknown>>
  * Exceptions: Throws when a legal action other than `ranged_attack` has no row shape.
  */
 function orderRowSchema(gates: EnvelopeGates): Record<string, unknown> {
-  const actions = legalOrderActionsForMode(gates.coordinateMode, true, gates.includeStandingOrderActions !== false);
+  const actions = legalOrderActionsForMode(
+    gates.coordinateMode,
+    gates.includeNavalActions !== false,
+    gates.includeStandingOrderActions !== false,
+    gates.includeAirActions
+  );
   const properties = orderRowProperties(actions);
   return {
     anyOf: actions.flatMap((action) =>
@@ -428,6 +433,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'airStrikes':
       return arraySchema(airStrikeRowSchema());
     case 'ferryOrders':
+    case 'airDrops':
       return arraySchema(
         closedObjectSchema({ unitId: STRING_SCHEMA, unitIds: STRING_ARRAY_SCHEMA, destination: STRING_SCHEMA }, [
           'destination',

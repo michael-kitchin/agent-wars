@@ -8,6 +8,7 @@
  */
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AirDropOrder } from '../../shared/ipc/airDropTypes';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { HUMAN_SEAT_ID, NEUTRAL_OWNER_ID, type OwnerId } from '../../shared/seatIds';
 import { sortSeatsByOrder } from '../../shared/seatRoster';
@@ -76,7 +77,16 @@ export interface OwnerTurnOrders {
    * Expected outcome: Included in the launch phase when the missile belongs to this owner.
    * Exceptions: None.
    */
-  readonly missileLaunchOrders: readonly MissileLaunchOrder[];
+    readonly missileLaunchOrders: readonly MissileLaunchOrder[];
+  /**
+   * Air drops this owner declared.
+   *
+   * Contract: Each entry names an air unit and a target hex. Absent means none.
+   * When to use: After the human drop orders have been merged.
+   * Expected outcome: A drop for a unit that also strikes is dropped later.
+   * Exceptions: None.
+   */
+  readonly airDropOrders?: readonly AirDropOrder[];
 }
 
 /**
@@ -104,6 +114,7 @@ export const EMPTY_OWNER_TURN_ORDERS: OwnerTurnOrders = {
   ferryOrders: [],
   embarkOrders: [],
   missileLaunchOrders: [],
+  airDropOrders: [],
 };
 
 /**
@@ -152,6 +163,7 @@ export function keepOrdersOfOwnedUnits(
     ferryOrders: keep(orders.ferryOrders, 'ferry'),
     embarkOrders: keep(orders.embarkOrders, 'embark'),
     missileLaunchOrders: keep(orders.missileLaunchOrders, 'missile'),
+    airDropOrders: keep(orders.airDropOrders ?? [], 'drop'),
   };
 }
 

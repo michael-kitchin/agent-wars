@@ -94,12 +94,14 @@ test('tacticalOpponentPlanFromRequestOrdersSuccess maps strategic-shaped order a
     tacticalOpponentPlanFromRequestOrdersSuccess({
       orders: [{ unitId: 'opp-1', toH3Index: 'h1' }],
       rangedAttacks: [{ unitId: 'opp-2', targetH3Index: 'h2' }],
+      airDropOrders: [{ unitId: 'opp-air', targetH3Index: 'h3' }],
     }),
     {
       movementOrders: [{ unitId: 'opp-1', toH3Index: 'h1' }],
       rangedAttacks: [{ unitId: 'opp-2', targetH3Index: 'h2' }],
       airStrikes: [],
       ferryOrders: [],
+      airDropOrders: [{ unitId: 'opp-air', targetH3Index: 'h3' }],
       embarkOrders: [],
     }
   );

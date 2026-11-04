@@ -68,6 +68,15 @@ export interface RequestOrdersResult {
    */
   ferryOrders?: FerryOrder[];
   /**
+   * Air drops that passed validation.
+   *
+   * Contract: Omitted when none remain. Each air unit appears once.
+   * When to use: Storing the consult and playing the turn.
+   * Expected outcome: `unitId` and `targetH3Index` for drops the seat may fly.
+   * Exceptions: None.
+   */
+  airDropOrders?: import('../../shared/ipc/airDropTypes').AirDropOrder[];
+  /**
    * Missile launches that passed validation.
    *
    * Contract: Omitted when none remain. Each missile appears once.

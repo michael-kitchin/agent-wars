@@ -10,6 +10,7 @@
  * Exceptions: None; invalid rows are dropped with reasons rather than thrown.
  */
 
+import type { AirDropOrder } from '../../shared/ipc/airDropTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -23,6 +24,8 @@ import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools
 import { moveDefendPostsToExplicitMoveDestinations } from '../tools/standingOrdersDefendPost';
 import { mergeCommanderAttackOrders } from '../tools/tempoRuleAttacks';
 import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
+import { validateAirDropOrder } from '../gameActions/airDropValidation';
+import { tacticalAirDropRefusal } from '../tacticalBattle/tacticalAirDrop';
 import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
 import { projectTacticalSnapshotAfterPlayerMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import {
@@ -291,6 +294,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   const rangedSource = parsed.rangedAttacks ?? [];
   const airSource = parsed.airStrikes ?? [];
   const ferrySource = parsed.ferryOrders ?? [];
+  const dropSource = parsed.airDropOrders ?? [];
   const embarkSource = parsed.embarkOrders ?? [];
   const missileApplied = applyParsedMissileLaunches({
     parsed: parsed.missileLaunches ?? [],
@@ -312,6 +316,9 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(ferrySource)) {
     dropReasons.push(`Duplicate ferry for ${aiOrderUnitLabel(unitId)}`);
   }
+  for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(dropSource)) {
+    dropReasons.push(`Duplicate air drop for ${aiOrderUnitLabel(unitId)}`);
+  }
   for (const unitId of unitIdsWhoseEarlierRowsWereDiscarded(embarkSource)) {
     dropReasons.push(`Duplicate embark for ${aiOrderUnitLabel(unitId)}`);
   }
@@ -319,6 +326,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   const llmRangedOrders = dedupeByUnitKeepLast(rangedSource);
   const llmAirStrikes = dedupeByUnitKeepLast(airSource);
   const llmFerryOrders = dedupeByUnitKeepLast(ferrySource);
+  const llmAirDrops = dedupeByUnitKeepLast(dropSource);
   const llmEmbarkOrders = dedupeByUnitKeepLast(embarkSource);
   const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
   const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
@@ -331,6 +339,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     standingOrderAirStrikes: standingGenerated.airStrikes,
     modelRanged: llmRangedOrders,
     modelAirStrikes: llmAirStrikes,
+    modelFerryUnitIds: llmFerryOrders.map((order) => order.unitId),
+    modelAirDropUnitIds: llmAirDrops.map((order) => order.unitId),
   });
 
   const validated: { unitId: string; toH3Index: string }[] = [];
@@ -552,6 +562,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       state,
       modelFerryOrders: llmFerryOrders,
       airStrikeUnitIds: new Set(mergedAirStrikes.map((s) => s.unitId)),
+      airDropUnitIds: new Set(llmAirDrops.map((order) => order.unitId)),
       displayLabelForUnit: aiOrderUnitLabel,
     });
     outFerry = strategicFerry.ferryOrders;
@@ -603,12 +614,24 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         : '';
     onLog(`AI planning complete in ${ms} ms: ${bits.join(', ')}${dropNote}${tokNote}.`);
   }
+  const validatedAirDrops: AirDropOrder[] = [];
+  for (const drop of llmAirDrops) {
+    const reason = tacticalBattle
+      ? tacticalAirDropRefusal(tacticalBattle, drop.unitId, drop.targetH3Index)
+      : airDropRefusal(drop.unitId, drop.targetH3Index, seatId);
+    if (reason) {
+      dropReasons.push(`Air drop ${aiOrderUnitLabel(drop.unitId)}: ${reason}`);
+      continue;
+    }
+    validatedAirDrops.push(drop);
+  }
   return {
     success: true,
     orders: validated,
     rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
     airStrikes: outAir.length > 0 ? outAir : undefined,
     ferryOrders: outFerry.length > 0 ? outFerry : undefined,
+    airDropOrders: validatedAirDrops.length > 0 ? validatedAirDrops : undefined,
     embarkOrders: outEmbark.length > 0 ? outEmbark : undefined,
     missileLaunches: outMissile.length > 0 ? outMissile : undefined,
     strategy: parsed.strategy,
@@ -642,5 +665,21 @@ function dropReasonWhenTacticalUnitIsNotSeat(
   const owner = battle.subUnits.find((unit) => unit.id === unitId)?.player;
   if (owner === seatId) return null;
   return `${kind} ${label(unitId)}: unit belongs to another commander`;
+}
+
+/**
+ * The strategic reason a drop cannot be stored, or null when the engine accepts it.
+ *
+ * Purpose: Keeps the apply loop from calling validation twice.
+ * When to use: One strategic drop row.
+ * Expected outcome: The validator's reason, or null.
+ * Exceptions: None.
+ */
+function airDropRefusal(unitId: string, targetH3Index: string, seatId: AiSeatId): string | null {
+  const result = validateAirDropOrder(unitId, targetH3Index, {
+    allowedPlayer: seatId,
+    displayLabelForUnit: (id) => id,
+  });
+  return result.valid ? null : result.reason;
 }
 

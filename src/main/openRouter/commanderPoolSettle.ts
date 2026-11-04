@@ -192,6 +192,7 @@ export function applyConsultOutcome(
         rangedOrders: [...outcome.rangedOrders],
         airStrikeOrders: [...outcome.airStrikeOrders],
         ferryOrders: [...outcome.ferryOrders],
+        airDropOrders: [...(outcome.airDropOrders ?? [])],
         embarkOrders: [...outcome.embarkOrders],
         missileLaunchOrders: [...outcome.missileLaunchOrders],
       });

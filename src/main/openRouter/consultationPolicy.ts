@@ -27,6 +27,7 @@ export type StrategicResolutionOpponentActivitySlice = Pick<
   | 'combatParticipantUnitIdsBySeat'
   | 'resolvedFerryMoves'
   | 'airStrikeMoves'
+  | 'airDropMoves'
   | 'missileLaunches'
   | 'hadStrategicMarchResolutionBySeat'
 >;
@@ -41,7 +42,7 @@ export type StrategicResolutionOpponentActivitySlice = Pick<
  */
 export type StrategicResolutionHumanActivitySlice = Pick<
   ReadyResult,
-  'humanMoves' | 'resolvedFerryMoves' | 'airStrikeMoves' | 'missileLaunches' | 'kills' | 'killsByDirectFire' | 'killsByReturnFire'
+  'humanMoves' | 'resolvedFerryMoves' | 'airStrikeMoves' | 'airDropMoves' | 'missileLaunches' | 'kills' | 'killsByDirectFire' | 'killsByReturnFire'
 >;
 
 /**
@@ -62,6 +63,7 @@ export type ReadyResultWithParticipants = Pick<
   | 'infrastructureDestroyedEvents'
   | 'resolvedFerryMoves'
   | 'airStrikeMoves'
+  | 'airDropMoves'
   | 'missileLaunches'
   | 'hadStrategicMarchResolutionBySeat'
   | 'humanMoves'
@@ -171,6 +173,7 @@ export function seatHadStrategicResolutionUnitActions(
   if ((r.combatParticipantUnitIdsBySeat?.[seatId]?.length ?? 0) > 0) return true;
   if (animationRowsIncludePlayer(r.resolvedFerryMoves, seatId)) return true;
   if (animationRowsIncludePlayer(r.airStrikeMoves, seatId)) return true;
+  if (animationRowsIncludePlayer(r.airDropMoves, seatId)) return true;
   if ((r.missileLaunches ?? []).some((launch) => launch.player === seatId)) return true;
   return false;
 }
@@ -196,6 +199,7 @@ export function enemyHadStrategicResolutionObservableActions(
   })) return true;
   if ((r.resolvedFerryMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
   if ((r.airStrikeMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
+  if ((r.airDropMoves ?? []).some((row) => row.player !== seatId && isSeatId(row.player))) return true;
   if ((r.missileLaunches ?? []).some((launch) => launch.player !== seatId && isSeatId(launch.player) && launch.targetControllerId === seatId)) {
     return true;
   }

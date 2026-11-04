@@ -59,6 +59,8 @@ const marchBlockingCases: { reason: string; terrainKind: string | null; expected
   { reason: STRATEGIC_DESTINATION_UNREACHABLE_REASON, terrainKind: 'plains', expected: 'Blocked: Unreachable' },
   { reason: ARMOR_MOVE_ENDS_ON_ENTER_REASON, terrainKind: 'arctic', expected: 'Blocked: Unreachable' },
   { reason: 'Destination out of ferry range (4).', terrainKind: null, expected: 'Blocked: Range' },
+  { reason: 'No chain of your airports stays within ferry range.', terrainKind: null, expected: 'Blocked: Range' },
+  { reason: 'Destination airport must be controlled by unit owner', terrainKind: null, expected: 'Blocked: Invalid' },
   {
     reason: 'Ferry destination must be a human-controlled airport hex.',
     terrainKind: null,

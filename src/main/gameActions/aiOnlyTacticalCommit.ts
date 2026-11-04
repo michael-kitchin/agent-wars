@@ -134,7 +134,7 @@ export function commitAiOnlyTacticalBeat(args: {
  * Exceptions: None.
  */
 function seatHadRangedOrAir(draft: TacticalOpponentPlanPayload): boolean {
-  return draft.rangedAttacks.length > 0 || draft.airStrikes.length > 0;
+  return draft.rangedAttacks.length > 0 || draft.airStrikes.length > 0 || (draft.airDropOrders?.length ?? 0) > 0;
 }
 
 /**
@@ -150,6 +150,7 @@ function draftOrEmpty(draft: TacticalOpponentPlanPayload | undefined): TacticalO
     movementOrders: [],
     rangedAttacks: [],
     airStrikes: [],
+    airDropOrders: [],
     ferryOrders: [],
     embarkOrders: [],
   };

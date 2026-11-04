@@ -11,6 +11,7 @@
 import { dbGetAll, dbGetOne, dbRun, getHexController, getStrategicInfrastructureForHex } from '../gameDb';
 import { logDebug } from '../logger';
 import type { CombatUnit } from '../combatUnitTypes';
+import { applyTransportLossForRemovedNavalUnits } from './sealift';
 
 /**
  * Detects multi-player combat occupancy on a strategic hex so air-base cleanup can defer until the contest clears.
@@ -35,7 +36,7 @@ function hexHasMultiPlayerCombatPresence(h3Index: string): boolean {
  *
  * Purpose: Keeps the air-base validity rule in one module for ready and melee-intercept completion paths.
  * When to use: After movement and combat phases when bases may have flipped or airports been destroyed.
- * Expected outcome: Invalid air rows are removed from `units`; returned entries describe what was deleted.
+ * Expected outcome: Invalid air rows are removed from `units`. Returned entries are that air unit and the land units that were assigned to it.
  * Exceptions: Database errors propagate to callers.
  */
 export function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
@@ -53,14 +54,16 @@ export function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
     const infra = getStrategicInfrastructureForHex(row.h3_index);
     const controller = getHexController(row.h3_index);
     if (infra.airportCount > 0 && controller === row.player) continue;
-    dbRun('DELETE FROM units WHERE id = ?', [row.id]);
-    removed.push({
+    const airUnit = {
       id: row.id,
       player: row.player,
-      unitType: row.unit_type,
+      unitType: 'air' as const,
       h3Index: row.h3_index,
       displayOrder: row.display_order ?? undefined,
-    });
+    };
+    const cargo = applyTransportLossForRemovedNavalUnits([airUnit]);
+    dbRun('DELETE FROM units WHERE id = ?', [row.id]);
+    removed.push(airUnit, ...cargo);
   }
   return removed;
 }

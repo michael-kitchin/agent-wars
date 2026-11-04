@@ -16,7 +16,7 @@ import {
 } from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildQueueItemTypes } from '../productionRules';
-import { compareCasualtyOrder, getRange } from '../combatConstants';
+import { compareCasualtyOrder } from '../combatConstants';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { createCombatDiceLog, rollCombatDieAgainst, type CombatDiceLog } from '../combatDiceRecording';
@@ -37,7 +37,9 @@ import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
 import type { TerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import { validateAirStrikeOrder } from './airValidation';
-import { isEmbarkedLandUnitOnWater } from './sealift';
+import { applyTransportLossForRemovedNavalUnits } from './sealift';
+import { isLandUnitEmbarkedOnAir, landUnitSitsOutCombat } from './airlift';
+import { rollAntiAirCounterFire } from './airCounterFire';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
 /**
@@ -164,6 +166,13 @@ export function destroyBasedAirUnitsAtHex(
     [h3Index, 'air']
   );
   for (const row of rows) {
+    applyTransportLossForRemovedNavalUnits([{
+      id: row.id,
+      player: row.player,
+      unitType: row.unit_type,
+      h3Index: row.h3_index,
+      displayOrder: row.display_order ?? undefined,
+    }]);
     dbRun('DELETE FROM units WHERE id = ?', [row.id]);
   }
   return rows;
@@ -457,12 +466,13 @@ function resolveAirStrikeAgainstUnits(
   );
   const eligibleDefenders = defenders.filter((defender) => {
     if (defender.unit_type !== 'infantry' && defender.unit_type !== 'armor') return true;
-    return !isEmbarkedLandUnitOnWater(defender.id);
+    return !landUnitSitsOutCombat(defender.id);
   });
   let success = false;
+  const strikeTargets = defenders.filter((defender) => !isLandUnitEmbarkedOnAir(defender.id));
   let attackerLost = false;
-  if (attackHit && defenders.length > 0) {
-    const victim = [...defenders].sort((a, b) => compareCasualtyOrder(a.unit_type, b.unit_type))[0]!;
+  if (attackHit && strikeTargets.length > 0) {
+    const victim = [...strikeTargets].sort((a, b) => compareCasualtyOrder(a.unit_type, b.unit_type))[0]!;
     if (acc.fortification?.hooks.absorbHit({ player: victim.player, h3Index: targetH3Index }) !== true) {
       dbRun('DELETE FROM units WHERE id = ?', [victim.id]);
       recordRemovedUnit(acc, victim);
@@ -470,31 +480,22 @@ function resolveAirStrikeAgainstUnits(
     success = true;
   }
 
-  for (const defender of eligibleDefenders) {
-    if (getRange(defender.unit_type) < 1) continue;
-    const counterFireThreshold = attackHitThreshold({
+  attackerLost = rollAntiAirCounterFire({
+    attacker,
+    targetH3Index,
+    defenders: eligibleDefenders,
+    rollDie,
+    diceLog: acc.diceLog,
+    originHitBonusAt,
+    techHitBonusAt,
+    weatherAttackPenalty: (defender) => penaltyForDbUnit({
+      unitId: defender.id,
       unitType: defender.unit_type,
-      originHitBonus: originHitBonusAt(defender.id, defender.h3_index),
-      techAttackBonus: techHitBonusAt(defender.id).attack,
-      weatherAttackPenalty: penaltyForDbUnit({
-        unitId: defender.id,
-        unitType: defender.unit_type,
-        h3Index: defender.h3_index,
-        kind: 'ranged',
-      }),
-    });
-    const counterFireContext = {
-      kind: 'antiAir',
-      player: defender.player,
-      unitType: defender.unit_type,
-      anchorH3Index: targetH3Index,
-    } as const;
-    if (!rollCombatDieAgainst(rollDie, counterFireThreshold, counterFireContext, acc.diceLog.sink)) continue;
-    dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
-    recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index });
-    attackerLost = true;
-    break;
-  }
+      h3Index: defender.h3_index,
+      kind: 'ranged',
+    }),
+    onAttackerRemoved: () => recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index }),
+  });
   return { success, attackerLost };
 }
 

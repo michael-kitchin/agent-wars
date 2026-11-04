@@ -274,6 +274,7 @@ export async function afterResolution(
           rangedOrders: result.rangedAttacks ?? [],
           airStrikeOrders: result.airStrikes ?? [],
           ferryOrders: result.ferryOrders ?? [],
+          airDropOrders: result.airDropOrders ?? [],
           embarkOrders: result.embarkOrders ?? [],
           missileLaunchOrders: result.missileLaunches ?? [],
         });

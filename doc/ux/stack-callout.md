@@ -25,7 +25,7 @@ Opens in Strategic planning and Tactical planning after a plain click on a unit 
 - When Shift is held and the hex has human units, "+ All" adds them and "- All" removes them.
 - A close control. Control tips for the close control, the row toggles, and the All controls are in [control-tooltips.md](control-tooltips.md).
 - The callout opens `TOOLTIP_OFFSET_PX` (12) below and to the right of the click, then shifts so it stays inside the window (`placeAnchoredPopup`). It may cover the top bar, the console, or the minimap. A callout taller or wider than the window sits against the top and left and may still be clipped. Appending or removing the sealift section moves it again without hiding it.
-- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags. Control tips for a slot list and its debark button are in [control-tooltips.md](control-tooltips.md).
+- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags. An air unit on the hex adds a row when infantry there can board, or when that air unit already carries infantry. Armor alone does not add one. The air row has one infantry slot, and debark is allowed on the hex the air unit occupies. Control tips for a slot list and its debark button are in [control-tooltips.md](control-tooltips.md).
 
 Enemy rows have no selection toggle.
 

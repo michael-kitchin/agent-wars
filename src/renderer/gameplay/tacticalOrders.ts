@@ -1,6 +1,14 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
+import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { selectionSupportAction, selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import {
+  airDropAimTooltipText,
+  airDropDisabledTooltipText,
+  airDropStopTooltipText,
+  supportButtonTooltipText,
+} from '../chrome/controlTooltipText';
+import {
+  formatPendingAirDropSidebarLabel,
   formatPendingAirStrikeSidebarLabel,
   formatPendingMissileLaunchSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
@@ -14,8 +22,83 @@ export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import { refreshHoverRoutePreview } from './hoverRoutePreviewRefresh';
 import { renderSelectionBarState, selectedUnitTypes } from './selectionBar';
-import { supportButtonTooltipText } from '../chrome/controlTooltipText';
 export { refreshHoverRoutePreview };
+
+/**
+ * How many infantry units are embarked on each carrier in the active theater.
+ *
+ * Purpose: The air-drop button is shown when any selected air unit has infantry, and enabled only when every one does.
+ * When to use: While updating the selection panel.
+ * Expected outcome: A count per carrier id. A carrier with no infantry is absent.
+ * Exceptions: None.
+ */
+function infantryAboardCountByCarrier(): Map<string, number> {
+  const counts = new Map<string, number>();
+  const battle = S.tacticalBattleSnapshot;
+  if (battle) {
+    for (const unit of battle.subUnits) {
+      if (unit.unitType !== 'infantry' || !unit.embarkedOnSubUnitId) continue;
+      counts.set(unit.embarkedOnSubUnitId, (counts.get(unit.embarkedOnSubUnitId) ?? 0) + 1);
+    }
+    return counts;
+  }
+  for (const unit of S.gameState?.units ?? []) {
+    if (unit.unitType !== 'infantry' || !unit.embarkedOnCarrierUnitId) continue;
+    counts.set(unit.embarkedOnCarrierUnitId, (counts.get(unit.embarkedOnCarrierUnitId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * The human units in the current selection.
+ *
+ * Purpose: The air-drop button looks only at the player's own selected units.
+ * When to use: `airDropButtonState`.
+ * Expected outcome: One row per selected human unit in this theater.
+ * Exceptions: None.
+ */
+function selectedHumanUnits(): { id: string; unitType: string }[] {
+  const battle = S.tacticalBattleSnapshot;
+  return S.selectedUnitIds.flatMap((id) => {
+    if (battle) {
+      const unit = battle.subUnits.find((row) => row.id === id && row.player === HUMAN_SEAT_ID);
+      return unit ? [{ id: unit.id, unitType: unit.unitType }] : [];
+    }
+    const unit = S.gameState?.units.find((row) => row.id === id && row.player === HUMAN_SEAT_ID);
+    return unit ? [{ id: unit.id, unitType: unit.unitType }] : [];
+  });
+}
+
+/**
+ * Whether the air-drop button is on screen and whether it can be pressed.
+ *
+ * Purpose: A mixed selection hides it. An air selection with no infantry hides it. A partial load shows it disabled.
+ * When to use: Each `updateRangedSidebar` pass.
+ * Expected outcome: Visible when every selected human unit is air and at least one carries infantry. Enabled when every one carries infantry.
+ * Exceptions: None.
+ */
+function airDropButtonState(): { visible: boolean; enabled: boolean } {
+  const selected = selectedHumanUnits();
+  if (selected.length === 0 || selected.some((unit) => unit.unitType !== 'air')) {
+    return { visible: false, enabled: false };
+  }
+  const counts = infantryAboardCountByCarrier();
+  const carrying = selected.filter((unit) => (counts.get(unit.id) ?? 0) >= 1);
+  return { visible: carrying.length > 0, enabled: carrying.length === selected.length };
+}
+
+/**
+ * Drops queued air drops for these units.
+ *
+ * Purpose: A strike or a ferry replaces a drop for the same air unit.
+ * When to use: After a strike or ferry is queued for those ids.
+ * Expected outcome: Those units' drops are gone. Other drops stay.
+ * Exceptions: None.
+ */
+function forgetAirDropsFor(unitIds: readonly string[]): void {
+  const ids = new Set(unitIds);
+  S.pendingAirDrops = S.pendingAirDrops.filter((row) => !ids.has(row.unitId));
+}
 
 /**
  * The reticle's accessible names, one per kind of attack.
@@ -92,6 +175,29 @@ export function replacePendingAirStrikesForSelected(
     selectedIds,
     (unitId) => ({ unitId, targetH3Index, targetType })
   );
+  forgetAirDropsFor(selectedIds);
+}
+
+/**
+ * Queues one air drop for each selected air unit.
+ *
+ * Purpose: A double-click on a legal landing hex replaces any drop, strike, or ferry for those units.
+ * When to use: After `validateGroupAirDropTarget` succeeds.
+ * Expected outcome: One drop per selected id. Strikes and ferries for those ids are removed. Other units are unchanged.
+ * Exceptions: None.
+ */
+export function replacePendingAirDropsForSelected(selectedIds: string[], targetH3Index: string): void {
+  const ids = new Set(selectedIds);
+  S.pendingAirStrikes = S.pendingAirStrikes.filter((row) => !ids.has(row.unitId));
+  S.pendingFerryOrders = S.pendingFerryOrders.filter((row) => !ids.has(row.unitId));
+  replacePendingOrdersForSelected(
+    () => S.pendingAirDrops,
+    (next) => {
+      S.pendingAirDrops = next;
+    },
+    selectedIds,
+    (unitId) => ({ unitId, targetH3Index })
+  );
 }
 
 /**
@@ -121,7 +227,11 @@ export function replacePendingMissileLaunchesForSelected(selectedIds: string[], 
  * Expected outcome: Moving units replace their pending ferry. Units already at `destinationH3Index` lose any pending ferry and are not re-queued. Other units' ferries stay.
  * Exceptions: None.
  */
-export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
+export function replacePendingFerryOrdersForSelected(
+  selectedIds: string[],
+  destinationH3Index: string,
+  pathsByUnitId?: Readonly<Record<string, readonly string[]>>
+): void {
   const alreadyBased = new Set(
     selectedIds.filter((unitId) =>
       S.gameState?.units.some((unit) => unit.id === unitId && unit.h3Index === destinationH3Index)
@@ -134,8 +244,13 @@ export function replacePendingFerryOrdersForSelected(selectedIds: string[], dest
       S.pendingFerryOrders = next;
     },
     movingIds,
-    (unitId) => ({ unitId, destinationH3Index })
+    (unitId) => ({
+      unitId,
+      destinationH3Index,
+      pathH3Indexes: pathsByUnitId?.[unitId],
+    })
   );
+  forgetAirDropsFor(movingIds);
 }
 
 /**
@@ -151,6 +266,8 @@ export function clearPendingTacticalOrders(): void {
   S.rangedModeActive = false;
   S.pendingAirStrikes = [];
   S.airStrikeModeActive = false;
+  S.pendingAirDrops = [];
+  S.airDropModeActive = false;
   S.pendingMissileLaunches = [];
   S.missileLaunchModeActive = false;
   S.pendingFerryOrders = [];
@@ -221,6 +338,20 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
   S.airStrikeModeActive = false;
+  finishTargetingDraftCancel(unitId, deps);
+}
+
+/**
+ * Removes one air unit's pending drop and turns air-drop aiming off.
+ *
+ * Purpose: Backs the cancel control on an Air drops row.
+ * When to use: From that row's cancel callback.
+ * Expected outcome: Only that unit's drop is removed.
+ * Exceptions: None.
+ */
+export function cancelAirDropForUnit(unitId: string, deps: TacticalOrderDeps): void {
+  S.pendingAirDrops = S.pendingAirDrops.filter((row) => row.unitId !== unitId);
+  S.airDropModeActive = false;
   finishTargetingDraftCancel(unitId, deps);
 }
 
@@ -317,14 +448,24 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   if (strikeListEl) {
     renderSidebarOrderGroup(
       'strike',
-      S.pendingAirStrikes.map((strike) =>
-        sidebarOrderRowArgs(
-          strike.unitId,
-          formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle),
-          () => cancelAirStrikeForUnit(strike.unitId, deps),
-          deps
-        )
-      )
+      [
+        ...S.pendingAirStrikes.map((strike) =>
+          sidebarOrderRowArgs(
+            strike.unitId,
+            formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle),
+            () => cancelAirStrikeForUnit(strike.unitId, deps),
+            deps
+          )
+        ),
+        ...S.pendingAirDrops.map((drop) =>
+          sidebarOrderRowArgs(
+            drop.unitId,
+            formatPendingAirDropSidebarLabel(S.gameState, drop, battle),
+            () => cancelAirDropForUnit(drop.unitId, deps),
+            deps
+          )
+        ),
+      ]
     );
   }
   if (launchListEl) {
@@ -345,6 +486,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     const tb = S.tacticalBattleSnapshot;
     const rangedWasActive = S.rangedModeActive;
     const strikeWasActive = S.airStrikeModeActive;
+    const dropWasActive = S.airDropModeActive;
     const launchWasActive = S.missileLaunchModeActive;
     const unitTypes = selectedUnitTypes();
     const mode = selectionSupportButtonMode(unitTypes, !!tb);
@@ -388,9 +530,30 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       S.missileLaunchModeActive = false;
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
     }
+    const dropButton = document.getElementById('air-drop-btn') as HTMLButtonElement | null;
+    const dropHost = document.getElementById('air-drop-tip-host');
+    const dropState = airDropButtonState();
+    if (!dropState.visible) S.airDropModeActive = false;
+    if (dropButton && dropHost) {
+      dropHost.style.display = dropState.visible ? '' : 'none';
+      dropButton.disabled = !dropState.enabled;
+      dropButton.setAttribute('aria-pressed', String(S.airDropModeActive));
+      dropButton.setAttribute('aria-label', 'Air drop');
+      if (!dropState.enabled) {
+        dropHost.setAttribute('data-control-tooltip', airDropDisabledTooltipText);
+        dropButton.removeAttribute('data-control-tooltip');
+      } else {
+        dropHost.removeAttribute('data-control-tooltip');
+        dropButton.setAttribute(
+          'data-control-tooltip',
+          S.airDropModeActive ? airDropStopTooltipText : airDropAimTooltipText
+        );
+      }
+    }
     const targetingModeCleared =
       (rangedWasActive && !S.rangedModeActive) ||
       (strikeWasActive && !S.airStrikeModeActive) ||
+      (dropWasActive && !S.airDropModeActive) ||
       (launchWasActive && !S.missileLaunchModeActive);
     if (targetingModeCleared) {
       S.hoverRoutePreview = null;

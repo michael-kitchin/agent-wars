@@ -31,6 +31,7 @@ import {
   commitHumanTacticalDraftOrders,
   validateGroupRangedTarget,
   validateGroupAirStrikeTarget,
+  validateGroupAirDropTarget,
   validateGroupFerryTarget,
   cancelHumanOrder,
   resolveMeleeIntercept,
@@ -441,6 +442,7 @@ function registerIpcHandlers(): void {
       movementOrders: v.movementOrders,
       rangedAttacks: v.rangedAttacks,
       airStrikes: v.airStrikes,
+      airDropOrders: v.airDropOrders,
       ferryOrders: v.ferryOrders,
       embarkOrders: v.embarkOrders,
       opponentTacticalDraft: v.opponentTacticalDraft,
@@ -500,6 +502,16 @@ function registerIpcHandlers(): void {
         return { success: false, reason: 'Invalid grouped strike payload' };
       }
       return validateGroupAirStrikeTarget(parsed.unitIds, parsed.targetH3Index, parsed.targetType);
+    }
+  );
+  ipcMain.handle(
+    IPC_GAME.validateGroupAirDropTarget,
+    (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
+      const parsed = parseGroupedTargetPayload(payload);
+      if (!parsed) {
+        return { success: false, reason: 'Invalid grouped air drop payload' };
+      }
+      return validateGroupAirDropTarget(parsed.unitIds, parsed.targetH3Index);
     }
   );
   ipcMain.handle(

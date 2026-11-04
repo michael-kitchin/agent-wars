@@ -44,5 +44,5 @@ test('stack count badges share one font and one helper', () => {
 test('pending support lines share one segment builder', () => {
   const orders = readRendererSource('rendering', 'orderDrawing.ts');
   assert.equal(occurrenceCount(orders, 'segments.push('), 1);
-  assert.equal(occurrenceCount(orders, 'drawPendingSupportOrderLines(ctx, '), 3);
+  assert.equal(occurrenceCount(orders, 'drawPendingSupportOrderLines(ctx, '), 4);
 });

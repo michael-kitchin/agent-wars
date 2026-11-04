@@ -44,7 +44,7 @@ toH3Index: string;
    * Expected outcome: Renderer interpolates along this polyline instead of a single geodesic chord.
    * Exceptions: None.
    */
-pathH3Indexes?: string[];
+pathH3Indexes?: readonly string[];
 }
 
 /**
@@ -109,7 +109,7 @@ toH3Index: string;
    * Expected outcome: `drawMovingUnits` uses polyline interpolation when present.
    * Exceptions: None.
    */
-pathH3Indexes?: string[];
+pathH3Indexes?: readonly string[];
 }
 
 /**

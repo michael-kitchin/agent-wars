@@ -173,3 +173,82 @@ test('tactical melee skips hexes with a single side after support', () => {
     assert.strictEqual(out.battle.subUnits.length, snap.subUnits.length);
   });
 });
+
+test('melee that destroys an air sub-unit also removes the infantry embarked on it', () => {
+  withTempGameDb('aw-tactical-melee-air-cargo-', () => {
+    const strategic = tacticalParentCell(31, 32);
+    const contested = tacticalUnderCorner(31, 32);
+    const footprint = [...gridDisk(contested, 1)];
+    const [humanAside, enemyAside] = footprint.filter((cell) => cell !== contested);
+    assert.ok(humanAside && enemyAside);
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-melee-air-cargo',
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: footprint,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      subUnits: [
+        {
+          id: 'air-1',
+          parentUnitId: 'air-parent',
+          player: 'human',
+          unitType: 'air',
+          h3Index: contested,
+          displayName: 'Air',
+        },
+        {
+          id: 'air-sibling',
+          parentUnitId: 'air-parent',
+          player: 'human',
+          unitType: 'air',
+          h3Index: humanAside,
+          displayName: 'Air sibling',
+        },
+        {
+          id: 'inf-1',
+          parentUnitId: 'inf-parent',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: contested,
+          displayName: 'Infantry',
+          embarkedOnSubUnitId: 'air-1',
+        },
+        {
+          id: 'inf-sibling',
+          parentUnitId: 'inf-parent',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: humanAside,
+          displayName: 'Infantry sibling',
+        },
+        {
+          id: 'armor-1',
+          parentUnitId: 'armor-parent',
+          player: 'opponent',
+          unitType: 'armor',
+          h3Index: contested,
+          displayName: 'Armor',
+        },
+        {
+          id: 'armor-sibling',
+          parentUnitId: 'armor-parent',
+          player: 'opponent',
+          unitType: 'armor',
+          h3Index: enemyAside,
+          displayName: 'Armor sibling',
+        },
+      ],
+    };
+    const out = applyTacticalMeleeAfterSupportOrders(snap, () => 0);
+    assert.equal(out.battle.subUnits.some((unit) => unit.id === 'air-1'), false);
+    assert.equal(out.battle.subUnits.some((unit) => unit.id === 'inf-1'), false);
+    assert.equal(out.meleeRemovedUnits.some((unit) => unit.id === 'air-1'), true);
+    assert.equal(out.meleeRemovedUnits.some((unit) => unit.id === 'inf-1'), true);
+    const carrierKill = out.killsByMelee.find((edge) => edge.victimId === 'air-1');
+    const cargoKill = out.killsByMelee.find((edge) => edge.victimId === 'inf-1');
+    assert.ok(carrierKill);
+    assert.deepEqual(cargoKill?.killerIds, carrierKill.killerIds);
+    assert.equal(out.battle.subUnits.some((unit) => unit.id === 'inf-sibling'), true);
+    assert.equal(out.battle.subUnits.some((unit) => unit.id === 'air-sibling'), true);
+  });
+});

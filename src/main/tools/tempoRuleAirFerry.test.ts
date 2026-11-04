@@ -19,6 +19,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { safeGridHexDistance } from './assessUnitProximity';
 import { collectTempoRuleFerries } from './tempoRuleAirFerry';
+import { validateFerryOrder } from '../gameActions/airValidation';
 
 /**
  * A rear-based opponent squadron, a forward friendly airport, and an enemy only the forward base can reach.
@@ -56,8 +57,11 @@ function stageIdleSquadron(): {
         return fromForward !== null && fromForward <= AIR_STRIKE_RANGE_HEXES && fromHome !== null && fromHome > AIR_STRIKE_RANGE_HEXES;
       });
       if (!enemyH3) continue;
-      for (const base of [homeBase, forwardBase]) {
-        dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [base, 'opponent']);
+      for (const airport of airports) {
+        dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [
+          airport,
+          airport === homeBase || airport === forwardBase ? 'opponent' : 'human',
+        ]);
       }
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [homeBase, squadron.id]);
       dbRun(
@@ -229,11 +233,117 @@ function testSweepLeavesSquadronThatCanAlreadyStrike(): void {
   });
 }
 
+function testSweepOrdersATwoHopAirport(): void {
+  withSeededGame('two-hop', () => {
+    const staged = stageTwoHopSquadron();
+    if (!staged) {
+      console.log('testSweepOrdersATwoHopAirport: skip — map lacks a two-hop airport chain');
+      return;
+    }
+    const validation = validateFerryOrder(staged.squadron.id, staged.farBase, { allowedPlayer: 'opponent' });
+    assert.strictEqual(validation.valid, true);
+    const orders = collectTempoRuleFerries({
+      playerId: 'opponent',
+      state: staged.state,
+      unavailableAirUnitIds: new Set<string>(),
+    });
+    const order = orders.find((row) => row.unitId === staged.squadron.id);
+    assert.ok(order, 'the sweep must order the two-hop airport closest to the enemy');
+    assert.strictEqual(order!.destinationH3Index, staged.farBase);
+  });
+}
+
+/**
+ * An airport that exists but cannot be reached is not ordered.
+ *
+ * Purpose: The sweep must not keep a destination the chain refuses.
+ * When to use: After the ferry legality check becomes the airport chain.
+ * Expected outcome: No ferry to that airport.
+ * Exceptions: Skips when the map cannot supply the staged geometry.
+ */
+function testSweepSkipsAnUnreachableAirport(): void {
+  withSeededGame('unreachable', () => {
+    const staged = stageTwoHopSquadron();
+    if (!staged) {
+      console.log('testSweepSkipsAnUnreachableAirport: skip — map lacks a two-hop airport chain');
+      return;
+    }
+    dbRun('UPDATE res_s_infrastructure SET airport_count = 0 WHERE h3_index = ?', [staged.mid]);
+    const state = getGameState();
+    const orders = collectTempoRuleFerries({
+      playerId: 'opponent',
+      state,
+      unavailableAirUnitIds: new Set<string>(),
+    });
+    assert.ok(
+      !orders.some((row) => row.unitId === staged.squadron.id && row.destinationH3Index === staged.farBase),
+      'an airport with no chain must not be ordered'
+    );
+  });
+}
+
+/**
+ * Origin, one intermediate, and a destination past a single hop, with an enemy beside the destination.
+ *
+ * Purpose: The two-hop sweep cases need a chain the single-hop rule would have refused.
+ * When to use: Those two cases only.
+ * Expected outcome: The squadron, the intermediate, the far base, and the state. Null when the map has no such triple.
+ * Exceptions: None.
+ */
+function stageTwoHopSquadron(): {
+  squadron: GameStateSnapshot['units'][number];
+  mid: string;
+  farBase: string;
+  state: GameStateSnapshot;
+} | null {
+  const seeded = getGameState();
+  const squadron = seeded.units.find((unit) => unit.player === 'opponent' && unit.unitType === 'air');
+  if (!squadron) return null;
+  const hexSet = new Set(seeded.hexes.map((hex) => hex.h3Index));
+  const airports = (seeded.strategicInfrastructure ?? []).filter((row) => row.airportCount > 0).map((row) => row.h3Index);
+  for (const origin of airports) {
+    for (const mid of airports) {
+      if (mid === origin) continue;
+      const first = safeGridHexDistance(origin, mid);
+      if (first === null || first < 1 || first > AIR_FERRY_RANGE_HEXES) continue;
+      for (const farBase of airports) {
+        if (farBase === origin || farBase === mid) continue;
+        const second = safeGridHexDistance(mid, farBase);
+        const direct = safeGridHexDistance(origin, farBase);
+        if (second === null || direct === null) continue;
+        if (second < 1 || second > AIR_FERRY_RANGE_HEXES || direct <= AIR_FERRY_RANGE_HEXES) continue;
+        const enemyH3 = gridDisk(farBase, 1).find((hex) => {
+          if (hex === farBase || !hexSet.has(hex)) return false;
+          const fromOrigin = safeGridHexDistance(origin, hex);
+          return fromOrigin !== null && fromOrigin > AIR_STRIKE_RANGE_HEXES;
+        });
+        if (!enemyH3) continue;
+        for (const airport of airports) {
+          const owner = airport === origin || airport === mid || airport === farBase ? 'opponent' : 'human';
+          dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [airport, owner]);
+        }
+        dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [origin, squadron.id]);
+        dbRun(
+          `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'human', 'infantry', ?, 94)`,
+          ['human-ferry-far', enemyH3]
+        );
+        const state = getGameState();
+        const moved = state.units.find((unit) => unit.id === squadron.id);
+        if (!moved) return null;
+        return { squadron: moved, mid, farBase, state };
+      }
+    }
+  }
+  return null;
+}
+
 function run(): void {
   testSweepFerriesIdleSquadronForward();
   testSweepSkipsClaimedSquadrons();
   testSweepRespectsHoldFire();
   testSweepLeavesSquadronThatCanAlreadyStrike();
+  testSweepOrdersATwoHopAirport();
+  testSweepSkipsAnUnreachableAirport();
   console.log('tempoRuleAirFerry tests passed');
 }
 

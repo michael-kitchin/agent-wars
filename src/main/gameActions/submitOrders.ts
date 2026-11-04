@@ -4,6 +4,7 @@ import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import { validateAirDropOrder } from './airDropValidation';
 import { validateMissileLaunchOrder } from './missileValidation';
 import {
   ORDER_PLAN_SANITIZE_CONTEXT,
@@ -11,6 +12,7 @@ import {
   logOrderPlanSanitizeSummary,
   strategicAirStrikeDuplicateReason,
   strategicFerryDuplicateReason,
+  strategicAirDropDuplicateReason,
   strategicMissileLaunchDuplicateReason,
   strategicMovementDuplicateReason,
   strategicRangedDuplicateReason,
@@ -158,11 +160,13 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
   const ranged = payload.rangedAttacks ?? [];
   const airStrikes = payload.airStrikes ?? [];
   const ferryOrders = payload.ferryOrders ?? [];
+  const airDropOrders = payload.airDropOrders ?? [];
   logDebug('submitOrders', {
     orderCount: orders.length,
     rangedCount: ranged.length,
     airStrikeCount: airStrikes.length,
     ferryCount: ferryOrders.length,
+    airDropCount: airDropOrders.length,
   });
   try {
     if (!isDbReady()) {
@@ -239,6 +243,23 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
     droppedInvalidRows += ferryPass.droppedCount;
     const keptFerry = ferryPass.kept;
 
+    const airDropDupReason = strategicAirDropDuplicateReason(airDropOrders, deps.displayLabelForUnit);
+    if (airDropDupReason) return { success: false, reason: airDropDupReason };
+    const dropPass = keepValidOrderRows(airDropOrders, 'airDrop', (drop) => {
+      if (strikeUnitIds.has(drop.unitId)) {
+        return {
+          valid: false as const,
+          reason: `Air unit ${deps.displayLabelForUnit(drop.unitId)} cannot strike and drop in the same turn`,
+        };
+      }
+      return validateAirDropOrder(drop.unitId, drop.targetH3Index, {
+        allowedPlayer: deps.humanPlayerId,
+        displayLabelForUnit: deps.displayLabelForUnit,
+      });
+    });
+    droppedInvalidRows += dropPass.droppedCount;
+    const keptDrops = dropPass.kept;
+
     const missileLaunches = payload.missileLaunches ?? [];
     const missileDupReason = strategicMissileLaunchDuplicateReason(missileLaunches, deps.displayLabelForUnit);
     if (missileDupReason) return { success: false, reason: missileDupReason };
@@ -280,6 +301,10 @@ export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOr
     dbRun('DELETE FROM pending_ferry_orders');
     for (const f of keptFerry) {
       dbRun('INSERT INTO pending_ferry_orders (unit_id, destination_h3_index) VALUES (?, ?)', [f.unitId, f.destinationH3Index]);
+    }
+    dbRun('DELETE FROM pending_air_drop_orders');
+    for (const drop of keptDrops) {
+      dbRun('INSERT INTO pending_air_drop_orders (unit_id, target_h3_index) VALUES (?, ?)', [drop.unitId, drop.targetH3Index]);
     }
     dbRun('DELETE FROM pending_missile_launches');
     for (const row of keptMissileLaunches) {

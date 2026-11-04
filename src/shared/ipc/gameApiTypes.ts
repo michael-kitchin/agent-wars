@@ -105,6 +105,7 @@ export type CommitHumanTacticalDraftOrdersIpcPayload = {
   movementOrders: MovementOrder[];
   rangedAttacks?: RangedAttackOrder[];
   airStrikes?: AirStrikeOrder[];
+  airDropOrders?: import('./airDropTypes').AirDropOrder[];
   ferryOrders?: FerryOrder[];
   embarkOrders?: EmbarkOrder[];
   opponentTacticalDraft?: TacticalOpponentPlanPayload;
@@ -461,6 +462,18 @@ validateGroupAirStrikeTarget: (payload: {
     targetH3Index: string;
     targetType: AirStrikeTargetType;
   }) => Promise<{ success: boolean; reason?: string }>;
+  /**
+   * Whether every selected air unit can drop infantry on one hex or cell.
+   *
+   * Contract: Success means the whole selection can. A reason means none of them should be queued.
+   * When to use: The air-drop double-click.
+   * Expected outcome: The same reason the order validator would return for the first illegal unit.
+   * Exceptions: None.
+   */
+  validateGroupAirDropTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{
+    success: boolean;
+    reason?: string;
+  }>;
     /**
    * Specifies the contract for the `validateGroupFerryTarget` member (validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
 
@@ -469,7 +482,11 @@ validateGroupAirStrikeTarget: (payload: {
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{
+  success: boolean;
+  reason?: string;
+  ferryPathsByUnitId?: Readonly<Record<string, readonly string[]>>;
+}>;
   /**
    * Checks a group of missiles against one target hex.
    *

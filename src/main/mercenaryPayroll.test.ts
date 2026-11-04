@@ -79,6 +79,21 @@ test('a loaded ship deserts only with its cargo, and a rider never deserts', () 
   assert.equal(forgiven.creditsAfter, 0);
 });
 
+test('a mercenary air unit deserts with its cargo, and a rider on another air unit does not desert alone', () => {
+  const deserted = settleMercenaryPayroll({
+    mercenaries: [ship('air', 5, ['cargo'])],
+    credits: 0,
+    seed: 1,
+  });
+  assert.deepEqual(deserted.deserterIds, ['air', 'cargo']);
+  const stayed = settleMercenaryPayroll({
+    mercenaries: [rider('ride', 9, 'regular-air')],
+    credits: 0,
+    seed: 1,
+  });
+  assert.deepEqual(stayed.deserterIds, []);
+});
+
 test('a mercenary aboard a mercenary ship deserts only with that ship', () => {
   const kept = settleMercenaryPayroll({
     mercenaries: [ship('ship', 3, ['rider']), aboard('rider', 3, 'ship'), walker('walk', 13)],

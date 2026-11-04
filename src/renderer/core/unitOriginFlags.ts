@@ -195,7 +195,7 @@ function hexFortifiedByAnotherSide(h3Index: string, viewerSeatId: string | null)
  * Exceptions: None.
  */
 function shipIsCarryingCargo(unitId: string): boolean {
-  return (S.gameState?.units ?? []).some((unit) => unit.embarkedOnNavalUnitId === unitId);
+  return (S.gameState?.units ?? []).some((unit) => unit.embarkedOnCarrierUnitId === unitId);
 }
 
 /**
@@ -208,7 +208,7 @@ function shipIsCarryingCargo(unitId: string): boolean {
  */
 function tooltipUnitFacts(unitId: string): {
   readonly shown: { readonly player: string; readonly unitType: string; readonly techLevel?: TechLevel; readonly isMercenary?: boolean };
-  readonly placed: { readonly id: string; readonly player: string; readonly unitType: string; readonly h3Index: string; readonly embarkedOnNavalUnitId?: string | null } | null;
+  readonly placed: { readonly id: string; readonly player: string; readonly unitType: string; readonly h3Index: string; readonly embarkedOnCarrierUnitId?: string | null } | null;
 } | null {
   const battle = S.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
   const strategicId = parseTacticalSubUnitId(unitId)?.parentUnitId ?? unitId;
@@ -237,7 +237,7 @@ function mercenaryValueForLiveUnit(unitId: string): string | null {
   const forHire = placed != null && neutralUnitOfferedForRehire({
     ownerId: placed.player,
     unitType: placed.unitType,
-    embarked: (placed.embarkedOnNavalUnitId ?? '').length > 0,
+    embarked: (placed.embarkedOnCarrierUnitId ?? '').length > 0,
     carryingCargo: shipIsCarryingCargo(placed.id),
     fortifiedByAnotherSide: hexFortifiedByAnotherSide(placed.h3Index, viewerSeatId),
   });

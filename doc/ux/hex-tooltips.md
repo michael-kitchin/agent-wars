@@ -8,7 +8,7 @@ Tell the player what a hex contains, and why a hovered order is blocked or chang
 
 ## Availability
 
-The hex tooltip can appear in Strategic planning, Tactical planning, and Resolution playback while the pointer rests on a hex. It does not appear while a unit is selected and the player is aiming a march, ferry, air strike, missile launch, or ranged attack, with Shift up and resolution playback not running. It also does not appear when the stack callout or the build popup is open, while a blocked or effects tooltip is showing, or while a control tip is showing. Shift inspection and resolution playback still show the hex tooltip. The blocked tooltip appears during hover preview of a march, ranged attack, or air strike. The effects tooltip appears during that same aiming when terrain, weather, or target cover changes the order. A missile launch does not show it.
+The hex tooltip can appear in Strategic planning, Tactical planning, and Resolution playback while the pointer rests on a hex. It does not appear while a unit is selected and the player is aiming a march, ferry, air strike, air drop, missile launch, or ranged attack, with Shift up and resolution playback not running. It also does not appear when the stack callout or the build popup is open, while a blocked or effects tooltip is showing, or while a control tip is showing. Shift inspection and resolution playback still show the hex tooltip. The blocked tooltip appears during hover preview of a march, ranged attack, air strike, or air drop. The effects tooltip appears during that same aiming when terrain, weather, or target cover changes the order. A missile launch does not show it.
 
 ## Information Displayed
 

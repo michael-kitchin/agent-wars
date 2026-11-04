@@ -100,6 +100,15 @@ reason?: string;
    * Exceptions: None.
    */
   committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
+  /**
+   * Airport chain for each strategic unit this group ferry will move.
+   *
+   * Contract: The renderer stores the preview path. It does not search the airport graph itself.
+   * When to use: A successful strategic `validateGroupFerryTarget`. Omitted during a battle and on failure.
+   * Expected outcome: One path per unit that is not already at the destination.
+   * Exceptions: None.
+   */
+  ferryPathsByUnitId?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**

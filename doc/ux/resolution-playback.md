@@ -12,7 +12,7 @@ Runs in Resolution playback after strategic Ready or a tactical Ready commit, wh
 
 ## Information Displayed
 
-An AI-only beat plays back like a human beat: both commanders' marches, fire, air strikes, melee, dice, and the turn-update toast.
+An AI-only beat plays back like a human beat: both commanders' marches, fire, air strikes, air drops, melee, dice, and the turn-update toast.
 
 The player sees the following stages, skipping any stage the resolution does not have:
 
@@ -43,7 +43,7 @@ A map toast can summarize losses the player can see, and the hex changes from th
 ### Mouse
 
 - The animation does not have its own controls.
-- While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged, Strike, and Launch target double-clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
+- While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged, Strike, air-drop, and Launch target double-clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
 - While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. The selection panel's close control still clears the selection, and queued orders stay queued. A tactical entry marker still starts a battle, which cancels a strategic playback. Build markers and tactical entry markers are hidden while dice chips are showing, so a tactical entry marker can't be clicked then. Both come back when the chips fade.
 - The console is not blocked by playback. Its own rules apply.
 
@@ -75,7 +75,7 @@ A map toast can summarize losses the player can see, and the hex changes from th
 - Dice chips never take input. They do not change when the other stages play, and playback continues after those stages until the chips fade.
 - Build markers and tactical entry markers never cover dice chips.
 - Dice chips are not drawn on the strategic map while it is zoomed in far enough to hide strategic units.
-- A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays on the map through that stage's destruction mark and is not drawn again, including on the flight home. A unit removed by ranged fire, including return fire, stays through the ranged destruction mark and is not drawn from movement onward. A failed ferry does not glide. A unit whose move was cancelled because it would have traded hexes with another owner is not drawn moving. Strategic playback omits that order (`withoutStrategicHeadOnHolderMoves`). In a battle, the glide is omitted when the sub-unit is still on its start cell (`withoutTacticalHeadOnHolderMoves`, and the human march loop in `commitHumanTacticalDraftOrders`). A melee victim stays through the melee destruction mark and is drawn moving only when the removal hex is the march destination. A removed icon is not drawn on an unknown casualty hex. A survivor on that hex stays. Dice chips can continue after the icon is gone.
+- A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays on the map through that stage's destruction mark and is not drawn again, including on the flight home. An air drop plays in that stage. The air unit flies to the target and back when it survives. The infantry stays on the target and does not fly home. A shot-down drop does not fly home, and the infantry is not drawn landing. A unit removed by ranged fire, including return fire and infantry that was aboard a ship or air unit that fire destroyed, stays through the ranged destruction mark and is not drawn from movement onward. A failed ferry does not glide. In a battle, infantry that was aboard an air unit destroyed by that failure is removed with it. A unit whose move was cancelled because it would have traded hexes with another owner is not drawn moving. Strategic playback omits that order (`withoutStrategicHeadOnHolderMoves`). In a battle, the glide is omitted when the sub-unit is still on its start cell (`withoutTacticalHeadOnHolderMoves`, and the human march loop in `commitHumanTacticalDraftOrders`). A melee victim, including infantry that was aboard an air unit the melee destroyed, stays through the melee destruction mark and is drawn moving only when the removal hex is the march destination. A removed icon is not drawn on an unknown casualty hex. A survivor on that hex stays. Dice chips can continue after the icon is gone.
 
 ## Strategic and Tactical Differences
 

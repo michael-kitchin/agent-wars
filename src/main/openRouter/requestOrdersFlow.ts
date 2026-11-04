@@ -396,6 +396,7 @@ export async function requestOrdersFlow(
   const envelopeGates: EnvelopeGates = {
     coordinateMode: coordinateContext.mode,
     includeAirActions: planState.units.some((u) => u.player === seatId && u.unitType === 'air'),
+    includeNavalActions: planState.units.some((u) => u.player === seatId && u.unitType === 'naval'),
     includeMissileActions: !tacticalBattle && planState.units.some((u) => u.player === seatId && isMissileUnitType(u.unitType)),
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,

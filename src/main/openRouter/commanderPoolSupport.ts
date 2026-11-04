@@ -144,6 +144,15 @@ export type CommanderConsultOutcome = {
    */
   readonly ferryOrders: readonly FerryOrder[];
   /**
+   * Air drops to store for a strategic consult.
+   *
+   * Contract: Empty when `finished` is false. Absent means none.
+   * When to use: `setAiPendingOrders`.
+   * Expected outcome: The validated drop rows.
+   * Exceptions: None.
+   */
+  readonly airDropOrders?: readonly import('../../shared/ipc/airDropTypes').AirDropOrder[];
+  /**
    * Embark orders to store for a strategic consult.
    *
    * Contract: Empty when `finished` is false.
@@ -253,6 +262,7 @@ export function emptyConsultOutcome(
     rangedOrders: [],
     airStrikeOrders: [],
     ferryOrders: [],
+    airDropOrders: [],
     embarkOrders: [],
     missileLaunchOrders: [],
     message: null,

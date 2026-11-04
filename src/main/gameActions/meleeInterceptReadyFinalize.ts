@@ -13,6 +13,7 @@ import {
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { processProductionAfterControlResolution, resolveStrategicControlAfterCombatAndMovement } from './controlAndProduction';
 import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
+import type { AirDropPhaseResult } from './airDropResolution';
 import type { CombatResolutionResult } from '../combatResolution';
 import { combatDicePlaybackFields } from '../combatDiceRecording';
 import type { CombatUnit } from '../combatUnitTypes';
@@ -81,6 +82,15 @@ rangedResult: CombatResolutionResult;
    */
 airStrikeResult: AirStrikePhaseResult;
   /**
+   * Drops resolved before melee.
+   *
+   * Contract: Already applied to the database. Finalize reports the animation and the removals.
+   * When to use: Both the uninterrupted path and the melee resume path.
+   * Expected outcome: `airDropMoves` is set when any drop flew. Removals join the air-strike casualty list.
+   * Exceptions: None.
+   */
+  airDropResult: AirDropPhaseResult;
+  /**
    * Launches resolved before melee.
    *
    * Contract: Already applied to the database. Finalize only reports them.
@@ -142,7 +152,7 @@ combatUnitsBefore: CombatUnit[];
    * Expected outcome: Excludes embarked follow rows (passed separately).
    * Exceptions: None.
    */
-humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
+humanMoves: { unitId: string; fromH3Index: string; toH3Index: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Movement of every owner other than the human seat.
    *
@@ -151,7 +161,7 @@ humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
    * Expected outcome: May be empty.
    * Exceptions: None.
    */
-aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
+aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Specifies the contract for the `embarkedFollowMoves` member (embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 
@@ -271,6 +281,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     meleeResult,
     rangedResult,
     airStrikeResult,
+    airDropResult,
     missileLaunchResult,
     airStrikeTransportLosses,
     rangedTransportLosses,
@@ -296,7 +307,8 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
 
   const fortificationReports = buildFortificationReports(args.fortificationTally);
   const controlTransitions = resolveStrategicControlAfterCombatAndMovement(traversedHexesByPlayer);
-  const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
+  const baseLossRemoved = destroyAirUnitsWithInvalidBase();
+  const baseLossRemovedAir = baseLossRemoved.filter((unit) => unit.unitType === 'air');
   const airStrikeDestroyedFeatures = { urban: 0, airport: 0, seaport: 0 };
   let airStrikeDestroyedBasedAirUnits = 0;
   for (const event of airStrikeResult.infrastructureDestroyedEvents) {
@@ -352,6 +364,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
   dbRun('DELETE FROM pending_air_orders');
   dbRun('DELETE FROM pending_missile_launches');
   dbRun('DELETE FROM pending_ferry_orders');
+  dbRun('DELETE FROM pending_air_drop_orders');
   dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', ['planning', turnNumber + 1]);
   const traversedForFog: Partial<Record<SeatId, readonly string[]>> = {};
   for (const [owner, hexes] of traversedHexesByPlayer) {
@@ -369,7 +382,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     ...rangedTransportLosses.map((unit) => unit.id),
     ...meleeResult.removedUnitIds,
     ...meleeTransportLosses.map((unit) => unit.id),
-    ...baseLossRemovedAir.map((u) => u.id),
+    ...baseLossRemoved.map((u) => u.id),
   ];
   const allRemovedUnits = [
     ...missileLaunchResult.removedUnits,
@@ -379,7 +392,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     ...rangedTransportLosses,
     ...meleeResult.removedUnits,
     ...meleeTransportLosses,
-    ...baseLossRemovedAir,
+    ...baseLossRemoved,
   ];
   const allKills = [...rangedResult.kills, ...meleeResult.kills];
   const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
@@ -495,12 +508,15 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
         : undefined,
     airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
     airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
-    airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? stampLossFlags(airStrikeResult.removedUnits) : undefined,
+    airStrikeRemovedUnits: airStrikeResult.removedUnits.length + airDropResult.removedUnits.length > 0
+      ? stampLossFlags([...airStrikeResult.removedUnits, ...airDropResult.removedUnits])
+      : undefined,
     missileLaunches: missileLaunchResult.launches.length > 0 ? [...missileLaunchResult.launches] : undefined,
     sightCues: args.sightCues && args.sightCues.length > 0 ? [...args.sightCues] : undefined,
     missileStrikeRemovedUnits:
       missileLaunchResult.removedUnits.length > 0 ? stampLossFlags([...missileLaunchResult.removedUnits]) : undefined,
     airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,
+    airDropMoves: airDropResult.moves.length > 0 ? airDropResult.moves : undefined,
     airStrikeAttemptCount: airStrikeResult.attemptCount > 0 ? airStrikeResult.attemptCount : undefined,
     airStrikeSuccessfulCount: airStrikeResult.successfulCount > 0 ? airStrikeResult.successfulCount : undefined,
     airStrikeFailedCount: airStrikeResult.failedCount > 0 ? airStrikeResult.failedCount : undefined,

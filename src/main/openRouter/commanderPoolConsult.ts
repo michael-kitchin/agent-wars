@@ -105,6 +105,7 @@ async function runCommanderConsult(request: CommanderConsultRequest): Promise<Co
       rangedOrders: value.rangedAttacks ?? [],
       airStrikeOrders: value.airStrikes ?? [],
       ferryOrders: value.ferryOrders ?? [],
+      airDropOrders: value.airDropOrders ?? [],
       embarkOrders: value.embarkOrders ?? [],
       missileLaunchOrders: value.missileLaunches ?? [],
       message: prose(value.message),

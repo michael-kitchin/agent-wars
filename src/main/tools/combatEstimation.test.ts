@@ -299,7 +299,7 @@ function testStrategicEmbarkedAtSeaExcluded(): void {
     hexes: [{ h3Index: h3, terrain: 'water', terrainKind: 'water' }],
     units: [
       { id: 'human-naval-1', player: 'human', unitType: 'naval', h3Index: h3 },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3, embarkedOnNavalUnitId: 'human-naval-1' },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3, embarkedOnCarrierUnitId: 'human-naval-1' },
     ],
     phase: 'planning',
     turnNumber: 1,

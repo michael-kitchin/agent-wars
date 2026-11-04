@@ -175,6 +175,9 @@ export function buildTacticalCombatPlaybackFields(
       outcome.infrastructureDestroyedEvents.length > 0 ? outcome.infrastructureDestroyedEvents : undefined,
     airStrikeAttemptCount: outcome.airStrikeAttemptCount > 0 ? outcome.airStrikeAttemptCount : undefined,
     ...(outcome.airStrikePlaybackMoves.length > 0 ? { airStrikeMoves: outcome.airStrikePlaybackMoves } : {}),
+    ...(outcome.airDropPlaybackMoves && outcome.airDropPlaybackMoves.length > 0
+      ? { airDropMoves: [...outcome.airDropPlaybackMoves] }
+      : {}),
     ...(outcome.airStrikePlaybackStrikeHexes.length > 0 ? { airStrikeHexes: outcome.airStrikePlaybackStrikeHexes } : {}),
     ...(outcome.airStrikePlaybackCasualtyHexes.length > 0
       ? { airStrikeCasualtyHexes: outcome.airStrikePlaybackCasualtyHexes }

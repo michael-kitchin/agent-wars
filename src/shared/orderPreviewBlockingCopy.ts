@@ -155,8 +155,9 @@ export function blockingHoverMessageFromMarchInvalidReason(
   if (low.includes('database not initialized') || low.includes('unavailable') || low.includes('no selected units')) {
     return null;
   }
-  if (low.includes('out of range') || low.includes('out of ferry range')) return 'Blocked: Range';
+  if (low.includes('out of range') || low.includes('out of ferry range') || low.includes('within ferry range')) return 'Blocked: Range';
   if (low.includes('ferry destination must be a human-controlled airport')) return 'Blocked: Invalid';
+  if (low.includes('controlled by unit owner')) return 'Blocked: Invalid';
   if (low.includes('ferry destination must have an intact airport')) return 'Blocked: Invalid';
   if (low.includes('destination airport is not intact')) return 'Blocked: Invalid';
   if (low.includes('origin airport is not intact')) return 'Blocked: Invalid';

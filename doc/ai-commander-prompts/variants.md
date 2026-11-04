@@ -112,7 +112,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 | system | Omit the air operations section. Omit the air clause from the combat paragraph, so the tempo sentence names ranged attacks only. |
 | user | Do not name the air or ferry tails. |
 | tools | unchanged |
-| envelope | Omit the air and ferry tails from the contract, the example, and the repair schema. |
+| envelope | Omit the air, ferry, and airDrops tails from the contract, the example, and the repair schema. |
 | coaching | Drop the idle-air rule and the strike-or-ferry exclusivity rule. |
 | empty-state | The section is omitted, not emitted as a row of dashes. A dash table costs context and invites the model to hunt for air options that do not exist. |
 
@@ -120,12 +120,12 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the naval transport section, the naval clause from the combat paragraph, and the routing tool's land-target clause. |
+| system | Omit the naval transport section when the roster also has no air. When it has air, the section is the heading plus the airlift sentence and there is no ship table. Omit the naval clause from the combat paragraph, and the routing tool's land-target clause. |
 | user | unchanged |
 | tools | The routing tool's line is emitted without its naval suffix. |
-| envelope | Omit the embark, transport, and disembark actions from the legal-action list. |
+| envelope | Omit `transport_move`. Omit `embark` and `disembark` only when the roster also has no air. Air without ships keeps those two. |
 | coaching | Drop the naval-routing rule and the sealift rule. |
-| empty-state | Section omitted rather than emitted with dashes, same reasoning as 3.1. |
+| empty-state | With no air, the section is omitted rather than emitted with dashes, same reasoning as 3.1. With air and no ships, the section is the airlift sentence and not a dash table. |
 
 ### 3.3 No observed enemy units
 
@@ -280,7 +280,7 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 | Fire withheld **and** a legal shot exists | The withholding order wins: the unit does not fire and the engine's fallback does not fire for it. The prompt must not imply that a withheld unit will shoot anyway, and must not imply that omitting an attack is equivalent to withholding. |
 | Overlapping home regions | The shared cells appear once, in the shared-cell line, and the exclusive lists exclude them. When the regions are identical as sets, only the shared line and the progress lines appear. The shared cells count toward both win conditions and the coaching says so. |
 | Option target already occupied | An enemy-occupied cell is a legal move/melee target. Approach targets omit stay-put friendlies and enemy-occupied cells. A suggested destination may name that enemy cell when moving there strictly closes. The occupancy rule stays in the coaching, because the model can also propose destinations from the routing tool. |
-| Air unit given both a strike and a ferry | The strike wins and the ferry is discarded. The coaching states the exclusivity so the model does not spend a decision on a discarded order. |
+| Air unit given a strike and a drop or a ferry | The strike wins, and the drop and the ferry are discarded. An explicit drop wins over a ferry. The coaching states the exclusivity so the model does not spend a decision on a discarded order. |
 | Air unit whose base is not intact or not controlled | It cannot ferry. The air table's base columns carry this, and the coaching must not tell such a unit to reposition. |
 | Tactical destination beyond the beat budget | The order is clamped to the first reachable leg, not rejected. Human Ready still clamps. An AI consultation drops that shortened step when the sub-unit can already shoot from its current cell, unless the step enters an enemy cell. The coaching states both so the model does not read a held shooter as a failed order, and does not read every partial step as applied. |
 | Distances are hop counts **and** the mode is tactical | The caveat line is omitted, because its gate requires a strategic cell. Tactical step counts inside one footprint do not carry the same distortion. |
@@ -305,7 +305,7 @@ Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read thro
 
 | Surface | Contract |
 | --- | --- |
-| system | The turn line names the date. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present, when the battle weather is not mild or some strategic hex is not mild. Missing weather includes the rules. A mild battle, and a map whose every hex is mild, omit the paragraph and the Weather column. Tactical weather text omits the strategic movement sentence and the strategic ferry sentence. The air-strike weather sentence is included only when the consulted side has air. When the column is shown, the cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` count uses each unit's ferry range to each airport, so an airport in snow the unit lacks counts only within 2 hexes. Best Options ferry rows are that same owned-airport set, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
+| system | The turn line names the date. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present, when the battle weather is not mild or some strategic hex is not mild. Missing weather includes the rules. A mild battle, and a map whose every hex is mild, omit the paragraph and the Weather column. Tactical weather text omits the strategic movement sentence and the strategic ferry sentence. The air-strike weather sentence is included only when the consulted side has air. When the column is shown, the cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` column lists at most 8 nearest reachable airports. A hop into snow is 2 hexes when the unit lacks the snow tag. Best Options ferry rows are chain-reachable owned intact airports, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
 | tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged, return-fire, and air-strike thresholds as resolution. |
 | empty-state | A unit with no tags has `weatherTags: []`. The Unit Status cell is the weather where it stands, with no parentheses. The unit tooltip omits Weather when the unit has no tags. |
 

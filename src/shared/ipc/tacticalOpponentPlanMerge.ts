@@ -18,6 +18,7 @@ export function tacticalOpponentPlanPayloadHasAnyOrders(
     plan.movementOrders.length +
       plan.rangedAttacks.length +
       plan.airStrikes.length +
+      (plan.airDropOrders?.length ?? 0) +
       plan.ferryOrders.length +
       plan.embarkOrders.length >
     0
@@ -54,6 +55,7 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
   rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
   airStrikes?: readonly AirStrikeOrder[];
   ferryOrders?: readonly FerryOrder[];
+  airDropOrders?: readonly import('./airDropTypes').AirDropOrder[];
   embarkOrders?: readonly EmbarkOrder[];
   exitBattle?: boolean;
 }): TacticalOpponentPlanPayload {
@@ -62,6 +64,7 @@ export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
     rangedAttacks: [...(raw.rangedAttacks ?? [])],
     airStrikes: [...(raw.airStrikes ?? [])],
     ferryOrders: [...(raw.ferryOrders ?? [])],
+    airDropOrders: [...(raw.airDropOrders ?? [])],
     embarkOrders: [...(raw.embarkOrders ?? [])],
     ...(raw.exitBattle === true ? { exitBattle: true } : {}),
   };

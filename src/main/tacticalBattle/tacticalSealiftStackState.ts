@@ -45,8 +45,17 @@ export function getTacticalSealiftStackStateForHex(h3Index: string): SealiftStac
 export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleSnapshot, h3Index: string): SealiftStackState {
   const at = snap.subUnits.filter((u) => u.h3Index === h3Index && u.player === HUMAN_SEAT_ID);
   const navalSubs = at.filter((u) => u.unitType === 'naval').sort((a, b) => a.id.localeCompare(b.id));
+  const infantryPresent = at.some((unit) => unit.unitType === 'infantry');
+  const airSubs = at
+    .filter((unit) => unit.unitType === 'air')
+    .filter(
+      (unit) =>
+        infantryPresent || at.some((land) => land.unitType === 'infantry' && land.embarkedOnSubUnitId === unit.id)
+    )
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const landSubs = at.filter((u) => u.unitType === 'infantry' || u.unitType === 'armor');
-  const landOptions: SealiftLandUnitOption[] = landSubs
+  const visibleLand = navalSubs.length > 0 ? landSubs : landSubs.filter((unit) => unit.unitType === 'infantry');
+  const landOptions: SealiftLandUnitOption[] = visibleLand
     .map((u) => ({ unitId: u.id, unitType: u.unitType as 'infantry' | 'armor' }))
     .sort((a, b) => {
       if (a.unitType !== b.unitType) return a.unitType === 'armor' ? -1 : 1;
@@ -57,7 +66,7 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
   for (const land of landSubs) {
     const e = land.embarkedOnSubUnitId;
     if (!e) continue;
-    const naval = at.find((u) => u.id === e && u.unitType === 'naval');
+    const naval = at.find((u) => u.id === e && (u.unitType === 'naval' || u.unitType === 'air'));
     if (!naval) continue;
     assignments.push({
       landUnitId: land.id,
@@ -66,17 +75,32 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
     });
   }
   const navalIds = navalSubs.map((u) => u.id);
-  const slotsByNavalId = buildSealiftSlotsByNavalId(navalIds, assignments);
-  normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
+  const airIds = airSubs.map((unit) => unit.id);
+  const carrierIds = [...navalIds, ...airIds];
+  const slotsByNavalId = buildSealiftSlotsByNavalId(carrierIds, assignments);
+  normalizeSealiftSlots(carrierIds, slotsByNavalId, landTypeById);
   const contextMode = getSealiftStackContextModeForHex(h3Index);
   const debarkAllowed = canManualDebarkFromHex(h3Index, HUMAN_SEAT_ID);
-  const navalRows = buildSealiftNavalRows({
+  const shipRows = buildSealiftNavalRows({
     navalIds,
     slotsByNavalId,
     landTypeById,
     contextMode,
     debarkAllowed,
   });
+  const airRows = buildSealiftNavalRows({
+    navalIds: airIds,
+    slotsByNavalId,
+    landTypeById,
+    contextMode: 'coastal_port',
+    debarkAllowed: true,
+  }).map((row) => ({
+    ...row,
+    slot2UnitId: null,
+    slot2Disabled: true,
+    debarkSlot2Enabled: false,
+  }));
+  const navalRows = [...shipRows, ...airRows];
   return buildSealiftStackState({
     h3Index,
     contextMode,

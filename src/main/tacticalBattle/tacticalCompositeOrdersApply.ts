@@ -4,13 +4,14 @@
  */
 
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AirDropOrder, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { createCombatRng } from '../combatResolution';
 import { getGameSeed } from '../gameDb';
 import { isNeutralOwnerId, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { opposingPartyIdOf } from './opposingParty';
+import { withoutFerryForDroppedUnits } from './tacticalAirDrop';
 import { tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
@@ -37,6 +38,7 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
     movementOrders: readonly { unitId: string; toH3Index: string }[];
     rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
     airStrikes?: readonly AirStrikeOrder[];
+    airDropOrders?: readonly AirDropOrder[];
     ferryOrders?: readonly FerryOrder[];
     embarkOrders?: readonly EmbarkOrder[];
   }
@@ -58,19 +60,26 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
     tacticalTurnNumber: battle.tacticalTurnNumber,
   });
   const next = createCombatRng(seed);
+  const strikeUnitIds = new Set((opts.airStrikes ?? []).map((order) => order.unitId));
   const airRanged = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     afterEmbark,
     opts.airStrikes,
     opts.rangedAttacks,
     party,
-    next
+    next,
+    'singlePlayer',
+    opts.airDropOrders
   );
   const movementOrders = holds ? [] : opts.movementOrders;
   const afterMove =
     movementOrders.length > 0
       ? projectTacticalSnapshotAfterOpponentMovementOrders(airRanged.battle, movementOrders)
       : airRanged.battle;
-  const afterFerry = applyTacticalFerryPhaseOnBattle(afterMove, holds ? undefined : opts.ferryOrders, party);
+  const afterFerry = applyTacticalFerryPhaseOnBattle(
+    afterMove,
+    holds ? undefined : withoutFerryForDroppedUnits(opts.ferryOrders, opts.airDropOrders, strikeUnitIds),
+    party
+  );
   return tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
 }
 
@@ -105,6 +114,7 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
   opts: {
     rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
     airStrikes?: readonly AirStrikeOrder[];
+    airDropOrders?: readonly AirDropOrder[];
     ferryOrders?: readonly FerryOrder[];
     embarkOrders?: readonly EmbarkOrder[];
   }
@@ -123,12 +133,15 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     layoutSubUnits: battle.subUnits,
   });
   const next = createCombatRng(seed);
+  const strikeUnitIds = new Set((opts.airStrikes ?? []).map((order) => order.unitId));
   const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     battle,
     opts.airStrikes,
     opts.rangedAttacks,
     HUMAN_SEAT_ID,
-    next
+    next,
+    'singlePlayer',
+    opts.airDropOrders
   );
   for (const e of opts.embarkOrders ?? []) {
     const v = validateTacticalHumanEmbarkOrder(e, acc.battle.subUnits, acc.battle.enclosingStrategicH3Index);
@@ -137,7 +150,11 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     }
   }
   const afterEmbark = applyTacticalEmbarkPhaseOnBattle(acc.battle, opts.embarkOrders, HUMAN_SEAT_ID);
-  const afterFerry = applyTacticalFerryPhaseOnBattle(afterEmbark, opts.ferryOrders, HUMAN_SEAT_ID);
+  const afterFerry = applyTacticalFerryPhaseOnBattle(
+    afterEmbark,
+    withoutFerryForDroppedUnits(opts.ferryOrders, opts.airDropOrders, strikeUnitIds),
+    HUMAN_SEAT_ID
+  );
   const outBattle = tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
   return {
     battle: outBattle,

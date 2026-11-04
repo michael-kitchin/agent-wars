@@ -45,7 +45,13 @@ export function selectedUnitTypes(): string[] {
  * Exceptions: None.
  */
 export function renderSelectionBarState(): void {
-  const aim = S.missileLaunchModeActive ? 'launch' : S.airStrikeModeActive ? 'strike' : S.rangedModeActive ? 'ranged' : null;
+  const aim = S.missileLaunchModeActive
+    ? 'launch'
+    : S.airStrikeModeActive || S.airDropModeActive
+      ? 'strike'
+      : S.rangedModeActive
+        ? 'ranged'
+        : null;
   const panel = document.getElementById('selection-panel');
   if (panel) {
     if (aim) panel.dataset.aim = aim;

@@ -111,6 +111,22 @@ export function formatPendingRangedAttackSidebarLabel(
 }
 
 /**
+ * Formats the line for a queued air drop.
+ *
+ * Purpose: The Air drops group and the selection panel show the same line.
+ * When to use: For each row of `S.pendingAirDrops`. Pass the battle snapshot during a battle.
+ * Expected outcome: For example `→ GD · 2h`.
+ * Exceptions: None.
+ */
+export function formatPendingAirDropSidebarLabel(
+  state: GameStateSnapshot | null,
+  order: { unitId: string; targetH3Index: string },
+  battle?: OrderLabelBattle | null
+): string {
+  return formatUnitToTargetDetail(state, order.unitId, order.targetH3Index, battle, 'Air drop');
+}
+
+/**
  * Formats the line for a queued air strike, naming the target type as the target-type list does.
  *
  * Purpose: The Air strikes group and the selection panel show the same line.

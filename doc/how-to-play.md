@@ -149,7 +149,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 Every side gives orders for the same turn, and the engine resolves them together, always in this order:
 
 1. Missile launches
-2. Air strikes
+2. Air strikes, then air drops
 3. Ranged fire
 4. Movement
 5. Melee
@@ -160,7 +160,8 @@ Every side gives orders for the same turn, and the engine resolves them together
 
 - You can plan your turn while the commanders plan theirs. Moving, aiming, and building all work while they think. Only Ready waits for their plans.
 - Strikes and ranged fire use positions from before anyone moves, so they land where you aimed.
-- Melee happens wherever enemy units share a hex after movement.
+- Melee happens wherever enemy units share a hex after movement. An air unit on that hex fights there. Infantry it is carrying does not.
+- An air unit ferries after ground movement. Infantry it is carrying arrives with it. A drop is earlier, with the air strikes, and the air unit stays at its airport.
 - Enemy units ordered into each other's hexes don't slip past each other. A roll picks one of the two hexes. The units there stay put, the units heading in arrive, and they fight in melee. Battles work the same way.
 - Each unit rolls one d20 and hits on a roll at or under its hit number. A roll of 18 to 20 always misses.
 - A hit removes one unit. Units don't take partial damage. In a fortified hex, a hit that would remove one of the controller's units removes one [fortification](#fortifications) instead, until none remain. The hex does not change hands while any fortification is left.
@@ -177,7 +178,7 @@ Each piece, on the global map and across the 23 regional maps.
 | ![Infantry token](media/token-infantry.png) | **Infantry**<br>Attack 3, defense 7<br>Cap 12 | Field armies<br>⚒︎20, 1+ city cells<br>Moves 1 hex<br>Melee only | Divisions<br>⚒︎8–60, 1+ city cells<br>Moves 1 hex<br>Melee only |
 | ![Armor token](media/token-armor.png) | **Armor**<br>Attack 10, defense 7<br>Cap 8 | Field armies<br>⚒︎40, 2+ city cells<br>Moves 2 hexes<br>Fires 1 hex | Divisions<br>⚒︎16–120, 2–7 city cells<br>Moves 2 hexes<br>Fires 1 hex |
 | ![Naval token](media/token-naval.png) | **Naval**<br>Attack 7, defense 7<br>Cap 8 | Fleets<br>⚒︎100, 10+ city cells and a seaport<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry | Task forces<br>⚒︎40–300, 5–31 city cells and a seaport<br>Moves 2 hexes, water and coast<br>Fires 2 hexes<br>Carries 1 armor or 2 infantry |
-| ![Air token](media/token-air.png) | **Air**<br>Attack 10, defense 3<br>Cap 6 | Air wings<br>⚒︎60, 5+ city cells and an airport<br>Ferries 4 hexes<br>Strikes 3 hexes from base | Air groups<br>⚒︎24–180, 3–17 city cells and an airport<br>Ferries 4 hexes<br>Strikes 3 hexes from base |
+| ![Air token](media/token-air.png) | **Air**<br>Attack 10, defense 3<br>Cap 6 | Air wings<br>⚒︎60, 5+ city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base | Air groups<br>⚒︎24–180, 3–17 city cells and an airport<br>Ferries through owned airports, 4 hexes per hop<br>Strikes 3 hexes from base |
 | ![Missile token](media/token-missile.png) | **Missile**<br>Never rolls, hit last<br>Cap 2 | ⚒︎200, 21+ city cells (Advanced)<br>Doesn't move<br>Launches once, 12 hexes | ⚒︎80–600, 6–59 city cells (Advanced)<br>Doesn't move<br>Launches once, 5–14 hexes |
 | ![Mercenary token](media/token-mercenary.png) | **Mercenary**<br>Any type but missile<br>No cap | Raise: ⚒︎ unit price + one turn of upkeep<br>Rehire: two turns of upkeep<br>Fee paid when ordered; returned if removed or unfilled<br>Upkeep: ¤3 infantry, ¤5 armor, ¤8 air, ¤13 naval | Same credits<br>⚒︎ at that map's unit price |
 | ![Fortification token](media/token-fortification.png) | **Fortification**<br>Soaks one hit on the holder's units<br>No cap | ⚒︎20 per city cell<br>Needs an intact city cell | ⚒︎8–60 per city cell |
@@ -282,7 +283,7 @@ Select units, then click the reticle in the selection panel. It stays pressed wh
 ![Select an air unit or stack, click the reticle, and pick a target type from the list beside it. Then double-click a hex to order the strike.](media/air-strike.png)
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn. During the turn, the line to the target is the same dashed crimson arrow as the order. The line home uses that side's map color.
-- **One action a turn:** strike or ferry, not both.
+- **One action a turn:** a strike, a drop, or a ferry, and only one of those.
 - **Odds:** a strike hits on 10 or less (50%), before cover and bonuses.
 - **Target types:** the list beside the reticle offers four, and keeps your last choice. The picture shows Production, with the dashed strike line on an enemy city.
 
@@ -297,8 +298,8 @@ A city, airport, or seaport shoots back at those odds whether or not the strike 
 
 - **Several ports:** some hexes have more than one airport or seaport cell. They keep basing air units or building ships until every one is wrecked.
 - **For good:** destroyed cities, airports, and seaports never rebuild. You can bomb your own.
-- **Losing a base:** an air unit dies if an enemy ground unit takes its airport hex, or if a strike hits that hex's airport.
-- **Ferrying:** with only air units selected, double-click one of your airports within 4 hexes. With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
+- **Losing a base:** an air unit dies if an enemy ground unit takes its airport hex, or if a strike hits that hex's airport. Infantry it is carrying dies with it.
+- **Ferrying:** with only air units selected, double-click one of your intact airports. The route can hop through other airports you control in the same turn. Each hop is within 4 hexes, or 2 into snow when the weather bonus is on and the unit lacks the snow tag. The line connects every airport, and the arrowhead is on the last one.
 - **Vision:** each air unit sees 3 hexes around its base, even when it does nothing.
 
 ## Ballistic Missiles
@@ -323,7 +324,7 @@ A missile is built at an Advanced city. On the world map it launches once, at an
 
 ![Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.](media/sealift.png)
 
-- **Capacity:** each naval unit carries one armor or two infantry.
+- **Capacity:** each naval unit carries one armor or two infantry. Each air unit carries one infantry unit. Load it from the stack list on the hex where the air unit is. It ferries through airports you control, or you drop it with the button immediately left of the reticle onto a land hex within strike range. The air unit stays at its airport. Unload on the hex the air unit occupies. If the air unit is destroyed, by a shot, by a battle, by losing its airport, or by a ferry that has nowhere to land, the infantry is destroyed with it. Infantry aboard an air unit never fights.
 - **Where to load:** a coastal hex or a land seaport, or a water seaport you control.
 - **Loading:** put the land units and the ship in the same hex. Open the hex's stack list and pick units in the ship's slot lists.
 - **At once:** slot changes take effect immediately. They aren't queued orders and don't wait for Ready.

@@ -139,6 +139,21 @@ export function strategicFerryDuplicateReason(
 }
 
 /**
+ * Returns a reason when the same unit id appears twice in a drop list.
+ *
+ * Purpose: Duplicate drop rows remain a hard error, the same as ferry rows.
+ * When to use: `executeSubmitOrders` before drop row validation.
+ * Expected outcome: `null` when unique.
+ * Exceptions: None.
+ */
+export function strategicAirDropDuplicateReason(
+  rows: readonly { unitId: string }[],
+  displayLabelForUnit: (unitId: string) => string
+): string | null {
+  return firstDuplicateUnitReason(rows, displayLabelForUnit, (label) => `Duplicate air drop order for ${label}`);
+}
+
+/**
  * Returns a reason when the same unit id appears twice in a missile-launch list.
  *
  * Purpose: Duplicate launch rows remain a hard error.

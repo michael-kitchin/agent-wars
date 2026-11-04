@@ -1,5 +1,5 @@
 import { cellToLatLng } from 'h3-js';
-import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, MissileLaunchOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AirDropAnimationMove, AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, MissileLaunchOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import {
   filterShotLinesByVisibleEndpoints,
@@ -273,17 +273,14 @@ export function drawPendingFerryLines(
     const unit = units.find((u) => u.id === ferry.unitId);
     if (!unit) continue;
     if (unit.h3Index === ferry.destinationH3Index) continue;
-    const [originLat, originLng] = cellToLatLng(unit.h3Index);
-    const [destLat, destLng] = cellToLatLng(ferry.destinationH3Index);
-    drawHumanMarchStyleRouteSegments(ctx, [
-      {
-        turn: 1,
-        hexes: [
-          [originLat, originLng],
-          [destLat, destLng],
-        ],
-      },
-    ]);
+    const points = (ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2
+      ? ferry.pathH3Indexes
+      : [unit.h3Index, ferry.destinationH3Index]
+    ).map((hex) => {
+      const [lat, lng] = cellToLatLng(hex);
+      return [lat, lng] as [number, number];
+    });
+    drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
   }
 }
 
@@ -361,4 +358,78 @@ export function buildAirStrikeReturnPlaybackMoves(
       fromH3Index: move.targetH3Index,
       toH3Index: move.fromH3Index,
     }));
+}
+
+/**
+ * Outbound playback for air drops: the air unit flies to the target, and landed infantry flies there too.
+ *
+ * Purpose: The air unit and the infantry leave the airport together. A shot-down drop draws only the air unit.
+ * When to use: Ready playback, before the return leg.
+ * Expected outcome: One air move per drop, plus one infantry move when `infantryUnitId` is set.
+ * Exceptions: None.
+ */
+export function buildAirDropOutboundPlaybackMoves(
+  moves: readonly AirDropAnimationMove[] | undefined
+): ResolutionPlaybackMove[] {
+  if (!moves || moves.length === 0) return [];
+  const outbound: ResolutionPlaybackMove[] = [];
+  for (const move of moves) {
+    outbound.push({
+      unitId: move.unitId,
+      player: move.player,
+      unitType: 'air',
+      fromH3Index: move.fromH3Index,
+      toH3Index: move.targetH3Index,
+    });
+    if (move.infantryUnitId) {
+      outbound.push({
+        unitId: move.infantryUnitId,
+        player: move.player,
+        unitType: 'infantry',
+        fromH3Index: move.fromH3Index,
+        toH3Index: move.targetH3Index,
+      });
+    }
+  }
+  return outbound;
+}
+
+/**
+ * Return playback for air drops that survived.
+ *
+ * Purpose: The air unit flies home. The infantry stays on the target.
+ * When to use: Ready playback, after the outbound leg.
+ * Expected outcome: One air move per drop with `returnsToBase`. Shot-down drops are absent.
+ * Exceptions: None.
+ */
+export function buildAirDropReturnPlaybackMoves(
+  moves: readonly AirDropAnimationMove[] | undefined
+): ResolutionPlaybackMove[] {
+  if (!moves || moves.length === 0) return [];
+  return moves
+    .filter((move) => move.returnsToBase)
+    .map((move) => ({
+      unitId: move.unitId,
+      player: move.player,
+      unitType: 'air',
+      fromH3Index: move.targetH3Index,
+      toH3Index: move.fromH3Index,
+    }));
+}
+
+/**
+ * Draws pending air drops with the air-strike arrow.
+ *
+ * Purpose: A queued drop stays on the map until Ready.
+ * When to use: From `drawPendingSupportOrderOverlays` when `S.pendingAirDrops` is not empty.
+ * Expected outcome: One arrow from the air unit to the landing hex.
+ * Exceptions: Skips a row whose air unit is not in `units`.
+ */
+export function drawAirDropLines(
+  ctx: CanvasRenderingContext2D,
+  drops: readonly { readonly unitId: string; readonly targetH3Index: string }[],
+  units: readonly PendingOrderLineUnit[],
+  hexList: string[] | undefined
+): void {
+  drawPendingSupportOrderLines(ctx, 'airStrike', drops, units, hexList);
 }

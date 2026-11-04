@@ -96,6 +96,23 @@ test('executeDismissMercenary converts a loaded ship with its cargo and keeps th
   });
 });
 
+test('executeDismissMercenary converts a loaded air unit with its infantry', () => {
+  withTempGameDb('aw-dismiss-air-', () => {
+    const h3 = humanHex();
+    insertUnitRow(dbRun, unitRow('h1-a910', h3, 'air', true));
+    insertUnitRow(dbRun, unitRow('h1-a911', h3, 'infantry', true));
+    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['h1-a911', 'h1-a910']);
+    const result = executeDismissMercenary(HUMAN_SEAT_ID, 'h1-a910');
+    assert.deepEqual(result, { success: true, unitIds: ['h1-a910', 'h1-a911'] });
+    assert.equal(ownerOf('h1-a910')?.player, NEUTRAL_OWNER_ID);
+    assert.equal(ownerOf('h1-a911')?.player, NEUTRAL_OWNER_ID);
+    assert.ok(dbGetOne(
+      'SELECT land_unit_id AS landUnitId FROM unit_transport_assignments WHERE land_unit_id = ? AND naval_unit_id = ?',
+      ['h1-a911', 'h1-a910']
+    ));
+  });
+});
+
 test('executeDismissMercenary refuses a regular unit, another seat, a missing id, cargo, resolution, and a knocked-out seat', () => {
   withTempGameDb('aw-dismiss-refuse-', () => {
     const h3 = humanHex();
@@ -186,7 +203,7 @@ function ownerOf(id: string): { player: string; mercenary: number } | undefined 
  * Expected outcome: A human unit of the given type. `mercenary` sets `is_mercenary`.
  * Exceptions: None.
  */
-function unitRow(id: string, h3Index: string, unitType: 'infantry' | 'naval', mercenary: boolean) {
+function unitRow(id: string, h3Index: string, unitType: 'infantry' | 'naval' | 'air', mercenary: boolean) {
   return {
     id,
     player: HUMAN_SEAT_ID,

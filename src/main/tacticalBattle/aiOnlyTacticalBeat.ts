@@ -20,6 +20,7 @@ import { commitAiOnlyTacticalBeatSnapshot } from './tacticalBattleSession';
 import { applyTacticalMeleeAfterSupportOrders, tacticalCombatSeed } from './tacticalMeleeApply';
 import { projectTacticalSnapshotAfterPlayerMovementOrders } from './tacticalMovementApply';
 import { withoutTacticalHeadOnHolderMoves } from './tacticalHeadOnContact';
+import { withoutFerryForDroppedUnits } from './tacticalAirDrop';
 import { validateTacticalOpponentEmbarkOrder } from './tacticalOpponentOrderValidation';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
@@ -158,13 +159,16 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
     layoutSubUnits: current.subUnits,
   });
   const next = createCombatRng(seed);
+  const mergedAir = [...(drafts.leadDraft?.airStrikes ?? []), ...(drafts.opposingDraft?.airStrikes ?? [])];
+  const strikeUnitIds = new Set(mergedAir.map((order) => order.unitId));
   const airAndRanged = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     afterOpposingEmbark,
-    [...(drafts.leadDraft?.airStrikes ?? []), ...(drafts.opposingDraft?.airStrikes ?? [])],
+    mergedAir,
     [...(drafts.leadDraft?.rangedAttacks ?? []), ...(drafts.opposingDraft?.rangedAttacks ?? [])],
     lead,
     next,
     'mergedHumanThenOpponent',
+    [...(drafts.leadDraft?.airDropOrders ?? []), ...(drafts.opposingDraft?.airDropOrders ?? [])]
   );
   const headOn = withoutTacticalHeadOnHolderMoves({
     battle: airAndRanged.battle,
@@ -180,10 +184,14 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
     : afterLeadMove;
   const leadEmbark = legalEmbarkOrders(afterOpposingMove, drafts.leadDraft?.embarkOrders ?? [], lead);
   const afterLeadEmbark = applyTacticalEmbarkPhaseOnBattle(afterOpposingMove, leadEmbark, lead);
-  const afterLeadFerry = applyTacticalFerryPhaseOnBattle(afterLeadEmbark, drafts.leadDraft?.ferryOrders, lead);
+  const afterLeadFerry = applyTacticalFerryPhaseOnBattle(
+    afterLeadEmbark,
+    withoutFerryForDroppedUnits(drafts.leadDraft?.ferryOrders, drafts.leadDraft?.airDropOrders, strikeUnitIds),
+    lead
+  );
   const afterOpposingFerry = applyTacticalFerryPhaseOnBattle(
     afterLeadFerry.battle,
-    drafts.opposingDraft?.ferryOrders,
+    withoutFerryForDroppedUnits(drafts.opposingDraft?.ferryOrders, drafts.opposingDraft?.airDropOrders, strikeUnitIds),
     opposing,
   );
   const synced = tacticalBattleWithSyncedEmbarkCargo(afterOpposingFerry.battle);
@@ -230,6 +238,7 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
     infrastructureDestroyedEvents: airAndRanged.infrastructureDestroyedEvents,
     airStrikeAttemptCount: airAndRanged.airStrikeAttemptCount,
     airStrikePlaybackMoves: airAndRanged.airStrikePlaybackMoves,
+    airDropPlaybackMoves: airAndRanged.airDropPlaybackMoves,
     airStrikePlaybackStrikeHexes: airAndRanged.airStrikePlaybackStrikeHexes,
     airStrikePlaybackCasualtyHexes: airAndRanged.airStrikePlaybackCasualtyHexes,
     airStrikePlaybackRemovedUnits: airAndRanged.airStrikePlaybackRemovedUnits,

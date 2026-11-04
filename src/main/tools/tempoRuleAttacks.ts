@@ -128,6 +128,24 @@ export type MergeCommanderAttackOrdersArgs = {
   modelRanged: readonly { unitId: string; targetH3Index: string }[];
   /** Air strikes the model asked for, already deduplicated per unit. */
   modelAirStrikes: readonly StandingOrderGeneratedAirStrike[];
+  /**
+   * Units the model is ferrying.
+   *
+   * Contract: Optional. A unit in this list keeps its ferry when the model did not also strike.
+   * When to use: After the model's ferry rows are deduplicated.
+   * Expected outcome: A standing-order strike and a tempo strike are not added for these units.
+   * Exceptions: None.
+   */
+  modelFerryUnitIds?: readonly string[];
+  /**
+   * Units the model is dropping.
+   *
+   * Contract: Optional. A unit in this list keeps its drop when the model did not also strike.
+   * When to use: After the model's drop rows are deduplicated.
+   * Expected outcome: A standing-order strike and a tempo strike are not added for these units.
+   * Exceptions: None.
+   */
+  modelAirDropUnitIds?: readonly string[];
 };
 
 /**
@@ -151,17 +169,24 @@ export function mergeCommanderAttackOrders(args: MergeCommanderAttackOrdersArgs)
     ...args.modelRanged.map((r) => r.unitId),
     ...args.modelAirStrikes.map((s) => s.unitId),
   ]);
+  const protectedFromGeneratedStrike = new Set([
+    ...(args.modelFerryUnitIds ?? []),
+    ...(args.modelAirDropUnitIds ?? []),
+  ]);
   const rangedBeforeSweep = [
     ...args.standingOrderRanged.filter((o) => !modelClaimedUnitIds.has(o.unitId)),
     ...args.modelRanged,
   ];
   const airStrikesBeforeSweep = [
-    ...args.standingOrderAirStrikes.filter((s) => !modelClaimedUnitIds.has(s.unitId)),
+    ...args.standingOrderAirStrikes.filter(
+      (strike) => !modelClaimedUnitIds.has(strike.unitId) && !protectedFromGeneratedStrike.has(strike.unitId)
+    ),
     ...args.modelAirStrikes,
   ];
   const alreadyAttackingUnitIds = new Set([
     ...rangedBeforeSweep.map((r) => r.unitId),
     ...airStrikesBeforeSweep.map((s) => s.unitId),
+    ...protectedFromGeneratedStrike,
   ]);
   const sweep = args.tacticalBattle
     ? collectTacticalTempoAttacks({

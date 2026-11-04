@@ -70,7 +70,7 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
   /**
    * Naval carrier id when this land unit has an active sealift assignment.
    *
-   * Contract: SQL null when not embarked; maps to optional `embarkedOnNavalUnitId` on snapshot units.
+   * Contract: SQL null when not embarked; maps to optional `embarkedOnCarrierUnitId` on snapshot units.
    * When to use: LEFT JOIN from `unit_transport_assignments` in the canonical units listing query.
    * Expected outcome: Present on strategic snapshots for renderer selection guards.
    * Exceptions: None.
@@ -211,7 +211,7 @@ function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'
     ...(row.is_mercenary === 1 ? { isMercenary: true } : {}),
   };
   if (typeof row.embarked_on_naval_unit_id === 'string' && row.embarked_on_naval_unit_id.length > 0) {
-    unit.embarkedOnNavalUnitId = row.embarked_on_naval_unit_id;
+    unit.embarkedOnCarrierUnitId = row.embarked_on_naval_unit_id;
   }
   const origin = unitOriginFromRow(row);
   if (origin) unit.origin = origin;

@@ -39,6 +39,13 @@ function testStructuredPayloadPreservesAirAndFerryOrders(): void {
     ferryOrders: [{ unitId: 'human-air-2', destinationH3Index: '812bfffffffffff' }],
     missileLaunches: [{ unitId: 'human-missile-1', targetH3Index: '812dfffffffffff' }],
   });
+  const withDrops = normalizeSubmitOrdersPayload({
+    movementOrders: [],
+    airDropOrders: [{ unitId: 'human-air-1', targetH3Index: '8129fffffffffff' }],
+  });
+  assert.deepStrictEqual(withDrops.airDropOrders, [
+    { unitId: 'human-air-1', targetH3Index: '8129fffffffffff' },
+  ]);
 }
 
 /**

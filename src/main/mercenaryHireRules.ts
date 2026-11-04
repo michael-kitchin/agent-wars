@@ -87,7 +87,7 @@ export interface HireContext {
   /**
    * Cargo unit ids aboard each ship.
    *
-   * Contract: Built from `embarkedOnNavalUnitId`.
+   * Contract: Built from `embarkedOnCarrierUnitId`.
    * When to use: Rejecting a loaded ship and a unit that is aboard one.
    * Expected outcome: Empty when the ship has no cargo in the snapshot.
    * Exceptions: None.
@@ -279,7 +279,7 @@ export function buildHireContext(state: GameStateSnapshot, seatId: SeatId): Hire
     const list = unitsByHex.get(unit.h3Index) ?? [];
     list.push(unit);
     unitsByHex.set(unit.h3Index, list);
-    const shipId = unit.embarkedOnNavalUnitId;
+    const shipId = unit.embarkedOnCarrierUnitId;
     if (shipId) {
       const cargo = cargoByShip.get(shipId) ?? [];
       cargo.push(unit.id);
@@ -461,7 +461,7 @@ function rehireCandidates(
   for (const unit of units) {
     if (unit.player !== NEUTRAL_OWNER_ID) continue;
     if (!isHireableUnitType(unit.unitType)) continue;
-    if (unit.embarkedOnNavalUnitId) continue;
+    if (unit.embarkedOnCarrierUnitId) continue;
     if ((context.cargoByShip.get(unit.id)?.length ?? 0) > 0) continue;
     const techLevel = context.techBonusEnabled && unit.techLevel === 'advanced' ? 'advanced' : undefined;
     const upkeep = mercenaryUpkeepFor(unit.unitType, techLevel);

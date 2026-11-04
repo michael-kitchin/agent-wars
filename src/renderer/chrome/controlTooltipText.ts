@@ -183,6 +183,31 @@ export const strikeAimTooltipText =
 export const strikeStopTooltipText = 'Stop aiming an air strike. Strikes already in the list stay there.';
 
 /**
+ * Purpose: Names the landing the air-drop button aims, and says the air unit flies home.
+ * When to use: `#air-drop-btn` while air-drop aiming is off.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const airDropAimTooltipText =
+  'Aim an air drop. Double-click a land hex within strike range. The carried infantry lands there, and the air unit returns to its airport.';
+
+/**
+ * Purpose: Says a second click stops aiming and queued drops stay in the list.
+ * When to use: `#air-drop-btn` while air-drop aiming is on.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const airDropStopTooltipText = 'Stop aiming an air drop. Drops already in the list stay there.';
+
+/**
+ * Purpose: Says why the air-drop button is greyed out for a selection that is not entirely carrying infantry.
+ * When to use: `#air-drop-tip-host` while the button is disabled.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const airDropDisabledTooltipText = 'Air drop needs every selected air unit to be carrying infantry.';
+
+/**
  * Purpose: Says the next double-click chooses the hex a missile flies to.
  * When to use: `#ranged-attack-btn` while missile aiming is off and the selection is missiles.
  * Expected outcome: The control tip shows this sentence.

@@ -428,7 +428,7 @@ function testAirFieldsGatedByIncludeAirActions(): void {
  *
  * Purpose: Teaching embark/transport/disembark with no ship invites unfillable orders.
  * When to use: After `includeNavalActions` on the JSON contract.
- * Expected outcome: Default lists transport_move; includeNavalActions:false omits the three sealift verbs.
+ * Expected outcome: Default lists transport_move. No ships and no air omits all three. Air with no ships keeps embark and disembark and omits transport_move.
  * Exceptions: None.
  */
 function testSealiftActionsGatedByIncludeNavalActions(): void {
@@ -444,12 +444,24 @@ function testSealiftActionsGatedByIncludeNavalActions(): void {
     includeMemoryUpdates: false,
     includeProductionOrders: false,
     includeNavalActions: false,
+    includeAirActions: false,
     movementOrderInstruction: '',
     submitMemoryClause: '',
     productionSubmitClause: '',
   });
   assert.ok(!withoutNaval.includes('transport_move'), 'no-naval contract omits transport_move');
   assert.ok(!withoutNaval.includes('disembark'), 'no-naval contract omits disembark');
+  const airWithoutShips = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeNavalActions: false,
+    includeAirActions: true,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(airWithoutShips.includes('embark') && airWithoutShips.includes('disembark'), 'air without ships keeps boarding');
+  assert.ok(!airWithoutShips.includes('transport_move'), 'air without ships omits transport_move');
 }
 
 /**

@@ -271,6 +271,15 @@ export function processV3OrdersArray(
         continue;
       }
       const h3 = hexCodeToH3OrUndefined(dest, context);
+      const carrier = state.units.find((unit) => unit.id === navalUnitId);
+      if (carrier?.unitType === 'air') {
+        dropRow(dropReasons, `transport_move ${unitId}: an air unit ferries with ferryOrders`);
+        continue;
+      }
+      if (carrier && carrier.unitType !== 'naval') {
+        dropRow(dropReasons, `transport_move ${unitId}: ${navalUnitId} is not a naval unit`);
+        continue;
+      }
       if (h3) movementOrders.push({ unitId: navalUnitId, toH3Index: h3 });
       else dropRow(dropReasons, `transport_move ${unitId}: destination ${dest} is not on this map`);
       continue;

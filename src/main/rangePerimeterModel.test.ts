@@ -76,18 +76,18 @@ function testStrategicVsTacticalRangedPlanningGate(): void {
  *
  * Purpose: Strategic AA must skip melee-only types via `getRange`; tactical AA must use `unitHasTacticalRangedBaseline`.
  * When to use: After changing air-strike counter-fire eligibility in either theater.
- * Expected outcome: Both files contain the theater-specific skip predicates.
+ * Expected outcome: `airCounterFire.ts` skips `getRange` below 1, and tactical air-strike counter-fire uses the tactical baseline.
  * Exceptions: None.
  */
 function testAirStrikeAaTheaterSplitInSource(): void {
-  const strategic = fs.readFileSync(path.resolve(process.cwd(), 'src', 'main', 'gameActions', 'airStrikeResolution.ts'), 'utf8');
+  const strategic = fs.readFileSync(path.resolve(process.cwd(), 'src', 'main', 'gameActions', 'airCounterFire.ts'), 'utf8');
   const tactical = fs.readFileSync(
     path.resolve(process.cwd(), 'src', 'main', 'tacticalBattle', 'tacticalAirStrikeUnits.ts'),
     'utf8'
   );
   assert.ok(
     strategic.includes('if (getRange(defender.unit_type) < 1) continue;'),
-    'strategic air-strike AA must skip types with getRange < 1 (infantry melee-only)'
+    'strategic anti-air must skip types with getRange < 1 (infantry melee-only)'
   );
   assert.ok(
     tactical.includes('if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;'),

@@ -52,9 +52,10 @@ function testStrikeableInfraCountsOnlyHumanControlled(): void {
   const airRow = md.split('\n').find((line) => line.includes('opponent-air-1'));
   assert.ok(airRow, 'air unit row must be present');
   const cells = airRow.split('|').map((c) => c.trim()).filter((c) => c.length > 0);
-  assert.equal(cells[5], '1', 'Strikeable Urban must count only the human-controlled hex');
-  assert.equal(cells[6], '1', 'Strikeable Airports must count only the human-controlled hex');
-  assert.equal(cells[7], '1', 'Strikeable Seaports must count only the human-controlled hex');
+  assert.equal(cells[2], 'none', 'Aboard names the infantry or none');
+  assert.equal(cells[6], '1', 'Strikeable Urban must count only the human-controlled hex');
+  assert.equal(cells[7], '1', 'Strikeable Airports must count only the human-controlled hex');
+  assert.equal(cells[8], '1', 'Strikeable Seaports must count only the human-controlled hex');
   assert.match(md, /Enemy infrastructure in your current strike envelope: airports=1, seaports=1/);
   assert.match(md, /infrastructure_destroyed/);
   assert.match(md, /targetType/i);
@@ -89,8 +90,8 @@ function testStrategicAirSectionOmitsWhenRosterEmpty(): void {
  *
  * Purpose: The briefing count must match the ferry orders validation will accept.
  * When to use: After edits to the Ferry Destinations column.
- * Expected outcome: A friendly airport three hexes away in a January snow hex counts with weather off or for a
- * snow-tagged unit, and does not count for an untagged unit with weather on.
+ * Expected outcome: A friendly airport three hexes away in a January snow hex is listed with weather off or for a
+ * snow-tagged unit, and is omitted for an untagged unit with weather on.
  * Exceptions: Fails when the weather pack is missing.
  */
 function testFerryDestinationsHonorSnowRange(): void {
@@ -121,11 +122,11 @@ function testFerryDestinationsHonorSnowRange(): void {
     );
     const airRow = md.split('\n').find((line) => line.includes('opponent-air-1'));
     assert.ok(airRow, 'air unit row must be present');
-    return airRow.split('|').map((c) => c.trim()).filter((c) => c.length > 0)[8]!;
+    return airRow.split('|').map((c) => c.trim()).filter((c) => c.length > 0)[9]!;
   };
-  assert.equal(ferryCount(false), '1');
-  assert.equal(ferryCount(true), '0');
-  assert.equal(ferryCount(true, ['snow']), '1');
+  assert.equal(ferryCount(false), snowHex);
+  assert.equal(ferryCount(true), 'none');
+  assert.equal(ferryCount(true, ['snow']), snowHex);
 }
 
 function run(): void {

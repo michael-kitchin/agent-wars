@@ -15,6 +15,7 @@ import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } fro
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
+import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
@@ -521,6 +522,15 @@ export function parseOrdersResponse(
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
   /**
+   * Air drops normalized to H3 targets.
+   *
+   * Contract: One row per expanded actor. Empty when the model omitted the field or every row was dropped.
+   * When to use: `applyParsedRequestOrders` validates this list.
+   * Expected outcome: `unitId` and `targetH3Index` only.
+   * Exceptions: None.
+   */
+  airDropOrders: import('../../shared/ipc/airDropTypes').AirDropOrder[];
+  /**
    * Missile launches normalized to H3 targets.
    *
    * Contract: One row per expanded actor. Empty when the model omitted the field or every row was dropped.
@@ -657,12 +667,18 @@ export function parseOrdersResponse(
         } = processV3OrdersArray(ordersArray, state, latLngByH3, resolveToH3, context);
         const expandedAirStrikes = expandGroupedActorEntries(obj.airStrikes);
         const expandedFerryOrders = expandGroupedActorEntries(obj.ferryOrders);
+        const expandedAirDrops = expandGroupedActorEntries(obj.airDrops);
         const expandedMissileLaunches = expandGroupedActorEntries(obj.missileLaunches);
         const normalizedAirStrikes = normalizeAirStrikeOrders(expandedAirStrikes, state, context);
         const normalizedFerryOrders = normalizeFerryOrders(expandedFerryOrders, context);
+        const normalizedAirDrops = normalizeAirDropOrders(expandedAirDrops, context);
         const normalizedMissileLaunches = normalizeMissileLaunchOrders(expandedMissileLaunches, context);
         const expandedActorRowCount =
-          ordersArray.length + expandedAirStrikes.length + expandedFerryOrders.length + expandedMissileLaunches.length;
+          ordersArray.length +
+          expandedAirStrikes.length +
+          expandedFerryOrders.length +
+          expandedAirDrops.length +
+          expandedMissileLaunches.length;
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {
@@ -679,6 +695,7 @@ export function parseOrdersResponse(
           ...productionDropReasons,
           ...normalizedAirStrikes.dropReasons,
           ...normalizedFerryOrders.dropReasons,
+          ...normalizedAirDrops.dropReasons,
           ...normalizedMissileLaunches.dropReasons,
         ];
         return {
@@ -687,6 +704,7 @@ export function parseOrdersResponse(
           embarkOrders,
           airStrikes: normalizedAirStrikes.airStrikes,
           ferryOrders: normalizedFerryOrders.ferryOrders,
+          airDropOrders: normalizedAirDrops.airDropOrders,
           missileLaunches: normalizedMissileLaunches.missileLaunches,
           strategy,
           message,
@@ -703,6 +721,7 @@ export function parseOrdersResponse(
             embarkOrders.length === 0 &&
             normalizedAirStrikes.airStrikes.length === 0 &&
             normalizedFerryOrders.ferryOrders.length === 0 &&
+            normalizedAirDrops.airDropOrders.length === 0 &&
             normalizedMissileLaunches.missileLaunches.length === 0 &&
             appliedStandingOrderCount === 0,
           expandedActorRowCount,

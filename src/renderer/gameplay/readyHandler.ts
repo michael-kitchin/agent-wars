@@ -27,6 +27,7 @@ import {
 } from './readyResolutionAnnouncements';
 import { dropHeldBattleTurnUpdate, hasPendingDestroyedBattleParents } from './heldBattleTurnUpdate';
 import { announceKnockouts } from './knockoutNotices';
+import { buildAirDropOutboundPlaybackMoves, buildAirDropReturnPlaybackMoves } from '../rendering/orderDrawing';
 import { offerHumanKnockoutChoice } from './knockoutDialog';
 import { holdObserveAutoAdvanceForBattleEntry, maybeObserveAutoAdvance, stopObserveAutoAdvance } from './observeChrome';
 import { frameAutomaticStrategicUnits } from '../map/unitFrameCamera';
@@ -131,7 +132,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
       S.pendingMissileLaunches.length > 0 ||
-      S.pendingFerryOrders.length > 0;
+      S.pendingFerryOrders.length > 0 ||
+      S.pendingAirDrops.length > 0;
     if (hasPendingDraftOrders) {
       const submitResult = (await window.gameApi.submitOrders({
         movementOrders: [],
@@ -139,6 +141,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikes: S.pendingAirStrikes,
         missileLaunches: S.pendingMissileLaunches,
         ferryOrders: S.pendingFerryOrders,
+        airDropOrders: S.pendingAirDrops,
       })) as { success: boolean; reason?: string };
       if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!submitResult.success) {
@@ -243,8 +246,14 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     );
     const sightCuesForPlayback = sightCueBeamsForViewer(readyResult.sightCues ?? [], reportViewerSeatId());
     const strikeMoves = [...(readyResult.airStrikeMoves ?? []), ...buildMissilePlaybackMoves(visibleMissileLaunches)];
-    const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves);
-    const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(strikeMoves);
+    const airStrikeOutboundMoves = [
+      ...deps.buildAirStrikeOutboundPlaybackMoves(strikeMoves),
+      ...buildAirDropOutboundPlaybackMoves(readyResult.airDropMoves),
+    ];
+    const airStrikeReturnMoves = [
+      ...deps.buildAirStrikeReturnPlaybackMoves(strikeMoves),
+      ...buildAirDropReturnPlaybackMoves(readyResult.airDropMoves),
+    ];
 
     deps.updateOpenRouterCostLabel();
     if (readyResult.aiConsulted === false) {

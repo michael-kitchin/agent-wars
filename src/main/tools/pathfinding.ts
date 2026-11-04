@@ -5,6 +5,7 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
+import { resolveStrategicAirportFerry } from '../gameActions/airFerryRoute';
 import { isMissileUnitType, MISSILE_CANNOT_MOVE_REASON } from '../../shared/missileRules';
 import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import {
@@ -842,8 +843,34 @@ export function executePathfinding(
         return { status: 'error', error: 'plan_route requires unitId (string)' };
       }
       const matchedUnit = state.units.find((u) => u.id === a.unitId);
-      if (matchedUnit?.unitType === 'air') {
-        return { status: 'error', error: 'Air units use air strikes, not hex movement. Use the air_strike order instead of plan_route.' };
+      if (matchedUnit?.unitType === 'air' && tacticalBattle) {
+        return {
+          status: 'error',
+          error: 'In a battle, an air unit ferries one hop between intact airport cells. plan_route returns an airport chain only on the strategic map.',
+        };
+      }
+      if (matchedUnit?.unitType === 'air' && !tacticalBattle) {
+        const airDest = Array.isArray(a.destination) && a.destination.length >= 2 && a.destination.every((n) => typeof n === 'number')
+          ? [Number(a.destination[0]), Number(a.destination[1])] as LatLng
+          : undefined;
+        if (!airDest) {
+          return { status: 'error', error: 'plan_route requires destination as a two-character briefing hex code from the operational map (see Available Tools schema); arguments are decoded before routing.' };
+        }
+        const destinationH3 = resolveToH3(airDest[0], airDest[1]);
+        if (!destinationH3) return { status: 'error', error: 'Destination airport is not intact' };
+        const route = resolveStrategicAirportFerry({
+          unitId: matchedUnit.id,
+          originH3Index: matchedUnit.h3Index,
+          destinationH3Index: destinationH3,
+          owner: matchedUnit.player,
+        });
+        if (!route.reachable) return { status: 'error', error: route.reason };
+        return {
+          status: 'ok',
+          orderToH3: destinationH3,
+          airportPathH3Indexes: route.pathH3Indexes,
+          hopCount: Math.max(0, route.pathH3Indexes.length - 1),
+        };
       }
       if (isMissileUnitType(matchedUnit?.unitType ?? '')) {
         return { status: 'error', error: MISSILE_CANNOT_MOVE_REASON };

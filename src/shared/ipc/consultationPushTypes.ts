@@ -1,3 +1,4 @@
+import type { AirDropOrder } from './airDropTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from './ordersTypes';
 
 /**
@@ -12,6 +13,15 @@ export type TacticalOpponentPlanPayload = {
   movementOrders: MovementOrder[];
   rangedAttacks: RangedAttackOrder[];
   airStrikes: AirStrikeOrder[];
+  /**
+   * Air drops for this beat.
+   *
+   * Contract: Missing means none. A present array may be empty.
+   * When to use: A commander or the human queued a drop.
+   * Expected outcome: Each row is one air sub-unit and one cell.
+   * Exceptions: None.
+   */
+  airDropOrders?: AirDropOrder[];
   ferryOrders: FerryOrder[];
   embarkOrders: EmbarkOrder[];
   /**

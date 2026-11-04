@@ -196,6 +196,15 @@ unitId: string;
    * Exceptions: None.
    */
 destinationH3Index: string;
+  /**
+   * Airports from the origin through the destination, when the preview already computed the chain.
+   *
+   * Contract: The renderer draws this polyline. Resolution does not read it.
+   * When to use: A pending ferry row on the human map. Omit it and the line is one segment.
+   * Expected outcome: Present for a strategic chain. Absent for a tactical hop and for a row saved before the chain existed.
+   * Exceptions: None.
+   */
+  pathH3Indexes?: readonly string[];
 }
 
 /**
@@ -272,6 +281,15 @@ fromH3Index: string;
    * Exceptions: None.
    */
 toH3Index: string;
+  /**
+   * Airports the unit actually flew, origin through destination.
+   *
+   * Contract: Playback glides through every stop. A missing path is the straight segment between the ends.
+   * When to use: `resolveStrategicFerryOrders` and the Ready result that copies those moves.
+   * Expected outcome: Length at least 2 when the chain was flown.
+   * Exceptions: None.
+   */
+  pathH3Indexes?: readonly string[];
 }
 
 /**
@@ -328,6 +346,15 @@ airStrikes?: AirStrikeOrder[];
    * Exceptions: None.
    */
 ferryOrders?: FerryOrder[];
+  /**
+   * Air drops for this submit.
+   *
+   * Contract: Each row is one air unit and one target hex. Absent means none.
+   * When to use: The human order plan.
+   * Expected outcome: Stored in `pending_air_drop_orders`. A unit that also strikes loses the drop.
+   * Exceptions: None.
+   */
+  airDropOrders?: import('./airDropTypes').AirDropOrder[];
 }
 
 /**

@@ -147,6 +147,7 @@ import {
   containerPixelHitsDrawnUnitIcon,
 } from './map/drawInteraction';
 import {
+  replacePendingAirDropsForSelected,
   replacePendingAirStrikesForSelected,
   replacePendingFerryOrdersForSelected,
   replacePendingRangedAttacksForSelected,
@@ -772,6 +773,7 @@ function init(): void {
     formatTargetingValidationReason,
     showMapToast,
     replacePendingAirStrikesForSelected,
+    replacePendingAirDropsForSelected,
     replacePendingRangedAttacksForSelected,
     clearSelection,
     hideStackCallout,

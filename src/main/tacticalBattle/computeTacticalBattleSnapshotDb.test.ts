@@ -15,6 +15,7 @@ import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
+import { insertUnitRow } from '../gameDb/unitInsert';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
 import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
 import {
@@ -346,5 +347,53 @@ test('Phase E: melee tactical-entry filter keeps contested res1 during resolutio
       filtered.includes(targetStrategicH3),
       `tactical probe should retain fixture hex; raw=${JSON.stringify(raw)} filtered=${JSON.stringify(filtered)}`
     );
+  });
+});
+
+/**
+ * Confirms a battle keeps strategic air cargo off the sub-units and writes the assignment back at the end.
+ *
+ * Purpose: Airlift uses the same assignment table as sealift, and a battle must not invent a boarding from it.
+ * When to use: After changes to battle start or the transport baseline.
+ * Expected outcome: The infantry sub-unit starts unboarded, and ending the battle restores the air assignment.
+ * Exceptions: Assertion failure names the missing row.
+ */
+test('a battle restores an air unit cargo row and does not board it at the start', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-air-cargo-baseline-', ({ targetStrategicH3 }) => {
+    insertUnitRow(dbRun, {
+      id: 'air-lift-parent',
+      player: HUMAN_SEAT_ID,
+      unitType: 'air',
+      displayOrder: 90,
+      h3Index: targetStrategicH3,
+      origin: null,
+      formedTurn: 1,
+    });
+    insertUnitRow(dbRun, {
+      id: 'inf-lift-parent',
+      player: HUMAN_SEAT_ID,
+      unitType: 'infantry',
+      displayOrder: 91,
+      h3Index: targetStrategicH3,
+      origin: null,
+      formedTurn: 1,
+    });
+    dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'inf-lift-parent',
+      'air-lift-parent',
+    ]);
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
+    assert.equal(started.success, true);
+    const snap = getActiveTacticalBattleSnapshot();
+    const infantry = snap?.subUnits.find((unit) => unit.parentUnitId === 'inf-lift-parent');
+    assert.ok(infantry);
+    assert.equal(infantry.embarkedOnSubUnitId ?? null, null);
+    dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', ['inf-lift-parent']);
+    endTacticalBattleSession();
+    const restored = dbGetOne<{ navalUnitId: string }>(
+      'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
+      ['inf-lift-parent']
+    );
+    assert.equal(restored?.navalUnitId, 'air-lift-parent');
   });
 });

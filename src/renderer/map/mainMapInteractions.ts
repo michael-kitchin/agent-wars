@@ -178,6 +178,15 @@ replacePendingAirStrikesForSelected: (
     targetH3Index: string,
     targetType: AirStrikeTargetType
   ) => void;
+  /**
+   * Queues one air drop per selected air unit.
+   *
+   * Contract: The double-click handler records a legal drop.
+   * When to use: Passed through to `handleMainMapDoubleClick`.
+   * Expected outcome: The pending drop list replaces rows for those ids.
+   * Exceptions: None.
+   */
+  replacePendingAirDropsForSelected: (selectedIds: string[], targetH3Index: string) => void;
     /**
    * Specifies the contract for the `replacePendingRangedAttacksForSelected` member (replacePendingRangedAttacksForSelected: (selectedIds: string[], targetH3Index: string) => void;).
 
@@ -333,7 +342,11 @@ updatePendingOrdersSidebar: () => void;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;
+replacePendingFerryOrdersForSelected: (
+  selectedIds: string[],
+  destinationH3Index: string,
+  pathsByUnitId?: Readonly<Record<string, readonly string[]>>
+) => void;
     /**
    * Specifies the contract for the `clearCommittedOrderDraftState` member (clearCommittedOrderDraftState: () => void;).
 
@@ -787,7 +800,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     // A click while targeting is on must not queue the attack or clear the selection.
     // The double-click that follows places the attack. Clearing here would turn targeting
     // off and let that double-click plan a march from the gesture snapshot.
-    if ((S.rangedModeActive || S.airStrikeModeActive || S.missileLaunchModeActive) && S.selectedUnitIds.length > 0 && S.gameState) {
+    if ((S.rangedModeActive || S.airStrikeModeActive || S.airDropModeActive || S.missileLaunchModeActive) && S.selectedUnitIds.length > 0 && S.gameState) {
       return;
     }
 
@@ -939,6 +952,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       formatTargetingValidationReason: deps.formatTargetingValidationReason,
       replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
       replacePendingAirStrikesForSelected: deps.replacePendingAirStrikesForSelected,
+      replacePendingAirDropsForSelected: deps.replacePendingAirDropsForSelected,
       replacePendingRangedAttacksForSelected: deps.replacePendingRangedAttacksForSelected,
       clearSelection: deps.clearSelection,
       hideStackCallout: deps.hideStackCallout,

@@ -110,9 +110,9 @@ Element documents share a fixed heading set:
 - [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Save game, Load game, Offer tactical battles, How to play, and Quit.
 - [save-and-load.md](ux/save-and-load.md): Save game and Load game, the confirm before a load replaces a live match, and the automatic saves.
 - [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
-- [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle and the air-strike target list in the selection panel.
+- [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle, the air-drop button, and the air-strike target list in the selection panel.
 - [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, Air strikes, and Missile launches groups on the Orders tab.
-- [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, holds the reticle that aims a ranged attack, an air strike, or a missile launch, and offers Dismiss for one of your mercenaries during strategic planning.
+- [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, holds the reticle that aims a ranged attack, an air strike, or a missile launch, holds the air-drop button immediately left of that reticle, and offers Dismiss for one of your mercenaries during strategic planning.
 - [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Commanders tab's Tool groups section.
 - [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Commanders tab: Start or Stop and its sentence, one card per commander, and the activity log. Each commander's popover sets that seat's nickname, API key, model, reasoning effort, provider choice, and doctrine. The new-game popover uses the same model list. A card's name is `sideDisplayName` in `src/shared/sideNicknames.ts`. A null nickname shows that side's short home name. The commander's prompt still uses the full home name.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.

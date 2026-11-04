@@ -180,6 +180,26 @@ export async function refreshHoverRoutePreview(
       });
       return;
     }
+    if (S.airDropModeActive) {
+      const validateDrop = window.gameApi?.validateGroupAirDropTarget;
+      if (!validateDrop) {
+        publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const validation = await validateDrop({ unitIds, targetH3Index: hoveredH3 });
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
+        deps,
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: 'air',
+        originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
+        allowBlockingOrderTooltip,
+      });
+      return;
+    }
     if (S.airStrikeModeActive) {
       const validateAir = getValidateGroupAirStrikeTarget();
       if (!validateAir) {
@@ -253,6 +273,26 @@ export async function refreshHoverRoutePreview(
       unitIds,
       validation,
       supportKind: 'ranged',
+      originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
+      allowBlockingOrderTooltip,
+    });
+    return;
+  }
+  if (S.airDropModeActive) {
+    const validateDrop = window.gameApi?.validateGroupAirDropTarget;
+    if (!validateDrop) {
+      publishHoverRoutePreview(deps, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    const validation = await validateDrop({ unitIds, targetH3Index: hoveredH3 });
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+    publishGroupedSupportTargetingPreview({
+      deps,
+      hoveredH3,
+      unitIds,
+      validation,
+      supportKind: 'air',
       originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
       originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
       allowBlockingOrderTooltip,

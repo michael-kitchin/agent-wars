@@ -97,6 +97,7 @@ const IPC_GAME = {
   commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
+  validateGroupAirDropTarget: 'game:validateGroupAirDropTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',
   validateGroupMissileLaunchTarget: 'game:validateGroupMissileLaunchTarget',
   cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
@@ -577,6 +578,18 @@ validateGroupAirStrikeTarget: (payload: {
     targetH3Index: string;
     targetType: AirStrikeTargetType;
   }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupAirStrikeTarget, payload),
+  /**
+   * Asks whether every selected air unit can drop infantry on one hex.
+   *
+   * Purpose: The map double-click queues a drop only when the whole selection can.
+   * When to use: While air-drop aiming is on.
+   * Expected outcome: Success, or the first reason. One illegal unit fails the group.
+   * Exceptions: IPC errors propagate as promise rejections.
+   */
+  validateGroupAirDropTarget: (payload: {
+    unitIds: string[];
+    targetH3Index: string;
+  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupAirDropTarget, payload),
     /**
    * Documents the object literal property `validateGroupFerryTarget` (validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string; }): Promise<{ success: boolean; reason?: string }> => ipcRende).
 
@@ -588,7 +601,7 @@ validateGroupAirStrikeTarget: (payload: {
 validateGroupFerryTarget: (payload: {
     unitIds: string[];
     destinationH3Index: string;
-  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupFerryTarget, payload),
+  }): Promise<{ success: boolean; reason?: string; ferryPathsByUnitId?: Readonly<Record<string, readonly string[]>> }> => ipcRenderer.invoke(IPC_GAME.validateGroupFerryTarget, payload),
   /**
    * Asks whether every selected missile can launch at one hex.
    *

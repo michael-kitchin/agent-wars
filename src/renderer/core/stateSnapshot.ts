@@ -242,7 +242,7 @@ export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQu
 /**
  * Reloads strategic game state after a successful sealift embark/debark so embark flags stay current.
  *
- * Purpose: Selection and march preview read `embarkedOnNavalUnitId` from `S.gameState`; without a refresh,
+ * Purpose: Selection and march preview read `embarkedOnCarrierUnitId` from `S.gameState`; without a refresh,
  * manually debarked land units remain blocked for same-turn select/move even though SQLite cleared the assignment.
  * When to use: After successful strategic `updateSealiftSlot` (embark or debark) in the stack callout.
  * Expected outcome: Client unit rows match main-process embark state; optional standing-order refresh after embark cancels.

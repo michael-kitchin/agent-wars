@@ -31,7 +31,7 @@ let rangePerimeterAnimationTickInFlight = false;
  * Exceptions: None.
  */
 function isRangePerimeterModeActive(): boolean {
-  return S.rangedModeActive || S.airStrikeModeActive;
+  return S.rangedModeActive || S.airStrikeModeActive || S.airDropModeActive;
 }
 
 /**
@@ -44,7 +44,7 @@ function isRangePerimeterModeActive(): boolean {
  */
 export function buildRangePerimeterSignature(): string {
   if (!isRangePerimeterModeActive()) return '';
-  const mode = S.airStrikeModeActive ? 'air' : 'ranged';
+  const mode = S.airStrikeModeActive || S.airDropModeActive ? 'air' : 'ranged';
   const battleKey = S.tacticalBattleSnapshot?.enclosingStrategicH3Index ?? 'strategic';
   const ids = [...S.selectedUnitIds].sort().join(',');
   return `${mode}|${battleKey}|${ids}`;
@@ -67,7 +67,7 @@ function computeSelectedRangeHexSetFromState(): Set<string> | null {
     const selected = tactical.subUnits.filter((s) => S.selectedUnitIds.includes(s.id));
     if (selected.length === 0) return null;
     try {
-      if (S.airStrikeModeActive) return buildTacticalAirStrikeRangeSet(footprint);
+      if (S.airStrikeModeActive || S.airDropModeActive) return buildTacticalAirStrikeRangeSet(footprint);
       return buildTacticalRangedRangeSet(tactical, selected, footprint);
     } catch (err) {
       console.error('computeSelectedRangeHexSetFromState tactical failed', err);
@@ -84,7 +84,7 @@ function computeSelectedRangeHexSetFromState(): Set<string> | null {
     unitType: u.unitType,
   }));
   try {
-    if (S.airStrikeModeActive) return buildStrategicAirStrikeRangeSet(units);
+    if (S.airStrikeModeActive || S.airDropModeActive) return buildStrategicAirStrikeRangeSet(units);
     return buildStrategicRangedRangeSet(units);
   } catch (err) {
     console.error('computeSelectedRangeHexSetFromState strategic failed', err);
@@ -195,7 +195,7 @@ function projectLoopsToScreen(
 }
 
 /**
- * Draws the animated dashed range perimeter when ranged or air-strike planning is active.
+ * Draws the animated dashed range perimeter when ranged, air-strike, or air-drop planning is active.
  *
  * Purpose: Visualizes max range for the selected group without LOS or target validity filtering. The outline uses the missile crimson and keeps the animated dash.
  * When to use: In both tactical and strategic `drawGameScene` branches before unit icons.
@@ -208,7 +208,7 @@ export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {
   const loops = S.rangePerimeterLoopsLatLng;
   if (!loops?.length) return;
 
-  const style = rangePerimeterStaticLineStyle(S.airStrikeModeActive ? 'airStrike' : 'ranged', 'perimeter');
+  const style = rangePerimeterStaticLineStyle(S.airStrikeModeActive || S.airDropModeActive ? 'airStrike' : 'ranged', 'perimeter');
   const patternLength = style.dash[0] + style.dash[1];
   const phase =
     patternLength > 0

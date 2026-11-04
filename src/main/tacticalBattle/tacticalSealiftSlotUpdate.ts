@@ -90,12 +90,19 @@ export function projectTacticalSealiftSlotChange(
   if (!navalIds.includes(args.navalUnitId)) {
     return { success: false, reason: 'Selected naval unit is not in this stack.' };
   }
+  const carrierIsAir = snap.subUnits.some((unit) => unit.id === args.navalUnitId && unit.unitType === 'air');
+  if (carrierIsAir && args.slotIndex === 2) {
+    return { success: false, reason: 'An air unit has only one infantry slot.' };
+  }
   const isDebark = args.landUnitId === null;
   if (isDebark) {
-    if (!canManualDebarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
+    if (!carrierIsAir && !canManualDebarkFromHex(args.h3Index, HUMAN_SEAT_ID)) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, HUMAN_SEAT_ID, snap.enclosingStrategicH3Index)) {
+  } else if (
+    !carrierIsAir &&
+    !canPlayerEmbarkFromTacticalHex(args.h3Index, HUMAN_SEAT_ID, snap.enclosingStrategicH3Index)
+  ) {
     const atSea = baseState.contextMode === 'water';
     return {
       success: false,
@@ -103,6 +110,11 @@ export function projectTacticalSealiftSlotChange(
     };
   }
   const landKey = args.landUnitId?.trim() ?? '';
+  if (carrierIsAir && landKey.length > 0) {
+    const landType = baseState.landOptions.find((option) => option.unitId === landKey)?.unitType
+      ?? snap.subUnits.find((unit) => unit.id === landKey)?.unitType;
+    if (landType !== 'infantry') return { success: false, reason: 'An air unit can carry only infantry.' };
+  }
   if (landKey.length > 0 && !baseState.landOptions.some((o) => o.unitId === landKey)) {
     return { success: false, reason: 'Selected land unit is not available for this stack.' };
   }

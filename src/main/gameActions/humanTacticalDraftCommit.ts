@@ -273,6 +273,7 @@ export function commitHumanTacticalDraftOrders(args: {
   movementOrders: readonly { unitId: string; toH3Index: string }[];
   rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
   airStrikes?: readonly AirStrikeOrder[];
+  airDropOrders?: readonly import('../../shared/ipc/airDropTypes').AirDropOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
   opponentTacticalDraft?: TacticalOpponentPlanPayload;
@@ -373,6 +374,7 @@ export function commitHumanTacticalDraftOrders(args: {
       movementOrders: appliedMovementOrders,
       rangedAttacks: explicitRanged,
       airStrikes: explicitAir,
+      airDropOrders: args.airDropOrders,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
       opponentTacticalDraft,

@@ -12,7 +12,10 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableHelpers';
-import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
+import { findAirportFerryRoute } from '../../shared/airportFerryRoute';
+import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import { strategicFerryRangeHexes } from '../../shared/weatherBonusRules';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
 import { SECTION_TITLE_AIR_OPERATIONS_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';
@@ -72,15 +75,15 @@ export function buildAirOperationsBriefingBlock(
     lines.push(topLevelHeading(SECTION_TITLE_AIR_OPERATIONS_STATUS));
     lines.push('');
     lines.push(
-      'Air rules (tactical): strikes may target enemy sub-units anywhere in this battle footprint; one air action per unit per beat.'
+      'Air rules (tactical): strikes and drops cover this battle footprint; ferry is one hop between intact airport cells; an air sub-unit carries one infantry sub-unit.'
     );
     lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
     lines.push('');
     const airStatusRows: Array<Array<unknown>> = opponentAir.map((air) => {
       const targetableEnemyUnits = humanUnits.length;
-      return [air.id, format(air.h3Index), targetableEnemyUnits];
+      return [air.id, format(air.h3Index), infantryAboardLabel(state, air.id), targetableEnemyUnits];
     });
-    lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Enemy Unit Targets'], airStatusRows));
+    lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Aboard', 'Enemy Unit Targets'], airStatusRows));
     return lines.join('\n');
   }
 
@@ -105,7 +108,7 @@ export function buildAirOperationsBriefingBlock(
   lines.push(topLevelHeading(SECTION_TITLE_AIR_OPERATIONS_STATUS));
   lines.push('');
   lines.push(
-    `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
+    `Air rules: an air unit ferries any distance by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${strategicFerryRangeHexes({ weatherAtDestination: 'snow', tags: [], enabled: true })} into snow when the unit lacks the snow tag. It strikes and drops within ${AIR_STRIKE_RANGE_HEXES} of its current airport. Ferry Destinations lists at most 8 nearest reachable airports; any other airport you control may be legal, and plan_route confirms the chain. One air action per unit per turn.`
   );
   lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
   lines.push('');
@@ -122,26 +125,17 @@ export function buildAirOperationsBriefingBlock(
     const baseControlled = controllerByHex.get(air.h3Index) === ownSeat;
     const targetableEnemyUnits = humanUnits.filter((u) => strikeEnvelope.has(u.h3Index)).length;
     const strikeable = countStrikeableEnemyInfrastructure({ strikeEnvelope, infraRows, controllerByHex, ownSeatId: ownSeat });
-    const ferryDestinations = opponentAirports.filter(
-      (ap) =>
-        ap.h3Index !== air.h3Index &&
-        isWithinAirFerryGridRange(
-          air.h3Index,
-          ap.h3Index,
-          'briefingSectionsAirOps ferry destinations',
-          strategicFerryRangeOnState(air, ap.h3Index, state)
-        )
-    ).length;
     airStatusRows.push([
       air.id,
       format(air.h3Index),
+      infantryAboardLabel(state, air.id),
       baseIntact ? 'yes' : 'no',
       baseControlled ? 'yes' : 'no',
       targetableEnemyUnits,
       strikeable.urban,
       strikeable.airports,
       strikeable.seaports,
-      ferryDestinations,
+      nearestFerryAirportCodes(air, opponentAirports, state, format, ownSeat),
     ]);
   }
   lines.push(
@@ -149,6 +143,7 @@ export function buildAirOperationsBriefingBlock(
       [
         'Unit ID',
         'Base Hex',
+        'Aboard',
         'Base Intact',
         'Base Controlled',
         'Enemy Unit Targets',
@@ -174,4 +169,66 @@ export function buildAirOperationsBriefingBlock(
     'Callback support: subscribe with event "infrastructure_destroyed" and parameters targetType plus the briefing hex code to be re-consulted after successful infra strikes.'
   );
   return lines.join('\n');
+}
+
+/**
+ * The infantry id aboard an air unit, or `none`.
+ *
+ * Purpose: The Air Operations table names cargo the same way the naval table names a ship's cargo.
+ * When to use: One air row in either consultation mode.
+ * Expected outcome: One infantry id, or `none` when the air unit is empty.
+ * Exceptions: None.
+ */
+function infantryAboardLabel(state: GameStateSnapshot, airUnitId: string): string {
+  const aboard = state.units.find(
+    (unit) =>
+      unit.unitType === 'infantry' &&
+      (unit.embarkedOnCarrierUnitId === airUnitId ||
+        (unit as { embarkedOnSubUnitId?: string }).embarkedOnSubUnitId === airUnitId)
+  );
+  return aboard?.id ?? 'none';
+}
+
+/**
+ * At most eight reachable airports, nearest first, ties broken by the hex id.
+ *
+ * Purpose: The ferry column stays short. A longer chain is confirmed with `plan_route`.
+ * When to use: One strategic air row.
+ * Expected outcome: Briefing hex codes separated by commas, or `none`.
+ * Exceptions: None. An unreachable airport is omitted.
+ */
+function nearestFerryAirportCodes(
+  air: GameStateSnapshot['units'][number],
+  airports: readonly { h3Index: string }[],
+  state: GameStateSnapshot,
+  format: (h3: string) => string,
+  owner: string
+): string {
+  const nodes = airports.map((airport) => ({
+    h3Index: airport.h3Index,
+    owner,
+    intact: true,
+    neutralBorder: isNeutralBorderHex(airport.h3Index),
+  }));
+  const reached: { h3Index: string; distance: number }[] = [];
+  for (const airport of airports) {
+    if (airport.h3Index === air.h3Index) continue;
+    const route = findAirportFerryRoute({
+      originH3Index: air.h3Index,
+      destinationH3Index: airport.h3Index,
+      owner,
+      nodes,
+      gridDistance: computeGridDistancePure,
+      unmeasuredHopWithinRange: isWithinGridRangePure,
+      hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(air, destinationH3Index, state),
+    });
+    if (!route.reachable) continue;
+    reached.push({
+      h3Index: airport.h3Index,
+      distance: computeGridDistancePure(air.h3Index, airport.h3Index) ?? Number.MAX_SAFE_INTEGER,
+    });
+  }
+  reached.sort((left, right) => left.distance - right.distance || (left.h3Index < right.h3Index ? -1 : 1));
+  const codes = reached.slice(0, 8).map((row) => format(row.h3Index));
+  return codes.length > 0 ? codes.join(', ') : 'none';
 }

@@ -1,9 +1,11 @@
 /**
  * Tactical snapshot mutations ordered like strategic ready resolution (no production): embark (when applicable),
- * air strike phase, ranged phase, then callers apply movement, ferry, cargo sync, and melee.
+ * air strike phase, air drops, ranged phase, then callers apply movement, ferry, cargo sync, and melee.
  */
 
 import type {
+  AirDropAnimationMove,
+  AirDropOrder,
   AirStrikeAnimationMove,
   AirStrikeOrder,
   EmbarkOrder,
@@ -15,7 +17,12 @@ import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../sh
 import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import type { TacticalBattlePlayerId, TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
-import { syncEmbarkedLandToNavalHex } from './tacticalEmbarkedCargoSync';
+import {
+  cargoKillEdgesForRemovedCarriers,
+  embarkedLandIdsForCarriers,
+  syncEmbarkedLandToNavalHex,
+} from './tacticalEmbarkedCargoSync';
+import { resolveTacticalAirDrops } from './tacticalAirDrop';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
 import { createTacticalFortificationHooks } from './tacticalFortificationSoak';
 import {
@@ -239,6 +246,15 @@ export type TacticalAirRangedPhaseAccum = {
    */
   airStrikePlaybackMoves: AirStrikeAnimationMove[];
   /**
+   * Air-drop animation rows for this beat.
+   *
+   * Purpose: The renderer flies the air unit out and back, and flies the infantry only outbound.
+   * When to use: Tactical playback assembly, beside `airStrikePlaybackMoves`.
+   * Expected outcome: One row per drop that resolved. Empty when no drop ran.
+   * Exceptions: None.
+   */
+  airDropPlaybackMoves: AirDropAnimationMove[];
+  /**
    * Target hexes for air combat lightning during playback (mirrors strategic `strikeHexes`).
    *
    * Purpose: Maps to `TacticalCommitResolutionPlayback.airStrikeHexes` separate from ranged combat hexes.
@@ -340,7 +356,7 @@ function recordTacticalRangedRubble(args: {
 /**
  * Applies tactical air strikes (units + infrastructure in one sorted pass) then ranged combat via `runRangedPhase`.
  *
- * Purpose: Matches strategic `executeReadyStrategicTurn` ordering: full air strike phase, then ranged, before movement.
+ * Purpose: Matches strategic `executeReadyStrategicTurn` ordering: air strikes, then air drops, then ranged, before movement.
  * When to use: After opponent embark on the same snapshot clone; use `mergedHumanThenOpponent` when concatenating human-then-opponent air and ranged lists like strategic `allAirStrikes` / `allRanged`.
  * Expected outcome: Snapshot reflects air and ranged casualties; kill buckets match strategic toast semantics. Air, ranged, and counter-fire
  *   rolls add each roller's origin bonus at its own cell, read from the persisted match flags and this `battle`.
@@ -353,7 +369,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   rangedAttacks: readonly { unitId: string; targetH3Index: string }[] | undefined,
   rangedPlayer: TacticalBattlePlayerId,
   next: () => number,
-  resolutionScope: TacticalAirRangedResolutionScope = 'singlePlayer'
+  resolutionScope: TacticalAirRangedResolutionScope = 'singlePlayer',
+  airDropOrders?: readonly AirDropOrder[]
 ): TacticalAirRangedPhaseAccum {
   tacticalLogQuery('applyTacticalAirStrikeThenRangedPhaseOnBattle', {
     battleId: battle.battleId,
@@ -517,6 +534,23 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     });
   }
   flushAirCasualties();
+  const dropOutcome = resolveTacticalAirDrops({
+    battle: { ...battle, subUnits: sub },
+    orders: airDropOrders ?? [],
+    strikeUnitIds: new Set((airStrikes ?? []).map((order) => order.unitId)),
+    rollDie,
+    onRoll: airDiceLog.sink,
+    originHitBonusAt,
+    techHitBonusAt,
+  });
+  sub = dropOutcome.subUnits;
+  for (const row of dropOutcome.removedUnits) {
+    if (removedUnitIdsLogged.has(row.id)) continue;
+    removedUnitIdsLogged.add(row.id);
+    removedUnits.push(row);
+    airStrikeCasualtyHexSet.add(row.h3Index);
+  }
+  for (const kill of dropOutcome.killsByReturnFire) killsByReturnFire.push(kill);
   const airStrikePlaybackRemovedUnits = [...removedUnits];
   let workBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
   const footprint = new Set(workBattle.tacticalChildH3Indexes);
@@ -605,7 +639,23 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       ...(rangedResult.rangedResolutionShotLines ?? []),
     ]);
     const removedSet = new Set(rangedResult.removedUnitIds);
+    const rangedCarrierIds = new Set(
+      [...removedSet].filter((id) => {
+        const carrier = workBattle.subUnits.find((unit) => unit.id === id);
+        return carrier?.unitType === 'naval' || carrier?.unitType === 'air';
+      })
+    );
+    const cargoLostWithCarriers = embarkedLandIdsForCarriers(workBattle.subUnits, rangedCarrierIds);
+    for (const cargoId of cargoLostWithCarriers) removedSet.add(cargoId);
     const byId = new Map(workBattle.subUnits.map((u) => [u.id, u] as const));
+    const shotIds = new Set(rangedResult.removedUnitIds);
+    for (const cargoId of cargoLostWithCarriers) {
+      if (shotIds.has(cargoId) || removedUnitIdsLogged.has(cargoId)) continue;
+      const cargo = byId.get(cargoId);
+      if (!cargo) continue;
+      removedUnitIdsLogged.add(cargoId);
+      removedUnits.push(removedUnitSnapshot(cargo));
+    }
     for (const id of rangedResult.removedUnitIds) {
       const row = byId.get(id);
       if (row) {
@@ -615,8 +665,25 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     for (const k of rangedResult.killsByDirectFire ?? []) {
       killsByDirectFire.push(k);
     }
+    for (const edge of cargoKillEdgesForRemovedCarriers(
+      workBattle.subUnits,
+      rangedResult.killsByDirectFire ?? [],
+      rangedCarrierIds,
+      shotIds
+    )) {
+      killsByDirectFire.push(edge);
+    }
     for (const k of rangedResult.killsByReturnFire ?? []) {
       killsByReturnFire.push(k);
+    }
+    const rangedVictimIds = new Set<string>([...shotIds, ...killsByDirectFire.map((edge) => edge.victimId)]);
+    for (const edge of cargoKillEdgesForRemovedCarriers(
+      workBattle.subUnits,
+      rangedResult.killsByReturnFire ?? [],
+      rangedCarrierIds,
+      rangedVictimIds
+    )) {
+      killsByReturnFire.push(edge);
     }
     workBattle = {
       ...workBattle,
@@ -718,6 +785,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     infrastructureDestroyedEvents,
     airStrikeAttemptCount,
     airStrikePlaybackMoves: strikeMoves,
+    airDropPlaybackMoves: dropOutcome.moves,
     airStrikePlaybackStrikeHexes: [...strikeHexesSet],
     airStrikePlaybackCasualtyHexes: [...airStrikeCasualtyHexSet],
     airStrikePlaybackRemovedUnits,
@@ -730,9 +798,9 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
 /**
  * Snapshot plus ferry-abort casualties after one player's tactical ferry phase.
  *
- * Contract: `removedUnits` are air sub-units destroyed because dest was illegal and the origin airport is gone.
+ * Contract: `removedUnits` are air sub-units destroyed because the destination was illegal and the origin airport is gone, plus infantry that was embarked on those air sub-units.
  * When to use: Ready/support apply after `applyTacticalFerryPhaseOnBattle`.
- * Expected outcome: Empty `removedUnits` when every hop moved or stayed; battle `subUnits` omit destroyed air.
+ * Expected outcome: Empty `removedUnits` when every hop moved or stayed. Otherwise the battle omits the destroyed air sub-units and their embarked infantry.
  * Exceptions: None.
  */
 export type TacticalFerryPhaseResult = {
@@ -745,8 +813,9 @@ export type TacticalFerryPhaseResult = {
  *
  * Purpose: Keeps tactical ferry phase aligned with `readyStrategicResolutionPipeline` post-move ferry handling.
  * When to use: After `projectTacticalSnapshotAfterHumanMovementOrders` / opponent movement on the same beat.
- * Expected outcome: Air jumps to intact airport cells in the footprint; illegal dest with a lost origin destroys
- * the unit; illegal dest with an intact origin leaves the unit in place.
+ * Expected outcome: Air jumps to intact airport cells in the footprint, and embarked infantry moves with it.
+ *   An illegal destination with a lost origin destroys the air sub-unit and its embarked infantry.
+ *   An illegal destination with an intact origin leaves the unit in place.
  * Exceptions: None.
  */
 export function applyTacticalFerryPhaseOnBattle(
@@ -770,11 +839,20 @@ export function applyTacticalFerryPhaseOnBattle(
       continue;
     }
     if (outcome === 'destroy') {
+      const cargoIds = embarkedLandIdsForCarriers(sub, new Set([air.id]));
       toDestroy.add(air.id);
       removedUnits.push(removedUnitSnapshot(air));
+      for (const cargoId of cargoIds) {
+        if (toDestroy.has(cargoId)) continue;
+        const cargo = sub.find((unit) => unit.id === cargoId);
+        if (!cargo) continue;
+        toDestroy.add(cargoId);
+        removedUnits.push(removedUnitSnapshot(cargo));
+      }
       tacticalLogQuery('applyTacticalFerryPhaseOnBattle destroy lost origin', {
         unitId: f.unitId,
         dest: f.destinationH3Index,
+        cargoCount: cargoIds.length,
       });
     }
   }

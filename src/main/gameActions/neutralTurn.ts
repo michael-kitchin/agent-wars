@@ -159,7 +159,7 @@ export function prepareNeutralTransportsForTurn(coordinates: NeutralTurnCoordina
        AND EXISTS (SELECT 1 FROM unit_transport_assignments WHERE naval_unit_id = units.id)`,
     [NEUTRAL_OWNER_ID]
   );
-  if (ships.length === 0) return;
+  if (ships.length > 0) {
   const occupied = new Set(
     dbGetAll<{ player: string; h3Index: string }>('SELECT player, h3_index AS h3Index FROM units')
       .filter((unit) => isSeatId(unit.player))
@@ -213,6 +213,22 @@ export function prepareNeutralTransportsForTurn(coordinates: NeutralTurnCoordina
       coordinates.resolveToH3
     );
     if (result.status === 'error') logError('neutralTurn could not assign a landing march', { shipId: ship.id, error: result.error });
+  }
+  }
+  const airCarriers = dbGetAll<{ id: string; h3Index: string }>(
+    `SELECT id, h3_index AS h3Index FROM units
+     WHERE player = ? AND unit_type = 'air'
+       AND EXISTS (SELECT 1 FROM unit_transport_assignments WHERE naval_unit_id = units.id)`,
+    [NEUTRAL_OWNER_ID]
+  );
+  for (const carrier of airCarriers) {
+    const cargo = dbGetAll<{ id: string }>(
+      'SELECT land_unit_id AS id FROM unit_transport_assignments WHERE naval_unit_id = ?',
+      [carrier.id]
+    );
+    for (const unit of cargo) clearEmbarkAssignmentForLandUnit(unit.id);
+    assignDefend(carrier.id, carrier.h3Index, coordinates);
+    for (const unit of cargo) assignDefend(unit.id, carrier.h3Index, coordinates);
   }
 }
 

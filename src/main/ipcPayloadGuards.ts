@@ -190,6 +190,7 @@ export type ParsedHumanTacticalCommitOrders = {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   airStrikes: AirStrikeOrder[];
+  airDropOrders: { unitId: string; targetH3Index: string }[];
   ferryOrders: FerryOrder[];
   embarkOrders: EmbarkOrder[];
   opponentTacticalDraft?: TacticalOpponentPlanPayload;
@@ -287,6 +288,7 @@ export function parseHumanTacticalCommitPayload(
     movementOrders?: unknown;
     rangedAttacks?: unknown;
     airStrikes?: unknown;
+    airDropOrders?: unknown;
     ferryOrders?: unknown;
     embarkOrders?: unknown;
     useEventDrivenConsultation?: unknown;
@@ -303,6 +305,9 @@ export function parseHumanTacticalCommitPayload(
   const airParsed = parseAirStrikeRows(p.airStrikes ?? [], invalid);
   if (!airParsed.ok) return airParsed;
   const airStrikes = airParsed.rows;
+  const dropParsed = parseUnitIdFieldRows(p.airDropOrders ?? [], 'targetH3Index', invalid);
+  if (!dropParsed.ok) return dropParsed;
+  const airDropOrders = dropParsed.rows.map((row) => ({ unitId: row.unitId, targetH3Index: row.value }));
   const ferryParsed = parseUnitIdFieldRows(p.ferryOrders ?? [], 'destinationH3Index', invalid);
   if (!ferryParsed.ok) return ferryParsed;
   const ferryOrders = ferryParsed.rows.map((row) => ({ unitId: row.unitId, destinationH3Index: row.value }));
@@ -317,6 +322,7 @@ export function parseHumanTacticalCommitPayload(
       movementOrders?: unknown;
       rangedAttacks?: unknown;
       airStrikes?: unknown;
+      airDropOrders?: unknown;
       ferryOrders?: unknown;
       embarkOrders?: unknown;
     };
@@ -326,6 +332,8 @@ export function parseHumanTacticalCommitPayload(
     if (!opponentRanged.ok) return opponentRanged;
     const opponentAir = parseAirStrikeRows(o.airStrikes ?? [], invalid);
     if (!opponentAir.ok) return opponentAir;
+    const opponentDrops = parseUnitIdFieldRows(o.airDropOrders ?? [], 'targetH3Index', invalid);
+    if (!opponentDrops.ok) return opponentDrops;
     const opponentFerry = parseUnitIdFieldRows(o.ferryOrders ?? [], 'destinationH3Index', invalid);
     if (!opponentFerry.ok) return opponentFerry;
     const opponentEmbark = parseUnitIdFieldRows(o.embarkOrders ?? [], 'navalUnitId', invalid);
@@ -334,6 +342,7 @@ export function parseHumanTacticalCommitPayload(
       movementOrders: opponentMovement.rows.map((row) => ({ unitId: row.unitId, toH3Index: row.value })),
       rangedAttacks: opponentRanged.rows.map((row) => ({ unitId: row.unitId, targetH3Index: row.value })),
       airStrikes: opponentAir.rows,
+      airDropOrders: opponentDrops.rows.map((row) => ({ unitId: row.unitId, targetH3Index: row.value })),
       ferryOrders: opponentFerry.rows.map((row) => ({ unitId: row.unitId, destinationH3Index: row.value })),
       embarkOrders: opponentEmbark.rows.map((row) => ({ unitId: row.unitId, navalUnitId: row.value })),
     };
@@ -344,6 +353,7 @@ export function parseHumanTacticalCommitPayload(
       movementOrders,
       rangedAttacks,
       airStrikes,
+      airDropOrders,
       ferryOrders,
       embarkOrders,
       opponentTacticalDraft,

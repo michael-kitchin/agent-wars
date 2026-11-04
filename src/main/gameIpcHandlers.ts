@@ -269,10 +269,20 @@ export async function handleGameReady(
   const resolvedFerryMoves = readyResult.resolvedFerryMoves ?? [];
   const humanFerryMoves = resolvedFerryMoves
     .filter((move) => move.player === HUMAN_SEAT_ID)
-    .map((move) => ({ unitId: move.unitId, fromH3Index: move.fromH3Index, toH3Index: move.toH3Index }));
+    .map((move) => ({
+      unitId: move.unitId,
+      fromH3Index: move.fromH3Index,
+      toH3Index: move.toH3Index,
+      pathH3Indexes: move.pathH3Indexes,
+    }));
   const opponentFerryMoves = resolvedFerryMoves
     .filter((move) => isAiSeatId(move.player))
-    .map((move) => ({ unitId: move.unitId, fromH3Index: move.fromH3Index, toH3Index: move.toH3Index }));
+    .map((move) => ({
+      unitId: move.unitId,
+      fromH3Index: move.fromH3Index,
+      toH3Index: move.toH3Index,
+      pathH3Indexes: move.pathH3Indexes,
+    }));
   const allAiMoves = [...aiMoves, ...opponentFerryMoves];
   const allHumanMoves = [...(readyResult.humanMoves ?? []), ...humanFerryMoves];
 

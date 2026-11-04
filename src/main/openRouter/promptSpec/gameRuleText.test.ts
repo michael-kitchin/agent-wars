@@ -79,15 +79,17 @@ const STRATEGIC_RESOLUTION_STAGES = [
   'embark',
   'missile launches',
   'air strikes',
+  'air drops',
   'ranged',
   'movement',
-  'cargo sync',
   'ferry',
+  'cargo sync',
   'melee',
 ] as const;
 const TACTICAL_RESOLUTION_STAGES = [
   'embark',
   'air strikes',
+  'air drops',
   'ranged',
   'movement',
   'ferry',

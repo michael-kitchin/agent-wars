@@ -264,6 +264,7 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'sightCues'
   | 'missileStrikeRemovedUnits'
   | 'airStrikeMoves'
+  | 'airDropMoves'
   | 'airStrikeAttemptCount'
   | 'airStrikeSuccessfulCount'
   | 'airStrikeFailedCount'
@@ -328,6 +329,7 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     sightCues: source.sightCues,
     missileStrikeRemovedUnits: source.missileStrikeRemovedUnits,
     airStrikeMoves: source.airStrikeMoves,
+    airDropMoves: source.airDropMoves,
     airStrikeAttemptCount: source.airStrikeAttemptCount,
     airStrikeSuccessfulCount: source.airStrikeSuccessfulCount,
     airStrikeFailedCount: source.airStrikeFailedCount,

@@ -10,6 +10,7 @@ import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
 import type { LossFlagFacts } from '../../shared/lossFlagFacts';
 import type { FortificationLossTally } from '../fortificationCombat';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
+import type { AirDropPhaseResult } from './airDropResolution';
 import type { MissileLaunchPhaseResult } from './missileLaunchResolution';
 import { logDebug, logError, logTrace } from '../logger';
 import { isOwnerId, type OwnerId } from '../../shared/seatIds';
@@ -105,6 +106,15 @@ rangedResult: CombatResolutionResult;
    */
 airStrikeResult: AirStrikePhaseResult;
   /**
+   * Drops already resolved before this pause.
+   *
+   * Contract: The database already shows landed infantry and shot-down carriers.
+   * When to use: Finalize copies `moves` onto the Ready result.
+   * Expected outcome: Playback still runs after the player answers.
+   * Exceptions: None.
+   */
+  airDropResult: AirDropPhaseResult;
+  /**
    * Launches already resolved before this pause.
    *
    * Contract: Produced once, before the invocation count is stored. Resume must not roll them again.
@@ -148,7 +158,7 @@ rangedTransportLosses: CombatUnit[];
    * Expected outcome: May be empty.
    * Exceptions: None.
    */
-humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
+humanMoves: { unitId: string; fromH3Index: string; toH3Index: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Movement of every owner other than the human seat.
    *
@@ -157,7 +167,7 @@ humanMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];
    * Expected outcome: May be empty. Includes Neutral when Neutral marched.
    * Exceptions: None.
    */
-aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string }[];
+aiMoves: { unitId: string; fromH3Index: string; toH3Index: string; player?: string; pathH3Indexes?: readonly string[] }[];
     /**
    * Specifies the contract for the `embarkedFollowMoves` member (embarkedFollowMoves: { unitId: string; fromH3Index: string; toH3Index: string }[];).
 

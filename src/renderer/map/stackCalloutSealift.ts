@@ -147,7 +147,11 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
         noneOption.value = '';
         noneOption.textContent = '(none)';
         select.appendChild(noneOption);
-        for (const option of state.landOptions) {
+        const carrierType = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
+        const options = carrierType === 'air'
+          ? state.landOptions.filter((option) => option.unitType === 'infantry')
+          : state.landOptions;
+        for (const option of options) {
           const opt = document.createElement('option');
           opt.value = option.unitId;
           opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
@@ -204,7 +208,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
             select.value = select.dataset.prevLand ?? '';
             showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
           } else {
-            // Embark/debark changes `embarkedOnNavalUnitId` in main; refresh so selection/march use current flags.
+            // Embark/debark changes `embarkedOnCarrierUnitId` in main; refresh so selection/march use current flags.
             await refreshGameStateAfterSealiftChange({ refreshStandingOrders: selected.length > 0 });
             if (selected.length > 0) {
               await refreshHoverRoutePreview();
@@ -267,7 +271,10 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
       };
 
       addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
-      addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+      const carrierType = units.find((unit) => unit.id === row.navalUnitId)?.unitType;
+      if (carrierType !== 'air') {
+        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+      }
       rowEl.appendChild(right);
       section.appendChild(rowEl);
     }

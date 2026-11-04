@@ -3,6 +3,7 @@
  */
 
 import type {
+  AirDropOrder,
   AirStrikeOrder,
   FerryOrder,
   HumanStandingOrderSnapshot,
@@ -24,6 +25,7 @@ let strategicOrderDraftStash: {
   humanStandingOrders: HumanStandingOrderSnapshot[];
   pendingRangedAttacks: RangedAttackOrder[];
   pendingAirStrikes: AirStrikeOrder[];
+  pendingAirDrops: AirDropOrder[];
   pendingMissileLaunches: MissileLaunchOrder[];
   pendingFerryOrders: FerryOrder[];
 } | null = null;
@@ -42,12 +44,15 @@ export function stashStrategicOrderDraftsForTacticalSession(): void {
     humanStandingOrders: [...S.humanStandingOrders],
     pendingRangedAttacks: [...S.pendingRangedAttacks],
     pendingAirStrikes: [...S.pendingAirStrikes],
+    pendingAirDrops: [...S.pendingAirDrops],
     pendingMissileLaunches: [...S.pendingMissileLaunches],
     pendingFerryOrders: [...S.pendingFerryOrders],
   };
   S.humanStandingOrders = [];
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
+  S.pendingAirDrops = [];
+  S.airDropModeActive = false;
   S.pendingMissileLaunches = [];
   S.pendingFerryOrders = [];
   S.pendingEmbarkOrders = [];
@@ -94,6 +99,10 @@ export function restoreStrategicOrderDraftsAfterTacticalSession(): void {
   );
   S.pendingAirStrikes = restoreDraftRowsForLivingUnits(
     strategicOrderDraftStash.pendingAirStrikes,
+    livingUnitIds
+  );
+  S.pendingAirDrops = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.pendingAirDrops,
     livingUnitIds
   );
   S.pendingMissileLaunches = restoreDraftRowsForLivingUnits(

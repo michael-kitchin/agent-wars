@@ -101,7 +101,8 @@ promptLine: string;
 const ALL_TOOL_METADATA: ToolMeta[] = [
   {
     name: 'plan_route',
-    description: 'Compute the optimal path for a unit to a destination hex. Returns the full multi-turn route with per-turn waypoints. Use to understand how long moves take before committing.',
+    description:
+      'Compute a route for a unit. Land and naval units receive a hex-by-hex march. An air unit receives the airport chain for a ferry, not a hex-by-hex march. Use it to confirm a longer airport chain before committing.',
     parameters: {
       type: 'object',
       properties: {

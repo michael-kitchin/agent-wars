@@ -3,6 +3,7 @@
  */
 
 import { createCombatRng, runMeleePhase } from '../combatResolution';
+import { cargoKillEdgesForRemovedCarriers, embarkedLandIdsForCarriers } from './tacticalEmbarkedCargoSync';
 import type { CombatUnit } from '../combatUnitTypes';
 import { getGameSeed } from '../gameDb';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
@@ -59,11 +60,12 @@ export function tacticalCombatSeed(args: {
  *
  * Purpose: Single adapter between snapshot rows and melee phase input without mutating the snapshot.
  * When to use: Immediately before `runMeleePhase` inside `applyTacticalMeleeAfterSupportOrders`.
- * Expected outcome: One `CombatUnit` per live sub-unit; `displayOrder` is a stable tie-break index only.
+ * Expected outcome: One `CombatUnit` per live sub-unit except infantry embarked on an air unit. `displayOrder` is a stable tie-break index only.
  * Exceptions: None.
  */
 function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapshot[]): CombatUnit[] {
-  return subUnits.map((u, i) => ({
+  const airIds = new Set(subUnits.filter((unit) => unit.unitType === 'air').map((unit) => unit.id));
+  return subUnits.filter((unit) => !unit.embarkedOnSubUnitId || !airIds.has(unit.embarkedOnSubUnitId)).map((u, i) => ({
     id: u.id,
     player: u.player,
     unitType: u.unitType,
@@ -78,7 +80,7 @@ function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapsho
  * Purpose: Completes the tactical WEGO beat so co-located opposing sub-units fight with combat-die resolution instead of
  * persisting indefinitely without combat; kill lines and removal snapshots feed the same toast path as strategic Ready.
  * When to use: End of `applyHumanTacticalDraftBeatInStrategicOrder` / `commitHumanTacticalDraftOrders` after air+ranged, march, optional human embark, ferry, and cargo sync.
- * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested tactical hexes.
+ * Expected outcome: Updated `battle.subUnits` with melee casualties removed. Infantry embarked on an air sub-unit that melee destroyed is removed with it. Empty melee arrays when no contested tactical hexes.
  *   Each melee roll adds the roller's origin bonus at its cell, read from the persisted match flags and this `battle`.
  *   `meleeDiceRolls` lists every melee die in roll order, anchored on the contested cell, for playback.
  * Exceptions: None; delegates RNG to `createCombatRng` and melee logic to `runMeleePhase` when `combatNext` is omitted.
@@ -135,6 +137,10 @@ export function applyTacticalMeleeAfterSupportOrders(
   }
   const removedSet = new Set(meleeResult.removedUnitIds);
   const byId = new Map(battle.subUnits.map((u) => [u.id, u] as const));
+  const airCarrierIds = new Set([...removedSet].filter((id) => byId.get(id)?.unitType === 'air'));
+  const cargoLostWithAir = embarkedLandIdsForCarriers(battle.subUnits, airCarrierIds);
+  for (const cargoId of cargoLostWithAir) removedSet.add(cargoId);
+  const shotIds = new Set(meleeResult.removedUnitIds);
   const meleeRemovedUnits: RemovedUnitSnapshot[] = [];
   for (const id of meleeResult.removedUnitIds) {
     const row = byId.get(id);
@@ -142,7 +148,16 @@ export function applyTacticalMeleeAfterSupportOrders(
       meleeRemovedUnits.push(removedUnitSnapshot(row));
     }
   }
+  for (const cargoId of cargoLostWithAir) {
+    if (shotIds.has(cargoId)) continue;
+    const cargo = byId.get(cargoId);
+    if (cargo) meleeRemovedUnits.push(removedUnitSnapshot(cargo));
+  }
   const subUnits = battle.subUnits.filter((u) => !removedSet.has(u.id));
+  const killsByMelee = meleeResult.kills.map((kill) => ({ victimId: kill.victimId, killerIds: kill.killerIds }));
+  killsByMelee.push(
+    ...cargoKillEdgesForRemovedCarriers(battle.subUnits, killsByMelee, airCarrierIds, shotIds)
+  );
   syncStrategicUnitsDbWhenTacticalParentsEliminated(battle.subUnits, subUnits);
   tacticalLogMutate('applyTacticalMeleeAfterSupportOrders applied', {
     battleId: battle.battleId,
@@ -152,7 +167,7 @@ export function applyTacticalMeleeAfterSupportOrders(
   });
   return {
     battle: { ...battle, subUnits },
-    killsByMelee: meleeResult.kills.map((k) => ({ victimId: k.victimId, killerIds: k.killerIds })),
+    killsByMelee,
     meleeRemovedUnits,
     meleeCombatHexes: meleeResult.combatHexes,
     meleeCasualtyHexes: meleeResult.casualtyHexes,

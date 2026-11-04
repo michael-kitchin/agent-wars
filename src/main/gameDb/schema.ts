@@ -68,6 +68,11 @@ export function getFullDdl(): string {
       destination_h3_index TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS pending_air_drop_orders (
+      unit_id TEXT PRIMARY KEY,
+      target_h3_index TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS unit_transport_assignments (
       land_unit_id TEXT PRIMARY KEY,
       naval_unit_id TEXT NOT NULL

@@ -1,4 +1,5 @@
 import type { AiSeatId } from '../seatIds';
+import type { AirDropAnimationMove } from './airDropTypes';
 import type { AirStrikeAnimationMove } from './ordersTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
@@ -125,6 +126,15 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    * Exceptions: None.
    */
   airStrikeMoves?: AirStrikeAnimationMove[];
+  /**
+   * Air-drop flights this beat.
+   *
+   * Purpose: The renderer plays these with the air-strike outbound and return legs.
+   * When to use: After a beat that dropped infantry.
+   * Expected outcome: Omitted when no drop resolved. The infantry id is set only when that infantry landed.
+   * Exceptions: None.
+   */
+  airDropMoves?: AirDropAnimationMove[];
   /**
    * Tactical hexes where tactical air combat lightning should flash (targets), mirroring `ReadyResult.airStrikeHexes`.
    *
