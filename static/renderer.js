@@ -16566,14 +16566,42 @@
     while (refLng - shifted > 180) shifted += 360;
     return shifted;
   }
+  function alignRingToReference(ring, centerLng, referenceLng) {
+    const shift = referenceLng == null ? 0 : alignLongitudeToReference(centerLng, referenceLng) - centerLng;
+    return ring.map(([lat, lng]) => [lat, alignLongitudeToReference(lng, centerLng) + shift]);
+  }
+  function alignLatLngRun(points, anchorLng) {
+    const aligned = [];
+    let previousLng = anchorLng;
+    for (const [lat, lng] of points) {
+      const alignedLng = previousLng == null ? lng : alignLongitudeToReference(lng, previousLng);
+      aligned.push([lat, alignedLng]);
+      previousLng = alignedLng;
+    }
+    return aligned;
+  }
 
   // src/shared/mapExtent.ts
   var extentReferenceLng = null;
+  var battleReferenceLng = null;
+  var battleReferenceSuspended = false;
   function setMapExtentReferenceLng(lng) {
     extentReferenceLng = lng;
   }
-  function mapExtentReferenceLng() {
+  function setBattleDrawReferenceLng(lng) {
+    battleReferenceLng = lng;
+  }
+  function setBattleDrawReferenceSuspended(suspended) {
+    battleReferenceSuspended = suspended;
+  }
+  function drawReferenceLng() {
+    if (battleReferenceLng != null && !battleReferenceSuspended) return battleReferenceLng;
     return extentReferenceLng;
+  }
+  function battleDrawReferenceLng(h3Indexes, regionalReferenceLng) {
+    const interval = longitudeIntervalFromCenters(h3Indexes.map((h3) => cellToLatLng(h3)[1]));
+    if (!interval) return null;
+    return regionalReferenceLng == null ? interval.referenceLng : alignLongitudeToReference(interval.referenceLng, regionalReferenceLng);
   }
   function loadedMapExtentKey(mapId, h3Indexes) {
     if (h3Indexes.length === 0) return `${mapId}:empty`;
@@ -16636,14 +16664,20 @@
     return lat;
   }
   function alignLngToReference(lng, refLng) {
-    const reference = mapExtentReferenceLng() ?? refLng;
+    const reference = drawReferenceLng() ?? refLng;
     return alignLongitudeToReference(lng, reference);
   }
+  function alignLngToDrawReference(lng) {
+    const reference = drawReferenceLng();
+    return reference == null ? lng : alignLongitudeToReference(lng, reference);
+  }
+  function alignLatLngRunToDrawReference(points, anchorLng) {
+    return alignLatLngRun(points, anchorLng ?? drawReferenceLng());
+  }
   function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
-    const boundary = cellToBoundary(h3Index);
-    const [, refLng] = cellToLatLng(h3Index);
-    return boundary.map(
-      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), alignLngToReference(lng, refLng)]
+    const [, centerLng] = cellToLatLng(h3Index);
+    return alignRingToReference(cellToBoundary(h3Index), centerLng, drawReferenceLng()).map(
+      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), lng]
     );
   }
 
@@ -16803,7 +16837,8 @@
       zoomSnap: 0.25,
       zoomDelta: 0.5,
       wheelPxPerZoomLevel: 80,
-      worldCopyJump: true,
+      /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
+      worldCopyJump: false,
       maxBounds: worldBounds2,
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
@@ -16911,7 +16946,7 @@
     if (!mainMap) return { x: 0, y: 0 };
     const leafletRef = getL();
     const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
+    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
     return { x: p.x, y: p.y };
   }
   function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
@@ -17094,7 +17129,7 @@
     let bestScore = -Infinity;
     for (const h3 of neighbors) {
       const [lat, lng] = cellToLatLng(h3);
-      const alignedLng = alignLngToReference(lng, centerLng);
+      const alignedLng = alignLongitudeToReference(lng, centerLng);
       const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
       if (score > bestScore) {
         bestScore = score;
@@ -17119,7 +17154,7 @@
     const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
     if (!neighbor) return;
     const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
-    const neighborLng = alignLngToReference(neighborLngRaw, center.lng);
+    const neighborLng = alignLongitudeToReference(neighborLngRaw, center.lng);
     const centerPt = map.latLngToContainerPoint(leafletRef.latLng(center.lat, center.lng));
     const neighborPt = map.latLngToContainerPoint(
       leafletRef.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
@@ -21511,8 +21546,8 @@ ${bonuses}`;
       lockedMinZoom = null;
       setMapExtentReferenceLng(null);
       const bounds2 = worldBounds(maps.leaflet);
-      applyToMap(maps.main, bounds2, true, 1.5, fit);
-      applyToMap(maps.mini, bounds2, true, 0, fit);
+      applyToMap(maps.main, bounds2, 1.5, fit);
+      applyToMap(maps.mini, bounds2, 0, fit);
       return true;
     }
     setMapExtentReferenceLng(target.referenceLng);
@@ -21522,8 +21557,8 @@ ${bonuses}`;
     );
     activeBounds = bounds;
     if (fit) maps.main.setMinZoom?.(0);
-    applyToMap(maps.main, bounds, false, null, fit);
-    applyToMap(maps.mini, bounds, false, 0, fit);
+    applyToMap(maps.main, bounds, null, fit);
+    applyToMap(maps.mini, bounds, 0, fit);
     if (fit && maps.main.getZoom && maps.main.setMinZoom) {
       lockedMinZoom = maps.main.getZoom();
       maps.main.setMinZoom(lockedMinZoom);
@@ -21535,6 +21570,28 @@ ${bonuses}`;
   }
   function restoreLoadedMapExtent(fit = false) {
     applyLoadedMapExtent(active, fit);
+  }
+  function enterBattleLongitudeFrame(childTacticalH3Indexes, matchExtent) {
+    const regionalReferenceLng = matchExtent === "world" ? null : matchExtent.referenceLng;
+    let referenceLng = null;
+    try {
+      referenceLng = battleDrawReferenceLng(childTacticalH3Indexes, regionalReferenceLng);
+    } catch (err) {
+      console.error("battle longitude frame skipped: footprint cell could not be read", {
+        cellCount: childTacticalH3Indexes.length,
+        err
+      });
+    }
+    setBattleDrawReferenceLng(referenceLng);
+    console.debug("battle longitude frame", {
+      cellCount: childTacticalH3Indexes.length,
+      regionalReferenceLng,
+      referenceLng
+    });
+  }
+  function exitBattleLongitudeFrame() {
+    setBattleDrawReferenceLng(null);
+    console.debug("battle longitude frame cleared");
   }
   function syncMapExtentToSnapshot(state, options) {
     const mapId = state.gameMap?.id ?? "global";
@@ -21571,9 +21628,8 @@ ${bonuses}`;
       leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
   }
-  function applyToMap(map, bounds, worldCopyJump, minZoom, fit) {
+  function applyToMap(map, bounds, minZoom, fit) {
     if (!map) return;
-    if (map.options) map.options.worldCopyJump = worldCopyJump;
     map.setMaxBounds?.(bounds);
     if (minZoom != null) map.setMinZoom?.(minZoom);
     if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
@@ -21603,6 +21659,7 @@ ${bonuses}`;
   // src/renderer/map/mainMapCameraReturn.ts
   var saved = null;
   function saveMainMapCameraForReturn() {
+    setBattleDrawReferenceSuspended(true);
     const map = getMainLeafletMap();
     if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
       saved = null;
@@ -21614,17 +21671,19 @@ ${bonuses}`;
       zoom: map.getZoom(),
       minZoom: map.getMinZoom(),
       maxZoom: map.getMaxZoom(),
-      maxBounds: map.options?.maxBounds ?? null,
-      worldCopyJump: map.options?.worldCopyJump === true
+      maxBounds: map.options?.maxBounds ?? null
     };
   }
+  function matchMapExtentTarget() {
+    return saved?.extent ?? loadedMapExtentTarget();
+  }
   function returnMainMapCamera() {
+    setBattleDrawReferenceSuspended(false);
     const camera = saved;
     saved = null;
     const map = getMainLeafletMap();
     if (!camera || !map) return false;
     applyLoadedMapExtent(camera.extent, true);
-    if (map.options) map.options.worldCopyJump = camera.worldCopyJump;
     map.setMaxBounds?.(camera.maxBounds);
     map.setMinZoom?.(camera.minZoom);
     map.setMaxZoom?.(camera.maxZoom);
@@ -21633,6 +21692,7 @@ ${bonuses}`;
   }
   function forgetMainMapCameraForReturn() {
     saved = null;
+    setBattleDrawReferenceSuspended(false);
   }
 
   // src/renderer/chrome/panelSlideHelpers.ts
@@ -29954,10 +30014,12 @@ ${bonuses}`;
     }
     return best.index;
   }
-  function fitMainMapToFrame(framed) {
+  function fitMainMapToFrame(box) {
     const map = getMainLeafletMap();
     const leaflet = getLeafletGlobal();
     if (!map?.fitBounds || !leaflet?.latLng || !leaflet.latLngBounds) return false;
+    const referenceLng = drawReferenceLng();
+    const framed = referenceLng == null ? box : shiftIntoFrame(box, referenceLng);
     try {
       const bounds = leaflet.latLngBounds(
         leaflet.latLng(framed.south, framed.west, true),
@@ -30017,6 +30079,7 @@ ${bonuses}`;
     frameAutomaticBattleUnits(limit);
   }
   function enterTacticalMapView(childTacticalH3Indexes) {
+    enterBattleLongitudeFrame(childTacticalH3Indexes, matchMapExtentTarget());
     const map = getMainLeafletMap();
     const L = getLeafletGlobal();
     if (!map || !L || typeof map.fitBounds !== "function") return;
@@ -30064,6 +30127,7 @@ ${bonuses}`;
     }
   }
   function exitTacticalMapView() {
+    exitBattleLongitudeFrame();
     const map = getMainLeafletMap();
     const L = getLeafletGlobal();
     if (!map || !L) {
@@ -32221,7 +32285,9 @@ ${bonuses}`;
   function setTacticalTransportVectorsSuppressed(suppressed) {
     vectorsSuppressed = suppressed;
   }
-  var lastRowCount = -1;
+  var alignedSourceRows = null;
+  var alignedReferenceLng = null;
+  var alignedRows = null;
   var cachedRowBounds = null;
   var lastViewportKey = null;
   function computeRowBounds(rows) {
@@ -32325,9 +32391,14 @@ ${bonuses}`;
       east: bounds.getEast()
     };
     const key = quantizedViewportKey(viewport, typeof map.getZoom === "function" ? map.getZoom() ?? 0 : 0);
-    const rowsChanged = lastRowCount !== rendererSharedState.tacticalTransportVectorOverlayRows.length;
-    if (rowsChanged || !cachedRowBounds) {
-      cachedRowBounds = computeRowBounds(rendererSharedState.tacticalTransportVectorOverlayRows);
+    const sourceRows = rendererSharedState.tacticalTransportVectorOverlayRows;
+    const referenceLng = drawReferenceLng();
+    const rowsChanged = !alignedRows || !cachedRowBounds || alignedSourceRows !== sourceRows || alignedReferenceLng !== referenceLng;
+    if (rowsChanged) {
+      alignedRows = sourceRows.map((row) => ({ ...row, points: alignLatLngRunToDrawReference(row.points) }));
+      cachedRowBounds = computeRowBounds(alignedRows);
+      alignedSourceRows = sourceRows;
+      alignedReferenceLng = referenceLng;
     }
     if (!vectorLayer || rowsChanged || key !== lastViewportKey) {
       if (vectorLayer && vectorLayerAttached) {
@@ -32335,9 +32406,8 @@ ${bonuses}`;
         vectorLayerAttached = false;
       }
       const view = expandedViewport(viewport);
-      const visibleRows = rendererSharedState.tacticalTransportVectorOverlayRows.filter((_, idx) => intersectsViewport(cachedRowBounds[idx], view));
+      const visibleRows = alignedRows.filter((_, idx) => intersectsViewport(cachedRowBounds[idx], view));
       vectorLayer = buildVectorLayerGroup(map, visibleRows, L);
-      lastRowCount = rendererSharedState.tacticalTransportVectorOverlayRows.length;
       lastViewportKey = key;
     }
     if (vectorLayer && !vectorLayerAttached) {
@@ -34890,9 +34960,12 @@ ${bonuses}`;
     if (!map) return;
     const L = getLeafletGlobal();
     const runs = [];
+    let previousLng;
     for (const seg of segments) {
       if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-      const points = seg.hexes.map(([lat, lng]) => {
+      const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
+      previousLng = aligned[aligned.length - 1][1];
+      const points = aligned.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
@@ -34964,8 +35037,7 @@ ${bonuses}`;
       const continuous = isMissileUnitType(move.unitType) ? { continuous: true } : void 0;
       const path = move.pathH3Indexes;
       if (path && path.length >= 2 && map) {
-        const points = path.map((h) => {
-          const [lat, lng] = cellToLatLng(h);
+        const points = alignLatLngRunToDrawReference(path.map((h) => cellToLatLng(h))).map(([lat, lng]) => {
           const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
           return { x: p.x, y: p.y };
         });
@@ -35013,13 +35085,14 @@ ${bonuses}`;
         });
         ({ lat, lng } = latLngAlongPolylineByArcFraction(refLng, coords, progress));
       } else {
-        const [lat0, lng0] = cellToLatLng(move.fromH3Index);
+        const [lat0, lng0Raw] = cellToLatLng(move.fromH3Index);
         const [lat1, lng1] = cellToLatLng(move.toH3Index);
-        const lng1Aligned = alignLngToReference(lng1, lng0);
+        const lng0 = alignLngToDrawReference(lng0Raw);
+        const lng1Aligned = alignLongitudeToReference(lng1, lng0);
         lat = lat0 + progress * (lat1 - lat0);
         lng = lng0 + progress * (lng1Aligned - lng0);
       }
-      const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+      const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
       const color = orderColorForOwner(move.player);
       const label = group.unitTypes.size > 1 ? "*" : UNIT_TYPE_LABELS[move.unitType] ?? "?";
       drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff", move.player);
@@ -41842,9 +41915,12 @@ ${bonuses}`;
           let lastSegmentLast = null;
           let remainingSolidEdges = perStackSolidCap;
           const runs = [];
+          let previousLng;
           for (const seg of preview.segments) {
             if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-            const points = seg.hexes.map(([lat, lng]) => {
+            const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
+            previousLng = aligned[aligned.length - 1][1];
+            const points = aligned.map(([lat, lng]) => {
               const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
               return { x: p.x, y: p.y };
             });
@@ -41866,10 +41942,9 @@ ${bonuses}`;
           if (!arrow && preview.arrowLatLng && preview.segments.length > 0) {
             const firstHex = preview.segments[0]?.hexes[0];
             if (firstHex) {
-              const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
-              const toPoint = map.latLngToContainerPoint(
-                L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
-              );
+              const [from, to] = alignLatLngRunToDrawReference([firstHex, preview.arrowLatLng]);
+              const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(from[0]), from[1]));
+              const toPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(to[0]), to[1]));
               arrow = routeEndArrow({ x: fromPoint.x, y: fromPoint.y }, { x: toPoint.x, y: toPoint.y });
             }
           }

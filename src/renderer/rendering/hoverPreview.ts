@@ -3,7 +3,7 @@ import { tacticalHoverSolidEdgeCapByOriginH3 } from '../../shared/tacticalMarchH
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { MOVEMENT_HOVER_VALID_ALPHA, ORDER_LINE_WIDTH } from '../core/constants';
 import { paletteForCurrentOwner } from './ownerColors';
-import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
+import { alignLatLngRunToDrawReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { strokeSupportOrderLines } from './orderDrawing';
 import {
   ORDER_LINE_LATER_DASH,
@@ -111,9 +111,12 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     let lastSegmentLast: { x: number; y: number } | null = null;
     let remainingSolidEdges = perStackSolidCap;
     const runs: OrderLineRun[] = [];
+    let previousLng: number | undefined;
     for (const seg of preview.segments) {
       if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-      const points = seg.hexes.map(([lat, lng]) => {
+      const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
+      previousLng = aligned[aligned.length - 1]![1];
+      const points = aligned.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
@@ -136,10 +139,9 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     if (!arrow && preview.arrowLatLng && preview.segments.length > 0) {
       const firstHex = preview.segments[0]?.hexes[0];
       if (firstHex) {
-        const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
-        const toPoint = map.latLngToContainerPoint(
-          L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
-        );
+        const [from, to] = alignLatLngRunToDrawReference([firstHex, preview.arrowLatLng]);
+        const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(from![0]), from![1]));
+        const toPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(to![0]), to![1]));
         arrow = routeEndArrow({ x: fromPoint.x, y: fromPoint.y }, { x: toPoint.x, y: toPoint.y });
       }
     }

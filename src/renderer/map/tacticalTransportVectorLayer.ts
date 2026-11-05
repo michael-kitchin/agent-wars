@@ -4,6 +4,8 @@
  */
 
 import { rendererSharedState as S } from '../core/state';
+import { drawReferenceLng } from '../../shared/mapExtent';
+import { alignLatLngRunToDrawReference } from './hexGrid';
 import {
   TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
   TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
@@ -61,21 +63,41 @@ export function setTacticalTransportVectorsSuppressed(suppressed: boolean): void
 }
 
 /**
- * Documents the module-scope binding `lastRowCount` (lastRowCount: number).
-
- * Purpose: Allows cheap rebuild checks when renderer receives refreshed vector rows.
- * When to use: Compare to `S.tacticalTransportVectorOverlayRows.length` before creating a new layer group.
- * Expected outcome: `-1` before first successful build.
+ * Row list that `alignedRows` was built from.
+ *
+ * Purpose: Hydration replaces the row array, so identity tells the sync when to realign and rebuild.
+ * When to use: Compared with `S.tacticalTransportVectorOverlayRows` in `syncTacticalTransportVectorLeafletLayer`.
+ * Expected outcome: Null before the first build.
  * Exceptions: None.
  */
-let lastRowCount = -1;
+let alignedSourceRows: typeof S.tacticalTransportVectorOverlayRows | null = null;
+
+/**
+ * Draw reference that `alignedRows` was built for.
+ *
+ * Purpose: Entering or leaving a battle moves the draw frame, so the rows must move with it.
+ * When to use: Compared with `drawReferenceLng()` in `syncTacticalTransportVectorLeafletLayer`.
+ * Expected outcome: Null on the global map outside a battle, and before the first build.
+ * Exceptions: None.
+ */
+let alignedReferenceLng: number | null = null;
+
+/**
+ * Vector rows with each line aligned as one run in the active draw frame.
+ *
+ * Purpose: Roads and rails must draw on the same copy of the world as the battle hexes, and stay connected across 180°.
+ * When to use: For bounds and polylines in place of the raw rows.
+ * Expected outcome: Null before the first build; otherwise one row per source row, in the same order.
+ * Exceptions: None.
+ */
+let alignedRows: typeof S.tacticalTransportVectorOverlayRows | null = null;
 
 /**
  * Documents the module-scope binding `cachedRowBounds` (cachedRowBounds: RowBounds[] | null).
 
  * Purpose: Caches per-row geographic bounds so viewport culling can avoid rebuilding layers for offscreen rows.
- * When to use: Recomputed only when vector row count changes (during sync).
- * Expected outcome: Null before first cache build; otherwise aligned with `S.tacticalTransportVectorOverlayRows` index order.
+ * When to use: Recomputed whenever `alignedRows` is rebuilt (during sync).
+ * Expected outcome: Null before first cache build; otherwise in `alignedRows` index order.
  * Exceptions: None.
  */
 let cachedRowBounds: RowBounds[] | null = null;
@@ -255,11 +277,13 @@ function buildVectorLayerGroup(
 }
 
 /**
- * Defines the `syncTacticalTransportVectorLeafletLayer` function shape (export function syncTacticalTransportVectorLeafletLayer(): void).
-
+ * Shows, hides, or rebuilds the road and rail layer for the current view.
+ *
  * Purpose: Keeps optional vector layer visibility synchronized with tactical visibility and loaded vector rows.
  * When to use: Called every redraw tick before canvas overlay passes.
- * Expected outcome: Layer appears while tactical is visible and vector rows exist; hidden otherwise.
+ * Expected outcome: Layer appears while tactical is visible and vector rows exist; hidden otherwise. Rows are realigned
+ *   to the active draw frame when the row list or the draw reference changes, and the layer is rebuilt then or when the
+ *   view moves materially.
  * Exceptions: None; no-ops when Leaflet map/global is unavailable.
  */
 export function syncTacticalTransportVectorLeafletLayer(): void {
@@ -289,9 +313,15 @@ export function syncTacticalTransportVectorLeafletLayer(): void {
     east: bounds.getEast(),
   };
   const key = quantizedViewportKey(viewport, typeof map.getZoom === 'function' ? map.getZoom() ?? 0 : 0);
-  const rowsChanged = lastRowCount !== S.tacticalTransportVectorOverlayRows.length;
-  if (rowsChanged || !cachedRowBounds) {
-    cachedRowBounds = computeRowBounds(S.tacticalTransportVectorOverlayRows);
+  const sourceRows = S.tacticalTransportVectorOverlayRows;
+  const referenceLng = drawReferenceLng();
+  const rowsChanged =
+    !alignedRows || !cachedRowBounds || alignedSourceRows !== sourceRows || alignedReferenceLng !== referenceLng;
+  if (rowsChanged) {
+    alignedRows = sourceRows.map((row) => ({ ...row, points: alignLatLngRunToDrawReference(row.points) }));
+    cachedRowBounds = computeRowBounds(alignedRows);
+    alignedSourceRows = sourceRows;
+    alignedReferenceLng = referenceLng;
   }
   if (!vectorLayer || rowsChanged || key !== lastViewportKey) {
     if (vectorLayer && vectorLayerAttached) {
@@ -299,9 +329,8 @@ export function syncTacticalTransportVectorLeafletLayer(): void {
       vectorLayerAttached = false;
     }
     const view = expandedViewport(viewport);
-    const visibleRows = S.tacticalTransportVectorOverlayRows.filter((_, idx) => intersectsViewport(cachedRowBounds![idx]!, view));
+    const visibleRows = alignedRows!.filter((_, idx) => intersectsViewport(cachedRowBounds![idx]!, view));
     vectorLayer = buildVectorLayerGroup(map, visibleRows, L);
-    lastRowCount = S.tacticalTransportVectorOverlayRows.length;
     lastViewportKey = key;
   }
   if (vectorLayer && !vectorLayerAttached) {

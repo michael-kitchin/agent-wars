@@ -1,9 +1,11 @@
 import { cellToLatLng } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
+  battleDrawReferenceLng,
   loadedMapExtentKey,
   longitudeIntervalFromCenters,
   mapExtentBoxForHexes,
+  setBattleDrawReferenceLng,
   setMapExtentReferenceLng,
   shouldApplyLoadedMapExtent,
   type MapExtentBox,
@@ -74,15 +76,6 @@ interface ExtentMap {
    * Exceptions: None.
    */
   on?: (event: string, handler: () => void) => void;
-  /**
-   * Leaflet options this module writes.
-   *
-   * Contract: Optional. Only `worldCopyJump` is changed.
-   * When to use: Regional apply sets it false. Global apply sets it true.
-   * Expected outcome: The flag matches the loaded map.
-   * Exceptions: None.
-   */
-  options?: { worldCopyJump?: boolean };
 }
 
 /**
@@ -153,7 +146,7 @@ let lockedMinZoom: number | null = null;
  *
  * Purpose: The player can pan and zoom inside the loaded map and no farther.
  * When to use: From snapshot sync, and with `fit: false` when restoring after tactical mode.
- * Expected outcome: Global uses minZoom 1.5, Mercator bounds, and worldCopyJump. Regional fits, then locks minZoom to that zoom. Returns true when the maps were updated.
+ * Expected outcome: Global uses minZoom 1.5 and Mercator bounds. Regional fits, then locks minZoom to that zoom. Returns true when the maps were updated.
  * Exceptions: Returns false without throwing when Leaflet is not ready.
  */
 export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true): boolean {
@@ -165,8 +158,8 @@ export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true)
     lockedMinZoom = null;
     setMapExtentReferenceLng(null);
     const bounds = worldBounds(maps.leaflet);
-    applyToMap(maps.main, bounds, true, 1.5, fit);
-    applyToMap(maps.mini, bounds, true, 0, fit);
+    applyToMap(maps.main, bounds, 1.5, fit);
+    applyToMap(maps.mini, bounds, 0, fit);
     return true;
   }
   setMapExtentReferenceLng(target.referenceLng);
@@ -176,8 +169,8 @@ export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true)
   );
   activeBounds = bounds;
   if (fit) maps.main.setMinZoom?.(0);
-  applyToMap(maps.main, bounds, false, null, fit);
-  applyToMap(maps.mini, bounds, false, 0, fit);
+  applyToMap(maps.main, bounds, null, fit);
+  applyToMap(maps.mini, bounds, 0, fit);
   if (fit && maps.main.getZoom && maps.main.setMinZoom) {
     lockedMinZoom = maps.main.getZoom();
     maps.main.setMinZoom(lockedMinZoom);
@@ -193,11 +186,56 @@ export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true)
  *
  * Purpose: Tactical exit used to reopen the whole world.
  * When to use: From `exitTacticalMapView` before restoring the strategic camera.
- * Expected outcome: Max bounds and worldCopyJump match the loaded map. The camera itself is left to the caller.
+ * Expected outcome: Max bounds match the loaded map. The camera itself is left to the caller.
  * Exceptions: None beyond `applyLoadedMapExtent`.
  */
 export function restoreLoadedMapExtent(fit = false): void {
   applyLoadedMapExtent(active, fit);
+}
+
+/**
+ * Puts the open battle's drawing in one longitude frame.
+ *
+ * Purpose: A battle that crosses 180° would otherwise draw its two sides a world apart.
+ * When to use: As a battle view opens, before the battle area is measured. Pass the match's extent, which differs from
+ *   the applied one while the new-game preview shows another map.
+ * Expected outcome: The battle reference is the footprint's midpoint in the match region's frame. An empty footprint,
+ *   or one H3 cannot read, leaves no battle reference, so drawing falls back to the loaded map's frame.
+ * Exceptions: None. A footprint H3 cannot read is logged.
+ */
+export function enterBattleLongitudeFrame(
+  childTacticalH3Indexes: readonly string[],
+  matchExtent: 'world' | MapExtentBox
+): void {
+  const regionalReferenceLng = matchExtent === 'world' ? null : matchExtent.referenceLng;
+  let referenceLng: number | null = null;
+  try {
+    referenceLng = battleDrawReferenceLng(childTacticalH3Indexes, regionalReferenceLng);
+  } catch (err) {
+    console.error('battle longitude frame skipped: footprint cell could not be read', {
+      cellCount: childTacticalH3Indexes.length,
+      err,
+    });
+  }
+  setBattleDrawReferenceLng(referenceLng);
+  console.debug('battle longitude frame', {
+    cellCount: childTacticalH3Indexes.length,
+    regionalReferenceLng,
+    referenceLng,
+  });
+}
+
+/**
+ * Returns drawing to the loaded map's longitude frame.
+ *
+ * Purpose: Strategic drawing after a battle must not stay on the battle's copy of the world.
+ * When to use: As a battle view closes, whether or not the map exists.
+ * Expected outcome: No battle reference is set.
+ * Exceptions: None.
+ */
+export function exitBattleLongitudeFrame(): void {
+  setBattleDrawReferenceLng(null);
+  console.debug('battle longitude frame cleared');
 }
 
 /**
@@ -298,22 +336,15 @@ function worldBounds(leaflet: {
 }
 
 /**
- * Writes one map's copy-jump flag, max bounds, and optional fit.
+ * Writes one map's max bounds, optional minimum zoom, and optional fit.
  *
  * Purpose: Main and minimap share the same geographic limit.
  * When to use: From `applyLoadedMapExtent` for each map.
- * Expected outcome: `worldCopyJump` matches the loaded mode. Fit runs only when requested.
+ * Expected outcome: Max bounds are set. A non-null `minZoom` is applied. Fit runs only when requested.
  * Exceptions: Skips a null minimap.
  */
-function applyToMap(
-  map: ExtentMap | null,
-  bounds: unknown,
-  worldCopyJump: boolean,
-  minZoom: number | null,
-  fit: boolean
-): void {
+function applyToMap(map: ExtentMap | null, bounds: unknown, minZoom: number | null, fit: boolean): void {
   if (!map) return;
-  if (map.options) map.options.worldCopyJump = worldCopyJump;
   map.setMaxBounds?.(bounds);
   if (minZoom != null) map.setMinZoom?.(minZoom);
   if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });

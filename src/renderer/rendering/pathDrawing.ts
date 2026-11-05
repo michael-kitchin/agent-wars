@@ -1,5 +1,10 @@
 import { cellToLatLng } from 'h3-js';
-import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
+import { alignLongitudeToReference } from '../../shared/webMercator';
+import {
+  alignLatLngRunToDrawReference,
+  alignLngToDrawReference,
+  clampLatForWebMercatorDisplay,
+} from '../map/hexGrid';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 import { isMissileUnitType } from '../../shared/missileRules';
 import {
@@ -64,7 +69,7 @@ export function drawLineArrow(
  * Purpose: Single visual contract for standing orders, tactical draft marches, pending ferry lines, and matching hover previews.
  * When to use: Any committed or planned human movement polyline that should match ground march line styling.
  * Expected outcome: One cased line in the human seat's map color at `ORDER_LINE_WIDTH`, solid for turn 1 and dashed after, with an
- *   arrowhead whose tip is the route's last hex center.
+ *   arrowhead whose tip is the route's last hex center. Segments join into one line in the active draw frame, even across 180°.
  * Exceptions: Skips segments with fewer than two lat/lng points; no-op when Leaflet map is unavailable.
  */
 export function drawHumanMarchStyleRouteSegments(
@@ -77,9 +82,12 @@ export function drawHumanMarchStyleRouteSegments(
   if (!map) return;
   const L = getLeafletGlobal();
   const runs: OrderLineRun[] = [];
+  let previousLng: number | undefined;
   for (const seg of segments) {
     if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-    const points = seg.hexes.map(([lat, lng]) => {
+    const aligned = alignLatLngRunToDrawReference(seg.hexes, previousLng);
+    previousLng = aligned[aligned.length - 1]![1];
+    const points = aligned.map(([lat, lng]) => {
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       return { x: p.x, y: p.y };
     });
@@ -208,8 +216,7 @@ export function drawResolutionMoveLines(
     const continuous = isMissileUnitType(move.unitType) ? ({ continuous: true } as const) : undefined;
     const path = move.pathH3Indexes;
     if (path && path.length >= 2 && map) {
-      const points = path.map((h) => {
-        const [lat, lng] = cellToLatLng(h);
+      const points = alignLatLngRunToDrawReference(path.map((h) => cellToLatLng(h))).map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
@@ -229,12 +236,14 @@ export function drawResolutionMoveLines(
 }
 
 /**
- * Defines the `drawMovingUnits` function shape (export function drawMovingUnits( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, moves: ResolutionPlaybackMove[], hexLi).
-
- * Purpose: Supports maintainability by documenting why `drawMovingUnits` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Draws each moving group's token part way along its move during playback.
+ *
+ * Purpose: The player sees units travel from origin to destination instead of jumping.
+ * When to use: From the scene draw while a resolution playback is running, with that frame's progress.
+ * Expected outcome: One token per owner, origin, and destination, placed at `progress` along the path or the straight
+ *   line, in the active draw frame. A group of several units adds a stacked token and a count badge. Nothing is drawn
+ *   once `progress` reaches 1.
+ * Exceptions: None. Draws nothing when the main map is missing.
  */
 export function drawMovingUnits(
   ctx: CanvasRenderingContext2D,
@@ -285,13 +294,14 @@ export function drawMovingUnits(
       });
       ({ lat, lng } = latLngAlongPolylineByArcFraction(refLng, coords, progress));
     } else {
-      const [lat0, lng0] = cellToLatLng(move.fromH3Index);
+      const [lat0, lng0Raw] = cellToLatLng(move.fromH3Index);
       const [lat1, lng1] = cellToLatLng(move.toH3Index);
-      const lng1Aligned = alignLngToReference(lng1, lng0);
+      const lng0 = alignLngToDrawReference(lng0Raw);
+      const lng1Aligned = alignLongitudeToReference(lng1, lng0);
       lat = lat0 + progress * (lat1 - lat0);
       lng = lng0 + progress * (lng1Aligned - lng0);
     }
-    const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+    const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
     const color = orderColorForOwner(move.player);
     const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');
     drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff', move.player);

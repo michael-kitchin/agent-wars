@@ -1,7 +1,8 @@
 import { observeModeControls } from '../../shared/observeModeControls';
 import { shouldApplyAutomaticBattleFrame, type LatLngFrameBox } from '../../shared/unitFrameBox';
 import { getHexBoundaryLatLngForLeafletOverlay, WEB_MERCATOR_MAX_ABS_LAT } from './hexGrid';
-import { restoreLoadedMapExtent } from './mapExtent';
+import { matchMapExtentTarget } from './mainMapCameraReturn';
+import { enterBattleLongitudeFrame, exitBattleLongitudeFrame, restoreLoadedMapExtent } from './mapExtent';
 import { getLeafletGlobal } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { rendererSharedState as S } from '../core/state';
@@ -29,8 +30,10 @@ type LeafletMapLike = {
  * Corners of the battle area, including the same pad the tactical camera already uses.
  *
  * Purpose: Automatic and ordinary battles share one footprint, so pan limits and the unit-frame clamp match.
- * When to use: Before fitting a battle, and when a later beat frames units inside that area.
- * Expected outcome: South, west, north, and east in degrees. Null when no cell has a corner.
+ * When to use: Before fitting a battle, and when a later beat frames units inside that area. The battle longitude
+ *   frame must already be set, so a footprint that crosses 180° measures as one span.
+ * Expected outcome: South, west, north, and east in degrees, in the battle's longitude frame. Null when no cell has a
+ *   corner.
  * Exceptions: None.
  */
 export function tacticalBattleAreaFrameBox(childTacticalH3Indexes: readonly string[]): LatLngFrameBox | null {
@@ -101,11 +104,12 @@ export function frameOpenAutomaticBattle(): void {
  *
  * Purpose: Frames the tactical battle area when entering tactical mode from strategic.
  * When to use: After a tactical battle session starts and child tactical indexes are known.
- * Expected outcome: Map flies/fits to the tactical bounds, min/max zoom are adjusted,
- * and planning chrome toasts are dismissed once at entry (hide only; later shows still work).
- * Exceptions: No-ops when the Leaflet map, global, fitBounds, or bounds are unavailable.
+ * Expected outcome: Battle drawing moves to the footprint's longitude frame. Map flies/fits to the tactical bounds,
+ * min/max zoom are adjusted, and planning chrome toasts are dismissed once at entry (hide only; later shows still work).
+ * Exceptions: The camera steps no-op when the Leaflet map, global, fitBounds, or bounds are unavailable.
  */
 export function enterTacticalMapView(childTacticalH3Indexes: string[]): void {
+  enterBattleLongitudeFrame(childTacticalH3Indexes, matchMapExtentTarget());
   const map = getMainLeafletMap() as LeafletMapLike | null;
   const L = getLeafletGlobal() as
     | {
@@ -171,9 +175,16 @@ export function enterTacticalMapView(childTacticalH3Indexes: string[]): void {
 }
 
 /**
- * Restores Leaflet pan/zoom limits after tactical mode ends.
+ * Restores the strategic longitude frame and Leaflet pan/zoom limits after tactical mode ends.
+ *
+ * Purpose: Strategic drawing and the camera return to the loaded map after a battle.
+ * When to use: From every path that clears the battle snapshot.
+ * Expected outcome: Battle drawing leaves the battle's longitude frame even without a map. With a map, the loaded
+ *   extent, the saved zoom limits, and the strategic view return.
+ * Exceptions: None.
  */
 export function exitTacticalMapView(): void {
+  exitBattleLongitudeFrame();
   const map = getMainLeafletMap() as LeafletMapLike | null;
   const L = getLeafletGlobal() as
     | {

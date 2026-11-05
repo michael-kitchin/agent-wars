@@ -5,11 +5,13 @@
  * Purpose: The new-game preview frames its own map and changes the pan and zoom limits. Closing the screen must show
  *   the match as the player left it, on the world map or in a battle.
  * When to use: `saveMainMapCameraForReturn` as the screen opens over a match, `returnMainMapCamera` when the player
- *   closes it, and `forgetMainMapCameraForReturn` when the match under it is replaced or ends.
- * Expected outcome: At most one saved camera at a time.
+ *   closes it, and `forgetMainMapCameraForReturn` when the match under it is replaced or ends. `matchMapExtentTarget`
+ *   reads the match's extent while the preview has its own applied.
+ * Expected outcome: At most one saved camera at a time. From save until return or forget, the battle draw reference
+ *   is suspended.
  * Exceptions: None; a missing map is skipped.
  */
-import type { MapExtentBox } from '../../shared/mapExtent';
+import { setBattleDrawReferenceSuspended, type MapExtentBox } from '../../shared/mapExtent';
 import { applyLoadedMapExtent, loadedMapExtentTarget } from './mapExtent';
 import { getMainLeafletMap } from './worldLeafletMap';
 
@@ -30,7 +32,7 @@ type CameraMap = {
   setMaxZoom?: (zoom: number) => void;
   setMaxBounds?: (bounds: unknown) => void;
   setView?: (center: unknown, zoom: number, options?: { animate?: boolean }) => void;
-  options?: { maxBounds?: unknown; worldCopyJump?: boolean };
+  options?: { maxBounds?: unknown };
 };
 
 /**
@@ -96,15 +98,6 @@ interface SavedCamera {
    * Exceptions: None.
    */
   readonly maxBounds: unknown;
-  /**
-   * Whether the map jumped between world copies.
-   *
-   * Contract: The `worldCopyJump` option when the camera was saved.
-   * When to use: Read when the camera is restored.
-   * Expected outcome: The option is written back as it was.
-   * Exceptions: None.
-   */
-  readonly worldCopyJump: boolean;
 }
 
 /**
@@ -122,10 +115,12 @@ let saved: SavedCamera | null = null;
  *
  * Purpose: The new-game preview is about to move the camera and change the limits.
  * When to use: As the new-game screen opens over a live match, before the preview loads.
- * Expected outcome: The current camera is saved, replacing any earlier one. Without a map, nothing is saved.
+ * Expected outcome: The battle draw reference is suspended, so the preview draws in its own frame. The current camera
+ *   is saved, replacing any earlier one. Without a map, nothing is saved.
  * Exceptions: None.
  */
 export function saveMainMapCameraForReturn(): void {
+  setBattleDrawReferenceSuspended(true);
   const map = getMainLeafletMap() as CameraMap | null;
   if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
     saved = null;
@@ -138,8 +133,19 @@ export function saveMainMapCameraForReturn(): void {
     minZoom: map.getMinZoom(),
     maxZoom: map.getMaxZoom(),
     maxBounds: map.options?.maxBounds ?? null,
-    worldCopyJump: map.options?.worldCopyJump === true,
   };
+}
+
+/**
+ * Returns the loaded extent of the match, even while the new-game preview has applied its own.
+ *
+ * Purpose: A battle can open under the preview, and its drawing frame must match the map the player returns to.
+ * When to use: When a battle view opens.
+ * Expected outcome: The extent saved for the waiting match, or the applied extent when no camera is saved.
+ * Exceptions: None.
+ */
+export function matchMapExtentTarget(): 'world' | MapExtentBox {
+  return saved?.extent ?? loadedMapExtentTarget();
 }
 
 /**
@@ -147,18 +153,18 @@ export function saveMainMapCameraForReturn(): void {
  *
  * Purpose: Closing the new-game screen shows the match as the player left it.
  * When to use: After the screen has closed and the map has taken its new size.
- * Expected outcome: Returns true when a camera was put back. The loaded extent is applied again, then the saved pan
- *   limit, zoom limits, and world-copy setting, then the centre and zoom, without animation. Returns false, and changes
- *   nothing, when no camera was saved or the map is missing.
+ * Expected outcome: The battle draw reference is no longer suspended. Returns true when a camera was put back. The
+ *   loaded extent is applied again, then the saved pan limit and zoom limits, then the centre and zoom, without
+ *   animation. Returns false, and changes nothing else, when no camera was saved or the map is missing.
  * Exceptions: None.
  */
 export function returnMainMapCamera(): boolean {
+  setBattleDrawReferenceSuspended(false);
   const camera = saved;
   saved = null;
   const map = getMainLeafletMap() as CameraMap | null;
   if (!camera || !map) return false;
   applyLoadedMapExtent(camera.extent, true);
-  if (map.options) map.options.worldCopyJump = camera.worldCopyJump;
   map.setMaxBounds?.(camera.maxBounds);
   map.setMinZoom?.(camera.minZoom);
   map.setMaxZoom?.(camera.maxZoom);
@@ -171,9 +177,10 @@ export function returnMainMapCamera(): boolean {
  *
  * Purpose: A replaced or finished match must not pull the camera back later.
  * When to use: When the match under the new-game screen is replaced or ends.
- * Expected outcome: No camera is saved.
+ * Expected outcome: No camera is saved, and the battle draw reference is no longer suspended.
  * Exceptions: None.
  */
 export function forgetMainMapCameraForReturn(): void {
   saved = null;
+  setBattleDrawReferenceSuspended(false);
 }

@@ -1,6 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import { alignLongitudeToReference } from '../../shared/webMercator';
-import { longitudeIntervalFromCenters, mapExtentBoxForHexes } from '../../shared/mapExtent';
+import { drawReferenceLng, longitudeIntervalFromCenters, mapExtentBoxForHexes } from '../../shared/mapExtent';
 import { observeModeControls } from '../../shared/observeModeControls';
 import {
   hexCenterSteps,
@@ -293,7 +293,7 @@ function panLimitFor(unit: LatLngFrameBox): LatLngFrameBox | null {
  * Moves `box` by whole worlds until its midpoint is within 180° of `referenceLng`.
  *
  * Purpose: A dateline unit box and a dateline region must be compared on the same copy of the world.
- * When to use: The regional pan limit, before clamping.
+ * When to use: The regional pan limit, before clamping, and the fitted box, before `fitBounds`.
  * Expected outcome: The same width and height, with longitude shifted by a multiple of 360.
  * Exceptions: None.
  */
@@ -364,16 +364,19 @@ function nearestIndex(indexes: readonly string[]): string | null {
  *
  * Purpose: The automatic frame is a camera move. The loaded map and the battle area keep their own limits.
  * When to use: After `unitFrameBox` returns a box.
- * Expected outcome: True when `fitBounds` was called. False when the map is not ready.
+ * Expected outcome: The box is moved by whole worlds onto the active draw frame's copy, where the hexes are drawn,
+ *   then fitted. True when `fitBounds` was called. False when the map is not ready.
  * Exceptions: Logs and returns false when Leaflet throws.
  */
-function fitMainMapToFrame(framed: LatLngFrameBox): boolean {
+function fitMainMapToFrame(box: LatLngFrameBox): boolean {
   const map = getMainLeafletMap() as FrameMap | null;
   const leaflet = getLeafletGlobal() as {
     latLng?: (lat: number, lng: number, noWrap?: boolean) => unknown;
     latLngBounds?: (sw: unknown, ne: unknown) => unknown;
   } | null;
   if (!map?.fitBounds || !leaflet?.latLng || !leaflet.latLngBounds) return false;
+  const referenceLng = drawReferenceLng();
+  const framed = referenceLng == null ? box : shiftIntoFrame(box, referenceLng);
   try {
     const bounds = leaflet.latLngBounds(
       leaflet.latLng(framed.south, framed.west, true),

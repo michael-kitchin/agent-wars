@@ -43,7 +43,7 @@ When no match is loaded, the basemap can still be visible under the new-game set
 ### Other
 
 - When a match starts, the console is already on screen. The view frames that match's bounds in the map beside the console, then zooms one level toward the player's infantry and armor. If the player has neither, that zoom uses any of the player's units. If the player has no units, the view stays on the framed bounds. A global match frames the Mercator world. A regional match frames that region's hexes. Starting a match on the same region as the previous match frames it again. A later turn does not move the view back to that frame while the match's hex footprint is unchanged. While the match is automatic — no active human seat, and the checkbox "Start the next turn when every commander is ready" is on — each planning turn also moves the camera onto the visible units. That frame adds `UNIT_FRAME_PAD_HEXES` (3) hexes of span on one axis, centered, through `unitFrameBox` in `src/shared/unitFrameBox.ts`. Longitude is padded when the unit box is at least as wide, in Web Mercator, as the map panel. Otherwise latitude is padded. The camera stays inside the loaded map's pan limits. The loaded footprint itself is not refit. The move happens after that turn's playback, or when the turn had nothing to play, and not while playback is on screen. Changing View as does not move it. With no visible units, it stays where it is. A semi-automatic watch, and any match with an active human seat, keep the camera where the player left it.
-- When a tactical battle starts, pan limits follow the battle area until the battle ends. A human battle and a semi-automatic battle fly to that area. An automatic battle fits that area, locks zoom-out there, then frames the living sub-units with the same one-axis pad, `UNIT_FRAME_PAD_HEXES` (3). Each later beat of an automatic battle frames those units again when that beat's playback ends. With no living sub-units, the camera stays on the battle footprint. Zoom-out in an automatic battle still reaches the battle footprint. Pan stays inside the battle area in every battle.
+- When a tactical battle starts, pan limits follow the battle area until the battle ends. A human battle and a semi-automatic battle fly to that area. An automatic battle fits that area, locks zoom-out there, then frames the living sub-units with the same one-axis pad, `UNIT_FRAME_PAD_HEXES` (3). Each later beat of an automatic battle frames those units again when that beat's playback ends. With no living sub-units, the camera stays on the battle footprint. Zoom-out in an automatic battle still reaches the battle footprint. Pan stays inside the battle area in every battle. A battle area that crosses the 180° meridian draws as one area, with its hexes, units, routes, roads, and rails on the same copy of the world, and dragging the map stays on that copy. The new-game preview, opened during such a battle, draws in its own map's frame, and closing it puts the battle back where it was drawn.
 - When the battle ends, pan limits return to the match's bounds. In an automatic match the camera then frames the visible units, the same way a planning turn does. Otherwise the view returns to the frame saved when that match opened. When no frame was saved, the view fits those bounds.
 - When some basemap tiles fail to load, a map toast says the game remains playable. That toast is shown once per session and hides like other map toasts. The Reports tab keeps it. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
 
@@ -68,7 +68,7 @@ When no match is loaded, the basemap can still be visible under the new-game set
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
-| Area | World map | The enclosing hex's tactical cells plus three neighboring rings. A new battle leaves out cells beyond a regional map's edge. A battle already underway keeps the cells it started with. Pan stays inside that area. An automatic battle starts on the living units plus `UNIT_FRAME_PAD_HEXES` (3) on one axis, and refits when each beat's playback ends. Zoom-out still reaches the battle footprint |
+| Area | World map | The enclosing hex's tactical cells plus three neighboring rings. A new battle leaves out cells beyond a regional map's edge. A battle already underway keeps the cells it started with. An area that crosses the 180° meridian draws as one area. Pan stays inside that area. An automatic battle starts on the living units plus `UNIT_FRAME_PAD_HEXES` (3) on one axis, and refits when each beat's playback ends. Zoom-out still reaches the battle footprint |
 | Units | Strategic units | Battle sub-units |
 | Clicks outside the area | Not applicable | Error toast, no order |
 | Turn shown | Top bar, strategic turn | Battle header, tactical beat |
@@ -103,8 +103,10 @@ None.
 - `static/index.html` (`#canvas-container`, `#main-map`, `#map-overlay`)
 - `src/renderer/map/worldLeafletMap.ts`
 - `static/shellChrome.css` (`#main-map .leaflet-bottom.leaflet-right`, `#main-map .leaflet-control-zoom`)
-- `src/renderer/map/mapExtent.ts`
-- `src/shared/mapExtent.ts`
+- `src/renderer/map/mapExtent.ts` (`enterBattleLongitudeFrame`, `exitBattleLongitudeFrame`)
+- `src/shared/mapExtent.ts` (`drawReferenceLng`, `battleDrawReferenceLng`)
+- `src/shared/webMercator.ts` (`alignRingToReference`, `alignLatLngRun`)
+- `src/renderer/map/mainMapCameraReturn.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapDoubleClickHandler.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`

@@ -52,6 +52,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 - A range perimeter is never shown while targeting is off.
 - Playback combat marks, dice chips, and sight-cue lines are never shown after playback ends.
 - Sight-cue lines never appear in a battle, while a human seat is playing, or when fog of war is off.
+- A route, a hover preview, a played-back move, or a road or rail line that crosses the 180° meridian is one connected line, never a line across the whole map (`alignLatLngRunToDrawReference` in `src/renderer/map/hexGrid.ts`). In a battle and on a regional map it is on the same copy of the world as the hexes it joins, and so is a moving token.
 
 ## Strategic and Tactical Differences
 
@@ -71,7 +72,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
 ## Known Deviations
 
-None.
+- On the global map outside a battle, a route or played-back move that crosses the 180° meridian continues past the map's edge, so the part beyond 180° and its arrowhead are off the map, while the destination hex is drawn at the opposite edge. A token moving along a straight line does the same until it arrives.
 
 ## Open Questions
 
@@ -85,6 +86,7 @@ None.
 - `src/shared/orderArrowGeometry.ts`
 - `src/shared/ordersHeldForPlayback.ts`
 - `src/renderer/rendering/pathDrawing.ts`
+- `src/renderer/map/hexGrid.ts` (`alignLatLngRunToDrawReference`, `alignLngToDrawReference`)
 - `src/renderer/rendering/orderDrawing.ts`
 - `src/renderer/rendering/orderOverlayStages.ts`
 - `src/renderer/rendering/hoverPreview.ts`

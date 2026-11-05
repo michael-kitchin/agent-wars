@@ -8,6 +8,7 @@ import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
+  alignLngToDrawReference,
   alignLngToReference,
   clampLatForWebMercatorDisplay,
 } from './hexGrid';
@@ -348,7 +349,8 @@ export function initWorldLeafletMaps(
     zoomSnap: 0.25,
     zoomDelta: 0.5,
     wheelPxPerZoomLevel: 80,
-    worldCopyJump: true,
+    /* Max bounds keep the world view inside ±180°; the drag wrap would pull a battle drawn past 180° to another copy. */
+    worldCopyJump: false,
     maxBounds: worldBounds,
     maxBoundsViscosity: 1,
     /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
@@ -540,12 +542,13 @@ export function setMainBasemapFilter(filter: string): void {
 }
 
 /**
- * Defines the `hexCenterToOverlayPoint` function shape (export function hexCenterToOverlayPoint().
-
- * Purpose: Supports maintainability by documenting why `hexCenterToOverlayPoint` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Projects one hex center to main-map container pixels.
+ *
+ * Purpose: Units, chips, symbols, and markers sit on hex centers, on the same copy of the world as the hex outlines.
+ * When to use: Through `hexCenterPx` for any marker anchored on one hex.
+ * Expected outcome: The center's pixel position, with longitude moved into the active draw frame. `{ x: 0, y: 0 }`
+ *   when the main map is missing.
+ * Exceptions: None beyond `latLngFn`.
  */
 export function hexCenterToOverlayPoint(
   h3Index: string,
@@ -554,7 +557,7 @@ export function hexCenterToOverlayPoint(
   if (!mainMap) return { x: 0, y: 0 };
   const leafletRef = getL();
   const [lat, lng] = latLngFn(h3Index);
-  const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
+  const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
   return { x: p.x, y: p.y };
 }
 

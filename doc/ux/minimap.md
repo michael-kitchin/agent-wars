@@ -76,7 +76,7 @@ In Strategic planning and Tactical planning the overview is the loaded map. Duri
 
 ## Known Deviations
 
-None.
+- On the global map, a battle whose area crosses the 180° meridian is drawn in one longitude frame, past 180° on one side. The view rectangle uses the main view's bounds as they are, so the part beyond 180° runs off the overview's edge instead of continuing at the opposite edge (`syncMinimapViewportRect`).
 
 ## Open Questions
 

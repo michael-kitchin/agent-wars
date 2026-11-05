@@ -1,5 +1,6 @@
 import { strategicCellAt, strategicParentOf, tacticalCellAt } from '../../shared/h3Resolutions';
 import { cellToLatLng, gridDisk } from 'h3-js';
+import { alignLongitudeToReference } from '../../shared/webMercator';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from './hexGrid';
 import {
   getMainLeafletMap,
@@ -57,6 +58,7 @@ export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
  * Purpose: One hex step toward a cardinal or diagonal net vector for hold-to-continue pan.
  * When to use: From `panMapByNetAxes` (res-1 or res-4) and as the implementation behind single-axis pan wrappers.
  * Expected outcome: Neighbor h3 with maximum `scoreNeighborForPanAxes`, or null when axes are zero / no neighbors.
+ *   Offsets are measured next to the center hex, so the choice is the same across 180° and in any draw frame.
  * Exceptions: None (invalid h3 from `gridDisk` is skipped via empty neighbor lists).
  */
 export function getNeighborForPanAxes(
@@ -72,7 +74,7 @@ export function getNeighborForPanAxes(
   let bestScore = -Infinity;
   for (const h3 of neighbors) {
     const [lat, lng] = cellToLatLng(h3);
-    const alignedLng = alignLngToReference(lng, centerLng);
+    const alignedLng = alignLongitudeToReference(lng, centerLng);
     const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
     if (score > bestScore) {
       bestScore = score;
@@ -124,7 +126,7 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
   const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
   if (!neighbor) return;
   const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
-  const neighborLng = alignLngToReference(neighborLngRaw, center.lng);
+  const neighborLng = alignLongitudeToReference(neighborLngRaw, center.lng);
   const centerPt = map.latLngToContainerPoint(leafletRef.latLng(center.lat, center.lng));
   const neighborPt = map.latLngToContainerPoint(
     leafletRef.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)

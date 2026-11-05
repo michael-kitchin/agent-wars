@@ -105,14 +105,35 @@ export interface MapExtentBox {
 }
 
 /**
- * Active draw reference, or null while the global map is showing.
+ * Regional draw reference, or null while the global map is showing.
  *
  * Purpose: Regional hex drawing must share one unwrapped longitude frame.
- * When to use: Read from `alignLngToReference` only.
+ * When to use: Read through `drawReferenceLng`.
  * Expected outcome: Null keeps each caller's own reference.
  * Exceptions: None.
  */
 let extentReferenceLng: number | null = null;
+
+/**
+ * Draw reference for the open battle, or null outside a battle.
+ *
+ * Purpose: A battle that crosses 180° must draw in one frame on the global map too. It is kept apart from the regional
+ *   reference so applying an extent during a battle does not clear it.
+ * When to use: Written by `setBattleDrawReferenceLng`. Read through `drawReferenceLng`.
+ * Expected outcome: Null when no battle is open.
+ * Exceptions: None.
+ */
+let battleReferenceLng: number | null = null;
+
+/**
+ * True while the battle reference is set aside for the new-game preview.
+ *
+ * Purpose: The preview draws another map in its own frame while the battle waits underneath.
+ * When to use: Written by `setBattleDrawReferenceSuspended`. Read through `drawReferenceLng`.
+ * Expected outcome: While true, `drawReferenceLng` ignores the battle reference.
+ * Exceptions: None.
+ */
+let battleReferenceSuspended = false;
 
 /**
  * Records the longitude that regional drawing should stay near.
@@ -127,15 +148,62 @@ export function setMapExtentReferenceLng(lng: number | null): void {
 }
 
 /**
- * Returns the regional draw reference when one is active.
+ * Records the longitude that drawing of the open battle should stay near.
  *
- * Purpose: Lets the renderer align vertices without threading the extent through every draw call.
- * When to use: From `alignLngToReference`.
- * Expected outcome: The stored midpoint, or null on the global map.
+ * Purpose: Hexes, units, and lines on both sides of 180° must land on one copy of the world.
+ * When to use: With the result of `battleDrawReferenceLng` when a battle view opens, and with null when it closes.
+ * Expected outcome: `drawReferenceLng` returns this value until it is cleared or suspended.
  * Exceptions: None.
  */
-export function mapExtentReferenceLng(): number | null {
+export function setBattleDrawReferenceLng(lng: number | null): void {
+  battleReferenceLng = lng;
+}
+
+/**
+ * Sets the battle reference aside, or puts it back.
+ *
+ * Purpose: The new-game preview opens over a battle and must draw its own map in its own frame.
+ * When to use: True when the main camera is saved for the preview. False when that camera is restored or dropped.
+ * Expected outcome: While suspended, `drawReferenceLng` falls back to the regional reference. The stored battle
+ *   reference is kept and can still be replaced.
+ * Exceptions: None.
+ */
+export function setBattleDrawReferenceSuspended(suspended: boolean): void {
+  battleReferenceSuspended = suspended;
+}
+
+/**
+ * Returns the longitude that drawing should stay near.
+ *
+ * Purpose: One reference for every hex, marker, and line, so callers do not choose between battle and region.
+ * When to use: From the renderer's alignment helpers.
+ * Expected outcome: The battle reference when it is set and not suspended. Otherwise the regional reference, or null
+ *   on the global map.
+ * Exceptions: None.
+ */
+export function drawReferenceLng(): number | null {
+  if (battleReferenceLng != null && !battleReferenceSuspended) return battleReferenceLng;
   return extentReferenceLng;
+}
+
+/**
+ * Picks the draw reference for a battle footprint.
+ *
+ * Purpose: A footprint that crosses 180° needs a midpoint on the short side, in the same frame as the loaded region.
+ * When to use: When a battle view opens. Pass the regional reference, or null on the global map.
+ * Expected outcome: The midpoint of the footprint's center interval, moved by whole turns to within 180° of
+ *   `regionalReferenceLng` when one is given. Null for an empty footprint.
+ * Exceptions: Throws the H3 library's error when an index is not a cell.
+ */
+export function battleDrawReferenceLng(
+  h3Indexes: readonly string[],
+  regionalReferenceLng: number | null
+): number | null {
+  const interval = longitudeIntervalFromCenters(h3Indexes.map((h3) => cellToLatLng(h3)[1]));
+  if (!interval) return null;
+  return regionalReferenceLng == null
+    ? interval.referenceLng
+    : alignLongitudeToReference(interval.referenceLng, regionalReferenceLng);
 }
 
 /**
