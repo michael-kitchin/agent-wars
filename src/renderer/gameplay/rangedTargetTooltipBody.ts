@@ -27,9 +27,41 @@ import { resolveUnitOrigin } from '../core/unitOriginFlags';
  * Exceptions: None.
  */
 interface HoveredCellUnit {
+  /**
+   * Unit id on the hovered cell.
+   *
+   * Contract: The snapshot id, for a strategic unit or a battle sub-unit.
+   * When to use: Filtering defenders and building roster lines.
+   * Expected outcome: Passed through as the roster unit id.
+   * Exceptions: None.
+   */
   readonly id: string;
+  /**
+   * Seat that owns the unit, or Neutral.
+   *
+   * Contract: A seat id or the Neutral id. The human seat is left off the defender list.
+   * When to use: Filtering occupants of the hovered cell.
+   * Expected outcome: Compared with `HUMAN_SEAT_ID`.
+   * Exceptions: None.
+   */
   readonly player: string;
+  /**
+   * Build type of the unit.
+   *
+   * Contract: The type the roster uses to name the unit or collapse it into a count.
+   * When to use: Building a roster line.
+   * Expected outcome: The build type stored on that snapshot unit.
+   * Exceptions: None.
+   */
   readonly unitType: string;
+  /**
+   * Cell the unit occupies.
+   *
+   * Contract: A unit this filter keeps has the hovered cell here.
+   * When to use: Selecting occupants of one cell.
+   * Expected outcome: Compared with the hovered h3.
+   * Exceptions: None.
+   */
   readonly h3Index: string;
 }
 

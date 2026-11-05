@@ -21,7 +21,13 @@ import { getPreviewHumanMarchOrders, getPreviewRangedTargetOdds, getValidateGrou
 import { defenderIdsOnHoveredCell, rangedTargetRosterHtml } from './rangedTargetTooltipBody';
 import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGroupedTargeting';
 import { hoverRoutePreviewAsyncContextStillValid } from './hoverRoutePreviewStale';
-import type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
+import type {
+  GroupedSupportTargetingPreviewArgs,
+  LegalRangedTargetOdds,
+  LegalRangedTargetOddsRequest,
+  RefreshHoverRoutePreviewOptions,
+  ValidatedRangedHoverArgs,
+} from './hoverRoutePreviewTypes';
 import type { TacticalOrderDeps } from './tacticalOrderDeps';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
 
@@ -114,27 +120,6 @@ function hoverPreviewStillCurrent(seq: number, hoveredH3: string, unitIds: reado
 }
 
 /**
- * Inputs for one ranged, air, or missile hover line.
- *
- * Purpose: The tactical and strategic branches share one publisher.
- * When to use: `publishGroupedSupportTargetingPreview`.
- * Expected outcome: Odds fields are set only by the ranged publisher.
- * Exceptions: None.
- */
-interface GroupedSupportTargetingPreviewArgs {
-  readonly deps: TacticalOrderDeps;
-  readonly hoveredH3: string;
-  readonly unitIds: readonly string[];
-  readonly validation: { success: boolean; reason?: string | null };
-  readonly supportKind: 'ranged' | 'air' | 'missile';
-  readonly originH3ForGrouping: (unitId: string) => string | undefined;
-  readonly originH3ForPreview: (unitId: string) => string | undefined;
-  readonly allowBlockingOrderTooltip: boolean;
-  readonly rangedTargetOdds?: HoverRangedTargetOdds;
-  readonly countedDefenderIds?: readonly string[];
-}
-
-/**
  * Publishes a ranged or air support-targeting hover preview.
  *
  * Purpose: The tactical and strategic ranged and air branches share the representative-origin lines and the reason slot.
@@ -173,44 +158,6 @@ function publishGroupedSupportTargetingPreview(args: GroupedSupportTargetingPrev
 }
 
 /**
- * Kill, Hurt, Loss, and the defenders that were counted.
- *
- * Purpose: The hover stores these percents and the defenders that were counted.
- * When to use: The return of `requestLegalRangedTargetOdds`.
- * Expected outcome: All three percents, and the ids that entered the estimate. A null percent on any of them means the odds line is omitted.
- * Exceptions: None.
- */
-interface LegalRangedTargetOdds {
-  readonly killPercent: number | null;
-  /**
-   * Chance the attackers score at least one hit, as a whole percent.
-   *
-   * Purpose: The Hurt number on the odds line.
-   * When to use: Copied from the odds result into the tooltip.
-   * Expected outcome: `Math.round(probabilityAtLeastOneHit * 100)`, or null when any of the three chances is missing.
-   * Exceptions: None.
-   */
-  readonly hurtPercent: number | null;
-  readonly lossPercent: number | null;
-  readonly countedDefenderIds: readonly string[];
-}
-
-/**
- * The cells and units for one ranged-odds request.
- *
- * Purpose: One odds request for the attackers the validator accepted and the defenders the player can see.
- * When to use: `requestLegalRangedTargetOdds`.
- * Expected outcome: Those ids, the hovered cell, and whether that cell is a battle cell.
- * Exceptions: None.
- */
-interface LegalRangedTargetOddsRequest {
-  readonly attackerIds: readonly string[];
-  readonly defenderIds: readonly string[];
-  readonly targetH3: string;
-  readonly inBattle: boolean;
-}
-
-/**
  * Asks for Kill, Hurt, and Loss for one legal ranged target.
  *
  * Purpose: Air, missile, march, and ferry hovers do not call this.
@@ -229,26 +176,6 @@ async function requestLegalRangedTargetOdds(
     targetH3: payload.targetH3,
     inBattle: payload.inBattle,
   });
-}
-
-/**
- * Inputs for publishing one ranged hover.
- *
- * Purpose: The tactical and strategic ranged branches share one publish.
- * When to use: After ranged validation returns.
- * Expected outcome: The hover identity, the validation, and the two origin lookups.
- * Exceptions: None.
- */
-interface ValidatedRangedHoverArgs {
-  readonly deps: TacticalOrderDeps;
-  readonly seq: number;
-  readonly hoveredH3: string;
-  readonly unitIds: readonly string[];
-  readonly validation: { success: boolean; reason?: string | null };
-  readonly inBattle: boolean;
-  readonly originH3ForGrouping: (unitId: string) => string | undefined;
-  readonly originH3ForPreview: (unitId: string) => string | undefined;
-  readonly allowBlockingOrderTooltip: boolean;
 }
 
 /**

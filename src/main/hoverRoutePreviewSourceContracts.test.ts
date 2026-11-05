@@ -17,6 +17,7 @@ function occurrenceCount(source: string, needle: string): number {
 test('hover support targeting uses one publisher and one stale-check field', () => {
   const source = readRendererSource('gameplay', 'hoverRoutePreviewRefresh.ts');
   assert.equal(occurrenceCount(source, 'buildGroupedSupportTargetingLinePreview('), 1);
-  assert.equal(occurrenceCount(source, 'publishGroupedSupportTargetingPreview('), 8);
+  assert.equal(occurrenceCount(source, 'publishGroupedSupportTargetingPreview('), 7);
+  assert.equal(occurrenceCount(source, 'publishValidatedRangedHover('), 3);
   assert.equal(occurrenceCount(source, 'seqAtStart:'), 1);
 });

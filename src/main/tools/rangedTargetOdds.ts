@@ -33,7 +33,7 @@ export interface RangedTargetOdds {
   /**
    * Chance the shot wipes the counted defenders, as a whole percent.
    *
-   * Purpose: The Kill number.
+   * Contract: The Kill number.
    * When to use: Read after a completed estimate.
    * Expected outcome: `Math.round(probabilityDefenderEliminated * 100)`, or null when the estimate
    * cannot supply all three chances.
@@ -43,7 +43,7 @@ export interface RangedTargetOdds {
   /**
    * Chance the attackers lose at least one unit, as a whole percent.
    *
-   * Purpose: The Loss number.
+   * Contract: The Loss number.
    * When to use: Read after a completed estimate.
    * Expected outcome: `Math.round(probabilityAttackerLosesUnit * 100)`, or null when the estimate cannot supply all three chances.
    * Exceptions: None.
@@ -52,7 +52,7 @@ export interface RangedTargetOdds {
   /**
    * Chance the attackers score at least one hit, as a whole percent.
    *
-   * Purpose: The Hurt number on the odds line.
+   * Contract: The Hurt number on the odds line.
    * When to use: Read after a completed estimate.
    * Expected outcome: `Math.round(probabilityAtLeastOneHit * 100)`, or null when the estimate cannot supply all three chances.
    * Exceptions: None.
@@ -61,7 +61,7 @@ export interface RangedTargetOdds {
   /**
    * Defender ids that were eligible for the ranged estimate.
    *
-   * Purpose: The roster lists opponent seats among these ids only.
+   * Contract: The roster lists opponent seats among these ids only.
    * When to use: After `previewRangedTargetOdds` returns a result.
    * Expected outcome: The ids passed to the estimator, in the caller's order, with rejected ids removed.
    * Exceptions: None.
@@ -81,7 +81,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Unit ids the ranged validator just accepted.
    *
-   * Purpose: Every accepted shooter fires in the one estimate.
+   * Contract: Every accepted shooter fires in the one estimate.
    * When to use: The selection `validateGroupRangedTarget` accepted.
    * Expected outcome: Passed through as the attacker unit list.
    * Exceptions: None.
@@ -90,7 +90,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Defender ids the renderer can see on the hovered cell.
    *
-   * Purpose: Limits the estimate to units the player already sees, including Neutral.
+   * Contract: Limits the estimate to units the player already sees, including Neutral.
    * When to use: Occupants of the hovered cell other than the human seat.
    * Expected outcome: Rejected ids are dropped before the estimate.
    * Exceptions: None.
@@ -99,7 +99,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Hovered cell the shot is aimed at.
    *
-   * Purpose: The estimate's target, already the battle cell when a battle is open.
+   * Contract: The estimate's target, already the battle cell when a battle is open.
    * When to use: The same h3 the ranged validator used.
    * Expected outcome: Looked up in `latLngByH3`.
    * Exceptions: None.
@@ -108,7 +108,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Match snapshot whose hex list contains `targetH3`.
    *
-   * Purpose: Strategic rules read `state.units`. A battle passes the tactical plan state so the
+   * Contract: Strategic rules read `state.units`. A battle passes the tactical plan state so the
    * target cell is one of `state.hexes`.
    * When to use: `getGameState()` on the strategic map, or `buildTacticalAiPlanState` in a battle.
    * Expected outcome: Forwarded to the estimator unchanged.
@@ -118,7 +118,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Centers for the hexes in `state`.
    *
-   * Purpose: The estimator takes a lat/lng target and snaps it back with `resolveToH3`.
+   * Contract: The estimator takes a lat/lng target and snaps it back with `resolveToH3`.
    * When to use: The map from `buildLatLngCoordinateMap` over `state.hexes`.
    * Expected outcome: `targetH3` is present.
    * Exceptions: None.
@@ -127,7 +127,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Nearest-cell snap for a lat/lng.
    *
-   * Purpose: Same resolver the estimator uses to check the target is in `state.hexes`.
+   * Contract: Same resolver the estimator uses to check the target is in `state.hexes`.
    * When to use: The resolver paired with `latLngByH3`.
    * Expected outcome: Returns an h3 from that map.
    * Exceptions: None.
@@ -136,7 +136,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Open battle, when the target is a battle cell.
    *
-   * Purpose: Selects battle ranged rules, including infantry return fire.
+   * Contract: Selects battle ranged rules, including infantry return fire.
    * When to use: Only while a battle snapshot is the one the renderer is aiming in.
    * Expected outcome: Omitted on the strategic map.
    * Exceptions: None.
@@ -145,7 +145,7 @@ export interface PreviewRangedTargetOddsInput {
   /**
    * Estimator to call once defenders remain.
    *
-   * Purpose: Tests replace this to see whether the call happened and which ids it received.
+   * Contract: Tests replace this to see whether the call happened and which ids it received.
    * When to use: Omit in production.
    * Expected outcome: Defaults to `executeEstimateCombat`.
    * Exceptions: A throw is caught by `previewRangedTargetOdds`.
@@ -162,9 +162,41 @@ export interface PreviewRangedTargetOddsInput {
  * Exceptions: None.
  */
 interface RangedTargetOddsPrediction {
+  /**
+   * Estimator label for whether the shot is a fight.
+   *
+   * Contract: `uncontested` clears Kill, Hurt, and Loss together.
+   * When to use: After the estimator returns a prediction.
+   * Expected outcome: Any other label leaves the three probabilities to be checked.
+   * Exceptions: None.
+   */
   readonly assessment?: string;
+  /**
+   * Chance the shot wipes the counted defenders.
+   *
+   * Contract: A finite probability from 0 through 1, or omitted.
+   * When to use: After the estimator returns a prediction.
+   * Expected outcome: Rounded to `killPercent` only when all three probabilities are finite numbers.
+   * Exceptions: None.
+   */
   readonly probabilityDefenderEliminated?: number;
+  /**
+   * Chance the attackers lose at least one unit.
+   *
+   * Contract: A finite probability from 0 through 1, or omitted.
+   * When to use: After the estimator returns a prediction.
+   * Expected outcome: Rounded to `lossPercent` only when all three probabilities are finite numbers.
+   * Exceptions: None.
+   */
   readonly probabilityAttackerLosesUnit?: number;
+  /**
+   * Chance the attackers score at least one hit, including a hit that only removes a fortification.
+   *
+   * Contract: A finite probability from 0 through 1, or omitted.
+   * When to use: After the estimator returns a prediction.
+   * Expected outcome: Rounded to `hurtPercent` only when all three probabilities are finite numbers.
+   * Exceptions: None.
+   */
   readonly probabilityAtLeastOneHit?: number;
 }
 

@@ -23,7 +23,7 @@ export interface RangedTargetRosterMarks {
   /**
    * Number flag for one opponent, or an empty string when that seat has no flag.
    *
-   * Purpose: The nickname still shows when this is empty.
+   * Contract: The nickname still shows when this is empty.
    * When to use: Once per roster line.
    * Expected outcome: `outerHTML` of `createSideNumberFlag`, or `''`.
    * Exceptions: None.
@@ -32,7 +32,7 @@ export interface RangedTargetRosterMarks {
   /**
    * Origin flag for one named unit, or an empty string when it has no origin.
    *
-   * Purpose: The name still shows when this is empty.
+   * Contract: The name still shows when this is empty.
    * When to use: Once per named token.
    * Expected outcome: An `<img>` with no origin-tooltip attribute, or `''`.
    * Exceptions: None.
@@ -41,7 +41,7 @@ export interface RangedTargetRosterMarks {
   /**
    * Type icon for one collapsed group.
    *
-   * Purpose: A group has no origin flag.
+   * Contract: A group has no origin flag.
    * When to use: Once per group token.
    * Expected outcome: `outerHTML` of `createLossTypeToken`.
    * Exceptions: None.
@@ -61,7 +61,7 @@ export interface RangedTargetTooltipParts {
   /**
    * Effects and Cover HTML already produced for this order.
    *
-   * Purpose: Those lines follow the opponent list.
+   * Contract: Those lines follow the opponent list.
    * When to use: The result of `resolveOrderPreviewEffectsTooltipHtml`.
    * Expected outcome: Null or empty when nothing slows the shot.
    * Exceptions: None.
@@ -70,7 +70,7 @@ export interface RangedTargetTooltipParts {
   /**
    * Opponent lines for the counted defenders.
    *
-   * Purpose: One line per opponent seat.
+   * Contract: One line per opponent seat.
    * When to use: The result of `buildRangedTargetRosterHtml`.
    * Expected outcome: Null or empty when no opponent was counted.
    * Exceptions: None.
@@ -79,7 +79,7 @@ export interface RangedTargetTooltipParts {
   /**
    * Wipe chance as a whole percent.
    *
-   * Purpose: The Kill number. The odds line is omitted when this is null.
+   * Contract: The Kill number. The odds line is omitted when this is null.
    * When to use: The odds result for this target.
    * Expected outcome: A number, or null.
    * Exceptions: None.
@@ -88,7 +88,7 @@ export interface RangedTargetTooltipParts {
   /**
    * Chance the attackers lose at least one unit, as a whole percent.
    *
-   * Purpose: The Loss number. The odds line is omitted when this is null.
+   * Contract: The Loss number. The odds line is omitted when this is null.
    * When to use: The odds result for this target.
    * Expected outcome: A number, or null.
    * Exceptions: None.
@@ -97,7 +97,7 @@ export interface RangedTargetTooltipParts {
   /**
    * Chance the attackers score at least one hit, as a whole percent.
    *
-   * Purpose: The Hurt number. The odds line is omitted when this is null.
+   * Contract: The Hurt number. The odds line is omitted when this is null.
    * When to use: The odds result for this target.
    * Expected outcome: `Math.round(probabilityAtLeastOneHit * 100)`, or null when any of the three chances is missing.
    * Exceptions: None.

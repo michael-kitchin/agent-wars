@@ -27,9 +27,41 @@ import { previewRangedTargetOdds, type RangedTargetOdds } from '../tools/rangedT
  * Exceptions: None.
  */
 interface RangedTargetOddsIpcArgs {
+  /**
+   * Unit ids the ranged validator accepted.
+   *
+   * Contract: Every entry is a string. The handler does not add shooters the renderer omitted.
+   * When to use: The payload of `game:previewRangedTargetOdds`.
+   * Expected outcome: Passed through as the attacker list.
+   * Exceptions: None.
+   */
   readonly attackerIds: readonly string[];
+  /**
+   * Defender ids the renderer can see on the target.
+   *
+   * Contract: Every entry is a string. Occupants the renderer omitted stay out of the estimate.
+   * When to use: The same payload.
+   * Expected outcome: Rejected ids are dropped before the estimate.
+   * Exceptions: None.
+   */
   readonly defenderIds: readonly string[];
+  /**
+   * Cell the shot is aimed at.
+   *
+   * Contract: A non-empty h3. A battle target is the battle cell.
+   * When to use: The same payload.
+   * Expected outcome: Looked up in the coordinate map for that match.
+   * Exceptions: None.
+   */
   readonly targetH3: string;
+  /**
+   * Whether the renderer has a battle open.
+   *
+   * Contract: True only when the renderer says a battle is open.
+   * When to use: The same payload.
+   * Expected outcome: The handler requires an active battle snapshot when this is true.
+   * Exceptions: None.
+   */
   readonly inBattle: boolean;
 }
 
