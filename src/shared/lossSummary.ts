@@ -33,8 +33,15 @@ export const UNIT_GROUP_LABEL_BY_TYPE: Readonly<Record<LostUnitType, string>> = 
   missile: 'Missile',
 };
 
-/** Order used when emitting grouped type totals on crowded loss lines. */
-const GROUP_ORDER: LostUnitType[] = ['naval', 'air', 'armor', 'infantry', 'missile'];
+/**
+ * Type order for a collapsed group on a popup loss line.
+ *
+ * Purpose: A roster and a loss line list collapsed types in the same order.
+ * When to use: `splitLossEntries`, and any caller that sorts units before that split.
+ * Expected outcome: Naval, air, armor, infantry, then missile.
+ * Exceptions: None.
+ */
+export const LOSS_GROUP_ORDER: readonly LostUnitType[] = ['naval', 'air', 'armor', 'infantry', 'missile'];
 
 /**
  * Supported unit types for loss grouping and display.
@@ -248,6 +255,97 @@ export function formatCollapsedTypeCount(count: number, unitType: LostUnitType):
 }
 
 /**
+ * One collapsed type on a popup loss line.
+ *
+ * Purpose: The ranged-target roster paints a type icon for the same group the loss toast writes as text.
+ * When to use: `splitLossEntries` groups.
+ * Expected outcome: `text` is `formatCollapsedTypeCount` for `count` and `unitType`.
+ * Exceptions: None.
+ */
+export interface LossEntryGroup {
+  /**
+   * The unit type that was collapsed.
+   *
+   * Contract: A member of `LOSS_GROUP_ORDER`.
+   * When to use: Choosing the type icon.
+   * Expected outcome: One of the build unit types.
+   * Exceptions: None.
+   */
+  readonly unitType: LostUnitType;
+  /**
+   * How many units of that type were collapsed.
+   *
+   * Contract: Greater than `LOSS_TYPE_NAME_LIST_MAX`.
+   * When to use: The count in the token.
+   * Expected outcome: At least 4.
+   * Exceptions: None.
+   */
+  readonly count: number;
+  /**
+   * The popup token, such as `4x Infantry`.
+   *
+   * Contract: `formatCollapsedTypeCount(count, unitType)`.
+   * When to use: The text after the type icon.
+   * Expected outcome: Count, `x`, and the type label.
+   * Exceptions: None.
+   */
+  readonly text: string;
+}
+
+/**
+ * Named units and collapsed groups for one popup line.
+ *
+ * Purpose: Callers that paint flags need the units, not only the joined sentence.
+ * When to use: `formatLossEntries` and the ranged-target roster.
+ * Expected outcome: `named` keeps input order. `groups` follow `LOSS_GROUP_ORDER`.
+ * Exceptions: None.
+ */
+export interface LossEntrySplit {
+  /**
+   * Units that stay named.
+   *
+   * Contract: A type at or under `LOSS_TYPE_NAME_LIST_MAX`, plus any type that is not a build type. Input order.
+   * When to use: One flag and name per entry.
+   * Expected outcome: Empty when every known type collapsed.
+   * Exceptions: None.
+   */
+  readonly named: readonly LostUnit[];
+  /**
+   * Types that collapsed.
+   *
+   * Contract: Only types with more than `LOSS_TYPE_NAME_LIST_MAX` units, in `LOSS_GROUP_ORDER`.
+   * When to use: One type icon per entry.
+   * Expected outcome: Empty when every type stayed named.
+   * Exceptions: None.
+   */
+  readonly groups: readonly LossEntryGroup[];
+}
+
+/**
+ * Splits one victim list into names and collapsed groups.
+ *
+ * Purpose: The popup sentence and the ranged-target roster share one threshold.
+ * When to use: `formatLossEntries`, and any roster that must not parse that sentence.
+ * Expected outcome: Named units in input order, then groups in `LOSS_GROUP_ORDER`. An empty list yields two empty arrays.
+ * Exceptions: None.
+ */
+export function splitLossEntries(units: readonly LostUnit[]): LossEntrySplit {
+  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
+  for (const unit of units) {
+    if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
+  }
+  const named = units.filter(
+    (unit) => !isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX
+  );
+  const groups = LOSS_GROUP_ORDER.flatMap((unitType) => {
+    const count = counts[unitType];
+    if (count <= LOSS_TYPE_NAME_LIST_MAX) return [];
+    return [{ unitType, count, text: formatCollapsedTypeCount(count, unitType) }];
+  });
+  return { named, groups };
+}
+
+/**
  * Formats victim entries for one popup cause line.
  *
  * Purpose: Names a type that lost three or fewer units, and collapses a type that lost more.
@@ -258,21 +356,8 @@ export function formatCollapsedTypeCount(count: number, unitType: LostUnitType):
  */
 export function formatLossEntries(units: readonly LostUnit[]): string {
   if (units.length === 0) return '';
-  const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
-  for (const unit of units) {
-    if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
-  }
-  const parts: string[] = [];
-  for (const unit of units) {
-    if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
-      parts.push(unit.displayName);
-    }
-  }
-  for (const unitType of GROUP_ORDER) {
-    const count = counts[unitType];
-    if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(formatCollapsedTypeCount(count, unitType));
-  }
-  return parts.join(', ');
+  const split = splitLossEntries(units);
+  return [...split.named.map((unit) => unit.displayName), ...split.groups.map((group) => group.text)].join(', ');
 }
 
 /**
@@ -306,7 +391,7 @@ function formatGroupedTypeTotals(units: readonly LostUnit[]): string {
     if (u.unitType in counts) counts[u.unitType] += 1;
   }
   const parts: string[] = [];
-  for (const t of GROUP_ORDER) {
+  for (const t of LOSS_GROUP_ORDER) {
     const n = counts[t];
     if (n > 0) parts.push(`${n.toLocaleString()} ${UNIT_GROUP_LABEL_BY_TYPE[t]}`);
   }

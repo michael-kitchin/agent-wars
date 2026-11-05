@@ -55,6 +55,7 @@ import type {
   CommitHumanTacticalDraftOrdersIpcPayload,
   CommitHumanTacticalDraftOrdersIpcResult,
   GameApi,
+  RangedTargetOddsPreview,
 } from '../shared/ipc/gameApiTypes';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
 /**
@@ -96,6 +97,7 @@ const IPC_GAME = {
   assignHumanMarchOrders: 'game:assignHumanMarchOrders',
   commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
+  previewRangedTargetOdds: 'game:previewRangedTargetOdds',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
   validateGroupAirDropTarget: 'game:validateGroupAirDropTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',
@@ -565,6 +567,20 @@ commitHumanTacticalDraftOrders: (payload: CommitHumanTacticalDraftOrdersIpcPaylo
    */
 validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke(IPC_GAME.validateGroupRangedTarget, payload),
+  /**
+   * Kill, Hurt, and Loss for one legal ranged target.
+   *
+   * Purpose: The ranged hover asks the main process for the same three chances the commander briefing calls Odds.
+   * When to use: After ranged validation succeeds.
+   * Expected outcome: Percents and counted defender ids, or null when the estimate cannot be used.
+   * Exceptions: IPC failures reject. The hover catches that and still publishes the attack line.
+   */
+  previewRangedTargetOdds: (payload: {
+    attackerIds: string[];
+    defenderIds: string[];
+    targetH3: string;
+    inBattle: boolean;
+  }): Promise<RangedTargetOddsPreview | null> => ipcRenderer.invoke(IPC_GAME.previewRangedTargetOdds, payload),
     /**
    * Documents the object literal property `validateGroupAirStrikeTarget` (validateGroupAirStrikeTarget: (payload: { unitIds: string[]; targetH3Index: string; targetType: AirStrikeTargetType; }): Promise<{ success: bo).
 

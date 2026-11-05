@@ -255,7 +255,11 @@ function testExactCombatProbabilities(): void {
 
   // 1 armor (attack 10, defense 7) melee vs 1 infantry (attack 3, defense 7). Melee roles are random, so the
   // prediction averages "armor rolls 10/20 vs infantry 7/20" and "armor rolls 7/20 vs infantry 3/20".
-  type RoleCase = { probabilityDefenderEliminated: number; probabilityAttackerLosesUnit: number };
+  type RoleCase = {
+    probabilityDefenderEliminated: number;
+    probabilityAttackerLosesUnit: number;
+    probabilityAtLeastOneHit: number;
+  };
   const result = executeEstimateCombat(
     {
       engagementType: 'melee',
@@ -268,6 +272,7 @@ function testExactCombatProbabilities(): void {
   ) as { status: string; prediction?: {
     probabilityDefenderEliminated: number;
     probabilityAttackerLosesUnit: number;
+    probabilityAtLeastOneHit: number;
     defenderLossesExpected: number;
     attackerLossesExpected: number;
     assessment: string;
@@ -283,6 +288,10 @@ function testExactCombatProbabilities(): void {
   assert.ok(Math.abs(roles.attackersRollAttack.probabilityAttackerLosesUnit - 7 / 20) < eps);
   assert.ok(Math.abs(roles.attackersRollDefense.probabilityDefenderEliminated - 7 / 20) < eps);
   assert.ok(Math.abs(roles.attackersRollDefense.probabilityAttackerLosesUnit - 3 / 20) < eps);
+  assert.ok(Math.abs(
+    result.prediction!.probabilityAtLeastOneHit
+      - (roles.attackersRollAttack.probabilityAtLeastOneHit + roles.attackersRollDefense.probabilityAtLeastOneHit) / 2
+  ) < eps);
 }
 
 /**

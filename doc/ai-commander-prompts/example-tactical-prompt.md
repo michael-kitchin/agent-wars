@@ -95,7 +95,7 @@ When Best Options This Turn lists a target for a sub-unit, copy it and do not ca
 - The Commander's Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.
 - assess_unit is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.
 - Batch independent tool calls: when you need the same tool for several units or hexes, request all of those calls together in one reply as parallel tool calls instead of one call per reply. Wait for a result only when the next call's arguments depend on it.
-- Copy a listed shot from Best Options unless its Odds show wipe below 50% and lose at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.
+- Copy a listed shot from Best Options unless its Odds show Kill below 50% and Loss at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.
 - Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat.
 - Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry.
 

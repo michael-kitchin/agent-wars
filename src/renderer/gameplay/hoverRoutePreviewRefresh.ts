@@ -10,13 +10,15 @@ import {
   resolutionPlaybackBlocksMapOrders,
 } from '../../shared/mapOrderGestureGate';
 import { resolveOrderPreviewEffectsTooltipHtml } from '../../shared/orderPreviewEffectsTooltip';
+import { composeRangedTargetTooltipHtml } from '../../shared/rangedTargetTooltip';
 import { rendererSharedState as S } from '../core/state';
-import type { HoverRoutePreviewState } from '../core/types';
+import type { HoverRangedTargetOdds, HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip, scheduleOrderEffectsTooltip } from '../map/orderSlowerHexTooltip';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipStrategicState';
 import { buildOrderPreviewEffectsTooltipInput } from './orderPreviewEffectsContext';
-import { getPreviewHumanMarchOrders, getValidateGroupAirStrikeTarget, getValidateGroupMissileLaunchTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
+import { getPreviewHumanMarchOrders, getPreviewRangedTargetOdds, getValidateGroupAirStrikeTarget, getValidateGroupMissileLaunchTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
+import { defenderIdsOnHoveredCell, rangedTargetRosterHtml } from './rangedTargetTooltipBody';
 import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGroupedTargeting';
 import { hoverRoutePreviewAsyncContextStillValid } from './hoverRoutePreviewStale';
 import type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
@@ -28,7 +30,7 @@ import { HUMAN_SEAT_ID } from '../../shared/seatIds';
  *
  * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
  * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
- * Expected outcome: Redraw requested. `#order-block-tooltip` waits one second for an illegal preview. `#order-slower-tooltip` waits one second for terrain or weather that changes a legal order. The hex tooltip stays hidden while that planning gesture is armed.
+ * Expected outcome: Redraw requested. `#order-block-tooltip` waits one second for an illegal preview. `#order-slower-tooltip` waits one second when a legal order has terrain, weather, or cover to show, and when a legal ranged aim has opponent lines or Kill, Hurt, and Loss. Null text hides that popup. The hex tooltip stays hidden while that planning gesture is armed.
  * Exceptions: None.
  */
 function publishHoverRoutePreview(
@@ -67,6 +69,15 @@ function publishHoverRoutePreview(
       hasBlockedMessage: Boolean(msg),
     })
   );
+  const tooltipHtml = preview.renderAsSupportTargeting === 'ranged'
+    ? composeRangedTargetTooltipHtml({
+        effectsHtml,
+        rosterHtml: rangedTargetRosterHtml(preview),
+        killPercent: preview.rangedTargetOdds?.killPercent ?? null,
+        hurtPercent: preview.rangedTargetOdds?.hurtPercent ?? null,
+        lossPercent: preview.rangedTargetOdds?.lossPercent ?? null,
+      })
+    : effectsHtml;
   if (msg) {
     hideOrderSlowerHexTooltip();
     if (allowBlockingOrderTooltip) {
@@ -77,7 +88,7 @@ function publishHoverRoutePreview(
   } else {
     showOrderBlockHexTooltip(null);
     if (planningHidesHexTooltip) {
-      scheduleOrderEffectsTooltip(effectsHtml);
+      scheduleOrderEffectsTooltip(tooltipHtml);
     } else {
       hideOrderSlowerHexTooltip();
     }
@@ -103,6 +114,27 @@ function hoverPreviewStillCurrent(seq: number, hoveredH3: string, unitIds: reado
 }
 
 /**
+ * Inputs for one ranged, air, or missile hover line.
+ *
+ * Purpose: The tactical and strategic branches share one publisher.
+ * When to use: `publishGroupedSupportTargetingPreview`.
+ * Expected outcome: Odds fields are set only by the ranged publisher.
+ * Exceptions: None.
+ */
+interface GroupedSupportTargetingPreviewArgs {
+  readonly deps: TacticalOrderDeps;
+  readonly hoveredH3: string;
+  readonly unitIds: readonly string[];
+  readonly validation: { success: boolean; reason?: string | null };
+  readonly supportKind: 'ranged' | 'air' | 'missile';
+  readonly originH3ForGrouping: (unitId: string) => string | undefined;
+  readonly originH3ForPreview: (unitId: string) => string | undefined;
+  readonly allowBlockingOrderTooltip: boolean;
+  readonly rangedTargetOdds?: HoverRangedTargetOdds;
+  readonly countedDefenderIds?: readonly string[];
+}
+
+/**
  * Publishes a ranged or air support-targeting hover preview.
  *
  * Purpose: The tactical and strategic ranged and air branches share the representative-origin lines and the reason slot.
@@ -110,16 +142,7 @@ function hoverPreviewStillCurrent(seq: number, hoveredH3: string, unitIds: reado
  * Expected outcome: A support-targeting preview, with the blocking reason in the ranged slot or the air slot matching `supportKind`.
  * Exceptions: None.
  */
-function publishGroupedSupportTargetingPreview(args: {
-  deps: TacticalOrderDeps;
-  hoveredH3: string;
-  unitIds: readonly string[];
-  validation: { success: boolean; reason?: string | null };
-  supportKind: 'ranged' | 'air' | 'missile';
-  originH3ForGrouping: (unitId: string) => string | undefined;
-  originH3ForPreview: (unitId: string) => string | undefined;
-  allowBlockingOrderTooltip: boolean;
-}): void {
+function publishGroupedSupportTargetingPreview(args: GroupedSupportTargetingPreviewArgs): void {
   const valid = args.validation.success;
   const reason = valid ? null : (args.validation.reason ?? null);
   const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
@@ -135,7 +158,141 @@ function publishGroupedSupportTargetingPreview(args: {
     args.validation.reason ?? null,
     args.originH3ForPreview
   );
-  publishHoverRoutePreview(args.deps, { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind }, reason, args.allowBlockingOrderTooltip);
+  publishHoverRoutePreview(
+    args.deps,
+    {
+      hoveredH3Index: args.hoveredH3,
+      data,
+      renderAsSupportTargeting: args.supportKind,
+      ...(args.rangedTargetOdds ? { rangedTargetOdds: args.rangedTargetOdds } : {}),
+      ...(args.countedDefenderIds ? { countedDefenderIds: args.countedDefenderIds } : {}),
+    },
+    reason,
+    args.allowBlockingOrderTooltip,
+  );
+}
+
+/**
+ * Kill, Hurt, Loss, and the defenders that were counted.
+ *
+ * Purpose: The hover stores these percents and the defenders that were counted.
+ * When to use: The return of `requestLegalRangedTargetOdds`.
+ * Expected outcome: All three percents, and the ids that entered the estimate. A null percent on any of them means the odds line is omitted.
+ * Exceptions: None.
+ */
+interface LegalRangedTargetOdds {
+  readonly killPercent: number | null;
+  /**
+   * Chance the attackers score at least one hit, as a whole percent.
+   *
+   * Purpose: The Hurt number on the odds line.
+   * When to use: Copied from the odds result into the tooltip.
+   * Expected outcome: `Math.round(probabilityAtLeastOneHit * 100)`, or null when any of the three chances is missing.
+   * Exceptions: None.
+   */
+  readonly hurtPercent: number | null;
+  readonly lossPercent: number | null;
+  readonly countedDefenderIds: readonly string[];
+}
+
+/**
+ * The cells and units for one ranged-odds request.
+ *
+ * Purpose: One odds request for the attackers the validator accepted and the defenders the player can see.
+ * When to use: `requestLegalRangedTargetOdds`.
+ * Expected outcome: Those ids, the hovered cell, and whether that cell is a battle cell.
+ * Exceptions: None.
+ */
+interface LegalRangedTargetOddsRequest {
+  readonly attackerIds: readonly string[];
+  readonly defenderIds: readonly string[];
+  readonly targetH3: string;
+  readonly inBattle: boolean;
+}
+
+/**
+ * Asks for Kill, Hurt, and Loss for one legal ranged target.
+ *
+ * Purpose: Air, missile, march, and ferry hovers do not call this.
+ * When to use: After ranged validation succeeds and the hover is still current.
+ * Expected outcome: The odds result, or null when the bridge is missing or the main process returns null.
+ * Exceptions: IPC rejection propagates. The caller catches it and still publishes the attack line.
+ */
+async function requestLegalRangedTargetOdds(
+  payload: LegalRangedTargetOddsRequest,
+): Promise<LegalRangedTargetOdds | null> {
+  const previewOdds = getPreviewRangedTargetOdds();
+  if (!previewOdds) return null;
+  return previewOdds({
+    attackerIds: [...payload.attackerIds],
+    defenderIds: [...payload.defenderIds],
+    targetH3: payload.targetH3,
+    inBattle: payload.inBattle,
+  });
+}
+
+/**
+ * Inputs for publishing one ranged hover.
+ *
+ * Purpose: The tactical and strategic ranged branches share one publish.
+ * When to use: After ranged validation returns.
+ * Expected outcome: The hover identity, the validation, and the two origin lookups.
+ * Exceptions: None.
+ */
+interface ValidatedRangedHoverArgs {
+  readonly deps: TacticalOrderDeps;
+  readonly seq: number;
+  readonly hoveredH3: string;
+  readonly unitIds: readonly string[];
+  readonly validation: { success: boolean; reason?: string | null };
+  readonly inBattle: boolean;
+  readonly originH3ForGrouping: (unitId: string) => string | undefined;
+  readonly originH3ForPreview: (unitId: string) => string | undefined;
+  readonly allowBlockingOrderTooltip: boolean;
+}
+
+/**
+ * Publishes a ranged hover, including odds when the shot is legal.
+ *
+ * Purpose: The attack line publishes even when the odds call fails or returns nothing. A hover that changed during the call publishes nothing.
+ * When to use: The tactical and strategic ranged branches, after validation returns.
+ * Expected outcome: A ranged preview. Legal shots carry percents and counted ids when the odds call returned them.
+ * Exceptions: None. A thrown odds call is logged and the preview still publishes when the hover is current.
+ */
+async function publishValidatedRangedHover(args: ValidatedRangedHoverArgs): Promise<void> {
+  if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+  let rangedTargetOdds: HoverRangedTargetOdds | undefined;
+  let countedDefenderIds: readonly string[] | undefined;
+  if (args.validation.success) {
+    try {
+      const odds = await requestLegalRangedTargetOdds({
+        attackerIds: args.unitIds,
+        defenderIds: defenderIdsOnHoveredCell(args.hoveredH3, args.inBattle),
+        targetH3: args.hoveredH3,
+        inBattle: args.inBattle,
+      });
+      if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+      if (odds) {
+        rangedTargetOdds = { killPercent: odds.killPercent, hurtPercent: odds.hurtPercent, lossPercent: odds.lossPercent };
+        countedDefenderIds = odds.countedDefenderIds;
+      }
+    } catch (err) {
+      console.error('ranged target odds failed', err);
+      if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+    }
+  }
+  publishGroupedSupportTargetingPreview({
+    deps: args.deps,
+    hoveredH3: args.hoveredH3,
+    unitIds: args.unitIds,
+    validation: args.validation,
+    supportKind: 'ranged',
+    originH3ForGrouping: args.originH3ForGrouping,
+    originH3ForPreview: args.originH3ForPreview,
+    allowBlockingOrderTooltip: args.allowBlockingOrderTooltip,
+    rangedTargetOdds,
+    countedDefenderIds,
+  });
 }
 
 /**
@@ -167,13 +324,13 @@ export async function refreshHoverRoutePreview(
         return;
       }
       const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-      publishGroupedSupportTargetingPreview({
+      await publishValidatedRangedHover({
         deps,
+        seq,
         hoveredH3,
         unitIds,
         validation,
-        supportKind: 'ranged',
+        inBattle: true,
         originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
         originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip,
@@ -266,13 +423,13 @@ export async function refreshHoverRoutePreview(
       return;
     }
     const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-    publishGroupedSupportTargetingPreview({
+    await publishValidatedRangedHover({
       deps,
+      seq,
       hoveredH3,
       unitIds,
       validation,
-      supportKind: 'ranged',
+      inBattle: false,
       originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
       originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
       allowBlockingOrderTooltip,

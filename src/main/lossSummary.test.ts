@@ -53,7 +53,7 @@ function testGroupedWhenMoreThanThreeOfOneType(): void {
  * Verifies grouped totals omit zero groups and follow Naval/Air/Armored/Infantry order.
  *
  * Purpose: Protects mixed-type grouping labels including Armored spelling.
- * When to use: Run after changing `GROUP_ORDER` or label map.
+ * When to use: Run after changing `LOSS_GROUP_ORDER` or the label map.
  * Expected outcome: Named naval units first, then `4x Armored`. Zero groups are omitted.
  * Exceptions: None.
  */
@@ -202,7 +202,7 @@ function testInlineWithoutUnitIdsUsesGroupedTypesNotDisplayNames(): void {
  * Groups infantry and missiles once each type has more than three losses.
  *
  * Purpose: A missile is a loss type and sorts after infantry in the grouped order.
- * When to use: After changing `GROUP_ORDER` or `isKnownLossType`.
+ * When to use: After changing `LOSS_GROUP_ORDER` or `isKnownLossType`.
  * Expected outcome: `4x Infantry, 4x Missile`.
  * Exceptions: None.
  */

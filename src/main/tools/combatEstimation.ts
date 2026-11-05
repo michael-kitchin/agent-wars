@@ -164,6 +164,15 @@ export interface EngagementPrediction {
    * Exceptions: None.
    */
   readonly probabilityAttackerLosesUnit: number;
+  /**
+   * Probability that the attackers score at least one hit.
+   *
+   * Contract: In [0, 1]. Fortification soak does not reduce it. A hit that only removes a fortification still counts.
+   * When to use: Callers round this for the Hurt percentage.
+   * Expected outcome: Zero when every attacker hit chance is zero.
+   * Exceptions: None.
+   */
+  readonly probabilityAtLeastOneHit: number;
 }
 
 /**
@@ -172,7 +181,8 @@ export interface EngagementPrediction {
  * Purpose: Pure math shared by ranged estimates and each melee role case.
  * When to use: With one hit chance per rolling attacker and per rolling defender; pass an empty defender list when
  * no defender can fire back.
- * Expected outcome: An `EngagementPrediction`; hits beyond the opposing unit count are wasted, as in resolution.
+ * Expected outcome: An `EngagementPrediction`. Hits beyond the opposing unit count are wasted, as in resolution.
+ * `probabilityAtLeastOneHit` is the attacker-hit mass for `k >= 1`. Soak is not applied to that mass.
  * Exceptions: None.
  */
 export function computeEngagementPrediction(
@@ -192,10 +202,12 @@ export function computeEngagementPrediction(
   let attackerHitsExpected = 0;
   let defenderLossesExpected = 0;
   let probabilityDefenderEliminated = 0;
+  let probabilityAtLeastOneHit = 0;
   poissonBinomialPMF([...attackerHitProbs]).forEach((p, k) => {
     attackerHitsExpected += Math.min(k, defenderCount) * p;
     defenderLossesExpected += Math.min(Math.max(k - defenderSoak, 0), defenderCount) * p;
     if (k >= defenderCount + defenderSoak) probabilityDefenderEliminated += p;
+    if (k >= 1) probabilityAtLeastOneHit += p;
   });
   let attackerLossesExpected = 0;
   let probabilityAttackerLosesUnit = 0;
@@ -210,6 +222,7 @@ export function computeEngagementPrediction(
     defenderLossesExpected,
     probabilityDefenderEliminated,
     probabilityAttackerLosesUnit,
+    probabilityAtLeastOneHit,
   };
 }
 
@@ -231,6 +244,7 @@ function averagePredictions(a: EngagementPrediction, b: EngagementPrediction): E
     defenderLossesExpected: mean('defenderLossesExpected'),
     probabilityDefenderEliminated: mean('probabilityDefenderEliminated'),
     probabilityAttackerLosesUnit: mean('probabilityAttackerLosesUnit'),
+    probabilityAtLeastOneHit: mean('probabilityAtLeastOneHit'),
   };
 }
 
@@ -246,6 +260,7 @@ function summarizeRoleCase(p: EngagementPrediction): Record<string, number> {
   return {
     probabilityDefenderEliminated: p.probabilityDefenderEliminated,
     probabilityAttackerLosesUnit: p.probabilityAttackerLosesUnit,
+    probabilityAtLeastOneHit: p.probabilityAtLeastOneHit,
     attackerLossesExpected: p.attackerLossesExpected,
     defenderLossesExpected: p.defenderLossesExpected,
   };
@@ -420,6 +435,7 @@ const UNCONTESTED_PREDICTION = {
   defenderLossesExpected: 0,
   probabilityDefenderEliminated: 0,
   probabilityAttackerLosesUnit: 0,
+  probabilityAtLeastOneHit: 0,
   assessment: 'uncontested',
   reasoning: 'No defenders at target hex',
 } as const;

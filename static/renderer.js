@@ -15931,7 +15931,7 @@
     infantry: "Infantry",
     missile: "Missile"
   };
-  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
+  var LOSS_GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
   function emptyPlayerLossSummary() {
     return { ranged: [], melee: [], returnFire: [], airStrike: [], missileStrike: [], other: [] };
   }
@@ -15944,23 +15944,25 @@
   function formatCollapsedTypeCount(count, unitType) {
     return `${String(count)}x ${UNIT_GROUP_LABEL_BY_TYPE[unitType]}`;
   }
-  function formatLossEntries(units) {
-    if (units.length === 0) return "";
+  function splitLossEntries(units) {
     const counts = { naval: 0, air: 0, armor: 0, infantry: 0, missile: 0 };
     for (const unit of units) {
       if (isKnownLossType(unit.unitType)) counts[unit.unitType] += 1;
     }
-    const parts = [];
-    for (const unit of units) {
-      if (!isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX) {
-        parts.push(unit.displayName);
-      }
-    }
-    for (const unitType of GROUP_ORDER) {
+    const named = units.filter(
+      (unit) => !isKnownLossType(unit.unitType) || counts[unit.unitType] <= LOSS_TYPE_NAME_LIST_MAX
+    );
+    const groups = LOSS_GROUP_ORDER.flatMap((unitType) => {
       const count = counts[unitType];
-      if (count > LOSS_TYPE_NAME_LIST_MAX) parts.push(formatCollapsedTypeCount(count, unitType));
-    }
-    return parts.join(", ");
+      if (count <= LOSS_TYPE_NAME_LIST_MAX) return [];
+      return [{ unitType, count, text: formatCollapsedTypeCount(count, unitType) }];
+    });
+    return { named, groups };
+  }
+  function formatLossEntries(units) {
+    if (units.length === 0) return "";
+    const split = splitLossEntries(units);
+    return [...split.named.map((unit) => unit.displayName), ...split.groups.map((group) => group.text)].join(", ");
   }
   var CAUSE_SPECS = [
     { key: "ranged", label: "Ranged attack" },
@@ -33670,6 +33672,33 @@ ${bonuses}`;
     if (!labels.includes(label)) labels.push(label);
   }
 
+  // src/shared/rangedTargetTooltip.ts
+  function buildRangedTargetRosterHtml(lines, marks) {
+    if (lines.length === 0) return null;
+    const rows = lines.map((line) => {
+      const tokens = line.tokens.map((token) => {
+        if (token.kind === "unit") {
+          return `${marks.originFlagHtml(token.unitId)}${escapeHtmlText(token.displayName)}`;
+        }
+        return `${marks.groupMarkHtml(line.seatId, token.unitType)}${escapeHtmlText(token.text)}`;
+      });
+      return `${marks.sideFlagHtml(line.seatId)}<strong>${escapeHtmlText(line.nickname)}:</strong> ${tokens.join(", ")}`;
+    });
+    return rows.join(TOOLTIP_SECTION_GAP_HTML);
+  }
+  function composeRangedTargetTooltipHtml(parts) {
+    const blocks = [];
+    if (parts.rosterHtml) blocks.push(parts.rosterHtml);
+    if (parts.effectsHtml) blocks.push(parts.effectsHtml);
+    if (parts.killPercent != null && parts.hurtPercent != null && parts.lossPercent != null) {
+      blocks.push(
+        `<strong>Kill:</strong> ${parts.killPercent}%, <strong>Hurt:</strong> ${parts.hurtPercent}%, <strong>Loss:</strong> ${parts.lossPercent}%`
+      );
+    }
+    if (blocks.length === 0) return null;
+    return blocks.join(TOOLTIP_SECTION_GAP_HTML);
+  }
+
   // src/renderer/gameplay/orderPreviewEffectsContext.ts
   function buildOrderPreviewEffectsTooltipInput(args) {
     const kind = effectsKind(args.preview);
@@ -33749,6 +33778,9 @@ ${bonuses}`;
   function getValidateGroupRangedTarget() {
     return window.gameApi?.validateGroupRangedTarget;
   }
+  function getPreviewRangedTargetOdds() {
+    return window.gameApi?.previewRangedTargetOdds;
+  }
   function getValidateGroupAirStrikeTarget() {
     return window.gameApi?.validateGroupAirStrikeTarget;
   }
@@ -33757,6 +33789,100 @@ ${bonuses}`;
   }
   function getPreviewHumanMarchOrders() {
     return window.gameApi?.previewHumanMarchOrders;
+  }
+
+  // src/shared/rangedTargetRoster.ts
+  function groupRank(unitType) {
+    const index = LOSS_GROUP_ORDER.indexOf(unitType);
+    return index < 0 ? LOSS_GROUP_ORDER.length : index;
+  }
+  function buildRangedTargetRosterLines(input) {
+    const seats = [...input.seats].sort(
+      (a, b) => a.seatOrder - b.seatOrder || a.seatId.localeCompare(b.seatId)
+    );
+    const lines = [];
+    for (const seat of seats) {
+      if (aiIndexForSeatId(seat.seatId) == null) continue;
+      const units = input.defenders.filter((unit) => unit.seatId === seat.seatId).sort(
+        (a, b) => groupRank(a.unitType) - groupRank(b.unitType) || a.displayName.localeCompare(b.displayName) || a.unitId.localeCompare(b.unitId)
+      );
+      if (units.length === 0) continue;
+      const lost = units.map((unit) => ({
+        unitId: unit.unitId,
+        unitType: unit.unitType,
+        displayName: unit.displayName
+      }));
+      const split = splitLossEntries(lost);
+      const named = [];
+      for (const unit of split.named) {
+        if (!unit.unitId) continue;
+        named.push({ kind: "unit", unitId: unit.unitId, displayName: unit.displayName });
+      }
+      const groups = split.groups.map((group) => ({
+        kind: "group",
+        unitType: group.unitType,
+        count: group.count,
+        text: group.text
+      }));
+      const tokens = [...named, ...groups];
+      if (tokens.length === 0) continue;
+      lines.push({ seatId: seat.seatId, nickname: sideDisplayName(seat), tokens });
+    }
+    return lines;
+  }
+
+  // src/renderer/gameplay/rangedTargetTooltipBody.ts
+  function defenderIdsOnHoveredCell(hoveredH3, inBattle) {
+    return occupants(hoveredH3, inBattle).filter((unit) => unit.player !== HUMAN_SEAT_ID).map((unit) => unit.id);
+  }
+  function rangedTargetRosterHtml(preview) {
+    const counted = new Set(preview.countedDefenderIds ?? []);
+    if (counted.size === 0) return null;
+    const defenders = rosterUnits(preview.hoveredH3Index, counted);
+    const seats = (rendererSharedState.gameState?.seats ?? []).map((seat) => ({
+      seatId: seat.seatId,
+      seatOrder: seat.seatOrder,
+      nickname: seat.nickname,
+      homeRegion: seat.homeRegion,
+      kind: seat.kind
+    }));
+    const lines = buildRangedTargetRosterLines({ defenders, seats });
+    return buildRangedTargetRosterHtml(lines, {
+      sideFlagHtml: (seatId) => {
+        const flag = createSideNumberFlag(seatId, seats);
+        return flag ? flag.outerHTML : "";
+      },
+      originFlagHtml,
+      groupMarkHtml: (seatId, unitType) => createLossTypeToken(unitType, seatId, seats).outerHTML
+    });
+  }
+  function occupants(hoveredH3, inBattle) {
+    if (inBattle) {
+      return (rendererSharedState.tacticalBattleSnapshot?.subUnits ?? []).filter((unit) => unit.h3Index === hoveredH3);
+    }
+    return (rendererSharedState.gameState?.units ?? []).filter((unit) => unit.h3Index === hoveredH3);
+  }
+  function rosterUnits(hoveredH3, counted) {
+    return occupants(hoveredH3, rendererSharedState.tacticalBattleSnapshot != null).filter((unit) => counted.has(unit.id)).map((unit) => ({
+      unitId: unit.id,
+      seatId: unit.player,
+      unitType: unit.unitType,
+      displayName: rendererSharedState.unitDisplayNameById.get(unit.id) ?? fallbackDisplayNameFromUnitId(unit.id)
+    }));
+  }
+  function originFlagHtml(unitId) {
+    const origin = resolveUnitOrigin(unitId);
+    if (!origin) return "";
+    const image = document.createElement("img");
+    image.className = COUNTRY_FLAG_CLASS_NAME;
+    image.src = originFlagAssetPath({
+      subdivisionCode: origin.birthSubdivisionCode ?? null,
+      countryCode: origin.birthCountryCode
+    });
+    image.alt = "";
+    image.setAttribute("aria-hidden", "true");
+    image.draggable = false;
+    return image.outerHTML;
   }
 
   // src/renderer/gameplay/hoverRoutePreviewGroupedTargeting.ts
@@ -33830,6 +33956,13 @@ ${bonuses}`;
         hasBlockedMessage: Boolean(msg)
       })
     );
+    const tooltipHtml = preview.renderAsSupportTargeting === "ranged" ? composeRangedTargetTooltipHtml({
+      effectsHtml,
+      rosterHtml: rangedTargetRosterHtml(preview),
+      killPercent: preview.rangedTargetOdds?.killPercent ?? null,
+      hurtPercent: preview.rangedTargetOdds?.hurtPercent ?? null,
+      lossPercent: preview.rangedTargetOdds?.lossPercent ?? null
+    }) : effectsHtml;
     if (msg) {
       hideOrderSlowerHexTooltip();
       if (allowBlockingOrderTooltip) {
@@ -33840,7 +33973,7 @@ ${bonuses}`;
     } else {
       showOrderBlockHexTooltip(null);
       if (planningHidesHexTooltip) {
-        scheduleOrderEffectsTooltip(effectsHtml);
+        scheduleOrderEffectsTooltip(tooltipHtml);
       } else {
         hideOrderSlowerHexTooltip();
       }
@@ -33871,7 +34004,63 @@ ${bonuses}`;
       args.validation.reason ?? null,
       args.originH3ForPreview
     );
-    publishHoverRoutePreview(args.deps, { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind }, reason, args.allowBlockingOrderTooltip);
+    publishHoverRoutePreview(
+      args.deps,
+      {
+        hoveredH3Index: args.hoveredH3,
+        data,
+        renderAsSupportTargeting: args.supportKind,
+        ...args.rangedTargetOdds ? { rangedTargetOdds: args.rangedTargetOdds } : {},
+        ...args.countedDefenderIds ? { countedDefenderIds: args.countedDefenderIds } : {}
+      },
+      reason,
+      args.allowBlockingOrderTooltip
+    );
+  }
+  async function requestLegalRangedTargetOdds(payload2) {
+    const previewOdds = getPreviewRangedTargetOdds();
+    if (!previewOdds) return null;
+    return previewOdds({
+      attackerIds: [...payload2.attackerIds],
+      defenderIds: [...payload2.defenderIds],
+      targetH3: payload2.targetH3,
+      inBattle: payload2.inBattle
+    });
+  }
+  async function publishValidatedRangedHover(args) {
+    if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+    let rangedTargetOdds;
+    let countedDefenderIds;
+    if (args.validation.success) {
+      try {
+        const odds = await requestLegalRangedTargetOdds({
+          attackerIds: args.unitIds,
+          defenderIds: defenderIdsOnHoveredCell(args.hoveredH3, args.inBattle),
+          targetH3: args.hoveredH3,
+          inBattle: args.inBattle
+        });
+        if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+        if (odds) {
+          rangedTargetOdds = { killPercent: odds.killPercent, hurtPercent: odds.hurtPercent, lossPercent: odds.lossPercent };
+          countedDefenderIds = odds.countedDefenderIds;
+        }
+      } catch (err) {
+        console.error("ranged target odds failed", err);
+        if (!hoverPreviewStillCurrent(args.seq, args.hoveredH3, args.unitIds)) return;
+      }
+    }
+    publishGroupedSupportTargetingPreview({
+      deps: args.deps,
+      hoveredH3: args.hoveredH3,
+      unitIds: args.unitIds,
+      validation: args.validation,
+      supportKind: "ranged",
+      originH3ForGrouping: args.originH3ForGrouping,
+      originH3ForPreview: args.originH3ForPreview,
+      allowBlockingOrderTooltip: args.allowBlockingOrderTooltip,
+      rangedTargetOdds,
+      countedDefenderIds
+    });
   }
   async function refreshHoverRoutePreview2(deps, options) {
     const allowBlockingOrderTooltip = options?.allowBlockingOrderTooltip === true;
@@ -33891,13 +34080,13 @@ ${bonuses}`;
           return;
         }
         const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-        publishGroupedSupportTargetingPreview({
+        await publishValidatedRangedHover({
           deps,
+          seq,
           hoveredH3,
           unitIds,
           validation,
-          supportKind: "ranged",
+          inBattle: true,
           originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
           originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === HUMAN_SEAT_ID)?.h3Index,
           allowBlockingOrderTooltip
@@ -33987,13 +34176,13 @@ ${bonuses}`;
         return;
       }
       const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
-      publishGroupedSupportTargetingPreview({
+      await publishValidatedRangedHover({
         deps,
+        seq,
         hoveredH3,
         unitIds,
         validation,
-        supportKind: "ranged",
+        inBattle: false,
         originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
         originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === HUMAN_SEAT_ID)?.h3Index,
         allowBlockingOrderTooltip
@@ -36788,7 +36977,7 @@ ${bonuses}`;
   }
 
   // src/shared/destroyedInBattleLine.ts
-  var GROUP_ORDER2 = ["naval", "air", "armor", "infantry", "missile"];
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry", "missile"];
   function visibleDestroyedParents(units, viewerSeatId2, visibleHexes) {
     if (viewerSeatId2 == null) return [...units];
     return units.filter((unit) => unit.ownerId === viewerSeatId2 || visibleHexes.has(unit.h3Index));
@@ -36807,7 +36996,7 @@ ${bonuses}`;
         named.push(unit.displayName);
       }
     }
-    const groups = GROUP_ORDER2.flatMap((unitType) => {
+    const groups = GROUP_ORDER.flatMap((unitType) => {
       if (!grouped.has(unitType)) return [];
       const count = counts.get(unitType);
       return count == null ? [] : [formatCollapsedTypeCount(count, unitType)];

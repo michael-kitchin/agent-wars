@@ -50,16 +50,32 @@ function oddsInput(overrides: Partial<BestOptionsOddsInput>): BestOptionsOddsInp
  *
  * Purpose: Binary fractions such as 0.185 can round the wrong way, so the fixture uses multiples of 0.01.
  * When to use: The formatter.
- * Expected outcome: `wipe 62%, lose 19%` for those two fractions, and an em dash otherwise.
+ * Expected outcome: `Kill: 62%, Hurt: 80%, Loss: 19%` for those three fractions, and an em dash otherwise.
  * Exceptions: None.
  */
 function testFormatRoundsHundredthsAndDashesTheRest(): void {
   assert.equal(
-    formatBestOptionsOdds({ probabilityDefenderEliminated: 0.62, probabilityAttackerLosesUnit: 0.19 }),
-    'wipe 62%, lose 19%'
+    formatBestOptionsOdds({
+      probabilityDefenderEliminated: 0.62,
+      probabilityAtLeastOneHit: 0.8,
+      probabilityAttackerLosesUnit: 0.19,
+    }),
+    'Kill: 62%, Hurt: 80%, Loss: 19%'
   );
   assert.equal(formatBestOptionsOdds(null), '—');
   assert.equal(formatBestOptionsOdds({ assessment: 'uncontested' }), '—');
+  assert.equal(
+    formatBestOptionsOdds({ probabilityDefenderEliminated: 0.62, probabilityAttackerLosesUnit: 0.19 }),
+    '—'
+  );
+  assert.equal(
+    formatBestOptionsOdds({
+      probabilityDefenderEliminated: 0.62,
+      probabilityAtLeastOneHit: Number.NaN,
+      probabilityAttackerLosesUnit: 0.19,
+    }),
+    '—'
+  );
 }
 
 /**
@@ -77,7 +93,12 @@ function testAirStrikeSkipsAndCacheCollapses(): void {
     return {
       status: 'ok',
       error: null,
-      prediction: { probabilityDefenderEliminated: 0.5, probabilityAttackerLosesUnit: 0.1, assessment: 'even' },
+      prediction: {
+        probabilityDefenderEliminated: 0.5,
+        probabilityAtLeastOneHit: 0.4,
+        probabilityAttackerLosesUnit: 0.1,
+        assessment: 'even',
+      },
     };
   };
   const cache = new Map<string, string>();
@@ -104,7 +125,7 @@ function testAirStrikeSkipsAndCacheCollapses(): void {
       cache,
     })
   );
-  assert.equal(first, 'wipe 50%, lose 10%');
+  assert.equal(first, 'Kill: 50%, Hurt: 40%, Loss: 10%');
   assert.equal(second, first);
   assert.equal(calls, 1);
 }

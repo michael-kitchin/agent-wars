@@ -18,6 +18,13 @@ test('a soak of 2 absorbs two sure hits against one defender', () => {
   assert.equal(prediction.defenderLossesExpected, 0);
   assert.equal(prediction.attackerHitsExpected, 1);
   assert.equal(prediction.probabilityDefenderEliminated, 0);
+  assert.equal(prediction.probabilityAtLeastOneHit, 1);
+});
+
+test('one hit chance against two defenders is a hit and not a wipe', () => {
+  const prediction = computeEngagementPrediction([0.5], [], 1, 2, 0);
+  assert.equal(prediction.probabilityAtLeastOneHit, 0.5);
+  assert.equal(prediction.probabilityDefenderEliminated, 0);
 });
 
 test('an unexplored hex soaks nothing', () => {

@@ -149,6 +149,62 @@ data: HumanOrderGroupPreviewResult;
    * Exceptions: None.
    */
 renderAsSupportTargeting?: 'ranged' | 'air' | 'missile';
+  /**
+   * Kill, Hurt, and Loss for this ranged target.
+   *
+   * Purpose: The effects tooltip prints one odds line from these percents.
+   * When to use: Set on a legal ranged hover after the odds call returns all three chances or none.
+   * Expected outcome: All three numbers, or all three null when the estimate could not supply them. Omitted for every other preview and when the odds call returned nothing.
+   * Exceptions: None.
+   */
+  rangedTargetOdds?: HoverRangedTargetOdds;
+  /**
+   * Defender ids that entered the ranged estimate.
+   *
+   * Purpose: The roster names opponent seats among these ids and no others.
+   * When to use: Together with `rangedTargetOdds` on a legal ranged hover.
+   * Expected outcome: The ids the estimate counted. Omitted when the odds call returned nothing.
+   * Exceptions: None.
+   */
+  countedDefenderIds?: readonly string[];
+}
+
+/**
+ * Kill, Hurt, and Loss percents stored on a ranged hover preview.
+ *
+ * Purpose: The tooltip prints these three numbers, or none when any is missing.
+ * When to use: `HoverRoutePreviewState.rangedTargetOdds`.
+ * Expected outcome: Whole percents. Null means the odds line is omitted.
+ * Exceptions: None.
+ */
+export interface HoverRangedTargetOdds {
+  /**
+   * Chance the shot wipes the counted defenders.
+   *
+   * Purpose: The Kill number.
+   * When to use: Read while composing the ranged tooltip.
+   * Expected outcome: A whole percent, or null.
+   * Exceptions: None.
+   */
+  readonly killPercent: number | null;
+  /**
+   * Chance the attackers lose at least one unit.
+   *
+   * Purpose: The Loss number.
+   * When to use: Read while composing the ranged tooltip.
+   * Expected outcome: A whole percent, or null.
+   * Exceptions: None.
+   */
+  readonly lossPercent: number | null;
+  /**
+   * Chance the attackers score at least one hit.
+   *
+   * Purpose: The Hurt number.
+   * When to use: Read while composing the ranged tooltip.
+   * Expected outcome: A whole percent, or null.
+   * Exceptions: None.
+   */
+  readonly hurtPercent: number | null;
 }
 
 /**

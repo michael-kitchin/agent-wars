@@ -3,7 +3,7 @@
  *
  * Purpose: The briefing carries the fight math, so the model does not have to call `estimate_combat` before a listed row.
  * When to use: From the Best Options table renderer, once per grouped row.
- * Expected outcome: A short cell such as `wipe 62%, lose 19%`, or an em dash when the row is not a fight.
+ * Expected outcome: A short cell such as `Kill: 62%, Hurt: 80%, Loss: 19%`, or an em dash when the row is not a fight.
  * Exceptions: A thrown estimate is logged and becomes an em dash. One bad row does not drop the briefing.
  */
 
@@ -73,7 +73,7 @@ export interface BestOptionsOddsPrediction {
    * Chance the defenders are wiped out.
    *
    * Contract: A fraction from 0 to 1. Absent when the prediction is not a fight.
-   * When to use: The `wipe` percentage.
+   * When to use: The Kill percentage.
    * Expected outcome: Rounded with `Math.round(p * 100)`.
    * Exceptions: None.
    */
@@ -82,11 +82,20 @@ export interface BestOptionsOddsPrediction {
    * Chance the attacker loses at least one unit.
    *
    * Contract: A fraction from 0 to 1.
-   * When to use: The `lose` percentage.
+   * When to use: The Loss percentage.
    * Expected outcome: Rounded with `Math.round(p * 100)`.
    * Exceptions: None.
    */
   readonly probabilityAttackerLosesUnit?: number;
+  /**
+   * Chance the attackers score at least one hit.
+   *
+   * Contract: A fraction from 0 to 1. Fortification soak does not reduce it. A hit that only removes a fortification still counts.
+   * When to use: The Hurt percentage.
+   * Expected outcome: Rounded with `Math.round(p * 100)`.
+   * Exceptions: None.
+   */
+  readonly probabilityAtLeastOneHit?: number;
   /**
    * Estimator label. `uncontested` is not a fight.
    *
@@ -175,9 +184,9 @@ export interface BestOptionsOddsInput {
 /**
  * Formats one prediction as the Odds cell.
  *
- * Purpose: The table shows two percentages, not the raw fractions.
+ * Purpose: The table shows Kill, Hurt, and Loss, not the raw fractions.
  * When to use: After a successful estimate, and for a null or uncontested prediction.
- * Expected outcome: `wipe N%, lose M%`, or an em dash.
+ * Expected outcome: `Kill: N%, Hurt: N%, Loss: N%`, or an em dash.
  * Exceptions: None.
  */
 export function formatBestOptionsOdds(prediction: BestOptionsOddsPrediction | null | undefined): string {
@@ -186,19 +195,24 @@ export function formatBestOptionsOdds(prediction: BestOptionsOddsPrediction | nu
     prediction == null ||
     prediction.assessment === 'uncontested' ||
     typeof prediction.probabilityDefenderEliminated !== 'number' ||
-    typeof prediction.probabilityAttackerLosesUnit !== 'number'
+    typeof prediction.probabilityAtLeastOneHit !== 'number' ||
+    typeof prediction.probabilityAttackerLosesUnit !== 'number' ||
+    !Number.isFinite(prediction.probabilityDefenderEliminated) ||
+    !Number.isFinite(prediction.probabilityAtLeastOneHit) ||
+    !Number.isFinite(prediction.probabilityAttackerLosesUnit)
   ) {
     return bestOptionsOddsEmpty;
   }
-  const wipe = Math.round(prediction.probabilityDefenderEliminated * 100);
-  const lose = Math.round(prediction.probabilityAttackerLosesUnit * 100);
-  return `wipe ${wipe}%, lose ${lose}%`;
+  const kill = Math.round(prediction.probabilityDefenderEliminated * 100);
+  const hurt = Math.round(prediction.probabilityAtLeastOneHit * 100);
+  const loss = Math.round(prediction.probabilityAttackerLosesUnit * 100);
+  return `Kill: ${kill}%, Hurt: ${hurt}%, Loss: ${loss}%`;
 }
 
 /**
  * Odds cell for one grouped Best Options row.
  *
- * Purpose: Ranged and move/melee rows show the estimator's wipe and loss chances for every listed unit together.
+ * Purpose: Ranged and move/melee rows show Kill, Hurt, and Loss for every listed unit together.
  * When to use: Once per grouped row, with a cache shared by the table.
  * Expected outcome: An em dash for any other action, a missing target, an error result, or a thrown estimate.
  * Exceptions: A thrown estimate is logged and becomes an em dash.

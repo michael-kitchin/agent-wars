@@ -62,6 +62,7 @@ import { registerEndMatchIpcHandler } from './ipc/endMatchIpcHandler';
 import { registerHumanNicknameIpcHandler } from './ipc/humanNicknameIpcHandler';
 import { registerSeatCommanderIpcHandler } from './ipc/seatCommanderIpcHandler';
 import { registerMissileLaunchIpcHandler } from './ipc/missileLaunchIpcHandler';
+import { registerRangedTargetOddsIpcHandler } from './ipc/rangedTargetOddsIpc';
 import { registerMercenaryIpcHandler } from './ipc/mercenaryIpcHandler';
 import { forgetAutoSaveTurnKey, rememberCurrentAutoSaveTurnKey, registerSaveLoadIpcHandler, runWithReadyInFlight, withAutoSaveAfter } from './ipc/saveLoadIpcHandler';
 import { resetCommanderPool } from './openRouter/commanderPool';
@@ -570,6 +571,7 @@ function registerIpcHandlers(): void {
   registerHumanNicknameIpcHandler(ipcMain);
   registerSeatCommanderIpcHandler(ipcMain);
   registerMissileLaunchIpcHandler(ipcMain);
+  registerRangedTargetOddsIpcHandler(ipcMain);
   registerMercenaryIpcHandler(ipcMain);
   registerSaveLoadIpcHandler(ipcMain, () => mainWindow, sendActivityLog);
 }

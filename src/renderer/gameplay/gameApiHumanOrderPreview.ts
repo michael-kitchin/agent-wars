@@ -11,6 +11,18 @@ export function getValidateGroupRangedTarget() {
 }
 
 /**
+ * Returns `previewRangedTargetOdds` when the preload bridge exposed it.
+ *
+ * Purpose: The ranged hover asks for Kill, Hurt, and Loss only through this lookup.
+ * When to use: After ranged validation succeeds.
+ * Expected outcome: Callable IPC, or undefined when the bridge is not ready.
+ * Exceptions: None.
+ */
+export function getPreviewRangedTargetOdds() {
+  return window.gameApi?.previewRangedTargetOdds;
+}
+
+/**
  * Returns `validateGroupAirStrikeTarget` when the preload bridge exposed it (otherwise undefined).
  *
  * Purpose: Same as `getValidateGroupRangedTarget` for air-strike hover validation.

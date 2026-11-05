@@ -114,6 +114,53 @@ export type CommitHumanTacticalDraftOrdersIpcPayload = {
 };
 
 /**
+ * Kill, Hurt, and Loss returned for one ranged target.
+ *
+ * Purpose: The hover tooltip prints these three percents and lists only the counted defenders.
+ * When to use: The result of `previewRangedTargetOdds`.
+ * Expected outcome: All three percents are numbers, or all three are null. `countedDefenderIds` entered the estimate.
+ * Exceptions: None.
+ */
+export interface RangedTargetOddsPreview {
+  /**
+   * Chance the shot wipes the counted defenders, as a whole percent.
+   *
+   * Contract: `Math.round(probabilityDefenderEliminated * 100)`, or null when any of the three chances is missing.
+   * When to use: The Kill number.
+   * Expected outcome: A number from 0 through 100, or null.
+   * Exceptions: None.
+   */
+  readonly killPercent: number | null;
+  /**
+   * Chance the attackers lose at least one unit, as a whole percent.
+   *
+   * Contract: `Math.round(probabilityAttackerLosesUnit * 100)`, or null when any of the three chances is missing.
+   * When to use: The Loss number.
+   * Expected outcome: A number from 0 through 100, or null.
+   * Exceptions: None.
+   */
+  readonly lossPercent: number | null;
+  /**
+   * Chance the attackers score at least one hit, as a whole percent.
+   *
+   * Contract: `Math.round(probabilityAtLeastOneHit * 100)`, or null when any of the three chances is missing.
+   * When to use: The Hurt number.
+   * Expected outcome: A number from 0 through 100, or null.
+   * Exceptions: None.
+   */
+  readonly hurtPercent: number | null;
+  /**
+   * Defender ids that entered the estimate.
+   *
+   * Contract: Rejected ids are already removed. The roster keeps opponent seats among these.
+   * When to use: Building the opponent lines.
+   * Expected outcome: The ids passed to the estimator, in the request's order.
+   * Exceptions: None.
+   */
+  readonly countedDefenderIds: readonly string[];
+}
+
+/**
  * Documents the `GameApi` interface as a named contract surface (export interface GameApi).
 
  * Purpose: Supports maintainability by documenting why `GameApi` exists.
@@ -449,6 +496,20 @@ commitHumanTacticalDraftOrders: (
    * Exceptions: None.
    */
 validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  /**
+   * Kill, Hurt, and Loss for one legal ranged target.
+   *
+   * Contract: `killPercent` is the wipe chance, `hurtPercent` is the chance at least one hit lands, and `lossPercent` is the chance the attackers lose a unit, all whole percents. All three are null together when the estimate cannot supply them. `countedDefenderIds` are the defender ids that entered the estimate. The result is null when the payload cannot be read, the battle is missing, or the estimate throws.
+   * When to use: After ranged validation succeeds, with the attackers it accepted and the non-human units on that cell.
+   * Expected outcome: One set of percents for the whole target, or null.
+   * Exceptions: The handler returns null when the payload, the battle, or the estimate cannot be used. An invoke that throws still rejects. The hover catches that and publishes the attack line.
+   */
+  previewRangedTargetOdds: (payload: {
+    attackerIds: string[];
+    defenderIds: string[];
+    targetH3: string;
+    inBattle: boolean;
+  }) => Promise<RangedTargetOddsPreview | null>;
     /**
    * Specifies the contract for the `validateGroupAirStrikeTarget` member (validateGroupAirStrikeTarget: (payload: { unitIds: string[]; targetH3Index: string; targetType: AirStrikeTargetType; }) => Promise<{ success:).
 

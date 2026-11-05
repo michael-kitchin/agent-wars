@@ -71,14 +71,14 @@ const TACTICAL_PRIORITY_BLOCK =
  *
  * Purpose: Same tempo rule as strategic, with beat nouns.
  * When to use: Always in tactical coaching.
- * Expected outcome: Names an air-strike row only when an air sub-unit exists. Tells the model to skip a row whose Odds show wipe below 50% and lose at least 50%, and not to invent a target. Mentions that firing does not use the move.
+ * Expected outcome: Names an air-strike row only when an air sub-unit exists. Tells the model to skip a row whose Odds show Kill below 50% and Loss at least 50%, and not to invent a target. Mentions that firing does not use the move.
  * Exceptions: None.
  */
 function tempoBullet(hasAirUnits: boolean): string {
   const listed = hasAirUnits
     ? 'Copy a listed shot, including an air-strike row, from Best Options'
     : 'Copy a listed shot from Best Options';
-  return `- ${listed} unless its Odds show wipe below 50% and lose at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.`;
+  return `- ${listed} unless its Odds show Kill below 50% and Loss at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.`;
 }
 
 /**

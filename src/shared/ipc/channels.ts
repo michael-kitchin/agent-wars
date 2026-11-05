@@ -37,6 +37,7 @@ export const IPC_GAME = {
   assignHumanMarchOrders: 'game:assignHumanMarchOrders',
   commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
   validateGroupRangedTarget: 'game:validateGroupRangedTarget',
+  previewRangedTargetOdds: 'game:previewRangedTargetOdds',
   validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
   validateGroupAirDropTarget: 'game:validateGroupAirDropTarget',
   validateGroupFerryTarget: 'game:validateGroupFerryTarget',

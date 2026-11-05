@@ -77,7 +77,7 @@ function groupThisTurnOptionRowsByTarget(
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
 const BEST_OPTIONS_ODDS_LINE =
-  'Odds is the chance this row wipes out the defenders, and the chance you lose a unit, if every listed unit takes part. An em dash is not a fight, or it could not be estimated.';
+  'Odds is Kill, Hurt, and Loss for every listed unit taking part. Kill is the chance the defenders are wiped out. Hurt is the chance at least one hit lands, including a hit that only removes a fortification. Loss is the chance you lose a unit. An em dash is not a fight, or it could not be estimated.';
 
 export function renderThisTurnOptionsTableMarkdown(
   rows: PossibleActionTableRow[],

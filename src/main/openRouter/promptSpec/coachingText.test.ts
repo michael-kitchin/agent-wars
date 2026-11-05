@@ -230,7 +230,11 @@ test('tempo coaching names air strike only when air is present', () => {
   assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /air-strike row/);
   assert.match(joined(tacticalGates({ hasAirUnits: true })), /air-strike row/);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /air-strike row/);
-  assert.match(joined(strategicGates()), /wipe below 50%/);
+  for (const text of [joined(strategicGates()), joined(tacticalGates())]) {
+    assert.match(text, /Kill below 50%/);
+    assert.match(text, /Loss at least 50%/);
+    assert.doesNotMatch(text, /wipe below 50%/);
+  }
 });
 
 test('callback coaching states the empty-list event-driven consequence', () => {

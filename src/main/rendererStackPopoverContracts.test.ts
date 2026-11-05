@@ -224,6 +224,28 @@ function testHoverOrderPlanningInteractionLock(): void {
       !hoverRefreshSource.includes('resolveOrderSlowerTooltipHtml'),
     'hover preview effects tooltip should use resolveOrderPreviewEffectsTooltipHtml and keep ranged collection out of the publisher'
   );
+  const hoverRefreshFn = getFunctionSource(hoverRefreshSource, 'refreshHoverRoutePreview');
+  const rangedHoverFn = getFunctionSource(hoverRefreshSource, 'publishValidatedRangedHover');
+  const rangedOddsFn = getFunctionSource(hoverRefreshSource, 'requestLegalRangedTargetOdds');
+  const publishFn = getFunctionSource(hoverRefreshSource, 'publishHoverRoutePreview');
+  const groupedFn = getFunctionSource(hoverRefreshSource, 'publishGroupedSupportTargetingPreview');
+  assert.equal((hoverRefreshFn.match(/publishValidatedRangedHover\(/g) ?? []).length, 2);
+  assert.ok(
+    !hoverRefreshFn.includes('requestLegalRangedTargetOdds') && !hoverRefreshFn.includes('previewRangedTargetOdds'),
+    'air, missile, march, and ferry hover branches do not request ranged odds'
+  );
+  assert.ok(
+    rangedHoverFn.includes('requestLegalRangedTargetOdds') && rangedOddsFn.includes('getPreviewRangedTargetOdds'),
+    'a legal ranged hover requests odds before it publishes'
+  );
+  assert.ok(
+    publishFn.includes('composeRangedTargetTooltipHtml') && publishFn.includes("renderAsSupportTargeting === 'ranged'"),
+    'a ranged hover composes the effects tooltip and other previews keep the effects text alone'
+  );
+  assert.ok(
+    !groupedFn.includes('previewRangedTargetOdds') && !groupedFn.includes('requestLegalRangedTargetOdds'),
+    'support-targeting drawing does not request odds'
+  );
   const mainMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
   const mainMapSource = fs.readFileSync(mainMapPath, 'utf8');
   const pointerMoveAt = mainMapSource.indexOf("addEventListener('pointermove'");

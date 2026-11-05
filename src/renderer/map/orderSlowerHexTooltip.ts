@@ -183,10 +183,10 @@ function armEffectsDwell(hex: string | null, detail: string | null, tooltipHtml:
 }
 
 /**
- * Shows the effects popup one second after the pointer rests on a cell whose order is changed by terrain, weather, or cover.
+ * Shows the effects popup one second after the pointer rests, when the armed order has tooltip text.
  *
- * Purpose: March, ferry, ranged, and air-strike aiming in both theaters use this wait. A later preview for that same cell keeps the wait while the pointer rests, or updates the copy if the popup is already open.
- * When to use: `publishHoverRoutePreview` when the hover is a legal armed order and the effects HTML is known. Pass null to hide.
+ * Purpose: March, ferry, ranged, and air-strike aiming in both theaters use this wait. A legal ranged aim can carry opponent lines and Kill, Hurt, and Loss even when terrain, weather, and cover change nothing. A later preview for that same cell keeps the wait while the pointer rests, or updates the copy if the popup is already open.
+ * When to use: `publishHoverRoutePreview` when the hover is a legal armed order and the tooltip HTML is known. Pass null to hide.
  * Expected outcome: The popup shows one second after the pointer rests, and only if the pointer is still on that cell. Travel before it opens starts the wait again.
  * Exceptions: None.
  */
