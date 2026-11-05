@@ -3,7 +3,7 @@
  *
  * Purpose: The briefing already knows which hexes can build and are not building. Attention Flags and the opening message point at that list.
  * When to use: After `query_production` returns controlled-hex queues, and when appending the attention bullet.
- * Expected outcome: At most one bullet, listing at most six hexes, or null when nothing is idle.
+ * Expected outcome: At most one bullet, listing up to `PRODUCTION_ATTENTION_LISTED_HEXES` hexes grouped by queue state and buildable types, or null when nothing is idle.
  * Exceptions: None.
  */
 
@@ -14,12 +14,12 @@ import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from '.
 /**
  * How many idle hexes the Production attention bullet names before it counts the rest.
  *
- * Purpose: A long list of hex codes would crowd the flags. `query_production` still lists every controlled hex. The production table lists the busiest hexes and the hexes that already have a queue.
+ * Purpose: Every hex the bullet asks the model to queue needs a printed code to copy, so the bullet lists every idle hex up to this limit. The limit bounds the line on a very large empire. `query_production` still lists every controlled hex.
  * When to use: `formatProductionAttentionBullet`.
- * Expected outcome: Six.
+ * Expected outcome: Sixty.
  * Exceptions: None.
  */
-export const PRODUCTION_ATTENTION_LISTED_HEXES = 6;
+export const PRODUCTION_ATTENTION_LISTED_HEXES = 60;
 
 /**
  * One controlled hex that can still build and is not doing so.
@@ -43,7 +43,7 @@ export interface IdleProductionHex {
    * Why the hex is idle.
    *
    * Contract: `empty` when the queue has no entry. `blocked` when the next entry's type is at the deployment cap.
-   * When to use: Choosing the parenthetical in the attention bullet.
+   * When to use: Choosing the group and its state label in the attention bullet.
    * Expected outcome: One of those two words.
    * Exceptions: None.
    */
@@ -52,11 +52,49 @@ export interface IdleProductionHex {
    * Available build types that are not at the deployment cap.
    *
    * Contract: Uncapped unit types, plus `fortification` and `credits` when the hex lists them. Never empty on an idle hex.
-   * When to use: The `can build` list in the attention bullet.
+   * When to use: The `can build` list of the hex's group in the attention bullet.
    * Expected outcome: Type names in snapshot order.
    * Exceptions: None.
    */
   readonly buildableTypes: readonly string[];
+}
+
+/**
+ * Idle hexes that share a queue state and a buildable-type set.
+ *
+ * Purpose: The attention bullet prints each state and type set once, followed by every hex code it covers.
+ * When to use: The result of `groupIdleProductionHexes`.
+ * Expected outcome: `hexTexts` is never empty and keeps idle-list order.
+ * Exceptions: None.
+ */
+interface IdleProductionHexGroup {
+  /**
+   * Why every hex in the group is idle.
+   *
+   * Contract: `empty` when those queues have no entry. `blocked` when each next entry's type is at the deployment cap.
+   * When to use: Choosing the group's state label in the attention bullet.
+   * Expected outcome: One of those two words.
+   * Exceptions: None.
+   */
+  readonly reason: IdleProductionHex['reason'];
+  /**
+   * Available build types printed once for the group.
+   *
+   * Contract: The first hex's `buildableTypes`, in that hex's order. Never empty.
+   * When to use: The `can build` list in the attention bullet.
+   * Expected outcome: Type names in the first hex's order.
+   * Exceptions: None.
+   */
+  readonly buildableTypes: readonly string[];
+  /**
+   * Briefing codes of the hexes in the group.
+   *
+   * Contract: Labels in idle-list order. Never empty.
+   * When to use: The hex list after the group's colon.
+   * Expected outcome: One label per hex in the group.
+   * Exceptions: None.
+   */
+  readonly hexTexts: readonly string[];
 }
 
 /**
@@ -123,11 +161,34 @@ export function findIdleProductionHexes(
 }
 
 /**
+ * Groups idle hexes by queue state and buildable-type set.
+ *
+ * Purpose: Lets the attention bullet print every idle hex code without repeating the same type list per hex.
+ * When to use: `formatProductionAttentionBullet`, on the hexes it lists.
+ * Expected outcome: Groups in order of their first hex. Type sets match regardless of order, and each group prints its first hex's type order. Hexes keep input order.
+ * Exceptions: None.
+ */
+function groupIdleProductionHexes(idle: readonly IdleProductionHex[]): IdleProductionHexGroup[] {
+  logTrace('productionAttention groupIdleProductionHexes', { idleCount: idle.length });
+  const groups = new Map<string, { reason: IdleProductionHex['reason']; buildableTypes: readonly string[]; hexTexts: string[] }>();
+  for (const hex of idle) {
+    const key = `${hex.reason}|${[...hex.buildableTypes].sort().join(',')}`;
+    const group = groups.get(key);
+    if (group) {
+      group.hexTexts.push(hex.hexText);
+    } else {
+      groups.set(key, { reason: hex.reason, buildableTypes: hex.buildableTypes, hexTexts: [hex.hexText] });
+    }
+  }
+  return [...groups.values()];
+}
+
+/**
  * Renders the Production attention bullet, without a leading list marker.
  *
  * Purpose: The formatter adds the marker so this sentence can replace `None.` or follow the unit bullets.
  * When to use: When `findIdleProductionHexes` returned at least one hex.
- * Expected outcome: The exact production sentence, listing at most `PRODUCTION_ATTENTION_LISTED_HEXES` hexes. Null when the list is empty.
+ * Expected outcome: The exact production sentence. The first `PRODUCTION_ATTENTION_LISTED_HEXES` hexes are printed as `{empty queue|blocked at cap}, can build {types}: {hexes}` groups joined by `; `. Any remainder is counted, and the closing then asks for each listed hex. When every idle hex is listed, the closing asks for each. Null when the list is empty.
  * Exceptions: None.
  */
 export function formatProductionAttentionBullet(idle: readonly IdleProductionHex[]): string | null {
@@ -136,18 +197,19 @@ export function formatProductionAttentionBullet(idle: readonly IdleProductionHex
   const noun = idle.length === 1 ? 'hex' : 'hexes';
   const verb = idle.length === 1 ? 'is' : 'are';
   const listed = idle.slice(0, PRODUCTION_ATTENTION_LISTED_HEXES);
-  const items = listed
-    .map((hex) => {
-      const why = hex.reason === 'empty' ? 'empty queue' : 'blocked at cap';
-      return `${hex.hexText} (${why}; can build ${hex.buildableTypes.join(', ')})`;
+  const groups = groupIdleProductionHexes(listed)
+    .map((group) => {
+      const state = group.reason === 'empty' ? 'empty queue' : 'blocked at cap';
+      return `${state}, can build ${group.buildableTypes.join(', ')}: ${group.hexTexts.join(', ')}`;
     })
-    .join(', ');
+    .join('; ');
   const extra = idle.length - listed.length;
-  const more = extra > 0 ? ` and ${extra} more (query_production lists every hex)` : '';
-  return (
-    `Production: ${idle.length} controlled ${noun} can build but ${verb} not building — ${items}${more}. ` +
-    'Add a set_build_queue row to productionOrders for each.'
-  );
+  const more = extra > 0 ? `; ${extra} more not listed (query_production lists every hex)` : '';
+  const closing =
+    extra > 0
+      ? 'Add a set_build_queue row to productionOrders for each listed hex.'
+      : 'Add a set_build_queue row to productionOrders for each.';
+  return `Production: ${idle.length} controlled ${noun} can build but ${verb} not building — ${groups}${more}. ${closing}`;
 }
 
 /**

@@ -254,7 +254,7 @@ const AIRLIFT_PREFERENCE_BULLET =
  *
  * Purpose: An empty legal queue is wasted income; a capped queue should be swapped unless every type is capped.
  * When to use: When production tools are enabled.
- * Expected outcome: Queue something when empty. When every unit type is capped, queue fortification or credits if listed; otherwise leave the queue.
+ * Expected outcome: Queue something when empty. When every unit type is capped, queue fortification or credits if listed; otherwise leave the queue. The last sentence tells the model to queue the hexes the flag names.
  * Exceptions: None.
  */
 const PRODUCTION_BULLET =
@@ -264,7 +264,7 @@ const PRODUCTION_BULLET =
     '.\n\n  A hex whose available types'
   ) +
   '\n\n  When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.' +
-  '\n\n  When the Production attention flag is present, it names each such hex and the types it can still build.';
+  '\n\n  When the Production attention flag is present, it names the hexes to queue and the types they can still build.';
 
 /**
  * Shared home cells count for every home that lists them.

@@ -253,7 +253,7 @@ function testStrategicPromptDoesNotMarchToCurrentHex(): void {
  *
  * Purpose: The Turn 9 prompt said armor was at maximum but still told the model to fill every empty queue, and the model queued more armor.
  * When to use: After edits to `buildToolUsageGuidance` or `getInitialUserMessage` production copy.
- * Expected outcome: Strategic production guidance mentions skipping types at maximum in favor of still-buildable types.
+ * Expected outcome: Strategic production guidance mentions skipping types at maximum in favor of still-buildable types. The flag sentence names the hexes to queue and does not claim every idle hex is named.
  * Exceptions: None.
  */
 function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
@@ -270,6 +270,13 @@ function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
     'user message must not restate production cap rules the system prompt already owns'
   );
   assert.ok(!user.includes('Prefer setting queues on every eligible'));
+  assert.ok(
+    guidance.includes(
+      'When the Production attention flag is present, it names the hexes to queue and the types they can still build.'
+    ),
+    'flag sentence must tell the model to queue the named hexes'
+  );
+  assert.ok(!guidance.includes('names each such hex'), 'flag sentence must not claim every idle hex is named');
 }
 
 /**

@@ -138,7 +138,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
   When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.
 
-  When the Production attention flag is present, it names each such hex and the types it can still build.
+  When the Production attention flag is present, it names the hexes to queue and the types they can still build.
 - Write a short persistent note under the key turn_objectives, naming this turn's objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
