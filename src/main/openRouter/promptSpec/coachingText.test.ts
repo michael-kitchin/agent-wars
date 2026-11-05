@@ -137,6 +137,10 @@ test('strategic conditional items disappear when their gate is off', () => {
     joined(strategicGates({ hasAirUnits: false, hasBestOptionsTable: true })),
     /airStrikes/
   );
+  assert.doesNotMatch(
+    joined(strategicGates({ hasAirUnits: false, hasBestOptionsTable: true })),
+    /airDrops/
+  );
 });
 
 test('absent scenario id drops home-region goals from the context block', () => {
@@ -186,6 +190,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
 test('tactical conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /strike or drop anywhere in the footprint/i);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airStrikes/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airDrops/);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /ferryOrders/);
   assert.doesNotMatch(joined(tacticalGates({ hasNavalUnits: false })), /Naval Transport Status/i);
   assert.match(joined(tacticalGates({ hasBestOptionsTable: false })), /When it lists none, call plan_route or leave the sub-unit idle/);
@@ -206,6 +211,18 @@ test('option copy maps ranged rows and picks one row per actor per action in bot
   }
   assert.match(strategic, /Copy a Target Hex from a row listing that unit/i);
   assert.match(tactical, /Copy a Target Hex from a row listing that sub-unit/i);
+});
+
+test('option copy names an air drop when air is present and tells the model to pick one air action', () => {
+  const strategic = joined(strategicGates({ hasAirUnits: true, hasBestOptionsTable: true }));
+  const tactical = joined(tacticalGates({ hasAirUnits: true, hasBestOptionsTable: true }));
+  for (const text of [strategic, tactical]) {
+    assert.match(text, /airDrops/);
+    assert.match(text, /picks only one of air strike, air drop, and ferry/);
+    assert.match(text, /When its Aboard column is none/);
+  }
+  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airDrops/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airDrops/);
 });
 
 test('tempo coaching names air strike only when air is present', () => {

@@ -25,7 +25,7 @@ import { attackHitThreshold } from '../combatHitThresholds';
 import { rollCombatDieAgainst, type CombatDiceRollSink } from '../combatDiceRecording';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import type { TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { markTacticalSubUnitCasualty } from './tacticalAirStrikeUnits';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import type { SubmitOrdersResult } from '../gameActions/gameActionsTypes';
@@ -52,6 +52,41 @@ export function withoutFerryForDroppedUnits(
 }
 
 /**
+ * Why a battle cell cannot receive an air drop, ignoring whether infantry is aboard.
+ *
+ * Purpose: Best Options can list a drop before the embark order is stored. The cargo check stays on
+ *   `tacticalAirDropRefusal`.
+ * When to use: For each footprint cell while building drop rows, and from `tacticalAirDropRefusal`.
+ * Expected outcome: Null when the cell is inside the footprint, is not the air unit's cell, is not fortified by
+ *   another owner, and does not block infantry entry. Otherwise the same sentence the full refusal returns.
+ * Exceptions: None.
+ */
+export function tacticalAirDropTargetRefusal(
+  battle: TacticalBattleSnapshot,
+  airUnit: { readonly player: string; readonly h3Index: string },
+  targetH3Index: string
+): string | null {
+  logTrace('tacticalAirDrop tacticalAirDropTargetRefusal', {
+    player: airUnit.player,
+    originH3Index: airUnit.h3Index,
+    targetH3Index,
+  });
+  if (!battle.tacticalChildH3Indexes.includes(targetH3Index)) return 'Target is outside the tactical battle.';
+  if (targetH3Index === airUnit.h3Index) return "Air drop cannot target the air unit's own hex.";
+  if (isCellBlockedByFortification(battle, targetH3Index, airUnit.player)) return FORTIFIED_CELL_BLOCKED_HOVER;
+  if (
+    tacticalCellBlocksEntry({
+      input: terrainEffectsInputForBattleCell(battle, targetH3Index),
+      moveType: 'infantry',
+      allowsTerrainBonusStop: false,
+    })
+  ) {
+    return TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON;
+  }
+  return null;
+}
+
+/**
  * Why one tactical drop is illegal, or null when it can land.
  *
  * Purpose: Planning and resolution share one gate.
@@ -72,19 +107,7 @@ export function tacticalAirDropRefusal(
     (row) => row.unitType === 'infantry' && row.embarkedOnSubUnitId === unitId
   );
   if (infantry.length !== 1) return 'Air drop needs exactly one infantry unit aboard.';
-  if (!battle.tacticalChildH3Indexes.includes(targetH3Index)) return 'Target is outside the tactical battle.';
-  if (targetH3Index === unit.h3Index) return "Air drop cannot target the air unit's own hex.";
-  if (isCellBlockedByFortification(battle, targetH3Index, unit.player)) return FORTIFIED_CELL_BLOCKED_HOVER;
-  if (
-    tacticalCellBlocksEntry({
-      input: terrainEffectsInputForBattleCell(battle, targetH3Index),
-      moveType: 'infantry',
-      allowsTerrainBonusStop: false,
-    })
-  ) {
-    return TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON;
-  }
-  return null;
+  return tacticalAirDropTargetRefusal(battle, unit, targetH3Index);
 }
 
 /**

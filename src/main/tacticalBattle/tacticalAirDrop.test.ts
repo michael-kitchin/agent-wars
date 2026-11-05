@@ -8,7 +8,8 @@ import { test } from 'node:test';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { noOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus } from '../techBonus/techHitBonusLookup';
-import { resolveTacticalAirDrops } from './tacticalAirDrop';
+import { FORTIFIED_CELL_BLOCKED_HOVER } from '../../shared/fortificationRules';
+import { resolveTacticalAirDrops, tacticalAirDropRefusal, tacticalAirDropTargetRefusal } from './tacticalAirDrop';
 
 /**
  * A two-cell battle with one air unit, its infantry, and one enemy.
@@ -72,6 +73,21 @@ test('a miss lands the infantry and leaves the air unit on its cell', () => {
   assert.equal(result.moves[0]?.returnsToBase, true);
   assert.equal(result.moves[0]?.infantryUnitId, 'inf-1');
   assert.equal(result.removedUnits.length, 0);
+});
+
+test('a fortified cell is refused, and missing cargo is still the cargo sentence', () => {
+  const fortified = battle('infantry');
+  fortified.tacticalFortificationOwnerByH3 = { target: 'opponent' };
+  assert.equal(tacticalAirDropRefusal(fortified, 'air-1', 'target'), FORTIFIED_CELL_BLOCKED_HOVER);
+  const empty = {
+    ...fortified,
+    subUnits: fortified.subUnits.filter((unit) => unit.id !== 'inf-1'),
+  };
+  assert.equal(tacticalAirDropRefusal(empty, 'air-1', 'target'), 'Air drop needs exactly one infantry unit aboard.');
+  assert.equal(
+    tacticalAirDropTargetRefusal(empty, { player: 'human', h3Index: 'origin' }, 'target'),
+    FORTIFIED_CELL_BLOCKED_HOVER
+  );
 });
 
 test('return fire removes the air unit and the infantry', () => {

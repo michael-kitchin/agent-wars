@@ -4,6 +4,7 @@ import {
   resolutionCasualtyTiming,
   unitsDrawnAtCasualtyTiming,
 } from '../../shared/resolutionCasualtyDraw';
+import { unitsAtPlaybackOrigins } from '../../shared/resolutionPlaybackPositions';
 import {
   UNIT_ICON_HIT_PAD_PX,
   UNIT_RADIUS,
@@ -109,7 +110,7 @@ function drawUnitFromRemoved(unit: RemovedUnitSnapshot): GameStateSnapshot['unit
  *
  * Purpose: Resolution playback has to keep a removed icon through its destruction mark and glide a march only when that unit reached the destination.
  * When to use: Each map frame that draws unit icons, including while no playback is running.
- * Expected outcome: Without playback, the snapshot units and no moving ids. During playback, icons follow `unitsDrawnAtCasualtyTiming`, and `movingIds` is set only for an outbound strike, a return flight, or a march that `marchPlayedForUnit` still allows.
+ * Expected outcome: Without playback, the snapshot units and no moving ids. Before Movement, every mover is drawn on the hex it left, except an air unit flying a strike or drop. During playback, icons follow `unitsDrawnAtCasualtyTiming`, and `movingIds` is set only for an outbound strike, a return flight, or a march that `marchPlayedForUnit` still allows.
  * Exceptions: None.
  */
 export function getUnitsForDrawWithMovingIds(
@@ -124,18 +125,22 @@ export function getUnitsForDrawWithMovingIds(
     const { phase } = deps.buildResolutionPlaybackState(anim, elapsed);
     const moveProgress = phase.moveProgress;
     const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
+    const flyingIds = new Set(
+      [...(anim.airStrikeOutboundMoves ?? []), ...(anim.airStrikeReturnMoves ?? [])].map((move) => move.unitId)
+    );
+    const preMoveUnits = unitsAtPlaybackOrigins(state.units, anim.moves, flyingIds);
     const casualtyInput = {
       airRemovedUnits: anim.airStrikeRemovedUnits ?? [],
       rangedRemovedUnits: anim.rangedRemovedUnits ?? [],
       meleeRemovedUnits: anim.meleeRemovedUnits ?? [],
     };
     if (phase.inAirStrikeOutbound) {
-      unitsToDraw = state.units;
+      unitsToDraw = preMoveUnits;
       movingIds = new Set((anim.airStrikeOutboundMoves ?? []).map((move) => move.unitId));
     } else if (phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
       const strikeMoves = anim.airStrikeOutboundMoves ?? [];
       const strikeMoveById = new Map(strikeMoves.map((move) => [move.unitId, move]));
-      const staticUnits = state.units.filter((unit) => !strikeMoveById.has(unit.id));
+      const staticUnits = preMoveUnits.filter((unit) => !strikeMoveById.has(unit.id));
       const strikeUnitsAtTarget = strikeMoves.map((move) => {
         const existing = state.units.find((unit) => unit.id === move.unitId);
         if (existing) {
@@ -151,15 +156,10 @@ export function getUnitsForDrawWithMovingIds(
       unitsToDraw = [...staticUnits, ...strikeUnitsAtTarget];
       movingIds = undefined;
     } else if (phase.inAirStrikeReturn) {
-      unitsToDraw = state.units;
+      unitsToDraw = preMoveUnits;
       movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));
     } else if (phase.inRangedLightning || phase.inRangedCasualty) {
-      const preMoveSurvivors = state.units
-        .filter((u) => !rangedRemovedIds.has(u.id))
-        .map((u) => {
-          const move = anim.moves.find((m) => m.unitId === u.id);
-          return move ? { ...u, h3Index: move.fromH3Index } : u;
-        });
+      const preMoveSurvivors = preMoveUnits.filter((u) => !rangedRemovedIds.has(u.id));
       unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? []).map(drawUnitFromRemoved)];
       movingIds = undefined;
     } else if (phase.inMovement) {
@@ -170,11 +170,7 @@ export function getUnitsForDrawWithMovingIds(
           : undefined;
     } else if (anim.moves.length > 0 && moveProgress < 1) {
       // Snapshot already lists march destinations during pre-move phases; draw movers at playback origins until movement anim hides them.
-      const moveById = new Map(anim.moves.map((m) => [m.unitId, m] as const));
-      unitsToDraw = state.units.map((u) => {
-        const m = moveById.get(u.id);
-        return m ? { ...u, h3Index: m.fromH3Index } : u;
-      });
+      unitsToDraw = preMoveUnits;
       movingIds = undefined;
     } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
       unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? []).map(drawUnitFromRemoved)];

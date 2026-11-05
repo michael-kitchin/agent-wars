@@ -34,7 +34,7 @@ import {
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
   NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
 } from '../navalMovementMessages';
-import { getFilteredToolMetadata } from './openRouterToolCatalog';
+import { AIR_PLAN_ROUTE_PROMPT_SUFFIX, getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
 import { homeControlProgressForSeat } from '../gameActions/endOfTurnOutcome';
 import { buildSidesPromptBlock } from './promptSpec/sidesBlock';
@@ -200,6 +200,9 @@ export function buildConsultPromptParts(input: {
     let line = m.promptLine;
     if (m.name === 'plan_route' && !hasNaval) {
       line = line.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
+    }
+    if (m.name === 'plan_route' && (!hasAir || coordinateContext.mode === 'tactical')) {
+      line = line.replace(AIR_PLAN_ROUTE_PROMPT_SUFFIX, '');
     }
     return line;
   });

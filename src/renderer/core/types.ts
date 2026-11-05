@@ -37,11 +37,12 @@ fromH3Index: string;
    */
 toH3Index: string;
     /**
-   * When set (tactical playback), ordered tactical vertices from `fromH3Index` through `toH3Index` for path-following animation.
+   * When set, ordered vertices from `fromH3Index` through `toH3Index` for path-following animation.
    *
-   * Contract: Omitted for strategic Ready; when present, length is at least 2 and endpoints match `fromH3Index` / `toH3Index`.
-   * When to use: Tactical `commitHumanTacticalDraftOrders` resolution payload copied into `S.resolutionMoveAnimation.moves`.
-   * Expected outcome: Renderer interpolates along this polyline instead of a single geodesic chord.
+   * Contract: Strategic Ready sets this for a ferry and for cargo riding that ferry. Tactical commits set it for a march.
+   *   When present, length is at least 2 and the ends match `fromH3Index` and `toH3Index`.
+   * When to use: Copied onto `S.resolutionMoveAnimation.moves` from a Ready result or a tactical commit.
+   * Expected outcome: The renderer interpolates along this polyline instead of a single chord.
    * Exceptions: None.
    */
 pathH3Indexes?: readonly string[];

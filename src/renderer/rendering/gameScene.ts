@@ -32,6 +32,7 @@ import {
 import { drawInspectionStatusIcons } from './inspectionStatusIcons';
 import {
   buildResolutionPlaybackMoves,
+  drawHeldFerryLines,
   drawRangedResolutionShotLines,
   drawResolutionOutboundAttackLines,
 } from './orderDrawing';
@@ -621,6 +622,16 @@ function drawGameScene(
       hiddenCommittedUnitIdsWhilePreviewing,
       { originH3ByUnitId: marchArrowsUntilMovementEnds.originH3ByUnitId }
     );
+  }
+  // The live ferry list is cleared once playback starts. This copy keeps its arrowhead until Movement ends.
+  const ferryArrowsUntilMovementEnds = anim?.ferryArrowsUntilMovementEnds;
+  if (
+    shouldDrawCommittedPaths &&
+    !S.hideCommittedOrderLinesAfterReady &&
+    moveProgress < 1 &&
+    ferryArrowsUntilMovementEnds
+  ) {
+    drawHeldFerryLines(ctx, ferryArrowsUntilMovementEnds);
   }
   drawPendingMarchesHoverAndSupportOrderStack({
     ctx,

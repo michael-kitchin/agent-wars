@@ -8,7 +8,7 @@ import type {
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
 import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
-import type { OrdersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
+import type { HeldFerryLine, OrdersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import type { ResolutionMove, ResolutionPlaybackMove } from './types';
 
@@ -238,4 +238,16 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
    * Exceptions: None.
    */
   marchArrowsUntilMovementEnds?: OrdersHeldUntilMovementEnds;
+  /**
+   * Queued human ferries whose air units playback will glide onto the ordered destination.
+   *
+   * Purpose: The live ferry list is cleared once playback starts, before the movement stage.
+   *   These copies keep the airport path, and its arrowhead, until that stage finishes.
+   * When to use: Set from `ferriesHeldUntilMovementEnds` when strategic playback is created. Drawn while movement
+   *   progress is below 1.
+   * Expected outcome: Omitted when no queued ferry still has a playback move onto its destination. After movement
+   *   progress reaches 1 the copies are ignored.
+   * Exceptions: None.
+   */
+  ferryArrowsUntilMovementEnds?: readonly HeldFerryLine[];
 }) | null;

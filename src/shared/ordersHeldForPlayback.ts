@@ -132,3 +132,109 @@ export function ordersHeldUntilMovementEnds(
   }
   return { orders: held, originH3ByUnitId };
 }
+
+/**
+ * One queued ferry whose arrow stays up until movement playback finishes.
+ *
+ * Purpose: The live ferry list is cleared once playback starts, and the played-back move itself has no arrowhead.
+ * When to use: The result of `ferriesHeldUntilMovementEnds`, stored on the playback and drawn while movement progress is below 1.
+ * Expected outcome: `pathH3Indexes` is a copy of the airports the ferry flew, or the shorter fallback.
+ * Exceptions: None.
+ */
+export interface HeldFerryLine {
+  /**
+   * The air unit that was ferried.
+   *
+   * Contract: Matches the queued ferry order and the playback move.
+   * When to use: Telling one held line from another.
+   * Expected outcome: The unit id from the order that succeeded.
+   * Exceptions: None.
+   */
+  readonly unitId: string;
+  /**
+   * Airports from the origin through the destination.
+   *
+   * Contract: Length at least 2. A copy, so later edits to the order or the move do not change it.
+   * When to use: Drawing the held line and its arrowhead.
+   * Expected outcome: The path the ferry flew, the path stored on the order, or the origin and destination.
+   * Exceptions: None.
+   */
+  readonly pathH3Indexes: readonly string[];
+}
+
+/**
+ * One resolved move that may belong to a queued ferry.
+ *
+ * Purpose: A ferry is held only when playback actually glides that unit onto the ordered destination.
+ * When to use: As the `moves` argument of `ferriesHeldUntilMovementEnds`.
+ * Expected outcome: `fromH3Index` is the hex the unit left. `toH3Index` is where that move ended.
+ * Exceptions: None.
+ */
+export interface PlaybackFerryHoldMove {
+  /**
+   * The unit that moved.
+   *
+   * Contract: Matches the ferry order's unit id.
+   * When to use: Pairing a resolved move with the ferry being held.
+   * Expected outcome: The id of the air unit, not of cargo riding inside it.
+   * Exceptions: None.
+   */
+  readonly unitId: string;
+  /**
+   * The hex the unit left.
+   *
+   * Contract: Compared with `toH3Index`. A move that starts where it ends is not held.
+   * When to use: Building the two-hex fallback path.
+   * Expected outcome: The cell occupied before this resolution.
+   * Exceptions: None.
+   */
+  readonly fromH3Index: string;
+  /**
+   * The hex the move ended on.
+   *
+   * Contract: The ferry is held only when this equals the order's destination.
+   * When to use: Deciding that the queued ferry is the move being played.
+   * Expected outcome: The settled cell for that move.
+   * Exceptions: None.
+   */
+  readonly toH3Index: string;
+  /**
+   * Airports the unit actually flew, when resolution recorded them.
+   *
+   * Contract: Used only when length is at least 2. Otherwise the order path, then the two ends, is used.
+   * When to use: Preferring the flown chain over the path stored with the draft.
+   * Expected outcome: Origin through destination, including stops.
+   * Exceptions: None.
+   */
+  readonly pathH3Indexes?: readonly string[];
+}
+
+/**
+ * Copies the queued ferries that playback will glide, so their arrow can stay up through movement.
+ *
+ * Purpose: A played-back move has no arrowhead, and the live ferry list is cleared once playback starts.
+ * When to use: When strategic playback is created, with the ferry orders captured before Ready cleared them.
+ * Expected outcome: One line per ferry whose first move left one hex and ended on the ordered destination.
+ *   The path is the move's chain, then the order's chain, then the origin and destination. Each path is a copy.
+ *   A ferry with no such move is left out.
+ * Exceptions: None.
+ */
+export function ferriesHeldUntilMovementEnds(
+  ferryOrders: readonly {
+    readonly unitId: string;
+    readonly destinationH3Index: string;
+    readonly pathH3Indexes?: readonly string[];
+  }[],
+  moves: readonly PlaybackFerryHoldMove[]
+): HeldFerryLine[] {
+  const held: HeldFerryLine[] = [];
+  for (const order of ferryOrders) {
+    const move = moves.find((candidate) => candidate.unitId === order.unitId);
+    if (!move || move.fromH3Index === move.toH3Index || move.toH3Index !== order.destinationH3Index) continue;
+    const flown = move.pathH3Indexes && move.pathH3Indexes.length >= 2 ? move.pathH3Indexes : undefined;
+    const ordered = order.pathH3Indexes && order.pathH3Indexes.length >= 2 ? order.pathH3Indexes : undefined;
+    const path = flown ?? ordered ?? [move.fromH3Index, move.toH3Index];
+    held.push({ unitId: order.unitId, pathH3Indexes: [...path] });
+  }
+  return held;
+}

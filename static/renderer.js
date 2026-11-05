@@ -34958,17 +34958,24 @@ ${bonuses}`;
   function drawMissileLaunchLines(ctx, launches, units, hexList) {
     drawPendingSupportOrderLines(ctx, "missile", launches, units, hexList);
   }
+  function drawFerryRouteLine(ctx, pathH3Indexes) {
+    const points = pathH3Indexes.map((hex) => {
+      const [lat, lng] = cellToLatLng(hex);
+      return [lat, lng];
+    });
+    drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
+  }
+  function drawHeldFerryLines(ctx, lines) {
+    for (const line of lines) drawFerryRouteLine(ctx, line.pathH3Indexes);
+  }
   function drawPendingFerryLines(ctx, ferryOrders, units, hexList) {
     if (ferryOrders.length === 0 || !hexList) return;
     for (const ferry of ferryOrders) {
       const unit = units.find((u) => u.id === ferry.unitId);
       if (!unit) continue;
       if (unit.h3Index === ferry.destinationH3Index) continue;
-      const points = (ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2 ? ferry.pathH3Indexes : [unit.h3Index, ferry.destinationH3Index]).map((hex) => {
-        const [lat, lng] = cellToLatLng(hex);
-        return [lat, lng];
-      });
-      drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
+      const pathH3Indexes = ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2 ? ferry.pathH3Indexes : [unit.h3Index, ferry.destinationH3Index];
+      drawFerryRouteLine(ctx, pathH3Indexes);
     }
   }
   function buildResolutionPlaybackMoves(moves, units) {
@@ -35994,6 +36001,10 @@ ${bonuses}`;
         hiddenCommittedUnitIdsWhilePreviewing,
         { originH3ByUnitId: marchArrowsUntilMovementEnds.originH3ByUnitId }
       );
+    }
+    const ferryArrowsUntilMovementEnds = anim?.ferryArrowsUntilMovementEnds;
+    if (shouldDrawCommittedPaths && !rendererSharedState.hideCommittedOrderLinesAfterReady && moveProgress < 1 && ferryArrowsUntilMovementEnds) {
+      drawHeldFerryLines(ctx, ferryArrowsUntilMovementEnds);
     }
     drawPendingMarchesHoverAndSupportOrderStack({
       ctx,
@@ -38608,6 +38619,18 @@ ${bonuses}`;
     }
     return { orders: held2, originH3ByUnitId };
   }
+  function ferriesHeldUntilMovementEnds(ferryOrders, moves) {
+    const held2 = [];
+    for (const order of ferryOrders) {
+      const move = moves.find((candidate) => candidate.unitId === order.unitId);
+      if (!move || move.fromH3Index === move.toH3Index || move.toH3Index !== order.destinationH3Index) continue;
+      const flown = move.pathH3Indexes && move.pathH3Indexes.length >= 2 ? move.pathH3Indexes : void 0;
+      const ordered = order.pathH3Indexes && order.pathH3Indexes.length >= 2 ? order.pathH3Indexes : void 0;
+      const path = flown ?? ordered ?? [move.fromH3Index, move.toH3Index];
+      held2.push({ unitId: order.unitId, pathH3Indexes: [...path] });
+    }
+    return held2;
+  }
 
   // src/shared/ipc/tacticalOpponentPlanMerge.ts
   function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
@@ -39266,6 +39289,7 @@ ${bonuses}`;
       }
       if (await runTacticalReadyCommit({ deps, matchEpoch })) return;
       const turnReportTag = currentConsoleReportTag();
+      const submittedFerryOrders = [...rendererSharedState.pendingFerryOrders];
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingMissileLaunches.length > 0 || rendererSharedState.pendingFerryOrders.length > 0 || rendererSharedState.pendingAirDrops.length > 0;
       if (hasPendingDraftOrders) {
         const submitResult = await window.gameApi.submitOrders({
@@ -39459,6 +39483,7 @@ ${bonuses}`;
       if (needsAnimation) {
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
         const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(rendererSharedState.humanStandingOrders, state.units, humanMoves);
+        const ferryArrowsUntilMovementEnds = ferriesHeldUntilMovementEnds(submittedFerryOrders, humanMoves);
         rendererSharedState.resolutionMoveAnimation = {
           moves: resolutionMoves,
           ...sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {},
@@ -39482,6 +39507,7 @@ ${bonuses}`;
           unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
           unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0,
           ...marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {},
+          ...ferryArrowsUntilMovementEnds.length > 0 ? { ferryArrowsUntilMovementEnds } : {},
           ...pickPlaybackDiceRolls(readyResult, {
             visibleHexesBeforeTurn,
             visibleHexesAfterTurn: visibleHexes,
@@ -40755,6 +40781,20 @@ ${bonuses}`;
     void deps.syncOpenRouterRunToggleInteractable();
   }
 
+  // src/shared/resolutionPlaybackPositions.ts
+  function unitsAtPlaybackOrigins(units, moves, flyingUnitIds) {
+    const originByUnitId = /* @__PURE__ */ new Map();
+    for (const move of moves) {
+      if (!originByUnitId.has(move.unitId)) originByUnitId.set(move.unitId, move.fromH3Index);
+    }
+    return units.map((unit) => {
+      if (flyingUnitIds.has(unit.id)) return unit;
+      const origin = originByUnitId.get(unit.id);
+      if (origin === void 0 || origin === unit.h3Index) return unit;
+      return { ...unit, h3Index: origin };
+    });
+  }
+
   // src/renderer/map/drawInteraction.ts
   function drawLoadingScene2(ctx, width, height, deps) {
     ctx.fillStyle = deps.backgroundColor;
@@ -40787,18 +40827,22 @@ ${bonuses}`;
       const { phase } = deps.buildResolutionPlaybackState(anim, elapsed);
       const moveProgress = phase.moveProgress;
       const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
+      const flyingIds = new Set(
+        [...anim.airStrikeOutboundMoves ?? [], ...anim.airStrikeReturnMoves ?? []].map((move) => move.unitId)
+      );
+      const preMoveUnits = unitsAtPlaybackOrigins(state.units, anim.moves, flyingIds);
       const casualtyInput = {
         airRemovedUnits: anim.airStrikeRemovedUnits ?? [],
         rangedRemovedUnits: anim.rangedRemovedUnits ?? [],
         meleeRemovedUnits: anim.meleeRemovedUnits ?? []
       };
       if (phase.inAirStrikeOutbound) {
-        unitsToDraw = state.units;
+        unitsToDraw = preMoveUnits;
         movingIds = new Set((anim.airStrikeOutboundMoves ?? []).map((move) => move.unitId));
       } else if (phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
         const strikeMoves = anim.airStrikeOutboundMoves ?? [];
         const strikeMoveById = new Map(strikeMoves.map((move) => [move.unitId, move]));
-        const staticUnits = state.units.filter((unit) => !strikeMoveById.has(unit.id));
+        const staticUnits = preMoveUnits.filter((unit) => !strikeMoveById.has(unit.id));
         const strikeUnitsAtTarget = strikeMoves.map((move) => {
           const existing = state.units.find((unit) => unit.id === move.unitId);
           if (existing) {
@@ -40814,24 +40858,17 @@ ${bonuses}`;
         unitsToDraw = [...staticUnits, ...strikeUnitsAtTarget];
         movingIds = void 0;
       } else if (phase.inAirStrikeReturn) {
-        unitsToDraw = state.units;
+        unitsToDraw = preMoveUnits;
         movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));
       } else if (phase.inRangedLightning || phase.inRangedCasualty) {
-        const preMoveSurvivors = state.units.filter((u) => !rangedRemovedIds.has(u.id)).map((u) => {
-          const move = anim.moves.find((m) => m.unitId === u.id);
-          return move ? { ...u, h3Index: move.fromH3Index } : u;
-        });
+        const preMoveSurvivors = preMoveUnits.filter((u) => !rangedRemovedIds.has(u.id));
         unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? []).map(drawUnitFromRemoved)];
         movingIds = void 0;
       } else if (phase.inMovement) {
         unitsToDraw = state.units;
         movingIds = moveProgress < 1 ? new Set(anim.moves.filter((move) => marchPlayedForUnit(move, casualtyInput)).map((move) => move.unitId)) : void 0;
       } else if (anim.moves.length > 0 && moveProgress < 1) {
-        const moveById = new Map(anim.moves.map((m) => [m.unitId, m]));
-        unitsToDraw = state.units.map((u) => {
-          const m = moveById.get(u.id);
-          return m ? { ...u, h3Index: m.fromH3Index } : u;
-        });
+        unitsToDraw = preMoveUnits;
         movingIds = void 0;
       } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
         unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? []).map(drawUnitFromRemoved)];

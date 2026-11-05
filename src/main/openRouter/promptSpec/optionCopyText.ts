@@ -20,7 +20,7 @@ import type { PromptCoordinateMode } from './promptCoordinateMode';
  *
  * Purpose: One wording for both mode coaching bullets so strategic and tactical cannot drift.
  * When to use: The options-table branch of each mode's option-copy bullet.
- * Expected outcome: Names approach/move, ranged, optional ferry/air, unitIds grouping, and the one-row rule.
+ * Expected outcome: Names approach/move, ranged, optional ferry/air strike/air drop, unitIds grouping, the one-row rule, and that an air actor picks one of those three.
  * Exceptions: None.
  */
 export function buildOptionCopyMappingClause(args: {
@@ -31,14 +31,21 @@ export function buildOptionCopyMappingClause(args: {
   logDebug('promptSpec buildOptionCopyMappingClause', args);
   const actor = args.actorNoun;
   const ferry = args.includeFerryMapping ? '; copy a ferry Target Hex into ferryOrders' : '';
-  const air = args.hasAirUnits ? '; copy an air strike Target Hex into airStrikes' : '';
+  const air = args.hasAirUnits
+    ? '; copy an air strike Target Hex into airStrikes; copy an air drop Target Hex into airDrops'
+    : '';
+  const airChoice = args.hasAirUnits
+    ? ` An air ${actor} picks only one of air strike, air drop, and ferry. When its Aboard column is none, embark one infantry ${actor} from its hex in the same orders list.`
+    : '';
   return (
     `Copy a Target Hex from a row listing that ${actor} into explicit_move.destination (approach or move/melee); ` +
     `copy a ranged Target Hex or Target Unit into a ranged_attack entry` +
     ferry +
     air +
     `.\n\n  Each ${actor} gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; ` +
-    `do not copy overlapping rows that relist the same ${actor}.\n\n  ` +
+    `do not copy overlapping rows that relist the same ${actor}.` +
+    airChoice +
+    `\n\n  ` +
     `Never copy a Target Hex from a row that does not list that ${actor}; if that ${actor} has no row, call plan_route or leave it idle.`
   );
 }
@@ -82,7 +89,7 @@ export function buildOptionCopyOrRoutingBullet(
  *
  * Purpose: The intro must name the same mapping as the coaching bullet, including ranged rows.
  * When to use: `buildAvailableToolsIntro` when a briefing is present. An empty Best Options table does not change it.
- * Expected outcome: Approach/move into explicit_move, ranged into ranged_attack, optional ferry/air, one-row rule.
+ * Expected outcome: Approach/move into explicit_move, ranged into ranged_attack, optional ferry/air strike/air drop, one-row rule, and one air action when air is present.
  * Exceptions: None.
  */
 export function buildToolsIntroCopySentence(args: {
@@ -92,12 +99,14 @@ export function buildToolsIntroCopySentence(args: {
   logDebug('promptSpec buildToolsIntroCopySentence', args);
   const actor = args.coordinateMode === 'tactical' ? 'sub-unit' : 'unit';
   const oneStep = args.coordinateMode === 'strategic' ? ' when you need a one-step move' : '';
-  const ferry = args.hasAirUnits ? '; copy ferry Target Hexes into ferryOrders and air-drop Target Hexes into airDrops' : '';
+  const ferry = args.hasAirUnits ? '; copy ferry Target Hexes into ferryOrders and air drop Target Hexes into airDrops' : '';
   const air = args.hasAirUnits ? '; copy air strike Target Hexes into airStrikes' : '';
+  const airChoice = args.hasAirUnits ? ` An air ${actor} picks only one of air strike, air drop, and ferry.` : '';
   return (
     `Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move${oneStep}; ` +
     `copy ranged Target Hexes or Target Units into ranged_attack${ferry}${air}; ` +
-    `pick one row per ${actor} per action. ` +
-    `Never copy a Target Hex from a row that does not list that ${actor}.`
+    `pick one row per ${actor} per action.` +
+    airChoice +
+    ` Never copy a Target Hex from a row that does not list that ${actor}.`
   );
 }

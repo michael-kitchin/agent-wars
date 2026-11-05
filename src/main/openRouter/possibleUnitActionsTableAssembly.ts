@@ -63,7 +63,7 @@ export interface PossibleActionTableRow {
 
    * Contract: Comma-separated, deterministically ordered action labels for this unit and target hex.
    * When to use: Final markdown cell after `aggregateRows` merges raw rows.
-   * Expected outcome: Subset of move/melee, ranged attack, and air strike labels used by this module.
+   * Expected outcome: Subset of move/melee, approach, ferry, ranged, air strike, and air drop labels used by this module.
    * Exceptions: None.
    */
   actionTypes: string;
@@ -162,7 +162,7 @@ export interface RawPossibleActionRow {
   /**
    * Specifies the contract for the `actionType` member (actionType: string;).
 
-   * Contract: Single action label for this row before merge (move/melee, approach, ferry, ranged attack, or air strike).
+   * Contract: Single action label for this row before merge (move/melee, approach, ferry, ranged attack, air strike, or air drop).
    * When to use: One raw row per (unit, target, action) before `aggregateRows`.
    * Expected outcome: A known label from this module's action constants.
    * Exceptions: None.
@@ -244,6 +244,16 @@ export const ACTION_RANGED = 'ranged attack';
 export const ACTION_AIR_STRIKES = 'air strike';
 
 /**
+ * Action label for air-drop rows in Best Options This Turn.
+ *
+ * Purpose: An air unit with infantry aboard, or with friendly infantry on its hex, lists drop targets the model copies into `airDrops`.
+ * When to use: `collectAggregatedPossibleActionRows` when `forThisTurn` is set.
+ * Expected outcome: Rendered Action column shows `air drop`.
+ * Exceptions: None.
+ */
+export const ACTION_AIR_DROP = 'air drop';
+
+/**
  * Action label for air ferry destinations in possible-actions / Best Options tables.
  *
  * Purpose: Air units reposition airport-to-airport; labeling those dests `move/melee` invites explicit_move / tempo-rule misuse.
@@ -291,13 +301,19 @@ function urbanCountForRowPriority(row: PossibleActionTableRow): number {
 /**
  * Sort key so tempo-rule attacks are not crowded out of the per-unit top-5 by high-urban ferry or capture dests.
  *
- * Purpose: Air strike / ranged rows must remain visible when a unit also has many ferry or move/melee options; the prompt tells the model to strike now if the table lists a legal shot.
+ * Purpose: Air strike, air drop, and ranged rows must remain visible when a unit also has many ferry or move/melee options; the prompt tells the model to strike now if the table lists a legal shot.
  * When to use: `compareTableRowsForUnitPriority` after enemy occupancy, before urban count.
- * Expected outcome: `0` for air strike, `1` for ranged, `2` for all other action types (lower sorts earlier).
+ * Expected outcome: `0` for air strike or air drop, `1` for ranged, `2` for all other action types (lower sorts earlier).
  * Exceptions: None.
  */
 function tempoActionRankForRowPriority(row: PossibleActionTableRow): number {
-  if (row.actionTypes.includes(ACTION_AIR_STRIKES) || row.actionTypes.includes('air_strike')) return 0;
+  if (
+    row.actionTypes.includes(ACTION_AIR_STRIKES) ||
+    row.actionTypes.includes('air_strike') ||
+    row.actionTypes.includes(ACTION_AIR_DROP)
+  ) {
+    return 0;
+  }
   if (row.actionTypes.includes('ranged')) return 1;
   return 2;
 }
@@ -338,6 +354,7 @@ const ACTION_TYPE_ORDER: Record<string, number> = {
   [ACTION_MOVES_MELEE]: 2,
   [ACTION_RANGED]: 3,
   [ACTION_AIR_STRIKES]: 4,
+  [ACTION_AIR_DROP]: 5,
 };
 
 /**
@@ -357,11 +374,13 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
  *
  * Purpose: Picks one Action label when a caller needs a single priority, with shots ahead of moves.
  * When to use: Callers that cannot list every action. The Best Options table uses `bestOptionsActionLabels` instead, so a shared hex keeps both the shot and the move.
- * Expected outcome: One of `air strike`, `ranged`, `approach`, `ferry`, `move/melee`, or the raw `actionTypes` string as fallback.
+ * Expected outcome: One of `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`, or the raw
+ *   `actionTypes` string as fallback. A row that includes an air strike still returns `air strike`.
  * Exceptions: None.
  */
 export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): string {
   if (r.actionTypes.includes('air strike') || r.actionTypes.includes('air_strike')) return 'air strike';
+  if (r.actionTypes.includes('air drop')) return 'air drop';
   if (r.actionTypes.includes('ranged')) return 'ranged';
   if (r.actionTypes.includes('approach')) return 'approach';
   if (r.actionTypes.includes('ferry')) return 'ferry';
@@ -369,7 +388,7 @@ export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): st
   return r.actionTypes;
 }
 
-const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'ranged', 'approach', 'ferry', 'move/melee'] as const;
+const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'air drop', 'ranged', 'approach', 'ferry', 'move/melee'] as const;
 
 /**
  * Maps one aggregated action token onto the Best Options Action column label.
@@ -382,6 +401,7 @@ const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'ranged', 'approach', '
  */
 function canonicalBestOptionsAction(token: string): string {
   if (token === ACTION_AIR_STRIKES || token === 'air_strike') return 'air strike';
+  if (token === ACTION_AIR_DROP) return 'air drop';
   if (token === ACTION_RANGED || token === 'ranged') return 'ranged';
   if (token === ACTION_APPROACH) return 'approach';
   if (token === ACTION_FERRY) return 'ferry';

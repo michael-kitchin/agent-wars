@@ -5,6 +5,17 @@ import { NAVAL_PLAN_ROUTE_PROMPT_SUFFIX } from '../navalMovementMessages';
 import { RULES_TOPICS } from '../tools/referenceTools';
 import { logTrace } from '../logger';
 
+/**
+ * Extra plan_route sentence for a strategic roster that has air units.
+ *
+ * Purpose: An air plan_route result is an airport chain. Copying orderToHexCode into explicit_move sends the air unit on a ground march.
+ * When to use: Appended to the plan_route prompt line, then removed when the roster has no air unit or the consultation is a battle.
+ * Expected outcome: The sentence names ferryOrders.destination. A battle prompt and a roster without air omit it.
+ * Exceptions: None.
+ */
+export const AIR_PLAN_ROUTE_PROMPT_SUFFIX =
+  ' For an air unit, the result is the airport chain to that airport and its hop count; copy its orderToHexCode into ferryOrders.destination, not explicit_move.';
+
 /** JSON Schema `enum` values for tool params that accept a `BuildUnitType`; mirrors `ALL_BUILD_UNIT_TYPES`. */
 const BUILD_UNIT_TYPE_SCHEMA_ENUM = [...ALL_BUILD_UNIT_TYPES];
 
@@ -118,7 +129,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: `plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
+    promptLine: `plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}${AIR_PLAN_ROUTE_PROMPT_SUFFIX}`,
   },
   {
     name: 'check_distance',

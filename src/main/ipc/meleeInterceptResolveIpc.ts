@@ -12,6 +12,7 @@ import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimi
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
 import type { ReadyDeps, ReadyResultMinimal } from '../gameIpcHandlers';
 import { logHybridPipelineBoundary } from '../hybridTurnPipeline';
+import { buildReadyPlaybackMoves } from './readyPlaybackMoves';
 import { logDebug } from '../logger';
 import {
   hasDeferredPlaybackConsultPending,
@@ -124,10 +125,12 @@ export async function handleResolveMeleeIntercept(
     }
   }
 
+  const playbackMoves = buildReadyPlaybackMoves(resolveResult);
   return {
     success: true,
     ...pickReadyResolutionIpcMirrorFields(resolveResult),
-    humanMoves: resolveResult.humanMoves,
+    humanMoves: playbackMoves.humanMoves.length > 0 ? playbackMoves.humanMoves : undefined,
+    aiMoves: playbackMoves.aiMoves.length > 0 ? playbackMoves.aiMoves : undefined,
     combatParticipantUnitIdsBySeat: resolveResult.combatParticipantUnitIdsBySeat,
     removedUnitIdsBySeat: resolveResult.removedUnitIdsBySeat,
     tacticalAutoStartH3Index: resolveResult.tacticalAutoStartH3Index,

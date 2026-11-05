@@ -725,14 +725,14 @@ When the AI plays a tactical battle, the LLM receives a tactical briefing: full 
 
 ### 13.1 Strategic resolution animation
 
-During the resolution phase, the client animates so that combat and death overlays stay on the correct units. Each stage lasts `RESOLUTION_STAGE_MS` (1.5 s). While observing, with Sight cues and fog of war both on, a sight-cue stage plays before missile flights. It draws a line from each active AI seat's units to the hexes holding another owner's units that those units could see when the seat planned, using the vision radii in §6 (`VISION_RANGE_BY_UNIT_TYPE`). It is display only and changes no outcome (`buildSightCuesForReady` in `src/main/sightCues/sightCueReadyStage.ts`). A unit whose head-on move was cancelled (§4.3) does not glide.
+During the resolution phase, the client animates so that combat and death overlays stay on the correct units. Each stage lasts `RESOLUTION_STAGE_MS` (1.5 s). While observing, with Sight cues and fog of war both on, a sight-cue stage plays before missile flights. It draws a line from each active AI seat's units to the hexes holding another owner's units that those units could see when the seat planned, using the vision radii in §6 (`VISION_RANGE_BY_UNIT_TYPE`). It is display only and changes no outcome (`buildSightCuesForReady` in `src/main/sightCues/sightCueReadyStage.ts`). A unit whose head-on move was cancelled (§4.3) does not glide. Until the Movement stage, every unit that moves this turn is drawn on the hex it left (`unitsAtPlaybackOrigins`). An air unit flying a strike or drop is drawn by that flight instead. The same placement is used after a melee-intercept choice and in a battle.
 
 1. **Missile flights** — A launched missile draws a continuous line to the target and is not drawn flying home. The missile is already gone. Infrastructure losses and based air destroyed by the launch are shown with the strike, before air-strike flights.
-2. **Air strike indicators** — Highlight at hexes where air strikes occurred; units drawn at **pre-move** positions.
+2. **Air strike indicators** — Highlight at hexes where air strikes occurred. Strike and drop flights draw those air units. Every other mover is still on the hex it left.
 3. **Air strike casualties** — Red X at casualty hexes; infrastructure destruction indicators.
-4. **Ranged lightning** — Yellow lightning at ranged combat hexes; units at **pre-move** positions. Shot lines may be drawn from attacker to target.
+4. **Ranged lightning** — Yellow lightning at ranged combat hexes. Movers are still on the hex they left, except an air unit whose strike or drop flight is drawing it. Shot lines may be drawn from attacker to target.
 5. **Ranged casualties** — Red X at ranged removal hexes.
-6. **Movement** — Ground and naval units that are still alive interpolate from source to destination. A unit removed before movement does not move. Air ferries appear at the new airport (or show destruction, without gliding, if the ferry failed and the origin was lost). Embarked follow-moves travel with the carrier.
+6. **Movement** — Every unit that is still alive and whose move was kept glides from the hex it left to its destination, along the path resolution recorded (`buildReadyPlaybackMoves`). That includes a ground or naval march, an air ferry along the airports it flew, infantry carried by that ferry, and infantry or armor carried by a moving ship. A unit removed before movement does not move. A ferry that failed does not glide. The player's queued ferry line keeps its arrowhead until this stage ends (`ferriesHeldUntilMovementEnds`), then it is removed. A battle does not hold that ferry line.
 7. **Melee lightning** — Yellow lightning at melee hexes, including a siege hex that holds only one side (§4.6). A unit that reached its destination is drawn there. A unit removed on its origin is still on that hex.
 8. **Melee casualties** — Red X at melee removal hexes. Air units destroyed by base capture show destruction at their airport hex.
 
@@ -744,7 +744,7 @@ Dice chips listing every die rolled in the air strike, ranged, and melee phases 
 
 ### 13.2 Tactical battle animation
 
-Tactical battle animation follows the same removal rule as §13.1. A battle has no unknown casualty hexes. Movement uses interpolation between that battle's tactical hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the battle's tactical cells.
+Tactical battle animation follows the same removal rule and the same pre-movement placement as §13.1. A sub-unit that moves stays on its start cell until movement, except an air sub-unit flying a strike or drop. A battle has no unknown casualty hexes. Movement uses interpolation between that battle's tactical hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the battle's tactical cells.
 
 The tactical battle UI displays the battlefield from the opening of §12, with each cell's own terrain, road and rail overlays, and sub-unit markers. Airport and seaport marks are the enclosing hex's own cells. Exit Battle, in the battle header, triggers voluntary-exit mapping (§12.8).
 

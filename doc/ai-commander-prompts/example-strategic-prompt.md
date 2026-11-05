@@ -76,7 +76,7 @@ To move a naval unit toward a land target, copy a Best Options Target Hex for th
 
 # Available Tools
 
-Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move when you need a one-step move; copy ranged Target Hexes or Target Units into ranged_attack; copy ferry Target Hexes into ferryOrders; copy air strike Target Hexes into airStrikes; pick one row per unit per action.
+Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move when you need a one-step move; copy ranged Target Hexes or Target Units into ranged_attack; copy ferry Target Hexes into ferryOrders and air drop Target Hexes into airDrops; copy air strike Target Hexes into airStrikes; pick one row per unit per action. An air unit picks only one of air strike, air drop, and ferry.
 
 Never copy a Target Hex from a row that does not list that unit.
 
@@ -86,7 +86,7 @@ Standing-order status is already in the briefing; call query_orders only for a r
 
 Use tools selectively for memory lookup (memory_read) and production queue checks/sets when needed.
 
-1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination. For naval units, you may pass a land unit's briefing hex code as destination; the route will be to the nearest water/coastal hex to that position so the naval can get in range.
+1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination. For naval units, you may pass a land unit's briefing hex code as destination; the route will be to the nearest water/coastal hex to that position so the naval can get in range. For an air unit, the result is the airport chain to that airport and its hop count; copy its orderToHexCode into ferryOrders.destination, not explicit_move.
 2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.
 3. memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.
 4. query_orders(unitId?, all?) - Check standing order statuses.
@@ -106,9 +106,9 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 - Every unit with a ranged or air-strike row in Best Options This Turn should be given that shot, chosen from the listed rows, because the shot resolves from the turn-start position and does not consume the move. Do not invent a target the table does not list.
 - A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire.
 - Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
-- Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from a row listing that unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes.
+- Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from a row listing that unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes; copy an air drop Target Hex into airDrops.
 
-  Each unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same unit.
+  Each unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same unit. An air unit picks only one of air strike, air drop, and ferry. When its Aboard column is none, embark one infantry unit from its hex in the same orders list.
 
   Never copy a Target Hex from a row that does not list that unit; if that unit has no row, call plan_route or leave it idle. Call plan_route only for a destination the table does not list for that unit.
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
@@ -179,7 +179,7 @@ The top level must be a JSON object; a top-level array is invalid. Do not use to
 
 An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is dropped as already arrived. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
 
-For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there.
+For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there. For an air unit, that orderToHexCode goes into ferryOrders.destination, not explicit_move.
 
 Include optional "callbacks" for re-consultation planning. Each response replaces the whole callbacks list; omit the array or send [] to clear every subscription.
 
@@ -602,14 +602,14 @@ Air rules: an air unit ferries any distance by hopping controlled intact airport
 
 Air units: yours=6, enemy=0.
 
-| Unit ID | Base Hex | Base Intact | Base Controlled | Enemy Unit Targets | Strikeable Urban | Strikeable Airports | Strikeable Seaports | Ferry Destinations |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| a1-a1 | G9 | yes | yes | 0 | 0 | 0 | 0 | 0 |
-| a1-a4 | HV | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a5 | HV | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a6 | HV | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a7 | HV | yes | yes | 7 | 9 | 7 | 7 | 22 |
-| a1-a8 | IE | yes | yes | 7 | 7 | 7 | 6 | 22 |
+| Unit ID | Base Hex | Aboard | Base Intact | Base Controlled | Enemy Unit Targets | Strikeable Urban | Strikeable Airports | Strikeable Seaports | Ferry Destinations |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| a1-a1 | G9 | none | yes | yes | 0 | 0 | 0 | 0 | 0 |
+| a1-a4 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
+| a1-a5 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
+| a1-a6 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
+| a1-a7 | HV | none | yes | yes | 7 | 9 | 7 | 7 | 22 |
+| a1-a8 | IE | none | yes | yes | 7 | 7 | 7 | 6 | 22 |
 
 Enemy infrastructure in your current strike envelope: airports=7, seaports=7.
 

@@ -1,6 +1,6 @@
 /**
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
- * Derives legal moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
+ * Derives legal moves/melee reach, air ferry destinations, ranged attacks, air strikes, and air drops from order validation rules.
  *
  * Strategic vs tactical reachability (intentional parity of *pipeline*, not hex sets):
  * - Strategic ground: `getValidDestinations` → strategic `getLandMassReachableHexes` (hop BFS).
@@ -8,7 +8,8 @@
  * Best Options This Turn interest/approach live in `possibleUnitActionsBestOptionsInterest.ts`
  * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach; this-turn air strikes
  * list enemy-occupied or human-controlled infra only strategically, and human-occupied footprint cells
- * tactically when the parent strategic airport is intact; tactical Best Options lists airport-to-airport ferry dests).
+ * tactically when the parent strategic airport is intact; tactical Best Options lists airport-to-airport ferry dests;
+ * an air unit with infantry aboard, or friendly infantry on its hex, lists air-drop rows beside its strike or ferry rows; the lead side of an AI-only battle lists a drop only when infantry is already aboard).
  * The indexed snapshot maps and cell text live in `possibleUnitActionsIndexedState.ts`; strategic ferry and strike
  * destinations and the per-request destination caches live in `possibleUnitActionsDestinations.ts`.
  */
@@ -50,6 +51,7 @@ import {
 } from '../tools/stayPutFriendlyOccupancy';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
 import {
+  ACTION_AIR_DROP,
   ACTION_AIR_STRIKES,
   ACTION_FERRY,
   ACTION_MOVES_MELEE,
@@ -65,6 +67,7 @@ import {
   type RawPossibleActionRow,
 } from './possibleUnitActionsTableAssembly';
 import { collectRangedTargetHexes } from './possibleUnitActionsStrategicRanged';
+import { airDropRosterForBriefing, airDropTargetHexesForBriefing } from './possibleUnitActionsAirDrop';
 import {
   applyInterestOrApproach,
   describeTacticalBestOptionsInfrastructure,
@@ -217,7 +220,7 @@ export function collectAggregatedPossibleActionRows(args: {
    *
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent strategic airport is intact (tactical); air ferry dests stay listed and are labeled `ferry` (strategic: owned airports in range 4; tactical: intact airport cells in the footprint).
+   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent strategic airport is intact (tactical); air ferry dests stay listed and are labeled `ferry` (strategic: owned airports in range 4; tactical: intact airport cells in the footprint); an air unit with infantry aboard, or friendly infantry on its hex, also lists `air drop` rows for enemy-occupied land and cities it does not control. The lead side of an AI-only battle lists a drop only when the infantry is already aboard.
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -294,6 +297,7 @@ export function collectAggregatedPossibleActionRows(args: {
     });
   }
 
+  const dropRoster = forThisTurn ? airDropRosterForBriefing(tacticalBattle ? { battle: tacticalBattle } : { units: opponentUnits }) : [];
   const opponentAirCount = opponentUnits.filter((u) => u.unitType === 'air').length;
   if (tacticalBattle && opponentAirCount > 0) {
     logDebug('possibleUnitActions collectAggregatedPossibleActionRows tacticalAirFerryRows', {
@@ -439,6 +443,32 @@ export function collectAggregatedPossibleActionRows(args: {
             indexed,
             latLngByH3,
             isAirStrike: true,
+          });
+        }
+      }
+      if (forThisTurn) {
+        const dropHexes = airDropTargetHexesForBriefing({
+          unit: { id: unit.id, player: unit.player, unitType: unit.unitType, h3Index: unit.h3Index, carrierId: null },
+          roster: dropRoster,
+          indexed,
+          tactical:
+            tacticalBattle && tacticalBestOptionsInterest
+              ? { battle: tacticalBattle, interest: tacticalBestOptionsInterest }
+              : undefined,
+        });
+        if (dropHexes.length > 0) {
+          appendRowsForLegalHexes({
+            rows: rawRows,
+            unitId: unit.id,
+            unitType: unit.unitType,
+            unitH3: unit.h3Index,
+            actionType: ACTION_AIR_DROP,
+            legalHexes: dropHexes,
+            homeland,
+            indexed,
+            latLngByH3,
+            isAirStrike: false,
+            tacticalInterest: tacticalBestOptionsInterest,
           });
         }
       }

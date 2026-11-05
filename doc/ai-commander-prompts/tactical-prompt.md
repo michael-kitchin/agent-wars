@@ -91,10 +91,10 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 #### `### Best Options This Turn`
 
 - **Include:** when at least one option row exists; omit heading and table otherwise.
-- **Columns:** identical to strategic, including `Odds` and the `Target Infrastructure` cell contract (`|` is written as a space; an `air strike` row then omits text from `; strike:` onward; a cell with no `; strike:` suffix is otherwise unchanged; an empty cell is an em dash). `Odds` is `wipe N%, lose M%` for a ranged or move/melee row, from `probabilityDefenderEliminated` and `probabilityAttackerLosesUnit` with every listed unit attacking together. An air strike, approach, ferry, uncontested, or failed estimate is an em dash.
-- **Action values in battle:** `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. A unit listed on an `air strike` row is not also listed on a `ferry` row this beat.
-- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. With the terrain bonus on, that reach includes one cell of the unit's birth terrain that it otherwise could not enter, and nothing past that cell in the same beat. Approach targets omit stay-put friendlies; a cell a friendly is leaving this period is listed. move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact. Ferry targets are other intact airport cells in the footprint.
-- **Per-unit cap:** five target hexes per sub-unit. Each distinct action on a hex is its own row, in the order air strike, ranged, approach, ferry, then move/melee. Identical rows are merged and their sub-unit ids listed together. A sub-unit may use the same hex as its move and its ranged target; the shot resolves first (`buildAttackConstraintsClause`).
+- **Columns:** identical to strategic, including `Odds` and the `Target Infrastructure` cell contract (`|` is written as a space; an `air strike` row then omits text from `; strike:` onward; a cell with no `; strike:` suffix is otherwise unchanged; an empty cell is an em dash). `Odds` is `wipe N%, lose M%` for a ranged or move/melee row, from `probabilityDefenderEliminated` and `probabilityAttackerLosesUnit` with every listed unit attacking together. An air strike, air drop, approach, ferry, uncontested, or failed estimate is an em dash.
+- **Action values in battle:** `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`. A unit listed on an `air strike` row is not also listed on a `ferry` row this beat. An `air drop` row is added beside the strike or ferry row when that air sub-unit has infantry aboard, or when an unembarked friendly infantry sub-unit shares its cell. The lead side of an AI-only battle is the exception: its embark is applied after the drop, so it lists a drop only when the infantry is already aboard. The model picks one of air strike, air drop, and ferry.
+- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. With the terrain bonus on, that reach includes one cell of the unit's birth terrain that it otherwise could not enter, and nothing past that cell in the same beat. Approach targets omit stay-put friendlies; a cell a friendly is leaving this period is listed. move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact. Air drop targets are footprint cells that hold an enemy sub-unit, or urban cells whose enclosing hex is not controlled by the air unit's owner. A cell outside the footprint, the air unit's own cell, a cell another owner fortified, a cell that blocks infantry entry, and rubble are not drop targets. The drop does not require the air sub-unit to sit on an airport cell. Ferry targets are other intact airport cells in the footprint.
+- **Per-unit cap:** five target hexes per sub-unit. Each distinct action on a hex is its own row, in the order air strike, air drop, ranged, approach, ferry, then move/melee. Identical rows are merged and their sub-unit ids listed together. A sub-unit may use the same hex as its move and its ranged target; the shot resolves first (`buildAttackConstraintsClause`). An air drop ranks with an air strike for that cap (`tempoActionRankForRowPriority`).
 
 #### `## Recent Turn Notes`
 
@@ -140,8 +140,8 @@ Tactical variant, bullets in this order:
 ### 2.9 `# Air Operations Status`
 
 - **Include:** when the opponent has at least one air sub-unit in this battle. **Omit** the section otherwise, along with the strike list and every air clause.
-- **Content:** the tactical air rules line — strikes may target enemy sub-units anywhere in this battle footprint, one air action per unit per beat — and a per-unit table of strike targets.
-- **Omitted columns relative to strategic:** the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat. Ferry dests appear on Best Options, not as extra Air Operations columns.
+- **Content:** the tactical air rules line — strikes and drops cover this battle footprint, ferry is one hop between intact airport cells, and an air sub-unit carries one infantry sub-unit — then own and enemy air counts and a per-unit table. Columns are `Unit ID`, `Hex`, `Aboard`, `Enemy Unit Targets`. `Aboard` is the infantry sub-unit id, or `none`.
+- **Omitted columns relative to strategic:** base intact, base controlled, and the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat. Ferry dests appear on Best Options, not as extra Air Operations columns.
 
 ### 2.10 `# Naval Transport Status`
 
@@ -152,14 +152,14 @@ Tactical variant, bullets in this order:
 ### 2.11 `# Available Tools`
 
 - **Enabled set in battle:** the routing tool, the distance tool, `get_map`, and `rules` when planning tools are enabled, `assess_unit` when assessment tools are enabled, and `estimate_combat` when estimation tools are enabled. `assess_hex` and the memory, standing-order, and production tools are stripped. `get_map` is not offered on the strategic map. When `rules` is enabled, the combat-rules section ends by telling the model to call `rules(topic)` for a rule that is not printed above.
-- **Tool lines:** `assess_unit` and `estimate_combat` use battle-specific lines. `assess_unit` reports which enemies the sub-unit can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each nearby unit. `estimate_combat` predicts ranged or melee engagements under battle range, terrain, and line-of-sight rules from beat-start positions, and does not cover air strikes.
+- **Tool lines:** `assess_unit` and `estimate_combat` use battle-specific lines. `assess_unit` reports which enemies the sub-unit can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each nearby unit. `estimate_combat` predicts ranged or melee engagements under battle range, terrain, and line-of-sight rules from beat-start positions, and does not cover air strikes. `plan_route` keeps the ferry-into-`ferryOrders` clause and omits `AIR_PLAN_ROUTE_PROMPT_SUFFIX`.
 - **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping. It names the routing tool only when planning tools are enabled.
 - **Guidance bullets, in this order:**
   1. The briefing already contains unit status, attention flags, and this beat's options.
   2. When assessment tools are enabled: `assess_unit` is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.
   3. When estimation tools are enabled: Best Options already gives Odds for a listed fight. Use `estimate_combat` for a fight the table does not list. It does not cover air strikes.
   4. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
-  5. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; and a ferry target into `ferryOrders`; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
+  5. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; an air drop target into `airDrops` when air is present; and a ferry target into `ferryOrders`; an air sub-unit picks only one of air strike, air drop, and ferry, and embarks one infantry sub-unit from its cell in the same orders when Aboard is none; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
   6. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
   7. The tempo rule for the beat, per section 4 item 1.
   8. The sealift bullet, included only when the naval status section is present.
@@ -177,7 +177,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 ### 3.1 Fields
 
-`message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema. A human-versus-AI battle omits `exitBattle`. When it is present it is a required boolean, and the repair example sets it to false.
+`message`, `strategy`, `orders`, then `exitBattle` when the battle is between two AI commanders, then `airStrikes` when the opponent has air sub-units, `ferryOrders` when the opponent has air sub-units, `airDrops` when the opponent has air sub-units, and `callbacks`. **No `missileLaunches`, no `memoryUpdates`, and no `productionOrders`**, in the contract, in the example, and in the repair schema. A human-versus-AI battle omits `exitBattle`. When it is present it is a required boolean, and the repair example sets it to false.
 
 ### 3.2 Legal actions this beat
 
@@ -189,7 +189,8 @@ Section 3. Always included; the example must match the contract. Example unit id
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
 | `transport_move` | `unitId` or `unitIds`, `navalUnitId`, `destination` | Moves the transport and its cargo. |
 | `disembark` | `unitId`, `destination` | Clears cargo and marches in one action. |
-| `ferryOrders` entry | `unitId`, `destination` | Intact airport cells in the footprint. A sub-unit that strikes this beat must not also ferry; a ferry order for a striking sub-unit is discarded. |
+| `airDrops` entry | `unitId` or `unitIds`, `destination` | A footprint cell that can receive infantry. Present when the opponent has air sub-units. One air action per sub-unit: strike, drop, or ferry. |
+| `ferryOrders` entry | `unitId`, `destination` | Intact airport cells in the footprint. A sub-unit that strikes this beat must not also ferry; a ferry order for a striking sub-unit is discarded. A drop and a ferry cannot both be ordered. |
 
 **Forbidden:** the standing-order assignment and cancellation actions for sub-unit ids, missile launches, memory updates, and production orders. The prompt states the standing-order prohibition explicitly, because the strategic habit of assigning missions is exactly what a model carries into a beat.
 
@@ -201,6 +202,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 | `move/melee` | `explicit_move.destination` |
 | `ranged` | a `ranged_attack` entry's target |
 | `air strike` | an `airStrikes` entry's target |
+| `air drop` | an `airDrops` entry's `destination` |
 | `ferry` | a `ferryOrders` entry's destination |
 
 ### 3.4 Invalid output rules the prompt must state
@@ -209,7 +211,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 2. Standing-order assignment and cancellation for sub-unit ids are rejected this beat.
 3. Memory updates and production orders are not accepted.
 4. An entry missing a required field is dropped without comment.
-5. More than one ranged action for the same sub-unit in the same beat is not honoured. When air is present, the same one-action limit applies to air strikes and ferry.
+5. More than one ranged action for the same sub-unit in the same beat is not honoured. When air is present, the same one-action limit applies to air strike, air drop, and ferry.
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
 7. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
 8. An explicit_move to the sub-unit's current cell is dropped as already arrived.

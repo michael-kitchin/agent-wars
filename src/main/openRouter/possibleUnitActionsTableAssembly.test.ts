@@ -185,6 +185,57 @@ function testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry(): void {
 }
 
 /**
+ * An empty-city drop must survive the same cap as a strike.
+ *
+ * Purpose: A drop on a city with no enemy units sorts after enemy contact, and high-urban ferry rows would hide it.
+ * When to use: After edits to `tempoActionRankForRowPriority`.
+ * Expected outcome: With one air-drop row and five high-urban ferry rows, the capped list includes the drop.
+ *   A row that is only an air drop derives `air drop`. A row that also has a strike still derives `air strike`.
+ * Exceptions: None.
+ */
+function testSelectTopRowsPerUnitKeepsAirDropAheadOfFerry(): void {
+  const dropHex = '8f283082dcb519b0';
+  const ferryHexes = [
+    '8f283082dcb519b1',
+    '8f283082dcb519b2',
+    '8f283082dcb519b3',
+    '8f283082dcb519b4',
+    '8f283082dcb519b5',
+  ];
+  const drop = fixtureRow({
+    unitId: 'opponent-air-1',
+    unitType: 'air',
+    actionTypes: 'air drop',
+    targetH3: dropHex,
+    urbanHexCount: 0,
+    distance: 2,
+  });
+  const rows: PossibleActionTableRow[] = [
+    drop,
+    ...ferryHexes.map((targetH3, i) =>
+      fixtureRow({
+        unitId: 'opponent-air-1',
+        unitType: 'air',
+        actionTypes: 'ferry',
+        targetH3,
+        urbanHexCount: 80 - i,
+        distance: 1,
+      })
+    ),
+  ];
+  const capped = selectTopRowsPerUnit(rows, new Map());
+  assert.ok(
+    capped.some((r) => r.targetH3 === dropHex && r.actionTypes.includes('air drop')),
+    'air drop must survive the per-unit top-5 when ferry dests have higher urban counts'
+  );
+  assert.strictEqual(deriveThisTurnOptionsActionColumn(drop), 'air drop');
+  assert.strictEqual(
+    deriveThisTurnOptionsActionColumn(fixtureRow({ actionTypes: 'air strike, air drop' })),
+    'air strike'
+  );
+}
+
+/**
  * Documents the function binding `rawFixture` (rawFixture).
  *
  * Purpose: Builds a minimal `RawPossibleActionRow` for this-turn ferry-vs-strike filtering tests.
@@ -287,6 +338,7 @@ function main(): void {
   testSelectTopRowsPerUnitApproachIgnoresUrbanCount();
   testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban();
   testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry();
+  testSelectTopRowsPerUnitKeepsAirDropAheadOfFerry();
   testBestOptionsTableKeepsMoveRowWhenRangedSharesTheHex();
   testOmitThisTurnFerryRowsForStrikingAir();
   console.log('possibleUnitActionsTableAssembly tests passed');

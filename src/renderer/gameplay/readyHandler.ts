@@ -16,7 +16,7 @@ import {
 
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
-import { ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
+import { ferriesHeldUntilMovementEnds, ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { runTacticalReadyCommit } from './readyTacticalCommit';
 import {
@@ -128,6 +128,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (await runTacticalReadyCommit({ deps, matchEpoch })) return;
     // The turn this Ready resolves; its reports are filed under it after the snapshot moves on to the next turn.
     const turnReportTag = currentConsoleReportTag();
+    const submittedFerryOrders = [...S.pendingFerryOrders];
     const hasPendingDraftOrders =
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
@@ -354,6 +355,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
       const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(S.humanStandingOrders, state.units, humanMoves);
+      const ferryArrowsUntilMovementEnds = ferriesHeldUntilMovementEnds(submittedFerryOrders, humanMoves);
       S.resolutionMoveAnimation = {
         moves: resolutionMoves,
         ...(sightCuesForPlayback.length > 0 ? { sightCues: sightCuesForPlayback } : {}),
@@ -379,6 +381,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
         unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
         ...(marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {}),
+        ...(ferryArrowsUntilMovementEnds.length > 0 ? { ferryArrowsUntilMovementEnds } : {}),
         ...pickPlaybackDiceRolls(readyResult, {
           visibleHexesBeforeTurn,
           visibleHexesAfterTurn: visibleHexes,

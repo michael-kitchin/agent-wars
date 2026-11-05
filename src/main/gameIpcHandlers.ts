@@ -5,7 +5,7 @@
  */
 
 import { getAiPendingOrders, type GameStateSnapshot } from './gameDb';
-import { AI_SEAT_IDS, isAiSeatId, type AiSeatId, type SeatId, HUMAN_SEAT_ID } from '../shared/seatIds';
+import { AI_SEAT_IDS, type AiSeatId, type SeatId } from '../shared/seatIds';
 import { type OwnerTurnOrders, type TurnOrdersByOwner } from './gameActions/ownerTurnOrders';
 import { gatherCommanderOrdersForReady } from './openRouter/commanderReadyGather';
 import {
@@ -20,6 +20,7 @@ import {
   runEventDrivenAfterResolutionConsultation,
   type StrategicConsultArgs,
 } from './ipc/readyIpcResolutionMapping';
+import { buildReadyPlaybackMoves } from './ipc/readyPlaybackMoves';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
 import { getMatchGeneration } from './matchGeneration';
@@ -227,8 +228,6 @@ export async function handleGameReady(
     aiConsulted: aiConsulted ?? null,
   });
 
-  const aiMoves = buildDistinctAiMovesFromPlanningOrders(state, aiOrders);
-
   if (getMatchGeneration() !== generationAtStart) {
     logDebug('handleGameReady: match generation changed before resolution', { generationAtStart });
     return { success: false, reason: 'A new game started before this turn finished.' };
@@ -266,25 +265,7 @@ export async function handleGameReady(
       outputTokens: turnOutputTokens,
     };
   }
-  const resolvedFerryMoves = readyResult.resolvedFerryMoves ?? [];
-  const humanFerryMoves = resolvedFerryMoves
-    .filter((move) => move.player === HUMAN_SEAT_ID)
-    .map((move) => ({
-      unitId: move.unitId,
-      fromH3Index: move.fromH3Index,
-      toH3Index: move.toH3Index,
-      pathH3Indexes: move.pathH3Indexes,
-    }));
-  const opponentFerryMoves = resolvedFerryMoves
-    .filter((move) => isAiSeatId(move.player))
-    .map((move) => ({
-      unitId: move.unitId,
-      fromH3Index: move.fromH3Index,
-      toH3Index: move.toH3Index,
-      pathH3Indexes: move.pathH3Indexes,
-    }));
-  const allAiMoves = [...aiMoves, ...opponentFerryMoves];
-  const allHumanMoves = [...(readyResult.humanMoves ?? []), ...humanFerryMoves];
+  const playbackMoves = buildReadyPlaybackMoves(readyResult);
 
   const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
   const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
@@ -331,8 +312,8 @@ export async function handleGameReady(
     aiDropped,
     aiDropReasons,
     aiMovesLog,
-    aiMoves: allAiMoves.length > 0 ? allAiMoves : undefined,
-    humanMoves: allHumanMoves.length > 0 ? allHumanMoves : undefined,
+    aiMoves: playbackMoves.aiMoves.length > 0 ? playbackMoves.aiMoves : undefined,
+    humanMoves: playbackMoves.humanMoves.length > 0 ? playbackMoves.humanMoves : undefined,
     aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     ...pickReadyResolutionIpcMirrorFields(readyResult),
     aiStrategy,

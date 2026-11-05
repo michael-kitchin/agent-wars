@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildConsultMessages, CONSULT_SITUATION_LEAD_IN } from './consultPromptMessages';
 import { buildConsultPromptParts, joinConsultPromptParts } from './consultPromptParts';
+import { AIR_PLAN_ROUTE_PROMPT_SUFFIX } from './openRouterToolCatalog';
 import { TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS } from './tacticalPromptProjection';
 
 /**
@@ -129,4 +130,33 @@ test('structured outputs omit the schema skeleton and keep the example', () => {
   assert.ok(attached.staticSystemText.includes('## Example Response'));
   assert.ok(attached.staticSystemText.includes('explicit_move'));
   assert.ok(prose.staticSystemText.includes('Strict schema'));
+});
+
+test('the plan_route air sentence is only on a strategic prompt that has air', () => {
+  const coord = {
+    latLngByH3: new Map<string, [number, number]>([['cell-a', [1, 2]]]),
+    resolveToH3: () => 'cell-a' as string | undefined,
+    format: (h3: string) => h3,
+  };
+  const promptFor = (unitType: string, mode: 'strategic' | 'tactical') =>
+    joinConsultPromptParts(
+      buildConsultPromptParts({
+        state: battleState(1, 'March, Year 1', 'cell-a', unitType),
+        coordMap: coord,
+        enabledToolNames: ['plan_route'],
+        coordinateContext:
+          mode === 'tactical'
+            ? { mode, battleId: 'air-route', tacticalTurnNumber: 1 }
+            : { mode },
+        briefingOverride: 'briefing',
+        productionAttention: null,
+      })
+    );
+  const strategicAir = promptFor('air', 'strategic');
+  const strategicInfantry = promptFor('infantry', 'strategic');
+  const tacticalAir = promptFor('air', 'tactical');
+  assert.ok(strategicAir.includes(AIR_PLAN_ROUTE_PROMPT_SUFFIX));
+  assert.ok(!strategicInfantry.includes(AIR_PLAN_ROUTE_PROMPT_SUFFIX));
+  assert.ok(!tacticalAir.includes(AIR_PLAN_ROUTE_PROMPT_SUFFIX));
+  assert.ok(tacticalAir.includes('ferry into ferryOrders'));
 });

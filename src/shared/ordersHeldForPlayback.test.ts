@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { HumanStandingOrderSnapshot } from './ipc/humanOrderPreviewTypes';
-import { ordersHeldUntilMovementEnds } from './ordersHeldForPlayback';
+import { ferriesHeldUntilMovementEnds, ordersHeldUntilMovementEnds } from './ordersHeldForPlayback';
 
 /**
  * Builds one standing order for the hold tests.
@@ -54,4 +54,43 @@ test('ordersHeldUntilMovementEnds drops an arrived unit whose playback did not m
     [{ unitId: 'fleet-1', fromH3Index: 'dest' }]
   );
   assert.deepEqual(held, { orders: [], originH3ByUnitId: {} });
+});
+
+test('ferriesHeldUntilMovementEnds keeps a ferry that reached its destination, on the path it flew', () => {
+  const flown = ['hex-origin', 'hex-stop', 'hex-dest'];
+  const held = ferriesHeldUntilMovementEnds(
+    [{ unitId: 'ferry-1', destinationH3Index: 'hex-dest', pathH3Indexes: ['hex-origin', 'hex-dest'] }],
+    [{ unitId: 'ferry-1', fromH3Index: 'hex-origin', toH3Index: 'hex-dest', pathH3Indexes: flown }]
+  );
+  assert.deepEqual(held, [{ unitId: 'ferry-1', pathH3Indexes: ['hex-origin', 'hex-stop', 'hex-dest'] }]);
+  flown.push('hex-mutated');
+  assert.deepEqual(held[0]?.pathH3Indexes, ['hex-origin', 'hex-stop', 'hex-dest']);
+});
+
+test('ferriesHeldUntilMovementEnds skips a ferry with no move and one that ended elsewhere', () => {
+  const held = ferriesHeldUntilMovementEnds(
+    [
+      { unitId: 'ferry-missing', destinationH3Index: 'hex-dest' },
+      { unitId: 'ferry-diverted', destinationH3Index: 'hex-dest' },
+    ],
+    [{ unitId: 'ferry-diverted', fromH3Index: 'hex-origin', toH3Index: 'hex-other' }]
+  );
+  assert.deepEqual(held, []);
+});
+
+test('ferriesHeldUntilMovementEnds falls back to the order path, then to the two hexes', () => {
+  const held = ferriesHeldUntilMovementEnds(
+    [
+      { unitId: 'ferry-order', destinationH3Index: 'hex-dest', pathH3Indexes: ['hex-origin', 'hex-via', 'hex-dest'] },
+      { unitId: 'ferry-ends', destinationH3Index: 'hex-dest' },
+    ],
+    [
+      { unitId: 'ferry-order', fromH3Index: 'hex-origin', toH3Index: 'hex-dest' },
+      { unitId: 'ferry-ends', fromH3Index: 'hex-origin', toH3Index: 'hex-dest', pathH3Indexes: ['hex-only'] },
+    ]
+  );
+  assert.deepEqual(held, [
+    { unitId: 'ferry-order', pathH3Indexes: ['hex-origin', 'hex-via', 'hex-dest'] },
+    { unitId: 'ferry-ends', pathH3Indexes: ['hex-origin', 'hex-dest'] },
+  ]);
 });

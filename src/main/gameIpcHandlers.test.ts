@@ -15,7 +15,7 @@ import {
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
 import { advanceMatchGeneration } from './matchGeneration';
-import { AI_SEAT_IDS } from '../shared/seatIds';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID } from '../shared/seatIds';
 import { dbGetAll, dbRun, setAiPendingOrders } from './gameDb';
 import { updateSeatCommander } from './gameDb/seatRosterStore';
 import { withSeatedTempGameDbAsync } from './testSupport/withSeatedTempGameDb';
@@ -427,6 +427,76 @@ async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Pr
  * Expected outcome: The result succeeds and `tacticalAutoStartH3Index` is absent.
  * Exceptions: None.
  */
+/**
+ * Fight and Ignore both return the moves playback has to glide.
+ *
+ * Purpose: The intercept result replaces the first Ready result, so ferries and opponent moves must be on it.
+ * When to use: This file's runner.
+ * Expected outcome: The human ferry, with its path, is in `humanMoves`. The opponent march and ferry are in `aiMoves`.
+ * Exceptions: None. Unit ids and hex indexes below are test data.
+ */
+async function testHandleResolveMeleeInterceptForwardsPlaybackMoves(): Promise<void> {
+  const humanFerryPath = ['hex-h-from', 'hex-h-to'];
+  const opponentFerryPath = ['hex-a-from', 'hex-a-stop', 'hex-a-to'];
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
+    resolveMeleeIntercept: (): ReadyResult => ({
+      ...minimalResolvedReady,
+      aiMoves: [{ unitId: 'opponent-march', fromH3Index: 'hex-o-from', toH3Index: 'hex-o-to' }],
+      resolvedFerryMoves: [
+        {
+          unitId: 'human-ferry',
+          player: HUMAN_SEAT_ID,
+          fromH3Index: 'hex-h-from',
+          toH3Index: 'hex-h-to',
+          pathH3Indexes: humanFerryPath,
+        },
+        {
+          unitId: 'opponent-ferry',
+          player: AI_SEAT_IDS[0],
+          fromH3Index: 'hex-a-from',
+          toH3Index: 'hex-a-to',
+          pathH3Indexes: opponentFerryPath,
+        },
+      ],
+    }),
+  };
+  const result = await handleResolveMeleeIntercept(
+    {
+      meleeDecisionToken: 'tok',
+      decision: 'ignore',
+      useEventDrivenConsultation: false,
+      aiPlanningRunEnabled: false,
+      enabledToolGroups: ['planning'],
+    },
+    deps
+  );
+  assert.strictEqual(result.success, true);
+  assert.deepStrictEqual(result.humanMoves, [
+    {
+      unitId: 'human-ferry',
+      fromH3Index: 'hex-h-from',
+      toH3Index: 'hex-h-to',
+      pathH3Indexes: humanFerryPath,
+    },
+  ]);
+  assert.deepStrictEqual(result.aiMoves, [
+    { unitId: 'opponent-march', fromH3Index: 'hex-o-from', toH3Index: 'hex-o-to' },
+    {
+      unitId: 'opponent-ferry',
+      fromH3Index: 'hex-a-from',
+      toH3Index: 'hex-a-to',
+      pathH3Indexes: opponentFerryPath,
+    },
+  ]);
+}
+
 async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
@@ -519,6 +589,10 @@ async function runAll(): Promise<void> {
     {
       name: 'game:resolveMeleeIntercept forwards tacticalAutoStart on Fight',
       fn: testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight,
+    },
+    {
+      name: 'game:resolveMeleeIntercept forwards playback moves',
+      fn: testHandleResolveMeleeInterceptForwardsPlaybackMoves,
     },
     {
       name: 'game:resolveMeleeIntercept omits tacticalAutoStart on Ignore',

@@ -67,6 +67,7 @@ A map toast can summarize losses the player can see, and the hex changes from th
 ## Invariants
 
 - Playback never starts when the resolution has no movement, no combat, no dice, and no sight cues to show.
+- Until the Movement stage, every unit that moves this turn is drawn on the hex it started from, except an air unit flying a strike or drop, which its flight draws. During Movement, every resolved march, ferry, and carried unit of every side, Neutral included, glides along its path. This holds on the world map, after a melee-intercept choice, and in battles.
 - Sight cues never appear in a battle, while a human seat is playing, or when fog of war is off.
 - Starting a tactical battle never leaves a strategic playback running.
 - A map gesture during playback never queues, changes, or cancels an order, and never changes the unit selection except by right-click.
@@ -113,6 +114,7 @@ None.
 - `src/renderer/rendering/sightCueDrawing.ts`
 - `src/shared/resolutionPlaybackTiming.ts`
 - `src/shared/resolutionCasualtyDraw.ts`
+- `src/shared/resolutionPlaybackPositions.ts` (`unitsAtPlaybackOrigins`)
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
 - `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
@@ -129,6 +131,8 @@ None.
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/gameplay/observeChrome.ts` (`maybeObserveAutoAdvance`)
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/main/ipc/readyPlaybackMoves.ts` (`buildReadyPlaybackMoves`)
+- `src/shared/ordersHeldForPlayback.ts` (`ordersHeldUntilMovementEnds`, `ferriesHeldUntilMovementEnds`)
 - `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/main/gameActions/aiOnlyTacticalCommit.ts` (`commitAiOnlyTacticalBeat`)
 - `src/main/gameActions/tacticalBeatPlayback.ts` (`buildSeatPlaybackMoves`, `buildTacticalCombatPlaybackFields`)

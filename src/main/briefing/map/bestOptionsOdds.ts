@@ -16,7 +16,7 @@ import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes
  * The em dash used for a Best Options cell that is not a fight.
  *
  * Purpose: Matches the empty-cell character the rest of the table already uses.
- * When to use: Approach, ferry, air strike, uncontested, and failed rows.
+ * When to use: Approach, ferry, air strike, air drop, uncontested, and failed rows.
  * Expected outcome: The single character `—`.
  * Exceptions: None.
  */

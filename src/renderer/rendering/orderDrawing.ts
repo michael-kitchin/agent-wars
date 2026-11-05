@@ -1,5 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import type { AirDropAnimationMove, AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, MissileLaunchOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { HeldFerryLine } from '../../shared/ordersHeldForPlayback';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import {
   filterShotLinesByVisibleEndpoints,
@@ -255,6 +256,34 @@ export function drawMissileLaunchLines(
 }
 
 /**
+ * Draws one ferry route as a solid march line with an arrowhead on the destination.
+ *
+ * Purpose: The queued ferry and the copy held through movement playback use the same stroke.
+ * When to use: For a path of at least two hexes, origin through destination.
+ * Expected outcome: One turn-1 segment. The arrowhead sits on the last hex's center.
+ * Exceptions: None. An empty path draws no segment.
+ */
+export function drawFerryRouteLine(ctx: CanvasRenderingContext2D, pathH3Indexes: readonly string[]): void {
+  const points = pathH3Indexes.map((hex) => {
+    const [lat, lng] = cellToLatLng(hex);
+    return [lat, lng] as [number, number];
+  });
+  drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
+}
+
+/**
+ * Draws the ferry arrows kept up until movement playback finishes.
+ *
+ * Purpose: The live ferry list is cleared once playback starts, so the held copies are drawn on their own.
+ * When to use: From the strategic map while movement progress is below 1 and committed paths are visible.
+ * Expected outcome: One arrowed line per held ferry, in list order.
+ * Exceptions: None.
+ */
+export function drawHeldFerryLines(ctx: CanvasRenderingContext2D, lines: readonly HeldFerryLine[]): void {
+  for (const line of lines) drawFerryRouteLine(ctx, line.pathH3Indexes);
+}
+
+/**
  * Draws pending human ferry orders using the same march-style polyline stroke as ground movement lines.
  *
  * Purpose: Keeps planned air ferry routes visually aligned with standing orders and march hover previews.
@@ -273,14 +302,11 @@ export function drawPendingFerryLines(
     const unit = units.find((u) => u.id === ferry.unitId);
     if (!unit) continue;
     if (unit.h3Index === ferry.destinationH3Index) continue;
-    const points = (ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2
-      ? ferry.pathH3Indexes
-      : [unit.h3Index, ferry.destinationH3Index]
-    ).map((hex) => {
-      const [lat, lng] = cellToLatLng(hex);
-      return [lat, lng] as [number, number];
-    });
-    drawHumanMarchStyleRouteSegments(ctx, [{ turn: 1, hexes: points }]);
+    const pathH3Indexes =
+      ferry.pathH3Indexes && ferry.pathH3Indexes.length >= 2
+        ? ferry.pathH3Indexes
+        : [unit.h3Index, ferry.destinationH3Index];
+    drawFerryRouteLine(ctx, pathH3Indexes);
   }
 }
 
