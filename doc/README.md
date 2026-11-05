@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **2.17.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **2.19.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, groups idle build hexes by what they can still queue, turns a move past this turn's budget into a march when standing orders are on, and holds a unit ordered onto its own cell.
 
 Turn replay is not built. Later polish, diplomacy, and async multiplayer remain unbuilt.
 
