@@ -11,8 +11,24 @@
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { CoordinateContext } from './map/coordinateContext';
 import { HEX_CODE_PATTERN } from './map/coordinateContext';
-import { h3ToCode } from './map/hexCodeTranslator';
+import { getHexCodeForContext } from './map/hexCoordinates';
 import { logDebug, logTrace } from '../logger';
+
+/**
+ * Resolves a stored hex id to a briefing code without logging a missing mapping.
+ *
+ * Purpose: Territory watches often name a cell outside the active registry. That is expected, not a failure.
+ * When to use: `formatTerritoryTarget` and `sanitizeCallbackParamsForPrompt`.
+ * Expected outcome: The code, or undefined when the id is not in the registry or is not an H3 index.
+ * Exceptions: None. Lookup throws are swallowed.
+ */
+function briefingCodeForStoredHex(hexId: string, ctx: CoordinateContext): string | undefined {
+  try {
+    return getHexCodeForContext(hexId, ctx);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Turns a stored hex id into the briefing cell code for a territory or infrastructure watch.
@@ -20,15 +36,11 @@ import { logDebug, logTrace } from '../logger';
  * Purpose: The Details cell must be copyable, so it shows the same two-character code the rest of the prompt uses.
  * When to use: `territory_changed` and `infrastructure_destroyed` parameter formatting.
  * Expected outcome: A briefing code, including when the stored value is already a two-character code.
- * Exceptions: Lookup failure returns `'specified territory'`.
+ * Exceptions: None. A missing or illegal id returns `'specified territory'`.
  */
 function formatTerritoryTarget(hexId: string, ctx: CoordinateContext): string {
   if (HEX_CODE_PATTERN.test(hexId)) return hexId;
-  try {
-    return h3ToCode(hexId, ctx);
-  } catch {
-    return 'specified territory';
-  }
+  return briefingCodeForStoredHex(hexId, ctx) ?? 'specified territory';
 }
 
 /**
@@ -37,15 +49,11 @@ function formatTerritoryTarget(hexId: string, ctx: CoordinateContext): string {
  * Purpose: Unknown events still must not leak raw H3 into the prompt.
  * When to use: The fallback branch of `formatCallbackLine`.
  * Expected outcome: Strings that look like H3 become codes; other values pass through.
- * Exceptions: None.
+ * Exceptions: None. A string that is not a registered cell is left unchanged.
  */
 function sanitizeCallbackParamsForPrompt(params: unknown, ctx: CoordinateContext): unknown {
   if (typeof params === 'string') {
-    try {
-      return h3ToCode(params, ctx);
-    } catch {
-      return params;
-    }
+    return briefingCodeForStoredHex(params, ctx) ?? params;
   }
   if (Array.isArray(params)) {
     return params.map((x) => sanitizeCallbackParamsForPrompt(x, ctx));

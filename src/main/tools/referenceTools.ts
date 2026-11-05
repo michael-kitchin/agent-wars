@@ -12,8 +12,9 @@ import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
-import { getH3IndexForCode, getHexCodeForContext } from '../briefing/map/hexCoordinates';
-import { renderTacticalWindowGridMarkdown } from '../briefing/map/briefingMapSection';
+import { getH3IndexForCode, getHexCodeForContext, listStrategicH3Indexes } from '../briefing/map/hexCoordinates';
+import { buildStrategicHexGameStateMap, renderTacticalWindowGridMarkdown } from '../briefing/map/briefingMapSection';
+import { renderStrategicWindowGridMarkdown } from '../briefing/map/strategicMapWindow';
 import { TACTICAL_MAP_WINDOW_RADIUS } from '../briefing/map/tacticalAsciiGridProjection';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
@@ -123,7 +124,7 @@ function ruleTextForTopic(topic: string, mode: PromptCoordinateMode, state: Game
     case 'weather':
       return buildWeatherRule(gates);
     case 'movement':
-      return buildMovementBudgetRule(mode);
+      return buildMovementBudgetRule(mode, true);
     case 'line-of-sight':
       return buildRangedReachRule(mode, true);
     case 'casualties':
@@ -201,12 +202,12 @@ function executeRules(execArgs: unknown, mode: PromptCoordinateMode, state: Game
 }
 
 /**
- * Map around one battle cell.
+ * Map around one cell.
  *
- * Purpose: The briefing map is a window. This fills in cells outside it.
+ * Purpose: The briefing map is a window. This fills in cells outside it, clipped to the battle or the loaded strategic cells.
  * When to use: `executeReferenceTool` when the name is `get_map`.
- * Expected outcome: Legend and fenced grid for the disk clipped to the footprint. No coordinates and no H3 index.
- * Exceptions: A strategic call, a bad radius, or a center outside the footprint returns an error result.
+ * Expected outcome: Legend and fenced grid for the disk. No coordinates and no H3 index.
+ * Exceptions: A bad radius or a center outside the active map returns an error result.
  */
 function executeGetMap(args: {
   readonly execArgs: unknown;
@@ -215,7 +216,10 @@ function executeGetMap(args: {
   readonly tacticalBattle: TacticalBattleSnapshot | undefined;
   readonly resolveToH3: (lat: number, lng: number) => string | undefined;
 }): Record<string, unknown> {
-  if (!args.tacticalBattle || args.coordinateContext.mode !== 'tactical') {
+  const battle = args.tacticalBattle;
+  const tactical = battle !== undefined && args.coordinateContext.mode === 'tactical';
+  const strategic = battle === undefined && args.coordinateContext.mode === 'strategic';
+  if (!tactical && !strategic) {
     return { status: 'error', error: 'get_map is only available during a battle.' };
   }
   const record = args.execArgs && typeof args.execArgs === 'object' && !Array.isArray(args.execArgs)
@@ -225,33 +229,39 @@ function executeGetMap(args: {
   if (radius === null) {
     return { status: 'error', error: `radius must be an integer from 0 to ${GET_MAP_RADIUS_MAX}.` };
   }
+  const offMap = tactical ? 'That cell is not on this battle map.' : 'That cell is not on the map.';
   const centerH3 = resolveGetMapCenter(record.center, args.coordinateContext, args.resolveToH3);
-  const footprint = new Set(args.tacticalBattle.tacticalChildH3Indexes);
+  const footprint = new Set(tactical && battle ? battle.tacticalChildH3Indexes : listStrategicH3Indexes());
   if (!centerH3 || !footprint.has(centerH3)) {
-    return { status: 'error', error: 'That cell is not on this battle map.' };
+    return { status: 'error', error: offMap };
   }
   let disk: string[];
   try {
     disk = gridDisk(centerH3, radius).filter((cell) => footprint.has(cell));
   } catch (err) {
     logError('referenceTools executeGetMap gridDisk failed', err);
-    return { status: 'error', error: 'That cell is not on this battle map.' };
+    return { status: 'error', error: offMap };
   }
   const center = getHexCodeForContext(centerH3, args.coordinateContext);
   if (!center || disk.length === 0) {
-    return { status: 'error', error: 'That cell is not on this battle map.' };
+    return { status: 'error', error: offMap };
   }
   try {
-    const map = renderTacticalWindowGridMarkdown({
-      state: args.state,
-      tacticalBattle: args.tacticalBattle,
-      windowCells: disk,
-    });
-    logDebug('referenceTools executeGetMap', { radius, cellCount: disk.length });
+    const map = tactical && battle
+      ? renderTacticalWindowGridMarkdown({
+          state: args.state,
+          tacticalBattle: battle,
+          windowCells: disk,
+        })
+      : renderStrategicWindowGridMarkdown({
+          windowCells: disk,
+          gameByH3: buildStrategicHexGameStateMap(args.state, disk),
+        });
+    logDebug('referenceTools executeGetMap', { radius, cellCount: disk.length, tactical });
     return { status: 'ok', center, radius, cellCount: disk.length, map };
   } catch (err) {
     logError('referenceTools executeGetMap render failed', err);
-    return { status: 'error', error: 'That cell is not on this battle map.' };
+    return { status: 'error', error: offMap };
   }
 }
 

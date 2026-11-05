@@ -293,11 +293,11 @@ export const OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE =
  *
  * Purpose: Fog-on assessments print path length while Best Options dests are one-step hops inside this turn's budget, so the printed path is remaining distance and not the hex to order.
  * When to use: Strategic formatBriefing immediately after the intel staleness sentence when fog is on at strategic.
- * Expected outcome: Tells the model to copy a Best Options Target Hex into explicit_move and not a farther hex from the printed path.
+ * Expected outcome: Tells the model to copy a Best Options Target Hex into explicit_move and not a farther hex from the printed path. What happens to an over-budget explicit_move is `buildMovementBudgetRule`, not this line.
  * Exceptions: None.
  */
 export const FOG_PATH_DISTANCE_BRIEFING_LINE =
-  'Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). That length can be longer than one movement budget. Best Options This Turn Target Hexes are the one-step destinations already inside this turn\'s budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path; an explicit_move past the budget is dropped.';
+  'Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). That length can be longer than one movement budget. Best Options This Turn Target Hexes are the one-step destinations already inside this turn\'s budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path.';
 
 /**
  * Minimal unit fields required to pair grid distances without a full snapshot type.

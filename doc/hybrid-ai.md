@@ -40,7 +40,7 @@ Mandatory overrides (`evaluateMandatoryOverrides` in `callbackEvaluation.ts`): `
 
 Subscription events the evaluator implements: `turns`, `unit_engaged`, `unit_destroyed`, `unit_arrived`, `threat_escalation`, `infrastructure_destroyed`. **`territory_changed` is a no-op** (accepted, never fires).
 
-Each consult **replaces** the full callback list. Tactical subscriptions use sub-unit ids and are cleared when the battle ends. An AI-only battle sets aside both commanders' strategic lists at the start (`stashOpponentCallbackSubscriptionsForTacticalBattle`) and restores both when the battle ends, including after a restart. A human battle sets aside the one AI seat. A stored battle that has only one list restores that list.
+Each consult **replaces** the full callback list. Tactical subscriptions use sub-unit ids and are cleared when the battle ends. An AI-only battle saves both commanders' strategic lists at the start (`stashOpponentCallbackSubscriptionsForTacticalBattle`) and, after that write returns, clears each saved seat's live list. A human battle saves and then clears the one AI seat. Each saved seat's Active Callbacks table starts empty. Each saved list is restored when the battle ends, including after a restart. A stored battle that has only one list restores that list. A null seat clears nothing. If the stash write throws, the live lists stay.
 
 ## Consult loop bounds
 
@@ -64,6 +64,10 @@ Hitting the tool-round cap sends the final orders call and warns on the **next**
 | JSON envelope | `orders` (including `assign_order` / `cancel_order` / `explicit_move` / `ranged_attack`), `airStrikes`, `ferryOrders`, `missileLaunches` when the commander has a missile and the consult is strategic, `callbacks`, `memoryUpdates`, `productionOrders`, `strategy`, `message` |
 
 Tactical envelopes omit `assign_order`, `missileLaunches`, memory writes, and production. Sub-units are ordered with `explicit_move`, `ranged_attack`, embark/disembark, `transport_move`.
+
+An explicit_move onto the unit's current cell is held. It is not a drop, the unit stays put, and a standing order is not cancelled. The same already-arrived case in a battle is held the same way. A tactical move shortened onto the sub-unit's firing cell stays a drop. When standing orders are on, a strategic explicit_move past this turn's budget becomes a standing march (`convertOverBudgetExplicitMoveToMarch` in `src/main/openRouter/explicitMoveMarch.ts`) when a route of at least two turns exists and the first step is legal. That first step is this turn's move. Air, missiles, an invalid distance, an armor halt, and a blocked land route are not converted. When standing orders are off, that farther move is dropped.
+
+A strategic consult keeps `get_map` and `rules` when planning tools are on. `get_map` draws the disk around a briefing code, clipped to the loaded strategic cells. In a battle the same tool is clipped to the battle footprint. See [ai-tools.md](ai-tools.md).
 
 A strategic consult applies `memoryUpdates` through `executeMemory` in `applyParsedMemoryUpdates` after order validation when memory tools are enabled. A valid persistent write at capacity is stored, and the oldest persistent note for that seat is deleted. A stored write at capacity, and any other rejected row, is a drop reason. The consultation still succeeds. A battle consult does not apply the rows. A list sent while the memory group is off is one drop reason and is not stored.
 

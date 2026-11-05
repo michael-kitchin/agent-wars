@@ -253,16 +253,18 @@ test('the High weather sentence widens the slowing weather and deepens the penal
 });
 
 test('buildMovementBudgetRule quotes engine budgets and states that air never marches', () => {
-  const strategic = buildMovementBudgetRule('strategic');
+  const strategic = buildMovementBudgetRule('strategic', true);
+  const strategicWithoutOrders = buildMovementBudgetRule('strategic', false);
   assert.ok(strategic.includes(String(getMovementBudget('armor'))));
   assert.match(strategic, /air (never marches|does not march)/i);
   assert.match(strategic, /Armor that enters a rugged, arctic, or city hex ends its move there/);
   assert.match(strategic, /A longer route continues on the next turn, and the turn count includes that halt/);
   assert.match(strategic, /Movement budgets in clear weather/);
   assert.match(strategic, /When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget/);
-  assert.match(strategic, /dropped, not shortened to the first step/);
+  assert.match(strategic, /becomes a standing march to that hex/);
+  assert.match(strategicWithoutOrders, /dropped, not shortened to the first step/);
   assert.doesNotMatch(strategic, /urban or rubble/i);
-  const tactical = buildMovementBudgetRule('tactical');
+  const tactical = buildMovementBudgetRule('tactical', true);
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));
   assert.match(tactical, /Clear of weather, the point budget is/);
   assert.doesNotMatch(tactical, /Movement this beat is a terrain-weighted/);
@@ -284,6 +286,7 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
   assert.match(tactical, /clamped to the first reachable leg/);
   assert.doesNotMatch(tactical, /dropped, not shortened to the first step/);
+  assert.doesNotMatch(tactical, /standing march/);
   assert.match(tactical, /the move is dropped and the sub-unit stays there/);
 });
 

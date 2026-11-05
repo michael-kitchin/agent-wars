@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CoordinateContext } from './map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from './map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry, listStrategicH3Indexes } from './map/hexCoordinates';
 import { h3ToCode } from './map/hexCodeTranslator';
 import { buildActiveCallbacksSection, formatCallbackLine } from './activeCallbacksSection';
 
@@ -41,6 +41,20 @@ test('infrastructure_destroyed Details keeps a stored briefing code', () => {
   );
   assert.equal(line, 'infrastructure_destroyed(seaport, CI)');
   assert.doesNotMatch(line, /specified territory/);
+});
+
+test('territory_changed outside the battle registry says specified territory', () => {
+  ensureStrategicCoordinateRegistryInitialized();
+  const [enclosing, elsewhere] = listStrategicH3Indexes();
+  assert.ok(enclosing && elsewhere && enclosing !== elsewhere);
+  const battleId = 'callbacks-territory-outside-registry';
+  initTacticalCoordinateRegistry(battleId, enclosing);
+  const tacticalCtx: CoordinateContext = { mode: 'tactical', battleId };
+  const line = formatCallbackLine(
+    { event: 'territory_changed', params: { hexId: elsewhere } },
+    tacticalCtx
+  );
+  assert.equal(line, 'territory_changed(specified territory)');
 });
 
 test('empty Active Callbacks row states the event-driven empty-list consequence', () => {

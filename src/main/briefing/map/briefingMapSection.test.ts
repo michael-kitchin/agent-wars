@@ -1,9 +1,9 @@
 /**
- * Contract tests for AI Operational Map markdown (strategic full-world extent, tactical footprint, fog).
+ * Contract tests for AI Operational Map markdown (strategic window, tactical footprint, fog).
  *
  * Purpose: Locks prompt map scope without coupling to OpenRouter; run via `npm test` after `build:main`.
  * When to use: After changes to `briefingMapSection`, grid projection, or registry selection.
- * Expected outcome: Strategic map includes every strategic code; the tactical map is the window around units and listed targets; fog hides enemy markers when hexes are not visible.
+ * Expected outcome: The strategic map is the window around units, visible enemies, cities, and listed targets; the tactical map is the window around units and listed targets; fog hides enemy markers when hexes are not visible.
  * Exceptions: None; failures indicate regressions in briefing map assembly.
  */
 
@@ -23,6 +23,7 @@ import {
   tacticalMapWindowIndentsFirstRow,
 } from './tacticalAsciiGridProjection';
 import { emptyOverlayGlyph, renderHexAsciiMap, type HexMapCellState } from './hexMapRenderer';
+import { STRATEGIC_MAP_WINDOW_RADIUS } from './strategicMapWindow';
 import { renderDisplacedFeaturesLine } from './briefingTables';
 import type { HexGrid } from './hexGridProjection';
 
@@ -69,37 +70,57 @@ function collectCodeTokensFromMapAscii(mapString: string): Set<string> {
 }
 
 /**
- * Defines the `testStrategicOperationalMapIncludesAllStrategicCodes` function shape.
+ * Collects every fenced code-block body.
  *
- * Purpose: Regression guard that strategic AI prompts use the full-world strategic set, not a unit viewport.
- * When to use: Whenever `buildStrategicOperationalMapSectionMarkdown` extent or registry wiring changes.
- * Expected outcome: Fence map body contains exactly one occurrence worth of every strategic code token.
+ * Purpose: A strategic window can be more than one patch.
+ * When to use: Assertions that must see every block, not only the first.
+ * Expected outcome: Inner strings between ``` pairs.
  * Exceptions: None.
  */
-function testStrategicOperationalMapIncludesAllCodes(): void {
+function allFenceBodies(markdown: string): string[] {
+  return [...markdown.matchAll(/```\n([\s\S]*?)\n```/g)].map((match) => match[1]!);
+}
+
+/**
+ * A unit and a distant controlled city are two blocks, and the Shown line names the crop.
+ *
+ * Purpose: The strategic prompt no longer sends the whole world as one grid.
+ * When to use: Whenever window selection or the legend changes.
+ * Expected outcome: Two fences, a Shown line, and the get_map sentence only when asked.
+ * Exceptions: None.
+ */
+function testStrategicOperationalMapWindowsAroundUnitsAndCities(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const strategicUnit = latLngToCell(12, 34, 1);
-  const [lat, lng] = cellToLatLng(strategicUnit);
+  const unit = latLngToCell(12, 34, 1);
+  const touchingUnit = new Set(gridDisk(unit, STRATEGIC_MAP_WINDOW_RADIUS + 1));
+  const city = gridDisk(unit, STRATEGIC_MAP_WINDOW_RADIUS + 3).find((cell) => !touchingUnit.has(cell));
+  assert.ok(city);
+  const [unitLat, unitLng] = cellToLatLng(unit);
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: strategicUnit, terrain: 'land', terrainKind: 'plains' }],
-    units: [{ id: 'opp-1', player: 'opponent', unitType: 'infantry', h3Index: strategicUnit }],
+    hexes: [
+      { h3Index: unit, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: city, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [{ id: 'opp-1', player: 'opponent', unitType: 'infantry', h3Index: unit }],
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
+    strategicControl: [{ h3Index: city, controllerPlayerId: 'opponent' }],
+    strategicInfrastructure: [{ h3Index: city, urbanHexCount: 4, airportCount: 0, seaportCount: 0 }],
   };
-  const latLngByH3 = new Map<string, [number, number]>([[strategicUnit, [lat, lng]]]);
-  const md = buildStrategicOperationalMapSectionMarkdown({
-    state,
-    latLngByH3,
-  });
-  const body = firstFenceBody(md);
-  const tokens = collectCodeTokensFromMapAscii(body);
-  const universe = listStrategicH3Indexes();
-  const expectedCodes = new Set(universe.map((h3) => getHexCodeForContext(h3, STRATEGIC_CTX)).filter(Boolean) as string[]);
-  assert.strictEqual(tokens.size, expectedCodes.size, 'map should list each strategic code once');
-  for (const code of expectedCodes) {
-    assert.ok(tokens.has(code), `missing strategic code ${code} in operational map`);
-  }
+  const latLngByH3 = new Map<string, [number, number]>([[unit, [unitLat, unitLng]]]);
+  const md = buildStrategicOperationalMapSectionMarkdown({ state, latLngByH3, mentionGetMap: false });
+  assert.equal(allFenceBodies(md).length, 2);
+  assert.match(md, /Shown: \d+ of \d+ cells in 2 areas around your units/);
+  assert.ok(!md.includes('Call get_map'));
+  assert.ok(md.includes('Each fenced block is one connected area.'));
+  const withTool = buildStrategicOperationalMapSectionMarkdown({ state, latLngByH3, mentionGetMap: true });
+  assert.ok(withTool.includes('Call get_map(center, radius) for cells outside this window.'));
+  const full = listStrategicH3Indexes();
+  const shown = /Shown: (\d+) of (\d+) cells/.exec(md);
+  assert.ok(shown);
+  assert.ok(Number(shown[1]) < full.length);
+  assert.equal(Number(shown[2]), full.length);
 }
 
 /**
@@ -192,7 +213,17 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
     state: hiddenState,
     latLngByH3,
   });
-  assert.ok(!firstFenceBody(hiddenMd).includes('!'), 'hidden human should not render ! overlay in fenced map');
+  assert.ok(
+    allFenceBodies(hiddenMd).every((body) => !body.includes('!')),
+    'hidden human should not render ! overlay in any fenced map'
+  );
+  assert.ok(!gridDisk(strategicAi, STRATEGIC_MAP_WINDOW_RADIUS).includes(strategicHuman));
+  const hiddenCode = getHexCodeForContext(strategicHuman, STRATEGIC_CTX);
+  assert.ok(hiddenCode);
+  assert.ok(
+    allFenceBodies(hiddenMd).every((body) => !body.includes(hiddenCode)),
+    'an undiscovered enemy is not a reason to draw that hex'
+  );
 
   const visibleState: GameStateSnapshot = {
     ...hiddenState,
@@ -202,7 +233,10 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
     state: visibleState,
     latLngByH3,
   });
-  assert.ok(firstFenceBody(visibleMd).includes('!'), 'visible human cell should render ! in fenced map');
+  assert.ok(
+    allFenceBodies(visibleMd).some((body) => body.includes('!')),
+    'visible human cell should render ! in a fenced map'
+  );
 }
 
 /**
@@ -507,7 +541,7 @@ function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
  * Exceptions: None.
  */
 const tests = [
-  { name: 'strategic operational map includes all res1 codes', fn: testStrategicOperationalMapIncludesAllCodes },
+  { name: 'strategic operational map windows around units and cities', fn: testStrategicOperationalMapWindowsAroundUnitsAndCities },
   { name: 'strategic operational map no-units fallback', fn: testStrategicOperationalMapNoUnitsFallback },
   {
     name: 'strategic operational map omits Best Options heading when table empty',

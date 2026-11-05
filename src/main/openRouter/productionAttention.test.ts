@@ -61,6 +61,22 @@ const allCapped = findIdleProductionHexes(
 );
 assert.deepStrictEqual(allCapped, []);
 
+const cappedWithCredits = findIdleProductionHexes(
+  [hexRow('ce', ['infantry', 'armor', 'credits'], [])],
+  new Set(['infantry', 'armor']),
+  label
+);
+assert.strictEqual(cappedWithCredits.length, 1);
+assert.strictEqual(cappedWithCredits[0]?.reason, 'empty');
+assert.deepStrictEqual(cappedWithCredits[0]?.buildableTypes, ['credits']);
+
+const queuedFortification = findIdleProductionHexes(
+  [hexRow('cf', ['armor', 'fortification'], [{ unitType: 'fortification', queueIndex: 0 }])],
+  new Set(['armor']),
+  label
+);
+assert.deepStrictEqual(queuedFortification, []);
+
 const building = findIdleProductionHexes(
   [hexRow('dd', ['infantry', 'armor'], [{ unitType: 'infantry', queueIndex: 0 }])],
   new Set(['armor']),

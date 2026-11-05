@@ -27,11 +27,23 @@ function testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues(): void 
     formatBriefingAvailableUnitTypes(['infantry', 'armor', 'naval', 'air'], maxed),
     'infantry, naval, air'
   );
-  assert.equal(formatBriefingAvailableUnitTypes(['armor'], maxed), 'armor (all at cap)');
+  assert.equal(formatBriefingAvailableUnitTypes(['armor'], maxed), 'armor (all unit types at cap)');
   assert.equal(
     formatBriefingAvailableUnitTypes(['infantry', 'armor', 'air'], new Set(['infantry', 'armor', 'air'])),
-    'infantry, armor, air (all at cap)'
+    'infantry, armor, air (all unit types at cap)'
   );
+  assert.equal(
+    formatBriefingAvailableUnitTypes(
+      ['armor', 'naval', 'fortification', 'credits'],
+      new Set(['armor', 'naval'])
+    ),
+    'armor, naval (all unit types at cap), fortification, credits'
+  );
+  assert.equal(
+    formatBriefingAvailableUnitTypes(['infantry', 'fortification', 'credits'], maxed),
+    'infantry, fortification, credits'
+  );
+  assert.equal(formatBriefingAvailableUnitTypes(['fortification', 'credits'], maxed), 'fortification, credits');
   assert.equal(formatBriefingAvailableUnitTypes([], maxed), '—');
   assert.equal(formatBriefingProductionQueueCell('1 armor', 'armor', maxed), '1 armor (blocked: at cap)');
   assert.equal(formatBriefingProductionQueueCell('1 infantry', 'infantry', maxed), '1 infantry');

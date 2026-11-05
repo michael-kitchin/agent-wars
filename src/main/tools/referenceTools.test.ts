@@ -12,11 +12,16 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
-import { cellToChildren } from 'h3-js';
+import { cellToChildren, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { closeGameDatabaseForTests, getGameState, openGameDatabaseAtPathForTests, resetGameForNewMatch } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
-import { getHexCodeForContext, initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
+import {
+  ensureStrategicCoordinateRegistryInitialized,
+  getHexCodeForContext,
+  initTacticalCoordinateRegistry,
+  listStrategicH3Indexes,
+} from '../briefing/map/hexCoordinates';
 import { tacticalParentCell, tacticalUnderCorner } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildSystemPromptForTools } from '../openRouter/openRouterBuildSystemPrompt';
@@ -121,6 +126,41 @@ test('get_map rejects a code that is not on the battle map', () => {
     resolveToH3: fixture.resolveToH3,
   });
   assert.equal(result.status, 'error');
+  assert.equal(result.error, 'That cell is not on this battle map.');
+});
+
+test('get_map on the strategic map returns the center and rejects a cell outside it', () => {
+  ensureStrategicCoordinateRegistryInitialized();
+  const centerH3 = latLngToCell(12, 34, 1);
+  const center = getHexCodeForContext(centerH3, { mode: 'strategic' });
+  assert.ok(center);
+  const footprint = listStrategicH3Indexes();
+  assert.ok(footprint.includes(centerH3));
+  const { resolveToH3 } = buildLatLngCoordinateMap([centerH3]);
+  const result = executeReferenceTool({
+    toolName: 'get_map',
+    execArgs: { center, radius: 0 },
+    state: {
+      ...emptyState,
+      hexes: [{ h3Index: centerH3, terrain: 'land', terrainKind: 'plains' }],
+    },
+    coordinateContext: { mode: 'strategic' },
+    tacticalBattle: undefined,
+    resolveToH3,
+  });
+  assert.equal(result.status, 'ok', String(result.error));
+  assert.equal(result.cellCount, 1);
+  assert.ok(Number(result.cellCount) <= footprint.length);
+  const missing = executeReferenceTool({
+    toolName: 'get_map',
+    execArgs: { center: 'ZZ', radius: 0 },
+    state: emptyState,
+    coordinateContext: { mode: 'strategic' },
+    tacticalBattle: undefined,
+    resolveToH3,
+  });
+  assert.equal(missing.status, 'error');
+  assert.equal(missing.error, 'That cell is not on the map.');
 });
 
 test('get_map rejects radius 9', () => {

@@ -39,6 +39,7 @@ import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersResult } from './requestOrdersFlowTypes';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { applyParsedMissileLaunches } from './missileLaunchOrderParsing';
+import { convertOverBudgetExplicitMoveToMarch } from './explicitMoveMarch';
 import {
   dedupeByUnitKeepLast,
   explicitMoveAlreadyArrivedReason,
@@ -290,6 +291,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     });
   }
   const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
+  const heldReasons: string[] = [];
+  const convertedUnitIds = new Set<string>();
   const movementSource = parsed.movementOrders ?? [];
   const rangedSource = parsed.rangedAttacks ?? [];
   const airSource = parsed.airStrikes ?? [];
@@ -358,7 +361,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       ? explicitMoveAlreadyArrivedReason(unitH3Index, order.toH3Index)
       : null;
     if (alreadyArrived) {
-      dropReasons.push(`${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${alreadyArrived}`);
+      heldReasons.push(`${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${alreadyArrived}`);
       seenUnits.add(order.unitId);
       continue;
     }
@@ -427,6 +430,30 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         invalidStandingMovementUnits.add(order.unitId);
         continue;
       }
+      const converted = convertOverBudgetExplicitMoveToMarch({
+        ordersEnabled: flags.ordersEnabled,
+        fromModel: sourceIsLlmOverride,
+        seatId,
+        unitId: order.unitId,
+        toH3Index: order.toH3Index,
+        reason: result.reason,
+        state,
+        latLngByH3,
+        resolveToH3,
+        pathfindingSession: getOrCreateAiPlanningPathfindingSession(),
+        validateAiOrder,
+      });
+      if (converted.converted) {
+        validated.push({ unitId: order.unitId, toH3Index: converted.firstStep });
+        seenUnits.add(order.unitId);
+        convertedUnitIds.add(order.unitId);
+        logDebug('openRouter applyParsedRequestOrders converted explicit_move to march', {
+          unitId: order.unitId,
+          toH3Index: order.toH3Index,
+          firstStep: converted.firstStep,
+        });
+        continue;
+      }
       dropReasons.push(`${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${result.reason}`);
     }
   }
@@ -441,7 +468,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
           playerId: seatId,
           state,
           moves: validated.filter((order) => llmMovementUnitIds.has(order.unitId)),
-          skipUnitIds: new Set(parsed.standingOrderUnitIds ?? []),
+          skipUnitIds: new Set([...(parsed.standingOrderUnitIds ?? []), ...convertedUnitIds]),
           latLngByH3,
         }).length
       : 0;
@@ -591,6 +618,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     defendPostsMoved,
     dropped: dropReasons.length,
     dropReasons,
+    held: heldReasons.length,
+    convertedToMarch: convertedUnitIds.size,
   });
   if (onLog) {
     const ms = Date.now() - wallClockStart;
@@ -607,12 +636,14 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       bits.push(`${outFerry.length} ferry`);
       bits.push(`${outMissile.length} missile launch(es)`);
     }
+    const heldNote = heldReasons.length > 0 ? `; held ${heldReasons.length}` : '';
+    const marchNote = convertedUnitIds.size > 0 ? `; converted to march ${convertedUnitIds.size}` : '';
     const dropNote = dropReasons.length > 0 ? `; ${dropReasons.length} validation note(s)` : '';
     const tokNote =
       usage.totalInputTokens > 0 || usage.totalOutputTokens > 0
         ? `; session tokens in/out ${usage.totalInputTokens}/${usage.totalOutputTokens}`
         : '';
-    onLog(`AI planning complete in ${ms} ms: ${bits.join(', ')}${dropNote}${tokNote}.`);
+    onLog(`AI planning complete in ${ms} ms: ${bits.join(', ')}${heldNote}${marchNote}${dropNote}${tokNote}.`);
   }
   const validatedAirDrops: AirDropOrder[] = [];
   for (const drop of llmAirDrops) {
@@ -639,6 +670,8 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     ...(parsed.exitBattle ? { exitBattle: true } : {}),
     dropped: dropReasons.length,
     dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+    ...(heldReasons.length > 0 ? { held: heldReasons.length, heldReasons } : {}),
+    ...(convertedUnitIds.size > 0 ? { convertedToMarch: convertedUnitIds.size } : {}),
     toolInvocationCounts,
     cost: usage.requestCost > 0 ? usage.requestCost : undefined,
     wallClockMs: Date.now() - wallClockStart,

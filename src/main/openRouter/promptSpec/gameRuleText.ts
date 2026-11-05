@@ -380,11 +380,11 @@ export function tacticalLandEnterCostRule(): string {
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget` are clear-weather counts. A lower number applies only when the weather sentence states one for a unit that lacks that weather. An over-budget strategic explicit move is dropped. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell. A tactical destination past the beat budget is clamped to the first reachable leg. That shortened step is dropped when the sub-unit can already shoot, unless it enters an enemy cell.
+ * Expected outcome: Strategic cell counts from `getMovementBudget` are clear-weather counts. A lower number applies only when the weather sentence states one for a unit that lacks that weather. An over-budget strategic explicit move becomes a standing march when `standingOrdersEnabled` is true, and is dropped when it is false. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell. A tactical destination past the beat budget is clamped to the first reachable leg. That shortened step is dropped when the sub-unit can already shoot, unless it enters an enemy cell.
  * Exceptions: None.
  */
-export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
-  logTrace('promptSpec buildMovementBudgetRule', { mode });
+export function buildMovementBudgetRule(mode: PromptCoordinateMode, standingOrdersEnabled: boolean): string {
+  logTrace('promptSpec buildMovementBudgetRule', { mode, standingOrdersEnabled });
   if (mode === 'tactical') {
     return (
       `Clear of weather, the point budget is ${MOVEMENT_RANGE_BY_UNIT_TYPE.infantry} points for infantry, ` +
@@ -403,7 +403,9 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
     "When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. " +
     'Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. ' +
     'A longer route continues on the next turn, and the turn count includes that halt. ' +
-    "An explicit_move farther than this turn's budget is dropped, not shortened to the first step."
+    (standingOrdersEnabled
+      ? "An explicit_move farther than this turn's budget becomes a standing march to that hex."
+      : "An explicit_move farther than this turn's budget is dropped, not shortened to the first step.")
   );
 }
 
@@ -585,7 +587,7 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
     ...(weatherRule ? [weatherRule] : []),
     buildTerrainCoverRule(gates.coordinateMode),
     resolutionParagraph,
-    buildMovementBudgetRule(gates.coordinateMode),
+    buildMovementBudgetRule(gates.coordinateMode, gates.ordersEnabled),
     buildDestinationOccupancyRule(gates.coordinateMode),
   ];
   if (gates.hasNavalUnits) {

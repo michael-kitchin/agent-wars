@@ -73,8 +73,8 @@ export function looksLikeTacticalSubUnitId(id: string): boolean {
  *
  * Purpose: Preserves that seat's strategic subscriptions so sub-unit tactical callbacks can be discarded on battle end.
  * When to use: Immediately after a successful `startTacticalBattleForEnclosingStrategicHex` installs the session. Pass null when the other party is not an AI seat.
- * Expected outcome: In-memory stash overwritten; durable key written. A null seat records that restore must not touch any seat. When `leadSeatId` is a different AI seat, that seat's rows are stashed too.
- * Exceptions: None.
+ * Expected outcome: In-memory stash overwritten; durable key written; each stashed seat's live list cleared. A null seat records that restore must not touch any seat and clears nothing. When `leadSeatId` is a different AI seat, that seat's rows are stashed and cleared too.
+ * Exceptions: A failed stash write propagates and leaves the live lists in place.
  */
 export function stashOpponentCallbackSubscriptionsForTacticalBattle(
   seatId: AiSeatId | null = AI_SEAT_IDS[0],
@@ -91,6 +91,12 @@ export function stashOpponentCallbackSubscriptionsForTacticalBattle(
       ...(leadSeat ? { leadSeat } : {}),
     };
   writeTacticalCallbackStashToGameConfig(stashedOpponentSubscriptions);
+  if (stashedOpponentSubscriptions.seatId !== null) {
+    clearSubscriptions(stashedOpponentSubscriptions.seatId);
+  }
+  if (stashedOpponentSubscriptions.leadSeat) {
+    clearSubscriptions(stashedOpponentSubscriptions.leadSeat.seatId);
+  }
   logDebug('tacticalCallbackSubscriptionLifecycle stashOpponentCallbackSubscriptionsForTacticalBattle', {
     seatId,
     count: stashedOpponentSubscriptions.subscriptions.length,

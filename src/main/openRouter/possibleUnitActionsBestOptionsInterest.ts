@@ -17,6 +17,33 @@ import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
 /**
+ * How many nearest enemy ids an approach row names before it counts the rest.
+ *
+ * Purpose: Listing every enemy on the nearest hex made approach rows repeat the whole roster.
+ * When to use: `formatApproachTargetUnitIds`.
+ * Expected outcome: Three.
+ * Exceptions: None.
+ */
+export const APPROACH_TARGET_UNITS_LISTED = 3;
+
+/**
+ * Formats the Target Units cell for an approach row.
+ *
+ * Purpose: The cell names who the move closes on without listing every unit at that distance.
+ * When to use: `nearestEnemyUnitIdsSummary`.
+ * Expected outcome: Up to three sorted ids. A longer list appends ` +N more`. An empty list is an em dash.
+ * Exceptions: None.
+ */
+export function formatApproachTargetUnitIds(ids: readonly string[]): string {
+  logTrace('possibleUnitActionsBestOptionsInterest formatApproachTargetUnitIds', { count: ids.length });
+  const listed = [...new Set(ids)].sort(compareUnitIdsNaturally);
+  if (listed.length === 0) return '—';
+  const shown = listed.slice(0, APPROACH_TARGET_UNITS_LISTED);
+  const extra = listed.length - shown.length;
+  return extra > 0 ? `${shown.join(', ')} +${extra} more` : shown.join(', ');
+}
+
+/**
  * Indexed snapshot fields the interest/approach filters read.
  *
  * Purpose: Lets the filters depend only on the maps they read rather than the full `PossibleActionsIndexedState`.
@@ -196,7 +223,7 @@ function safeGridDistance(from: string, to: string): number | null {
  *
  * Purpose: Approach hexes are usually empty of enemies; the table still needs to show who the move closes on.
  * When to use: When `applyInterestOrApproach` emits approach rows.
- * Expected outcome: Comma-separated enemy unit ids at the minimum H3 distance; `—` when none are observed.
+ * Expected outcome: Up to `APPROACH_TARGET_UNITS_LISTED` enemy unit ids at the minimum H3 distance, then ` +N more`. `—` when none are observed.
  * Exceptions: None; invalid distance pairs are skipped.
  */
 function nearestEnemyUnitIdsSummary(indexed: BestOptionsInterestIndex, fromH3: string): string {
@@ -214,7 +241,7 @@ function nearestEnemyUnitIdsSummary(indexed: BestOptionsInterestIndex, fromH3: s
     }
   }
   if (!Number.isFinite(nearestDist) || ids.length === 0) return '—';
-  return [...new Set(ids)].sort(compareUnitIdsNaturally).join(', ');
+  return formatApproachTargetUnitIds(ids);
 }
 
 /**

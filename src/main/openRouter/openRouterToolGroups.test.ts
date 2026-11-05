@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  filterToolNamesForStrategicConsult,
   filterToolNamesForTacticalBattle,
   getGroupIdForToolName,
   getToolNamesForEnabledGroups,
+  resolveConsultToolNames,
   TOOL_GROUP_REGISTRY,
 } from './openRouterToolGroups';
 
@@ -31,12 +31,16 @@ test('filterToolNamesForTacticalBattle: honors disabled tool groups', () => {
   );
 });
 
-test('filterToolNamesForStrategicConsult drops get_map and keeps rules', () => {
+test('strategic consults keep get_map and rules', () => {
   const planning = getToolNamesForEnabledGroups(['planning']);
-  assert.deepEqual(
-    [...filterToolNamesForStrategicConsult(planning)].sort(),
-    ['check_distance', 'plan_route', 'rules']
-  );
+  const names = resolveConsultToolNames({
+    requested: planning,
+    usePrecomputation: true,
+    tactical: false,
+    allToolNames: planning,
+    groupIdForToolName: getGroupIdForToolName,
+  });
+  assert.deepEqual([...names].sort(), ['check_distance', 'get_map', 'plan_route', 'rules']);
   assert.deepEqual(
     [...filterToolNamesForTacticalBattle(planning, getGroupIdForToolName)].sort(),
     ['check_distance', 'get_map', 'plan_route', 'rules']

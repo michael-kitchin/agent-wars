@@ -263,11 +263,11 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates, omitSchemaRe
         ...shared.slice(2),
         'Memory updates and production orders are not accepted this beat.',
         'Strategic hex codes are never valid field values this beat.',
-        "An explicit_move to the sub-unit's current cell is dropped as already arrived.",
+        "An explicit_move to the sub-unit's current cell is ignored as already arrived; the unit holds.",
       ]
     : [
         ...shared.slice(2),
-        "A march or explicit_move to the unit's current cell is dropped as already arrived.",
+        "A march or explicit_move to the unit's current cell is ignored as already arrived; the unit holds.",
         ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
         ...(gates.includeMissileActions === true
           ? ['Missiles cannot be given march, patrol, pursue, defend, or ranged orders; use missileLaunches.']

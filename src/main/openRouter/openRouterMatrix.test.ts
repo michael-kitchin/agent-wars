@@ -182,11 +182,10 @@ async function run(): Promise<void> {
       const enabledToolNames = openRouter.getToolNamesForEnabledGroups(enabledUiIds as unknown as string[]);
       const usePrecomputation = enabledUiIds.includes('precomputation');
       const precomputationExcluded = new Set(['assess_unit', 'assess_hex', 'estimate_combat']);
-      const strategicExcluded = new Set(['get_map']);
       const afterPrecomputation = usePrecomputation
         ? enabledToolNames.filter((name) => !precomputationExcluded.has(name))
         : enabledToolNames;
-      const effectiveToolSet = new Set(afterPrecomputation.filter((name) => !strategicExcluded.has(name)));
+      const effectiveToolSet = new Set(afterPrecomputation);
 
       const capturedRef: { value: CapturedPayload | null } = { value: null };
       const fakeResponse: ChatResponse = {

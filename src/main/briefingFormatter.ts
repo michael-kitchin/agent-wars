@@ -87,6 +87,15 @@ export type FormatBriefingSharedContext = {
    * Exceptions: None.
    */
   productionAttention?: string | null;
+  /**
+   * Whether a cropped strategic map tells the model to call `get_map`.
+   *
+   * Contract: Passed through to the operational map. The sentence appears only when the window is smaller than the loaded set.
+   * When to use: Strategic `formatBriefing` when the consult's tools include `get_map`.
+   * Expected outcome: The Shown line names `get_map` when this is true.
+   * Exceptions: None.
+   */
+  mentionGetMap?: boolean;
 };
 
 /**
@@ -874,6 +883,7 @@ export function formatBriefing(
     state,
     latLngByH3,
     indexedState: sharedContext?.indexedState,
+    mentionGetMap: sharedContext?.mentionGetMap === true,
   });
   if (operational.trim().length > 0) {
     sections.push('\n\n' + operational.trim());

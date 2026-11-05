@@ -284,6 +284,7 @@ export async function requestOrdersFlow(
         indexedState: possibleActionsIndexed,
         includeProductionSection: flags.productionEnabled,
         productionAttention,
+        mentionGetMap: enabledToolNames.includes('get_map'),
       }
     );
     if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {
@@ -352,6 +353,7 @@ export async function requestOrdersFlow(
       fullLogOperationalMapSupplement = buildStrategicOperationalMapSectionMarkdown({
         state: planState,
         latLngByH3,
+        mentionGetMap: enabledToolNames.includes('get_map'),
       });
       logDebug('openRouter requestOrders: full-prompt disk log will include operational map supplement', {
         supplementChars: fullLogOperationalMapSupplement.length,

@@ -170,25 +170,11 @@ export function filterToolNamesForTacticalBattle(
 }
 
 /**
- * Drops the battle map tool from a strategic consult.
- *
- * Purpose: `get_map` reads a battle footprint. `rules` still applies on the strategic map.
- * When to use: The strategic branch of `resolveConsultToolNames`.
- * Expected outcome: Input order preserved, with `get_map` removed.
- * Exceptions: None.
- */
-export function filterToolNamesForStrategicConsult(toolNames: readonly string[]): string[] {
-  const kept = toolNames.filter((name) => name !== 'get_map');
-  logTrace('openRouter filterToolNamesForStrategicConsult', { requested: toolNames.length, kept: kept.length });
-  return kept;
-}
-
-/**
  * Tool names for one consult after precomputation and mode filters.
  *
- * Purpose: Strategic consults never offer `get_map`. Battles drop tools that have no battle implementation.
+ * Purpose: Battles drop tools that have no battle implementation. Strategic consults keep `get_map`, clipped to the loaded cells.
  * When to use: `requestOrdersFlow` once the precomputation flag and battle snapshot are known.
- * Expected outcome: A defined list. An omitted request means every registered tool, then the mode filter.
+ * Expected outcome: A defined list. An omitted request means every registered tool, then the tactical filter when this is a battle.
  * Exceptions: None.
  */
 export function resolveConsultToolNames(input: {
@@ -204,7 +190,7 @@ export function resolveConsultToolNames(input: {
     : input.requested;
   const names = input.tactical
     ? filterToolNamesForTacticalBattle(base ?? input.allToolNames, input.groupIdForToolName)
-    : filterToolNamesForStrategicConsult(base ?? input.allToolNames);
+    : [...(base ?? input.allToolNames)];
   logDebug('openRouter resolveConsultToolNames', {
     tactical: input.tactical,
     usePrecomputation: input.usePrecomputation,

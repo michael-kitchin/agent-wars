@@ -368,6 +368,7 @@ test('callback stash restores pre-battle subscriptions and drops tactical sub-un
       5
     );
     stashOpponentCallbackSubscriptionsForTacticalBattle();
+    assert.equal(getSubscriptions('opponent').length, 0);
     replaceSubscriptions(
       'opponent',
       [{ event: 'unit_destroyed', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],
@@ -391,6 +392,8 @@ test('callback stash restores the battle AI seat and leaves other seats alone', 
     replaceSubscriptions('opponent', [{ event: 'turns', params: { n: 1 }, subscribedTurn: 3 }], 3);
     replaceSubscriptions('opponent2', [{ event: 'turns', params: { n: 9 }, subscribedTurn: 4 }], 4);
     stashOpponentCallbackSubscriptionsForTacticalBattle('opponent2');
+    assert.equal(getSubscriptions('opponent2').length, 0);
+    assert.equal(getSubscriptions('opponent')[0]?.event, 'turns');
     replaceSubscriptions(
       'opponent2',
       [{ event: 'unit_destroyed', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],
@@ -411,6 +414,8 @@ test('an AI-only stash restores both seats, including after a restart', () => {
     replaceSubscriptions('opponent', [{ event: 'turns', params: { n: 2 }, subscribedTurn: 5 }], 5);
     replaceSubscriptions('opponent2', [{ event: 'turns', params: { n: 7 }, subscribedTurn: 6 }], 6);
     stashOpponentCallbackSubscriptionsForTacticalBattle('opponent2', 'opponent');
+    assert.equal(getSubscriptions('opponent').length, 0);
+    assert.equal(getSubscriptions('opponent2').length, 0);
     replaceSubscriptions(
       'opponent',
       [{ event: 'unit_engaged', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],
@@ -443,6 +448,7 @@ test('callback stash for a non-AI party leaves every seat subscription list alon
       1
     );
     stashOpponentCallbackSubscriptionsForTacticalBattle(null);
+    assert.equal(getSubscriptions('opponent')[0]?.params?.unitId, 'opp-parent-armor-1:01');
     restoreOpponentCallbackSubscriptionsAfterTacticalBattle();
     const remaining = getSubscriptions('opponent');
     assert.equal(remaining.length, 1);
@@ -458,6 +464,7 @@ test('callback stash persists to game_config and hydrates after memory clear', (
       2
     );
     stashOpponentCallbackSubscriptionsForTacticalBattle();
+    assert.equal(getSubscriptions('opponent').length, 0);
     assert.ok(tacticalCallbackStashConfigExists(), 'stash should be written to game_config');
     resetTacticalCallbackSubscriptionStashForTests();
     hydrateOpponentCallbackStashFromGameConfig();
@@ -504,6 +511,7 @@ test('double restore does not wipe restored strategic callbacks', () => {
       7
     );
     stashOpponentCallbackSubscriptionsForTacticalBattle();
+    assert.equal(getSubscriptions('opponent').length, 0);
     replaceSubscriptions(
       'opponent',
       [{ event: 'unit_engaged', params: { unitId: 'opp-parent-armor-1:01' }, subscribedTurn: 1 }],

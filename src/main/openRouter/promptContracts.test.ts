@@ -244,7 +244,8 @@ function testStrategicPromptDoesNotMarchToCurrentHex(): void {
   const guidance = buildToolUsageGuidance(flags, true, 'strategic');
   assert.ok(/already arrived/i.test(guidance), 'must warn that current-hex marches are dropped');
   assert.ok(/defend to hold/i.test(guidance));
-  assert.match(guidance, /explicit_move to the unit's current Hex is dropped as already arrived/i);
+  assert.match(guidance, /explicit_move to the unit's current Hex is ignored as already arrived/i);
+  assert.match(guidance, /turn_objectives/);
 }
 
 /**

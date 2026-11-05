@@ -86,7 +86,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 | Surface | Contract |
 | --- | --- |
-| system | With planning off and standing orders also off, the situation message includes the fallback adjacent-cell listing under the unit roster: one line per own unit that names its legal empty neighbours and tells the model to omit explicit_move to stay. The response format, which stays in the system message, adds that a destination on the unit's current cell is dropped as already arrived. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
+| system | With planning off and standing orders also off, the situation message includes the fallback adjacent-cell listing under the unit roster: one line per own unit that names its legal empty neighbours and tells the model to omit explicit_move to stay. The response format, which stays in the system message, adds that a destination on the unit's current cell is ignored as already arrived and the unit holds. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
 | user | Point at the fallback listing as the only source of move destinations when it is present; otherwise point at the tools. |
 | tools | The routing and distance tools disappear with the planning group; the assessment and estimate tools disappear with theirs. |
 | envelope | unchanged in shape. Movement remains legal, but the destination rule changes to the fallback listing. |
@@ -250,7 +250,7 @@ Gate: which consultation entry point runs — every period, or only when an even
 | user | Skipped beat: none. |
 | tools | Skipped beat: none. |
 | envelope | Skipped beat: none. |
-| coaching | The consulted prompt must state that an unconsulted beat is one in which its sub-units do not move, so the model does not defer a move to a beat it may never be asked about. |
+| coaching | The consulted prompt must state that an unconsulted beat is one in which its sub-units do not move, so the model does not defer a move to a beat it may never be asked about. The Active Callbacks table starts empty: strategic subscriptions are saved and the live list is cleared at battle start, then restored when the battle ends. |
 | empty-state | n/a. |
 
 ### 6.4 Previous consultation reached the tool-round limit

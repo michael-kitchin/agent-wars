@@ -93,7 +93,7 @@ fallbackMovementEnabled: boolean;
  * Exceptions: None.
  */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
-  ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent" content "this turn\'s objectives") in your final JSON to record your plan.';
+  ' Include a memoryUpdates entry (e.g. write key "turn_objectives" tier "persistent" content "this turn\'s objectives") in your final JSON to record your plan.';
 
 /**
  * Opening geography clause for strategic AI prompts.
@@ -355,7 +355,7 @@ export function buildToolUsageGuidance(
 /**
  * Lists one-step move hexes for the mode with no planning tools and no standing orders.
  *
- * Purpose: That mode's only destination list must not offer the unit's current cell. An explicit_move there is dropped as already arrived, so staying is omitting the order.
+ * Purpose: That mode's only destination list must not offer the unit's current cell. An explicit_move there is ignored as already arrived, so staying is omitting the order.
  * When to use: When `fallbackMovementEnabled` is true, from the system-prompt builder.
  * Expected outcome: One line per own unit. A line with neighbours says `move to:` those codes and tells the model to omit explicit_move to stay. A line with none says to omit explicit_move. Empty when no unit has a coordinate.
  * Exceptions: None.
@@ -453,7 +453,7 @@ export function getMovementOrderInstruction(
     const memoryHint = flags.memoryEnabled ? ' After your analysis, add memoryUpdates in final JSON if needed. ' : '';
     return (
       memoryHint +
-      'Without planning/standing-order tools, use explicit_move with "destination" set only to a move hex from the "Adjacent cells (fallback)" list. Omit explicit_move to stay; a destination on the unit\'s current cell is dropped as already arrived.' +
+      'Without planning/standing-order tools, use explicit_move with "destination" set only to a move hex from the "Adjacent cells (fallback)" list. Omit explicit_move to stay; a destination on the unit\'s current cell is ignored as already arrived; the unit holds.' +
       memorySuffix
     );
   }

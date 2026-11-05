@@ -18,7 +18,7 @@ export type { GameSize };
  * Expected outcome: Verbatim inclusion so `PRODUCTION_CAP_QUEUE_GUIDANCE` and the table agree on one spelling.
  * Exceptions: None.
  */
-export const ALL_AVAILABLE_TYPES_AT_CAP_NOTE = 'all at cap';
+export const ALL_AVAILABLE_TYPES_AT_CAP_NOTE = 'all unit types at cap';
 
 /**
  * Prompt and briefing copy for AI production when a type is at the per-side deployment cap.
@@ -30,7 +30,8 @@ export const ALL_AVAILABLE_TYPES_AT_CAP_NOTE = 'all at cap';
  */
 export const PRODUCTION_CAP_QUEUE_GUIDANCE =
   'Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. ' +
-  `A hex whose available types are marked "${ALL_AVAILABLE_TYPES_AT_CAP_NOTE}" has no alternative — leave that queue as it is so it resumes when the cap frees up.`;
+  'When every unit type a hex can build is at cap, queue fortification or credits if they are listed. ' +
+  `A hex whose available types are marked "${ALL_AVAILABLE_TYPES_AT_CAP_NOTE}" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up.`;
 
 /**
  * Stable iteration order for deployment-cap checks and maxed-type lists (infantry → armor → naval → air).

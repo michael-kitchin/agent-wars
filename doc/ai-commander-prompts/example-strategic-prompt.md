@@ -4,6 +4,8 @@ One strategic consultation, laid out for reading. The operational map is in a co
 
 This reading copy was edited to match the builders rather than captured. The system message comes first, then the fixed lead-in, then the situation message. The catalog is [strategic-prompt.md](strategic-prompt.md). The builders under `src/main/openRouter/` win if this copy disagrees with them. The reply is [example-strategic-response.md](example-strategic-response.md).
 
+The operational map below is one connected area. The builders print one fenced block per area. When the window is smaller than the loaded set they add `Shown: N of M cells in K areas around your units, visible enemies, your cities, and the listed targets.` and, when `get_map` is enabled, `Call get_map(center, radius) for cells outside this window.`
+
 ---
 
 # Your Command
@@ -44,7 +46,7 @@ Terrain cover: ranged fire at a hex whose main terrain is forest or mountain nee
 
 This turn resolves as embark, then missile launches, then air strikes, then air drops, then ranged fire, then movement, then ferry, then cargo sync, then melee. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId. A unit may fire at a cell and move into that same cell in the same turn; the shot resolves first. Infantry has no strategic ranged_attack (melee only); use movement and melee. Copy each ranged or air-strike row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.
 
-Movement budgets in clear weather: 1 cell for infantry, 2 for armor and naval, and air never marches. When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. A longer route continues on the next turn, and the turn count includes that halt. An explicit_move farther than this turn's budget is dropped, not shortened to the first step.
+Movement budgets in clear weather: 1 cell for infantry, 2 for armor and naval, and air never marches. When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. A longer route continues on the next turn, and the turn count includes that halt. An explicit_move farther than this turn's budget becomes a standing march to that hex.
 
 Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 
@@ -88,12 +90,13 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
 1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination. For naval units, you may pass a land unit's briefing hex code as destination; the route will be to the nearest water/coastal hex to that position so the naval can get in range. For an air unit, the result is the airport chain to that airport and its hop count; copy its orderToHexCode into ferryOrders.destination, not explicit_move.
 2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.
-3. memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.
-4. query_orders(unitId?, all?) - Check standing order statuses.
-5. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
-6. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
-7. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
-8. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
+3. get_map(center, radius?) - The map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.
+4. memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.
+5. query_orders(unitId?, all?) - Check standing order statuses.
+6. query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.
+7. set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.
+8. query_mercenaries(hex?) - Read your treasury, upkeep, and hire orders, or what you can hire in one cell.
+9. hire_mercenaries(action, hex?, unitType?, count?, unitId?, orderId?) - Raise mercenaries in a cell, rehire a Neutral unit, or cancel a hire order. The fee is taken when the order is placed and returned if you cancel it. Orders fill at the end of the turn.
 
 ## How to Use These Tools Effectively
 
@@ -114,7 +117,7 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 - Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 - For every unit listed in the Units Without Standing Orders table, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn's movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.
 
-  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit's current Hex; that order is dropped as already arrived and the unit stays idle. An explicit_move to the unit's current Hex is dropped as already arrived and the unit stays idle.
+  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit's current Hex; that order is ignored as already arrived and the unit holds. An explicit_move to the unit's current Hex is ignored as already arrived and the unit holds.
 
   Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn's movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.
 - Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders, and marches or defend orders whose next move recedes from the nearest enemy.
@@ -131,12 +134,12 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 
   Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 
-  A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up.
+  When every unit type a hex can build is at cap, queue fortification or credits if they are listed. A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up.
 
-  When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.
+  When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.
 
   When the Production attention flag is present, it names each such hex and the types it can still build.
-- Write a short persistent note naming this turn's objectives and the units assigned to them. Include that memoryUpdates write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
+- Write a short persistent note under the key turn_objectives, naming this turn's objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
@@ -177,7 +180,7 @@ Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds"
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is dropped as already arrived. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
+An entry missing a required field is dropped without comment. More than one ranged or air action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. A march or explicit_move to the unit's current cell is ignored as already arrived; the unit holds. Air units cannot be given march, patrol, or pursue orders. Infantry cannot be given a strategic ranged_attack.
 
 For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there. For an air unit, that orderToHexCode goes into ferryOrders.destination, not explicit_move.
 
@@ -191,7 +194,7 @@ Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; 
 
 Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.
 
-A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.
+When every unit type a hex can build is at cap, queue fortification or credits if they are listed. A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up. Each set_build_queue item fully replaces the chosen hex queue with one unit type/count. To hire, add {"action":"raise_mercenaries","hex":"<code>","unitType":"infantry","count":1} or {"action":"rehire_mercenary","unitId":"<id>"} rows to productionOrders.
 
 ## Example Response
 
@@ -281,7 +284,7 @@ A last-known enemy position is a report with an age; a report older than 2 turns
 
 Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). That length can be longer than one movement budget.
 
-Best Options This Turn Target Hexes are the one-step destinations already inside this turn's budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path; an explicit_move past the budget is dropped.
+Best Options This Turn Target Hexes are the one-step destinations already inside this turn's budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path.
 
 | Unit ID | Type | Hex | Bonus | Weather | Nearest enemy + distance | Threat severity | Action needed |
 |---------|------|-----|-------|---------|---------------------------|-----------------|---------------|
@@ -333,7 +336,7 @@ Overlay: * = your units, ! = enemy units, including neutral garrisons, # = conte
 
 Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.
 
-Odd rows are indented one space. Use only hex codes from this map or tables.
+Each fenced block is one connected area. Odd rows in that block are indented one space. Use only hex codes from these blocks or the tables.
 
 ```text
 AB AA AC                                                                                                      
@@ -486,7 +489,7 @@ You can build only in your home region and in cells that hold one of your units 
 
 You are currently at maximum for: infantry, naval, air.
 
-Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. A hex whose available types are marked "all at cap" has no alternative — leave that queue as it is so it resumes when the cap frees up.
+Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. When every unit type a hex can build is at cap, queue fortification or credits if they are listed. A hex whose available types are marked "all unit types at cap" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up.
 
 Production progress/spawn resolves after Ready, after combat and control resolution.
 

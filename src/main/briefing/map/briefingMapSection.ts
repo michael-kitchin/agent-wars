@@ -19,7 +19,6 @@ import {
   initTacticalCoordinateRegistry,
   listStrategicH3Indexes,
 } from './hexCoordinates';
-import { projectToGrid } from './hexGridProjection';
 import {
   projectTacticalFootprintToAsciiGrid,
   projectTacticalMapWindow,
@@ -28,6 +27,15 @@ import {
 import type { HexMapCellState } from './hexMapRenderer';
 import { bindBestOptionsOdds } from './bestOptionsOdds';
 import { emptyOverlayGlyph, renderHexAsciiMap } from './hexMapRenderer';
+import {
+  controlledCityH3ForStrategicMap,
+  groupConnectedMapPatches,
+  renderStrategicWindowPatchesMarkdown,
+  selectStrategicMapWindowCells,
+  strategicOperationalMapLegend,
+  strategicWindowShownLine,
+  visibleEnemyH3ForStrategicMap,
+} from './strategicMapWindow';
 import {
   renderDisplacedFeaturesLine,
   renderThisTurnOptionsTableMarkdown,
@@ -58,13 +66,22 @@ function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
  * Expected outcome: Markdown fragment with the map at H2 and Best Options at H3.
  * Exceptions: None beyond missing registry initialization (handled via `ensureStrategicCoordinateRegistryInitialized`).
  *
- * Map extent: Uses every registered strategic cell (full world) so the LLM sees pole-to-pole and dateline-safe
- * geography; fog and enemy markers still follow `buildStrategicHexGameStateMap` visibility rules.
+ * Map extent: Cells within two steps of own units and visible enemies, plus Best Options targets and controlled
+ * hexes that have urban cells, an airport, or a seaport. Each connected patch is its own fenced block.
  */
 export function buildStrategicOperationalMapSectionMarkdown(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   indexedState?: PossibleActionsIndexedState;
+  /**
+   * Whether a cropped map tells the model to call `get_map`.
+   *
+   * Contract: The sentence is added only when this is true and the window is smaller than the loaded strategic set.
+   * When to use: Strategic briefings whose enabled tools include `get_map`.
+   * Expected outcome: The Shown line gains `Call get_map(center, radius) for cells outside this window.`
+   * Exceptions: None.
+   */
+  mentionGetMap?: boolean;
 }): string {
   logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown', {
     turn: args.state.turnNumber,
@@ -85,14 +102,6 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     return `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n(No units — map not rendered.)\n`;
   }
 
-  const mapHexes = listStrategicH3Indexes();
-  logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: full-world strategic set', {
-    strategicCellCount: mapHexes.length,
-  });
-  const grid = projectToGrid(mapHexes, context);
-  const gameByH3 = buildStrategicHexGameStateMap(args.state, mapHexes);
-  const { mapString, displacedFeatures } = renderHexAsciiMap(grid, gameByH3);
-
   const aggRows = collectAggregatedPossibleActionRows({
     state: args.state,
     latLngByH3: args.latLngByH3,
@@ -100,24 +109,42 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     forThisTurnOptionsTable: true,
     indexedState: args.indexedState,
   });
+  const mapHexes = listStrategicH3Indexes();
+  const windowCells = selectStrategicMapWindowCells({
+    mapCells: mapHexes,
+    ownUnitH3: args.state.units.filter((unit) => unit.player === ownSeat).map((unit) => unit.h3Index),
+    visibleEnemyH3: visibleEnemyH3ForStrategicMap(args.state),
+    controlledCityH3: controlledCityH3ForStrategicMap(args.state),
+    targetH3: aggRows.map((row) => row.targetH3),
+  });
+  const patches = groupConnectedMapPatches(windowCells);
+  logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: window', {
+    strategicCellCount: mapHexes.length,
+    windowCells: windowCells.length,
+    patches: patches.length,
+  });
+  const gameByH3 = buildStrategicHexGameStateMap(args.state, windowCells);
+  const rendered = renderStrategicWindowPatchesMarkdown({ patches, context, gameByH3 });
   const optionsMd = renderThisTurnOptionsTableMarkdown(
     aggRows,
     args.latLngByH3,
     context,
     bindBestOptionsOdds({ state: args.state, latLngByH3: args.latLngByH3 })
   );
-  const displacedLine = renderDisplacedFeaturesLine(displacedFeatures);
-
-  const legend =
-    'Each cell: top = hex code, bottom = terrain + overlay.\n' +
-    'Terrain: x = land, . = water.\n' +
-    `Overlay: ${emptyOverlayGlyph} = nothing here, * = your units, ! = enemy units, including neutral garrisons, # = contested, ? = undiscovered intel.\n` +
-    'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
-    'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
+  const cropped = windowCells.length < mapHexes.length;
+  const shown = cropped
+    ? strategicWindowShownLine({
+        windowCount: windowCells.length,
+        mapCount: mapHexes.length,
+        patchCount: patches.length,
+        mentionGetMap: args.mentionGetMap === true,
+      })
+    : '';
 
   return (
-    `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
-    `${displacedLine}\n` +
+    `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${strategicOperationalMapLegend(shown)}` +
+    `${rendered.blocks}\n\n` +
+    `${rendered.displacedLine}\n` +
     `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
 }
@@ -161,7 +188,15 @@ function briefingMapTerrainBand(rawTerrain: string): 'land' | 'water' {
   return rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
 }
 
-function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: string[]): Map<string, HexMapCellState> {
+/**
+ * Per-cell terrain, features, and occupancy for the strategic ASCII map.
+ *
+ * Purpose: Fog and `?` stay the same whether the cell is in the briefing window or a `get_map` disk.
+ * When to use: After the cells to draw are known.
+ * Expected outcome: One entry per `mapHexes` member. Enemy counts are zero on an undiscovered hex when fog is on.
+ * Exceptions: None. A missing terrain row is land.
+ */
+export function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: readonly string[]): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const controlByH3 = new Map((state.strategicControl ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByH3 = new Map(

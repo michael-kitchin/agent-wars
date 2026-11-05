@@ -85,7 +85,7 @@ When Best Options This Turn lists a target for a sub-unit, copy it and do not ca
 
 1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination.
 2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.
-3. get_map(center, radius?) - The battle map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.
+3. get_map(center, radius?) - The map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.
 4. rules(topic) - Full rules for one topic. Topics: weather, movement, line-of-sight, casualties, stacking, naval, air, fortifications, missiles, mercenaries, resolution, combat-stats.
 5. assess_unit(unitId, radius?) - Battle briefing on one sub-unit: enemies and friendlies within radius cells, which enemies it can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each unit.
 6. estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict a ranged or melee engagement under battle range, terrain, and line-of-sight rules, from beat-start positions. Returns win probability, expected casualties, and an assessment. Does not cover air strikes. Best Options already gives Odds for a listed fight. Use this for a fight the table does not list.
@@ -143,7 +143,7 @@ explicit_move (include "destination": briefing hex code for this beat's march; a
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is dropped as already arrived.
+An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is ignored as already arrived; the unit holds.
 
 Do not emit assign_order or cancel_order for tactical sub-unit ids. Memory updates and production orders are not accepted this beat.
 

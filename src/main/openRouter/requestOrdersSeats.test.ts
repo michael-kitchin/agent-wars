@@ -232,10 +232,10 @@ test('a second-seat consultation orders only that seat', async (t) => {
  *
  * Purpose: A zero-length AI move is not stored as a hold.
  * When to use: After the apply loop drops a same-hex explicit_move.
- * Expected outcome: Only the unit ordered to a different hex appears in `orders`, and a drop reason says already arrived.
+ * Expected outcome: Only the unit ordered to a different hex appears in `orders`, and a held reason says already arrived. That row is not a drop.
  * Exceptions: Skips when the regional pack is not extracted or the seat has fewer than two movable land units.
  */
-test('a same-hex explicit_move is dropped and a different hex is kept', async (t) => {
+test('a same-hex explicit_move is held and a different hex is kept', async (t) => {
   const map = listGameMaps().find((entry) => entry.id === 'western_asia_north' && entry.sideGroups.length >= 3);
   if (!map) {
     t.skip('western_asia_north is not extracted');
@@ -257,7 +257,7 @@ test('a same-hex explicit_move is dropped and a different hex is kept', async (t
       state: ReturnType<typeof getGameState>,
       modelId: string,
       options: { seatId: (typeof AI_SEAT_IDS)[number]; enabledToolNames: string[]; usePrecomputation: boolean }
-    ) => Promise<{ success: boolean; orders: { unitId: string; toH3Index: string }[]; dropReasons?: string[]; error?: string }>;
+    ) => Promise<{ success: boolean; orders: { unitId: string; toH3Index: string }[]; dropReasons?: string[]; heldReasons?: string[]; error?: string }>;
   };
   const memory = require('./commanderKeyMemory') as {
     writeSeatApiKeys: (entries: readonly { seatId: string; apiKey: string }[]) => void;
@@ -311,8 +311,12 @@ test('a same-hex explicit_move is dropped and a different hex is kept', async (t
       assert.deepEqual(result.orders.map((order) => order.unitId), [moving.id]);
       assert.equal(result.orders[0]?.toH3Index, neighbor);
       assert.ok(
-        (result.dropReasons ?? []).some((reason) => reason.includes('already arrived')),
-        `expected an already-arrived drop: ${(result.dropReasons ?? []).join(' | ')}`
+        (result.heldReasons ?? []).some((reason) => reason.includes('already arrived')),
+        `expected an already-arrived hold: ${(result.heldReasons ?? []).join(' | ')}`
+      );
+      assert.ok(
+        !(result.dropReasons ?? []).some((reason) => reason.includes('already arrived')),
+        `already arrived must not be a drop: ${(result.dropReasons ?? []).join(' | ')}`
       );
     });
   } finally {

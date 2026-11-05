@@ -20,7 +20,7 @@ import {
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
-import { isBuildUnitType } from '../productionRules';
+import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
 import { findIdleProductionHexes, selectNextQueueEntry, type IdleProductionHex } from './productionAttention';
 import type { GameStateSnapshot } from '../gameDb';
@@ -64,7 +64,7 @@ export function buildEmptyProductionQueuesSection(): string {
  *
  * Purpose: The production table must not list capped types as buildable when another type can still spawn; a hex that can only build capped types still lists them so pre-queue remains possible, but must say so or the cap guidance reads as an instruction to swap in a type the hex cannot build.
  * When to use: Production briefing rows after `getMaxedUnitTypesForPlayer`.
- * Expected outcome: Comma-separated queueable types, suffixed with the all-at-cap note when every listed type is maxed, or `—` when the hex has no available types at all.
+ * Expected outcome: Comma-separated queueable unit types, then fortification and credits. The cap note is attached to the unit types only when every one of them is maxed. `—` when the hex has nothing available.
  * Exceptions: None.
  */
 export function formatBriefingAvailableUnitTypes(
@@ -75,10 +75,16 @@ export function formatBriefingAvailableUnitTypes(
     availableCount: available.length,
     maxedCount: maxedTypes.size,
   });
-  const kept = filterQueueableUnitTypes(available, maxedTypes);
-  if (kept.length === 0) return '—';
-  const label = kept.join(', ');
-  return isEveryAvailableTypeAtCap(kept, maxedTypes) ? `${label} (${ALL_AVAILABLE_TYPES_AT_CAP_NOTE})` : label;
+  const unitTypes = available.filter((item) => isBuildUnitType(item));
+  const extras = available.filter((item) => isBuildQueueItemType(item) && !isBuildUnitType(item));
+  const kept = filterQueueableUnitTypes(unitTypes, maxedTypes);
+  if (kept.length === 0 && extras.length === 0) return '—';
+  const unitLabel = kept.length === 0
+    ? ''
+    : isEveryAvailableTypeAtCap(kept, maxedTypes)
+      ? `${kept.join(', ')} (${ALL_AVAILABLE_TYPES_AT_CAP_NOTE})`
+      : kept.join(', ');
+  return [unitLabel, extras.join(', ')].filter((part) => part.length > 0).join(', ');
 }
 
 /**
@@ -217,7 +223,7 @@ function normalizeControlledHexQueueRow(
   const fortifiedCount = Number(row.fortifiedCount ?? 0);
   const fortifiableCount = Number(row.fortifiableCount ?? 0);
   const availableList = Array.isArray(row.availableUnitTypes)
-    ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).filter(isBuildUnitType)
+    ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).filter((item) => isBuildQueueItemType(item))
     : [];
   const available = formatBriefingAvailableUnitTypes(availableList, maxedTypes);
   const entriesList = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];

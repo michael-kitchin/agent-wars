@@ -8,13 +8,13 @@
  */
 
 import { logTrace } from '../logger';
-import { isBuildUnitType } from '../productionRules';
+import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
 
 /**
  * How many idle hexes the Production attention bullet names before it counts the rest.
  *
- * Purpose: A long list of hex codes would crowd the flags. The production table and `query_production` still list every hex.
+ * Purpose: A long list of hex codes would crowd the flags. `query_production` still lists every controlled hex. The production table lists the busiest hexes and the hexes that already have a queue.
  * When to use: `formatProductionAttentionBullet`.
  * Expected outcome: Six.
  * Exceptions: None.
@@ -51,7 +51,7 @@ export interface IdleProductionHex {
   /**
    * Available build types that are not at the deployment cap.
    *
-   * Contract: Filtered with `isBuildUnitType`, then with `maxedTypes`. Never empty on an idle hex.
+   * Contract: Uncapped unit types, plus `fortification` and `credits` when the hex lists them. Never empty on an idle hex.
    * When to use: The `can build` list in the attention bullet.
    * Expected outcome: Type names in snapshot order.
    * Exceptions: None.
@@ -89,9 +89,9 @@ export function selectNextQueueEntry(
 /**
  * Lists controlled hexes that can build and are not building.
  *
- * Purpose: Attention Flags names these hexes. A hex whose every available type is at cap is not idle.
+ * Purpose: Attention Flags names these hexes. A hex whose unit types are all capped, and which lists neither fortification nor credits, is not idle.
  * When to use: Every controlled-hex queue from `query_production`, not only the rows shown in the table.
- * Expected outcome: Row order is kept. Buildable types are the available build types that are not in `maxedTypes`. A hex is `empty` when it has no queue entry and at least one buildable type, and `blocked` when its next entry is at cap while another type is still buildable.
+ * Expected outcome: Row order is kept. Buildable types are uncapped unit types plus fortification and credits when listed. A hex is `empty` when it has no queue entry and at least one buildable type, and `blocked` when its next entry is a capped unit type while something is still buildable. A hex whose unit types are all capped and which lists neither extra is not idle.
  * Exceptions: None.
  */
 export function findIdleProductionHexes(
@@ -103,9 +103,11 @@ export function findIdleProductionHexes(
   const idle: IdleProductionHex[] = [];
   for (const row of rows) {
     const available = Array.isArray(row.availableUnitTypes)
-      ? (row.availableUnitTypes as unknown[]).map((value) => String(value)).filter(isBuildUnitType)
+      ? (row.availableUnitTypes as unknown[]).map((value) => String(value))
       : [];
-    const buildableTypes = available.filter((unitType) => !maxedTypes.has(unitType));
+    const unitTypes = available.filter((item) => isBuildUnitType(item));
+    const extras = available.filter((item) => isBuildQueueItemType(item) && !isBuildUnitType(item));
+    const buildableTypes = [...unitTypes.filter((unitType) => !maxedTypes.has(unitType)), ...extras];
     if (buildableTypes.length === 0) continue;
     const entries = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
     const nextEntry = selectNextQueueEntry(entries);

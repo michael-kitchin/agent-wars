@@ -147,7 +147,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   },
   {
     name: 'get_map',
-    description: 'The battle map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
+    description: 'The map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
     parameters: {
       type: 'object',
       properties: {
@@ -156,7 +156,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['center'],
     },
-    promptLine: 'get_map(center, radius?) - The battle map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
+    promptLine: 'get_map(center, radius?) - The map around a cell. Radius is 0 to 8 grid steps, default 2. Use it for cells outside the map in the briefing.',
   },
   {
     name: 'rules',

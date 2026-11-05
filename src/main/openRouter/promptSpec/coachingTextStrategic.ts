@@ -188,7 +188,7 @@ function tempoBullet(hasAirUnits: boolean): string {
  */
 const ORDERLESS_BULLET =
   '- For every unit listed in the Units Without Standing Orders table, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn\'s movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.' +
-  '\n\n  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. An explicit_move to the unit\'s current Hex is dropped as already arrived and the unit stays idle.' +
+  '\n\n  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit\'s current Hex; that order is ignored as already arrived and the unit holds. An explicit_move to the unit\'s current Hex is ignored as already arrived and the unit holds.' +
   '\n\n  Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
 
 /**
@@ -254,7 +254,7 @@ const AIRLIFT_PREFERENCE_BULLET =
  *
  * Purpose: An empty legal queue is wasted income; a capped queue should be swapped unless every type is capped.
  * When to use: When production tools are enabled.
- * Expected outcome: Queue something when empty; leave the queue when every available type is capped.
+ * Expected outcome: Queue something when empty. When every unit type is capped, queue fortification or credits if listed; otherwise leave the queue.
  * Exceptions: None.
  */
 const PRODUCTION_BULLET =
@@ -263,7 +263,7 @@ const PRODUCTION_BULLET =
     '. A hex whose available types',
     '.\n\n  A hex whose available types'
   ) +
-  '\n\n  When every available type for that cell is capped, leave the queue alone so it resumes when the cap frees.' +
+  '\n\n  When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.' +
   '\n\n  When the Production attention flag is present, it names each such hex and the types it can still build.';
 
 /**
@@ -286,7 +286,7 @@ const SHARED_HOME_BULLET =
  * Exceptions: None.
  */
 const MEMORY_BULLET =
-  '- Write a short persistent note naming this turn\'s objectives and the units assigned to them. Include that memoryUpdates write every strategic turn. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
+  '- Write a short persistent note under the key turn_objectives, naming this turn\'s objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
 
 /**
  * Callbacks replace the whole subscription list.

@@ -149,6 +149,33 @@ export interface RequestOrdersResult {
    */
   dropReasons?: string[];
   /**
+   * Explicit moves onto the unit's current cell.
+   *
+   * Contract: Omitted when none. These rows are not drops and do not move the unit.
+   * When to use: The completion log and support, beside `dropReasons`.
+   * Expected outcome: The count matches `heldReasons`.
+   * Exceptions: None.
+   */
+  held?: number;
+  /**
+   * One line per explicit move that was already at its destination.
+   *
+   * Contract: Human-readable. Omitted when empty.
+   * When to use: Beside `held`.
+   * Expected outcome: The same text a drop reason used, without counting as a drop.
+   * Exceptions: None.
+   */
+  heldReasons?: string[];
+  /**
+   * Over-budget explicit moves stored as standing marches.
+   *
+   * Contract: Omitted when none. Each counted unit also has this turn's first step in `orders`.
+   * When to use: The completion log.
+   * Expected outcome: A non-negative count of marches written during apply.
+   * Exceptions: None.
+   */
+  convertedToMarch?: number;
+  /**
    * Per-tool-name invocation counts for the completed request.
    *
    * Contract: Keys are tool names; values are non-negative integers.
