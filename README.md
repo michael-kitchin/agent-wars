@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v2.19.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v2.19.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v2.20.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.20.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -284,7 +284,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 ## Status
 
-- **Version:** 2.19.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 2.20.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -294,6 +294,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **2.20.0** removes a vertical line of city cells that a new game drew down the 180° meridian. Those cells were counted as cities because the map seam wrapped them across the world. A new game on Australia & New Zealand or Eastern Europe uses the corrected city counts: Australia & New Zealand infantry costs 9, and Eastern Europe's strike threshold is 8 city cells. A save keeps the city cells and prices it was created with.
 - **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, and groups idle build hexes by what they can still queue. A move past this turn's budget becomes a march when standing orders are on, and a move onto a unit's own cell holds that unit. A battle that crosses the 180° meridian draws as one area. Starting the game again brings the open window to the front, and preparing a commander's briefing freezes the window less.
 - **2.17.0** lets an air unit carry one infantry unit and either drop it within strike range or ferry it through your airports. Resting on a ranged target shows Kill, Hurt, and Loss, and a commander's options use those same chances.
 - **2.16.0** shortens commander prompts. A tactical briefing lists the odds of each fight it already shows. Planning stops after 20 tool rounds, then asks once more for orders with the tools withheld. A planning round can submit orders without a tool call. A knocked-out side shows the turn in parentheses, and a fortification loss names the place and how many hits it absorbed.
