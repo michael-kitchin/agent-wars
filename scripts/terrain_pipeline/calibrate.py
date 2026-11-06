@@ -75,7 +75,7 @@ def _extract_res1_features_and_water_relation(
         rows: List[tuple[CellFeatures, WaterRelationKind]] = []
         for cell in _generate_res1_cells():
             poly = cell_polygon(cell)
-            relation = ocean_relation_for_cell_polygons(poly, ocean_ctx)
+            relation = ocean_relation_for_cell_polygons(poly, ocean_ctx, cell=cell)
             points = deterministic_points_within_polygon(poly, sample_count)
             sampled = sample_many_rasters(raster_pairs, points)
             lc = {c: sampled.get(f"class_{c}") for c in needed_classes}

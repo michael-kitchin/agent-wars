@@ -23,11 +23,12 @@ class DbConfig:
     When to use:
         Build a connection string for validation and optional staging tables.
     What to expect:
-        Environment variables override defaults and can target a custom host/seaport/db.
+        Environment variables override defaults and can target a custom host/port/db.
     """
 
     host: str = "localhost"
-    seaport: int = 5432
+    # PostgreSQL TCP port. psycopg requires the connection keyword ``port``.
+    port: int = 5432
     dbname: str = "agent_wars_1"
     user: str = "postgres"
     password_env_var: str = "AGENT_WARS_DB_PASSWORD"

@@ -2,7 +2,8 @@
 Load ocean (water) polygons from a shapefile and classify H3 cells vs that mask.
 
 Predicates run in EPSG:3857 so H3 lon/lat rings and typical global ocean shapefiles interact
-reliably (avoids many antimeridian issues in raw geographic coordinates).
+reliably. H3 cells that cross 180 degrees are split at the map seam before these tests
+(see ``project_cell_for_masks``).
 
 Uses a :class:`PreparedGeometry` for repeated ``covers`` / ``intersects`` against the full ocean
 union — essential for performance with dense datasets (e.g. Natural Earth 10m).
@@ -17,13 +18,21 @@ from pathlib import Path
 
 import fiona
 from pyproj import CRS, Transformer
-from shapely import make_valid
-from shapely.geometry import LineString, MultiPolygon, Polygon, shape
+from shapely import get_parts, make_valid
+from shapely.affinity import translate
+from shapely.geometry import LineString, MultiPolygon, Polygon, box, shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shapely_xy_transform, unary_union
 from shapely.prepared import prep
 
+from .antimeridian import (
+    ANTIMERIDIAN_SEAM_INSET_M,
+    WEB_MERCATOR_HALF_WIDTH_M,
+    WEB_MERCATOR_WORLD_WIDTH_M,
+    crosses_antimeridian,
+)
 from .classifier import OceanRelationKind
+from .logging_utils import TRACE_LEVEL
 
 LOGGER = logging.getLogger(__name__)
 
@@ -194,24 +203,6 @@ def _exterior_edges_3857(poly: Polygon) -> list[LineString]:
     return edges
 
 
-def _count_edges_fully_covered_by_ocean(
-    cell_3857: Polygon,
-    ocean_ctx: OceanPredicateContext,
-) -> tuple[int, int]:
-    """
-    Why this exists:
-        Support the isolated-island rule: count boundary segments entirely contained in the ocean union.
-    When to use:
-        When the cell intersects ocean but is not fully covered.
-    What to expect:
-        ``(covered_count, total_edges)`` using prepared ``covers`` on each exterior edge.
-    """
-
-    edges = _exterior_edges_3857(cell_3857)
-    covered = sum(1 for e in edges if ocean_ctx.covers(e))
-    return covered, len(edges)
-
-
 @dataclass(frozen=True)
 class MaskPolygonMetrics:
     """
@@ -238,12 +229,150 @@ class MaskPolygonMetrics:
         return self.total_edges > 0 and self.mask_edges == self.total_edges
 
 
+@dataclass(frozen=True)
+class ProjectedCell:
+    """
+    Why this exists:
+        Carry a cell's EPSG:3857 area and boundary edges together, so a cell split at 180 degrees
+        is tested the same way as any other cell.
+    When to use:
+        Build with ``project_cell_for_masks``, then pass to ``_mask_metrics_for_projected_cell``.
+    What to expect:
+        Ordinary cells have a Polygon area and one segment per edge. A cell crossing 180 degrees has
+        one area piece near each edge of the map, and an edge that crosses the seam has two segments.
+    """
+
+    # Area for covers and intersects tests. A MultiPolygon only for a cell split at 180 degrees.
+    area: Polygon | MultiPolygon
+    # One entry per boundary edge in ring order. Each entry holds the edge's segments on each side of the seam.
+    edges: tuple[tuple[LineString, ...], ...]
+
+
+def project_cell_for_masks(cell_poly_wgs84: Polygon | MultiPolygon, *, cell: str | None = None) -> ProjectedCell:
+    """
+    Why this exists:
+        Project a cell polygon to EPSG:3857 for the water and urban mask tests without letting a cell
+        on the 180-degree meridian wrap across the whole map.
+    When to use:
+        Before ``_mask_metrics_for_projected_cell``. Pass the H3 index as ``cell`` whenever the polygon
+        came from ``cell_polygon``. Without it, a crossing cell is projected the old way and spans the
+        whole map.
+    What to expect:
+        Cells that do not cross 180 degrees, pole cells, and calls without ``cell`` use the unchanged
+        single-polygon projection. Crossing cells are split at the map seam.
+    Exceptions:
+        ``ValueError`` when a crossing cell's polygon is not a Polygon or the split leaves no area or
+        an edge without segments.
+    """
+
+    if cell is not None and crosses_antimeridian(cell):
+        LOGGER.log(TRACE_LEVEL, "project_cell_for_masks cell=%s split=True.", cell)
+        return _project_antimeridian_cell(cell, cell_poly_wgs84)
+    LOGGER.log(TRACE_LEVEL, "project_cell_for_masks cell=%s split=False.", cell)
+    projected = _cell_polygon_wgs84_to_3857(cell_poly_wgs84)
+    return ProjectedCell(area=projected, edges=tuple((edge,) for edge in _exterior_edges_3857(projected)))
+
+
+def _shifted_lonlat_to_3857(lng: float, lat: float) -> tuple[float, float]:
+    """
+    Why this exists:
+        PROJ wraps longitudes past 180 back to the west edge of the map. Shifting those x values by
+        one world width keeps a crossing cell's ring continuous past the east edge.
+    When to use:
+        For each vertex of a crossing cell from ``cell_polygon``, which uses longitudes up to about 180 plus
+        the cell width.
+    What to expect:
+        EPSG:3857 coordinates, with x greater than ``WEB_MERCATOR_HALF_WIDTH_M`` for longitudes past 180.
+    """
+
+    if lng > 180.0:
+        x, y = _transformer_wgs84_to_3857.transform(lng - 360.0, lat)
+        return x + WEB_MERCATOR_WORLD_WIDTH_M, y
+    return _transformer_wgs84_to_3857.transform(lng, lat)
+
+
+def _split_at_seam(geom: BaseGeometry) -> list[BaseGeometry]:
+    """
+    Why this exists:
+        Cut a continuous EPSG:3857 geometry that runs past the east map edge into the piece inside the
+        map and the piece past the edge, moved back to the west side.
+    When to use:
+        On rings and edges built with ``_shifted_lonlat_to_3857``.
+    What to expect:
+        Non-empty pieces, east first. Each side stops ``ANTIMERIDIAN_SEAM_INSET_M`` short of the seam, so
+        pieces stay inside the map and inside water polygons that end a hair short of longitude -180.
+    """
+
+    minx, miny, maxx, maxy = geom.bounds
+    east = geom.intersection(box(minx - 1.0, miny - 1.0, WEB_MERCATOR_HALF_WIDTH_M - ANTIMERIDIAN_SEAM_INSET_M, maxy + 1.0))
+    west_window = box(WEB_MERCATOR_HALF_WIDTH_M + ANTIMERIDIAN_SEAM_INSET_M, miny - 1.0, maxx + 1.0, maxy + 1.0)
+    west = translate(geom.intersection(west_window), xoff=-WEB_MERCATOR_WORLD_WIDTH_M)
+    return [piece for piece in (east, west) if not piece.is_empty]
+
+
+def _parts_with_extent(geom: BaseGeometry, kind: type) -> list[BaseGeometry]:
+    """
+    Why this exists:
+        A clip can return a multi-geometry, a point, or a collection. Only real polygons and segments
+        take part in the mask tests.
+    When to use:
+        On each piece from ``_split_at_seam``, with ``Polygon`` for areas and ``LineString`` for edges.
+    What to expect:
+        The parts that are instances of ``kind`` with non-zero area (polygons) or length (lines).
+    """
+
+    return [
+        part
+        for part in get_parts(geom)
+        if isinstance(part, kind) and (part.area > 0.0 if kind is Polygon else part.length > 0.0)
+    ]
+
+
+def _project_antimeridian_cell(cell: str, cell_poly_wgs84: Polygon | MultiPolygon) -> ProjectedCell:
+    """
+    Why this exists:
+        Build the split projection for a cell that crosses 180 degrees, so each piece is tested
+        against masks on its own side of the map.
+    When to use:
+        From ``project_cell_for_masks`` only, for cells where ``crosses_antimeridian`` holds.
+    What to expect:
+        A ``ProjectedCell`` whose area has one or two pieces and whose edges keep the ring order of the
+        cell boundary.
+    Exceptions:
+        ``ValueError`` naming the cell when the polygon is not a Polygon, no area remains after the split,
+        or an edge has no segment.
+    """
+
+    if not isinstance(cell_poly_wgs84, Polygon):
+        message = f"Cell {cell} crosses 180 degrees but its polygon is a {cell_poly_wgs84.geom_type}, not a Polygon."
+        LOGGER.error(message)
+        raise ValueError(message)
+    continuous = Polygon([_shifted_lonlat_to_3857(lng, lat) for lng, lat in list(cell_poly_wgs84.exterior.coords)[:-1]])
+    pieces = [part for piece in _split_at_seam(continuous) for part in _parts_with_extent(piece, Polygon)]
+    if not pieces:
+        message = f"Cell {cell} has no area left after splitting at 180 degrees."
+        LOGGER.error(message)
+        raise ValueError(message)
+    edges: list[tuple[LineString, ...]] = []
+    for index, edge in enumerate(_exterior_edges_3857(continuous)):
+        segments = tuple(part for piece in _split_at_seam(edge) for part in _parts_with_extent(piece, LineString))
+        if not segments:
+            message = f"Cell {cell} edge {index} has no segment after splitting at 180 degrees."
+            LOGGER.error(message)
+            raise ValueError(message)
+        edges.append(segments)
+    area = pieces[0] if len(pieces) == 1 else MultiPolygon(pieces)
+    LOGGER.debug("Split cell %s at 180 degrees: area_pieces=%d edges=%d.", cell, len(pieces), len(edges))
+    return ProjectedCell(area=area, edges=tuple(edges))
+
+
 def _cell_polygon_wgs84_to_3857(cell_poly_wgs84: Polygon | MultiPolygon) -> Polygon:
     """
     Why this exists:
-        Normalize H3 cell polygons to a single EPSG:3857 polygon for mask predicates.
+        Normalize H3 cell polygons to a single EPSG:3857 polygon for mask predicates. This is the path
+        for cells that do not cross 180 degrees.
     When to use:
-        Shared by ``mask_metrics_for_cell_polygon`` and ``ocean_relation_for_cell_polygons``.
+        Through ``project_cell_for_masks``.
     What to expect:
         Returns a valid :class:`~shapely.geometry.Polygon`; may use convex hull for exotic multipolygon cases.
     """
@@ -265,22 +394,24 @@ def _cell_polygon_wgs84_to_3857(cell_poly_wgs84: Polygon | MultiPolygon) -> Poly
 def mask_metrics_for_cell_polygon(
     cell_poly_wgs84: Polygon | MultiPolygon,
     mask_ctx: OceanPredicateContext,
+    *,
+    cell: str | None = None,
 ) -> MaskPolygonMetrics:
     """
     Why this exists:
         Compute edge counts and intersection flags for a cell against any prepared mask union.
     When to use:
-        Metadata JSON export (water/urban) and debugging mask parity.
+        Metadata JSON export (water/urban) and debugging mask parity. Pass ``cell`` for polygons from
+        ``cell_polygon`` so a cell crossing 180 degrees is split at the map seam.
     What to expect:
         ``total_edges`` is 5 or 6 for typical H3 cells; ``mask_edges`` never exceeds ``total_edges``.
     """
 
-    cell_3857 = _cell_polygon_wgs84_to_3857(cell_poly_wgs84)
-    return _mask_metrics_for_projected_cell(cell_3857, mask_ctx)
+    return _mask_metrics_for_projected_cell(project_cell_for_masks(cell_poly_wgs84, cell=cell), mask_ctx)
 
 
 def _mask_metrics_for_projected_cell(
-    cell_3857: Polygon,
+    projected: ProjectedCell,
     mask_ctx: OceanPredicateContext,
 ) -> MaskPolygonMetrics:
     """
@@ -291,13 +422,14 @@ def _mask_metrics_for_projected_cell(
     What to expect:
         Same flags as ``mask_metrics_for_cell_polygon``. Coverage and intersection are both
         measured, and every boundary edge is counted, including when the cell misses the mask.
+        An edge counts as covered only when all of its segments are covered.
     """
 
-    covers = mask_ctx.covers(cell_3857)
-    intersects = mask_ctx.intersects(cell_3857)
-    covered, total = _count_edges_fully_covered_by_ocean(cell_3857, mask_ctx)
+    covers = mask_ctx.covers(projected.area)
+    intersects = mask_ctx.intersects(projected.area)
+    covered = sum(1 for segments in projected.edges if all(mask_ctx.covers(segment) for segment in segments))
     return MaskPolygonMetrics(
-        total_edges=total,
+        total_edges=len(projected.edges),
         mask_edges=covered,
         mask_covers_cell=covers,
         intersects=intersects,
@@ -307,12 +439,15 @@ def _mask_metrics_for_projected_cell(
 def ocean_relation_for_cell_polygons(
     cell_poly_wgs84: Polygon | MultiPolygon,
     ocean_ctx: OceanPredicateContext,
+    *,
+    cell: str | None = None,
 ) -> OceanRelationKind:
     """
     Why this exists:
         Apply ocean vs land/coastal rules from the water polygon union (EPSG:3857 predicates).
     When to use:
-        For each H3 cell after building ``cell_polygon(cell)``.
+        For each H3 cell after building ``cell_polygon(cell)``. Pass ``cell`` so a cell crossing
+        180 degrees is split at the map seam.
     What to expect:
         ``in_water`` if the cell is entirely within the water union, or if it intersects water and **every**
         exterior edge lies fully within the water union (isolated dry inside the hex while the hex boundary is
@@ -321,7 +456,7 @@ def ocean_relation_for_cell_polygons(
         (never coastal without a water intersection).
     """
 
-    m = mask_metrics_for_cell_polygon(cell_poly_wgs84, ocean_ctx)
+    m = mask_metrics_for_cell_polygon(cell_poly_wgs84, ocean_ctx, cell=cell)
     if m.all_in_mask:
         return "in_water"
     if not m.intersects:

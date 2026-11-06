@@ -6,7 +6,7 @@ import { regionManifestTextFromZip } from './regionPackExtract';
 import { compareManifestSchemaVersion, readRegionManifest, readRegionManifestText, resolveGeneratedRegionsDirectory } from './regionManifestRead';
 
 const EXPECTED_INFANTRY: Readonly<Record<string, number>> = {
-  australia_new_zealand: 10,
+  australia_new_zealand: 9,
   caribbean: 12,
   central_america: 11,
   central_asia: 18,

@@ -16,7 +16,7 @@ Footprint counts are strategic hexes. Side-group entries are each group's share 
 
 | ID | Tier | Map | Pair | Footprint (hexes) | Origin units (units present) | Side groups: urban share (land hexes) | Size ratio | Urban cells / producing hexes / median |
 |---|---|---|---|---|---|---|---|---|
-| *global* | | *Global game* | *res1/res4* | *842, whole globe* | *Countries* | *UN subregions as home regions* | | *4,643 / 283 / 8 (game data)* |
+| *global* | | *Global game* | *res1/res4* | *842, whole globe* | *Countries* | *UN subregions as home regions* | | *4,303 / 264 / 8 (game data)* |
 | eastern-asia | Strong | Eastern Asia | res2/res5 | 216 land + 57 sea = **273** | Admin-1: China (31), Mongolia (22); Whole country: Hong Kong, Japan, Macao, North Korea, South Korea, Taiwan | Japan 27.7% (31); Korea, Manchuria & Inner Mongolia 21.4% (40); North China, the northwest & Mongolia 25.2% (66); South & east China, Taiwan (SECT) 25.6% (54) | 2.1 | 2,832 / 120 / 10.5 |
 | western-europe | Strong | Western Europe | res3/res6 | 136 land + 38 sea + 91 neutral border = **265** | Admin-1: Austria (9), Germany (16); NE region: Belgium (3), France (13); Whole country: Liechtenstein, Luxembourg, Monaco, Netherlands, Switzerland | Southern & eastern Germany, Austria, Switzerland (SEGAS) 24.6% (30); Netherlands & northern Germany 24.2% (22); Southern France 23.8% (30); Northern France & Belgium 27.4% (35) | 1.6 | 4,323 / 94 / 32 |
 | southern-europe | Strong | Southern Europe | res3/res6 | 189 land + 99 sea = **288** | Admin-1: Greece (14); NE region: Bosnia and Herz. (2), Italy (20), Portugal (6), Spain (18, autonomous communities by override); Whole country: Albania, Andorra, Croatia, Gibraltar, Kosovo, Montenegro, North Macedonia, San Marino, Serbia, Slovenia, Vatican | Portugal & western Spain 15.4% (38); Eastern Spain 16.4% (27); Northwestern Italy 18.4% (8); Venetia, the Balkans & Greece 19.8% (55); Southern Italy 14.7% (21); Central Italy 15.3% (15) | 6.9 | 3,203 / 98 / 17.5 |
@@ -31,11 +31,11 @@ Footprint counts are strategic hexes. Side-group entries are each group's share 
 | libya-egypt-sudan | Passable | Libya, Egypt, Sudan (desert trimmed) | res3/res6 | 262 land + 26 sea = **288** | Admin-1: Libya (22), Sudan (17); Whole country: Egypt | Libya 27.2% (86); Lower Egypt 37.3% (25); Upper Egypt & Sudan 35.4% (149) | 6.0 | 413 / 31 / 8 |
 | maghreb | Passable | Maghreb | res3/res6 | 296 land + 30 sea = **326** | Admin-1: Morocco (16); Whole country: Algeria, Tunisia, W. Sahara | Morocco 37.8% (55); Tunisia & eastern Algeria 30.9% (25); Western & central Algeria (WCA) 31.3% (177) | 7.1 | 452 / 33 / 11 |
 | west-africa-coast | Passable | West Africa coast | res3/res6 | 307 land + 43 sea = **350** | Admin-1: Côte d'Ivoire (19), Ghana (10), Nigeria (37), Senegal (14), Sierra Leone (4), Togo (5); NE region: Burkina Faso (13), Guinea (8), Guinea-Bissau (4); Whole country: Benin, Gambia, Liberia | Western Nigeria 27.8% (14); Northern & eastern Nigeria (NEN) 29.1% (69); Western Ghana to Senegal 19.4% (145); Ghana, Togo & Benin 23.7% (41) | 10.4 | 835 / 56 / 9.5 |
-| eastern-europe | Weak | Eastern Europe (whole region) | res2/res5 | 308 land + 42 sea = **350** | Admin-1: Russia (85); Whole country: Belarus, Bulgaria, Czechia, Hungary, Moldova, Poland, Romania, Slovakia, Ukraine | Central & northwestern Russia (CNWR) 17.4% (42); Ukraine, Belarus, Moldova, Romania & Bulgaria 21.8% (15); Volga Russia 21.9% (16); Urals, Siberia & Far East 22.6% (183); Poland, Czechia, Slovakia & Hungary 16.2% (7) | 26.1 | 1,388 / 107 / 9 |
+| eastern-europe | Weak | Eastern Europe (whole region) | res2/res5 | 308 land + 42 sea = **350** | Admin-1: Russia (85); Whole country: Belarus, Bulgaria, Czechia, Hungary, Moldova, Poland, Romania, Slovakia, Ukraine | Central & northwestern Russia (CNWR) 17.8% (42); Ukraine, Belarus, Moldova, Romania & Bulgaria 22.3% (15); Volga Russia 22.4% (16); Urals, Siberia & Far East 20.8% (183); Poland, Czechia, Slovakia & Hungary 16.6% (7) | 26.1 | 1,388 / 107 / 9 |
 | south-america | Weak | South America | res2/res5 | 265 land + 78 sea = **343** | Admin-1: Argentina (24), Bolivia (9), Brazil (27); Whole country: Chile, Colombia, Ecuador, Falkland Is., Guyana, Paraguay, Peru, Suriname, Uruguay, Venezuela | Southeast Brazil 21.9% (17); Venezuela, Colombia, Ecuador & the Guianas 15.6% (47); Central & northern Brazil, Paraguay (CNBP) 19.5% (88); Argentina & Uruguay 23.9% (53); Chile, Bolivia & Peru 19.2% (50) | 5.2 | 720 / 115 / 4 |
 | south-eastern-asia | Weak | South-Eastern Asia | res2/res5 | 143 land + 83 sea + 31 neutral border = **257** | NE region: Thailand (6); Whole country: Brunei, Cambodia, Indonesia, Laos, Malaysia, Myanmar, Philippines, Singapore, Timor-Leste, Vietnam | Central Thailand 28.1% (2); Myanmar, northern Thailand & Indochina 21.5% (25); Malaysia, southern Thailand, Brunei & the Philippines 27.4% (28); Indonesia & Timor-Leste 23.0% (75) | 37.5 | 247 / 38 / 3.5 |
 | caribbean | Weak | Caribbean | res3/res6 | 120 land + 165 sea = **285** | Admin-1: Cuba (16); Whole country: Anguilla, Antigua and Barb., Bahamas, Barbados, British Virgin Is., Cayman Is., Dominica, Dominican Rep., Grenada, Haiti, Jamaica, Montserrat, Puerto Rico, Saint Lucia, Sint Maarten, St-Barthélemy, St-Martin, St. Kitts and Nevis, St. Vin. and Gren., Trinidad and Tobago, Turks and Caicos Is., U.S. Virgin Is. | Puerto Rico & the Leeward Islands 29.9% (13); Hispaniola 19.5% (21); Cuba, Jamaica & the Bahamas 20.8% (70); Southern Antilles & Trinidad 29.9% (18) | 5.4 | 110 / 15 / 5 |
-| australia-nz | Weak | Australia & New Zealand | res2/res5 | 146 land + 148 sea = **294** | Admin-1: Australia (9); NE region: New Zealand (4) | Tasman (Victoria, Tasmania, NZ) (TVTNZ) 33.6% (20); New South Wales & ACT 26.9% (12); Queensland, NT, WA & SA 39.5% (106) | 8.8 | 189 / 33 / 3 |
+| australia-nz | Weak | Australia & New Zealand | res2/res5 | 146 land + 148 sea = **294** | Admin-1: Australia (9); NE region: New Zealand (4) | Tasman (Victoria, Tasmania, NZ) (TVTNZ) 32.5% (20); New South Wales & ACT 27.4% (12); Queensland, NT, WA & SA 40.2% (106) | 8.8 | 189 / 33 / 3 |
 | middle-africa-north | Weak | Middle Africa north | res3/res6 | 270 land + 17 sea = **287** | Admin-1: Cameroon (10), Central African Rep. (17), Chad (22), Gabon (9); Whole country: Eq. Guinea, São Tomé and Principe | Northern Cameroon & Chad 28.1% (107); Gabon, Equatorial Guinea & coastal Cameroon 24.6% (37); Central & western Cameroon (CWC) 25.4% (23); Central African Republic 21.9% (48) | 4.7 | 81 / 13 / 5 |
 | middle-africa-south | Weak | Middle Africa south | res3/res6 | 340 land = **340** | Admin-1: Angola (18), Congo (12), Dem. Rep. Congo (11) | Katanga & Kasai 32.7% (55); Angola 30.9% (99); Northern & western DR Congo, Congo (NWDRCC) 36.4% (139) | 2.5 | 135 / 20 / 6 |
 | southern-east-africa | Weak | Southern East Africa | res3/res6 | 256 land + 26 sea = **282** | Admin-1: Mozambique (10), Tanzania (30), Zambia (10), Zimbabwe (10); NE region: Malawi (5) | Zambia 25.0% (52); Tanzania 25.0% (73); Mozambique & Malawi 21.5% (75); Zimbabwe 28.5% (26) | 2.9 | 228 / 33 / 7 |
@@ -53,7 +53,7 @@ Costs are in production points. A hex earns one point per turn for each intact u
 | western_europe | 60 | 120 | 300 | 180 | 600 | 5 | 7/17/31 | 59 | 26 | 2.907 |
 | southern_europe | 40 | 80 | 200 | 120 | 400 | 9 | 5/12/19 | 41 | 19 | 2.087 |
 | northern_europe | 25 | 50 | 125 | 75 | 250 | 12 | 3/7/12 | 26 | 12 | 1.286 |
-| eastern_europe | 17 | 34 | 85 | 51 | 170 | 14 | 3/6/10 | 15 | 7 | 0.833 |
+| eastern_europe | 17 | 34 | 85 | 51 | 170 | 14 | 3/6/10 | 15 | 8 | 0.844 |
 | northern_america | 20 | 40 | 100 | 60 | 200 | 8 | 2/6/11 | 20 | 9 | 1.000 |
 | central_america | 11 | 22 | 55 | 33 | 110 | 11 | 3/5/7 | 9 | 5 | 0.571 |
 | caribbean | 12 | 24 | 60 | 36 | 120 | 10 | 3/5/6 | 12 | 5 | 0.597 |
@@ -72,7 +72,7 @@ Costs are in production points. A hex earns one point per turn for each intact u
 | southern_asia_east | 20 | 40 | 100 | 60 | 200 | 10 | 3/8/11 | 18 | 9 | 0.976 |
 | eastern_asia | 30 | 60 | 150 | 90 | 300 | 7 | 3/9/16 | 36 | 15 | 1.617 |
 | south_eastern_asia | 9 | 18 | 45 | 27 | 90 | 7 | 2/3/5 | 7 | 4 | 0.427 |
-| australia_new_zealand | 10 | 20 | 50 | 30 | 100 | 8 | 2/4/5 | 10 | 4 | 0.480 |
+| australia_new_zealand | 9 | 18 | 45 | 27 | 90 | 8 | 2/3/5 | 10 | 4 | 0.446 |
 
 ## Table 3: Strategic terrain and combat
 
@@ -163,7 +163,7 @@ The movement and cover rules barely affect the global game (8% of res1 land hexe
   - Where no flag exists, use the country flag plus the NE `postal` code. The naming pipeline needs `iso_3166_2` added to its state rows.
 - **Side groups:** Table 1 lists each group's share of the map's tactical urban cells and its land hexes. Membership is the assignment in `scripts/regional_pipeline/side_group_catalog.py`. A group's share must stay within ±25% of an equal share of that map, and `regional:check` enforces it.
 - **Urban cells:** Natural Earth 10m urban areas with scalerank ≤ 5 (the game's current rule), using H3 `overlap` containment at the map's tactical resolution, counted per strategic hex.
-  - Run at res4, this method reproduces 93% of the game's res4 urban cells (4,304 of 4,643) with the same distribution (median 8 vs 8, 90th percentile 46 vs 44). Ratios therefore use the same method on both sides.
+  - Run at res4, this method finds 4,304 urban cells against the game's 4,303, with the same distribution (median 8 vs 8, 90th percentile 46 vs 45.7). Ratios therefore use the same method on both sides.
 - **Global baseline (same method, res1/res4):** 264 producing hexes, median 8.
   - Share of producing hexes with at least 2 / 5 / 10 / 21 urban cells: 89% / 62% / 44% / 24%.
   - Geometric-mean urban cells of hexes able to build infantry / armor / air / naval: 7.75 / 9.88 / 17.16 / 25.43.

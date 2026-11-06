@@ -24,10 +24,11 @@ from .metadata_io import (
 from .metadata_models import HexMetadataRecordRes1, HexMetadataRecordRes4, UrbanRankMaskEntry
 from .ocean_mask import (
     OceanPredicateContext,
-    _cell_polygon_wgs84_to_3857,
+    ProjectedCell,
     _mask_metrics_for_projected_cell,
     build_ocean_predicate_context,
     load_ocean_union_wgs84,
+    project_cell_for_masks,
 )
 from .point_features import PointCountIndex, build_pair_indexes
 from .resolution_profile import ResolutionProfile
@@ -330,7 +331,7 @@ def _row_for_cell(
     """
 
     poly = cell_polygon(cell)
-    projected = _cell_polygon_wgs84_to_3857(poly)
+    projected = project_cell_for_masks(poly, cell=cell)
     water_metrics = _mask_metrics_for_projected_cell(projected, masks.water)
     total_edges = water_metrics.total_edges
     water_edges = water_metrics.mask_edges
@@ -386,14 +387,14 @@ def _row_for_cell(
 
 
 def _urban_rank_entries(
-    projected_cell: BaseGeometry,
+    projected_cell: ProjectedCell,
     urban_by_rank: tuple[tuple[int, OceanPredicateContext], ...],
 ) -> list[UrbanRankMaskEntry]:
     """
     Why this exists:
         Keep the sparse per-rank urban list identical to the global tactical file.
     When to use:
-        For tactical cells only. ``projected_cell`` is the cell already in EPSG:3857.
+        For tactical cells only. ``projected_cell`` is the projected cell from ``project_cell_for_masks``.
     What to expect:
         Omits ranks that neither cover nor intersect the cell.
     """

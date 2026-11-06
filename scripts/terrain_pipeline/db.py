@@ -28,7 +28,8 @@ class DbRuntimeConfig:
     """
 
     host: str
-    seaport: int
+    # PostgreSQL TCP port, passed to psycopg as ``port``.
+    port: int
     dbname: str
     user: str
     password: str
@@ -52,7 +53,7 @@ def resolve_db_runtime_config(cfg: DbConfig) -> DbRuntimeConfig:
         )
     return DbRuntimeConfig(
         host=cfg.host,
-        seaport=cfg.seaport,
+        port=cfg.port,
         dbname=cfg.dbname,
         user=cfg.user,
         password=password,
@@ -72,7 +73,7 @@ def open_connection(runtime: DbRuntimeConfig) -> psycopg.Connection:
     LOGGER.debug("Opening PostgreSQL connection for terrain pipeline.")
     return psycopg.connect(
         host=runtime.host,
-        seaport=runtime.seaport,
+        port=runtime.port,
         dbname=runtime.dbname,
         user=runtime.user,
         password=runtime.password,

@@ -317,7 +317,7 @@ class TerrainPipeline:
             "generated_at_utc": datetime.now(UTC).isoformat(),
             "db": {
                 "host": self.config.db.host,
-                "seaport": self.config.db.seaport,
+                "port": self.config.db.port,
                 "dbname": self.config.db.dbname,
                 "user": self.config.db.user,
                 "schema": self.config.schema_name,
@@ -516,7 +516,7 @@ class TerrainPipeline:
             raster_pairs = [(k, v) for k, v in datasets.items() if k in needed_keys]
             for idx, cell in enumerate(cells, start=1):
                 poly = cell_polygon(cell)
-                relation = ocean_relation_for_cell_polygons(poly, water_ctx)
+                relation = ocean_relation_for_cell_polygons(poly, water_ctx, cell=cell)
                 points = deterministic_points_within_polygon(poly, sample_count)
                 sampled = sample_many_rasters(raster_pairs, points)
                 landcover = {cls: sampled.get(f"class_{cls}") for cls in needed_landcover_classes}
@@ -533,7 +533,7 @@ class TerrainPipeline:
                     water_relation=relation,
                 )
                 if urban_ctx is not None and relation != "in_water":
-                    urban_relation = ocean_relation_for_cell_polygons(poly, urban_ctx)
+                    urban_relation = ocean_relation_for_cell_polygons(poly, urban_ctx, cell=cell)
                     if urban_relation != "no_water":
                         terrain = "urban"
                 out.append(TerrainRecord(h3_index=cell, terrain=terrain))

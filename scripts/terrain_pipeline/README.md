@@ -253,6 +253,7 @@ python -m scripts.terrain_pipeline.road_rail_sides_cli qa-line-coverage --buffer
   - **Res-1:** dissolved **ocean** shapefile only (reproject to WGS84 if needed).
   - **Res-4:** dissolved **ocean ∪ lakes** union (same predicate rules as ocean-only).
   - Water geometry **`covers`** the cell → **`water`**; **`intersects`** but not **`covers`** → **`coastal`**; no intersection → **interior** biome stack (no other coastal rule).
+- **Cells that cross 180 degrees:** `cell_polygon` shifts such a cell's longitudes to one side of the line for raster sampling. The water and urban tests split it at the EPSG:3857 map seam instead, so each piece is tested on its own side (`project_cell_for_masks` in `ocean_mask.py`). Pole cells keep the unsplit projection. `python -m scripts.terrain_pipeline.antimeridian_qa` summarizes those cells and checks a regenerated file against a baseline.
 - **Interior biomes:** area-sampled land-cover means and topography — `arctic` → `forest` → `mountain` → `desert` → `plains` (`ClassifierThresholds` in `config.py`).
 - **Urban (res-4 only):** Metadata export records aggregate urban metrics and `urban_by_scalerank` intersection metrics; app/runtime consumers decide whether to render an urban variation from those fields.
 - Area sample counts: `area_weighted_samples_per_cell_res1` / `area_weighted_samples_per_cell_res4` on `PipelineConfig`.
