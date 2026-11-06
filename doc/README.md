@@ -34,7 +34,7 @@ Release **2.16.0** shortens commander prompts, lists the odds of each fight the 
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
 
-Release **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, groups idle build hexes by what they can still queue, turns a move past this turn's budget into a march when standing orders are on, and holds a unit ordered onto its own cell.
+Release **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, groups idle build hexes by what they can still queue, turns a move past this turn's budget into a march when standing orders are on, and holds a unit ordered onto its own cell. A battle that crosses the 180° meridian draws as one area. Starting the game again brings the open window to the front, and preparing a commander's briefing freezes the window less.
 
 Turn replay is not built. Later polish, diplomacy, and async multiplayer remain unbuilt.
 

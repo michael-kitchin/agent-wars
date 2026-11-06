@@ -294,7 +294,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
-- **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, and groups idle build hexes by what they can still queue. A move past this turn's budget becomes a march when standing orders are on, and a move onto a unit's own cell holds that unit.
+- **2.19.0** draws each commander's strategic map around its units, visible enemies, cities, and listed targets, and groups idle build hexes by what they can still queue. A move past this turn's budget becomes a march when standing orders are on, and a move onto a unit's own cell holds that unit. A battle that crosses the 180° meridian draws as one area. Starting the game again brings the open window to the front, and preparing a commander's briefing freezes the window less.
 - **2.17.0** lets an air unit carry one infantry unit and either drop it within strike range or ferry it through your airports. Resting on a ranged target shows Kill, Hurt, and Loss, and a commander's options use those same chances.
 - **2.16.0** shortens commander prompts. A tactical briefing lists the odds of each fight it already shows. Planning stops after 20 tool rounds, then asks once more for orders with the tools withheld. A planning round can submit orders without a tool call. A knocked-out side shows the turn in parentheses, and a fortification loss names the place and how many hits it absorbed.
 - **2.15.0** lets each commander choose an OpenRouter host, gives a model call twice as long before it times out, and shows each commander's think time on the result screen.
