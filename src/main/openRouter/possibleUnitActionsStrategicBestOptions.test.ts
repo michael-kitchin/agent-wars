@@ -25,6 +25,8 @@ import {
   findGeodesicLandMassChain,
 } from '../testSupport/strategicLandChainFixtures';
 import { collectAggregatedPossibleActionRows, partitionHomelandNearestOther } from './possibleUnitActions';
+import { collectLegalFerryDestinationHexesCached } from './possibleUnitActionsDestinations';
+import { buildPossibleActionsIndexedState } from './possibleUnitActionsIndexedState';
 import { applyInterestOrApproach } from './possibleUnitActionsBestOptionsInterest';
 import { formatLatLng } from './promptText';
 import { getValidDestinations } from '../oneStepMoveDestinations';
@@ -809,6 +811,45 @@ function testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows(): void {
 }
 
 /**
+ * Two builds from one snapshot agree, and a mutated returned list does not change the next build.
+ *
+ * Purpose: A consult builds these rows more than once from the same snapshot object.
+ * When to use: After changing the strategic ferry destination cache.
+ * Expected outcome: The two row arrays are deep-equal. Pushing onto the cached function's return value leaves the next call unchanged.
+ * Exceptions: Throws when the world map has no unmeasurable in-disk pair.
+ */
+function testFerryDestinationsStayStableWhenTheSnapshotIsReused(): void {
+  const { origin, dest } = findUnmeasurableFerryDiskPair();
+  const state: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [
+      { h3Index: origin, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: dest, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: origin }],
+    pendingOrders: [],
+    strategicInfrastructure: [
+      { h3Index: origin, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+      { h3Index: dest, urbanHexCount: 4, airportCount: 1, seaportCount: 0 },
+    ],
+    strategicControl: [
+      { h3Index: origin, controllerPlayerId: 'opponent' },
+      { h3Index: dest, controllerPlayerId: 'opponent' },
+    ],
+  };
+  const first = collectStrategicThisTurnRows(state);
+  const second = collectStrategicThisTurnRows(state);
+  assert.deepStrictEqual(second, first);
+  const unit = state.units[0]!;
+  const returned = collectLegalFerryDestinationHexesCached(unit, buildPossibleActionsIndexedState(state), state);
+  returned.push('mutated');
+  const again = collectLegalFerryDestinationHexesCached(unit, buildPossibleActionsIndexedState(state), state);
+  assert.ok(!again.includes('mutated'));
+  assert.ok(again.includes(dest));
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
  *
  * Purpose: Runs the strategic Best Options occupancy and approach contracts.
@@ -868,6 +909,10 @@ const tests = [
   {
     name: 'applyInterestOrApproach lists a hex a friendly is leaving this period',
     fn: testStrategicBestOptionsApproachListsHexAFriendlyIsLeaving,
+  },
+  {
+    name: 'strategic ferry destinations stay stable when one snapshot is built twice',
+    fn: testFerryDestinationsStayStableWhenTheSnapshotIsReused,
   },
 ];
 

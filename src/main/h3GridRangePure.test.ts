@@ -8,8 +8,9 @@
  */
 
 import * as assert from 'assert';
-import { cellToChildren, cellToParent, getPentagons, gridDistance, gridPathCells } from 'h3-js';
+import { cellToChildren, cellToParent, getPentagons, getRes0Cells, gridDistance, gridPathCells } from 'h3-js';
 import {
+  clearGridFallbackSearchesForTests,
   computeGridDistancePure,
   computeGridDistanceWithPathFallbackPure,
   computeGridPathCellsPure,
@@ -106,9 +107,66 @@ function testComputeGridPathCellsPureCoversFaceCrossings(): void {
  * Expected outcome: Each entry has a `name` and zero-arg `fn`.
  * Exceptions: None.
  */
+/**
+ * Finds one resolution-1 origin with at least five destinations H3 cannot measure directly.
+ *
+ * Purpose: The distance search is what strategic scans use when `gridDistance` and `gridPathCells` both fail.
+ * When to use: The query-order contract in this file.
+ * Expected outcome: An origin and five destinations. Destinations come from other resolution-0 parents, and at most 200 are tried per origin.
+ * Exceptions: Fails the assertion when no such origin exists.
+ */
+function strategicFaceCrossingSample(): { origin: string; destinations: string[] } {
+  const byParent = getRes0Cells().map((parent) => cellToChildren(parent, 1));
+  for (let parentIndex = 0; parentIndex < byParent.length; parentIndex += 1) {
+    const others = byParent.filter((_, index) => index !== parentIndex).flat();
+    for (const origin of byParent[parentIndex] ?? []) {
+      const destinations: string[] = [];
+      let checked = 0;
+      for (const destination of others) {
+        checked += 1;
+        if (checked > 200) break;
+        if (computeGridDistancePure(origin, destination) !== null) continue;
+        destinations.push(destination);
+        if (destinations.length >= 5) return { origin, destinations };
+      }
+    }
+  }
+  assert.fail('expected a resolution-1 origin with five unmeasurable destinations');
+}
+
+/**
+ * The per-origin distance search matches an independent path, in either query order.
+ *
+ * Purpose: Resuming a search must not depend on which destination was asked first.
+ * When to use: After changing `computeGridDistanceWithPathFallbackPure`.
+ * Expected outcome: Nearest-first and farthest-first both equal the path length minus one.
+ * Exceptions: None. A null path expects a null distance.
+ */
+function testFallbackDistanceAgreesAcrossQueryOrder(): void {
+  const { origin, destinations } = strategicFaceCrossingSample();
+  const oracle = destinations.map((destination) => {
+    const path = computeGridPathCellsPure(origin, destination);
+    return path === null ? null : path.length - 1;
+  });
+  const ordered = destinations
+    .map((destination, index) => ({ destination, distance: oracle[index] ?? Number.MAX_SAFE_INTEGER }))
+    .sort((left, right) => left.distance - right.distance || (left.destination < right.destination ? -1 : 1));
+  const expected = ordered.map((row) => (row.distance === Number.MAX_SAFE_INTEGER ? null : row.distance));
+  clearGridFallbackSearchesForTests();
+  const nearestFirst = ordered.map((row) => computeGridDistanceWithPathFallbackPure(origin, row.destination));
+  clearGridFallbackSearchesForTests();
+  const farthestFirst = [...ordered]
+    .reverse()
+    .map((row) => computeGridDistanceWithPathFallbackPure(origin, row.destination))
+    .reverse();
+  assert.deepStrictEqual(nearestFirst, expected);
+  assert.deepStrictEqual(farthestFirst, expected);
+}
+
 const tests = [
   { name: 'computeGridDistancePure memo matches direct H3', fn: testComputeGridDistancePureMatchesDirectH3 },
   { name: 'computeGridPathCellsPure covers face crossings', fn: testComputeGridPathCellsPureCoversFaceCrossings },
+  { name: 'face-crossing distance agrees in either query order', fn: testFallbackDistanceAgreesAcrossQueryOrder },
 ];
 
 /**

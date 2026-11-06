@@ -15,7 +15,10 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import { tacticalDraftAlreadyDecided } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { getGameState, getSeatRoster } from '../gameDb';
+import { dbGetOne, getSeatRoster } from '../gameDb';
+import { hasDbHandle } from '../gameDb/dbConnection';
+import { readTurnStateRow } from '../gameDb/turnStateReads';
+import { gameMapLoadError } from '../gameMap/loadGameMap';
 import { logDebug, logError, logTrace } from '../logger';
 import {
   beginCommanderToolCountWave,
@@ -479,16 +482,18 @@ function currentTiming(): CommanderPoolTiming {
 }
 
 /**
- * Reads the match turn, or null when the database cannot be read.
+ * Reads the match turn from the turn row, or null when that read throws.
  *
- * Purpose: A consult records the turn it started on.
+ * Purpose: A consult records the turn it started on without building a full snapshot.
  * When to use: Before launching.
- * Expected outcome: The current turn, or null after an error log.
- * Exceptions: Logs and returns null. Does not throw.
+ * Expected outcome: The stored turn, or `1` when there is no database, the map failed to load, or the turn row is missing. `null` after an error log when the read throws.
+ * Exceptions: Logs and returns null. Does not throw. Does not log a map-load failure; the snapshot path already does that.
  */
 function readTurnNumber(): number | null {
   try {
-    return getGameState().turnNumber;
+    if (!hasDbHandle()) return 1;
+    if (gameMapLoadError() !== null) return 1;
+    return readTurnStateRow(dbGetOne)?.turn_number ?? 1;
   } catch (err) {
     logError('commanderPool could not read the match turn', err);
     return null;

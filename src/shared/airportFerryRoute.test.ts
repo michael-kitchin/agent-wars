@@ -5,7 +5,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { findAirportFerryRoute, type AirportFerryNode, type AirportFerryRouteRequest } from './airportFerryRoute';
+import {
+  findAirportFerryRoute,
+  findReachableAirportFerryDestinations,
+  type AirportFerryNode,
+  type AirportFerryRouteRequest,
+} from './airportFerryRoute';
 
 /**
  * Builds a route request from a distance table.
@@ -222,4 +227,112 @@ test('an unmeasured hop is an edge only when the disk fallback accepts it', () =
   });
   assert.deepEqual(accepted, { reachable: true, pathH3Indexes: ['a', 'b'] });
   assert.deepEqual(rejected, { reachable: false, reason: 'No chain of your airports stays within ferry range.' });
+});
+
+/**
+ * Membership in the reachable set matches a per-destination route search.
+ *
+ * Purpose: The set is what briefings and possible-action rows use. A disagreement would list an airport the path search refuses.
+ * When to use: After changing either search.
+ * Expected outcome: Every node other than the origin is in the set exactly when `findAirportFerryRoute` says it is reachable. The origin is absent.
+ * Exceptions: None.
+ */
+function assertReachMatchesRoute(routeRequest: AirportFerryRouteRequest): void {
+  const reached = findReachableAirportFerryDestinations({
+    originH3Index: routeRequest.originH3Index,
+    owner: routeRequest.owner,
+    nodes: routeRequest.nodes,
+    gridDistance: routeRequest.gridDistance,
+    unmeasuredHopWithinRange: routeRequest.unmeasuredHopWithinRange,
+    hopRangeHexes: routeRequest.hopRangeHexes,
+  });
+  assert.equal(reached.has(routeRequest.originH3Index), false);
+  for (const node of routeRequest.nodes) {
+    if (node.h3Index === routeRequest.originH3Index) continue;
+    const route = findAirportFerryRoute({ ...routeRequest, destinationH3Index: node.h3Index });
+    assert.equal(reached.has(node.h3Index), route.reachable, node.h3Index);
+  }
+}
+
+test('reachable airports match a route search on every existing graph', () => {
+  const direct = request({
+    originH3Index: 'a',
+    destinationH3Index: 'b',
+    owner: 'p1',
+    nodes: [airport('a'), airport('b')],
+    edges: { 'a>b': 4 },
+  });
+  const viaIntermediate = request({
+    originH3Index: 'a',
+    destinationH3Index: 'c',
+    owner: 'p1',
+    nodes: [airport('a'), airport('b'), airport('c')],
+    edges: { 'a>c': 8, 'a>b': 4, 'b>c': 4 },
+  });
+  const blockedStops = request({
+    originH3Index: 'a',
+    destinationH3Index: 'd',
+    owner: 'p1',
+    nodes: [
+      airport('a'),
+      { h3Index: 'wrong-owner', owner: 'p2', intact: true, neutralBorder: false },
+      { h3Index: 'wrecked', owner: 'p1', intact: false, neutralBorder: false },
+      { h3Index: 'border', owner: 'p1', intact: true, neutralBorder: true },
+      airport('m'),
+      airport('d'),
+    ],
+    edges: {
+      'a>wrong-owner': 1,
+      'wrong-owner>d': 1,
+      'a>wrecked': 1,
+      'wrecked>d': 1,
+      'a>border': 1,
+      'border>d': 1,
+      'a>m': 4,
+      'm>d': 4,
+      'a>d': 8,
+    },
+  });
+  const shortRange = request({
+    originH3Index: 'a',
+    destinationH3Index: 'near',
+    owner: 'p1',
+    nodes: [airport('a'), airport('far'), airport('near')],
+    edges: { 'a>far': 3, 'a>near': 2 },
+    hopRangeHexes: () => 2,
+  });
+  const nullDistance = request({
+    originH3Index: 'a',
+    destinationH3Index: 'b',
+    owner: 'p1',
+    nodes: [airport('a'), airport('b')],
+    edges: { 'a>b': null },
+  });
+  const unmeasured = {
+    ...request({
+      originH3Index: 'a',
+      destinationH3Index: 'b',
+      owner: 'p1',
+      nodes: [airport('a'), airport('b')],
+      edges: { 'a>b': null },
+    }),
+    unmeasuredHopWithinRange: () => true,
+  };
+  for (const graph of [direct, viaIntermediate, blockedStops, shortRange, nullDistance, unmeasured]) {
+    assertReachMatchesRoute(graph);
+  }
+});
+
+test('a destination-specific hop range keeps only the airport that range allows', () => {
+  const nodes = [airport('a'), airport('snow'), airport('clear')];
+  const reached = findReachableAirportFerryDestinations({
+    originH3Index: 'a',
+    owner: 'p1',
+    nodes,
+    gridDistance: (fromH3Index, toH3Index) => (fromH3Index === 'a' && toH3Index !== 'a' ? 3 : null),
+    hopRangeHexes: (destinationH3Index) => (destinationH3Index === 'snow' ? 2 : 4),
+  });
+  assert.equal(reached.has('a'), false);
+  assert.equal(reached.has('snow'), false);
+  assert.equal(reached.has('clear'), true);
 });

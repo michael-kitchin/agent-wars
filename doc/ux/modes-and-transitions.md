@@ -96,6 +96,7 @@ stateDiagram-v2
 
 - App start with no loaded match -> New game.
 - App start with a loaded match that is not over -> that match, with the console expanded on Opponent. Game over at launch still opens the dialog.
+- Second launch, same user-data directory -> the existing window comes forward and the new process exits. A different user-data directory starts its own copy.
 - Load game, after the file is accepted -> the window reloads into the mode that file resumes, matching a quit and a relaunch with that file on disk. A match still being played asks first. See [save-and-load.md](save-and-load.md).
 - New game -> Strategic planning: Start game succeeds.
 - Strategic planning -> New game: New game in the game menu. The match keeps running under the screen. It is replaced when Start succeeds. New game is unavailable while a Ready is resolving.

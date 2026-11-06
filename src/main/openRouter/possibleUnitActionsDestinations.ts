@@ -4,7 +4,7 @@
  */
 
 import { gridDisk } from 'h3-js';
-import { findAirportFerryRoute } from '../../shared/airportFerryRoute';
+import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../gameDb';
@@ -18,7 +18,7 @@ import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
-import { logInfo, logTrace } from '../logger';
+import { logDebug, logInfo, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { airBaseHasIntactAirport, getInfra, type PossibleActionsIndexedState } from './possibleUnitActionsIndexedState';
 
@@ -49,19 +49,18 @@ export function collectLegalFerryDestinationHexes(
       intact: true,
       neutralBorder: isNeutralBorderHex(h3),
     }));
+  const reachable = findReachableAirportFerryDestinations({
+    originH3Index: unit.h3Index,
+    owner: unit.player,
+    nodes,
+    gridDistance: computeGridDistancePure,
+    unmeasuredHopWithinRange: isWithinGridRangePure,
+    hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(unit, destinationH3Index, state),
+  });
   const out: string[] = [];
   for (const node of nodes) {
     if (node.h3Index === unit.h3Index || node.owner !== unit.player) continue;
-    const route = findAirportFerryRoute({
-      originH3Index: unit.h3Index,
-      destinationH3Index: node.h3Index,
-      owner: unit.player,
-      nodes,
-      gridDistance: computeGridDistancePure,
-      unmeasuredHopWithinRange: isWithinGridRangePure,
-      hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(unit, destinationH3Index, state),
-    });
-    if (!route.reachable) continue;
+    if (!reachable.has(node.h3Index)) continue;
     logHexControllerParityMismatch({
       h3Index: node.h3Index,
       snapshotController: node.owner,
@@ -71,6 +70,106 @@ export function collectLegalFerryDestinationHexes(
     out.push(node.h3Index);
   }
   return out;
+}
+
+/**
+ * Drops every cached ferry list without walking the WeakMap.
+ *
+ * Purpose: A snapshot object is the cache key. Tests that reuse one object after changing it need a fresh search.
+ * When to use: `resetLegalFerryDestinationCacheForTests` only.
+ * Expected outcome: The next lookup treats any existing bucket as empty.
+ * Exceptions: None.
+ */
+let legalFerryDestinationGeneration = 0;
+
+/**
+ * Ferry lists keyed by the snapshot object, then by origin, owner, and weather tags.
+ *
+ * Purpose: One consult builds possible-action rows more than once from the same snapshot. Those builds share this search.
+ * When to use: `collectLegalFerryDestinationHexesCached` only.
+ * Expected outcome: A new `getGameState()` result or a new consult snapshot misses on its own. A caller that mutates a
+ *   snapshot in place, or that passes an indexed view which disagrees with that snapshot, calls the test reset first.
+ *   Every search input comes from the snapshot. The indexed view is derived from that same snapshot.
+ * Exceptions: None.
+ */
+const legalFerryDestinationCache = new WeakMap<
+  GameStateSnapshot,
+  { generation: number; byKey: Map<string, string[]> }
+>();
+
+/**
+ * Returns the ferry-list map for this snapshot, replacing it after a test reset.
+ *
+ * Purpose: Keeps generation checks in one place.
+ * When to use: `collectLegalFerryDestinationHexesCached` only.
+ * Expected outcome: A map whose entries belong to the current generation.
+ * Exceptions: None.
+ */
+function legalFerryDestinationBucket(state: GameStateSnapshot): Map<string, string[]> {
+  const existing = legalFerryDestinationCache.get(state);
+  if (existing && existing.generation === legalFerryDestinationGeneration) return existing.byKey;
+  const byKey = new Map<string, string[]>();
+  legalFerryDestinationCache.set(state, { generation: legalFerryDestinationGeneration, byKey });
+  return byKey;
+}
+
+/**
+ * Names one strategic ferry search: origin, owner, and weather tags.
+ *
+ * Purpose: Units that share all three get the same ferry list, so the cache and the build's origin count use one key.
+ * When to use: `collectLegalFerryDestinationHexesCached`, and when counting distinct ferry origins in one build.
+ * Expected outcome: One string when the origin, owner, and weather tags match. The snapshot is a separate cache key.
+ * Exceptions: None.
+ */
+export function legalFerryDestinationCacheKey(unit: {
+  h3Index: string;
+  player: string;
+  weatherTags?: readonly WeatherState[];
+}): string {
+  logTrace('possibleUnitActions legalFerryDestinationCacheKey', { h3Index: unit.h3Index, player: unit.player });
+  return `${unit.h3Index}|${unit.player}|${unit.weatherTags?.join(',') ?? ''}`;
+}
+
+/**
+ * Returns the strategic ferry destinations for one air unit, reusing a previous search on the same snapshot.
+ *
+ * Purpose: The consult builds the same destinations two or three times. The rows themselves stay uncached because each
+ *   build uses a different coordinate map.
+ * When to use: The strategic air branch of `collectAggregatedPossibleActionRows`.
+ * Expected outcome: The same hexes as `collectLegalFerryDestinationHexes`, in the same order. Each call returns a new
+ *   array. Hit and miss both log at trace.
+ * Exceptions: None. Errors from the search propagate and nothing is stored.
+ */
+export function collectLegalFerryDestinationHexesCached(
+  unit: { id: string; h3Index: string; player: string; unitType: string; weatherTags?: readonly WeatherState[] },
+  indexed: PossibleActionsIndexedState,
+  state: GameStateSnapshot
+): string[] {
+  const key = legalFerryDestinationCacheKey(unit);
+  const bucket = legalFerryDestinationBucket(state);
+  const hit = bucket.get(key);
+  if (hit) {
+    logTrace('possibleUnitActions collectLegalFerryDestinationHexesCached hit', { unitId: unit.id, h3Index: unit.h3Index });
+    return [...hit];
+  }
+  logTrace('possibleUnitActions collectLegalFerryDestinationHexesCached miss', { unitId: unit.id, h3Index: unit.h3Index });
+  const computed = collectLegalFerryDestinationHexes(unit, indexed, state);
+  const stored = [...computed];
+  bucket.set(key, stored);
+  return [...stored];
+}
+
+/**
+ * Forgets cached strategic ferry destinations.
+ *
+ * Purpose: Isolates a test that mutates a snapshot, or that passes an indexed view which disagrees with it.
+ * When to use: At the start of such a test. A new snapshot object does not need this.
+ * Expected outcome: The next lookup misses. One debug line is logged.
+ * Exceptions: None.
+ */
+export function resetLegalFerryDestinationCacheForTests(): void {
+  logDebug('possibleUnitActions resetLegalFerryDestinationCacheForTests');
+  legalFerryDestinationGeneration += 1;
 }
 
 /**

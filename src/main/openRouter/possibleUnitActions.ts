@@ -38,8 +38,9 @@ import {
   type PossibleActionsIndexedState,
 } from './possibleUnitActionsIndexedState';
 import {
-  collectLegalFerryDestinationHexes,
+  collectLegalFerryDestinationHexesCached,
   collectStrikeHexesForAirUnit,
+  legalFerryDestinationCacheKey,
   rememberComputedHexList,
   tacticalLegalMoveDestCacheKey,
   tacticalRangedDestCacheKey,
@@ -310,6 +311,7 @@ export function collectAggregatedPossibleActionRows(args: {
   const strikeHexByOrigin = new Map<string, string[]>();
   const rangedDestByKey = new Map<string, string[]>();
   const strategicLandNavalOrigins = new Set<string>();
+  const strategicFerryOrigins = new Set<string>();
 
   for (const unit of opponentUnits) {
     if (isMissileUnitType(unit.unitType)) continue;
@@ -322,11 +324,8 @@ export function collectAggregatedPossibleActionRows(args: {
             () => collectTacticalLegalFerryDestinationHexes(tacticalBattle, unit.h3Index, unit.player)
           );
         }
-        return rememberComputedHexList(
-          ferryDestByKey,
-          `${unit.h3Index}|${unit.player}|${unit.weatherTags?.join(',') ?? ''}`,
-          () => collectLegalFerryDestinationHexes(unit, indexed, args.state)
-        );
+        strategicFerryOrigins.add(legalFerryDestinationCacheKey(unit));
+        return collectLegalFerryDestinationHexesCached(unit, indexed, args.state);
       }
       if (tacticalBattle) {
         return rememberComputedHexList(
@@ -523,7 +522,7 @@ export function collectAggregatedPossibleActionRows(args: {
   logDebug('possibleUnitActions collectAggregatedPossibleActionRows destCache', {
     opponentUnitCount: opponentUnits.length,
     landNavalOriginKeys: tacticalBattle ? legalDestByKey.size : strategicLandNavalOrigins.size,
-    ferryOriginKeys: ferryDestByKey.size,
+    ferryOriginKeys: tacticalBattle ? ferryDestByKey.size : strategicFerryOrigins.size,
     strikeOriginKeys: strikeHexByOrigin.size,
     rangedOriginKeys: rangedDestByKey.size,
     tactical: Boolean(tacticalBattle),

@@ -78,6 +78,8 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 ### Notes
 
+- Only one copy of Agent Wars runs at a time. Launching it again brings the open window to the front.
+
 - At any time you can change models, stop and restart AI reasoning, or check on spend by opening the **Command** tab.
 
 ![Command tab.](doc/media/command-tab.png)

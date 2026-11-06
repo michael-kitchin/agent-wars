@@ -78,8 +78,9 @@ const PATH_FALLBACK_MEMO_CAPACITY = 2_000;
  *
  * Purpose: Bounds fallback work so one distant pair cannot enumerate a large slice of the grid during order validation;
  * line-of-sight traces run inside a battle footprint or a weapon range, both far shorter than this.
- * When to use: `computeGridPathCellsPure` only.
- * Expected outcome: Pairs farther apart than this report null rather than stalling validation.
+ * When to use: `computeGridPathCellsPure` and the per-origin distance search.
+ * Expected outcome: A search that reaches this depth reports null for a cell it has not already recorded. A distance
+ *   `computeGridDistancePure` can measure is returned as that number, including when it is above this cap.
  * Exceptions: None.
  */
 const PATH_FALLBACK_MAX_DEPTH = 64;
@@ -156,37 +157,164 @@ function breadthFirstPathCells(originH3Index: string, destinationH3Index: string
 }
 
 /**
- * Memoizes BFS-derived distances so scan-heavy callers do not re-run a search they only need a number from.
+ * One unfinished breadth-first distance search from a single origin.
  *
- * Purpose: Nearest-hex scans and ranged-target enumeration measure many candidates against one origin, far more
- * distinct pairs than `pathFallbackMemo` is sized to hold. Caching the integer keeps those callers off the array
- * cache entirely, so a long scan cannot evict the traces the line-of-sight callers depend on.
- * When to use: Only inside `computeGridDistanceWithPathFallbackPure`; keys are `origin|destination`.
- * Expected outcome: Same integer or null as an uncached derivation.
+ * Purpose: Many callers measure several destinations from one origin. Keeping the search lets the next destination resume.
+ * When to use: `fallbackSearchByOrigin` only.
+ * Expected outcome: `depthByCell` holds the origin at 0 and every later first visit. `queue` grows. `nextIndex` is the next
+ *   cell to expand. `exhausted` is true once the queue ends or a dequeued cell is already at the depth cap.
  * Exceptions: None.
  */
-const distanceFallbackMemo = new Map<string, number | null>();
+type FallbackDistanceSearch = {
+  readonly depthByCell: Map<string, number>;
+  readonly queue: string[];
+  nextIndex: number;
+  exhausted: boolean;
+};
+
+/**
+ * Distance searches keyed by origin. Insertion order is the eviction order.
+ *
+ * Purpose: A scan from one origin should not start over for every destination, and a long session must not keep every origin.
+ * When to use: `searchFor` only.
+ * Expected outcome: At most `FALLBACK_SEARCH_ORIGIN_CAPACITY` origins, and about `FALLBACK_SEARCH_CELL_BUDGET` recorded cells.
+ * Exceptions: None.
+ */
+const fallbackSearchByOrigin = new Map<string, FallbackDistanceSearch>();
+
+/**
+ * Recorded cells across every stored search, including each origin.
+ *
+ * Purpose: Eviction has to know the memory cost, and subtracting a removed search's map size only stays correct when every
+ *   recorded cell was counted once.
+ * When to use: `searchFor`, `fallbackDistanceFrom`, and `clearGridFallbackSearchesForTests`.
+ * Expected outcome: Equals the sum of the stored maps' sizes.
+ * Exceptions: None.
+ */
+let fallbackSearchCellCount = 0;
+
+/**
+ * How many origins the distance search keeps.
+ *
+ * Purpose: Bounds the map when a turn measures many different origins.
+ * When to use: `searchFor` before inserting a new origin.
+ * Expected outcome: The oldest origin is dropped once this many searches exist.
+ * Exceptions: None.
+ */
+const FALLBACK_SEARCH_ORIGIN_CAPACITY = 256;
+
+/**
+ * How many recorded cells the distance searches may hold before the oldest origin is dropped.
+ *
+ * Purpose: One origin's disk at the depth cap is about 12,500 cells, so one search fits. A long turn must not keep all of them.
+ * When to use: `searchFor` before inserting a new origin.
+ * Expected outcome: Oldest origins are dropped until the count is inside the budget or the map is empty.
+ * Exceptions: None.
+ */
+const FALLBACK_SEARCH_CELL_BUDGET = 200_000;
+
+/**
+ * Returns the origin's search, creating it after evicting oldest entries that no longer fit.
+ *
+ * Purpose: A dropped search is only a cache. The next query for that origin searches again and returns the same distances.
+ * When to use: `fallbackDistanceFrom` only.
+ * Expected outcome: A search whose origin is recorded at depth 0. The cell count includes that origin.
+ * Exceptions: None. Eviction stops when the map is empty, so one search cannot loop.
+ */
+function searchFor(originH3Index: string): FallbackDistanceSearch {
+  const existing = fallbackSearchByOrigin.get(originH3Index);
+  if (existing) return existing;
+  while (
+    fallbackSearchByOrigin.size > 0 &&
+    (fallbackSearchByOrigin.size >= FALLBACK_SEARCH_ORIGIN_CAPACITY ||
+      fallbackSearchCellCount > FALLBACK_SEARCH_CELL_BUDGET)
+  ) {
+    const oldest = fallbackSearchByOrigin.keys().next().value;
+    if (oldest === undefined) break;
+    const evicted = fallbackSearchByOrigin.get(oldest);
+    if (evicted) fallbackSearchCellCount -= evicted.depthByCell.size;
+    fallbackSearchByOrigin.delete(oldest);
+  }
+  const depthByCell = new Map<string, number>([[originH3Index, 0]]);
+  fallbackSearchCellCount += 1;
+  const created: FallbackDistanceSearch = { depthByCell, queue: [originH3Index], nextIndex: 0, exhausted: false };
+  fallbackSearchByOrigin.set(originH3Index, created);
+  return created;
+}
+
+/**
+ * Distance from an origin whose straight-line H3 distance was null, resumed from the last expansion.
+ *
+ * Purpose: First-visit depth on unit-weight edges equals `breadthFirstPathCells`'s path length minus one. Neighbors already
+ *   recorded are skipped, a throwing `gridDisk` is skipped, and cells at the depth cap are recorded but not expanded.
+ *   The search is keyed by the origin only, because a throwing `gridDisk` does not prove the two directions are equal.
+ * When to use: `computeGridDistanceWithPathFallbackPure` after `computeGridDistancePure` returns null.
+ * Expected outcome: The same number a fresh per-pair search would return, or null when the destination is outside the cap.
+ *   The current neighbor ring is finished before returning, so a later destination from this origin is not skipped.
+ * Exceptions: None.
+ */
+function fallbackDistanceFrom(originH3Index: string, destinationH3Index: string): number | null {
+  const search = searchFor(originH3Index);
+  const known = search.depthByCell.get(destinationH3Index);
+  if (known !== undefined) return known;
+  if (search.exhausted) return null;
+  while (search.nextIndex < search.queue.length) {
+    const current = search.queue[search.nextIndex]!;
+    const depth = search.depthByCell.get(current)!;
+    if (depth >= PATH_FALLBACK_MAX_DEPTH) {
+      search.exhausted = true;
+      return null;
+    }
+    search.nextIndex += 1;
+    let ring: string[];
+    try {
+      ring = gridDisk(current, 1);
+    } catch {
+      continue;
+    }
+    for (const neighbor of ring) {
+      if (search.depthByCell.has(neighbor)) continue;
+      search.depthByCell.set(neighbor, depth + 1);
+      search.queue.push(neighbor);
+      fallbackSearchCellCount += 1;
+    }
+    const found = search.depthByCell.get(destinationH3Index);
+    if (found !== undefined) return found;
+  }
+  search.exhausted = true;
+  return null;
+}
+
+/**
+ * Drops every stored distance search.
+ *
+ * Purpose: Query-order tests start from an empty search.
+ * When to use: Tests only.
+ * Expected outcome: The next distance fallback starts a new search. This module does not log.
+ * Exceptions: None.
+ */
+export function clearGridFallbackSearchesForTests(): void {
+  fallbackSearchByOrigin.clear();
+  fallbackSearchCellCount = 0;
+}
 
 /**
  * Returns grid-step distance including pairs that H3's straight-line APIs cannot measure.
  *
- * Contract: `computeGridDistancePure` when that succeeds, else the length of `computeGridPathCellsPure` minus one.
+ * Contract: `computeGridDistancePure` when that succeeds, including a distance above the search cap. Otherwise the
+ *   per-origin search, whose first-visit depth matches `computeGridPathCellsPure`'s path length minus one. The same cell
+ *   is 0 from `computeGridDistancePure` and never reaches the search.
  * When to use: Any caller that must not treat an icosahedron face crossing as "no distance" — move-range validation,
  * nearest-enemy scoring, and approach filters all hid legal actions when they gave up on those pairs.
  * Expected outcome: Non-negative integer; 0 for the same cell.
- * Exceptions: None; returns null only when no path can be derived at all.
+ * Exceptions: None; returns null only when no path can be derived within the depth cap.
  */
 export function computeGridDistanceWithPathFallbackPure(
   originH3Index: string,
   destinationH3Index: string
 ): number | null {
   const direct = computeGridDistancePure(originH3Index, destinationH3Index);
-  if (direct !== null) return direct;
-  const key = `${originH3Index}|${destinationH3Index}`;
-  return getBoundedMemo(distanceFallbackMemo, key, DEFAULT_BOUNDED_MEMO_CAPACITY, () => {
-    const path = computeGridPathCellsPure(originH3Index, destinationH3Index);
-    return path === null ? null : Math.max(0, path.length - 1);
-  });
+  return direct !== null ? direct : fallbackDistanceFrom(originH3Index, destinationH3Index);
 }
 
 /**

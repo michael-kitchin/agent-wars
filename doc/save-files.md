@@ -12,6 +12,10 @@ The file's SQLite `application_id` is `SAVE_APPLICATION_ID` (`0x41575356`). Two 
 
 The operating-system dialogs use the filter name "Agent Wars save" and the extension `agentwars`.
 
+## The open match database
+
+The live match file (`GAME_DB_FILE_NAME`) is opened with `locking_mode = EXCLUSIVE` by `applyGameDbPragmas`. While the game is running, no other program can open that file. A save still works because `VACUUM INTO` uses the same connection. `claimSingleInstanceLock` allows one process per user-data directory, and a second launch brings the open window forward.
+
 ## What a save leaves out
 
 `MACHINE_LOCAL_CONFIG_KEYS` in `src/main/gameDb/machineLocalConfigKeys.ts` lists the seven `game_config` rows that belong to this machine. A save deletes them before the file is written. A load copies this machine's current values of those same rows into the loaded match. They are:

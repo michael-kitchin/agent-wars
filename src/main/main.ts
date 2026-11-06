@@ -79,6 +79,7 @@ import {
 import { logDebug, logError } from './logger';
 import { getHumanNickname, setHumanNickname } from './humanNickname';
 import { HUMAN_NICKNAME_DEFAULT, normalizeSideNickname } from '../shared/sideNicknames';
+import { claimSingleInstanceLock } from './singleInstanceLock';
 import { applyUserDataDirOverride } from './userDataDirOverride';
 import { parseBonusLevel } from '../shared/bonusLevel';
 import { parseGameSize } from '../shared/gameSize';
@@ -579,6 +580,8 @@ function registerIpcHandlers(): void {
 applyVersionedAppName();
 applyUserDataDirOverride(app);
 
+const isPrimaryInstance = claimSingleInstanceLock(app, () => mainWindow);
+
 process.on('uncaughtException', (err) => {
   logError('main uncaughtException', { message: err?.message ?? String(err), stack: err?.stack ?? null });
 });
@@ -586,31 +589,34 @@ process.on('unhandledRejection', (reason) => {
   logError('main unhandledRejection', reason);
 });
 
-app.whenReady().then(async () => {
-  await initDatabase();
-  restorePersistedTacticalBattleSession();
-  rememberCurrentAutoSaveTurnKey();
-  registerIpcHandlers();
-  createWindow();
-  app.on('child-process-gone', (_event, details) => {
-    logError('main child process gone', {
-      type: details.type,
-      reason: details.reason,
-      exitCode: details.exitCode,
-      serviceName: details.serviceName ?? null,
-      name: details.name ?? null,
+if (!isPrimaryInstance) {
+  app.quit();
+} else {
+  app.whenReady().then(async () => {
+    await initDatabase();
+    restorePersistedTacticalBattleSession();
+    rememberCurrentAutoSaveTurnKey();
+    registerIpcHandlers();
+    createWindow();
+    app.on('child-process-gone', (_event, details) => {
+      logError('main child process gone', {
+        type: details.type,
+        reason: details.reason,
+        exitCode: details.exitCode,
+        serviceName: details.serviceName ?? null,
+        name: details.name ?? null,
+      });
     });
   });
-});
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
   }
 });

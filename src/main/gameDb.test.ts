@@ -64,9 +64,11 @@ function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), sqliteDatab
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.createFreshGameDatabaseAt(p);
+    gameDb.closeGameDatabaseForTests();
     const d = new sqliteDatabaseCtor(p);
     gameDb.applyGameDbPragmas(d);
     gameDb.validateGameDatabaseOrThrow(d);
+    assert.strictEqual(d.pragma('locking_mode', { simple: true }), 'exclusive');
     const uv = d.pragma('user_version', { simple: true }) as number;
     assert.strictEqual(uv, gameDb.EXPECTED_USER_VERSION);
     d.close();

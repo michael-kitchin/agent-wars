@@ -58,7 +58,7 @@ export interface AirportFerryNode {
  * Inputs for one airport-chain search.
  *
  * Purpose: Keeps distance and weather range outside this module.
- * When to use: `findAirportFerryRoute`.
+ * When to use: `findAirportFerryRoute`, or `AirportFerryReachRequest` when the destination is not known yet.
  * Expected outcome: Origin, destination, owner, and the airports those two may hop between.
  * Exceptions: None.
  */
@@ -127,6 +127,16 @@ export interface AirportFerryRouteRequest {
    */
   readonly hopRangeHexes: (destinationH3Index: string) => number;
 }
+
+/**
+ * A ferry search that has not chosen a destination yet.
+ *
+ * Purpose: Listing every reachable airport is one search. Finding one path still uses `AirportFerryRouteRequest`.
+ * When to use: `findReachableAirportFerryDestinations`.
+ * Expected outcome: The same origin, owner, airports, and hop rules, without a destination.
+ * Exceptions: None.
+ */
+export type AirportFerryReachRequest = Omit<AirportFerryRouteRequest, 'destinationH3Index'>;
 
 /**
  * The chain, or the reason none exists.
@@ -226,14 +236,46 @@ export function findAirportFerryRoute(request: AirportFerryRouteRequest): Airpor
 }
 
 /**
+ * Lists every airport the owner can reach from the origin, except the origin itself.
+ *
+ * Purpose: Briefings and possible-action rows only need membership. One search replaces a search per destination.
+ * When to use: Strategic ferry lists. Validation, hover preview, and resolution still use `findAirportFerryRoute` because they need the path.
+ * Expected outcome: For any hex other than the origin, membership matches `findAirportFerryRoute` with that hex as the destination.
+ *   The origin is never included. A foreign, wrecked, or neutral-border airport is never included. Each hop asks `hopRangeHexes` for that arrival hex.
+ * Exceptions: None. A null distance is not an edge unless `unmeasuredHopWithinRange` accepts it.
+ */
+export function findReachableAirportFerryDestinations(request: AirportFerryReachRequest): ReadonlySet<string> {
+  const usable = request.nodes
+    .filter((node) => node.intact && node.owner === request.owner && !node.neutralBorder)
+    .map((node) => node.h3Index);
+  const seen = new Set<string>([request.originH3Index]);
+  const queue: string[] = [request.originH3Index];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+    for (const hex of usable) {
+      if (hex === current || seen.has(hex) || !hopAllowed(request, current, hex)) continue;
+      seen.add(hex);
+      queue.push(hex);
+    }
+  }
+  seen.delete(request.originH3Index);
+  return seen;
+}
+
+/**
  * A hop is legal when the grid distance is a positive number inside the arrival range, or when that distance is missing and the disk fallback accepts the hop.
  *
- * Purpose: The edge test for `findAirportFerryRoute`.
+ * Purpose: The edge test for airport ferry searches.
  * When to use: While expanding one airport.
  * Expected outcome: True only for a hop the caller would allow.
  * Exceptions: None.
  */
-function hopAllowed(request: AirportFerryRouteRequest, fromH3Index: string, toH3Index: string): boolean {
+function hopAllowed(
+  request: Pick<AirportFerryRouteRequest, 'gridDistance' | 'unmeasuredHopWithinRange' | 'hopRangeHexes'>,
+  fromH3Index: string,
+  toH3Index: string
+): boolean {
   const range = request.hopRangeHexes(toH3Index);
   const distance = request.gridDistance(fromH3Index, toH3Index);
   if (distance == null) return request.unmeasuredHopWithinRange?.(fromH3Index, toH3Index, range) ?? false;

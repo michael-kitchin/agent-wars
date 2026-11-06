@@ -12,7 +12,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableHelpers';
-import { findAirportFerryRoute } from '../../shared/airportFerryRoute';
+import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { strategicFerryRangeHexes } from '../../shared/weatherBonusRules';
@@ -210,19 +210,18 @@ function nearestFerryAirportCodes(
     intact: true,
     neutralBorder: isNeutralBorderHex(airport.h3Index),
   }));
+  const reachable = findReachableAirportFerryDestinations({
+    originH3Index: air.h3Index,
+    owner,
+    nodes,
+    gridDistance: computeGridDistancePure,
+    unmeasuredHopWithinRange: isWithinGridRangePure,
+    hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(air, destinationH3Index, state),
+  });
   const reached: { h3Index: string; distance: number }[] = [];
   for (const airport of airports) {
     if (airport.h3Index === air.h3Index) continue;
-    const route = findAirportFerryRoute({
-      originH3Index: air.h3Index,
-      destinationH3Index: airport.h3Index,
-      owner,
-      nodes,
-      gridDistance: computeGridDistancePure,
-      unmeasuredHopWithinRange: isWithinGridRangePure,
-      hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(air, destinationH3Index, state),
-    });
-    if (!route.reachable) continue;
+    if (!reachable.has(airport.h3Index)) continue;
     reached.push({
       h3Index: airport.h3Index,
       distance: computeGridDistancePure(air.h3Index, airport.h3Index) ?? Number.MAX_SAFE_INTEGER,
