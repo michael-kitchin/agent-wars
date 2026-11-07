@@ -282,6 +282,8 @@ The generated terrain and region packs under `data/generated/` are tracked, so b
 
 Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/README.md](scripts/terrain_pipeline/README.md). What the app loads at run time is in [doc/terrain-pipeline.md](doc/terrain-pipeline.md).
 
+The match basemap is the generated hillshade under `data/generated/basemap/`, not a live tile server. The app reads it through the `agentwars-basemap` protocol. The build commands are in [scripts/basemap_pipeline/README.md](scripts/basemap_pipeline/README.md).
+
 ## Status
 
 - **Version:** 2.20.0, distributed as side-load builds only (no store, signing, or notarization).

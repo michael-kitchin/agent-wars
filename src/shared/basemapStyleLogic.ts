@@ -5,7 +5,7 @@
 /**
  * CSS filter applied to Leaflet tile panes when the Atlas terrain style is active.
  *
- * Purpose: Distinguishes Atlas from Default without `hue-rotate`, which turns Esri ocean cyan into magenta.
+ * Purpose: Recolors the shared hillshade so Atlas reads apart from Default, without a hue shift.
  * When to use: Pass the return value of `basemapCssFilterForStyle` into the map tile-pane filter API.
  * Expected outcome: Exact string `saturate(0.78) contrast(1.2) brightness(1.03)`.
  * Exceptions: None.
@@ -15,7 +15,7 @@ export const ATLAS_BASEMAP_CSS_FILTER = 'saturate(0.78) contrast(1.2) brightness
 /**
  * CSS filter applied to Leaflet tile panes when the Scientific terrain style is active.
  *
- * Purpose: Flattens the shared Esri hillshade to grayscale so Scientific is distinct from Default and Atlas.
+ * Purpose: Flattens the shared hillshade to grayscale so Scientific reads apart from Default and Atlas.
  * When to use: Pass the return value of `basemapCssFilterForStyle` into the map tile-pane filter API.
  * Expected outcome: Exact string `grayscale(1) contrast(1.18) brightness(1.08)`.
  * Exceptions: None.
@@ -25,7 +25,7 @@ export const SCIENTIFIC_BASEMAP_CSS_FILTER = 'grayscale(1) contrast(1.18) bright
 /**
  * CSS filter applied to Leaflet tile panes when the Wargame terrain style is active.
  *
- * Purpose: Darkens the shared Esri hillshade without a separate tile host or API key.
+ * Purpose: Darkens the shared hillshade for Wargame. The same tiles stay mounted.
  * When to use: Pass the return value of `basemapCssFilterForStyle` into the map tile-pane filter API.
  * Expected outcome: Exact string `invert(1) hue-rotate(180deg)`.
  * Exceptions: None.
@@ -35,7 +35,7 @@ export const WARGAME_BASEMAP_CSS_FILTER = 'invert(1) hue-rotate(180deg)';
 /**
  * Whether Leaflet raster layers should be torn down and recreated for a provider id.
  *
- * Purpose: Style switches that keep the same XYZ host must not flash-reload tiles.
+ * Purpose: A style change keeps the same hillshade, so the tiles must stay mounted.
  * When to use: Via `basemapNeedsRemountForMaps`, or in tests of the single-map predicate.
  * Expected outcome: `true` when `currentId` is null or differs from `nextId`; `false` when they are equal.
  * Exceptions: None.

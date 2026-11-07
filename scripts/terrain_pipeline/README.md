@@ -62,6 +62,7 @@ Which setting a command reads:
 - Regional `validate`, `footprint`, `run`, and `origins` take `--data-root` (default `F:/Data` in `scripts/regional_pipeline/regional_cli.py`). See [../regional_pipeline/README.md](../regional_pipeline/README.md).
 - Hex naming takes `--data-root` on `python -m scripts.naming_pipeline.generate_hex_naming`. The default is `DEFAULT_DATA_ROOT` in `generate_hex_naming.py`. See [../naming_pipeline/README.md](../naming_pipeline/README.md).
 - Weather reads `WORLDCLIM_DIR` in `scripts/weather_pipeline/weather_pack.py`. Global weather export and the regional `weather` step both use it, including when regional `--data-root` points elsewhere. The export downloads `wc2.1_10m_tavg_*.tif` and `wc2.1_10m_prec_*.tif` into that folder when those files are absent. See [../weather_pipeline/README.md](../weather_pipeline/README.md).
+- The basemap pipeline reads ocean and lake shapefiles from `--data-root` (default `InputRasterSet.root`) and GMTED2010 from `--gmted-dir`. See [../basemap_pipeline/README.md](../basemap_pipeline/README.md).
 
 Put the shapefiles and EarthEnv rasters directly in the directory the command reads. Each `.shp` needs the sidecar files the driver requires (`.dbf`, `.shx`, `.prj`, and any others shipped with that layer).
 

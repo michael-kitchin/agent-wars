@@ -1,11 +1,9 @@
 /**
- * Leaflet main map + minimap (global `L` from static/vendor/leaflet). Basemap definitions and fallback
- * order live in basemapProvider.ts.
+ * Leaflet main map + minimap (global `L` from static/vendor/leaflet). The offline hillshade lives in basemapLayer.ts.
  */
 
 import { basemapNeedsRemountForMaps } from '../../shared/basemapStyleLogic';
-import { showMapToast } from '../openRouter/openRouterUiHelpers';
-import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
+import { bindOfflineBasemap, filterOfflineBasemapPanes } from './basemapLayer';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
   alignLngToDrawReference,
@@ -146,30 +144,11 @@ let viewportRect: VendorViewportRect | null = null;
  */
 let onMainViewChanged: (() => void) | null = null;
 
-/** Active tile layers so we can replace the basemap when the terrain style changes. */
-/**
- * Documents the module-scope binding `mainBasemapLayer` (mainBasemapLayer: VendorRasterLayer | null).
-
- * Purpose: Supports maintainability by documenting why `mainBasemapLayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let mainBasemapLayer: VendorRasterLayer | null = null;
-/**
- * Documents the module-scope binding `miniBasemapLayer` (miniBasemapLayer: VendorRasterLayer | null).
-
- * Purpose: Supports maintainability by documenting why `miniBasemapLayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let miniBasemapLayer: VendorRasterLayer | null = null;
 /**
  * Documents the module-scope binding `mountedMainBasemapProviderId` (mountedMainBasemapProviderId: string | null).
 
- * Purpose: Lets style changes skip a main-map remount when that map already shows the requested XYZ host.
- * When to use: Combined with the minimap id in `setMainBasemapByProviderId`; set when a main raster layer is added or the chain is exhausted.
+ * Purpose: Lets a style change skip a main-map remount when that map already shows the requested provider id.
+ * When to use: Together with the minimap id in `setMainBasemapByProviderId`. Set when the maps are created and when that function mounts the hillshade.
  * Expected outcome: The catalog id of the main map tiles, or null when none are mounted.
  * Exceptions: None.
  */
@@ -177,8 +156,8 @@ let mountedMainBasemapProviderId: string | null = null;
 /**
  * Documents the module-scope binding `mountedMiniBasemapProviderId` (mountedMiniBasemapProviderId: string | null).
 
- * Purpose: The minimap can HTTP-fallback independently of the main map; skip remount only when both ids match the request.
- * When to use: Combined with the main id in `setMainBasemapByProviderId`; set when a mini raster layer is added or the chain is exhausted.
+ * Purpose: Both maps record the provider id, so a style change skips remount only when each map already shows the requested id.
+ * When to use: Together with the main id in `setMainBasemapByProviderId`. Set when the maps are created and when that function mounts the hillshade.
  * Expected outcome: The catalog id of the minimap tiles, or null when none are mounted.
  * Exceptions: None.
  */
@@ -212,100 +191,19 @@ function getL(): GlobalLeafletFactory {
 }
 
 /**
- * Defines the `mountRasterBasemap` function shape (function mountRasterBasemap(leafletRef: GlobalLeafletFactory, map: VendorLeafletMap, showAttribution: boolean, chainIndex: number, target: 'main' | 'mini'): void).
-
- * Purpose: Supports maintainability by documenting why `mountRasterBasemap` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function mountRasterBasemap(
-  leafletRef: GlobalLeafletFactory,
-  map: VendorLeafletMap,
-  showAttribution: boolean,
-  chainIndex: number,
-  target: 'main' | 'mini'
-): void {
-  const chain = getRasterBasemapChain();
-  if (chainIndex >= chain.length) {
-    if (target === 'main') mountedMainBasemapProviderId = null;
-    else mountedMiniBasemapProviderId = null;
-    showBasemapErrorToast();
-    return;
-  }
-  const spec = chain[chainIndex]!;
-  if (target === 'main' && mainBasemapLayer) {
-    try {
-      map.removeLayer(mainBasemapLayer);
-    } catch {
-      /* ignore */
-    }
-    mainBasemapLayer = null;
-  }
-  if (target === 'mini' && miniBasemapLayer) {
-    try {
-      map.removeLayer(miniBasemapLayer);
-    } catch {
-      /* ignore */
-    }
-    miniBasemapLayer = null;
-  }
-  let switched = false;
-  const layerOpts: Record<string, unknown> = {
-    attribution: showAttribution ? spec.attributionHtml : '',
-    maxZoom: spec.maxZoom ?? 19,
-    minZoom: spec.minZoom ?? 0,
-  };
-  if (spec.subdomains !== undefined) layerOpts.subdomains = spec.subdomains;
-  const layer: VendorRasterLayer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
-  if (target === 'main') {
-    mainBasemapLayer = layer;
-    mountedMainBasemapProviderId = spec.id;
-  } else {
-    miniBasemapLayer = layer;
-    mountedMiniBasemapProviderId = spec.id;
-  }
-
-  const onTileError = () => {
-    if (switched) return;
-    switched = true;
-    layer.off('tileerror', onTileError);
-    try {
-      map.removeLayer(layer);
-    } catch {
-      /* ignore */
-    }
-    if (target === 'main') {
-      mainBasemapLayer = null;
-      mountedMainBasemapProviderId = null;
-    } else {
-      miniBasemapLayer = null;
-      mountedMiniBasemapProviderId = null;
-    }
-    console.warn('[agent-wars] Basemap tile error; trying next provider', {
-      failedId: spec.id,
-      nextIndex: chainIndex + 1,
-    });
-    mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
-  };
-  layer.on('tileerror', onTileError);
-}
-
-/**
- * Defines the `setMainBasemapByProviderId` function shape (export function setMainBasemapByProviderId(providerId: string): void).
-
- * Purpose: Swaps main and minimap XYZ layers to a catalog provider, or no-ops when both maps already show it.
- * When to use: After map init when the terrain style select changes; safe if Leaflet maps are missing.
- * Expected outcome: Both maps mount from `providerId` (with catalog fallback on HTTP tile errors) unless both already display that id.
- * Exceptions: Returns without throwing when `mainMap` or `miniMap` is null.
+ * Mounts the offline hillshade when the recorded provider id changes.
+ *
+ * Purpose: Terrain styles share one provider, so a style change does not remount.
+ * When to use: After map init when the terrain style select changes.
+ * Expected outcome: Both maps show the offline tiles unless they already show `providerId`.
+ * Exceptions: Returns without throwing when a map is missing.
  */
 export function setMainBasemapByProviderId(providerId: string): void {
   if (!mainMap || !miniMap) return;
   if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
-  const leafletRef = getL();
-  const startIdx = getRasterBasemapChainStartIndex(providerId);
-  mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
-  mountRasterBasemap(leafletRef, miniMap, false, startIdx, 'mini');
+  bindOfflineBasemap(getL() as unknown as Parameters<typeof bindOfflineBasemap>[0], mainMap, miniMap);
+  mountedMainBasemapProviderId = providerId;
+  mountedMiniBasemapProviderId = providerId;
 }
 
 /**
@@ -363,8 +261,9 @@ export function initWorldLeafletMaps(
     inertia: false,
   });
 
-  const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? 'esri_world_shaded_relief');
-  mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
+  const initialId = initialBasemapProviderId ?? 'offline_hillshade';
+  mountedMainBasemapProviderId = initialId;
+  mountedMiniBasemapProviderId = mountedMainBasemapProviderId;
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
@@ -396,7 +295,7 @@ export function initWorldLeafletMaps(
     keyboard: false,
   });
 
-  mountRasterBasemap(leafletRef, miniMap, false, startIdx, 'mini');
+  bindOfflineBasemap(leafletRef as unknown as Parameters<typeof bindOfflineBasemap>[0], mainMap, miniMap);
 
   miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
   miniMap.setZoom(miniMap.getZoom());
@@ -407,33 +306,6 @@ export function initWorldLeafletMaps(
   mainMap.on('zoomend', notifyMainViewChanged);
 
   syncMinimapViewportRect();
-}
-
-/**
- * Documents the module-scope binding `basemapErrorShown` (basemapErrorShown).
-
- * Purpose: Supports maintainability by documenting why `basemapErrorShown` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let basemapErrorShown = false;
-
-/**
- * Shows the basemap-failure sentence on the map toast at most once per app session.
- *
- * Purpose: Tile failures should use the same info style and hide timer as other map toasts.
- * When to use: From the basemap tile-error path after a provider failure.
- * Expected outcome: The sentence appears once, in the info style, and hides on the shared timer. Later calls do nothing. A later map toast can replace it and restart the timer. If the toast elements are missing, the session flag is still set and nothing is shown.
- * Exceptions: None.
- */
-function showBasemapErrorToast(): void {
-  if (basemapErrorShown) return;
-  basemapErrorShown = true;
-  showMapToast(
-    'Some map tiles failed to load (network or provider). The game remains playable; try again later.',
-    { isError: false }
-  );
 }
 
 /**
@@ -531,7 +403,7 @@ function applyTilePaneFilter(map: VendorLeafletMap | null, filter: string): void
 
  * Purpose: Darkens or clears raster tiles for Wargame without inverting hex overlays, units, or map chrome.
  * When to use: After map init and on terrain style change, with `basemapCssFilterForStyle`.
- * Expected outcome: Main and minimap tile panes receive `filter`; leftover `#main-map` container filters are cleared to empty.
+ * Expected outcome: Main and minimap tile panes and water panes receive `filter`, and so does the main map's elevation-tile pane. Leftover `#main-map` container filters are cleared to empty.
  * Exceptions: Missing tile panes are ignored; the invert string is never assigned to the map container.
  */
 export function setMainBasemapFilter(filter: string): void {
@@ -539,6 +411,7 @@ export function setMainBasemapFilter(filter: string): void {
   if (mapEl) mapEl.style.filter = '';
   applyTilePaneFilter(mainMap, filter);
   applyTilePaneFilter(miniMap, filter);
+  filterOfflineBasemapPanes(filter);
 }
 
 /**

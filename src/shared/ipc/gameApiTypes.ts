@@ -269,6 +269,24 @@ listGameMaps: () => Promise<GameMapListEntry[]>;
    * Exceptions: Rejects when the map or a side group is unknown, or when IPC transport fails.
    */
   newGameMapPreview: (request: NewGameMapPreviewRequest) => Promise<NewGameMapPreview>;
+  /**
+   * Native hillshade zoom for one map id.
+   *
+   * Contract: 9 when that region's pack exists. 7 for global, an unknown id, and a region without a pack.
+   * When to use: When the basemap map id changes.
+   * Expected outcome: `{ nativeZoom: 7 | 9 }`.
+   * Exceptions: Rejects on IPC transport failures.
+   */
+  basemapNativeZoom: (gameMapId: string) => Promise<{ nativeZoom: 7 | 9 }>;
+  /**
+   * Starts unpacking the regional partitions under a battle.
+   *
+   * Contract: Returns immediately. A missing pack unpacks nothing.
+   * When to use: At the start of a tactical view, without awaiting.
+   * Expected outcome: `{ accepted: true }`.
+   * Exceptions: Rejects on IPC transport failures. An unpack failure does not reject.
+   */
+  basemapPrefetch: (request: { gameMapId: string; childH3Indexes: readonly string[] }) => Promise<{ accepted: true }>;
     /**
    * Specifies the contract for the `newGame` member (newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;).
 

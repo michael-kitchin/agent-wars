@@ -4,7 +4,7 @@
  */
 
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, screen } from 'electron';
 import * as path from 'path';
 import { AI_SEAT_IDS, isAiSeatId, type SeatId } from '../shared/seatIds';
 import { fallbackConsultModelId, type TacticalBeatConsultArgs } from './ipc/readyIpcResolutionMapping';
@@ -18,6 +18,8 @@ import {
   listScenarioHomeRegions,
   getSeatRoster,
 } from './gameDb';
+import { handleBasemapProtocol } from './basemap/basemapProtocolHandler';
+import { registerBasemapIpc } from './basemap/basemapIpc';
 import { listGameMaps } from './gameMap/listGameMaps';
 import { buildNewGameMapPreview } from './gameMap/newGameMapPreview';
 import {
@@ -566,6 +568,7 @@ function registerIpcHandlers(): void {
     stopModelWork(reason, sendActivityLog);
   });
 
+  registerBasemapIpc(ipcMain);
   registerOpenRouterIpcHandler(ipcMain);
   registerCommanderPoolIpcHandler(ipcMain);
   registerEndMatchIpcHandler(ipcMain);
@@ -580,6 +583,19 @@ function registerIpcHandlers(): void {
 applyVersionedAppName();
 applyUserDataDirOverride(app);
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'agentwars-basemap',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
 const isPrimaryInstance = claimSingleInstanceLock(app, () => mainWindow);
 
 process.on('uncaughtException', (err) => {
@@ -593,6 +609,7 @@ if (!isPrimaryInstance) {
   app.quit();
 } else {
   app.whenReady().then(async () => {
+    protocol.handle('agentwars-basemap', (request) => handleBasemapProtocol(request));
     await initDatabase();
     restorePersistedTacticalBattleSession();
     rememberCurrentAutoSaveTurnKey();

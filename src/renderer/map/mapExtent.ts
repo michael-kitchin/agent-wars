@@ -1,4 +1,6 @@
 import { cellToLatLng } from 'h3-js';
+import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
+import { setBasemapGameMap } from './basemapLayer';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   battleDrawReferenceLng,
@@ -268,6 +270,7 @@ interface MapExtentSyncOptions {
  */
 export function syncMapExtentToSnapshot(state: GameStateSnapshot, options?: MapExtentSyncOptions): void {
   const mapId = state.gameMap?.id ?? 'global';
+  if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
   const key = loadedMapExtentKey(
     mapId,
     state.hexes.map((hex) => hex.h3Index)

@@ -12,6 +12,8 @@ const {
   buildElectronBuilderGeneratedResourceFilter,
   buildElectronBuilderRegionalZipFileEntries,
   buildElectronBuilderRegionalZipResource,
+  buildElectronBuilderBasemapFileEntries,
+  buildElectronBuilderBasemapResource,
 } = require('./electronBuilderGeneratedFiles.cjs');
 
 function testVersionedIdentityContract() {
@@ -76,6 +78,23 @@ function testGeneratedTerrainResourcesContract() {
   assert.ok(
     Array.isArray(regionalEntry.filter) && regionalEntry.filter.includes('**/*.json.zip'),
     'regional extraResources filter must keep zip archives'
+  );
+  const basemapFiles = buildElectronBuilderBasemapFileEntries();
+  const basemapResource = buildElectronBuilderBasemapResource();
+  assert.deepStrictEqual(basemapFiles, ['data/generated/basemap/**/*.zip', 'data/generated/basemap/**/*.webp']);
+  assert.deepStrictEqual(basemapResource.filter, ['**/*.zip', '**/*.webp']);
+  assert.deepStrictEqual(regionalFiles, ['data/generated/regions/**/*.json.zip']);
+  assert.ok(
+    Array.isArray(buildConfig.files) && buildConfig.files.includes('data/generated/basemap/**/*.zip'),
+    'electron-builder files must ship basemap zips'
+  );
+  const basemapEntry =
+    Array.isArray(buildConfig.extraResources) &&
+    buildConfig.extraResources.find((item) => item && item.to === 'data/generated/basemap');
+  assert.ok(basemapEntry, 'electron-builder extraResources must include the basemap tree');
+  assert.ok(
+    !JSON.stringify(ciBuildConfig.files || []).includes('data/generated/basemap'),
+    'the CI builder must not ship the basemap tree'
   );
 }
 

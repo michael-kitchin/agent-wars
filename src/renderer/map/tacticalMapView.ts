@@ -109,6 +109,8 @@ export function frameOpenAutomaticBattle(): void {
  * Exceptions: The camera steps no-op when the Leaflet map, global, fitBounds, or bounds are unavailable.
  */
 export function enterTacticalMapView(childTacticalH3Indexes: string[]): void {
+  const basemapMapId = S.gameState?.gameMap?.id ?? 'global';
+  void window.gameApi?.basemapPrefetch?.({ gameMapId: basemapMapId, childH3Indexes: childTacticalH3Indexes });
   enterBattleLongitudeFrame(childTacticalH3Indexes, matchMapExtentTarget());
   const map = getMainLeafletMap() as LeafletMapLike | null;
   const L = getLeafletGlobal() as

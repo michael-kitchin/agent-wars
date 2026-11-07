@@ -79,6 +79,8 @@ const IPC_GAME = {
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
+  basemapNativeZoom: 'game:basemapNativeZoom',
+  basemapPrefetch: 'game:basemapPrefetch',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',
   saveGame: 'game:saveGame',
@@ -305,6 +307,26 @@ listGameMaps: (): Promise<GameMapListEntry[]> =>
    */
   newGameMapPreview: (request: NewGameMapPreviewRequest): Promise<NewGameMapPreview> =>
     ipcRenderer.invoke(IPC_GAME.newGameMapPreview, request),
+  /**
+   * Asks which hillshade zoom the current map can serve.
+   *
+   * Purpose: A region with a pack uses zoom 9. Everything else uses the global zoom 7.
+   * When to use: When the basemap map id changes.
+   * Expected outcome: `{ nativeZoom: 7 | 9 }`.
+   * Exceptions: Rejects when the IPC channel fails. The layer then uses 7.
+   */
+  basemapNativeZoom: (gameMapId: string): Promise<{ nativeZoom: 7 | 9 }> =>
+    ipcRenderer.invoke(IPC_GAME.basemapNativeZoom, gameMapId),
+  /**
+   * Asks the main process to unpack the battle's regional tiles.
+   *
+   * Purpose: The battle view should not wait on the unpack.
+   * When to use: At the start of `enterTacticalMapView`, without awaiting.
+   * Expected outcome: `{ accepted: true }` before the unpack finishes.
+   * Exceptions: Rejects only when the IPC channel itself fails.
+   */
+  basemapPrefetch: (request: { gameMapId: string; childH3Indexes: readonly string[] }): Promise<{ accepted: true }> =>
+    ipcRenderer.invoke(IPC_GAME.basemapPrefetch, request),
     /**
    * Documents the object literal property `newGame` (newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload)).
 

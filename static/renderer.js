@@ -16607,8 +16607,8 @@
     if (h3Indexes.length === 0) return `${mapId}:empty`;
     return `${mapId}:${h3Indexes.length}:${h3Indexes[0]}:${h3Indexes[h3Indexes.length - 1]}`;
   }
-  function shouldApplyLoadedMapExtent(appliedKey2, nextKey, refit) {
-    return refit || appliedKey2 !== nextKey;
+  function shouldApplyLoadedMapExtent(appliedKey3, nextKey, refit) {
+    return refit || appliedKey3 !== nextKey;
   }
   function longitudeIntervalFromCenters(longitudes) {
     const sorted = longitudes.filter((lng) => Number.isFinite(lng)).sort((a, b) => a - b);
@@ -16698,41 +16698,153 @@
     return "";
   }
 
-  // src/renderer/map/basemapProvider.ts
-  var RASTER_BASEMAP_ORDER = [
-    {
-      id: "esri_world_shaded_relief",
-      displayName: "Esri World Shaded Relief",
-      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
-      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
-      maxZoom: 13,
-      minZoom: 0
-    },
-    {
-      id: "osm_mapnik",
-      displayName: "OpenStreetMap Standard",
-      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      subdomains: "abc",
-      maxZoom: 19,
-      minZoom: 0
-    }
-  ];
-  function getRasterBasemapChain() {
-    return RASTER_BASEMAP_ORDER;
+  // src/renderer/map/basemapLayer.ts
+  var ATTRIBUTION = "Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.";
+  var WATER_PANE = "basemapWater";
+  var GRID_PANE = "basemapGrid";
+  var GRID_COLOR = "rgba(48, 56, 64, 0.15)";
+  var GRID_DASH = "2 3";
+  var SOURCE_MERIDIANS = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180];
+  var SOURCE_PARALLELS = [-70, -50, -30, -10, 0, 10, 30, 50, 70];
+  var WATER_COLOR = "rgb(113, 148, 177)";
+  var leafletRef = null;
+  var mainMap = null;
+  var miniMap = null;
+  var mainLayer = null;
+  var miniLayer = null;
+  var gameMapId = "global";
+  var appliedKey = "";
+  var requestSerial = 0;
+  var basemapErrorShown = false;
+  function bindOfflineBasemap(leaflet, main, mini) {
+    leafletRef = leaflet;
+    mainMap = main;
+    miniMap = mini;
+    ensureWaterPane(main);
+    ensureWaterPane(mini);
+    ensureSourceGrid(leaflet, main);
+    void applyGameMap(gameMapId);
   }
-  function getRasterBasemapChainStartIndex(providerId) {
-    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
-    return i >= 0 ? i : 0;
+  function setBasemapGameMap(nextMapId) {
+    const mapId = nextMapId || "global";
+    gameMapId = mapId;
+    void applyGameMap(mapId);
+  }
+  function filterOfflineBasemapPanes(filter) {
+    applyPaneFilter(mainMap?.getPanes?.()?.tilePane, filter);
+    applyPaneFilter(miniMap?.getPanes?.()?.tilePane, filter);
+    applyPaneFilter(mainMap?.getPane?.(WATER_PANE), filter);
+    applyPaneFilter(miniMap?.getPane?.(WATER_PANE), filter);
+    applyPaneFilter(mainMap?.getPane?.(GRID_PANE), filter);
+  }
+  async function applyGameMap(mapId) {
+    const serial = ++requestSerial;
+    const nativeZoom = await nativeZoomFor(mapId);
+    if (serial !== requestSerial || !leafletRef || !mainMap || !miniMap) return;
+    const key = `${mapId}:${nativeZoom}`;
+    if (key === appliedKey && mainLayer && miniLayer) return;
+    appliedKey = key;
+    const url = `agentwars-basemap://tiles/${mapId}/{z}/{x}/{y}.webp`;
+    mainLayer = replaceLayer(leafletRef, mainMap, mainLayer, url, nativeZoom, true);
+    miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom, false);
+  }
+  function replaceLayer(leaflet, map, current, url, nativeZoom, showAttribution) {
+    if (current) {
+      current.off("tileerror", onTileError);
+      try {
+        map.removeLayer?.(current);
+      } catch {
+      }
+    }
+    const layer = leaflet.tileLayer(url, {
+      attribution: showAttribution ? ATTRIBUTION : "",
+      maxZoom: 16,
+      maxNativeZoom: nativeZoom,
+      minZoom: 0
+    });
+    layer.addTo?.(map);
+    layer.on("tileerror", onTileError);
+    return layer;
+  }
+  function ensureSourceGrid(leaflet, map) {
+    if (!leaflet.polyline || map.getPane?.(GRID_PANE)) return;
+    const pane = map.createPane?.(GRID_PANE);
+    if (!pane) return;
+    pane.style.zIndex = "250";
+    pane.style.pointerEvents = "none";
+    for (const longitude of SOURCE_MERIDIANS) {
+      leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180)).addTo?.(map);
+    }
+    for (const latitude of SOURCE_PARALLELS) {
+      leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0)).addTo?.(map);
+    }
+  }
+  function meridianPositions(longitude) {
+    return [
+      [-WEB_MERCATOR_MAX_ABS_LAT, longitude],
+      [WEB_MERCATOR_MAX_ABS_LAT, longitude]
+    ];
+  }
+  function parallelPositions(latitude) {
+    return [
+      [latitude, -180],
+      [latitude, 180]
+    ];
+  }
+  function gridStroke(solid) {
+    const stroke = {
+      pane: GRID_PANE,
+      color: GRID_COLOR,
+      weight: 1,
+      opacity: 1,
+      interactive: false,
+      smoothFactor: 0
+    };
+    if (!solid) stroke.dashArray = GRID_DASH;
+    return stroke;
+  }
+  function ensureWaterPane(map) {
+    if (map.getPane?.(WATER_PANE)) return;
+    const pane = map.createPane?.(WATER_PANE);
+    if (!pane) return;
+    const container = map.getContainer?.();
+    if (container) container.insertBefore(pane, container.firstChild);
+    pane.style.position = "absolute";
+    pane.style.inset = "0";
+    pane.style.width = "100%";
+    pane.style.height = "100%";
+    pane.style.zIndex = "190";
+    pane.style.pointerEvents = "none";
+    pane.style.background = WATER_COLOR;
+  }
+  function applyPaneFilter(pane, filter) {
+    if (!pane) return;
+    const filtered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
+    for (const el of filtered) el.style.filter = "";
+    pane.style.filter = filter;
+  }
+  function onTileError() {
+    if (basemapErrorShown) return;
+    basemapErrorShown = true;
+    showMapToast("Some map tiles failed to load. The game remains playable; try again later.", { isError: false });
+  }
+  async function nativeZoomFor(mapId) {
+    const ask = window.gameApi?.basemapNativeZoom;
+    if (!ask) return 7;
+    try {
+      const result = await ask(mapId);
+      return result?.nativeZoom === 9 ? 9 : 7;
+    } catch (err) {
+      console.error("[agent-wars] basemap native zoom failed", err);
+      return 7;
+    }
   }
 
   // src/renderer/map/worldLeafletMap.ts
-  var mainMap = null;
-  var miniMap = null;
+  var mainMap2 = null;
+  var miniMap2 = null;
   var viewportRect = null;
   var onMainViewChanged = null;
-  var mainBasemapLayer = null;
-  var miniBasemapLayer = null;
   var mountedMainBasemapProviderId = null;
   var mountedMiniBasemapProviderId = null;
   function notifyMainViewChanged() {
@@ -16740,82 +16852,20 @@
     onMainViewChanged?.();
   }
   function getL() {
-    const leafletRef = globalThis.L;
-    if (!leafletRef) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
-    return leafletRef;
-  }
-  function mountRasterBasemap(leafletRef, map, showAttribution, chainIndex, target) {
-    const chain = getRasterBasemapChain();
-    if (chainIndex >= chain.length) {
-      if (target === "main") mountedMainBasemapProviderId = null;
-      else mountedMiniBasemapProviderId = null;
-      showBasemapErrorToast();
-      return;
-    }
-    const spec = chain[chainIndex];
-    if (target === "main" && mainBasemapLayer) {
-      try {
-        map.removeLayer(mainBasemapLayer);
-      } catch {
-      }
-      mainBasemapLayer = null;
-    }
-    if (target === "mini" && miniBasemapLayer) {
-      try {
-        map.removeLayer(miniBasemapLayer);
-      } catch {
-      }
-      miniBasemapLayer = null;
-    }
-    let switched = false;
-    const layerOpts = {
-      attribution: showAttribution ? spec.attributionHtml : "",
-      maxZoom: spec.maxZoom ?? 19,
-      minZoom: spec.minZoom ?? 0
-    };
-    if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
-    const layer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
-    if (target === "main") {
-      mainBasemapLayer = layer;
-      mountedMainBasemapProviderId = spec.id;
-    } else {
-      miniBasemapLayer = layer;
-      mountedMiniBasemapProviderId = spec.id;
-    }
-    const onTileError = () => {
-      if (switched) return;
-      switched = true;
-      layer.off("tileerror", onTileError);
-      try {
-        map.removeLayer(layer);
-      } catch {
-      }
-      if (target === "main") {
-        mainBasemapLayer = null;
-        mountedMainBasemapProviderId = null;
-      } else {
-        miniBasemapLayer = null;
-        mountedMiniBasemapProviderId = null;
-      }
-      console.warn("[agent-wars] Basemap tile error; trying next provider", {
-        failedId: spec.id,
-        nextIndex: chainIndex + 1
-      });
-      mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
-    };
-    layer.on("tileerror", onTileError);
+    const leafletRef2 = globalThis.L;
+    if (!leafletRef2) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
+    return leafletRef2;
   }
   function setMainBasemapByProviderId(providerId) {
-    if (!mainMap || !miniMap) return;
+    if (!mainMap2 || !miniMap2) return;
     if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
-    const leafletRef = getL();
-    const startIdx = getRasterBasemapChainStartIndex(providerId);
-    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
-    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
+    bindOfflineBasemap(getL(), mainMap2, miniMap2);
+    mountedMainBasemapProviderId = providerId;
+    mountedMiniBasemapProviderId = providerId;
   }
   function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
     onMainViewChanged = onViewChanged;
-    const leafletRef = getL();
+    const leafletRef2 = getL();
     const mainEl = document.getElementById(mainContainerId);
     const miniEl = document.getElementById(minimapContainerId);
     if (!mainEl || !miniEl) {
@@ -16827,11 +16877,11 @@
       });
       return;
     }
-    const worldBounds2 = leafletRef.latLngBounds(
-      leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    const worldBounds2 = leafletRef2.latLngBounds(
+      leafletRef2.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leafletRef2.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
-    mainMap = leafletRef.map(mainEl, {
+    mainMap2 = leafletRef2.map(mainEl, {
       minZoom: 1.5,
       maxZoom: 12,
       zoomSnap: 0.25,
@@ -16850,21 +16900,22 @@
       fadeAnimation: false,
       inertia: false
     });
-    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "esri_world_shaded_relief");
-    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
-    mainMap.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
-    mainMap.doubleClickZoom.disable();
+    const initialId = initialBasemapProviderId ?? "offline_hillshade";
+    mountedMainBasemapProviderId = initialId;
+    mountedMiniBasemapProviderId = mountedMainBasemapProviderId;
+    mainMap2.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
+    mainMap2.doubleClickZoom.disable();
     try {
-      leafletRef.control.scale({
+      leafletRef2.control.scale({
         position: "bottomright",
         metric: true,
         imperial: true,
         maxWidth: 120
-      }).addTo(mainMap);
+      }).addTo(mainMap2);
     } catch {
     }
-    leafletRef.control.zoom({ position: "bottomright" }).addTo(mainMap);
-    miniMap = leafletRef.map(miniEl, {
+    leafletRef2.control.zoom({ position: "bottomright" }).addTo(mainMap2);
+    miniMap2 = leafletRef2.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
       zoomControl: false,
@@ -16875,29 +16926,20 @@
       boxZoom: false,
       keyboard: false
     });
-    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
-    miniMap.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
-    miniMap.setZoom(miniMap.getZoom());
-    mainMap.on("move", notifyMainViewChanged);
-    mainMap.on("zoom", notifyMainViewChanged);
-    mainMap.on("moveend", notifyMainViewChanged);
-    mainMap.on("zoomend", notifyMainViewChanged);
+    bindOfflineBasemap(leafletRef2, mainMap2, miniMap2);
+    miniMap2.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
+    miniMap2.setZoom(miniMap2.getZoom());
+    mainMap2.on("move", notifyMainViewChanged);
+    mainMap2.on("zoom", notifyMainViewChanged);
+    mainMap2.on("moveend", notifyMainViewChanged);
+    mainMap2.on("zoomend", notifyMainViewChanged);
     syncMinimapViewportRect();
   }
-  var basemapErrorShown = false;
-  function showBasemapErrorToast() {
-    if (basemapErrorShown) return;
-    basemapErrorShown = true;
-    showMapToast(
-      "Some map tiles failed to load (network or provider). The game remains playable; try again later.",
-      { isError: false }
-    );
-  }
   function syncMinimapViewportRect() {
-    if (!mainMap || !miniMap) return;
-    const leafletRef = getL();
-    const mainBounds = mainMap.getBounds();
-    const miniBounds = miniMap.getBounds();
+    if (!mainMap2 || !miniMap2) return;
+    const leafletRef2 = getL();
+    const mainBounds = mainMap2.getBounds();
+    const miniBounds = miniMap2.getBounds();
     const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
     const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
     const zoomedIn = mainSpan < miniSpan * 0.92;
@@ -16909,22 +16951,22 @@
       return;
     }
     if (!viewportRect) {
-      viewportRect = leafletRef.rectangle(mainBounds, {
+      viewportRect = leafletRef2.rectangle(mainBounds, {
         color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-border").trim() || "#5a7090",
         weight: 2,
         opacity: 1,
         fill: false,
         interactive: false
-      }).addTo(miniMap);
+      }).addTo(miniMap2);
     } else {
       viewportRect.setBounds(mainBounds);
     }
   }
   function getMainLeafletMap() {
-    return mainMap;
+    return mainMap2;
   }
   function getMiniLeafletMap() {
-    return miniMap;
+    return miniMap2;
   }
   function applyTilePaneFilter(map, filter) {
     try {
@@ -16939,29 +16981,30 @@
   function setMainBasemapFilter(filter) {
     const mapEl = document.getElementById("main-map");
     if (mapEl) mapEl.style.filter = "";
-    applyTilePaneFilter(mainMap, filter);
-    applyTilePaneFilter(miniMap, filter);
+    applyTilePaneFilter(mainMap2, filter);
+    applyTilePaneFilter(miniMap2, filter);
+    filterOfflineBasemapPanes(filter);
   }
   function hexCenterToOverlayPoint(h3Index, latLngFn) {
-    if (!mainMap) return { x: 0, y: 0 };
-    const leafletRef = getL();
+    if (!mainMap2) return { x: 0, y: 0 };
+    const leafletRef2 = getL();
     const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
+    const p = mainMap2.latLngToContainerPoint(leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
     return { x: p.x, y: p.y };
   }
   function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
-    if (!mainMap) return { x: 0, y: 0 };
-    const leafletRef = getL();
+    if (!mainMap2) return { x: 0, y: 0 };
+    const leafletRef2 = getL();
     const [lat, lng] = latLngFn(h3Index);
     const lngAligned = alignLngToReference(lng, referenceLngDegrees);
-    const p = mainMap.latLngToContainerPoint(
-      leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+    const p = mainMap2.latLngToContainerPoint(
+      leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
     );
     return { x: p.x, y: p.y };
   }
   function invalidateLeafletMapSizes() {
-    mainMap?.invalidateSize({ animate: false });
-    miniMap?.invalidateSize({ animate: false });
+    mainMap2?.invalidateSize({ animate: false });
+    miniMap2?.invalidateSize({ animate: false });
     notifyMainViewChanged();
   }
 
@@ -17141,8 +17184,8 @@
   function panMapByNetAxes(ns, ew) {
     if (isNetPanAxesZero({ ns, ew })) return;
     const map = getMainLeafletMap();
-    const leafletRef = globalThis.L;
-    if (!map || !leafletRef) return;
+    const leafletRef2 = globalThis.L;
+    if (!map || !leafletRef2) return;
     const center = map.getCenter();
     const tactical = rendererSharedState.tacticalBattleSnapshot != null;
     let centerH3;
@@ -17155,9 +17198,9 @@
     if (!neighbor) return;
     const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
     const neighborLng = alignLongitudeToReference(neighborLngRaw, center.lng);
-    const centerPt = map.latLngToContainerPoint(leafletRef.latLng(center.lat, center.lng));
+    const centerPt = map.latLngToContainerPoint(leafletRef2.latLng(center.lat, center.lng));
     const neighborPt = map.latLngToContainerPoint(
-      leafletRef.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
+      leafletRef2.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
     );
     const hexPixels = Math.hypot(neighborPt.x - centerPt.x, neighborPt.y - centerPt.y);
     const stepPixels = hexPixels * keyboardPanModeSpeed(tactical);
@@ -17167,8 +17210,8 @@
   }
   function applyInitialCameraForState(state) {
     const map = getMainLeafletMap();
-    const leafletRef = globalThis.L;
-    if (!map || !leafletRef) return;
+    const leafletRef2 = globalThis.L;
+    if (!map || !leafletRef2) return;
     const humanGround = state.units.filter(
       (u) => u.player === HUMAN_SEAT_ID && (u.unitType === "infantry" || u.unitType === "armor")
     );
@@ -17186,7 +17229,7 @@
     const centerLng = lngSum / anchors.length;
     const maxZoom = typeof map.getMaxZoom === "function" ? map.getMaxZoom() : 12;
     const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
-    map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+    map.setView(leafletRef2.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
     const ctr = typeof map.getCenter === "function" ? map.getCenter() : null;
     if (ctr) {
       rendererSharedState.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };
@@ -20044,8 +20087,8 @@
     const index = GAME_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
     return index >= 0 ? index + 1 : 1;
   }
-  function gameCalendarKindForMap(gameMapId) {
-    return gameMapId === "global" ? "monthly" : "weekly";
+  function gameCalendarKindForMap(gameMapId2) {
+    return gameMapId2 === "global" ? "monthly" : "weekly";
   }
   function isLeapGameYear(year) {
     const normalized = Number.isFinite(year) ? Math.floor(year) : 1;
@@ -21533,7 +21576,7 @@ ${bonuses}`;
   function loadedMapExtentTarget() {
     return active;
   }
-  var appliedKey = "";
+  var appliedKey2 = "";
   var resizeListenerAttached = false;
   var activeBounds = null;
   var lockedMinZoom = null;
@@ -21595,15 +21638,16 @@ ${bonuses}`;
   }
   function syncMapExtentToSnapshot(state, options) {
     const mapId = state.gameMap?.id ?? "global";
+    if (!isNewGameOverlayOpen()) setBasemapGameMap(mapId);
     const key = loadedMapExtentKey(
       mapId,
       state.hexes.map((hex) => hex.h3Index)
     );
     if (!extentMaps()) return;
-    if (!shouldApplyLoadedMapExtent(appliedKey, key, options?.refit === true)) return;
+    if (!shouldApplyLoadedMapExtent(appliedKey2, key, options?.refit === true)) return;
     if (mapId === "global" || state.hexes.length === 0) {
       applyLoadedMapExtent("world", true);
-      appliedKey = key;
+      appliedKey2 = key;
       return;
     }
     const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
@@ -21613,7 +21657,7 @@ ${bonuses}`;
     );
     if (!box) return;
     applyLoadedMapExtent(box, true);
-    appliedKey = key;
+    appliedKey2 = key;
   }
   function extentMaps() {
     const leaflet = globalThis.L;
@@ -22839,6 +22883,7 @@ ${bonuses}`;
     dismissStaleControlTooltip();
     deps.setMainUIControlsEnabled(true);
     invalidateLeafletMapSizes();
+    setBasemapGameMap(rendererSharedState.gameState?.gameMap?.id ?? "global");
     returnMainMapCamera();
     deps.updateReadyButtonState();
     if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
@@ -25731,7 +25776,7 @@ ${bonuses}`;
   var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
   var TERRAIN_STYLE_PRESETS = {
     /**
-       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
     
        * Purpose: Supports maintainability by documenting why `default` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -25740,7 +25785,7 @@ ${bonuses}`;
        */
     default: {
       label: "Default",
-      basemapId: "esri_world_shaded_relief",
+      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -25766,7 +25811,7 @@ ${bonuses}`;
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     /**
-       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
     
        * Purpose: Supports maintainability by documenting why `atlas` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -25775,7 +25820,7 @@ ${bonuses}`;
        */
     atlas: {
       label: "Atlas",
-      basemapId: "esri_world_shaded_relief",
+      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -25801,7 +25846,7 @@ ${bonuses}`;
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     /**
-       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
     
        * Purpose: Supports maintainability by documenting why `wargame` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -25810,7 +25855,7 @@ ${bonuses}`;
        */
     wargame: {
       label: "Wargame",
-      basemapId: "esri_world_shaded_relief",
+      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -25836,7 +25881,7 @@ ${bonuses}`;
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
     },
     /**
-       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
+       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
     
        * Purpose: Supports maintainability by documenting why `scientific` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -25845,7 +25890,7 @@ ${bonuses}`;
        */
     scientific: {
       label: "Scientific",
-      basemapId: "esri_world_shaded_relief",
+      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -28020,8 +28065,8 @@ ${bonuses}`;
     });
     return orders;
   }
-  function previewHexIsDrawn(gameMapId, homeOwnerIdentity, mapInspectionHeld) {
-    if (gameMapId !== "global") return true;
+  function previewHexIsDrawn(gameMapId2, homeOwnerIdentity, mapInspectionHeld) {
+    if (gameMapId2 !== "global") return true;
     if (mapInspectionHeld) return true;
     return homeOwnerIdentity != null;
   }
@@ -28840,7 +28885,7 @@ ${bonuses}`;
   function setPreviewHomeKeyReader(reader) {
     readHomeKeys = reader;
   }
-  var requestSerial = 0;
+  var requestSerial2 = 0;
   var framedExtentKey = null;
   var mapCameraHeldForStart = false;
   var mapCameraHoldSerial = 0;
@@ -28862,7 +28907,7 @@ ${bonuses}`;
   }
   async function refreshNewGameMapPreview() {
     if (mapCameraHeldForStart) return;
-    const serial = ++requestSerial;
+    const serial = ++requestSerial2;
     const built = readPreviewDialogRequest();
     if (!built) {
       noteNewGameMapPreviewRequest("");
@@ -28876,8 +28921,9 @@ ${bonuses}`;
     }
     try {
       const preview = await load(built.request);
-      if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
+      if (serial !== requestSerial2 || !newGameOverlayOpen() || mapCameraHeldForStart) return;
       if (!storeNewGameMapPreview(preview)) return;
+      setBasemapGameMap(preview.gameMapId);
       const key = extentKey(preview.extent);
       if (key !== framedExtentKey) {
         invalidateLeafletMapSizes();
@@ -28888,7 +28934,7 @@ ${bonuses}`;
       }
       repaintNewGameMapPreview();
     } catch (err) {
-      if (serial !== requestSerial) return;
+      if (serial !== requestSerial2) return;
       console.error("new game map preview failed", err);
     }
   }
@@ -28898,9 +28944,9 @@ ${bonuses}`;
     if (!regional) {
       return { gameMapId: "global", request: { scope: "global", homeKeys } };
     }
-    const gameMapId = selectValue("new-game-region-select");
-    if (!gameMapId) return null;
-    return { gameMapId, request: { scope: "regional", gameMapId, homeKeys } };
+    const gameMapId2 = selectValue("new-game-region-select");
+    if (!gameMapId2) return null;
+    return { gameMapId: gameMapId2, request: { scope: "regional", gameMapId: gameMapId2, homeKeys } };
   }
   function selectValue(id) {
     const select = document.getElementById(id);
@@ -30079,6 +30125,8 @@ ${bonuses}`;
     frameAutomaticBattleUnits(limit);
   }
   function enterTacticalMapView(childTacticalH3Indexes) {
+    const basemapMapId = rendererSharedState.gameState?.gameMap?.id ?? "global";
+    void window.gameApi?.basemapPrefetch?.({ gameMapId: basemapMapId, childH3Indexes: childTacticalH3Indexes });
     enterBattleLongitudeFrame(childTacticalH3Indexes, matchMapExtentTarget());
     const map = getMainLeafletMap();
     const L = getLeafletGlobal();

@@ -53,6 +53,7 @@
     "terrain:test": "python -m unittest discover -s scripts/terrain_pipeline/tests -p \"test_*.py\" -v",
     "weather:test": "python -m unittest discover -s scripts/weather_pipeline/tests -p \"test_*.py\" -v",
     "regional:test": "python -m unittest discover -s scripts/regional_pipeline/tests -p \"test_*.py\" -v",
+    "basemap:test": "python -m unittest discover -s scripts/basemap_pipeline/tests -p \"test_*.py\" -v",
     "regional:validate": "python -m scripts.regional_pipeline.regional_cli validate --verbose",
     "regional:footprint": "python -m scripts.regional_pipeline.regional_cli footprint --all --write",
     "regional:generate": "python -m scripts.regional_pipeline.regional_cli run --all --skip-existing --verbose",

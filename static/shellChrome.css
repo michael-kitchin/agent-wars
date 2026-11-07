@@ -98,6 +98,12 @@ body {
 #main-map.leaflet-container {
   font-family: system-ui, -apple-system, sans-serif;
 }
+/* Leaflet's plus-lighter blend adds each tile to the map background, so gray land washes out and transparent ocean stays gray.
+   A fixed pixel of extra tile size would grow with the zoom scale and cover the map once the view is past the native zoom. */
+#main-map.leaflet-container img.leaflet-tile,
+#minimap.leaflet-container img.leaflet-tile {
+  mix-blend-mode: normal;
+}
 #map-overlay {
   position: absolute;
   inset: 0;

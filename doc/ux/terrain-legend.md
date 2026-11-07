@@ -4,7 +4,7 @@ The terrain key, plus the control that picks a terrain style.
 
 ## Purpose
 
-Name the terrain kinds the map uses, and let the player switch the terrain style and matching basemap.
+Name the terrain kinds the map uses, and let the player switch the terrain style. The style changes the filter on the same hillshade tiles, including the water drawn under them. It does not switch tile hosts.
 
 ## Availability
 
@@ -21,7 +21,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-m
 
 ### Mouse
 
-- When the player changes Terrain style, the active style and the main basemap switch to that choice, and the legend redraws to match.
+- When the player changes Terrain style, the filter on the hillshade and on the water under it changes to that choice, on the main map and the minimap, and the same filter changes on the main map's elevation-tile lines, and the legend redraws to match. The tiles stay mounted. Default applies an empty filter. Atlas applies `ATLAS_BASEMAP_CSS_FILTER` (`saturate(0.78) contrast(1.2) brightness(1.03)`). Scientific applies `SCIENTIFIC_BASEMAP_CSS_FILTER` (`grayscale(1) contrast(1.18) brightness(1.08)`). Wargame applies `WARGAME_BASEMAP_CSS_FILTER` (`invert(1) hue-rotate(180deg)`). Unknown ids use the empty filter. All four are `basemapCssFilterForStyle` in `src/shared/basemapStyleLogic.ts`.
 
 ### Keyboard
 
@@ -43,6 +43,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-m
 
 - The legend always lists the same terrain kinds, in the same order, then Urban, then Rubble, then Fortified.
 - Changing style never changes the match, the selection, or queued orders.
+- Changing style never reloads the hillshade tiles.
 
 ## Strategic and Tactical Differences
 
@@ -69,6 +70,8 @@ None.
 - `src/renderer/map/mapChromeLayout.ts`
 - `src/shared/mapChromePlacement.ts`
 - `src/renderer/rendering/terrainVisualStyles.ts`
+- `src/shared/basemapStyleLogic.ts` (`basemapCssFilterForStyle`)
+- `src/renderer/map/basemapLayer.ts` (`filterOfflineBasemapPanes`)
 - `src/renderer/rendering/terrainLegendRow.ts` (shared legend row layout and swatch chrome)
 - `src/renderer/rendering/terrainLegendUrban.ts`
 - `src/renderer/rendering/terrainLegendRubble.ts`

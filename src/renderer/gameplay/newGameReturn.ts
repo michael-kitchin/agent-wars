@@ -10,6 +10,7 @@
  * Exceptions: None; missing elements are skipped.
  */
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
+import { setBasemapGameMap } from '../map/basemapLayer';
 import { rendererSharedState as S } from '../core/state';
 import { forgetMainMapCameraForReturn, returnMainMapCamera, saveMainMapCameraForReturn } from '../map/mainMapCameraReturn';
 import { invalidateLeafletMapSizes } from '../map/worldLeafletMap';
@@ -133,7 +134,7 @@ export interface NewGameCloseDeps {
  * Purpose: The close control's single action.
  * When to use: On a click on `#new-game-dialog-close`.
  * Expected outcome: Nothing unless a match is waiting and the screen is open. Otherwise the screen hides, its tip goes,
- *   the match controls take the pointer again, the map takes its new size and goes back to the saved camera, Ready is
+ *   the match controls take the pointer again, the hillshade returns to the waiting match, the map takes its new size and goes back to the saved camera, Ready is
  *   recomputed, background planning resumes when Run is on, and the frame redraws. The match's state, orders, and
  *   selection are as the player left them.
  * Exceptions: None.
@@ -147,6 +148,7 @@ export function closeNewGameOverlayToMatch(deps: NewGameCloseDeps): void {
   dismissStaleControlTooltip();
   deps.setMainUIControlsEnabled(true);
   invalidateLeafletMapSizes();
+  setBasemapGameMap(S.gameState?.gameMap?.id ?? 'global');
   returnMainMapCamera();
   deps.updateReadyButtonState();
   if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();

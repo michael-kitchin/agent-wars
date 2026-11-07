@@ -4,12 +4,16 @@ const {
   buildElectronBuilderGeneratedResourceFilter,
   buildElectronBuilderRegionalZipFileEntries,
   buildElectronBuilderRegionalZipResource,
+  buildElectronBuilderBasemapFileEntries,
+  buildElectronBuilderBasemapResource,
 } = require('./scripts/electronBuilderGeneratedFiles.cjs');
 
 const generatedTerrainFiles = buildElectronBuilderGeneratedFileEntries();
 const generatedTerrainResourceFilter = buildElectronBuilderGeneratedResourceFilter();
 const regionalZipFiles = buildElectronBuilderRegionalZipFileEntries();
 const regionalZipResource = buildElectronBuilderRegionalZipResource();
+const basemapFiles = buildElectronBuilderBasemapFileEntries();
+const basemapResource = buildElectronBuilderBasemapResource();
 const chromiumResource = chromiumLicenseExtraResource();
 
 module.exports = buildElectronBuilderConfig({
@@ -24,6 +28,7 @@ module.exports = buildElectronBuilderConfig({
     'node_modules',
     ...generatedTerrainFiles,
     ...regionalZipFiles,
+    ...basemapFiles,
   ],
   extraResources: [
     {
@@ -32,6 +37,7 @@ module.exports = buildElectronBuilderConfig({
       filter: generatedTerrainResourceFilter,
     },
     regionalZipResource,
+    basemapResource,
     ...chromiumResource,
   ],
   winTarget: ['zip'],

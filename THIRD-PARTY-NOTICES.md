@@ -419,6 +419,12 @@ SOFTWARE.
 
 Country flag SVGs in `static/flags/` are a vendored copy of hampusborgos/country-flags, pinned at commit `c09927e63705529bbf59ca6684cd9b23225dddad`. The upstream repository has no LICENSE file. Its README states that the flags were taken from Wikimedia Commons and are not under copyright protection, because flags are in the public domain. It also notes that other restrictions on how a flag is used may still apply.
 
+## GMTED2010
+
+The match hillshade is drawn from GMTED2010 elevation. That elevation is U.S. Geological Survey public-domain data. Elevation: GMTED2010 courtesy of the U.S. Geological Survey.
+
+https://www.usgs.gov/coastal-changes-and-impacts/gmted2010
+
 ## Natural Earth
 
 Map names, coasts, lakes, urban areas, airports, and ports are derived from Natural Earth. All versions of Natural Earth raster and vector map data are in the public domain. No permission is needed to use Natural Earth. Crediting the authors is unnecessary.

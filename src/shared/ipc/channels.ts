@@ -19,6 +19,8 @@ export const IPC_GAME = {
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
+  basemapNativeZoom: 'game:basemapNativeZoom',
+  basemapPrefetch: 'game:basemapPrefetch',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',
   saveGame: 'game:saveGame',

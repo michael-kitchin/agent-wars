@@ -39,6 +39,20 @@ The file is fixed climatology from WorldClim 2.1 10-arc-minute temperature and p
 
 How to regenerate the pack is in [scripts/weather_pipeline/README.md](../scripts/weather_pipeline/README.md). Only the `.json.zip` is tracked. The rules that turn those months into tags and penalties are in [combat rules §4.9](combat-rules-v3.md). The renderer never reads the pack. Main stamps the weather of the match date's month, and each unit's tags, onto the snapshot. A global turn is one month. A regional turn is one week, so that month stays until the date enters the next one. A battle keeps the enclosing hex's weather for every beat.
 
+## Hillshade
+
+The picture under the hexes is the hillshade in `data/generated/basemap/`. It ships with the game. `scripts/basemap_pipeline/` builds it from GMTED2010 elevation and Natural Earth water. The regeneration runbook stays in [scripts/basemap_pipeline/README.md](../scripts/basemap_pipeline/README.md). Its Python tests are `npm run basemap:test`.
+
+The global pack is `data/generated/basemap/global/`. Each regional pack is `data/generated/basemap/regions/<region_id>/`. A pack holds `basemap_pack.json.zip` (schema 1, member `basemap_pack.json`), `indexes.json.zip`, `land.webp`, `water.webp`, and one zip for each partition that stores shaded tiles. A partition with only flat tiles has no zip. A partition with no flat or shaded tile is left out of the index, and a tile the index does not name is water.
+
+The renderer requests `agentwars-basemap://tiles/{gameMapId}/{z}/{x}/{y}.webp` from `src/renderer/map/basemapLayer.ts`. `resolveBasemapTile` serves that URL. The host is `tiles` and the path is `/{mapId}/{z}/{x}/{y}.webp`. A raw URL that contains `..`, a backslash, or `%` is rejected before it is parsed. Y is XYZ. Zooms 0–7 are read from the global pack. Zooms 8 and 9 are read from that region's pack. When the global pack is present, the global map at those zooms, and a region whose pack is absent, answer with that pack's `water.webp`. Any other zoom is a 404. An unknown map id is a 404. Known ids are `global` and each region directory that contains `basemap_pack.json.zip` (`knownBasemapMapIds`).
+
+`game:basemapNativeZoom` returns `{ nativeZoom: 9 }` only when that region's `basemap_pack.json.zip` exists, and `{ nativeZoom: 7 }` otherwise, including an unknown id. The tile layer uses `minZoom` 0 and `maxZoom` 16. Past the native zoom the same tiles are stretched. The water drawn under the tiles, the credit line, and the four terrain-style filters are specified in [ux/map-surface.md](ux/map-surface.md) and [ux/terrain-legend.md](ux/terrain-legend.md).
+
+The first request for a shaded tile unpacks that partition under `<userData>/generated-basemap/<id>/<partition-key>/` and writes `partition.ready` with the zip's sha256. Indexes unpack to `<userData>/generated-basemap/<id>/indexes/` with `indexes.ready`. `enterTacticalMapView` calls `game:basemapPrefetch` and does not wait for it. Prefetch yields between partitions. Creating the window does not wait for an unpack.
+
+A packaged app reads the resources copy of `data/generated/basemap/` (`selectBasemapRoot`). The shipping file list is `electron-builder.config.cjs`. `npm test` does not require the packs. `npm run generated:assert-pack-ready` does, including every catalog region, and the post-pack check requires each packaged `basemap_pack.json.zip` to be present and non-empty.
+
 ## Resolutions
 
 - **Strategic map:** H3 resolution **1** on the global map. A regional map uses resolution **2** or **3**.
@@ -52,6 +66,7 @@ Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells u
 
 - Not a live GIS query at play time. Regeneration is an offline `npm run terrain:generate` (metadata CLI, then road/rail sides). High-fidelity road/rail and vector CLIs are separate npm scripts (see root `package.json`).
 - Not player-facing save data. Destroyed urban/airports/seaports are match state on top of the generated baseline.
+- Not the classification rasters. The match picture is the hillshade in [Hillshade](#hillshade).
 
 ## Regional Packs
 
@@ -62,3 +77,4 @@ Regional maps live under `data/generated/regions/<region_id>/`. Each folder hold
 - Movement, combat, and weather: [combat-rules-v3.md](combat-rules-v3.md) §4.9 and §12
 - Regeneration commands: the “Terrain data” section of the root [README.md](../README.md#terrain-data)
 - Python tests: `npm run terrain:test`
+- Hillshade basemap, loaded by the app: [scripts/basemap_pipeline/README.md](../scripts/basemap_pipeline/README.md)

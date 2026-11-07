@@ -18,6 +18,7 @@ const fixedRequirements = [
   { heading: 'iso3166-flags', snippets: ['Copyright (c) 2021 AJ McKenna'] },
   { heading: 'country-flags', snippets: ['c09927e63705529bbf59ca6684cd9b23225dddad'] },
   { heading: 'Natural Earth', snippets: ['Made with Natural Earth.'] },
+  { heading: 'GMTED2010', snippets: ['courtesy of the U.S. Geological Survey'] },
   {
     heading: 'EarthEnv Consensus Land Cover',
     snippets: [

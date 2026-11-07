@@ -82,21 +82,12 @@ minZoom?: number;
  */
 export const RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[] = [
   {
-    id: 'esri_world_shaded_relief',
-    displayName: 'Esri World Shaded Relief',
-    urlTemplate:
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
-    attributionHtml: 'Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors',
-    maxZoom: 13,
-    minZoom: 0,
-  },
-  {
-    id: 'osm_mapnik',
-    displayName: 'OpenStreetMap Standard',
-    urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    subdomains: 'abc',
-    maxZoom: 19,
+    id: 'offline_hillshade',
+    displayName: 'Hillshade',
+    urlTemplate: 'agentwars-basemap://tiles/{gameMapId}/{z}/{x}/{y}.webp',
+    attributionHtml:
+      'Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.',
+    maxZoom: 16,
     minZoom: 0,
   },
 ];

@@ -1,0 +1,1 @@
+"""Offline hillshade basemap prototype."""

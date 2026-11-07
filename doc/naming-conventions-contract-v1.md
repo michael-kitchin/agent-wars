@@ -17,7 +17,7 @@ This document is the authoritative naming contract for Agent Wars TypeScript. It
 **Out of scope:**
 
 - Function-local variables, parameters, and non-exported module internals.
-- Python under `scripts/` (PEP 8 snake_case / PascalCase classes), including `scripts/terrain_pipeline/`, `scripts/naming_pipeline/`, `scripts/regional_pipeline/`, `scripts/weather_pipeline/`, and `scripts/match_video/`.
+- Python under `scripts/` (PEP 8 snake_case / PascalCase classes), including `scripts/terrain_pipeline/`, `scripts/naming_pipeline/`, `scripts/regional_pipeline/`, `scripts/weather_pipeline/`, `scripts/basemap_pipeline/`, and `scripts/match_video/`.
 - CommonJS `scripts/*.cjs` file names (kebab-case is the convention).
 - String literal **values** (see Frozen names).
 - `.spec/completed/**` and `.spec/deprecated/**` (archival).

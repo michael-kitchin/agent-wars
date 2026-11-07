@@ -37,9 +37,37 @@ function buildElectronBuilderRegionalZipResource() {
   };
 }
 
+/**
+ * electron-builder `files` glob for the offline hillshade packs.
+ *
+ * Purpose: Ship the basemap zips and shared WebP files inside the app archive.
+ * When to use: From the shipping electron-builder config's `files` list.
+ * Expected outcome: Globs for the pack zips and the shared WebP files. Extracted regional JSON stays on the regional helper.
+ */
+function buildElectronBuilderBasemapFileEntries() {
+  return ['data/generated/basemap/**/*.zip', 'data/generated/basemap/**/*.webp'];
+}
+
+/**
+ * `extraResources` entry that copies the hillshade packs beside the packaged app.
+ *
+ * Purpose: The protocol reads the packs from resources, not only from inside asar.
+ * When to use: From the shipping config's `extraResources`, next to the regional zips.
+ * Expected outcome: Zip and WebP files under `data/generated/basemap`.
+ */
+function buildElectronBuilderBasemapResource() {
+  return {
+    from: 'data/generated/basemap',
+    to: 'data/generated/basemap',
+    filter: ['**/*.zip', '**/*.webp'],
+  };
+}
+
 module.exports = {
   buildElectronBuilderGeneratedFileEntries,
   buildElectronBuilderGeneratedResourceFilter,
   buildElectronBuilderRegionalZipFileEntries,
   buildElectronBuilderRegionalZipResource,
+  buildElectronBuilderBasemapFileEntries,
+  buildElectronBuilderBasemapResource,
 };

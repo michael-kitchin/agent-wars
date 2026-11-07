@@ -16,27 +16,27 @@ import {
 
 describe('basemapNeedsRemount', () => {
   it('remounts when nothing is mounted yet', () => {
-    assert.equal(basemapNeedsRemount(null, 'esri_world_shaded_relief'), true);
+    assert.equal(basemapNeedsRemount(null, 'offline_hillshade'), true);
   });
 
   it('skips remount when the requested provider is already mounted', () => {
-    assert.equal(basemapNeedsRemount('esri_world_shaded_relief', 'esri_world_shaded_relief'), false);
+    assert.equal(basemapNeedsRemount('offline_hillshade', 'offline_hillshade'), false);
   });
 
   it('remounts when the mounted provider differs from the request', () => {
-    assert.equal(basemapNeedsRemount('osm_mapnik', 'esri_world_shaded_relief'), true);
+    assert.equal(basemapNeedsRemount('offline_hillshade', 'other_hillshade'), true);
   });
 
   it('remounts a map pair when either map is on a different provider', () => {
     assert.equal(
-      basemapNeedsRemountForMaps('esri_world_shaded_relief', 'esri_world_shaded_relief', 'esri_world_shaded_relief'),
+      basemapNeedsRemountForMaps('offline_hillshade', 'offline_hillshade', 'offline_hillshade'),
       false
     );
     assert.equal(
-      basemapNeedsRemountForMaps('esri_world_shaded_relief', 'osm_mapnik', 'esri_world_shaded_relief'),
+      basemapNeedsRemountForMaps('offline_hillshade', 'other_hillshade', 'offline_hillshade'),
       true
     );
-    assert.equal(basemapNeedsRemountForMaps(null, 'esri_world_shaded_relief', 'esri_world_shaded_relief'), true);
+    assert.equal(basemapNeedsRemountForMaps(null, 'offline_hillshade', 'offline_hillshade'), true);
   });
 });
 
