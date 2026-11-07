@@ -99,10 +99,12 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 /* Leaflet's plus-lighter blend adds each tile to the map background, so gray land washes out and transparent ocean stays gray.
-   A fixed pixel of extra tile size would grow with the zoom scale and cover the map once the view is past the native zoom. */
+   A fixed pixel of extra tile size would grow with the zoom scale and cover the map once the view is past the native zoom.
+   contrast() stretches the gray already stored in the land pixels. The water pane and the elevation-tile lines are not tile images, so they stay out of this filter. */
 #main-map.leaflet-container img.leaflet-tile,
 #minimap.leaflet-container img.leaflet-tile {
   mix-blend-mode: normal;
+  filter: contrast(1.4);
 }
 #map-overlay {
   position: absolute;

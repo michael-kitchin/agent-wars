@@ -383,7 +383,7 @@ export function getMiniLeafletMap(): VendorLeafletMap | null {
  *
  * Purpose: Wargame invert must darken raster tiles without touching hex overlay, units, or chrome.
  * When to use: From `setMainBasemapFilter` for the main map and minimap.
- * Expected outcome: `pane.style.filter` equals `filter`; child `.leaflet-layer` / `.leaflet-tile` filters are cleared.
+ * Expected outcome: `pane.style.filter` equals `filter`. A child tile's inline filter is set to an empty string, which leaves the stylesheet `contrast(1.4)` on the land images. `none` would remove that contrast.
  * Exceptions: Returns without throwing when the map or tile pane is missing.
  */
 function applyTilePaneFilter(map: VendorLeafletMap | null, filter: string): void {

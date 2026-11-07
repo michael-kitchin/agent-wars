@@ -21,7 +21,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-m
 
 ### Mouse
 
-- When the player changes Terrain style, the filter on the hillshade and on the water under it changes to that choice, on the main map and the minimap, and the same filter changes on the main map's elevation-tile lines, and the legend redraws to match. The tiles stay mounted. Default applies an empty filter. Atlas applies `ATLAS_BASEMAP_CSS_FILTER` (`saturate(0.78) contrast(1.2) brightness(1.03)`). Scientific applies `SCIENTIFIC_BASEMAP_CSS_FILTER` (`grayscale(1) contrast(1.18) brightness(1.08)`). Wargame applies `WARGAME_BASEMAP_CSS_FILTER` (`invert(1) hue-rotate(180deg)`). Unknown ids use the empty filter. All four are `basemapCssFilterForStyle` in `src/shared/basemapStyleLogic.ts`.
+- When the player changes Terrain style, the filter on the hillshade and on the water under it changes to that choice, on the main map and the minimap, and the same filter changes on the main map's elevation-tile lines, and the legend redraws to match. The tiles stay mounted. Default applies an empty filter. Atlas applies `ATLAS_BASEMAP_CSS_FILTER` (`saturate(0.78) contrast(1.2) brightness(1.03)`). Scientific applies `SCIENTIFIC_BASEMAP_CSS_FILTER` (`grayscale(1) contrast(1.18) brightness(1.08)`). Wargame applies `WARGAME_BASEMAP_CSS_FILTER` (`invert(1) hue-rotate(180deg)`). Unknown ids use the empty filter. All four are `basemapCssFilterForStyle` in `src/shared/basemapStyleLogic.ts`. Land tile images also use `contrast(1.4)` from `static/shellChrome.css` on the main map and the minimap. That contrast is not part of the terrain-style filter, so the water and the elevation-tile lines do not receive it.
 
 ### Keyboard
 

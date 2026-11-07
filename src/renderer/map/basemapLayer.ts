@@ -391,6 +391,14 @@ function ensureWaterPane(map: OfflineBasemapMap): void {
   pane.style.background = WATER_COLOR;
 }
 
+/**
+ * Applies one terrain-style filter to a pane.
+ *
+ * Purpose: The style recolors a pane as a whole. Land contrast is a stylesheet rule on the tile images, so this must clear an inline filter with an empty string rather than `none`.
+ * When to use: For a tile pane, a water pane, or the main map's grid pane.
+ * Expected outcome: The pane uses `filter`. Tile images keep `contrast(1.4)` from `shellChrome.css`. The water and the grid lines do not.
+ * Exceptions: None. A missing pane is skipped.
+ */
 function applyPaneFilter(pane: HTMLElement | undefined, filter: string): void {
   if (!pane) return;
   const filtered = pane.querySelectorAll<HTMLElement>('.leaflet-layer, .leaflet-tile');

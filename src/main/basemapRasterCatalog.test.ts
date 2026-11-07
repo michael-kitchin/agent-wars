@@ -58,6 +58,11 @@ test('transparent ocean shows the water pane and tiles are not added to the back
   assert.ok(layerSource.includes('container.insertBefore(pane, container.firstChild)'), 'the water pane is placed on the map container');
   assert.ok(layerSource.includes("const WATER_COLOR = 'rgb(113, 148, 177)'"));
   assert.ok(chrome.includes('mix-blend-mode: normal'), 'hillshade tiles must not use plus-lighter');
+  assert.match(
+    chrome,
+    /img\.leaflet-tile,\s*#minimap\.leaflet-container img\.leaflet-tile \{[^}]*filter: contrast\(1\.4\)/,
+    'land tile images use contrast(1.4)'
+  );
 });
 
 test('elevation tile edges are drawn over the hillshade', () => {
