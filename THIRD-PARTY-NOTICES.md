@@ -1,6 +1,6 @@
 # Third-party notices
 
-Source code written for Agent Wars is under the MIT license in `LICENSE`. This file lists other people's work included with Agent Wars, or used to build data that ships with it. Each notice covers that third-party work. EarthEnv consensus land cover is CC BY-NC 4.0, and WorldClim requires permission before redistribution or commercial use. Those terms prevent commercial use of the application as distributed.
+Source code written for Agent Wars is under the MIT license in `LICENSE`. This file lists other people's work included with Agent Wars, or used to build data that ships with it. Each notice covers that third-party work. EarthEnv consensus land cover is CC BY-NC 4.0. That term prevents commercial use of the application as distributed.
 
 ## better-sqlite3
 
@@ -451,15 +451,19 @@ The EarthEnv topography page (https://www.earthenv.org/topography) states no sep
 
 Amatulli, G., Domisch, S., Tuanmu, M.-N., Parmentier, B., Ranipeta, A., Malczyk, J., and Jetz, W. (2018) A suite of global, cross-scale topographic variables for environmental and biodiversity modeling. Scientific Data 5: 180040. https://doi.org/10.1038/sdata.2018.40
 
-## WorldClim
+## CHELSA
 
-Monthly weather in the generated packs is classified from WorldClim version 2.1 10-arc-minute average temperature and precipitation for 1970-2000. The rasters are not shipped. The classification into mild, rain, snow, and heat is a modification of that data. The generated weather packs, `data/generated/terrain_res1_weather.json.zip` and each region's `terrain_res_s_weather.json.zip`, are tracked in this repository and included in the application.
+Monthly weather in the generated packs is classified from CHELSA version 2.1 monthly mean temperature (`tas`) and precipitation (`pr`) for 1981-2010. Each hex uses the mean of a 10-arc-minute box around its centroid. The rasters are not shipped. The classification into mild, rain, snow, and heat is a modification of that data. The generated weather packs, `data/generated/terrain_res1_weather.json.zip` and each region's `terrain_res_s_weather.json.zip`, are tracked in this repository and included in the application.
 
-https://www.worldclim.org/about.html states: "The data are freely available for academic use and other non-commercial use. Redistribution or commercial use is not allowed without prior permission."
+CHELSA V2.1 is published under Creative Commons Zero 1.0 (CC0 1.0). https://creativecommons.org/publicdomain/zero/1.0/
 
-https://worldclim.org/data/worldclim21.html
+https://www.chelsa-climate.org/datasets/chelsa_climatologies
 
-Cite: Fick, S.E. and R.J. Hijmans, 2017. WorldClim 2: new 1km spatial resolution climate surfaces for global land areas. International Journal of Climatology 37 (12): 4302-4315.
+https://doi.org/10.16904/envidat.228
+
+Cite: Karger, D.N., Conrad, O., Böhner, J., Kawohl, T., Kreft, H., Soria-Auza, R.W., Zimmermann, N.E., Linder, H.P., Kessler, M. (2017). Climatologies at high resolution for the earth's land surface areas. Scientific Data 4: 170122. https://doi.org/10.1038/sdata.2017.122
+
+Cite: Karger, D.N., Conrad, O., Böhner, J., Kawohl, T., Kreft, H., Soria-Auza, R.W., Zimmermann, N.E., Linder, H.P., Kessler, M. (2021). Climatologies at high resolution for the earth's land surface areas. EnviDat. https://doi.org/10.16904/envidat.228
 
 ## Data-generation tools
 

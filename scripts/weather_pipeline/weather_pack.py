@@ -1,18 +1,24 @@
-"""Build a weather JSON pack from strategic metadata and WorldClim monthly normals."""
+"""Build a weather JSON pack from strategic metadata and CHELSA monthly climatologies."""
 
 from __future__ import annotations
 
 import json
 import logging
-import urllib.request
-import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Final
 
 import h3
-import rasterio
 
 from scripts.terrain_pipeline.logging_utils import TRACE_LEVEL
+from scripts.weather_pipeline.chelsa_source import (
+    CHELSA_DIR,
+    ChelsaBands,
+    celsius_from_raw,
+    open_chelsa_bands,
+    precip_mm_from_raw,
+    window_mean_raw,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,41 +28,10 @@ SNOW_MEAN_C: Final = 0.0
 RAIN_MM: Final = 120.0
 # Mean temperature at or above this value counts as heat.
 HEAT_MEAN_C: Final = 23.0
-# Directory that caches the WorldClim GeoTIFFs.
-WORLDCLIM_DIR: Final = Path(r"F:\Data\worldclim")
-# WorldClim 2.1 average-temperature zip.
-TAVG_URL: Final = "https://geodata.ucdavis.edu/climate/worldclim/2_1/base/wc2.1_10m_tavg.zip"
-# WorldClim 2.1 precipitation zip.
-PREC_URL: Final = "https://geodata.ucdavis.edu/climate/worldclim/2_1/base/wc2.1_10m_prec.zip"
 # Search radius, in H3 grid steps, used by the global resolution-1 pack.
 GLOBAL_WATER_LAND_STEPS: Final = 2
-
-
-def download_and_extract(url: str, destination: Path) -> None:
-    """
-    Why this exists:
-        Cache WorldClim monthly rasters locally so weather export does not download them twice.
-    When to use:
-        Before opening temperature or precipitation bands.
-    What to expect:
-        Does nothing when the matching tifs are already present. Raises ``OSError`` or
-        ``zipfile.BadZipFile`` when a download or extract fails.
-    """
-
-    LOGGER.debug("Ensuring WorldClim archive %s is extracted in %s.", url, destination)
-    destination.mkdir(parents=True, exist_ok=True)
-    name = url.rsplit("/", 1)[-1]
-    marker = "tavg" if "tavg" in name else "prec"
-    if any(destination.glob(f"wc2.1_10m_{marker}_*.tif")):
-        print(f"worldclim {marker} already present")
-        return
-    zip_path = destination / name
-    if not zip_path.exists():
-        print(f"downloading {url}")
-        urllib.request.urlretrieve(url, zip_path)
-    print(f"extracting {zip_path.name}")
-    with zipfile.ZipFile(zip_path) as archive:
-        archive.extractall(destination)
+# Info progress interval while classifying metadata rows.
+_PROGRESS_ROWS: Final = 500
 
 
 def classify_month(mean_c: float, precip_mm: float) -> dict[str, object]:
@@ -64,7 +39,7 @@ def classify_month(mean_c: float, precip_mm: float) -> dict[str, object]:
     Why this exists:
         Match the shared TypeScript month rule for one temperature and precipitation pair.
     When to use:
-        Once per month while sampling a land hex.
+        Once per month while sampling a hex.
     What to expect:
         A display of snow, rain, heat, or mild, plus whether the month counts as heat.
     """
@@ -83,9 +58,9 @@ def classify_month(mean_c: float, precip_mm: float) -> dict[str, object]:
 def mild_year() -> list[dict[str, object]]:
     """
     Why this exists:
-        Give open ocean with no nearby land a full year of mild weather.
+        Give a hex with no sampled neighbor a full year of mild weather.
     When to use:
-        When a water hex has no land hex inside the search radius, or a land sample is nodata.
+        When no sampled hex is inside the search radius.
     What to expect:
         Twelve mild months, none of which count as heat.
     """
@@ -94,57 +69,26 @@ def mild_year() -> list[dict[str, object]]:
     return [{"display": "mild", "countsAsHeat": False} for _ in range(12)]
 
 
-def sample_year(
-    lat: float,
-    lng: float,
-    tavg: list[rasterio.DatasetReader],
-    prec: list[rasterio.DatasetReader],
-) -> list[dict[str, object]] | None:
-    """
-    Why this exists:
-        Read twelve monthly means at one lon/lat.
-    When to use:
-        For each land hex centroid.
-    What to expect:
-        Twelve classified months, or ``None`` when any band is nodata or NaN.
-    """
-
-    LOGGER.log(TRACE_LEVEL, "Sampling WorldClim year at lat=%s lng=%s.", lat, lng)
-    point = [(lng, lat)]
-    months: list[dict[str, object]] = []
-    for temp_band, rain_band in zip(tavg, prec, strict=True):
-        temp_value = next(temp_band.sample(point))[0]
-        rain_value = next(rain_band.sample(point))[0]
-        if temp_band.nodata is not None and temp_value == temp_band.nodata:
-            return None
-        if rain_band.nodata is not None and rain_value == rain_band.nodata:
-            return None
-        if temp_value != temp_value or rain_value != rain_value:
-            return None
-        months.append(classify_month(float(temp_value), float(rain_value)))
-    return months
-
-
-def nearest_land_months(
+def nearest_sampled_months(
     origin: str,
-    land_months: dict[str, list[dict[str, object]]],
+    sampled_months: dict[str, list[dict[str, object]]],
     max_steps: int,
 ) -> list[dict[str, object]]:
     """
     Why this exists:
-        Copy weather from the closest land hex so water hexes are not left unclassified.
+        Fill a hex the raster did not cover from the closest hex that did sample.
     When to use:
-        For each strategic hex whose metadata says ``all_water``.
+        For each strategic hex whose window mean is missing.
     What to expect:
-        The land year at the smallest grid distance within ``max_steps``, breaking ties by cell id.
-        A mild year when no land hex is inside the radius.
+        The sampled year at the smallest grid distance within ``max_steps``, breaking ties by cell id.
+        A mild year when no sampled hex is inside the radius.
     """
 
-    LOGGER.log(TRACE_LEVEL, "Searching %d steps from %s for land weather.", max_steps, origin)
+    LOGGER.log(TRACE_LEVEL, "Searching %d steps from %s for sampled weather.", max_steps, origin)
     best: tuple[int, str] | None = None
     for distance in range(1, max_steps + 1):
         for cell in h3.grid_disk(origin, distance):
-            if cell not in land_months:
+            if cell not in sampled_months:
                 continue
             if best is None or (distance, cell) < best:
                 best = (distance, cell)
@@ -152,90 +96,142 @@ def nearest_land_months(
             break
     if best is None:
         return mild_year()
-    return land_months[best[1]]
+    return sampled_months[best[1]]
 
 
-def open_worldclim_bands(worldclim_dir: Path) -> tuple[list[rasterio.DatasetReader], list[rasterio.DatasetReader]]:
+def sample_climate_year(lat: float, lng: float, bands: ChelsaBands) -> list[dict[str, object]] | None:
     """
     Why this exists:
-        Open the twelve temperature and twelve precipitation bands in month order.
+        Classify twelve months from the temperature and precipitation window around one centroid.
     When to use:
-        After ``download_and_extract`` has cached both archives.
+        Once per strategic hex, land or water.
     What to expect:
-        Two lists of open readers, sorted by filename. Raises ``RuntimeError`` when either count is not 12.
-        The caller closes the readers.
+        Twelve classified months, or ``None`` when any month's window is outside the raster or all nodata.
     """
 
-    LOGGER.debug("Opening WorldClim bands in %s.", worldclim_dir)
-    download_and_extract(TAVG_URL, worldclim_dir)
-    download_and_extract(PREC_URL, worldclim_dir)
-    tavg_paths = sorted(worldclim_dir.glob("wc2.1_10m_tavg_*.tif"))
-    prec_paths = sorted(worldclim_dir.glob("wc2.1_10m_prec_*.tif"))
-    if len(tavg_paths) != 12 or len(prec_paths) != 12:
-        raise RuntimeError(f"expected 12 tavg and 12 prec tifs, found {len(tavg_paths)} and {len(prec_paths)}")
-    return [rasterio.open(path) for path in tavg_paths], [rasterio.open(path) for path in prec_paths]
+    LOGGER.log(TRACE_LEVEL, "Sampling climate year at lat=%s lng=%s.", lat, lng)
+    months: list[dict[str, object]] = []
+    for temp_band, rain_band in zip(bands.temperature, bands.precipitation, strict=True):
+        temp_raw = window_mean_raw(temp_band, lat, lng)
+        rain_raw = window_mean_raw(rain_band, lat, lng)
+        if temp_raw is None or rain_raw is None:
+            return None
+        months.append(classify_month(celsius_from_raw(temp_raw), precip_mm_from_raw(rain_raw)))
+    return months
 
 
 def build_weather_payload(
     metadata_records: list[dict[str, Any]],
-    tavg: list[rasterio.DatasetReader],
-    prec: list[rasterio.DatasetReader],
+    sample_year_at: Callable[[float, float], list[dict[str, object]] | None],
     max_steps: int,
 ) -> dict[str, Any]:
     """
     Why this exists:
         Turn strategic metadata rows into the weather record list.
     When to use:
-        After WorldClim bands are open.
+        After a sampler is ready. The sampler is called for every row, including ``all_water``.
     What to expect:
-        ``{"version": 1, "records": [...]}`` sorted by ``h3Index``. Water hexes copy the nearest land year.
+        ``{"version": 1, "records": [...]}`` sorted by ``h3Index``. A missing year copies the nearest
+        sampled year within ``max_steps``, or a mild year when none is that close.
     """
 
-    LOGGER.debug("Building weather payload for %d records (max_steps=%d).", len(metadata_records), max_steps)
-    land_months: dict[str, list[dict[str, object]]] = {}
-    water_indexes: list[str] = []
-    for row in metadata_records:
-        h3_index = row["h3_index"]
-        if row.get("all_water") is True:
-            water_indexes.append(h3_index)
-            continue
-        lat, lng = h3.cell_to_latlng(h3_index)
-        sampled = sample_year(lat, lng, tavg, prec)
-        land_months[h3_index] = sampled if sampled is not None else mild_year()
-    output_records: list[dict[str, Any]] = []
-    for h3_index, months in land_months.items():
-        output_records.append({"h3Index": h3_index, "months": months})
-    for h3_index in water_indexes:
-        output_records.append({"h3Index": h3_index, "months": nearest_land_months(h3_index, land_months, max_steps)})
-    output_records.sort(key=lambda record: record["h3Index"])
-    return {"version": 1, "records": output_records}
+    payload, _sampled, _copied, _mild = _assemble_weather(metadata_records, sample_year_at, max_steps)
+    return payload
 
 
-def write_weather_pack(metadata_path: Path, output_path: Path, max_steps: int) -> int:
+def write_weather_pack(
+    metadata_path: Path,
+    output_path: Path,
+    max_steps: int,
+    chelsa_dir: Path = CHELSA_DIR,
+) -> int:
     """
     Why this exists:
         Write one weather JSON file from a strategic metadata file.
     When to use:
         From the global CLI or a regional export.
     What to expect:
-        Compact JSON at ``output_path``. Returns the record count. Closes WorldClim readers before returning.
-        Raises ``RuntimeError`` when the WorldClim bands are incomplete, and ``OSError`` when a file cannot be written.
+        Compact JSON at ``output_path``. Returns the record count. Closes CHELSA readers before returning.
+        Raises ``RuntimeError`` when the CHELSA bands are missing or invalid, and ``OSError`` when a file
+        cannot be written. The console line and the info log include sampled, copied, and mild counts.
     """
 
-    LOGGER.debug("Writing weather pack from %s to %s (max_steps=%d).", metadata_path, output_path, max_steps)
+    LOGGER.debug(
+        "Writing weather pack from %s to %s (max_steps=%d, chelsa_dir=%s).",
+        metadata_path,
+        output_path,
+        max_steps,
+        chelsa_dir,
+    )
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     records = metadata["records"] if isinstance(metadata, dict) else metadata
-    tavg, prec = open_worldclim_bands(WORLDCLIM_DIR)
+    bands = open_chelsa_bands(chelsa_dir)
     try:
-        payload = build_weather_payload(records, tavg, prec, max_steps)
+        payload, sampled, copied, mild = _assemble_weather(
+            records,
+            lambda lat, lng: sample_climate_year(lat, lng, bands),
+            max_steps,
+        )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     except Exception:
         LOGGER.error("Failed to write weather pack to %s.", output_path, exc_info=True)
         raise
     finally:
-        for dataset in tavg + prec:
-            dataset.close()
-    LOGGER.info("Wrote %d weather records to %s.", len(payload["records"]), output_path)
-    print(f"wrote {len(payload['records'])} hexes to {output_path}")
-    return len(payload["records"])
+        bands.close()
+    count = len(payload["records"])
+    LOGGER.info(
+        "Wrote %d weather records to %s (sampled %d, copied %d, mild %d).",
+        count,
+        output_path,
+        sampled,
+        copied,
+        mild,
+    )
+    print(f"wrote {count} hexes to {output_path} (sampled {sampled}, copied {copied}, mild {mild})")
+    return count
+
+
+def _assemble_weather(
+    metadata_records: list[dict[str, Any]],
+    sample_year_at: Callable[[float, float], list[dict[str, object]] | None],
+    max_steps: int,
+) -> tuple[dict[str, Any], int, int, int]:
+    """
+    Why this exists:
+        Sample every row and count how many years were sampled, copied, or left mild.
+    When to use:
+        From ``build_weather_payload`` and ``write_weather_pack``.
+    What to expect:
+        The compact payload plus three counts that sum to the record count.
+    """
+
+    LOGGER.debug("Building weather payload for %d records (max_steps=%d).", len(metadata_records), max_steps)
+    sampled_months: dict[str, list[dict[str, object]]] = {}
+    missing: list[str] = []
+    total = len(metadata_records)
+    for index, row in enumerate(metadata_records, start=1):
+        h3_index = row["h3_index"]
+        lat, lng = h3.cell_to_latlng(h3_index)
+        sampled = sample_year_at(lat, lng)
+        if sampled is None:
+            missing.append(h3_index)
+        else:
+            sampled_months[h3_index] = sampled
+        if index % _PROGRESS_ROWS == 0:
+            LOGGER.info("Weather rows done %d of %d.", index, total)
+    copied = 0
+    mild = 0
+    known = {id(months) for months in sampled_months.values()}
+    output_records: list[dict[str, Any]] = [
+        {"h3Index": h3_index, "months": months} for h3_index, months in sampled_months.items()
+    ]
+    for h3_index in missing:
+        months = nearest_sampled_months(h3_index, sampled_months, max_steps)
+        if id(months) in known:
+            copied += 1
+        else:
+            mild += 1
+        output_records.append({"h3Index": h3_index, "months": months})
+    output_records.sort(key=lambda record: record["h3Index"])
+    return {"version": 1, "records": output_records}, len(sampled_months), copied, mild

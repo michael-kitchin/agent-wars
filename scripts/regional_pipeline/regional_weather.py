@@ -16,11 +16,11 @@ LOGGER = logging.getLogger(__name__)
 def export_region_weather(manifest: RegionManifest, paths: RegionPaths) -> None:
     """
     Why this exists:
-        Sample WorldClim months for the region's strategic cells.
+        Sample CHELSA months for the region's strategic cells.
     When to use:
         After strategic metadata exists.
     What to expect:
-        Writes the weather file. A sea hex copies the nearest land hex inside this region.
+        Writes the weather file. A hex the raster does not cover copies the nearest sampled hex in this region.
     """
 
     steps = weather_water_land_steps_for(manifest.footprint.strategic_resolution)

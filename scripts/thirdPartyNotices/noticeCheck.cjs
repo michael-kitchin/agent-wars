@@ -28,8 +28,8 @@ const fixedRequirements = [
   },
   { heading: 'EarthEnv Topography', snippets: ['10.1038/sdata.2018.40'] },
   {
-    heading: 'WorldClim',
-    snippets: ['Redistribution or commercial use is not allowed without prior permission.'],
+    heading: 'CHELSA',
+    snippets: ['Creative Commons Zero 1.0 (CC0 1.0)'],
   },
   {
     heading: 'Data-generation tools',

@@ -1,1 +1,1 @@
-"""Weather packs derived from strategic metadata and WorldClim monthly normals."""
+"""Weather packs derived from strategic metadata and CHELSA monthly climatologies."""

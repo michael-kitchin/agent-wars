@@ -173,7 +173,7 @@ The offline pipeline samples rasters with rasterio and vector layers with Shapel
 | ------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Land cover          | Forest, desert, arctic, and plains                                                                | [EarthEnv](https://www.earthenv.org/landcover) 1 km consensus land cover, 12 classes                                          |
 | Topography          | Mountain cells. The 50 km grids where a hex edge is at least 100 km, and the 5 km grids otherwise. | [EarthEnv](https://www.earthenv.org/topography) ruggedness, slope, and elevation from GMTED2010                               |
-| Climate             | Each hex's weather in each month                                                                  | [WorldClim 2.1](https://worldclim.org/data/worldclim21.html) monthly temperature and precipitation, 1970–2000, 10 arc-minutes |
+| Climate             | Each hex's weather in each month                                                                  | [CHELSA V2.1](https://www.chelsa-climate.org/datasets/chelsa_climatologies) 1981-2010 monthly mean temperature and precipitation, averaged over a 10-arc-minute box |
 | Water               | Water, coast, and shoreline wetlands                                                              | [Natural Earth](https://www.naturalearthdata.com) 1:10m ocean and lakes                                                       |
 | Cities              | Urban cells, and so the economy                                                                   | Natural Earth urban areas, from 2002–2003 MODIS satellite data at 1 km                                                        |
 | Ports and airfields | Where naval and air units are built and based                                                     | Natural Earth airports and ports                                                                                              |
@@ -182,7 +182,7 @@ The offline pipeline samples rasters with rasterio and vector layers with Shapel
 | Landmasses          | Which land is connected, so land units march within a landmass.                                   | Natural Earth geography regions: continents, isthmuses, and islands of 2,000 km² or more                                      |
 
 
-Strategic hexes are assigned a per-month weather from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat.
+Strategic hexes are assigned a per-month weather from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat. The mean is the CHELSA 30-arc-second cells in that box, for land and water. Temperature is converted from kelvin. A centroid the raster does not cover copies the nearest sampled hex in that pack.
 
 Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
@@ -320,4 +320,4 @@ Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The versio
 
 Source code written for Agent Wars is under the [MIT license](LICENSE). Reuse it, and keep the copyright notice and the license text with the copy.
 
-Third-party software, vendored files, and the generated earth data under `data/generated/` keep the terms in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The terrain uses EarthEnv consensus land cover, which is CC BY-NC 4.0. The weather uses WorldClim, which allows academic and other non-commercial use and requires permission before redistribution or commercial use. Those terms prevent commercial use of the application as distributed.
+Third-party software, vendored files, and the generated earth data under `data/generated/` keep the terms in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The terrain uses EarthEnv consensus land cover, which is CC BY-NC 4.0. That term prevents commercial use of the application as distributed.

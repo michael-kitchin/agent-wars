@@ -4,31 +4,31 @@ overview: "Sample strategic weather from CHELSA V2.1 1981-2010 monthly climatolo
 todos:
   - id: preconditions
     content: Record git status, baseline tests, and a copy of the 24 tracked weather zips
-    status: pending
+    status: completed
   - id: source-module
     content: Add the CHELSA reader and its unit tests
-    status: pending
+    status: completed
   - id: pack-builder
     content: Sample every hex from CHELSA and keep the pack schema
-    status: pending
+    status: completed
   - id: selective-zip
     content: Let the global zip script archive one named JSON file
-    status: pending
+    status: completed
   - id: probe
     content: Check real CHELSA values at fixed points before regenerating packs
-    status: pending
+    status: completed
   - id: global-pack
     content: Regenerate and compare the global weather pack, then zip it
-    status: pending
+    status: completed
   - id: regional-packs
     content: Regenerate, compare, check, and zip every regional weather pack
-    status: pending
+    status: completed
   - id: docs
     content: Update the living docs and the notices check
-    status: pending
+    status: completed
   - id: final-checks
     content: Run the test suites and write the results file
-    status: pending
+    status: completed
 isProject: false
 ---
 

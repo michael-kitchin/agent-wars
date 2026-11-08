@@ -61,9 +61,9 @@ def minor_island_max_km2_for(strategic_resolution: int) -> float:
 def weather_water_land_steps_for(strategic_resolution: int, global_steps: int = 2) -> int:
     """
     Why this exists:
-        Scale how far a sea hex searches for a land hex when copying weather.
+        Scale how far a hex with no sample searches for a hex that has one.
     When to use:
-        When a regional weather export sets its water-to-land search.
+        When a regional weather export sets its neighbor search.
     What to expect:
         At least ``global_steps``. Finer strategic resolutions search more rings so the distance stays similar.
     """

@@ -53,7 +53,7 @@ Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#cr
 
 ## Source directory
 
-Offline generation reads Natural Earth vectors and EarthEnv rasters from directories outside this repo. Each setting below ships as `F:/Data`. Weather ships as `F:\Data\worldclim`. Point every setting you run at your directory. A setting you leave unchanged still reads its shipped path. Plans in `.spec/completed/` still name `F:/Data`. That was the directory on the machine where those plans were written. Change the settings in this section for a local setup.
+Offline generation reads Natural Earth vectors and EarthEnv rasters from directories outside this repo. Each setting below ships as `F:/Data`. Weather ships as `F:\Data\chelsea`. Point every setting you run at your directory. A setting you leave unchanged still reads its shipped path. Plans in `.spec/completed/` still name `F:/Data`. That was the directory on the machine where those plans were written. Change the settings in this section for a local setup.
 
 Which setting a command reads:
 
@@ -61,7 +61,7 @@ Which setting a command reads:
 - Road and rail commands (`road_rail_sides_cli`, including `qa-line-coverage`, and `road_rail_vectors_cli`) take `--data-root`. The default string `F:/Data` is set in those two files, separate from `InputRasterSet.root`. Example: `python -m scripts.terrain_pipeline.road_rail_sides_cli run --mode fast --data-root D:\gis`. `npm run terrain:generate` runs metadata, which uses `InputRasterSet.root`, then `terrain:generate:road-rail`, which uses `--data-root`. That script, `terrain:generate:road-rail:high-fidelity`, and `terrain:generate:road-rail-vectors` omit `--data-root`.
 - Regional `validate`, `footprint`, `run`, and `origins` take `--data-root` (default `F:/Data` in `scripts/regional_pipeline/regional_cli.py`). See [../regional_pipeline/README.md](../regional_pipeline/README.md).
 - Hex naming takes `--data-root` on `python -m scripts.naming_pipeline.generate_hex_naming`. The default is `DEFAULT_DATA_ROOT` in `generate_hex_naming.py`. See [../naming_pipeline/README.md](../naming_pipeline/README.md).
-- Weather reads `WORLDCLIM_DIR` in `scripts/weather_pipeline/weather_pack.py`. Global weather export and the regional `weather` step both use it, including when regional `--data-root` points elsewhere. The export downloads `wc2.1_10m_tavg_*.tif` and `wc2.1_10m_prec_*.tif` into that folder when those files are absent. See [../weather_pipeline/README.md](../weather_pipeline/README.md).
+- Weather reads `CHELSA_DIR` in `scripts/weather_pipeline/chelsa_source.py`. Global weather export and the regional `weather` step both use it, including when regional `--data-root` points elsewhere. The export does not download. See [../weather_pipeline/README.md](../weather_pipeline/README.md).
 - The basemap pipeline reads ocean and lake shapefiles from `--data-root` (default `InputRasterSet.root`) and GMTED2010 from `--gmted-dir`. See [../basemap_pipeline/README.md](../basemap_pipeline/README.md).
 
 Put the shapefiles and EarthEnv rasters directly in the directory the command reads. Each `.shp` needs the sidecar files the driver requires (`.dbf`, `.shx`, `.prj`, and any others shipped with that layer).

@@ -18,7 +18,7 @@ import { acclimationTags } from '../../shared/weatherBonusRules';
 /**
  * Twelve mild months for a hex the pack does not list.
  *
- * Purpose: Open ocean and test fixtures still have a year to read.
+ * Purpose: A hex the pack does not list still has a year to read.
  * When to use: `weatherYearForHex` when the index is absent.
  * Expected outcome: Twelve mild months that do not count as heat.
  * Exceptions: None.

@@ -27,8 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     When to use:
         ``python -m scripts.weather_pipeline.generate_res1_weather``.
     What to expect:
-        Writes compact JSON. Defaults match the historical metadata and output paths and use 2 water-to-land steps.
-        Returns 0. Raises when metadata or WorldClim inputs are missing.
+        Writes compact JSON. Defaults match the historical metadata and output paths and use 2 search steps.
+        Returns 0. Raises when metadata or CHELSA inputs are missing.
     """
 
     parser = argparse.ArgumentParser(description="Write the global resolution-1 weather pack.")
