@@ -13,6 +13,7 @@ import { hideStackCallout } from '../map/stackCallout';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
 import { syncAdminBorderLayers } from '../map/adminBorderLayers';
 import { drawMapLabels, resizeMapLabelCanvas } from '../map/mapLabelLayer';
+import { clearVisibleCityNames } from '../map/visibleCityNames';
 import { setTacticalTransportVectorsSuppressed, syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
 import { hideBuildEntryLayer } from '../map/terrainView';
 import { drawNewGameMapPreview, setNewGameMapPreviewRepaint } from '../map/newGameMapPreviewRendering';
@@ -759,6 +760,7 @@ function redraw(): void {
  * Exceptions: None.
  */
 function paintMapFrame(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  clearVisibleCityNames();
   const overlay = document.getElementById('game-over-overlay');
   const overlayOpen = overlay != null && !overlay.classList.contains('hidden');
   setTacticalTransportVectorsSuppressed(overlayOpen);

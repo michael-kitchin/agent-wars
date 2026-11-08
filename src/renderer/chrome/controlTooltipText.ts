@@ -469,7 +469,7 @@ export function toolGroupTooltipText(groupId: string): string | null {
  * Exceptions: None.
  */
 export const mapThemeTooltipText =
-  'Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night.';
+  'Pick the map colors for land, water, coastlines, borders, roads, rails, and place names. The choices are Standard, Topographic, Nautical, and Night.';
 
 /**
  * Tip for a build-entry button.

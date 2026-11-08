@@ -15,13 +15,15 @@ import {
   visibleLabelKinds,
   type MapLabelKind,
 } from '../../shared/mapLabelRules';
+import { withoutStatesNamedForCities } from '../../shared/mapLabelCityNames';
 import { parseMapLabelPack, type MapLabelFeature } from '../../shared/mapLabelPack';
 import { placeMapLabels, type PlacedMapLabel } from '../../shared/mapLabelPlacement';
 import type { MapLabelFontId, MapTheme } from '../../shared/mapThemes';
 import { WEB_MERCATOR_MAX_ABS_LAT, alignLongitudeToReference } from '../../shared/webMercator';
 import { rendererSharedState as S } from '../core/state';
 import { loadBasemapVectorText } from './vectorLayerGeometry';
-import { shouldRenderTacticalHexes } from './terrainView';
+import { mapAnnotationsUseDetailView } from './mapAnnotationView';
+import { getVisibleCityNameKeys } from './visibleCityNames';
 import { getMainLeafletMap } from './worldLeafletMap';
 
 /**
@@ -175,15 +177,18 @@ export function drawMapLabels(): void {
   if (!ctx || !metrics) return;
   ctx.setTransform(metrics.dpr, 0, 0, metrics.dpr, 0, 0);
   ctx.clearRect(0, 0, metrics.w, metrics.h);
+  // The smoke run reads this because a canvas has no DOM to inspect.
+  canvas.dataset.drawnLabelKinds = '';
   const theme = labelTheme;
   const map = getMainLeafletMap() as LabelHostMap | null;
   if (!theme || !map || labelFeatures.length === 0) return;
-  const tacticalView = shouldRenderTacticalHexes();
+  const tacticalView = mapAnnotationsUseDetailView();
   const placed = labelsForFrame(map, ctx, theme, tacticalView);
   const zoom = map.getZoom();
   for (const label of placed) {
     paintLabel(ctx, theme, label, labelKindOpacity(label.kind, zoom, tacticalView));
   }
+  canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(',');
 }
 
 /**
@@ -215,7 +220,7 @@ async function loadLabelDocument(requestRedraw: () => void): Promise<void> {
  *
  * Purpose: Placement is shared. This function supplies the view, the projection, and the measurement. The tactical flag is read once by the caller, because that read can change the flag.
  * When to use: From `drawMapLabels`, after the canvas is clear.
- * Expected outcome: The placed labels, using `tacticalView` for which kinds appear. Memory keeps a candidate that was not drawn and forgets a feature that was not a candidate.
+ * Expected outcome: The placed labels, using `tacticalView` for which kinds appear. A state whose name matches a city recorded for this frame is not a candidate. Memory keeps a candidate that was not drawn and forgets a feature that was not a candidate.
  * Exceptions: None.
  */
 function labelsForFrame(
@@ -231,9 +236,12 @@ function labelsForFrame(
   const east = bounds.getEast();
   const north = bounds.getNorth();
   const kinds = visibleLabelKinds(zoom, tacticalView);
-  const candidates = labelFeatures.filter((feature) => (
-    featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)
-  ));
+  const candidates = withoutStatesNamedForCities(
+    labelFeatures.filter((feature) => (
+      featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)
+    )),
+    getVisibleCityNameKeys(),
+  );
   const candidateIds = new Set(candidates.map((feature) => feature.id));
   const size = map.getSize();
   const center = map.getCenter();

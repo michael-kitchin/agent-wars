@@ -113,7 +113,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Memory: Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
 - Orders: Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
 - Production: Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
-- Map theme: Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night. (`mapThemeTooltipText` in `src/renderer/chrome/controlTooltipText.ts`).
+- Map theme: Pick the map colors for land, water, coastlines, borders, roads, rails, and place names. The choices are Standard, Topographic, Nautical, and Night. (`mapThemeTooltipText` in `src/renderer/chrome/controlTooltipText.ts`).
 - Build marker: `Build Units`, or `Build/Hire Units` when the hex is in the human hire set (`buildEntryTooltipTextFor` in `src/renderer/chrome/controlTooltipText.ts`).
 - Tactical entry marker: Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.
 - Single-hex add: Add a queue row. It starts as the first unit type this hex can build.

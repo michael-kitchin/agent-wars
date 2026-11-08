@@ -4,6 +4,8 @@
  */
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   CONTINENT_BESIDE_COUNTRY_OPACITY,
@@ -63,12 +65,38 @@ describe('map themes', () => {
     }
   });
 
+  it('dims night roads, lightens night rails, and leaves the other themes alone', () => {
+    assert.deepEqual(mapThemeById('night').transportLineColors, {
+      roadCenter: '#8b95a3',
+      roadOutline: '#0a0e14',
+      railCenter: '#dfe6ee',
+      railHalo: '#0a0e14',
+    });
+    for (const id of ['standard', 'topographic', 'nautical']) {
+      assert.deepEqual(mapThemeById(id).transportLineColors, {
+        roadCenter: '#ffffff',
+        roadOutline: '#000000',
+        railCenter: '#000000',
+        railHalo: '#ffffff',
+      });
+    }
+  });
+
   it('keeps the coastline distinct from the shared border ink', () => {
     for (const theme of MAP_THEMES) {
       assert.notEqual(theme.coastlineColor, theme.countryBorderColor, theme.id);
       assert.equal(theme.stateBorderColor, theme.countryBorderColor, theme.id);
       assert.match(theme.countryBorderColor, /^#[0-9a-f]{6}$/, theme.id);
     }
+  });
+
+  it('takes every road and rail color from the theme', () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalTransportVectorLayer.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /'#(?:ffffff|000000)'/);
+    assert.match(source, /transportLineColors/);
   });
 
   it('paints the local name stronger than the broader name beside it', () => {

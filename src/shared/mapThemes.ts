@@ -1,7 +1,7 @@
 /**
  * The four map themes and the land-color math the tile filter must match.
  *
- * Purpose: One place for water, land, coast, border, grid, and label colors, so the legend,
+ * Purpose: One place for water, land, coast, border, grid, label, road, and rail colors, so the legend,
  *   the tile filter, and the vector layers cannot drift apart.
  * When to use: Read `MAP_THEMES` for the legend and `mapThemeById` for a stored or incoming id.
  * Expected outcome: Unknown ids resolve to Standard. `themedLandRgb` is the color a stored land
@@ -84,6 +84,53 @@ export interface MapThemeLabelColors {
    * Exceptions: None.
    */
   readonly halo: string;
+}
+
+/**
+ * Stroke colors for the road and rail lines.
+ *
+ * Purpose: Night needs different ink from the three light themes. Weight and opacity stay in the overlay constants.
+ * When to use: When building the road and rail polylines.
+ * Expected outcome: Four CSS colors.
+ * Exceptions: None.
+ */
+export interface MapThemeTransportLineColors {
+  /**
+   * Road center line.
+   *
+   * Contract: A CSS color. Painted at full opacity.
+   * When to use: As the road center stroke.
+   * Expected outcome: White on the light themes and dim slate on Night.
+   * Exceptions: None.
+   */
+  readonly roadCenter: string;
+  /**
+   * Road outline, drawn under the center.
+   *
+   * Contract: A CSS color. The layer paints it at the transport halo opacity.
+   * When to use: As the road outline stroke.
+   * Expected outcome: Black on the light themes and near-black on Night.
+   * Exceptions: None.
+   */
+  readonly roadOutline: string;
+  /**
+   * Rail dashes.
+   *
+   * Contract: A CSS color. The layer paints it at the rail center opacity.
+   * When to use: As the rail dash stroke.
+   * Expected outcome: Black on the light themes and pale on Night.
+   * Exceptions: None.
+   */
+  readonly railCenter: string;
+  /**
+   * Rail halo, drawn under the dashes.
+   *
+   * Contract: A CSS color. The layer paints it at the rail halo opacity.
+   * When to use: As the rail halo stroke.
+   * Expected outcome: White on the light themes and near-black on Night.
+   * Exceptions: None.
+   */
+  readonly railHalo: string;
 }
 
 /**
@@ -203,6 +250,15 @@ export interface MapTheme {
    * Exceptions: None.
    */
   readonly labelColors: MapThemeLabelColors;
+  /**
+   * Road and rail line colors.
+   *
+   * Contract: One color for each of the four strokes.
+   * When to use: When building the transport polylines.
+   * Expected outcome: Night uses dim roads and pale rails. The other themes keep white roads and black rails.
+   * Exceptions: None.
+   */
+  readonly transportLineColors: MapThemeTransportLineColors;
 }
 
 /**
@@ -235,6 +291,21 @@ export interface LinearTransfer {
 }
 
 /**
+ * Road and rail colors shared by Standard, Topographic, and Nautical.
+ *
+ * Purpose: Those three themes keep the lines they drew before Night got its own ink.
+ * When to use: As `transportLineColors` on those three themes. Night has its own literal.
+ * Expected outcome: White road centers, black road outlines, black rail dashes, and white rail halos.
+ * Exceptions: None.
+ */
+const LIGHT_THEME_TRANSPORT_LINE_COLORS: MapThemeTransportLineColors = {
+  roadCenter: '#ffffff',
+  roadOutline: '#000000',
+  railCenter: '#000000',
+  railHalo: '#ffffff',
+};
+
+/**
  * Themes in legend order.
  *
  * Purpose: The dropdown and the SVG filter list both walk this array.
@@ -261,6 +332,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#3b3f46',
       halo: 'rgba(255, 255, 255, 0.85)',
     },
+    transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
     id: 'topographic',
@@ -280,6 +352,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#4a3a28',
       halo: 'rgba(251, 246, 228, 0.9)',
     },
+    transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
     id: 'nautical',
@@ -299,6 +372,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#2b2f33',
       halo: 'rgba(251, 236, 180, 0.9)',
     },
+    transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
     id: 'night',
@@ -317,6 +391,12 @@ export const MAP_THEMES: readonly MapTheme[] = [
       country: '#d7dde5',
       state: '#d7dde5',
       halo: 'rgba(10, 14, 20, 0.85)',
+    },
+    transportLineColors: {
+      roadCenter: '#8b95a3',
+      roadOutline: '#0a0e14',
+      railCenter: '#dfe6ee',
+      railHalo: '#0a0e14',
     },
   },
 ];

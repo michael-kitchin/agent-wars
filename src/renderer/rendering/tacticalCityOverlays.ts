@@ -35,6 +35,8 @@ import {
 import { getTacticalChildCodeWithinParent, getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import { tacticalBattleHexCode } from '../../shared/tacticalBattleFootprint';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
+import { cityCenterIsInView } from '../../shared/mapLabelCityNames';
+import { noteVisibleCityLabel } from '../map/visibleCityNames';
 import { withOpacityHex } from './canvasColor';
 
 /**
@@ -185,6 +187,25 @@ function drawTacticalCityCircleMarker(
 }
 
 /**
+ * Records a city whose center is inside the view.
+ *
+ * Purpose: The label pass hides a state of the same name. Drawing is unchanged.
+ * When to use: For every battle cell, and for an explored strategic parent. An unexplored parent reached only because inspection is held does not call this.
+ * Expected outcome: The folded names are stored when the label exists and the center is inside the view, including the edges. A missing label does nothing.
+ * Exceptions: None.
+ */
+function noteCityWhenCenterIsInView(
+  cityLabel: string | undefined,
+  centerPx: { x: number; y: number },
+  viewportWidth: number,
+  viewportHeight: number,
+): void {
+  if (!cityLabel) return;
+  if (!cityCenterIsInView(centerPx, { width: viewportWidth, height: viewportHeight })) return;
+  noteVisibleCityLabel(cityLabel);
+}
+
+/**
  * Defines the `drawTacticalCityOverlays` function shape (export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: TacticalCityOverlayDrawDeps): void).
 
  * Purpose: Renders city circle markers and collision-nudged labels on the overlay canvas; road/rail lines are drawn only on the Leaflet layer from vector JSON.
@@ -218,6 +239,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
         const span = spanForProjectedHex(pts);
         const centerPx = projectedRingCentroid(pts);
         const cityLabel = S.tacticalCityOverlayLabelByH3.get(child);
+        noteCityWhenCenterIsInView(cityLabel, centerPx, viewportWidth, viewportHeight);
         const hasAirportOrSeaport =
           tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
         if (cityLabel && !hasAirportOrSeaport) {
@@ -257,6 +279,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
         const span = spanForProjectedHex(pts);
         const centerPx = projectedRingCentroid(pts);
         const cityLabel = S.tacticalCityOverlayLabelByH3.get(child);
+        if (exploredHexes.has(parent.h3Index)) noteCityWhenCenterIsInView(cityLabel, centerPx, viewportWidth, viewportHeight);
 
         if (cityLabel) {
           const hasAirportOrSeaport =

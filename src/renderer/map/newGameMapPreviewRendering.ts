@@ -13,6 +13,7 @@ import { MULTI_PLAYER_FILL, MULTI_PLAYER_STROKE, TACTICAL_HIDE_THRESHOLD_VIEW_FR
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { readNewGameOptionChoices, readNewGameStartMonth } from '../gameplay/newGameOptionsUi';
 import { getMainLeafletMapForProjection } from './leafletMainMapProjection';
+import { isNewGameMapPreviewAtDetailZoom, setNewGameMapPreviewAtDetailZoom } from './mapAnnotationView';
 import { getLeafletGlobal } from './mapHelpers';
 import { projectHexBoundaryToContainerPoints, spanForProjectedHex } from './terrainView';
 import { drawPlacedStatusIcon, type StatusIconPlacement } from '../rendering/inspectionStatusIcons';
@@ -55,16 +56,6 @@ let shownGameMapId: string | null = null;
 let repaint: () => void = () => {};
 
 /**
- * Whether the preview is zoomed far enough that one of its strategic hexes fills the view.
- *
- * Purpose: Weather and tech icons hide at that zoom. The loaded match's zoom flag must stay untouched.
- * When to use: `previewAtBattleDetailZoom`. Cleared when the dialog opens and when it switches maps.
- * Expected outcome: Stays on until the sample hex falls to the hide threshold, then stays off until the show threshold.
- * Exceptions: None.
- */
-let previewBattleDetail = false;
-
-/**
  * Installs the canvas repaint used after a preview change.
  *
  * Purpose: Icon loads and dialog changes need a full frame, including while resolution playback would skip a deferred redraw.
@@ -85,7 +76,7 @@ export function setNewGameMapPreviewRepaint(fn: () => void): void {
  * Exceptions: None.
  */
 export function resetNewGameMapPreviewZoom(): void {
-  previewBattleDetail = false;
+  setNewGameMapPreviewAtDetailZoom(false);
 }
 
 /**
@@ -109,7 +100,7 @@ export function repaintNewGameMapPreview(): void {
  * Exceptions: None.
  */
 export function noteNewGameMapPreviewRequest(shownMapId: string): void {
-  if (shownGameMapId !== shownMapId) previewBattleDetail = false;
+  if (shownGameMapId !== shownMapId) setNewGameMapPreviewAtDetailZoom(false);
   shownGameMapId = shownMapId;
   if (payload != null && payload.gameMapId !== shownMapId) {
     payload = null;
@@ -237,12 +228,12 @@ function previewAtBattleDetailZoom(
   preview: NewGameMapPreview
 ): boolean {
   const fraction = previewStrategicFillFraction(map, leaflet, preview);
-  if (previewBattleDetail) {
-    if (fraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) previewBattleDetail = false;
+  if (isNewGameMapPreviewAtDetailZoom()) {
+    if (fraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) setNewGameMapPreviewAtDetailZoom(false);
   } else if (fraction >= TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION) {
-    previewBattleDetail = true;
+    setNewGameMapPreviewAtDetailZoom(true);
   }
-  return previewBattleDetail;
+  return isNewGameMapPreviewAtDetailZoom();
 }
 
 /**

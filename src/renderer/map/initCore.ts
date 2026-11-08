@@ -13,8 +13,8 @@ import { renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { setAdminBorderTacticalReader } from './adminBorderLayers';
 import { OFFLINE_HILLSHADE_ID } from './basemapLayer';
 import { bindMapLabelLayer } from './mapLabelLayer';
+import { mapAnnotationsUseDetailView } from './mapAnnotationView';
 import { applyActiveMapTheme } from './mapThemeApply';
-import { shouldRenderTacticalHexes } from './terrainView';
 import { getMainLeafletMap, initWorldLeafletMaps } from './worldLeafletMap';
 import {
   clearDeferredStackCalloutTimer,
@@ -369,7 +369,7 @@ function tacticalBattlesDialogIsOpen(): boolean {
 export function wireInitCore(deps: InitCoreDeps): void {
   try {
     installControlTooltip();
-    setAdminBorderTacticalReader(shouldRenderTacticalHexes);
+    setAdminBorderTacticalReader(mapAnnotationsUseDetailView);
     initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), OFFLINE_HILLSHADE_ID);
     bindMapLabelLayer(() => deps.requestRedraw());
     applyActiveMapTheme();

@@ -108,7 +108,7 @@ function borderCells(id: AdminBorderGroupId, view: VectorViewBounds, zoom: numbe
  * Supplies the tactical-view flag without this module reading the map module that owns it.
  *
  * Purpose: The tactical helper reads the main map. Importing it here would cycle through the module that binds these layers.
- * When to use: Once, before `bindAdminBorderLayers`, with `shouldRenderTacticalHexes`.
+ * When to use: Once, before `bindAdminBorderLayers`, with `mapAnnotationsUseDetailView`.
  * Expected outcome: Later syncs use this reader. Until it is set, the view is treated as not tactical.
  * Exceptions: None.
  */

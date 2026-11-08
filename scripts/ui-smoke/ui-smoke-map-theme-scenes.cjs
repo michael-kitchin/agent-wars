@@ -17,10 +17,10 @@ const MAP_HANDLE = '__uiSmokeMainMap';
 const SETTLE_MS = 700;
 
 const THEMES = Object.freeze([
-  { id: 'standard', label: 'Standard', water: 'rgb(163, 199, 223)' },
-  { id: 'topographic', label: 'Topographic', water: 'rgb(166, 217, 239)' },
-  { id: 'nautical', label: 'Nautical', water: 'rgb(227, 241, 248)' },
-  { id: 'night', label: 'Night', water: 'rgb(15, 26, 38)' },
+  { id: 'standard', label: 'Standard', water: 'rgb(163, 199, 223)', roadCenter: '#ffffff' },
+  { id: 'topographic', label: 'Topographic', water: 'rgb(166, 217, 239)', roadCenter: '#ffffff' },
+  { id: 'nautical', label: 'Nautical', water: 'rgb(227, 241, 248)', roadCenter: '#ffffff' },
+  { id: 'night', label: 'Night', water: 'rgb(15, 26, 38)', roadCenter: '#8b95a3' },
 ]);
 
 /**
@@ -62,6 +62,18 @@ async function optionLabels(page) {
  * Expected outcome: The map center and zoom match the arguments once the settle wait ends.
  * Exceptions: Throws when the map handle is missing.
  */
+/**
+ * Counts strokes of one color on the main map.
+ *
+ * Purpose: Road and rail lines are SVG paths, so the smoke run can count them. Grid lines use rgba and do not match.
+ * When to use: After a theme has settled at a zoom where roads are on screen.
+ * Expected outcome: The number of paths whose stroke is `color`. A light theme's white count includes rail halos.
+ * Exceptions: None.
+ */
+async function countRoadCenters(page, color) {
+  return page.locator(`#main-map path[stroke="${color}"]`).count();
+}
+
 async function setView(page, lat, lng, zoom) {
   await page.evaluate(
     ({ handle, lat, lng, zoom }) => window[handle].setView([lat, lng], zoom, { animate: false }),
@@ -121,6 +133,28 @@ async function runMapThemeScenes(page, report, outDir) {
       await page.screenshot({ path: path.join(outDir, `theme-${theme.id}-z6.png`) });
       await setView(page, 36.0, -5.6, 10);
       await page.screenshot({ path: path.join(outDir, `theme-${theme.id}-z10.png`) });
+      const roadCenters = await countRoadCenters(page, theme.roadCenter);
+      record(
+        report,
+        'roads follow theme',
+        roadCenters > 0,
+        `${theme.id} had ${roadCenters} ${theme.roadCenter} roads`,
+      );
+      if (roadCenters === 0) return;
+      if (theme.id === 'night') {
+        await page.locator('#terrain-legend select').selectOption('standard');
+        await page.waitForTimeout(SETTLE_MS);
+        const whiteRoads = await countRoadCenters(page, '#ffffff');
+        const nightRoads = await countRoadCenters(page, '#8b95a3');
+        record(
+          report,
+          'roads recolor without a pan',
+          whiteRoads > 0 && nightRoads === 0,
+          `white ${whiteRoads}, night ${nightRoads}`,
+        );
+        await page.locator('#terrain-legend select').selectOption('night');
+        await page.waitForTimeout(SETTLE_MS);
+      }
       await setView(page, 46.43, 6.55, 10);
       await page.screenshot({ path: path.join(outDir, `theme-${theme.id}-lake-z10.png`) });
       await setView(page, saved.lat, saved.lng, saved.zoom);

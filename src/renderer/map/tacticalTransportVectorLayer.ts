@@ -4,6 +4,7 @@
  */
 
 import { rendererSharedState as S } from '../core/state';
+import { DEFAULT_MAP_THEME_ID, mapThemeById, type MapTheme } from '../../shared/mapThemes';
 import { drawReferenceLng } from '../../shared/mapExtent';
 import { alignLatLngRunToDrawReference } from './hexGrid';
 import {
@@ -113,6 +114,29 @@ let cachedRowBounds: RowBounds[] | null = null;
 let lastViewportKey: string | null = null;
 
 /**
+ * Road and rail colors for the next rebuild.
+ *
+ * Purpose: The polylines copy these colors when the layer is built. A theme change clears the viewport key so the next sync rebuilds even when the view did not move.
+ * When to use: Read in `buildVectorLayerGroup`. Written by `setTacticalTransportTheme`.
+ * Expected outcome: Standard colors until a theme is applied.
+ * Exceptions: None.
+ */
+let transportColors = mapThemeById(DEFAULT_MAP_THEME_ID).transportLineColors;
+
+/**
+ * Stores the theme's road and rail colors and forces the next sync to rebuild the lines.
+ *
+ * Purpose: The layer otherwise rebuilds only when the view moves, so a theme change with no pan would keep the old ink.
+ * When to use: From `applyActiveMapTheme`, after the label theme is set.
+ * Expected outcome: The next `syncTacticalTransportVectorLeafletLayer` rebuilds the polylines with these colors.
+ * Exceptions: None.
+ */
+export function setTacticalTransportTheme(theme: MapTheme): void {
+  transportColors = theme.transportLineColors;
+  lastViewportKey = null;
+}
+
+/**
  * Documents the `LatLngTuple` type alias as a named contract surface (type LatLngTuple = [number, number]).
 
  * Purpose: Makes local map-geometry helper signatures readable while staying explicit about WGS84 tuple order.
@@ -219,7 +243,7 @@ function expandedViewport(viewport: ViewportBounds): ViewportBounds {
 
  * Purpose: Converts visible vector rows into a Leaflet layer group with road-under-rail styling and dashed rail centers.
  * When to use: Lazily from `syncTacticalTransportVectorLeafletLayer` when rows or quantized viewport changes.
- * Expected outcome: Non-interactive layer group; roads use semi-opaque outlines; rails use 50% white halos and 75% opaque dashed black centers.
+ * Expected outcome: Non-interactive layer group. Road outlines and centers, and rail halos and dashes, use the active theme's transport colors. Weights, opacities, and the rail dash stay as they are.
  * Exceptions: None.
  */
 function buildVectorLayerGroup(
@@ -239,7 +263,7 @@ function buildVectorLayerGroup(
     if (row.kind === 'road') {
       layers.push(
         leaflet.polyline(latlngs, {
-          color: '#000000',
+          color: transportColors.roadOutline,
           weight: TACTICAL_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT,
           opacity: TACTICAL_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
           interactive: false,
@@ -247,7 +271,7 @@ function buildVectorLayerGroup(
       );
       layers.push(
         leaflet.polyline(latlngs, {
-          color: '#ffffff',
+          color: transportColors.roadCenter,
           weight: TACTICAL_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT,
           opacity: 1,
           interactive: false,
@@ -256,7 +280,7 @@ function buildVectorLayerGroup(
     } else {
       layers.push(
         leaflet.polyline(latlngs, {
-          color: '#ffffff',
+          color: transportColors.railHalo,
           weight: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT,
           opacity: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY,
           interactive: false,
@@ -264,7 +288,7 @@ function buildVectorLayerGroup(
       );
       layers.push(
         leaflet.polyline(latlngs, {
-          color: '#000000',
+          color: transportColors.railCenter,
           weight: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
           opacity: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
           dashArray: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_DASH_ARRAY,

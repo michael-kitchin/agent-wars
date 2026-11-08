@@ -38,6 +38,7 @@ When a layout rule needs a machine check, add one to the matching file in `scrip
 - The minimap panel, the legend, and Leaflet's controls: `ui-smoke-map-chrome-checks.cjs`
 - The battle header: `ui-smoke-battle-checks.cjs`
 - The new-game screen: `ui-smoke-new-game-checks.cjs`
+- The new-game screen over a battle: `ui-smoke-map-label-checks.cjs`
 
 Scenes that click units find them through the game state and the main map (`ui-smoke-map.cjs`). The steps on the new-game overlay are in `ui-smoke-new-game.cjs`.
 

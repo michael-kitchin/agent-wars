@@ -4,7 +4,7 @@ The terrain key, plus the control that picks a map theme.
 
 ## Purpose
 
-Name the terrain kinds the map uses, and let the player switch the map theme. The theme sets the water color and recolors the gray land. Standard, Topographic, and Nautical reuse the default hex palette. Night reuses the wargame hex palette. It does not switch tile hosts.
+Name the terrain kinds the map uses, and let the player switch the map theme. The theme sets the water color, recolors the gray land, and sets road and rail colors. Night uses a dim road and pale rail dashes (`transportLineColors` in `src/shared/mapThemes.ts`). Standard, Topographic, and Nautical reuse the default hex palette. Night reuses the wargame hex palette. It does not switch tile hosts.
 
 ## Availability
 
@@ -21,7 +21,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-m
 
 ### Mouse
 
-- When the player changes Map theme, the water color and the land recolor change to that choice, on the main map and the minimap. On the main map the elevation-tile lines, the coastline, the borders, and the place names take that theme's colors, and Topographic and Nautical use the serif face. The legend redraws so the chips match the theme's hex palette. The tiles stay mounted. The choice starts at Standard, lasts until the app closes, and is not saved. Unknown ids use Standard. The colors are `MAP_THEMES` in `src/shared/mapThemes.ts`. Water is painted on the water pane. Land is an SVG `feComponentTransfer` filter on the tile pane (`mapThemeFilters.ts`), layered on the land images' `contrast(1.4)` from `static/shellChrome.css`. That contrast is not part of the theme filter, so the water and the elevation-tile lines do not receive it. The grid lines are recolored with `setStyle`, not with the land filter.
+- When the player changes Map theme, the water color and the land recolor change to that choice, on the main map and the minimap. On the main map the elevation-tile lines, the coastline, the borders, the road and rail lines, and the place names take that theme's colors, and Topographic and Nautical use the serif face. Night road centers are `#8b95a3`, road outlines and rail halos are `#0a0e14`, and rail dashes are `#dfe6ee`. Standard, Topographic, and Nautical keep white road centers (`#ffffff`), black road outlines, black rail dashes, and white rail halos (`transportLineColors` in `src/shared/mapThemes.ts`). The lines take the new colors on that change (`setTacticalTransportTheme` in `src/renderer/map/tacticalTransportVectorLayer.ts`). The legend redraws so the chips match the theme's hex palette. The tiles stay mounted. The choice starts at Standard, lasts until the app closes, and is not saved. Unknown ids use Standard. The colors are `MAP_THEMES` in `src/shared/mapThemes.ts`. Water is painted on the water pane. Land is an SVG `feComponentTransfer` filter on the tile pane (`mapThemeFilters.ts`), layered on the land images' `contrast(1.4)` from `static/shellChrome.css`. That contrast is not part of the theme filter, so the water and the elevation-tile lines do not receive it. The grid lines are recolored with `setStyle`, not with the land filter.
 
 ### Keyboard
 
@@ -73,6 +73,7 @@ None.
 - `src/renderer/rendering/terrainVisualStyles.ts`
 - `src/shared/mapThemes.ts` (`MAP_THEMES`, `mapThemeById`)
 - `src/renderer/map/mapThemeApply.ts` (`applyActiveMapTheme`)
+- `src/renderer/map/tacticalTransportVectorLayer.ts` (`setTacticalTransportTheme`)
 - `src/renderer/map/mapThemeFilters.ts`
 - `src/renderer/rendering/terrainHexPalettes.ts`
 - `src/renderer/map/basemapLayer.ts` (`applyBasemapTheme`)

@@ -84,6 +84,58 @@ export function visibleLabelKinds(zoom: number, tacticalView: boolean): MapLabel
 }
 
 /**
+ * Inputs for whether names and borders use the detail view.
+ *
+ * Purpose: The overlay and the loaded match do not share one zoom flag.
+ * When to use: `annotationViewIsDetail`.
+ * Expected outcome: The three fields below.
+ * Exceptions: None.
+ */
+export interface MapAnnotationViewInput {
+  /**
+   * Whether the new-game or game-over overlay is open.
+   *
+   * Contract: That screen draws its own map, so the match underneath must not choose the names.
+   * When to use: `annotationViewIsDetail`.
+   * Expected outcome: True while the overlay is visible.
+   * Exceptions: None.
+   */
+  readonly overlayOpen: boolean;
+
+  /**
+   * Whether one of the preview's strategic hexes fills the view.
+   *
+   * Contract: The preview's own latch. It is not the loaded match's zoom flag.
+   * When to use: When `overlayOpen` is true. Ignored when the overlay is closed.
+   * Expected outcome: True after the preview hex reaches the show threshold, until it falls to the hide threshold.
+   * Exceptions: None.
+   */
+  readonly previewAtDetailZoom: boolean;
+
+  /**
+   * Reads whether the loaded match is showing the detail view.
+   *
+   * Contract: Reading the match flag can change it, so this stays a function and is not called while the overlay is open.
+   * When to use: When `overlayOpen` is false.
+   * Expected outcome: The match's current detail-view flag. The call may update that flag.
+   * Exceptions: None. The caller supplies the function.
+   */
+  readonly readMatchDetailView: () => boolean;
+}
+
+/**
+ * Whether names and borders use the detail view.
+ *
+ * Purpose: One rule for the overlay and the match, so a battle under the new-game screen does not keep state names at world zoom.
+ * When to use: Once per frame, from the single annotation-view reader.
+ * Expected outcome: While the overlay is open, `previewAtDetailZoom`. Otherwise the result of `readMatchDetailView`. That read can change the match flag, and it does not run while the overlay is open.
+ * Exceptions: None.
+ */
+export function annotationViewIsDetail(input: MapAnnotationViewInput): boolean {
+  return input.overlayOpen ? input.previewAtDetailZoom : input.readMatchDetailView();
+}
+
+/**
  * Share of a country name's fill painted beside continent names.
  *
  * Purpose: The local name uses this share for its fill. The halo does not use it. A lone continent and a state name use this share too.

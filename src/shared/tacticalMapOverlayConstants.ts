@@ -7,28 +7,28 @@
 export const TACTICAL_MAP_OVERLAY_CITY_HALO_ALPHA = 0.55;
 
 /**
- * Opacity for Leaflet vector road black outline (rail white halo uses `TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY` instead).
+ * Opacity for the road outline (the rail halo uses `TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY` instead).
  * When to use: `tacticalTransportVectorLayer` road outline polylines; `tacticalCityOverlays` city marker stroke for parity with road edges.
- * Expected outcome: Semi-opaque black edge treatment for roads and city circles.
+ * Expected outcome: Semi-opaque edge treatment for roads and city circles. The color comes from `MapTheme.transportLineColors`.
  */
 export const TACTICAL_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY = 0.75;
 
-/** Opacity for Leaflet rail white halo (border) polyline under the dashed black center. */
+/** Opacity for the rail halo polyline under the dashed center. The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY = 0.5;
 
-/** Opacity for Leaflet rail black dashed center polyline. */
+/** Opacity for the rail dashed center polyline. The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY = 0.75;
 
-/** Leaflet polyline weight for road black outline (under the white center stroke). */
+/** Leaflet polyline weight for the road outline (under the center stroke). The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT = 3.3;
 
-/** Leaflet polyline weight for road white center stroke. */
+/** Leaflet polyline weight for the road center stroke. The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT = 2.0;
 
-/** Leaflet polyline weight for rail white halo stroke (under the dashed black center). */
+/** Leaflet polyline weight for the rail halo stroke (under the dashed center). The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT = 3.0;
 
-/** Leaflet polyline weight for rail black dashed center stroke. */
+/** Leaflet polyline weight for the rail dashed center stroke. The color comes from `MapTheme.transportLineColors`. */
 export const TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT = 1.85;
 
 /** Leaflet `dashArray` for rail center polylines (matches canvas rail dash feel). */

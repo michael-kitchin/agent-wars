@@ -24,6 +24,7 @@ const path = require('path');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
+const { checkNewGameOverBattleLabels } = require('./ui-smoke-map-label-checks.cjs');
 const { runMultiCommanderScenes } = require('./ui-smoke-multi.cjs');
 const {
   LAND_UNIT_TYPES,
@@ -375,6 +376,8 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.battleOrders);
+
+  await checkNewGameOverBattleLabels(page, report);
 
   // The battle header at the 800 x 600 minimum, then back to the first size for the beat.
   await setViewport(app, page, SMALL_WINDOW);

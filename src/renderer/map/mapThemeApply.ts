@@ -1,7 +1,7 @@
 /**
  * Paints the active theme onto the map.
  *
- * Purpose: One call updates the water, the land, the grid, the coastline, the borders, and the place names.
+ * Purpose: One call updates the water, the land, the grid, the coastline, the borders, the place names, and the roads and rails.
  * When to use: After the maps exist, and again when the legend changes the theme.
  * Expected outcome: Both maps show the active theme. Tiles stay mounted.
  * Exceptions: None. A missing pane is skipped by the layer it belongs to.
@@ -12,6 +12,7 @@ import { applyAdminBorderTheme } from './adminBorderLayers';
 import { applyBasemapTheme } from './basemapLayer';
 import { applyCoastlineTheme } from './coastlineLayers';
 import { setMapLabelTheme } from './mapLabelLayer';
+import { setTacticalTransportTheme } from './tacticalTransportVectorLayer';
 import { ensureMapThemeSvgFilters } from './mapThemeFilters';
 
 /**
@@ -19,7 +20,7 @@ import { ensureMapThemeSvgFilters } from './mapThemeFilters';
  *
  * Purpose: Init and the legend share this, so a new surface is added in one place.
  * When to use: After `initWorldLeafletMaps`, and from the legend callback before the redraw.
- * Expected outcome: Filters exist. The basemap, the coastline, the borders, and the place names use the active theme.
+ * Expected outcome: Filters exist. The basemap, the coastline, the borders, the place names, and the roads and rails use the active theme.
  * Exceptions: None.
  */
 export function applyActiveMapTheme(): void {
@@ -29,4 +30,5 @@ export function applyActiveMapTheme(): void {
   applyCoastlineTheme(theme);
   applyAdminBorderTheme(theme);
   setMapLabelTheme(theme);
+  setTacticalTransportTheme(theme);
 }

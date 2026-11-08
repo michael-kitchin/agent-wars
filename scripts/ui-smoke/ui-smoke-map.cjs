@@ -315,11 +315,111 @@ async function selectUnitInItsHex(page, unit) {
 }
 
 /**
+ * Whether a window point clicks the map.
+ *
+ * Purpose: A control drawn over a hex takes the click, so the unit under it never sees it.
+ * When to use: Before clicking a hex center.
+ * Expected outcome: True when the top element is inside `#main-map` and is not a button or other control.
+ * Exceptions: None.
+ */
+async function mapReceivesClick(page, point) {
+  return page.evaluate(({ x, y }) => {
+    const el = document.elementFromPoint(x, y);
+    const map = document.getElementById('main-map');
+    if (!el || !map || (el !== map && !map.contains(el))) return false;
+    return el.closest('button, a, input, select') == null;
+  }, point);
+}
+
+/**
+ * Reads the main map's center and zoom.
+ *
+ * Purpose: A temporary pan has to be undone so later pictures keep the camera they started with.
+ * When to use: Before shifting the map to uncover a hex.
+ * Expected outcome: The current center and zoom.
+ * Exceptions: Throws when the main map handle is not set.
+ */
+async function readMapCamera(page) {
+  return page.evaluate((handle) => {
+    const center = window[handle].getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window[handle].getZoom() };
+  }, MAP_HANDLE);
+}
+
+/**
+ * Puts the main map back to a saved camera.
+ *
+ * Purpose: Uncovering a hex must not leave the later scenes looking at a different place.
+ * When to use: After the stack click, when `camera` was saved. A null camera means the map did not move.
+ * Expected outcome: The map center and zoom match the saved values once the settle wait ends.
+ * Exceptions: Throws when the main map handle is not set.
+ */
+async function restoreMapCamera(page, camera) {
+  if (!camera) return;
+  await page.evaluate(({ handle, lat, lng, zoom }) => {
+    window[handle].setView([lat, lng], zoom, { animate: false });
+  }, { handle: MAP_HANDLE, lat: camera.lat, lng: camera.lng, zoom: camera.zoom });
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
+}
+
+/**
+ * Fractions of the map container where a covered hex can be moved.
+ *
+ * Purpose: The minimum window lays map-mode buttons across the middle of the map, on top of some hex centers.
+ * When to use: Only while searching for an open point in `revealStackHex`.
+ * Expected outcome: Several points inset from the edges, low and high.
+ * Exceptions: None.
+ */
+const OPEN_MAP_FRACTIONS = Object.freeze([
+  [0.72, 0.78],
+  [0.28, 0.78],
+  [0.72, 0.42],
+  [0.5, 0.86],
+  [0.5, 0.22],
+]);
+
+/**
+ * Returns a click point on a stack hex that the map itself receives.
+ *
+ * Purpose: At the minimum window a map-mode button can sit on the hex center. The click has to land on the unit.
+ * When to use: From `selectHumanStack`, after the selection panel is closed.
+ * Expected outcome: The hex center when it is already open. Otherwise the map shifts, at the same zoom, until the hex
+ *   lies on an open part of the map, and the previous camera is restored when no open point exists. `camera` is the
+ *   view to restore after the click, or null when the map did not move.
+ * Exceptions: Throws when every candidate point is still covered. The map is back on its previous camera.
+ */
+async function revealStackHex(page, h3Index) {
+  const first = await hexClientPoint(page, h3Index);
+  if (await mapReceivesClick(page, first)) return { point: first, camera: null };
+  const camera = await readMapCamera(page);
+  const latLng = h3.cellToLatLng(h3Index);
+  for (const [fx, fy] of OPEN_MAP_FRACTIONS) {
+    await page.evaluate(({ handle, lat, lng, zoom, fx: xFraction, fy: yFraction }) => {
+      const map = window[handle];
+      const box = map.getContainer().getBoundingClientRect();
+      const current = map.latLngToContainerPoint([lat, lng]);
+      const centerPoint = map.latLngToContainerPoint(map.getCenter());
+      const nextCenter = map.containerPointToLatLng([
+        centerPoint.x + (current.x - box.width * xFraction),
+        centerPoint.y + (current.y - box.height * yFraction),
+      ]);
+      map.setView(nextCenter, zoom, { animate: false });
+    }, { handle: MAP_HANDLE, lat: latLng[0], lng: latLng[1], zoom: camera.zoom, fx, fy });
+    await page.waitForTimeout(MAP_WAIT_MS.settle);
+    const point = await hexClientPoint(page, h3Index);
+    if (await mapReceivesClick(page, point)) return { point, camera };
+  }
+  await restoreMapCamera(page, camera);
+  throw new Error('the stack hex stays under a control at every open map point');
+}
+
+/**
  * Clicks a hex that holds two or more of the player's units and no enemy, and selects them all from the unit list.
  *
  * Purpose: Gives the selection panel several units in one hex.
  * When to use: After `captureMainMap`.
- * Expected outcome: Every unit in that hex is selected and the unit list is closed again.
+ * Expected outcome: Every unit in that hex is selected and the unit list is closed again. A control covering the hex
+ *   center shifts the map for the click, then puts the camera back.
  * Exceptions: Throws when the scenario has no such hex, or the list or the selection does not appear.
  */
 async function selectHumanStack(page) {
@@ -330,13 +430,17 @@ async function selectHumanStack(page) {
   if (!stack) throw new Error('the scenario has no hex holding two or more human units and no enemy');
   const unitIds = state.units.filter((u) => u.h3Index === stack.h3Index).map((u) => u.id);
   await clearSelection(page);
-  const point = await hexClientPoint(page, stack.h3Index);
-  await page.mouse.click(point.x, point.y);
-  await page.waitForSelector('#stack-callout:not(.hidden)', { timeout: MAP_WAIT_MS.order });
-  await page.click('#stack-callout .stack-callout-actions button:not(.stack-close-btn)');
-  await waitForSelectedUnits(page, unitIds);
-  await page.keyboard.press('Escape');
-  await page.waitForSelector('#stack-callout.hidden', { state: 'attached', timeout: MAP_WAIT_MS.order });
+  const revealed = await revealStackHex(page, stack.h3Index);
+  try {
+    await page.mouse.click(revealed.point.x, revealed.point.y);
+    await page.waitForSelector('#stack-callout:not(.hidden)', { timeout: MAP_WAIT_MS.order });
+    await page.click('#stack-callout .stack-callout-actions button:not(.stack-close-btn)');
+    await waitForSelectedUnits(page, unitIds);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#stack-callout.hidden', { state: 'attached', timeout: MAP_WAIT_MS.order });
+  } finally {
+    await restoreMapCamera(page, revealed.camera);
+  }
 }
 
 /**
@@ -385,10 +489,11 @@ async function queueMarchToFirstFree(page, unit, destinations) {
  */
 async function queueLoneUnitMarch(page, unitTypes = LAND_UNIT_TYPES) {
   const state = await readGameState(page);
-  for (const unit of loneHumanUnits(state.units, unitTypes)) {
+  const lone = loneHumanUnits(state.units, unitTypes);
+  for (const unit of lone) {
     if (await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index))) return unit;
   }
-  throw new Error('no lone land unit could queue a one-hex march');
+  throw new Error(`no lone land unit could queue a one-hex march (${lone.length} lone)`);
 }
 
 /**

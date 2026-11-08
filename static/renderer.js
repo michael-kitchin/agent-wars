@@ -16692,6 +16692,9 @@
     if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
     return ["continent", "country"];
   }
+  function annotationViewIsDetail(input) {
+    return input.overlayOpen ? input.previewAtDetailZoom : input.readMatchDetailView();
+  }
   var COUNTRY_LABEL_OPACITY = 1;
   var CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
   var STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
@@ -16915,6 +16918,12 @@
   }
 
   // src/shared/mapThemes.ts
+  var LIGHT_THEME_TRANSPORT_LINE_COLORS = {
+    roadCenter: "#ffffff",
+    roadOutline: "#000000",
+    railCenter: "#000000",
+    railHalo: "#ffffff"
+  };
   var MAP_THEMES = [
     {
       id: "standard",
@@ -16933,7 +16942,8 @@
         country: "#3b3f46",
         state: "#3b3f46",
         halo: "rgba(255, 255, 255, 0.85)"
-      }
+      },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
       id: "topographic",
@@ -16952,7 +16962,8 @@
         country: "#4a3a28",
         state: "#4a3a28",
         halo: "rgba(251, 246, 228, 0.9)"
-      }
+      },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
       id: "nautical",
@@ -16971,7 +16982,8 @@
         country: "#2b2f33",
         state: "#2b2f33",
         halo: "rgba(251, 236, 180, 0.9)"
-      }
+      },
+      transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
       id: "night",
@@ -16990,6 +17002,12 @@
         country: "#d7dde5",
         state: "#d7dde5",
         halo: "rgba(10, 14, 20, 0.85)"
+      },
+      transportLineColors: {
+        roadCenter: "#8b95a3",
+        roadOutline: "#0a0e14",
+        railCenter: "#dfe6ee",
+        railHalo: "#0a0e14"
       }
     }
   ];
@@ -22991,7 +23009,7 @@ ${bonuses}`;
         return null;
     }
   }
-  var mapThemeTooltipText = "Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night.";
+  var mapThemeTooltipText = "Pick the map colors for land, water, coastlines, borders, roads, rails, and place names. The choices are Standard, Topographic, Nautical, and Night.";
   function buildEntryTooltipTextFor(canHire) {
     return canHire ? "Build/Hire Units" : "Build Units";
   }
@@ -28732,6 +28750,22 @@ ${bonuses}`;
     return getMainLeafletMap();
   }
 
+  // src/renderer/map/mapAnnotationView.ts
+  var previewAtDetailZoom = false;
+  function isNewGameMapPreviewAtDetailZoom() {
+    return previewAtDetailZoom;
+  }
+  function setNewGameMapPreviewAtDetailZoom(atDetailZoom) {
+    previewAtDetailZoom = atDetailZoom;
+  }
+  function mapAnnotationsUseDetailView() {
+    return annotationViewIsDetail({
+      overlayOpen: isNewGameOverlayOpen(),
+      previewAtDetailZoom,
+      readMatchDetailView: shouldRenderTacticalHexes
+    });
+  }
+
   // src/shared/projectedRingCentroid.ts
   function projectedRingCentroid(points) {
     let sx = 0;
@@ -29365,18 +29399,17 @@ ${bonuses}`;
   var shownGameMapId = null;
   var repaint = () => {
   };
-  var previewBattleDetail = false;
   function setNewGameMapPreviewRepaint(fn) {
     repaint = fn;
   }
   function resetNewGameMapPreviewZoom() {
-    previewBattleDetail = false;
+    setNewGameMapPreviewAtDetailZoom(false);
   }
   function repaintNewGameMapPreview() {
     repaint();
   }
   function noteNewGameMapPreviewRequest(shownMapId) {
-    if (shownGameMapId !== shownMapId) previewBattleDetail = false;
+    if (shownGameMapId !== shownMapId) setNewGameMapPreviewAtDetailZoom(false);
     shownGameMapId = shownMapId;
     if (payload != null && payload.gameMapId !== shownMapId) {
       payload = null;
@@ -29463,12 +29496,12 @@ ${bonuses}`;
   }
   function previewAtBattleDetailZoom(map, leaflet, preview) {
     const fraction = previewStrategicFillFraction(map, leaflet, preview);
-    if (previewBattleDetail) {
-      if (fraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) previewBattleDetail = false;
+    if (isNewGameMapPreviewAtDetailZoom()) {
+      if (fraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) setNewGameMapPreviewAtDetailZoom(false);
     } else if (fraction >= TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION) {
-      previewBattleDetail = true;
+      setNewGameMapPreviewAtDetailZoom(true);
     }
-    return previewBattleDetail;
+    return isNewGameMapPreviewAtDetailZoom();
   }
   function previewStrategicFillFraction(map, leaflet, preview) {
     const sample = samplePreviewHex(map, leaflet, preview);
@@ -32950,6 +32983,21 @@ ${bonuses}`;
     return false;
   }
 
+  // src/shared/mapLabelCityNames.ts
+  function normalizedPlaceName(name) {
+    return name.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase("en").trim();
+  }
+  function cityNamesInOverlayLabel(label) {
+    return label.split(" / ").map((part) => part.trim()).filter((part) => part.length > 0);
+  }
+  function cityCenterIsInView(center, view) {
+    return center.x >= 0 && center.x <= view.width && center.y >= 0 && center.y <= view.height;
+  }
+  function withoutStatesNamedForCities(features, cityNameKeys) {
+    if (cityNameKeys.size === 0) return features.slice();
+    return features.filter((feature) => feature.kind !== "state" || !cityNameKeys.has(normalizedPlaceName(feature.name)));
+  }
+
   // src/shared/mapLabelPack.ts
   var SCHEMA_VERSION2 = "1.0.0";
   var LABEL_KINDS = ["continent", "country", "state"];
@@ -33113,6 +33161,20 @@ ${bonuses}`;
     return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2 && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;
   }
 
+  // src/renderer/map/visibleCityNames.ts
+  var visibleCityNameKeys = /* @__PURE__ */ new Set();
+  function clearVisibleCityNames() {
+    visibleCityNameKeys = /* @__PURE__ */ new Set();
+  }
+  function noteVisibleCityLabel(label) {
+    for (const name of cityNamesInOverlayLabel(label)) {
+      visibleCityNameKeys.add(normalizedPlaceName(name));
+    }
+  }
+  function getVisibleCityNameKeys() {
+    return visibleCityNameKeys;
+  }
+
   // src/renderer/map/mapLabelLayer.ts
   var labelFeatures = [];
   var previousAnchors = /* @__PURE__ */ new Map();
@@ -33140,15 +33202,17 @@ ${bonuses}`;
     if (!ctx || !metrics) return;
     ctx.setTransform(metrics.dpr, 0, 0, metrics.dpr, 0, 0);
     ctx.clearRect(0, 0, metrics.w, metrics.h);
+    canvas.dataset.drawnLabelKinds = "";
     const theme = labelTheme;
     const map = getMainLeafletMap();
     if (!theme || !map || labelFeatures.length === 0) return;
-    const tacticalView = shouldRenderTacticalHexes();
+    const tacticalView = mapAnnotationsUseDetailView();
     const placed = labelsForFrame(map, ctx, theme, tacticalView);
     const zoom = map.getZoom();
     for (const label of placed) {
       paintLabel(ctx, theme, label, labelKindOpacity(label.kind, zoom, tacticalView));
     }
+    canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(",");
   }
   async function loadLabelDocument(requestRedraw3) {
     try {
@@ -33173,7 +33237,10 @@ ${bonuses}`;
     const east = bounds.getEast();
     const north = bounds.getNorth();
     const kinds = visibleLabelKinds(zoom, tacticalView);
-    const candidates = labelFeatures.filter((feature) => featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north));
+    const candidates = withoutStatesNamedForCities(
+      labelFeatures.filter((feature) => featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)),
+      getVisibleCityNameKeys()
+    );
     const candidateIds = new Set(candidates.map((feature) => feature.id));
     const size = map.getSize();
     const center = map.getCenter();
@@ -33281,6 +33348,11 @@ ${bonuses}`;
   var alignedRows = null;
   var cachedRowBounds = null;
   var lastViewportKey = null;
+  var transportColors = mapThemeById(DEFAULT_MAP_THEME_ID).transportLineColors;
+  function setTacticalTransportTheme(theme) {
+    transportColors = theme.transportLineColors;
+    lastViewportKey = null;
+  }
   function computeRowBounds(rows) {
     return rows.map((row) => {
       let minLat = Infinity;
@@ -33325,7 +33397,7 @@ ${bonuses}`;
       if (row.kind === "road") {
         layers.push(
           leaflet.polyline(latlngs, {
-            color: "#000000",
+            color: transportColors.roadOutline,
             weight: TACTICAL_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT,
             opacity: TACTICAL_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
             interactive: false
@@ -33333,7 +33405,7 @@ ${bonuses}`;
         );
         layers.push(
           leaflet.polyline(latlngs, {
-            color: "#ffffff",
+            color: transportColors.roadCenter,
             weight: TACTICAL_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT,
             opacity: 1,
             interactive: false
@@ -33342,7 +33414,7 @@ ${bonuses}`;
       } else {
         layers.push(
           leaflet.polyline(latlngs, {
-            color: "#ffffff",
+            color: transportColors.railHalo,
             weight: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT,
             opacity: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY,
             interactive: false
@@ -33350,7 +33422,7 @@ ${bonuses}`;
         );
         layers.push(
           leaflet.polyline(latlngs, {
-            color: "#000000",
+            color: transportColors.railCenter,
             weight: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
             opacity: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
             dashArray: TACTICAL_MAP_OVERLAY_VECTOR_RAIL_DASH_ARRAY,
@@ -36679,6 +36751,11 @@ ${bonuses}`;
     ctx.fillStyle = "#f5cc00";
     ctx.fill();
   }
+  function noteCityWhenCenterIsInView(cityLabel, centerPx, viewportWidth, viewportHeight) {
+    if (!cityLabel) return;
+    if (!cityCenterIsInView(centerPx, { width: viewportWidth, height: viewportHeight })) return;
+    noteVisibleCityLabel(cityLabel);
+  }
   function drawTacticalCityOverlays(ctx, deps) {
     if (!rendererSharedState.gameState || !shouldRenderTacticalHexes()) return;
     const map = getMainLeafletMapForProjection();
@@ -36703,6 +36780,7 @@ ${bonuses}`;
           const span = spanForProjectedHex(pts);
           const centerPx = projectedRingCentroid(pts);
           const cityLabel = rendererSharedState.tacticalCityOverlayLabelByH3.get(child);
+          noteCityWhenCenterIsInView(cityLabel, centerPx, viewportWidth, viewportHeight);
           const hasAirportOrSeaport = tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
           if (cityLabel && !hasAirportOrSeaport) {
             const referenceOuterR = TACTICAL_MAP_OVERLAY_CITY_DOT_RADIUS_PX * 2 * zoomStrokeScale;
@@ -36740,6 +36818,7 @@ ${bonuses}`;
           const span = spanForProjectedHex(pts);
           const centerPx = projectedRingCentroid(pts);
           const cityLabel = rendererSharedState.tacticalCityOverlayLabelByH3.get(child);
+          if (exploredHexes.has(parent.h3Index)) noteCityWhenCenterIsInView(cityLabel, centerPx, viewportWidth, viewportHeight);
           if (cityLabel) {
             const hasAirportOrSeaport = rendererSharedState.terrainInfraTacticalAirport.has(child) || rendererSharedState.terrainInfraTacticalSeaport.has(child);
             if (!hasAirportOrSeaport) {
@@ -37349,6 +37428,7 @@ ${bonuses}`;
     drawMapLabels();
   }
   function paintMapFrame(ctx, w, h) {
+    clearVisibleCityNames();
     const overlay = document.getElementById("game-over-overlay");
     const overlayOpen = overlay != null && !overlay.classList.contains("hidden");
     setTacticalTransportVectorsSuppressed(overlayOpen);
@@ -43900,6 +43980,7 @@ ${bonuses}`;
     applyCoastlineTheme(theme);
     applyAdminBorderTheme(theme);
     setMapLabelTheme(theme);
+    setTacticalTransportTheme(theme);
   }
 
   // src/renderer/map/mapModeTabs.ts
@@ -43992,7 +44073,7 @@ ${bonuses}`;
   function wireInitCore(deps) {
     try {
       installControlTooltip();
-      setAdminBorderTacticalReader(shouldRenderTacticalHexes);
+      setAdminBorderTacticalReader(mapAnnotationsUseDetailView);
       initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), OFFLINE_HILLSHADE_ID);
       bindMapLabelLayer(() => deps.requestRedraw());
       applyActiveMapTheme();
