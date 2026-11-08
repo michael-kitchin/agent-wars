@@ -34,7 +34,7 @@ Release **2.16.0** shortens commander prompts, lists the odds of each fight the 
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
 
-Release **2.21.0** draws the map from a shaded-relief pack on this computer, draws land with more contrast so mountains read more clearly, and classifies monthly weather from CHELSA V2.1 1981–2010, including ocean hexes. A save still opens, and its weather follows this climate.
+Release **2.21.0** draws the map from a shaded-relief pack on this computer, draws land with more contrast so mountains read more clearly, and classifies monthly weather from CHELSA V2.1 1981–2010, including ocean hexes. Four map themes recolor land and water. A hairline follows coasts and lake shores, national borders and country names appear together, and a battle adds state borders and state names. A save still opens, and its weather follows this climate.
 
 Release **2.20.0** removes a vertical line of city cells that a new game drew down the 180° meridian. Those cells were counted as cities because the map seam wrapped them across the world. A new game on Australia & New Zealand or Eastern Europe uses the corrected city counts. A save keeps the city cells and prices it was created with.
 
