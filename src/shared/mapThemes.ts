@@ -49,29 +49,29 @@ export type MapLabelFontId = 'sans' | 'serif';
  */
 export interface MapThemeLabelColors {
   /**
-   * Continent names. Fainter than country names.
+   * Continent names.
    *
-   * Contract: A CSS color, usually with alpha.
+   * Contract: A CSS color. The same ink as `country` and `state`.
    * When to use: When filling a continent label.
-   * Expected outcome: Readable on that theme's land.
+   * Expected outcome: Opacity alone decides whether this reads stronger or quieter than the other kinds.
    * Exceptions: None.
    */
   readonly continent: string;
   /**
    * Country names.
    *
-   * Contract: A CSS color.
+   * Contract: A CSS color. The same ink as `continent` and `state`.
    * When to use: When filling a country label.
-   * Expected outcome: Darker or brighter than the continent color so it reads first.
+   * Expected outcome: Opacity alone decides whether this reads stronger or quieter than the other kinds.
    * Exceptions: None.
    */
   readonly country: string;
   /**
    * State and province names.
    *
-   * Contract: A CSS color.
+   * Contract: A CSS color. The same ink as `continent` and `country`.
    * When to use: When filling a state label.
-   * Expected outcome: Quieter than the country color.
+   * Expected outcome: Opacity alone decides whether this reads stronger or quieter than the other kinds.
    * Exceptions: None.
    */
   readonly state: string;
@@ -143,27 +143,27 @@ export interface MapTheme {
   /**
    * Coastline hairline.
    *
-   * Contract: A CSS color, distinct from both border colors.
+   * Contract: A CSS color, distinct from the shared border ink.
    * When to use: As the coastline stroke.
-   * Expected outcome: The coast reads apart from national borders.
+   * Expected outcome: The coast reads apart from national and state borders.
    * Exceptions: None.
    */
   readonly coastlineColor: string;
   /**
    * Solid national borders.
    *
-   * Contract: A CSS color.
+   * Contract: A CSS color. Opaque. The border layer paints it at `NATIONAL_BORDER_OPACITY`.
    * When to use: On the country and disputed-country border layers.
-   * Expected outcome: Distinct from the coastline color.
+   * Expected outcome: Distinct from the coastline color. Same ink as `stateBorderColor`.
    * Exceptions: None.
    */
   readonly countryBorderColor: string;
   /**
    * Dashed state and province borders.
    *
-   * Contract: A CSS color.
+   * Contract: A CSS color. Opaque. The border layer paints it at `STATE_BORDER_OPACITY`.
    * When to use: On the state and disputed-state border layers.
-   * Expected outcome: Quieter than the national border.
+   * Expected outcome: The same ink as `countryBorderColor`, so the opacity is what makes the line quieter.
    * Exceptions: None.
    */
   readonly stateBorderColor: string;
@@ -251,14 +251,14 @@ export const MAP_THEMES: readonly MapTheme[] = [
     landHighlightRgb: [251, 250, 247],
     coastlineColor: '#6d8ea6',
     countryBorderColor: '#4e6273',
-    stateBorderColor: 'rgba(78, 98, 115, 0.7)',
+    stateBorderColor: '#4e6273',
     gridLineColor: 'rgba(48, 56, 64, 0.15)',
     hexPaletteId: 'default',
     labelFont: 'sans',
     labelColors: {
-      continent: 'rgba(70, 74, 82, 0.55)',
+      continent: '#3b3f46',
       country: '#3b3f46',
-      state: '#686d76',
+      state: '#3b3f46',
       halo: 'rgba(255, 255, 255, 0.85)',
     },
   },
@@ -270,14 +270,14 @@ export const MAP_THEMES: readonly MapTheme[] = [
     landHighlightRgb: [251, 246, 228],
     coastlineColor: '#3f8fc0',
     countryBorderColor: '#6e5340',
-    stateBorderColor: 'rgba(110, 83, 64, 0.65)',
+    stateBorderColor: '#6e5340',
     gridLineColor: 'rgba(48, 56, 64, 0.15)',
     hexPaletteId: 'default',
     labelFont: 'serif',
     labelColors: {
-      continent: 'rgba(92, 70, 44, 0.55)',
+      continent: '#4a3a28',
       country: '#4a3a28',
-      state: '#6e5a43',
+      state: '#4a3a28',
       halo: 'rgba(251, 246, 228, 0.9)',
     },
   },
@@ -289,14 +289,14 @@ export const MAP_THEMES: readonly MapTheme[] = [
     landHighlightRgb: [251, 231, 166],
     coastlineColor: '#2f3a40',
     countryBorderColor: '#1e4d78',
-    stateBorderColor: 'rgba(30, 77, 120, 0.55)',
+    stateBorderColor: '#1e4d78',
     gridLineColor: 'rgba(48, 56, 64, 0.15)',
     hexPaletteId: 'default',
     labelFont: 'serif',
     labelColors: {
-      continent: 'rgba(40, 50, 60, 0.5)',
+      continent: '#2b2f33',
       country: '#2b2f33',
-      state: '#4f565c',
+      state: '#2b2f33',
       halo: 'rgba(251, 236, 180, 0.9)',
     },
   },
@@ -308,14 +308,14 @@ export const MAP_THEMES: readonly MapTheme[] = [
     landHighlightRgb: [74, 82, 92],
     coastlineColor: '#7d97ad',
     countryBorderColor: '#9eb4c8',
-    stateBorderColor: 'rgba(158, 180, 200, 0.6)',
+    stateBorderColor: '#9eb4c8',
     gridLineColor: 'rgba(210, 216, 228, 0.12)',
     hexPaletteId: 'wargame',
     labelFont: 'sans',
     labelColors: {
-      continent: 'rgba(215, 221, 229, 0.45)',
+      continent: '#d7dde5',
       country: '#d7dde5',
-      state: '#a9b3bf',
+      state: '#d7dde5',
       halo: 'rgba(10, 14, 20, 0.85)',
     },
   },

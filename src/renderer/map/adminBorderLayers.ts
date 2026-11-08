@@ -8,7 +8,7 @@
  */
 
 import type { MapTheme } from '../../shared/mapThemes';
-import { adminBorderGroupsForView } from '../../shared/adminBorderRules';
+import { adminBorderGroupsForView, borderLineOpacity } from '../../shared/adminBorderRules';
 import { coastlineLodForZoom, parseAdminBorderPack, visibleCellRefs } from '../../shared/vectorPackDecode';
 import type { AdminBorderGroupId, AdminBorderPack, VectorViewBounds } from '../../shared/vectorPackTypes';
 import { getActiveMapTheme } from './activeMapTheme';
@@ -66,9 +66,9 @@ function borderDash(id: AdminBorderGroupId): string | null {
 /**
  * Theme color for one group.
  *
- * Purpose: State borders stay distinct from national borders, and both stay distinct from the coastline.
+ * Purpose: Both levels share one opaque ink. `borderLineOpacity` is what makes a state line quieter.
  * When to use: The path style for that group.
- * Expected outcome: The theme's state color or country color.
+ * Expected outcome: The theme's state color for a state group, including a disputed state line. The country color for a country group.
  * Exceptions: None.
  */
 function borderColor(theme: MapTheme, id: AdminBorderGroupId): string {
@@ -192,7 +192,7 @@ export function syncAdminBorderLayers(): void {
  *
  * Purpose: A theme change recolors borders without rebuilding them.
  * When to use: From `applyActiveMapTheme`.
- * Expected outcome: Country groups use the country color and state groups use the state color. Width and dash stay with the group.
+ * Expected outcome: Country groups use the country color at `NATIONAL_BORDER_OPACITY`. State groups use the state color at `STATE_BORDER_OPACITY`. Width and dash stay with the group.
  * Exceptions: None.
  */
 export function applyAdminBorderTheme(theme: MapTheme): void {
@@ -203,6 +203,7 @@ export function applyAdminBorderTheme(theme: MapTheme): void {
       dashArray: borderDash(entry.id),
       smoothFactor: 0.5,
       seamWeightPx: null,
+      opacity: borderLineOpacity(entry.id),
     };
     entry.layer.setStyle(style);
   }

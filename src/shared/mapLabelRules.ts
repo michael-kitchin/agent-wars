@@ -41,7 +41,7 @@ export const MAX_LABELS_PER_FRAME = 150;
 /**
  * Extra pixels around a drawn label that the next label may not enter.
  *
- * Purpose: Country and state names need a gap so they do not touch. A continent may sit under either.
+ * Purpose: Two names of the same kind need a gap. A different kind may share the place and is painted later.
  * When to use: The collision pass.
  * Expected outcome: Two labels stay at least this many pixels apart.
  * Exceptions: None.
@@ -84,49 +84,70 @@ export function visibleLabelKinds(zoom: number, tacticalView: boolean): MapLabel
 }
 
 /**
- * Share of a country name that is painted, fill and halo together.
+ * Share of a country name's fill painted beside continent names.
  *
- * Purpose: Country names stay readable beside the fainter continent and state names.
- * When to use: `labelKindOpacity`.
- * Expected outcome: Two thirds.
+ * Purpose: The local name uses this share for its fill. The halo does not use it. A lone continent and a state name use this share too.
+ * When to use: `labelKindOpacity` when state names are not in the view. `CONTINENT_LABEL_OPACITY` and `STATE_LABEL_OPACITY` alias it.
+ * Expected outcome: Full strength. On a light theme that is darker than `CONTINENT_BESIDE_COUNTRY_OPACITY`. On Night it is brighter.
  * Exceptions: None.
  */
-export const COUNTRY_LABEL_OPACITY = 2 / 3;
+export const COUNTRY_LABEL_OPACITY = 1;
 
 /**
- * Share of a state name that is painted, fill and halo together.
+ * Share of a continent name painted when it is the only kind in view.
  *
- * Purpose: State names stay present without competing with the country names.
- * When to use: `labelKindOpacity`.
- * Expected outcome: One half.
+ * Purpose: A world view uses the same share as a country name drawn over a continent.
+ * When to use: `labelKindOpacity` below the country zoom.
+ * Expected outcome: `COUNTRY_LABEL_OPACITY`.
  * Exceptions: None.
  */
-export const STATE_LABEL_OPACITY = 1 / 2;
+export const CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
 
 /**
- * Share of a continent name that is painted when country names are also drawn.
+ * Share of a state name's fill.
  *
- * Purpose: The continent name stays visible under the country names.
- * When to use: `labelKindOpacity`. A world view that draws only continents uses full strength.
+ * Purpose: A state name uses the same fill share as a country name drawn over a continent. The halo does not use it.
+ * When to use: `labelKindOpacity`.
+ * Expected outcome: `COUNTRY_LABEL_OPACITY`.
+ * Exceptions: None.
+ */
+export const STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
+
+/**
+ * Share of a continent name painted when country names are also drawn.
+ *
+ * Purpose: The broader name under the local name uses this share. A country under a state uses it too.
+ * When to use: `labelKindOpacity` from the country zoom, outside a tactical view. `COUNTRY_BESIDE_STATE_OPACITY` aliases it.
  * Expected outcome: One half.
  * Exceptions: None.
  */
 export const CONTINENT_BESIDE_COUNTRY_OPACITY = 1 / 2;
 
 /**
+ * Share of a country name painted when state names are also drawn.
+ *
+ * Purpose: The country name stays visible under the state name, at the same share as a continent under a country.
+ * When to use: `labelKindOpacity` in a tactical view.
+ * Expected outcome: `CONTINENT_BESIDE_COUNTRY_OPACITY`.
+ * Exceptions: None.
+ */
+export const COUNTRY_BESIDE_STATE_OPACITY = CONTINENT_BESIDE_COUNTRY_OPACITY;
+
+/**
  * How strongly one kind is painted in the current view.
  *
  * Purpose: The theme color stays the same. The view decides how much of it shows.
  * When to use: When painting a label. The kind must already be one `visibleLabelKinds` returned.
- * Expected outcome: A world-view continent is 1. A continent beside countries is `CONTINENT_BESIDE_COUNTRY_OPACITY`.
- *   A country is `COUNTRY_LABEL_OPACITY`. A state is `STATE_LABEL_OPACITY`.
+ * Expected outcome: A world-view continent is `CONTINENT_LABEL_OPACITY`. A continent beside countries is `CONTINENT_BESIDE_COUNTRY_OPACITY`.
+ *   A country beside continents is `COUNTRY_LABEL_OPACITY`. A country beside states is `COUNTRY_BESIDE_STATE_OPACITY`.
+ *   A state is `STATE_LABEL_OPACITY`. The name on top is the theme color. The name under it is half.
  * Exceptions: None.
  */
 export function labelKindOpacity(kind: MapLabelKind, zoom: number, tacticalView: boolean): number {
-  if (kind === 'country') return COUNTRY_LABEL_OPACITY;
+  if (kind === 'country') return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
   if (kind === 'state') return STATE_LABEL_OPACITY;
   if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
-  return 1;
+  return CONTINENT_LABEL_OPACITY;
 }
 
 /**
@@ -144,7 +165,7 @@ export const METERS_PER_PIXEL_Z0 = 156543.03392804097;
  *
  * Purpose: Continents, countries, and states are not drawn at the same size.
  * When to use: When measuring and drawing a label.
- * Expected outcome: Size in CSS pixels, a font weight, letter spacing as a fraction of the size, and whether the name is capitalized.
+ * Expected outcome: Size in CSS pixels, a font weight, letter spacing as a fraction of the size, a halo width, and whether the name is capitalized.
  * Exceptions: None.
  */
 export interface MapLabelKindStyle {
@@ -176,6 +197,15 @@ export interface MapLabelKindStyle {
    */
   readonly letterSpacingEm: number;
   /**
+   * Halo stroke width in CSS pixels.
+   *
+   * Contract: A positive number, narrower for the smaller kinds.
+   * When to use: `lineWidth` of the halo stroke. It does not follow the label opacity.
+   * Expected outcome: A light outline that does not cover the fill of an 11 px name.
+   * Exceptions: None.
+   */
+  readonly haloWidthPx: number;
+  /**
    * Whether the name is drawn in capitals.
    *
    * Contract: True for continents and countries.
@@ -191,13 +221,13 @@ export interface MapLabelKindStyle {
  *
  * Purpose: One table, so the measurer and the painter cannot drift.
  * When to use: Before measuring or drawing a label.
- * Expected outcome: Continent 18/600, country 13/600, state 11/400.
+ * Expected outcome: Continent 18/600, country 13/600, state 11/400, with halo widths 3, 2, and 1.
  * Exceptions: None.
  */
 export const MAP_LABEL_KIND_STYLES: Readonly<Record<MapLabelKind, MapLabelKindStyle>> = {
-  continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, uppercase: true },
-  country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, uppercase: true },
-  state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, uppercase: false },
+  continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
+  country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
+  state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
 };
 
 /**

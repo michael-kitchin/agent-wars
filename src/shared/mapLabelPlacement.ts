@@ -3,8 +3,8 @@
  *
  * Purpose: One label per feature, kept at the same anchor while that anchor stays usable, and names do not pile up.
  * When to use: Once per map frame, after the visible kinds are known.
- * Expected outcome: At most `MAX_LABELS_PER_FRAME` labels, in priority order. A continent does not
- *   displace a country or a state. Other overlaps are skipped.
+ * Expected outcome: At most `MAX_LABELS_PER_FRAME` labels, in paint order. A different kind does not
+ *   displace another kind. A later kind is painted on top. Two labels of the same kind do not overlap.
  * Exceptions: None. A feature with no usable anchor is omitted.
  */
 
@@ -249,7 +249,7 @@ interface ChosenLabel {
  * Purpose: The same rules run in tests and on the map.
  * When to use: From the label canvas, once per draw.
  * Expected outcome: Labels in kind, rank, minimum zoom, then id order, stopping at the frame cap.
- *   A continent is skipped only when it meets another continent. A country or state is skipped when it meets another country or state.
+ *   A label is skipped only when it meets another label of the same kind. A later kind is painted on top.
  *   The previous anchor is kept while it stays usable. Otherwise the primary anchor wins, then the usable anchor nearest the center.
  * Exceptions: None.
  */
@@ -405,7 +405,7 @@ function distanceSquared(
 /**
  * Priority order for collision.
  *
- * Purpose: A country is kept in preference to a state that would cover it.
+ * Purpose: Later kinds are painted on top, so a state sits over a country and a country sits over a continent.
  * When to use: Before the greedy pass.
  * Expected outcome: Continent, then country, then state. Within a kind, smaller rank, then smaller minimum zoom, then id.
  * Exceptions: None.
@@ -421,17 +421,14 @@ function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
 /**
  * Whether two centered boxes meet after the candidate is padded.
  *
- * Purpose: A country and a state need a gap. A continent may sit under either of them.
+ * Purpose: Names of the same kind need a gap. A different kind may share the place and is painted later.
  * When to use: Against every label already accepted.
- * Expected outcome: False when one box is a continent and the other is not. Otherwise true when the candidate,
+ * Expected outcome: False when the kinds differ. Otherwise true when the candidate,
  *   grown by `LABEL_COLLISION_PADDING_PX`, meets the placed box.
  * Exceptions: None.
  */
 function boxesOverlap(candidate: ChosenLabel, placed: PlacedMapLabel): boolean {
-  const candidateKind = candidate.feature.kind;
-  if (candidateKind !== placed.kind && (candidateKind === 'continent' || placed.kind === 'continent')) {
-    return false;
-  }
+  if (candidate.feature.kind !== placed.kind) return false;
   const pad = LABEL_COLLISION_PADDING_PX;
   return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2
     && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;

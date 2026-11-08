@@ -370,10 +370,9 @@ function fallbackFamily(font: MapLabelFontId): string {
 /**
  * Strokes the halo and then fills the name.
  *
- * Purpose: Relief stays visible through the letters, and the letters stay readable on it.
+ * Purpose: The halo stays a fixed outline. The fill opacity is what separates the local name from the broader one.
  * When to use: Once per placed label.
- * Expected outcome: A round halo of line width 3 in the theme halo color, then the kind's fill.
- *   Both are multiplied by `opacity`, so the name fades without changing its color.
+ * Expected outcome: A round halo in the theme halo color, at the kind's halo width and not faded by the label opacity, then the kind's fill at `opacity`.
  * Exceptions: None.
  */
 function paintLabel(
@@ -384,12 +383,12 @@ function paintLabel(
 ): void {
   applyLabelFont(ctx, theme, label.kind);
   ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = MAP_LABEL_KIND_STYLES[label.kind].haloWidthPx;
   ctx.lineJoin = 'round';
   ctx.strokeStyle = theme.labelColors.halo;
-  ctx.fillStyle = theme.labelColors[label.kind];
   ctx.strokeText(label.text, label.x, label.y);
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = theme.labelColors[label.kind];
   ctx.fillText(label.text, label.x, label.y);
   ctx.restore();
 }

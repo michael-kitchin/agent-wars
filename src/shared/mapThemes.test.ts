@@ -6,6 +6,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  CONTINENT_BESIDE_COUNTRY_OPACITY,
+  COUNTRY_BESIDE_STATE_OPACITY,
+  COUNTRY_LABEL_OPACITY,
+  STATE_LABEL_OPACITY,
+} from './mapLabelRules';
+import {
   FLAT_LAND_GRAY,
   MAP_THEMES,
   landTransferFunctions,
@@ -57,10 +63,69 @@ describe('map themes', () => {
     }
   });
 
-  it('keeps coastline, country border, and state border colors distinct', () => {
+  it('keeps the coastline distinct from the shared border ink', () => {
     for (const theme of MAP_THEMES) {
-      const colors = new Set([theme.coastlineColor, theme.countryBorderColor, theme.stateBorderColor]);
-      assert.equal(colors.size, 3, theme.id);
+      assert.notEqual(theme.coastlineColor, theme.countryBorderColor, theme.id);
+      assert.equal(theme.stateBorderColor, theme.countryBorderColor, theme.id);
+      assert.match(theme.countryBorderColor, /^#[0-9a-f]{6}$/, theme.id);
+    }
+  });
+
+  it('paints the local name stronger than the broader name beside it', () => {
+    for (const theme of MAP_THEMES) {
+      assert.equal(theme.labelColors.continent, theme.labelColors.country, theme.id);
+      assert.equal(theme.labelColors.state, theme.labelColors.country, theme.id);
+      const land = themedLandRgb(theme, FLAT_LAND_GRAY);
+      const bands = [
+        [theme.labelColors.country, COUNTRY_LABEL_OPACITY, theme.labelColors.continent, CONTINENT_BESIDE_COUNTRY_OPACITY],
+        [theme.labelColors.state, STATE_LABEL_OPACITY, theme.labelColors.country, COUNTRY_BESIDE_STATE_OPACITY],
+      ] as const;
+      for (const [localInk, localOpacity, broaderInk, broaderOpacity] of bands) {
+        const local = relativeLuminance(paintedFill(localInk, localOpacity, land));
+        const broader = relativeLuminance(paintedFill(broaderInk, broaderOpacity, land));
+        if (theme.id === 'night') {
+          assert.ok(local > broader, `${theme.id} local ${local} is not brighter than broader ${broader}`);
+        } else {
+          assert.ok(local < broader, `${theme.id} local ${local} is not darker than broader ${broader}`);
+        }
+      }
     }
   });
 });
+
+/**
+ * Painted fill of one label ink at a view opacity, over a land color.
+ *
+ * Purpose: The label canvas multiplies the ink by the kind's opacity.
+ * When to use: When comparing the local name with the broader name on flat land.
+ * Expected outcome: The sRGB composite the canvas paints for an opaque `#rrggbb` ink.
+ * Exceptions: Throws when `ink` is not `#rrggbb`.
+ */
+function paintedFill(
+  ink: string,
+  opacity: number,
+  land: readonly [number, number, number],
+): [number, number, number] {
+  if (!/^#[0-9a-fA-F]{6}$/.test(ink)) throw new Error(`label ink ${ink} is not #rrggbb`);
+  const channel = (index: number): number => {
+    const source = Number.parseInt(ink.slice(1 + index * 2, 3 + index * 2), 16);
+    return source * opacity + land[index] * (1 - opacity);
+  };
+  return [channel(0), channel(1), channel(2)];
+}
+
+/**
+ * Relative luminance of an sRGB color.
+ *
+ * Purpose: Compares which painted name reads darker.
+ * When to use: After `paintedFill`.
+ * Expected outcome: A value from 0 to 1. A lower value is darker.
+ * Exceptions: None.
+ */
+function relativeLuminance(rgb: readonly [number, number, number]): number {
+  const linear = (channel: number): number => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+}

@@ -16692,20 +16692,22 @@
     if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
     return ["continent", "country"];
   }
-  var COUNTRY_LABEL_OPACITY = 2 / 3;
-  var STATE_LABEL_OPACITY = 1 / 2;
+  var COUNTRY_LABEL_OPACITY = 1;
+  var CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
+  var STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
   var CONTINENT_BESIDE_COUNTRY_OPACITY = 1 / 2;
+  var COUNTRY_BESIDE_STATE_OPACITY = CONTINENT_BESIDE_COUNTRY_OPACITY;
   function labelKindOpacity(kind, zoom, tacticalView) {
-    if (kind === "country") return COUNTRY_LABEL_OPACITY;
+    if (kind === "country") return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
     if (kind === "state") return STATE_LABEL_OPACITY;
     if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
-    return 1;
+    return CONTINENT_LABEL_OPACITY;
   }
   var METERS_PER_PIXEL_Z0 = 156543.03392804097;
   var MAP_LABEL_KIND_STYLES = {
-    continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, uppercase: true },
-    country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, uppercase: true },
-    state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, uppercase: false }
+    continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
+    country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
+    state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
   };
   function labelDisplayText(feature) {
     return MAP_LABEL_KIND_STYLES[feature.kind].uppercase ? feature.name.toLocaleUpperCase("en") : feature.name;
@@ -16715,12 +16717,17 @@
   }
 
   // src/shared/adminBorderRules.ts
+  var NATIONAL_BORDER_OPACITY = 2 / 3;
+  var STATE_BORDER_OPACITY = 1 / 2;
   function adminBorderGroupsForView(zoom, tacticalView) {
     const kinds = visibleLabelKinds(zoom, tacticalView);
     const groups = [];
     if (kinds.includes("country")) groups.push("country", "country_disputed");
     if (kinds.includes("state")) groups.push("state", "state_disputed");
     return groups;
+  }
+  function borderLineOpacity(id) {
+    return id === "state" || id === "state_disputed" ? STATE_BORDER_OPACITY : NATIONAL_BORDER_OPACITY;
   }
 
   // src/shared/vectorPackTypes.ts
@@ -16917,14 +16924,14 @@
       landHighlightRgb: [251, 250, 247],
       coastlineColor: "#6d8ea6",
       countryBorderColor: "#4e6273",
-      stateBorderColor: "rgba(78, 98, 115, 0.7)",
+      stateBorderColor: "#4e6273",
       gridLineColor: "rgba(48, 56, 64, 0.15)",
       hexPaletteId: "default",
       labelFont: "sans",
       labelColors: {
-        continent: "rgba(70, 74, 82, 0.55)",
+        continent: "#3b3f46",
         country: "#3b3f46",
-        state: "#686d76",
+        state: "#3b3f46",
         halo: "rgba(255, 255, 255, 0.85)"
       }
     },
@@ -16936,14 +16943,14 @@
       landHighlightRgb: [251, 246, 228],
       coastlineColor: "#3f8fc0",
       countryBorderColor: "#6e5340",
-      stateBorderColor: "rgba(110, 83, 64, 0.65)",
+      stateBorderColor: "#6e5340",
       gridLineColor: "rgba(48, 56, 64, 0.15)",
       hexPaletteId: "default",
       labelFont: "serif",
       labelColors: {
-        continent: "rgba(92, 70, 44, 0.55)",
+        continent: "#4a3a28",
         country: "#4a3a28",
-        state: "#6e5a43",
+        state: "#4a3a28",
         halo: "rgba(251, 246, 228, 0.9)"
       }
     },
@@ -16955,14 +16962,14 @@
       landHighlightRgb: [251, 231, 166],
       coastlineColor: "#2f3a40",
       countryBorderColor: "#1e4d78",
-      stateBorderColor: "rgba(30, 77, 120, 0.55)",
+      stateBorderColor: "#1e4d78",
       gridLineColor: "rgba(48, 56, 64, 0.15)",
       hexPaletteId: "default",
       labelFont: "serif",
       labelColors: {
-        continent: "rgba(40, 50, 60, 0.5)",
+        continent: "#2b2f33",
         country: "#2b2f33",
-        state: "#4f565c",
+        state: "#2b2f33",
         halo: "rgba(251, 236, 180, 0.9)"
       }
     },
@@ -16974,14 +16981,14 @@
       landHighlightRgb: [74, 82, 92],
       coastlineColor: "#7d97ad",
       countryBorderColor: "#9eb4c8",
-      stateBorderColor: "rgba(158, 180, 200, 0.6)",
+      stateBorderColor: "#9eb4c8",
       gridLineColor: "rgba(210, 216, 228, 0.12)",
       hexPaletteId: "wargame",
       labelFont: "sans",
       labelColors: {
-        continent: "rgba(215, 221, 229, 0.45)",
+        continent: "#d7dde5",
         country: "#d7dde5",
-        state: "#a9b3bf",
+        state: "#d7dde5",
         halo: "rgba(10, 14, 20, 0.85)"
       }
     }
@@ -17054,7 +17061,7 @@
         stroke: true,
         color: style.color,
         weight: style.weight,
-        opacity: 1,
+        opacity: style.opacity ?? 1,
         lineCap: "round",
         lineJoin: "round",
         fill: false
@@ -17271,7 +17278,8 @@
         weight: borderWeight(entry.id),
         dashArray: borderDash(entry.id),
         smoothFactor: 0.5,
-        seamWeightPx: null
+        seamWeightPx: null,
+        opacity: borderLineOpacity(entry.id)
       };
       entry.layer.setStyle(style);
     }
@@ -33100,10 +33108,7 @@ ${bonuses}`;
     return left.feature.id < right.feature.id ? -1 : left.feature.id > right.feature.id ? 1 : 0;
   }
   function boxesOverlap(candidate, placed) {
-    const candidateKind = candidate.feature.kind;
-    if (candidateKind !== placed.kind && (candidateKind === "continent" || placed.kind === "continent")) {
-      return false;
-    }
+    if (candidate.feature.kind !== placed.kind) return false;
     const pad = LABEL_COLLISION_PADDING_PX;
     return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2 && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;
   }
@@ -33231,12 +33236,12 @@ ${bonuses}`;
   function paintLabel(ctx, theme, label, opacity) {
     applyLabelFont(ctx, theme, label.kind);
     ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = MAP_LABEL_KIND_STYLES[label.kind].haloWidthPx;
     ctx.lineJoin = "round";
     ctx.strokeStyle = theme.labelColors.halo;
-    ctx.fillStyle = theme.labelColors[label.kind];
     ctx.strokeText(label.text, label.x, label.y);
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = theme.labelColors[label.kind];
     ctx.fillText(label.text, label.x, label.y);
     ctx.restore();
   }

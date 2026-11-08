@@ -64,6 +64,15 @@ export interface VectorPathStyle {
    * Exceptions: None.
    */
   readonly seamWeightPx: number | null;
+  /**
+   * How strongly a line is painted. Omitted means fully opaque.
+   *
+   * Contract: A number from 0 to 1, or omitted.
+   * When to use: Borders pass `borderLineOpacity`. Coastlines and filled cells omit it.
+   * Expected outcome: Leaflet line `opacity`. A polygon ignores it and stays fill opacity 1.
+   * Exceptions: None.
+   */
+  readonly opacity?: number;
 }
 
 /**
@@ -387,7 +396,7 @@ export function createBucketedVectorLayer(options: BucketedVectorLayerOptions): 
    *
    * Purpose: Line layers and seam-filled polygons do not share one option set.
    * When to use: When adding a path and when restyling one.
-   * Expected outcome: A polygon fills in `style.color` and strokes only when a seam weight is set. A line uses weight, dash, and round caps.
+   * Expected outcome: A polygon fills in `style.color` and strokes only when a seam weight is set. A line uses weight, dash, round caps, and `style.opacity`, or 1 when that is omitted.
    * Exceptions: None.
    */
   function pathOptions(): Record<string, unknown> {
@@ -411,7 +420,7 @@ export function createBucketedVectorLayer(options: BucketedVectorLayerOptions): 
       stroke: true,
       color: style.color,
       weight: style.weight,
-      opacity: 1,
+      opacity: style.opacity ?? 1,
       lineCap: 'round',
       lineJoin: 'round',
       fill: false,

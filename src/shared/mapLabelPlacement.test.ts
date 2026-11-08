@@ -9,6 +9,8 @@ import { parseMapLabelPack } from './mapLabelPack';
 import { placeMapLabels, type LabelPlacementInput } from './mapLabelPlacement';
 import {
   CONTINENT_BESIDE_COUNTRY_OPACITY,
+  CONTINENT_LABEL_OPACITY,
+  COUNTRY_BESIDE_STATE_OPACITY,
   COUNTRY_LABEL_OPACITY,
   STATE_LABEL_OPACITY,
   labelKindOpacity,
@@ -38,19 +40,21 @@ test('label kinds follow zoom and the tactical view', () => {
  *
  * Purpose: Country zoom fades continents and countries. A tactical view fades countries and states and omits continents.
  * When to use: As the contract test for `labelKindOpacity`.
- * Expected outcome: A lone continent stays at full strength. Beside countries it is half. Countries are two thirds. States are half.
+ * Expected outcome: A lone continent, a country beside continents, and a state are the theme color. A continent beside countries, and a country beside states, are half.
  * Exceptions: Assertion failures name the kind whose strength moved.
  */
 test('label opacity follows the view', () => {
-  assert.equal(labelKindOpacity('continent', 3, false), 1);
+  assert.equal(labelKindOpacity('continent', 3, false), CONTINENT_LABEL_OPACITY);
   assert.equal(labelKindOpacity('continent', 4, false), CONTINENT_BESIDE_COUNTRY_OPACITY);
   assert.equal(labelKindOpacity('continent', 5, false), CONTINENT_BESIDE_COUNTRY_OPACITY);
   assert.equal(labelKindOpacity('country', 5, false), COUNTRY_LABEL_OPACITY);
-  assert.equal(labelKindOpacity('country', 3, true), COUNTRY_LABEL_OPACITY);
+  assert.equal(labelKindOpacity('country', 3, true), COUNTRY_BESIDE_STATE_OPACITY);
   assert.equal(labelKindOpacity('state', 3, true), STATE_LABEL_OPACITY);
-  assert.equal(COUNTRY_LABEL_OPACITY, 2 / 3);
-  assert.equal(STATE_LABEL_OPACITY, 1 / 2);
+  assert.equal(COUNTRY_LABEL_OPACITY, 1);
   assert.equal(CONTINENT_BESIDE_COUNTRY_OPACITY, 1 / 2);
+  assert.equal(CONTINENT_LABEL_OPACITY, COUNTRY_LABEL_OPACITY);
+  assert.equal(STATE_LABEL_OPACITY, COUNTRY_LABEL_OPACITY);
+  assert.equal(COUNTRY_BESIDE_STATE_OPACITY, CONTINENT_BESIDE_COUNTRY_OPACITY);
 });
 
 /**
@@ -88,22 +92,41 @@ test('the previous anchor is kept while it stays usable', () => {
 });
 
 /**
- * Confirms a state that sits on a country is dropped.
+ * Confirms a state that sits on a country is kept and painted after it.
  *
- * Purpose: The country has priority, so the names do not cover each other.
- * When to use: As the contract test for collision.
- * Expected outcome: Only the country is placed.
- * Exceptions: Assertion failures when the state is also placed.
+ * Purpose: Both names stay, and the later paint puts the state on top.
+ * When to use: As the contract test for collision across those kinds.
+ * Expected outcome: The country is placed first and the state second.
+ * Exceptions: Assertion failures when either name is omitted or the state is painted first.
  */
-test('a state that overlaps a country is dropped', () => {
+test('a state that overlaps a country is painted over it', () => {
   const placed = placeMapLabels(input({
     features: [
-      named('adm0:AAA', 'country', [anchor(100, 100, 0)], 'Country'),
       named('adm1:BBB', 'state', [anchor(100, 100, 0)], 'State'),
+      named('adm0:AAA', 'country', [anchor(100, 100, 0)], 'Country'),
     ],
     kinds: ['country', 'state'],
   }));
-  assert.deepEqual(placed.map((label) => label.featureId), ['adm0:AAA']);
+  assert.deepEqual(placed.map((label) => label.featureId), ['adm0:AAA', 'adm1:BBB']);
+});
+
+/**
+ * Confirms two states that sit on each other keep one.
+ *
+ * Purpose: Allowing a state over a country must not let two states cover each other.
+ * When to use: As the contract test for same-kind collision.
+ * Expected outcome: The state with the lesser id remains. The one listed first does not win by being first.
+ * Exceptions: Assertion failures when both states are placed or the later id wins.
+ */
+test('two overlapping states keep one', () => {
+  const placed = placeMapLabels(input({
+    features: [
+      named('adm1:BBB', 'state', [anchor(100, 100, 0)], 'Second'),
+      named('adm1:AAA', 'state', [anchor(100, 100, 0)], 'First'),
+    ],
+    kinds: ['state'],
+  }));
+  assert.deepEqual(placed.map((label) => label.featureId), ['adm1:AAA']);
 });
 
 /**

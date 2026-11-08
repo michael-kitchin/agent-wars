@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { adminBorderGroupsForView } from './adminBorderRules';
+import { adminBorderGroupsForView, borderLineOpacity, NATIONAL_BORDER_OPACITY, STATE_BORDER_OPACITY } from './adminBorderRules';
 import { visibleLabelKinds } from './mapLabelRules';
 
 /**
@@ -43,6 +43,23 @@ test('borders follow the label kinds', () => {
 });
 
 /**
+ * Confirms the two border strengths.
+ *
+ * Purpose: National lines stay stronger than state lines on every theme.
+ * When to use: As the contract test for `borderLineOpacity`.
+ * Expected outcome: Country groups are two thirds. State groups are one half. A disputed line matches its level.
+ * Exceptions: Assertion failures name the group whose strength moved.
+ */
+test('border opacity follows the line level', () => {
+  assert.equal(NATIONAL_BORDER_OPACITY, 2 / 3);
+  assert.equal(STATE_BORDER_OPACITY, 1 / 2);
+  assert.equal(borderLineOpacity('country'), NATIONAL_BORDER_OPACITY);
+  assert.equal(borderLineOpacity('country_disputed'), NATIONAL_BORDER_OPACITY);
+  assert.equal(borderLineOpacity('state'), STATE_BORDER_OPACITY);
+  assert.equal(borderLineOpacity('state_disputed'), STATE_BORDER_OPACITY);
+});
+
+/**
  * Confirms the border layer asks the shared rule.
  *
  * Purpose: A second copy of the zoom cutoff would drift from the names.
@@ -56,5 +73,6 @@ test('border layers ask the shared group list', () => {
     'utf8',
   );
   assert.match(source, /adminBorderGroupsForView/);
+  assert.match(source, /borderLineOpacity/);
   assert.doesNotMatch(source, /COUNTRY_LABEL_MIN_ZOOM/);
 });
