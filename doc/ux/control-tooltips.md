@@ -77,7 +77,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Tech map mode: Show or hide each hex's tech tier icon on the world map, while the tech bonus is on. Holding T shows them too, while the key is down.
 - Control map mode: Show or hide the borders that mark who controls each hex, and the home-region outlines.
 - Production map mode: Show or hide production on every world hex, the way holding T does. Off shows it only on hexes you control.
-- Legend: Show or hide the terrain legend and its style choice.
+- Legend: Show or hide the terrain legend and its map theme. (`mapLegendToggleTooltipText` in `src/renderer/chrome/frameTooltipText.ts`, and the same sentence on `#map-legend-toggle` in `static/index.html`).
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
@@ -113,7 +113,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Memory: Let the opponent read notes it has saved. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
 - Orders: Let the opponent look up standing orders. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
 - Production: Let the opponent read and change build queues on the world map, not during a battle. The number counts uses in this consult, for every commander, and this does nothing when the model cannot use tools.
-- Terrain style: Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.
+- Map theme: Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night. (`mapThemeTooltipText` in `src/renderer/chrome/controlTooltipText.ts`).
 - Build marker: `Build Units`, or `Build/Hire Units` when the hex is in the human hire set (`buildEntryTooltipTextFor` in `src/renderer/chrome/controlTooltipText.ts`).
 - Tactical entry marker: Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.
 - Single-hex add: Add a queue row. It starts as the first unit type this hex can build.
@@ -201,7 +201,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`, `mapThemeTooltipText`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)

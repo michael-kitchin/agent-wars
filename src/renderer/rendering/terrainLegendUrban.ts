@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import type { HexPaletteId } from '../../shared/mapThemes';
 import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
 
 /**
@@ -19,9 +20,7 @@ import { appendLegendRow, applyLegendSwatchChrome } from './terrainLegendRow';
  */
 const URBAN_SWATCH_COLOR: Readonly<Record<string, string>> = Object.freeze({
   default: '#827060',
-  atlas: '#8d7a67',
   wargame: '#847061',
-  scientific: '#897562',
 });
 
 /**
@@ -32,8 +31,8 @@ const URBAN_SWATCH_COLOR: Readonly<Record<string, string>> = Object.freeze({
  * Expected outcome: A hex color. An unknown style is the default chip.
  * Exceptions: None.
  */
-export function urbanSwatchColor(styleId: string): string {
-  return URBAN_SWATCH_COLOR[styleId] ?? URBAN_SWATCH_COLOR.default!;
+export function urbanSwatchColor(paletteId: HexPaletteId): string {
+  return URBAN_SWATCH_COLOR[paletteId] ?? URBAN_SWATCH_COLOR.default!;
 }
 
 /**

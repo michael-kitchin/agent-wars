@@ -1,38 +1,29 @@
 /**
  * Offline hillshade tile layer and the water color drawn under it.
  *
- * Purpose: The match map reads `agentwars-basemap` tiles. Four terrain styles are CSS filters on those tiles, on the water, and on the elevation-tile lines.
- * When to use: After the Leaflet maps exist. Call `bindOfflineBasemap` once, then `setBasemapGameMap` when the match map changes.
- * Expected outcome: One tile layer on each map. Changing style does not remount the tiles.
+ * Purpose: The match map reads `agentwars-basemap` tiles. A theme sets the water color and recolors the land.
+ * When to use: After the Leaflet maps exist. Call `bindOfflineBasemap` once, then `setBasemapGameMap` when the match map changes, and `applyBasemapTheme` when the theme changes.
+ * Expected outcome: One tile layer on each map. Changing theme does not remount the tiles.
  * Exceptions: A failed native-zoom IPC uses zoom 7 and logs the error. Tile errors show one toast per session.
  */
 
+import { DEFAULT_MAP_THEME_ID, type MapTheme, mapThemeById } from '../../shared/mapThemes';
 import { WEB_MERCATOR_MAX_ABS_LAT } from '../../shared/webMercator';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
+import { landTileFilterCss } from './mapThemeFilters';
 
 /**
- * Provider id shared by every terrain style.
+ * Provider id shared by every map theme.
  *
- * Purpose: Style changes must not look like a basemap swap.
+ * Purpose: A theme change must not look like a basemap swap.
  * When to use: When recording which provider the Leaflet maps are showing.
  * Expected outcome: The string `offline_hillshade`.
  * Exceptions: None.
  */
 export const OFFLINE_HILLSHADE_ID = 'offline_hillshade';
 
-const ATTRIBUTION = 'Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.';
 const WATER_PANE = 'basemapWater';
 const GRID_PANE = 'basemapGrid';
-
-/**
- * Ink drawn along the elevation-tile edges.
- *
- * Purpose: Those edges are a step in the stored hillshade. A fine line makes the step read as a grid.
- * When to use: As the stroke of every source-tile line, before a terrain-style filter.
- * Expected outcome: A 1 px slate line at 15% opacity, on the main map only.
- * Exceptions: None.
- */
-const GRID_COLOR = 'rgba(48, 56, 64, 0.15)';
 
 /**
  * Dash pattern for a source-tile line that is not a reference edge.
@@ -63,16 +54,6 @@ const SOURCE_MERIDIANS = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 1
  * Exceptions: None.
  */
 const SOURCE_PARALLELS = [-70, -50, -30, -10, 0, 10, 30, 50, 70] as const;
-
-/**
- * Blue drawn under transparent ocean pixels.
- *
- * Purpose: The tiles store gray land and leave water empty, so this is the only control for how dark the ocean looks.
- * When to use: As the background of the water pane. Keep it equal to `PREVIEW_WATER_RGB` in `scripts/basemap_pipeline/basemap_settings.py`.
- * Expected outcome: `rgb(113, 148, 177)` on both maps, before a terrain-style filter.
- * Exceptions: None.
- */
-const WATER_COLOR = 'rgb(113, 148, 177)';
 
 /**
  * Leaflet surface this layer needs.
@@ -195,7 +176,10 @@ interface OfflineLeaflet {
    * Expected outcome: A path that is not yet on a map.
    * Exceptions: None.
    */
-  polyline?: (positions: Array<[number, number]>, options: Record<string, unknown>) => { addTo?: (map: OfflineBasemapMap) => void };
+  polyline?: (
+    positions: Array<[number, number]>,
+    options: Record<string, unknown>,
+  ) => { addTo?: (map: OfflineBasemapMap) => void; setStyle?: (style: { color: string }) => void };
 }
 
 let leafletRef: OfflineLeaflet | null = null;
@@ -207,6 +191,46 @@ let gameMapId = 'global';
 let appliedKey = '';
 let requestSerial = 0;
 let basemapErrorShown = false;
+let publishedNativeZoom = 7;
+const gridLines: Array<{ setStyle?: (style: { color: string }) => void }> = [];
+const nativeZoomListeners = new Set<(nativeZoom: number) => void>();
+
+/**
+ * Native zoom of the tile pyramid currently applied.
+ *
+ * Purpose: The coast edge mask turns on only past this zoom, because that is where the tiles start to stretch.
+ * When to use: Before the first published answer, or from a caller that missed the listener.
+ * Expected outcome: 7 until a map's native zoom is known, then that zoom.
+ * Exceptions: None.
+ */
+export function getBasemapNativeZoom(): number {
+  return publishedNativeZoom;
+}
+
+/**
+ * Runs `listener` after each accepted native-zoom answer, including the first.
+ *
+ * Purpose: The edge mask is created in another module, and this module must not import it.
+ * When to use: Once, after the maps are bound.
+ * Expected outcome: The listener receives the zoom whenever a map request settles on one.
+ * Exceptions: None. A listener that throws leaves the remaining listeners uncalled.
+ */
+export function onBasemapNativeZoomChanged(listener: (nativeZoom: number) => void): void {
+  nativeZoomListeners.add(listener);
+}
+
+/**
+ * Stores a native zoom and tells the listeners.
+ *
+ * Purpose: One place updates the getter and the mask together.
+ * When to use: When `applyGameMap` accepts an answer, including a repeat of the same map.
+ * Expected outcome: `getBasemapNativeZoom` returns `nativeZoom`, and every listener is called with it.
+ * Exceptions: A listener that throws propagates to the caller.
+ */
+function publishBasemapNativeZoom(nativeZoom: number): void {
+  publishedNativeZoom = nativeZoom;
+  for (const listener of nativeZoomListeners) listener(nativeZoom);
+}
 
 /**
  * Attaches the offline layers to both maps.
@@ -241,31 +265,38 @@ export function setBasemapGameMap(nextMapId: string): void {
 }
 
 /**
- * Filters the tile panes, the water panes, and the elevation-tile lines.
+ * Paints the active theme on both maps.
  *
- * Purpose: Wargame, Atlas, and Scientific recolor the hillshade, the water, and those lines together. A child of the tile pane would be filtered twice.
- * When to use: From `setMainBasemapFilter`.
- * Expected outcome: Both maps' tile panes and water panes use `filter`. The main map's grid pane uses it too. The minimap has no grid pane.
+ * Purpose: Water is a flat color. Land is the theme filter on the tile pane, above the stylesheet contrast.
+ *   Grid lines take the theme color directly, so the land filter does not gray them.
+ * When to use: From `applyActiveMapTheme`, after the maps exist.
+ * Expected outcome: Both water panes use `theme.waterColor`. Both tile panes use the land filter, and their
+ *   child tiles have an empty inline filter so `contrast(1.4)` remains. The grid pane's filter is cleared
+ *   and each grid line uses `theme.gridLineColor`.
  * Exceptions: None. A missing pane is skipped.
  */
-export function filterOfflineBasemapPanes(filter: string): void {
-  applyPaneFilter(mainMap?.getPanes?.()?.tilePane, filter);
-  applyPaneFilter(miniMap?.getPanes?.()?.tilePane, filter);
-  applyPaneFilter(mainMap?.getPane?.(WATER_PANE), filter);
-  applyPaneFilter(miniMap?.getPane?.(WATER_PANE), filter);
-  applyPaneFilter(mainMap?.getPane?.(GRID_PANE), filter);
+export function applyBasemapTheme(theme: MapTheme): void {
+  for (const map of [mainMap, miniMap]) {
+    const water = map?.getPane?.(WATER_PANE);
+    if (water) water.style.background = theme.waterColor;
+    applyTileTheme(map?.getPanes?.()?.tilePane, landTileFilterCss(theme));
+  }
+  const grid = mainMap?.getPane?.(GRID_PANE);
+  if (grid) grid.style.filter = '';
+  for (const line of gridLines) line.setStyle?.({ color: theme.gridLineColor });
 }
 
 async function applyGameMap(mapId: string): Promise<void> {
   const serial = ++requestSerial;
   const nativeZoom = await nativeZoomFor(mapId);
   if (serial !== requestSerial || !leafletRef || !mainMap || !miniMap) return;
+  publishBasemapNativeZoom(nativeZoom);
   const key = `${mapId}:${nativeZoom}`;
   if (key === appliedKey && mainLayer && miniLayer) return;
   appliedKey = key;
   const url = `agentwars-basemap://tiles/${mapId}/{z}/{x}/{y}.webp`;
-  mainLayer = replaceLayer(leafletRef, mainMap, mainLayer, url, nativeZoom, true);
-  miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom, false);
+  mainLayer = replaceLayer(leafletRef, mainMap, mainLayer, url, nativeZoom);
+  miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom);
 }
 
 function replaceLayer(
@@ -274,7 +305,6 @@ function replaceLayer(
   current: OfflineTileLayer | null,
   url: string,
   nativeZoom: number,
-  showAttribution: boolean,
 ): OfflineTileLayer {
   if (current) {
     current.off('tileerror', onTileError);
@@ -285,7 +315,6 @@ function replaceLayer(
     }
   }
   const layer = leaflet.tileLayer(url, {
-    attribution: showAttribution ? ATTRIBUTION : '',
     maxZoom: 16,
     maxNativeZoom: nativeZoom,
     minZoom: 0,
@@ -310,10 +339,14 @@ function ensureSourceGrid(leaflet: OfflineLeaflet, map: OfflineBasemapMap): void
   pane.style.zIndex = '250';
   pane.style.pointerEvents = 'none';
   for (const longitude of SOURCE_MERIDIANS) {
-    leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180)).addTo?.(map);
+    const line = leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180));
+    line?.addTo?.(map);
+    if (line) gridLines.push(line);
   }
   for (const latitude of SOURCE_PARALLELS) {
-    leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0)).addTo?.(map);
+    const line = leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0));
+    line?.addTo?.(map);
+    if (line) gridLines.push(line);
   }
 }
 
@@ -358,7 +391,7 @@ function parallelPositions(latitude: number): Array<[number, number]> {
 function gridStroke(solid: boolean): Record<string, unknown> {
   const stroke: Record<string, unknown> = {
     pane: GRID_PANE,
-    color: GRID_COLOR,
+    color: mapThemeById(DEFAULT_MAP_THEME_ID).gridLineColor,
     weight: 1,
     opacity: 1,
     interactive: false,
@@ -373,7 +406,7 @@ function gridStroke(solid: boolean): Record<string, unknown> {
  *
  * Purpose: Ocean pixels in the hillshade are transparent. An empty Leaflet pane has no box, so its background never paints and the map's gray shows through.
  * When to use: Once per map, before the first tile layer.
- * Expected outcome: A pane covering the map container, behind the moving map pane, filled with `rgb(113, 148, 177)`.
+ * Expected outcome: A pane covering the map container, behind the moving map pane, filled with the active theme's water color.
  * Exceptions: None. A map without pane methods is skipped.
  */
 function ensureWaterPane(map: OfflineBasemapMap): void {
@@ -388,18 +421,18 @@ function ensureWaterPane(map: OfflineBasemapMap): void {
   pane.style.height = '100%';
   pane.style.zIndex = '190';
   pane.style.pointerEvents = 'none';
-  pane.style.background = WATER_COLOR;
+  pane.style.background = mapThemeById(DEFAULT_MAP_THEME_ID).waterColor;
 }
 
 /**
- * Applies one terrain-style filter to a pane.
+ * Puts the land-color filter on a tile pane without removing contrast.
  *
- * Purpose: The style recolors a pane as a whole. Land contrast is a stylesheet rule on the tile images, so this must clear an inline filter with an empty string rather than `none`.
- * When to use: For a tile pane, a water pane, or the main map's grid pane.
- * Expected outcome: The pane uses `filter`. Tile images keep `contrast(1.4)` from `shellChrome.css`. The water and the grid lines do not.
+ * Purpose: The theme recolors the pane. Land contrast is a stylesheet rule on the tile images, so an inline filter must be cleared with an empty string. `none` would remove that contrast.
+ * When to use: From `applyBasemapTheme`, for each map's tile pane.
+ * Expected outcome: The pane uses `filter`. Tile images keep `contrast(1.4)` from `shellChrome.css`.
  * Exceptions: None. A missing pane is skipped.
  */
-function applyPaneFilter(pane: HTMLElement | undefined, filter: string): void {
+function applyTileTheme(pane: HTMLElement | undefined, filter: string): void {
   if (!pane) return;
   const filtered = pane.querySelectorAll<HTMLElement>('.leaflet-layer, .leaflet-tile');
   for (const el of filtered) el.style.filter = '';

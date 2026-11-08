@@ -181,6 +181,8 @@ async function runFirstSession(app, page, report, outDir) {
   }
   await setViewport(app, page, first);
   await page.waitForTimeout(SETTLE_MS.resize);
+  const { runMapThemeScenes } = require('./ui-smoke-map-theme-scenes.cjs');
+  await runMapThemeScenes(page, report, outDir);
 
   await page.click('#console-tab-commanders');
   await parkPointer(page);

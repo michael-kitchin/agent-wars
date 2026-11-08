@@ -463,13 +463,13 @@ export function toolGroupTooltipText(groupId: string): string | null {
 }
 
 /**
- * Purpose: Names the four styles and what they change.
+ * Purpose: Names the four themes and what they change.
  * When to use: The select created in `renderTerrainLegend`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const terrainStyleTooltipText =
-  'Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.';
+export const mapThemeTooltipText =
+  'Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night.';
 
 /**
  * Tip for a build-entry button.

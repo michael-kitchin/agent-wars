@@ -51,6 +51,7 @@ function assertExtractedGeneratedJsonForPack() {
   }
   assertRegionalCatalogZips();
   assertBasemapPacks();
+  assertBasemapVectorDocuments();
 }
 
 /**
@@ -154,6 +155,7 @@ function assertPackagedGeneratedJson(releaseDir = path.join(repoRoot, 'release')
   }
   assertPackagedRegionalZips(packagedDirs, releaseDir);
   assertPackagedBasemapPacks(packagedDirs, releaseDir);
+  assertPackagedBasemapVectors(packagedDirs, releaseDir);
 }
 
 /**
@@ -274,6 +276,64 @@ function refusePackRelative(name, label) {
  * Expected outcome: Returns when each `basemap_pack.json.zip` is present and non-empty.
  * Exceptions: Throws when the global pack or a catalog region pack is absent.
  */
+const BASEMAP_VECTOR_NAMES = ['coastlines', 'coast_edge_mask', 'admin_borders', 'map_labels'];
+
+/**
+ * Checks the four vector zips beside the hillshade packs.
+ *
+ * Purpose: A packaged app draws coastlines, borders, and labels from these zips.
+ * When to use: From the pre-pack check, after the hillshade packs.
+ * Expected outcome: Returns when each zip exists, is non-empty, and its member has schema 1.0.0 and a matching kind.
+ * Exceptions: Throws naming the document when a zip is missing or the member does not match.
+ */
+function assertBasemapVectorDocuments() {
+  const directory = path.join(repoRoot, 'data', 'generated', 'basemap', 'vectors');
+  for (const name of BASEMAP_VECTOR_NAMES) {
+    const zipPath = path.join(directory, `${name}.json.zip`);
+    if (!fs.existsSync(zipPath) || !fs.statSync(zipPath).isFile() || fs.statSync(zipPath).size <= 0) {
+      throw new Error(`generated-data-pack-assert: missing basemap vector ${name}`);
+    }
+    const archive = unzipSync(new Uint8Array(fs.readFileSync(zipPath)));
+    const member = archive[`${name}.json`];
+    if (!member) throw new Error(`generated-data-pack-assert: ${name} zip has no ${name}.json`);
+    let document;
+    try {
+      document = JSON.parse(Buffer.from(member).toString('utf8'));
+    } catch {
+      throw new Error(`generated-data-pack-assert: ${name} member is not json`);
+    }
+    if (!document || document.schema_version !== '1.0.0') {
+      throw new Error(`generated-data-pack-assert: ${name} schema_version is not 1.0.0`);
+    }
+    if (document.kind !== name) throw new Error(`generated-data-pack-assert: ${name} kind is not ${name}`);
+  }
+}
+
+/**
+ * Ensures the packaged resources tree contains the four vector zips.
+ *
+ * Purpose: The pre-pack check reads the repo. This check reads the copy under `release`.
+ * When to use: From the post-pack check, after the hillshade packs. The zips sit in `basemap/vectors`, not inside `basemap/global`.
+ * Expected outcome: Returns when each zip is present and non-empty.
+ * Exceptions: Throws naming the missing documents.
+ */
+function assertPackagedBasemapVectors(packagedDirs, releaseDir) {
+  const failures = [];
+  for (const name of BASEMAP_VECTOR_NAMES) {
+    const present = packagedDirs.some((dir) => {
+      const zipPath = path.join(dir, 'basemap', 'vectors', `${name}.json.zip`);
+      return fs.existsSync(zipPath) && fs.statSync(zipPath).isFile() && fs.statSync(zipPath).size > 0;
+    });
+    if (!present) failures.push(name);
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      `generated-data-pack-assert: packaged app is missing basemap vectors: ${failures.join(', ')}. ` +
+        `Searched under ${releaseDir}`,
+    );
+  }
+}
+
 function assertPackagedBasemapPacks(packagedDirs, releaseDir) {
   const failures = [];
   for (const mapId of ['global', ...catalogRegionIds()]) {

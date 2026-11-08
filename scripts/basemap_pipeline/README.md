@@ -6,7 +6,7 @@ This package builds two things. The prototype commands write a one-region previe
 
 Gray land with transparent water, in two styles. `plain` is a standard hillshade. `stylized` flattens gentle slopes, doubles the contrast of steep slopes, and applies a light blur: a Gaussian sigma of 0.375 pixels on the relief and 1 pixel on the slope used for flattening. Plain does not use that blur. Both smooth elevation along the crest (`ridge_smooth_sigma_px` is 6 pixels at the zoom being drawn) so a ridgeline stays continuous without blurring across the slope. Both use the same light, the same gray ramp, and the same relief: native slopes are doubled (`relief_exaggeration` is 2), and each coarser zoom multiplies that by `zoom_exaggeration_step` (1.2). The comparison is flattening, contrast, and that light blur.
 
-An app that uses the tiles must draw its water color underneath the tile layer. The preview page and the composites draw `PREVIEW_WATER_RGB` from `basemap_settings.py` for that purpose.
+An app that uses the tiles must draw its water color underneath the tile layer. `PREVIEW_WATER_RGB` in `basemap_settings.py` is only the color the pipeline preview and the composites use. The app's water color comes from the active map theme.
 
 ## Inputs
 
@@ -73,7 +73,7 @@ One region at a time. A region that crosses the antimeridian, or is wider than 1
 
 ## Licensing
 
-Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.
+Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water, coastlines, borders, and place names: Made with Natural Earth.
 
 ## Match packs
 
@@ -88,3 +88,18 @@ python -m scripts.basemap_pipeline.basemap_cli global-pack --gmted-dir F:/Data/g
 `--skip-existing` keeps a partition whose settings hash and sources hash still match. A tile is water when every pixel has alpha 0, flat land when every pixel is opaque and gray 206 through 214, and shaded otherwise. Only shaded tiles are stored. Flat land is `land.webp` and water is `water.webp`. A tile the index does not name is water.
 
 The tree is `data/generated/basemap/global/` and `data/generated/basemap/regions/<id>/`: `basemap_pack.json.zip`, `indexes.json.zip`, `land.webp`, `water.webp`, and one zip per partition that has shaded tiles.
+
+## Vector documents
+
+These commands write coastlines, the coast edge mask, and borders. They do not regenerate tiles. Water, coastlines, and the mask come from the same Natural Earth ocean and lakes the tiles use (`ne_10m_ocean.shp` and `ne_10m_lakes.shp`). Borders come from the land-boundary lines, not from country or state polygons: `ne_10m_admin_0_boundary_lines_land.shp` and `ne_10m_admin_1_states_provinces_lines.shp`. A `featurecla` containing "disputed" or "indefinite" is stored in that level's disputed group.
+
+Coastline bands are zooms 0–3 in 360° cells, 3–5 in 30° cells, 5–7 in 10° cells, and 7 upward in 2° cells. National borders start at zoom 4 (10°, then 2°). State borders use 5° cells through zoom 9 and 1° cells after that. The mask is one 2° grid. Each zip is one compact JSON member under `data/generated/basemap/vectors/`.
+
+```powershell
+python -m scripts.basemap_pipeline.vector_cli coast --data-root F:/Data --output data/generated/basemap/vectors --work .test/basemap/vectors/work
+python -m scripts.basemap_pipeline.vector_cli mask --data-root F:/Data --output data/generated/basemap/vectors --work .test/basemap/vectors/work
+python -m scripts.basemap_pipeline.vector_cli borders --data-root F:/Data --output data/generated/basemap/vectors --work .test/basemap/vectors/work
+python -m scripts.basemap_pipeline.vector_cli all --data-root F:/Data --output data/generated/basemap/vectors --work .test/basemap/vectors/work
+```
+
+`all` runs coast, mask, borders, and labels. The counts and the zip size are printed and written to `.test/basemap/vectors/work/report.json`. `labels` reads `ne_10m_geography_regions_polys.shp`, `ne_10m_admin_0_countries.shp`, and `ne_10m_admin_1_states_provinces.shp`, and writes `map_labels.json.zip`. Each feature's first anchor is its primary point.

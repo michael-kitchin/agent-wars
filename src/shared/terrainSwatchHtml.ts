@@ -48,7 +48,7 @@ function pipelineKindFromRaw(kind: string | null | undefined): PipelineTerrainKi
 /**
  * Returns the empty swatch element for one map-key kind.
  *
- * Purpose: The color is applied when the tooltip is shown, from the terrain style active at that moment.
+ * Purpose: The color is applied when the tooltip is shown, from the active map theme's hex palette.
  * When to use: Before a terrain name in tooltip HTML.
  * Expected outcome: A span whose `data-terrain-kind` is the pipeline kind. No background yet.
  * Exceptions: None.

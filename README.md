@@ -175,6 +175,9 @@ The offline pipeline samples rasters with rasterio and vector layers with Shapel
 | Topography          | Mountain cells. The 50 km grids where a hex edge is at least 100 km, and the 5 km grids otherwise. | [EarthEnv](https://www.earthenv.org/topography) ruggedness, slope, and elevation from GMTED2010                               |
 | Climate             | Each hex's weather in each month                                                                  | [CHELSA V2.1](https://www.chelsa-climate.org/datasets/chelsa_climatologies) 1981-2010 monthly mean temperature and precipitation, averaged over a 10-arc-minute box |
 | Water               | Water, coast, and shoreline wetlands                                                              | [Natural Earth](https://www.naturalearthdata.com) 1:10m ocean and lakes                                                       |
+| Coastlines          | Hairline coast and lake shores on the map                                                         | Natural Earth 1:10m ocean and lakes                                                                                           |
+| Borders             | National borders from zoom 4, and state borders in the tactical view                              | Natural Earth 1:10m land boundaries and state and province lines                                                              |
+| Place names         | Continent, country, and state names on the map                                                    | Natural Earth 1:10m geography regions, countries, and states and provinces. The faces are bundled Noto Sans and Noto Serif.   |
 | Cities              | Urban cells, and so the economy                                                                   | Natural Earth urban areas, from 2002–2003 MODIS satellite data at 1 km                                                        |
 | Ports and airfields | Where naval and air units are built and based                                                     | Natural Earth airports and ports                                                                                              |
 | Roads and railroads | Infantry and armor enter a battle cell for half a point on a road and a third on a rail.          | Natural Earth roads and railroads                                                                                             |
@@ -184,7 +187,7 @@ The offline pipeline samples rasters with rasterio and vector layers with Shapel
 
 Strategic hexes are assigned a per-month weather from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat. The mean is the CHELSA 30-arc-second cells in that box, for land and water. Temperature is converted from kelvin. A centroid the raster does not cover copies the nearest sampled hex in that pack.
 
-Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Map place names use the bundled Noto Sans and Noto Serif faces listed there.
 
 ### How the Economy Works
 

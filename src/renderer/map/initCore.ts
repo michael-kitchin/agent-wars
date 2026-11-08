@@ -9,8 +9,13 @@ import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { shouldRefreshStackCalloutOnShiftKeydown } from '../../shared/stackCalloutShiftKeydown';
-import { basemapCssFilterForStyle } from '../../shared/basemapStyleLogic';
-import { getActiveTerrainStyleBasemapId, getActiveTerrainStyleId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
+import { renderTerrainLegend } from '../rendering/terrainVisualStyles';
+import { setAdminBorderTacticalReader } from './adminBorderLayers';
+import { OFFLINE_HILLSHADE_ID } from './basemapLayer';
+import { bindMapLabelLayer } from './mapLabelLayer';
+import { applyActiveMapTheme } from './mapThemeApply';
+import { shouldRenderTacticalHexes } from './terrainView';
+import { getMainLeafletMap, initWorldLeafletMaps } from './worldLeafletMap';
 import {
   clearDeferredStackCalloutTimer,
   clearDeferredStackCalloutTimerForPressAway,
@@ -18,7 +23,6 @@ import {
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
 import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
-import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 import { installControlTooltip } from '../chrome/controlTooltip';
 import { showConsoleTab } from '../chrome/consoleFrame';
 import { consoleTabIdForLiveMatchLaunch } from '../../shared/consoleTabState';
@@ -365,14 +369,15 @@ function tacticalBattlesDialogIsOpen(): boolean {
 export function wireInitCore(deps: InitCoreDeps): void {
   try {
     installControlTooltip();
-    initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
-    setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
+    setAdminBorderTacticalReader(shouldRenderTacticalHexes);
+    initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), OFFLINE_HILLSHADE_ID);
+    bindMapLabelLayer(() => deps.requestRedraw());
+    applyActiveMapTheme();
     const leg = document.getElementById('terrain-legend');
     if (leg) {
       renderTerrainLegend(leg, {
-        onStyleChanged: () => {
-          setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
-          setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
+        onThemeChanged: () => {
+          applyActiveMapTheme();
           deps.requestRedraw();
         },
       });

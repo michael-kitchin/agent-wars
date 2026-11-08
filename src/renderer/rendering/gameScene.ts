@@ -11,6 +11,8 @@ import { updateGameStateSidebar } from '../core/uiState';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { hideStackCallout } from '../map/stackCallout';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
+import { syncAdminBorderLayers } from '../map/adminBorderLayers';
+import { drawMapLabels, resizeMapLabelCanvas } from '../map/mapLabelLayer';
 import { setTacticalTransportVectorsSuppressed, syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
 import { hideBuildEntryLayer } from '../map/terrainView';
 import { drawNewGameMapPreview, setNewGameMapPreviewRepaint } from '../map/newGameMapPreviewRendering';
@@ -434,6 +436,7 @@ function drawGameScene(
   state: GameStateSnapshot
 ): void {
   syncTacticalTransportVectorLeafletLayer();
+  syncAdminBorderLayers();
   ctx.clearRect(0, 0, width, height);
   if (S.tacticalBattleSnapshot) {
     maybeScheduleTacticalAnnihilationExit();
@@ -706,6 +709,7 @@ function resizeAndRedraw(): void {
   const h = Math.max(1, Math.floor(rect.height));
 
   S.canvasMetrics = { w, h, dpr };
+  resizeMapLabelCanvas(S.canvasMetrics);
 
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -718,6 +722,7 @@ function resizeAndRedraw(): void {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
   paintMapFrame(ctx, w, h);
+  drawMapLabels();
 }
 
 /**
@@ -742,6 +747,7 @@ function redraw(): void {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
   paintMapFrame(ctx, w, h);
+  drawMapLabels();
 }
 
 /**
@@ -761,6 +767,7 @@ function paintMapFrame(ctx: CanvasRenderingContext2D, w: number, h: number): voi
     drawNewGameMapPreview(ctx, requestRedraw);
     hideStackCallout();
     syncTacticalTransportVectorLeafletLayer();
+    syncAdminBorderLayers();
   } else if (!S.gameState) {
     drawLoadingScene(ctx, w, h);
   } else {

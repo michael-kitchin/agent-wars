@@ -2,8 +2,10 @@
  * Leaflet main map + minimap (global `L` from static/vendor/leaflet). The offline hillshade lives in basemapLayer.ts.
  */
 
-import { basemapNeedsRemountForMaps } from '../../shared/basemapStyleLogic';
-import { bindOfflineBasemap, filterOfflineBasemapPanes } from './basemapLayer';
+import { bindAdminBorderLayers } from './adminBorderLayers';
+import { bindOfflineBasemap, onBasemapNativeZoomChanged } from './basemapLayer';
+import type { VectorHostMap, VectorLeaflet } from './bucketedVectorLayer';
+import { bindCoastlineLayers, setCoastEdgeMaskNativeZoom } from './coastlineLayers';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
   alignLngToDrawReference,
@@ -145,25 +147,6 @@ let viewportRect: VendorViewportRect | null = null;
 let onMainViewChanged: (() => void) | null = null;
 
 /**
- * Documents the module-scope binding `mountedMainBasemapProviderId` (mountedMainBasemapProviderId: string | null).
-
- * Purpose: Lets a style change skip a main-map remount when that map already shows the requested provider id.
- * When to use: Together with the minimap id in `setMainBasemapByProviderId`. Set when the maps are created and when that function mounts the hillshade.
- * Expected outcome: The catalog id of the main map tiles, or null when none are mounted.
- * Exceptions: None.
- */
-let mountedMainBasemapProviderId: string | null = null;
-/**
- * Documents the module-scope binding `mountedMiniBasemapProviderId` (mountedMiniBasemapProviderId: string | null).
-
- * Purpose: Both maps record the provider id, so a style change skips remount only when each map already shows the requested id.
- * When to use: Together with the main id in `setMainBasemapByProviderId`. Set when the maps are created and when that function mounts the hillshade.
- * Expected outcome: The catalog id of the minimap tiles, or null when none are mounted.
- * Exceptions: None.
- */
-let mountedMiniBasemapProviderId: string | null = null;
-
-/**
  * Defines the `notifyMainViewChanged` function shape (function notifyMainViewChanged(): void).
 
  * Purpose: Supports maintainability by documenting why `notifyMainViewChanged` exists.
@@ -188,22 +171,6 @@ function getL(): GlobalLeafletFactory {
   const leafletRef = (globalThis as unknown as { L?: GlobalLeafletFactory }).L;
   if (!leafletRef) throw new Error('Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js');
   return leafletRef;
-}
-
-/**
- * Mounts the offline hillshade when the recorded provider id changes.
- *
- * Purpose: Terrain styles share one provider, so a style change does not remount.
- * When to use: After map init when the terrain style select changes.
- * Expected outcome: Both maps show the offline tiles unless they already show `providerId`.
- * Exceptions: Returns without throwing when a map is missing.
- */
-export function setMainBasemapByProviderId(providerId: string): void {
-  if (!mainMap || !miniMap) return;
-  if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
-  bindOfflineBasemap(getL() as unknown as Parameters<typeof bindOfflineBasemap>[0], mainMap, miniMap);
-  mountedMainBasemapProviderId = providerId;
-  mountedMiniBasemapProviderId = providerId;
 }
 
 /**
@@ -255,6 +222,8 @@ export function initWorldLeafletMaps(
     keyboard: false,
     /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
     zoomControl: false,
+    /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
+    attributionControl: false,
     /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
     zoomAnimation: false,
     fadeAnimation: false,
@@ -262,13 +231,14 @@ export function initWorldLeafletMaps(
   });
 
   const initialId = initialBasemapProviderId ?? 'offline_hillshade';
-  mountedMainBasemapProviderId = initialId;
-  mountedMiniBasemapProviderId = mountedMainBasemapProviderId;
+  if (initialId !== 'offline_hillshade') {
+    console.error('[agent-wars] the hillshade is the only basemap', initialId);
+  }
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
   try {
-    // Show real-world distance context when Leaflet scale control is available, beside the attribution.
+    // Show real-world distance on the scale, to the left of the zoom buttons.
     leafletRef.control
       .scale({
         position: 'bottomright',
@@ -296,6 +266,11 @@ export function initWorldLeafletMaps(
   });
 
   bindOfflineBasemap(leafletRef as unknown as Parameters<typeof bindOfflineBasemap>[0], mainMap, miniMap);
+  const vectorLeaflet = leafletRef as unknown as VectorLeaflet;
+  const vectorMain = mainMap as unknown as VectorHostMap;
+  bindCoastlineLayers(vectorLeaflet, vectorMain, miniMap as unknown as VectorHostMap);
+  bindAdminBorderLayers(vectorLeaflet, vectorMain);
+  onBasemapNativeZoomChanged(setCoastEdgeMaskNativeZoom);
 
   miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
   miniMap.setZoom(miniMap.getZoom());
@@ -376,42 +351,6 @@ export function getMainLeafletMap(): VendorLeafletMap | null {
  */
 export function getMiniLeafletMap(): VendorLeafletMap | null {
   return miniMap;
-}
-
-/**
- * Applies a CSS filter to one Leaflet tile pane and clears leftover per-tile filters.
- *
- * Purpose: Wargame invert must darken raster tiles without touching hex overlay, units, or chrome.
- * When to use: From `setMainBasemapFilter` for the main map and minimap.
- * Expected outcome: `pane.style.filter` equals `filter`. A child tile's inline filter is set to an empty string, which leaves the stylesheet `contrast(1.4)` on the land images. `none` would remove that contrast.
- * Exceptions: Returns without throwing when the map or tile pane is missing.
- */
-function applyTilePaneFilter(map: VendorLeafletMap | null, filter: string): void {
-  try {
-    const pane = map?.getPanes?.()?.tilePane;
-    if (!pane) return;
-    const oldFiltered = pane.querySelectorAll<HTMLElement>('.leaflet-layer, .leaflet-tile');
-    for (const el of oldFiltered) el.style.filter = '';
-    pane.style.filter = filter;
-  } catch {
-    /* tile pane unavailable */
-  }
-}
-
-/**
- * Defines the `setMainBasemapFilter` function shape (export function setMainBasemapFilter(filter: string): void).
-
- * Purpose: Darkens or clears raster tiles for Wargame without inverting hex overlays, units, or map chrome.
- * When to use: After map init and on terrain style change, with `basemapCssFilterForStyle`.
- * Expected outcome: Main and minimap tile panes and water panes receive `filter`, and so does the main map's elevation-tile pane. Leftover `#main-map` container filters are cleared to empty.
- * Exceptions: Missing tile panes are ignored; the invert string is never assigned to the map container.
- */
-export function setMainBasemapFilter(filter: string): void {
-  const mapEl = document.getElementById('main-map');
-  if (mapEl) mapEl.style.filter = '';
-  applyTilePaneFilter(mainMap, filter);
-  applyTilePaneFilter(miniMap, filter);
-  filterOfflineBasemapPanes(filter);
 }
 
 /**

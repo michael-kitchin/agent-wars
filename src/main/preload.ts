@@ -5,6 +5,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../shared/commanderStatus';
+import type { BasemapVectorName } from '../shared/vectorPackTypes';
 import type { DismissMercenaryResult } from '../shared/mercenaryDismiss';
 import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type { LoadGameResult, SaveGameResult } from '../shared/ipc/saveLoadTypes';
@@ -80,6 +81,7 @@ const IPC_GAME = {
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
   basemapNativeZoom: 'game:basemapNativeZoom',
+  basemapVectorDocument: 'game:basemapVectorDocument',
   basemapPrefetch: 'game:basemapPrefetch',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',
@@ -317,6 +319,16 @@ listGameMaps: (): Promise<GameMapListEntry[]> =>
    */
   basemapNativeZoom: (gameMapId: string): Promise<{ nativeZoom: 7 | 9 }> =>
     ipcRenderer.invoke(IPC_GAME.basemapNativeZoom, gameMapId),
+  /**
+   * Asks for the JSON of one basemap vector document.
+   *
+   * Purpose: The renderer draws coastlines, borders, and labels from this text.
+   * When to use: When one of those layers is first created.
+   * Expected outcome: The member text, or null when the document is missing.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+  basemapVectorDocument: (name: BasemapVectorName): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_GAME.basemapVectorDocument, name),
   /**
    * Asks the main process to unpack the battle's regional tiles.
    *

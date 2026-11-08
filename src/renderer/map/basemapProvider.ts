@@ -35,11 +35,14 @@ displayName: string;
    */
 urlTemplate: string;
     /**
-   * Specifies the contract for the `attributionHtml` member (attributionHtml: string;).
-
-   * Contract: Describes stable behavior for callers of `attributionHtml` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * HTML a caller could show as a map credit.
+   *
+   * Contract: The map does not display this. The elevation and Natural Earth credits stay in THIRD-PARTY-NOTICES.md, so
+   *   the hillshade entry keeps an empty string.
+   * When to use: Read only if a future surface is meant to print a credit. Do not pass it to a Leaflet attribution
+   *   control.
+   * Expected outcome: An empty string for the hillshade. A non-empty value would be a credit the map must still not
+   *   print.
    * Exceptions: None.
    */
 attributionHtml: string;
@@ -85,8 +88,7 @@ export const RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[] = [
     id: 'offline_hillshade',
     displayName: 'Hillshade',
     urlTemplate: 'agentwars-basemap://tiles/{gameMapId}/{z}/{x}/{y}.webp',
-    attributionHtml:
-      'Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.',
+    attributionHtml: '',
     maxZoom: 16,
     minZoom: 0,
   },

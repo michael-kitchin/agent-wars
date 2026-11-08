@@ -222,12 +222,12 @@ export const mapProductionModeTooltipText =
 /**
  * The Legend button's tip.
  *
- * Purpose: Says the button opens and closes the terrain legend, which holds the terrain style choice.
+ * Purpose: Says the button opens and closes the terrain legend, which holds the map theme.
  * When to use: `#map-legend-toggle`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const mapLegendToggleTooltipText = 'Show or hide the terrain legend and its style choice.';
+export const mapLegendToggleTooltipText = 'Show or hide the terrain legend and its map theme.';
 
 /**
  * The new-game setup panel's grip tip.

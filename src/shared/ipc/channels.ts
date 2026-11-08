@@ -20,6 +20,7 @@ export const IPC_GAME = {
   listGameMaps: 'game:listGameMaps',
   newGameMapPreview: 'game:newGameMapPreview',
   basemapNativeZoom: 'game:basemapNativeZoom',
+  basemapVectorDocument: 'game:basemapVectorDocument',
   basemapPrefetch: 'game:basemapPrefetch',
   newGame: 'game:newGame',
   endMatch: 'game:endMatch',

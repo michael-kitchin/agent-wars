@@ -16,6 +16,7 @@ import type {
   SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
+import type { BasemapVectorName } from '../vectorPackTypes';
 import type { DismissMercenaryResult } from '../mercenaryDismiss';
 import type { HexHireView, HireMutationResult, HireOrderRequest } from './mercenaryTypes';
 import type { CommanderPlanningMode, CommanderPoolSnapshot } from '../commanderStatus';
@@ -278,6 +279,15 @@ listGameMaps: () => Promise<GameMapListEntry[]>;
    * Exceptions: Rejects on IPC transport failures.
    */
   basemapNativeZoom: (gameMapId: string) => Promise<{ nativeZoom: 7 | 9 }>;
+  /**
+   * JSON text of one basemap vector document.
+   *
+   * Contract: `null` when the name is unknown, the zip is missing, or the zip cannot be read.
+   * When to use: When a coastline, mask, border, or label layer is first shown.
+   * Expected outcome: The UTF-8 member `<name>.json`, or null.
+   * Exceptions: Rejects on IPC transport failures.
+   */
+  basemapVectorDocument: (name: BasemapVectorName) => Promise<string | null>;
   /**
    * Starts unpacking the regional partitions under a battle.
    *

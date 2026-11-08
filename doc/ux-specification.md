@@ -48,7 +48,7 @@ Scenes that click units find them through the game state and the main map (`ui-s
 | Map pan, zoom, or clicks | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md), [selection-model.md](ux/selection-model.md) | [map-surface.md](ux/map-surface.md) |
 | Range, path, order, or combat drawings | [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [map-overlays.md](ux/map-overlays.md) |
 | The minimap panel or its map-mode tabs | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
-| The terrain legend or terrain style | [map-surface.md](ux/map-surface.md) | [terrain-legend.md](ux/terrain-legend.md) |
+| The terrain legend or map theme | [map-surface.md](ux/map-surface.md) | [terrain-legend.md](ux/terrain-legend.md) |
 | Hex or order tooltips | [order-lifecycle.md](ux/order-lifecycle.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [hex-tooltips.md](ux/hex-tooltips.md) |
 | A button, field, checkbox, or dropdown tip | [control-tooltips.md](ux/control-tooltips.md) | the element document for that control |
 | The stack callout | [selection-model.md](ux/selection-model.md), [input-map.md](ux/input-map.md) | [stack-callout.md](ux/stack-callout.md) |

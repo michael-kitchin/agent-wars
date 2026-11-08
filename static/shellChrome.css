@@ -106,12 +106,23 @@ body {
   mix-blend-mode: normal;
   filter: contrast(1.4);
 }
+/* Units, control outlines, terrain fill, and animations. Above the place names, and above every Leaflet pane in #main-map. */
 #map-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   z-index: 2;
+  display: block;
+  pointer-events: none;
+}
+/* Place names. Above the hillshade, coastline, and borders, and under the hex canvas. */
+#map-label-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
   display: block;
   pointer-events: none;
 }
@@ -266,8 +277,8 @@ body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
 body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Leaflet's bottom-right corner keeps the map's 12px inset. The zoom buttons are the rightmost item, then the scale,
-   then the attribution, on one bottom line. */
+/* Leaflet's bottom-right corner keeps the map's 12px inset. The zoom buttons are the rightmost item, and the scale
+   sits to their left. */
 #main-map .leaflet-bottom.leaflet-right {
   bottom: 12px;
   right: 12px;

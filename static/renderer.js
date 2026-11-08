@@ -16681,34 +16681,650 @@
     );
   }
 
-  // src/shared/basemapStyleLogic.ts
-  var ATLAS_BASEMAP_CSS_FILTER = "saturate(0.78) contrast(1.2) brightness(1.03)";
-  var SCIENTIFIC_BASEMAP_CSS_FILTER = "grayscale(1) contrast(1.18) brightness(1.08)";
-  var WARGAME_BASEMAP_CSS_FILTER = "invert(1) hue-rotate(180deg)";
-  function basemapNeedsRemount(currentId, nextId) {
-    return currentId !== nextId;
+  // src/shared/mapLabelRules.ts
+  var COUNTRY_LABEL_MIN_ZOOM = 4;
+  var LABEL_MIN_ZOOM_SLACK = 1.5;
+  var MAX_LABELS_PER_FRAME = 150;
+  var LABEL_COLLISION_PADDING_PX = 4;
+  var LABEL_VIEW_INSET_PX = 24;
+  function visibleLabelKinds(zoom, tacticalView) {
+    if (tacticalView) return ["country", "state"];
+    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
+    return ["continent", "country"];
   }
-  function basemapNeedsRemountForMaps(mainProviderId, miniProviderId, nextProviderId) {
-    return basemapNeedsRemount(mainProviderId, nextProviderId) || basemapNeedsRemount(miniProviderId, nextProviderId);
+  var COUNTRY_LABEL_OPACITY = 2 / 3;
+  var STATE_LABEL_OPACITY = 1 / 2;
+  var CONTINENT_BESIDE_COUNTRY_OPACITY = 1 / 2;
+  function labelKindOpacity(kind, zoom, tacticalView) {
+    if (kind === "country") return COUNTRY_LABEL_OPACITY;
+    if (kind === "state") return STATE_LABEL_OPACITY;
+    if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
+    return 1;
   }
-  function basemapCssFilterForStyle(styleId) {
-    if (styleId === "wargame") return WARGAME_BASEMAP_CSS_FILTER;
-    if (styleId === "atlas") return ATLAS_BASEMAP_CSS_FILTER;
-    if (styleId === "scientific") return SCIENTIFIC_BASEMAP_CSS_FILTER;
-    return "";
+  var METERS_PER_PIXEL_Z0 = 156543.03392804097;
+  var MAP_LABEL_KIND_STYLES = {
+    continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, uppercase: true },
+    country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, uppercase: true },
+    state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, uppercase: false }
+  };
+  function labelDisplayText(feature) {
+    return MAP_LABEL_KIND_STYLES[feature.kind].uppercase ? feature.name.toLocaleUpperCase("en") : feature.name;
+  }
+  function mercatorMetersPerPixel(zoom) {
+    return METERS_PER_PIXEL_Z0 / 2 ** zoom;
+  }
+
+  // src/shared/adminBorderRules.ts
+  function adminBorderGroupsForView(zoom, tacticalView) {
+    const kinds = visibleLabelKinds(zoom, tacticalView);
+    const groups = [];
+    if (kinds.includes("country")) groups.push("country", "country_disputed");
+    if (kinds.includes("state")) groups.push("state", "state_disputed");
+    return groups;
+  }
+
+  // src/shared/vectorPackTypes.ts
+  var ADMIN_BORDER_GROUP_IDS = ["country", "country_disputed", "state", "state_disputed"];
+
+  // src/shared/vectorPackDecode.ts
+  var SCHEMA_VERSION = "1.0.0";
+  var LONGITUDE_WINDOWS = [
+    { lo: -540, hi: -180, offset: -360 },
+    { lo: -180, hi: 180, offset: 0 },
+    { lo: 180, hi: 540, offset: 360 }
+  ];
+  function decodePart(part, quantumDeg, lngOffset) {
+    if (part.length < 4 || part.length % 2 !== 0) return [];
+    const points = [];
+    let lat = part[0] * quantumDeg;
+    let lng = part[1] * quantumDeg + lngOffset;
+    points.push([lat, lng]);
+    for (let index = 2; index < part.length; index += 2) {
+      lat += part[index] * quantumDeg;
+      lng += part[index + 1] * quantumDeg;
+      points.push([lat, lng]);
+    }
+    return points;
+  }
+  function coastlineLodForZoom(pack, zoom) {
+    return pack.lods.find((lod) => lod.minZoom <= zoom && (lod.maxZoom === null || zoom < lod.maxZoom)) ?? null;
+  }
+  function visibleCellRefs(view, cellDeg, maxCells) {
+    if (maxCells <= 0 || view.south > view.north) return [];
+    const south = Math.max(-WEB_MERCATOR_MAX_ABS_LAT, view.south);
+    const north = Math.min(WEB_MERCATOR_MAX_ABS_LAT, view.north);
+    if (south > north) return [];
+    const west = view.west;
+    let east = view.east;
+    if (east < west) east += 360;
+    if (cellDeg >= 360) return [{ key: "0:0", lngOffset: 0 }];
+    const refs = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const window2 of LONGITUDE_WINDOWS) {
+      const lo = Math.max(west, window2.lo);
+      const hi = Math.min(east, window2.hi);
+      if (!(hi > lo)) continue;
+      appendCells(refs, seen, south, north, lo - window2.offset, hi - window2.offset, window2.offset, cellDeg, maxCells);
+      if (refs.length >= maxCells) break;
+    }
+    return refs;
+  }
+  function parseCoastlinePack(value) {
+    const record = requireRecord(value, "coastlines");
+    requireIdentity(record, "coastlines");
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "coastlines",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      lods: requireLods(record)
+    };
+  }
+  function parseCoastEdgeMaskPack(value) {
+    const record = requireRecord(value, "coast_edge_mask");
+    requireIdentity(record, "coast_edge_mask");
+    const cellsValue = record.cells;
+    if (!isRecord(cellsValue)) throw new Error("cells is not an object");
+    const cells = {};
+    for (const [key, cell] of Object.entries(cellsValue)) {
+      if (!isRecord(cell)) throw new Error(`cells ${key} is not an object`);
+      cells[key] = {
+        water: requirePolygons(cell.water, "water"),
+        land: requirePolygons(cell.land, "land")
+      };
+    }
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "coast_edge_mask",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      cellDeg: requireNumber(record, "cell_deg"),
+      cells
+    };
+  }
+  function parseAdminBorderPack(value) {
+    const record = requireRecord(value, "admin_borders");
+    requireIdentity(record, "admin_borders");
+    const groupsValue = record.groups;
+    if (!Array.isArray(groupsValue)) throw new Error("groups is not an array");
+    const byId = /* @__PURE__ */ new Map();
+    for (const group of groupsValue) {
+      if (!isRecord(group)) throw new Error("group is not an object");
+      const id = group.id;
+      if (!isBorderGroupId(id)) throw new Error(`id ${String(id)} is not a border group`);
+      byId.set(id, parseLodList(group.lods));
+    }
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      kind: "admin_borders",
+      quantumDeg: requireNumber(record, "quantum_deg"),
+      groups: ADMIN_BORDER_GROUP_IDS.map((id) => ({ id, lods: byId.get(id) ?? [] }))
+    };
+  }
+  function appendCells(refs, seen, south, north, lo, hi, lngOffset, cellDeg, maxCells) {
+    const start = Math.max(lo, -180);
+    const end = Math.min(hi, 180);
+    if (!(end > start)) return;
+    const row0 = rowOf(south, cellDeg);
+    const row1 = rowOf(north, cellDeg);
+    const col0 = Math.floor((start + 180) / cellDeg);
+    const col1 = Math.floor((end - 1e-9 + 180) / cellDeg);
+    for (let row = row0; row <= row1; row += 1) {
+      for (let col = col0; col <= col1; col += 1) {
+        const key = `${row}:${col}`;
+        const id = `${lngOffset}:${key}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        refs.push({ key, lngOffset });
+        if (refs.length >= maxCells) return;
+      }
+    }
+  }
+  function rowOf(lat, cellDeg) {
+    const lastRow = Math.floor(180 / cellDeg) - 1;
+    const row = Math.floor((lat + 90) / cellDeg);
+    if (row < 0) return 0;
+    if (row > lastRow) return lastRow;
+    return row;
+  }
+  function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function requireRecord(value, label) {
+    if (!isRecord(value)) throw new Error(`${label} document is not an object`);
+    return value;
+  }
+  function requireIdentity(record, kind) {
+    if (record.schema_version !== SCHEMA_VERSION) {
+      throw new Error(`schema_version ${String(record.schema_version)} is not ${SCHEMA_VERSION}`);
+    }
+    if (record.kind !== kind) throw new Error(`kind ${String(record.kind)} is not ${kind}`);
+  }
+  function requireNumber(record, field) {
+    const value = record[field];
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${field} is not a number`);
+    return value;
+  }
+  function isBorderGroupId(value) {
+    return typeof value === "string" && ADMIN_BORDER_GROUP_IDS.includes(value);
+  }
+  function requireLods(record) {
+    return parseLodList(record.lods);
+  }
+  function parseLodList(value) {
+    if (!Array.isArray(value)) throw new Error("lods is not an array");
+    return value.map((lod) => {
+      if (!isRecord(lod)) throw new Error("lod is not an object");
+      const minZoom = lod.min_zoom;
+      const maxZoom = lod.max_zoom;
+      const cellDeg = lod.cell_deg;
+      if (typeof minZoom !== "number") throw new Error("min_zoom is not a number");
+      if (maxZoom !== null && typeof maxZoom !== "number") throw new Error("max_zoom is not a number or null");
+      if (typeof cellDeg !== "number") throw new Error("cell_deg is not a number");
+      return { minZoom, maxZoom, cellDeg, cells: parseCells(lod.cells) };
+    });
+  }
+  function parseCells(value) {
+    if (!isRecord(value)) throw new Error("cells is not an object");
+    const cells = {};
+    for (const [key, parts] of Object.entries(value)) {
+      if (!Array.isArray(parts)) throw new Error(`cells ${key} is not an array`);
+      cells[key] = parts.map((part) => {
+        if (!Array.isArray(part) || part.some((item) => typeof item !== "number")) throw new Error("part is not a number list");
+        return part;
+      });
+    }
+    return cells;
+  }
+  function requirePolygons(value, field) {
+    if (!Array.isArray(value)) throw new Error(`${field} is not an array`);
+    return value.map((polygon) => {
+      if (!Array.isArray(polygon)) throw new Error(`${field} polygon is not an array`);
+      return polygon.map((ring) => {
+        if (!Array.isArray(ring) || ring.some((item) => typeof item !== "number")) {
+          throw new Error(`${field} ring is not a number list`);
+        }
+        return ring;
+      });
+    });
+  }
+
+  // src/shared/mapThemes.ts
+  var MAP_THEMES = [
+    {
+      id: "standard",
+      label: "Standard",
+      waterColor: "rgb(163, 199, 223)",
+      landShadowRgb: [92, 90, 85],
+      landHighlightRgb: [251, 250, 247],
+      coastlineColor: "#6d8ea6",
+      countryBorderColor: "#4e6273",
+      stateBorderColor: "rgba(78, 98, 115, 0.7)",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "sans",
+      labelColors: {
+        continent: "rgba(70, 74, 82, 0.55)",
+        country: "#3b3f46",
+        state: "#686d76",
+        halo: "rgba(255, 255, 255, 0.85)"
+      }
+    },
+    {
+      id: "topographic",
+      label: "Topographic",
+      waterColor: "rgb(166, 217, 239)",
+      landShadowRgb: [107, 85, 54],
+      landHighlightRgb: [251, 246, 228],
+      coastlineColor: "#3f8fc0",
+      countryBorderColor: "#6e5340",
+      stateBorderColor: "rgba(110, 83, 64, 0.65)",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "serif",
+      labelColors: {
+        continent: "rgba(92, 70, 44, 0.55)",
+        country: "#4a3a28",
+        state: "#6e5a43",
+        halo: "rgba(251, 246, 228, 0.9)"
+      }
+    },
+    {
+      id: "nautical",
+      label: "Nautical",
+      waterColor: "rgb(227, 241, 248)",
+      landShadowRgb: [122, 100, 51],
+      landHighlightRgb: [251, 231, 166],
+      coastlineColor: "#2f3a40",
+      countryBorderColor: "#1e4d78",
+      stateBorderColor: "rgba(30, 77, 120, 0.55)",
+      gridLineColor: "rgba(48, 56, 64, 0.15)",
+      hexPaletteId: "default",
+      labelFont: "serif",
+      labelColors: {
+        continent: "rgba(40, 50, 60, 0.5)",
+        country: "#2b2f33",
+        state: "#4f565c",
+        halo: "rgba(251, 236, 180, 0.9)"
+      }
+    },
+    {
+      id: "night",
+      label: "Night",
+      waterColor: "rgb(15, 26, 38)",
+      landShadowRgb: [16, 19, 23],
+      landHighlightRgb: [74, 82, 92],
+      coastlineColor: "#7d97ad",
+      countryBorderColor: "#9eb4c8",
+      stateBorderColor: "rgba(158, 180, 200, 0.6)",
+      gridLineColor: "rgba(210, 216, 228, 0.12)",
+      hexPaletteId: "wargame",
+      labelFont: "sans",
+      labelColors: {
+        continent: "rgba(215, 221, 229, 0.45)",
+        country: "#d7dde5",
+        state: "#a9b3bf",
+        halo: "rgba(10, 14, 20, 0.85)"
+      }
+    }
+  ];
+  var DEFAULT_MAP_THEME_ID = "standard";
+  var LAND_TILE_CONTRAST = 1.4;
+  var FLAT_LAND_GRAY = 210;
+  var STANDARD_THEME = MAP_THEMES[0];
+  function mapThemeById(id) {
+    return MAP_THEMES.find((theme) => theme.id === id) ?? STANDARD_THEME;
+  }
+  function landTransferFunctions(theme) {
+    const channel = (index) => ({
+      slope: (theme.landHighlightRgb[index] - theme.landShadowRgb[index]) / 255,
+      intercept: theme.landShadowRgb[index] / 255
+    });
+    return { r: channel(0), g: channel(1), b: channel(2) };
+  }
+
+  // src/renderer/map/activeMapTheme.ts
+  var activeTheme = mapThemeById(DEFAULT_MAP_THEME_ID);
+  function getActiveMapTheme() {
+    return activeTheme;
+  }
+  function setActiveMapThemeId(id) {
+    const next = mapThemeById(id);
+    if (next.id === activeTheme.id) return false;
+    activeTheme = next;
+    return true;
+  }
+
+  // src/renderer/map/bucketedVectorLayer.ts
+  function createBucketedVectorLayer(options) {
+    const pane = options.map.getPane?.(options.paneName) ?? options.map.createPane?.(options.paneName);
+    if (pane) {
+      pane.style.zIndex = String(options.paneZIndex);
+      pane.style.pointerEvents = "none";
+    }
+    const renderer = options.leaflet.canvas?.({ pane: options.paneName, padding: 0.5 });
+    const paths = /* @__PURE__ */ new Map();
+    let source = null;
+    let style = {
+      color: "#000000",
+      weight: 1,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: null
+    };
+    let enabled = true;
+    let loggedSyncError = false;
+    let loggedMissingConstructor = false;
+    function pathOptions() {
+      if (options.shape === "polygon") {
+        return {
+          renderer,
+          interactive: false,
+          smoothFactor: 0,
+          fill: true,
+          fillColor: style.color,
+          fillOpacity: 1,
+          stroke: style.seamWeightPx != null,
+          color: style.color,
+          weight: style.seamWeightPx ?? 0
+        };
+      }
+      const line = {
+        renderer,
+        interactive: false,
+        smoothFactor: style.smoothFactor,
+        stroke: true,
+        color: style.color,
+        weight: style.weight,
+        opacity: 1,
+        lineCap: "round",
+        lineJoin: "round",
+        fill: false
+      };
+      if (style.dashArray != null) line.dashArray = style.dashArray;
+      return line;
+    }
+    function clearPaths() {
+      for (const path of paths.values()) path.remove?.();
+      paths.clear();
+      renderer?.remove?.();
+    }
+    function syncUncaught() {
+      if (!enabled || !source) {
+        clearPaths();
+        return;
+      }
+      const bounds = options.map.getBounds?.();
+      if (!bounds || !renderer) {
+        if (!renderer && !loggedMissingConstructor) {
+          loggedMissingConstructor = true;
+          console.error("[agent-wars] vector layer has no canvas renderer", options.paneName);
+        }
+        return;
+      }
+      const view = {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      };
+      const cells = source(view, options.map.getZoom?.() ?? 0);
+      const live = /* @__PURE__ */ new Set();
+      const paint2 = pathOptions();
+      for (const cell of cells) {
+        live.add(cell.cacheKey);
+        if (paths.has(cell.cacheKey)) continue;
+        const geometry = cell.build();
+        if (geometry.length === 0) continue;
+        const path = options.shape === "line" ? options.leaflet.polyline?.(geometry, paint2) : options.leaflet.polygon?.(geometry, paint2);
+        if (!path) continue;
+        path.addTo?.(options.map);
+        paths.set(cell.cacheKey, path);
+      }
+      for (const [key, path] of paths) {
+        if (live.has(key)) continue;
+        path.remove?.();
+        paths.delete(key);
+      }
+      if (paths.size === 0) renderer.remove?.();
+    }
+    function sync() {
+      try {
+        syncUncaught();
+      } catch (error) {
+        if (loggedSyncError) return;
+        loggedSyncError = true;
+        console.error("[agent-wars] vector layer sync failed", options.paneName, error);
+      }
+    }
+    return {
+      setSource(next) {
+        source = next;
+        clearPaths();
+        sync();
+      },
+      setStyle(next) {
+        style = next;
+        const paint2 = pathOptions();
+        for (const path of paths.values()) path.setStyle?.(paint2);
+      },
+      setEnabled(next) {
+        enabled = next;
+        sync();
+      },
+      setPaneFilter(filter) {
+        const target = options.map.getPane?.(options.paneName);
+        if (target) target.style.filter = filter;
+      },
+      sync
+    };
+  }
+
+  // src/renderer/map/vectorLayerGeometry.ts
+  var VECTOR_CELL_CAP = 800;
+  var cellCapLogged = false;
+  function noteVectorCellCap(count) {
+    if (count !== VECTOR_CELL_CAP || cellCapLogged) return;
+    cellCapLogged = true;
+    console.error("[agent-wars] vector cell cap reached", count);
+  }
+  async function loadBasemapVectorText(name) {
+    const ask = window.gameApi?.basemapVectorDocument;
+    if (!ask) {
+      console.error("[agent-wars] basemap vector document unavailable", name);
+      return null;
+    }
+    try {
+      return await ask(name);
+    } catch (error) {
+      console.error("[agent-wars] basemap vector document failed", name, error);
+      return null;
+    }
+  }
+  function vectorLines(parts, quantumDeg, lngOffset) {
+    const lines = [];
+    for (const part of parts) {
+      const decoded = decodePart(part, quantumDeg, lngOffset);
+      if (decoded.length >= 2) lines.push(decoded);
+    }
+    return lines;
+  }
+  function vectorPolygons(polygons, quantumDeg, lngOffset) {
+    const shapes = [];
+    for (const polygon of polygons) {
+      const rings = [];
+      for (const ring of polygon) {
+        const decoded = decodePart(ring, quantumDeg, lngOffset);
+        if (decoded.length >= 3) rings.push(decoded);
+      }
+      if (rings.length > 0) shapes.push(rings);
+    }
+    return shapes;
+  }
+
+  // src/renderer/map/adminBorderLayers.ts
+  var BORDER_DRAW_ORDER = [
+    "state",
+    "state_disputed",
+    "country",
+    "country_disputed"
+  ];
+  function borderWeight(id) {
+    return id === "country" || id === "country_disputed" ? 1.25 : 1;
+  }
+  function borderDash(id) {
+    if (id === "country_disputed" || id === "state_disputed") return "1 3";
+    if (id === "state") return "4 3";
+    return null;
+  }
+  function borderColor(theme, id) {
+    return id === "state" || id === "state_disputed" ? theme.stateBorderColor : theme.countryBorderColor;
+  }
+  var borderPack = null;
+  var bound = false;
+  var mainMap = null;
+  var readTacticalView = () => false;
+  var borderLayers = [];
+  function borderCells(id, view, zoom) {
+    const pack = borderPack;
+    const group = pack?.groups.find((candidate) => candidate.id === id);
+    if (!pack || !group) return [];
+    const lod = coastlineLodForZoom(group, zoom);
+    if (!lod) return [];
+    const lodIndex = group.lods.indexOf(lod);
+    const refs = visibleCellRefs(view, lod.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function setAdminBorderTacticalReader(reader) {
+    readTacticalView = reader;
+  }
+  function bindAdminBorderLayers(leaflet, main) {
+    if (bound) return;
+    bound = true;
+    mainMap = main;
+    for (const id of BORDER_DRAW_ORDER) {
+      const layer = createBucketedVectorLayer({
+        map: main,
+        leaflet,
+        paneName: "basemapBorders",
+        paneZIndex: 270,
+        shape: "line"
+      });
+      layer.setSource((view, zoom) => borderCells(id, view, zoom));
+      borderLayers.push({ id, layer });
+    }
+    applyAdminBorderTheme(getActiveMapTheme());
+    main.on?.("moveend", syncAdminBorderLayers);
+    main.on?.("zoomend", syncAdminBorderLayers);
+    syncAdminBorderLayers();
+    void loadBorders();
+  }
+  async function loadBorders() {
+    const text = await loadBasemapVectorText("admin_borders");
+    if (text == null) return;
+    try {
+      borderPack = parseAdminBorderPack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] admin borders document rejected", error);
+      return;
+    }
+    syncAdminBorderLayers();
+  }
+  function syncAdminBorderLayers() {
+    if (!mainMap) return;
+    let groups;
+    try {
+      groups = adminBorderGroupsForView(mainMap.getZoom?.() ?? 0, readTacticalView());
+    } catch (error) {
+      console.error("[agent-wars] admin border visibility failed", error);
+      return;
+    }
+    const visible = new Set(groups);
+    for (const entry of borderLayers) entry.layer.setEnabled(visible.has(entry.id));
+  }
+  function applyAdminBorderTheme(theme) {
+    for (const entry of borderLayers) {
+      const style = {
+        color: borderColor(theme, entry.id),
+        weight: borderWeight(entry.id),
+        dashArray: borderDash(entry.id),
+        smoothFactor: 0.5,
+        seamWeightPx: null
+      };
+      entry.layer.setStyle(style);
+    }
+  }
+
+  // src/renderer/map/mapThemeFilters.ts
+  var SVG_ID = "map-theme-filters";
+  function ensureMapThemeSvgFilters() {
+    if (document.getElementById(SVG_ID)) return;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = SVG_ID;
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    svg.style.position = "absolute";
+    for (const theme of MAP_THEMES) {
+      const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+      filter.id = `map-theme-land-${theme.id}`;
+      filter.setAttribute("color-interpolation-filters", "sRGB");
+      const transfer = document.createElementNS("http://www.w3.org/2000/svg", "feComponentTransfer");
+      const functions = landTransferFunctions(theme);
+      for (const [name, channel] of [
+        ["feFuncR", functions.r],
+        ["feFuncG", functions.g],
+        ["feFuncB", functions.b]
+      ]) {
+        const fn = document.createElementNS("http://www.w3.org/2000/svg", name);
+        fn.setAttribute("type", "linear");
+        fn.setAttribute("slope", String(channel.slope));
+        fn.setAttribute("intercept", String(channel.intercept));
+        transfer.appendChild(fn);
+      }
+      filter.appendChild(transfer);
+      svg.appendChild(filter);
+    }
+    document.body.appendChild(svg);
+  }
+  function landTileFilterCss(theme) {
+    return `url(#map-theme-land-${theme.id})`;
+  }
+  function landUnderlayFilterCss(theme) {
+    return `contrast(${LAND_TILE_CONTRAST}) ${landTileFilterCss(theme)}`;
   }
 
   // src/renderer/map/basemapLayer.ts
-  var ATTRIBUTION = "Elevation: GMTED2010 courtesy of the U.S. Geological Survey. Water: Made with Natural Earth.";
+  var OFFLINE_HILLSHADE_ID = "offline_hillshade";
   var WATER_PANE = "basemapWater";
   var GRID_PANE = "basemapGrid";
-  var GRID_COLOR = "rgba(48, 56, 64, 0.15)";
   var GRID_DASH = "2 3";
   var SOURCE_MERIDIANS = [-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180];
   var SOURCE_PARALLELS = [-70, -50, -30, -10, 0, 10, 30, 50, 70];
-  var WATER_COLOR = "rgb(113, 148, 177)";
   var leafletRef = null;
-  var mainMap = null;
+  var mainMap2 = null;
   var miniMap = null;
   var mainLayer = null;
   var miniLayer = null;
@@ -16716,9 +17332,19 @@
   var appliedKey = "";
   var requestSerial = 0;
   var basemapErrorShown = false;
+  var publishedNativeZoom = 7;
+  var gridLines = [];
+  var nativeZoomListeners = /* @__PURE__ */ new Set();
+  function onBasemapNativeZoomChanged(listener) {
+    nativeZoomListeners.add(listener);
+  }
+  function publishBasemapNativeZoom(nativeZoom2) {
+    publishedNativeZoom = nativeZoom2;
+    for (const listener of nativeZoomListeners) listener(nativeZoom2);
+  }
   function bindOfflineBasemap(leaflet, main, mini) {
     leafletRef = leaflet;
-    mainMap = main;
+    mainMap2 = main;
     miniMap = mini;
     ensureWaterPane(main);
     ensureWaterPane(mini);
@@ -16730,25 +17356,29 @@
     gameMapId = mapId;
     void applyGameMap(mapId);
   }
-  function filterOfflineBasemapPanes(filter) {
-    applyPaneFilter(mainMap?.getPanes?.()?.tilePane, filter);
-    applyPaneFilter(miniMap?.getPanes?.()?.tilePane, filter);
-    applyPaneFilter(mainMap?.getPane?.(WATER_PANE), filter);
-    applyPaneFilter(miniMap?.getPane?.(WATER_PANE), filter);
-    applyPaneFilter(mainMap?.getPane?.(GRID_PANE), filter);
+  function applyBasemapTheme(theme) {
+    for (const map of [mainMap2, miniMap]) {
+      const water = map?.getPane?.(WATER_PANE);
+      if (water) water.style.background = theme.waterColor;
+      applyTileTheme(map?.getPanes?.()?.tilePane, landTileFilterCss(theme));
+    }
+    const grid = mainMap2?.getPane?.(GRID_PANE);
+    if (grid) grid.style.filter = "";
+    for (const line of gridLines) line.setStyle?.({ color: theme.gridLineColor });
   }
   async function applyGameMap(mapId) {
     const serial = ++requestSerial;
-    const nativeZoom = await nativeZoomFor(mapId);
-    if (serial !== requestSerial || !leafletRef || !mainMap || !miniMap) return;
-    const key = `${mapId}:${nativeZoom}`;
+    const nativeZoom2 = await nativeZoomFor(mapId);
+    if (serial !== requestSerial || !leafletRef || !mainMap2 || !miniMap) return;
+    publishBasemapNativeZoom(nativeZoom2);
+    const key = `${mapId}:${nativeZoom2}`;
     if (key === appliedKey && mainLayer && miniLayer) return;
     appliedKey = key;
     const url = `agentwars-basemap://tiles/${mapId}/{z}/{x}/{y}.webp`;
-    mainLayer = replaceLayer(leafletRef, mainMap, mainLayer, url, nativeZoom, true);
-    miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom, false);
+    mainLayer = replaceLayer(leafletRef, mainMap2, mainLayer, url, nativeZoom2);
+    miniLayer = replaceLayer(leafletRef, miniMap, miniLayer, url, nativeZoom2);
   }
-  function replaceLayer(leaflet, map, current, url, nativeZoom, showAttribution) {
+  function replaceLayer(leaflet, map, current, url, nativeZoom2) {
     if (current) {
       current.off("tileerror", onTileError);
       try {
@@ -16757,9 +17387,8 @@
       }
     }
     const layer = leaflet.tileLayer(url, {
-      attribution: showAttribution ? ATTRIBUTION : "",
       maxZoom: 16,
-      maxNativeZoom: nativeZoom,
+      maxNativeZoom: nativeZoom2,
       minZoom: 0
     });
     layer.addTo?.(map);
@@ -16773,10 +17402,14 @@
     pane.style.zIndex = "250";
     pane.style.pointerEvents = "none";
     for (const longitude of SOURCE_MERIDIANS) {
-      leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180)).addTo?.(map);
+      const line = leaflet.polyline(meridianPositions(longitude), gridStroke(longitude === 0 || Math.abs(longitude) === 180));
+      line?.addTo?.(map);
+      if (line) gridLines.push(line);
     }
     for (const latitude of SOURCE_PARALLELS) {
-      leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0)).addTo?.(map);
+      const line = leaflet.polyline(parallelPositions(latitude), gridStroke(latitude === 0));
+      line?.addTo?.(map);
+      if (line) gridLines.push(line);
     }
   }
   function meridianPositions(longitude) {
@@ -16794,7 +17427,7 @@
   function gridStroke(solid) {
     const stroke = {
       pane: GRID_PANE,
-      color: GRID_COLOR,
+      color: mapThemeById(DEFAULT_MAP_THEME_ID).gridLineColor,
       weight: 1,
       opacity: 1,
       interactive: false,
@@ -16815,9 +17448,9 @@
     pane.style.height = "100%";
     pane.style.zIndex = "190";
     pane.style.pointerEvents = "none";
-    pane.style.background = WATER_COLOR;
+    pane.style.background = mapThemeById(DEFAULT_MAP_THEME_ID).waterColor;
   }
-  function applyPaneFilter(pane, filter) {
+  function applyTileTheme(pane, filter) {
     if (!pane) return;
     const filtered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
     for (const el of filtered) el.style.filter = "";
@@ -16840,13 +17473,158 @@
     }
   }
 
+  // src/renderer/map/coastlineLayers.ts
+  var COASTLINE_WEIGHT_PX = 1.5;
+  var MINIMAP_COASTLINE_WEIGHT_PX = 1;
+  var MASK_SEAM_WEIGHT_PX = 1;
+  var coastPack = null;
+  var maskPack = null;
+  var nativeZoom = 7;
+  var maskLoadStarted = false;
+  var bound2 = false;
+  var mainMap3 = null;
+  var coastLayer = null;
+  var underlayLayer = null;
+  var maskLayer = null;
+  var miniLayer2 = null;
+  function flatLandColor() {
+    return `rgb(${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY}, ${FLAT_LAND_GRAY})`;
+  }
+  function coastCells(view, zoom, firstBandOnly) {
+    const pack = coastPack;
+    if (!pack) return [];
+    const lod = firstBandOnly ? pack.lods[0] ?? null : coastlineLodForZoom(pack, zoom);
+    if (!lod) return [];
+    const lodIndex = pack.lods.indexOf(lod);
+    const refs = visibleCellRefs(view, lod.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `${lodIndex}|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorLines(lod.cells[ref.key] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function maskCells(view, side) {
+    const pack = maskPack;
+    if (!pack) return [];
+    const refs = visibleCellRefs(view, pack.cellDeg, VECTOR_CELL_CAP);
+    noteVectorCellCap(refs.length);
+    return refs.map((ref) => ({
+      cacheKey: `mask|${ref.key}|${ref.lngOffset}`,
+      build: () => vectorPolygons(pack.cells[ref.key]?.[side] ?? [], pack.quantumDeg, ref.lngOffset)
+    }));
+  }
+  function refreshCoastLayers() {
+    if (!mainMap3) return;
+    const pastNative = (mainMap3.getZoom?.() ?? 0) > nativeZoom;
+    if (pastNative) void ensureMaskLoaded();
+    underlayLayer?.setEnabled(pastNative);
+    maskLayer?.setEnabled(pastNative);
+    coastLayer?.sync();
+    miniLayer2?.sync();
+  }
+  async function ensureMaskLoaded() {
+    if (maskLoadStarted) return;
+    maskLoadStarted = true;
+    const text = await loadBasemapVectorText("coast_edge_mask");
+    if (text == null) return;
+    try {
+      maskPack = parseCoastEdgeMaskPack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] coast edge mask document rejected", error);
+      return;
+    }
+    underlayLayer?.sync();
+    maskLayer?.sync();
+  }
+  async function loadCoastlines() {
+    const text = await loadBasemapVectorText("coastlines");
+    if (text == null) return;
+    try {
+      coastPack = parseCoastlinePack(JSON.parse(text));
+    } catch (error) {
+      console.error("[agent-wars] coastlines document rejected", error);
+      return;
+    }
+    coastLayer?.sync();
+    miniLayer2?.sync();
+  }
+  function bindCoastlineLayers(leaflet, main, mini) {
+    if (bound2) return;
+    bound2 = true;
+    mainMap3 = main;
+    coastLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapCoast",
+      paneZIndex: 260,
+      shape: "line"
+    });
+    underlayLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapLandUnderlay",
+      paneZIndex: 150,
+      shape: "polygon"
+    });
+    maskLayer = createBucketedVectorLayer({
+      map: main,
+      leaflet,
+      paneName: "basemapWaterMask",
+      paneZIndex: 230,
+      shape: "polygon"
+    });
+    miniLayer2 = createBucketedVectorLayer({
+      map: mini,
+      leaflet,
+      paneName: "basemapCoast",
+      paneZIndex: 260,
+      shape: "line"
+    });
+    coastLayer.setSource((view, zoom) => coastCells(view, zoom, false));
+    underlayLayer.setSource((view) => maskCells(view, "land"));
+    maskLayer.setSource((view) => maskCells(view, "water"));
+    miniLayer2.setSource((view, zoom) => coastCells(view, zoom, true));
+    underlayLayer.setEnabled(false);
+    maskLayer.setEnabled(false);
+    applyCoastlineTheme(getActiveMapTheme());
+    main.on?.("moveend", refreshCoastLayers);
+    main.on?.("zoomend", refreshCoastLayers);
+    mini.on?.("moveend", () => miniLayer2?.sync());
+    mini.on?.("zoomend", () => miniLayer2?.sync());
+    refreshCoastLayers();
+    void loadCoastlines();
+  }
+  function setCoastEdgeMaskNativeZoom(zoom) {
+    nativeZoom = zoom;
+    refreshCoastLayers();
+  }
+  function applyCoastlineTheme(theme) {
+    const coastStyle = {
+      color: theme.coastlineColor,
+      weight: COASTLINE_WEIGHT_PX,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: null
+    };
+    const seam = (color) => ({
+      color,
+      weight: 0,
+      dashArray: null,
+      smoothFactor: 0,
+      seamWeightPx: MASK_SEAM_WEIGHT_PX
+    });
+    coastLayer?.setStyle(coastStyle);
+    miniLayer2?.setStyle({ ...coastStyle, weight: MINIMAP_COASTLINE_WEIGHT_PX });
+    underlayLayer?.setStyle(seam(flatLandColor()));
+    underlayLayer?.setPaneFilter(landUnderlayFilterCss(theme));
+    maskLayer?.setStyle(seam(theme.waterColor));
+  }
+
   // src/renderer/map/worldLeafletMap.ts
-  var mainMap2 = null;
+  var mainMap4 = null;
   var miniMap2 = null;
   var viewportRect = null;
   var onMainViewChanged = null;
-  var mountedMainBasemapProviderId = null;
-  var mountedMiniBasemapProviderId = null;
   function notifyMainViewChanged() {
     syncMinimapViewportRect();
     onMainViewChanged?.();
@@ -16855,13 +17633,6 @@
     const leafletRef2 = globalThis.L;
     if (!leafletRef2) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
     return leafletRef2;
-  }
-  function setMainBasemapByProviderId(providerId) {
-    if (!mainMap2 || !miniMap2) return;
-    if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
-    bindOfflineBasemap(getL(), mainMap2, miniMap2);
-    mountedMainBasemapProviderId = providerId;
-    mountedMiniBasemapProviderId = providerId;
   }
   function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
     onMainViewChanged = onViewChanged;
@@ -16881,7 +17652,7 @@
       leafletRef2.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
       leafletRef2.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
-    mainMap2 = leafletRef2.map(mainEl, {
+    mainMap4 = leafletRef2.map(mainEl, {
       minZoom: 1.5,
       maxZoom: 12,
       zoomSnap: 0.25,
@@ -16895,26 +17666,29 @@
       keyboard: false,
       /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
       zoomControl: false,
+      /* Elevation and Natural Earth credits stay in the notices file. The map does not print them. */
+      attributionControl: false,
       /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
       zoomAnimation: false,
       fadeAnimation: false,
       inertia: false
     });
     const initialId = initialBasemapProviderId ?? "offline_hillshade";
-    mountedMainBasemapProviderId = initialId;
-    mountedMiniBasemapProviderId = mountedMainBasemapProviderId;
-    mainMap2.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
-    mainMap2.doubleClickZoom.disable();
+    if (initialId !== "offline_hillshade") {
+      console.error("[agent-wars] the hillshade is the only basemap", initialId);
+    }
+    mainMap4.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
+    mainMap4.doubleClickZoom.disable();
     try {
       leafletRef2.control.scale({
         position: "bottomright",
         metric: true,
         imperial: true,
         maxWidth: 120
-      }).addTo(mainMap2);
+      }).addTo(mainMap4);
     } catch {
     }
-    leafletRef2.control.zoom({ position: "bottomright" }).addTo(mainMap2);
+    leafletRef2.control.zoom({ position: "bottomright" }).addTo(mainMap4);
     miniMap2 = leafletRef2.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
@@ -16926,19 +17700,24 @@
       boxZoom: false,
       keyboard: false
     });
-    bindOfflineBasemap(leafletRef2, mainMap2, miniMap2);
+    bindOfflineBasemap(leafletRef2, mainMap4, miniMap2);
+    const vectorLeaflet = leafletRef2;
+    const vectorMain = mainMap4;
+    bindCoastlineLayers(vectorLeaflet, vectorMain, miniMap2);
+    bindAdminBorderLayers(vectorLeaflet, vectorMain);
+    onBasemapNativeZoomChanged(setCoastEdgeMaskNativeZoom);
     miniMap2.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
     miniMap2.setZoom(miniMap2.getZoom());
-    mainMap2.on("move", notifyMainViewChanged);
-    mainMap2.on("zoom", notifyMainViewChanged);
-    mainMap2.on("moveend", notifyMainViewChanged);
-    mainMap2.on("zoomend", notifyMainViewChanged);
+    mainMap4.on("move", notifyMainViewChanged);
+    mainMap4.on("zoom", notifyMainViewChanged);
+    mainMap4.on("moveend", notifyMainViewChanged);
+    mainMap4.on("zoomend", notifyMainViewChanged);
     syncMinimapViewportRect();
   }
   function syncMinimapViewportRect() {
-    if (!mainMap2 || !miniMap2) return;
+    if (!mainMap4 || !miniMap2) return;
     const leafletRef2 = getL();
-    const mainBounds = mainMap2.getBounds();
+    const mainBounds = mainMap4.getBounds();
     const miniBounds = miniMap2.getBounds();
     const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
     const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
@@ -16963,47 +17742,30 @@
     }
   }
   function getMainLeafletMap() {
-    return mainMap2;
+    return mainMap4;
   }
   function getMiniLeafletMap() {
     return miniMap2;
   }
-  function applyTilePaneFilter(map, filter) {
-    try {
-      const pane = map?.getPanes?.()?.tilePane;
-      if (!pane) return;
-      const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
-      for (const el of oldFiltered) el.style.filter = "";
-      pane.style.filter = filter;
-    } catch {
-    }
-  }
-  function setMainBasemapFilter(filter) {
-    const mapEl = document.getElementById("main-map");
-    if (mapEl) mapEl.style.filter = "";
-    applyTilePaneFilter(mainMap2, filter);
-    applyTilePaneFilter(miniMap2, filter);
-    filterOfflineBasemapPanes(filter);
-  }
   function hexCenterToOverlayPoint(h3Index, latLngFn) {
-    if (!mainMap2) return { x: 0, y: 0 };
+    if (!mainMap4) return { x: 0, y: 0 };
     const leafletRef2 = getL();
     const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap2.latLngToContainerPoint(leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
+    const p = mainMap4.latLngToContainerPoint(leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), alignLngToDrawReference(lng)));
     return { x: p.x, y: p.y };
   }
   function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
-    if (!mainMap2) return { x: 0, y: 0 };
+    if (!mainMap4) return { x: 0, y: 0 };
     const leafletRef2 = getL();
     const [lat, lng] = latLngFn(h3Index);
     const lngAligned = alignLngToReference(lng, referenceLngDegrees);
-    const p = mainMap2.latLngToContainerPoint(
+    const p = mainMap4.latLngToContainerPoint(
       leafletRef2.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
     );
     return { x: p.x, y: p.y };
   }
   function invalidateLeafletMapSizes() {
-    mainMap2?.invalidateSize({ animate: false });
+    mainMap4?.invalidateSize({ animate: false });
     miniMap2?.invalidateSize({ animate: false });
     notifyMainViewChanged();
   }
@@ -22221,7 +22983,7 @@ ${bonuses}`;
         return null;
     }
   }
-  var terrainStyleTooltipText = "Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.";
+  var mapThemeTooltipText = "Pick the map colors for land, water, coastlines, borders, and place names. The choices are Standard, Topographic, Nautical, and Night.";
   function buildEntryTooltipTextFor(canHire) {
     return canHire ? "Build/Hire Units" : "Build Units";
   }
@@ -25365,12 +26127,10 @@ ${bonuses}`;
   // src/renderer/rendering/terrainLegendUrban.ts
   var URBAN_SWATCH_COLOR = Object.freeze({
     default: "#827060",
-    atlas: "#8d7a67",
-    wargame: "#847061",
-    scientific: "#897562"
+    wargame: "#847061"
   });
-  function urbanSwatchColor(styleId) {
-    return URBAN_SWATCH_COLOR[styleId] ?? URBAN_SWATCH_COLOR.default;
+  function urbanSwatchColor(paletteId) {
+    return URBAN_SWATCH_COLOR[paletteId] ?? URBAN_SWATCH_COLOR.default;
   }
   function appendUrbanLegendRow(container, color) {
     const swatch = document.createElement("span");
@@ -25753,39 +26513,22 @@ ${bonuses}`;
   }
 
   // src/renderer/rendering/terrainLegendRubble.ts
-  function applyRubbleSwatchPaint(element, styleId) {
+  function applyRubbleSwatchPaint(element, paletteId) {
     element.style.background = "";
-    element.style.backgroundColor = urbanSwatchColor(styleId);
+    element.style.backgroundColor = urbanSwatchColor(paletteId);
     element.style.backgroundImage = rubbleSwatchBackgroundImage();
     element.style.backgroundRepeat = "repeat";
   }
-  function appendRubbleLegendRow(container, styleId) {
+  function appendRubbleLegendRow(container, paletteId) {
     const swatch = document.createElement("span");
     applyLegendSwatchChrome(swatch);
-    applyRubbleSwatchPaint(swatch, styleId);
+    applyRubbleSwatchPaint(swatch, paletteId);
     appendLegendRow(container, swatch, "Rubble");
   }
 
-  // src/renderer/rendering/terrainVisualStyles.ts
-  var patternCache = /* @__PURE__ */ new Map();
-  var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
-  var DEFAULT_HEX_STROKE_COLOR = "rgba(36,38,42,0.4)";
-  var DEFAULT_HEX_STROKE_WIDTH = 0.5;
-  var WARGAME_HEX_STROKE_COLOR = "rgba(210, 216, 228, 0.077)";
-  var WARGAME_HEX_STROKE_WIDTH = 0.72;
-  var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
-  var TERRAIN_STYLE_PRESETS = {
-    /**
-       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
-    
-       * Purpose: Supports maintainability by documenting why `default` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
+  // src/renderer/rendering/terrainHexPalettes.ts
+  var TERRAIN_HEX_PALETTES = {
     default: {
-      label: "Default",
-      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -25810,52 +26553,7 @@ ${bonuses}`;
       rubbleOverlayFill: "rgba(130, 112, 96, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
-    /**
-       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
-    
-       * Purpose: Supports maintainability by documenting why `atlas` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    atlas: {
-      label: "Atlas",
-      basemapId: "offline_hillshade",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(56, 128, 214, 0.28)",
-        coastal: "rgba(76, 173, 188, 0.24)",
-        wetlands: "rgba(76, 173, 188, 0.24)",
-        plains: "rgba(193, 211, 165, 0.2)",
-        forest: "rgba(70, 146, 86, 0.43)",
-        mountain: "rgba(168, 70, 96, 0.55)",
-        desert: "rgba(220, 189, 128, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(141, 122, 103, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(141, 122, 103, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
-    },
-    /**
-       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
-    
-       * Purpose: Supports maintainability by documenting why `wargame` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
     wargame: {
-      label: "Wargame",
-      basemapId: "offline_hillshade",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -25879,44 +26577,47 @@ ${bonuses}`;
       urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: false, pattern: "orthogonal" },
       rubbleOverlayFill: "rgba(132, 112, 97, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
-    },
-    /**
-       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'offline_hillshade', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
-    
-       * Purpose: Supports maintainability by documenting why `scientific` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    scientific: {
-      label: "Scientific",
-      basemapId: "offline_hillshade",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(42, 117, 214, 0.28)",
-        coastal: "rgba(59, 186, 194, 0.24)",
-        wetlands: "rgba(59, 186, 194, 0.24)",
-        plains: "rgba(186, 208, 160, 0.2)",
-        forest: "rgba(50, 142, 74, 0.43)",
-        mountain: "rgba(154, 77, 122, 0.54)",
-        desert: "rgba(214, 182, 120, 0.44)",
-        arctic: "rgba(234, 245, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     }
   };
-  var activeTerrainStyleId = "default";
+  var TERRAIN_SWATCH_COLORS = {
+    default: {
+      water: "#3d82d6",
+      coastal: "#2a9aaf",
+      wetlands: "#2f8f72",
+      plains: "#9bb56e",
+      forest: "#3a9a52",
+      mountain: "#8a5cb8",
+      desert: "#d4a85a",
+      arctic: "#d7e7f6"
+    },
+    wargame: {
+      water: "#3a80d4",
+      coastal: "#34a8b8",
+      wetlands: "#36a080",
+      plains: "#96b068",
+      forest: "#3c9e56",
+      mountain: "#e05a9a",
+      desert: "#e0ac52",
+      arctic: "#d4e3f8"
+    }
+  };
+  var DEFAULT_HEX_STROKE = { color: "rgba(36,38,42,0.4)", width: 0.5 };
+  var WARGAME_HEX_STROKE = { color: "rgba(210, 216, 228, 0.077)", width: 0.72 };
+  function hexPaletteById(paletteId) {
+    return TERRAIN_HEX_PALETTES[paletteId] ?? TERRAIN_HEX_PALETTES.default;
+  }
+  function terrainSwatchColor(paletteId, kind) {
+    const colors = TERRAIN_SWATCH_COLORS[paletteId] ?? TERRAIN_SWATCH_COLORS.default;
+    return colors[kind] ?? "#9aa3ad";
+  }
+  function hexStrokeStyleFor(paletteId) {
+    return paletteId === "wargame" ? WARGAME_HEX_STROKE : DEFAULT_HEX_STROKE;
+  }
+
+  // src/renderer/rendering/terrainVisualStyles.ts
+  var patternCache = /* @__PURE__ */ new Map();
+  var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
+  var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
   function makeDiagonalHatchPattern(color, spacing, lineWidth2, reverseDiagonal, crosshatch = false) {
     const c = document.createElement("canvas");
     const s = spacing * 2;
@@ -25990,91 +26691,25 @@ ${bonuses}`;
     return `rgba(${r}, ${g}, ${b}, ${aStr})`;
   }
   function activePreset() {
-    return TERRAIN_STYLE_PRESETS[activeTerrainStyleId];
-  }
-  function getTerrainStyleOptions() {
-    return Object.keys(TERRAIN_STYLE_PRESETS).map((id) => ({
-      id,
-      label: TERRAIN_STYLE_PRESETS[id].label
-    }));
-  }
-  function getActiveTerrainStyleId() {
-    return activeTerrainStyleId;
-  }
-  function getActiveTerrainStyleBasemapId() {
-    return activePreset().basemapId;
+    return hexPaletteById(getActiveMapTheme().hexPaletteId);
   }
   function getActiveHexStrokeStyle() {
-    if (activeTerrainStyleId === "wargame") {
-      return { color: WARGAME_HEX_STROKE_COLOR, width: WARGAME_HEX_STROKE_WIDTH };
-    }
-    return { color: DEFAULT_HEX_STROKE_COLOR, width: DEFAULT_HEX_STROKE_WIDTH };
-  }
-  function setActiveTerrainStyle(id) {
-    if (activeTerrainStyleId === id) return;
-    activeTerrainStyleId = id;
-    patternCache.clear();
+    return hexStrokeStyleFor(getActiveMapTheme().hexPaletteId);
   }
   function paintTerrainSwatches(root) {
     root.querySelectorAll(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
       const kind = node.dataset.terrainKind;
       if (!kind) return;
       if (kind === "urban") {
-        node.style.background = urbanSwatchColor(activeTerrainStyleId);
+        node.style.background = urbanSwatchColor(getActiveMapTheme().hexPaletteId);
         return;
       }
       if (kind === "rubble") {
-        applyRubbleSwatchPaint(node, activeTerrainStyleId);
+        applyRubbleSwatchPaint(node, getActiveMapTheme().hexPaletteId);
         return;
       }
-      node.style.background = terrainSwatchColor(kind);
+      node.style.background = terrainSwatchColor(getActiveMapTheme().hexPaletteId, kind);
     });
-  }
-  var TERRAIN_SWATCH_COLORS = {
-    default: {
-      water: "#3d82d6",
-      coastal: "#2a9aaf",
-      wetlands: "#2f8f72",
-      plains: "#9bb56e",
-      forest: "#3a9a52",
-      mountain: "#8a5cb8",
-      desert: "#d4a85a",
-      arctic: "#d7e7f6"
-    },
-    atlas: {
-      water: "#3f86dc",
-      coastal: "#2e9eb4",
-      wetlands: "#339878",
-      plains: "#a0ba74",
-      forest: "#40a058",
-      mountain: "#b44a64",
-      desert: "#dbb468",
-      arctic: "#d8e8f7"
-    },
-    wargame: {
-      water: "#3a80d4",
-      coastal: "#34a8b8",
-      wetlands: "#36a080",
-      plains: "#96b068",
-      forest: "#3c9e56",
-      mountain: "#e05a9a",
-      desert: "#e0ac52",
-      arctic: "#d4e3f8"
-    },
-    scientific: {
-      water: "#3c84d8",
-      coastal: "#2aa8b0",
-      wetlands: "#329882",
-      plains: "#9cb672",
-      forest: "#38964e",
-      mountain: "#b04a84",
-      desert: "#d4b062",
-      arctic: "#d7e7f6"
-    }
-  };
-  function terrainSwatchColor(kind) {
-    const colors = TERRAIN_SWATCH_COLORS[activeTerrainStyleId];
-    return colors[kind] ?? "#9aa3ad";
   }
   function terrainKindFillStyle(kind, options) {
     const k = kind;
@@ -26088,7 +26723,7 @@ ${bonuses}`;
   function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1, options) {
     const k = kind;
     const overlayKey = options?.rubbleOverlay ? "rubble" : options?.urbanOverlay ? "urban" : "base";
-    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${overlayKey}`;
+    const key = `${getActiveMapTheme().hexPaletteId}:${k}:${fillAndHatchAlphaScale}:${overlayKey}`;
     if (patternCache.has(key)) return patternCache.get(key) ?? null;
     const p = activePreset();
     const spec = options?.rubbleOverlay ? p.rubbleOverlayHatch : options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
@@ -26139,30 +26774,30 @@ ${bonuses}`;
     container.style.lineHeight = "1.3";
     container.style.pointerEvents = "auto";
     const styleSelect = document.createElement("select");
-    styleSelect.setAttribute("aria-label", "Terrain style");
-    styleSelect.setAttribute("data-control-tooltip", terrainStyleTooltipText);
-    const opts = getTerrainStyleOptions();
-    for (const o of opts) {
+    styleSelect.setAttribute("aria-label", "Map theme");
+    styleSelect.setAttribute("data-control-tooltip", mapThemeTooltipText);
+    for (const theme of MAP_THEMES) {
       const opt = document.createElement("option");
-      opt.value = o.id;
-      opt.textContent = o.label;
+      opt.value = theme.id;
+      opt.textContent = theme.label;
       styleSelect.appendChild(opt);
     }
-    styleSelect.value = getActiveTerrainStyleId();
+    styleSelect.value = getActiveMapTheme().id;
     styleSelect.addEventListener("change", () => {
-      setActiveTerrainStyle(styleSelect.value);
-      if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
+      setActiveMapThemeId(styleSelect.value);
+      options?.onThemeChanged?.();
       renderTerrainLegend(container, options);
     });
     container.appendChild(styleSelect);
+    const paletteId = getActiveMapTheme().hexPaletteId;
     for (const kind of TERRAIN_LEGEND_ORDER) {
       const sw = document.createElement("span");
       applyLegendSwatchChrome(sw);
-      sw.style.background = terrainSwatchColor(kind);
+      sw.style.background = terrainSwatchColor(paletteId, kind);
       appendLegendRow(container, sw, formatTerrainKindLabel(kind));
     }
-    appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
-    appendRubbleLegendRow(container, getActiveTerrainStyleId());
+    appendUrbanLegendRow(container, urbanSwatchColor(paletteId));
+    appendRubbleLegendRow(container, paletteId);
     appendFortifiedLegendRow(container);
   }
 
@@ -32307,6 +32942,309 @@ ${bonuses}`;
     return false;
   }
 
+  // src/shared/mapLabelPack.ts
+  var SCHEMA_VERSION2 = "1.0.0";
+  var LABEL_KINDS = ["continent", "country", "state"];
+  function parseMapLabelPack(text) {
+    const value = JSON.parse(text);
+    if (!isRecord2(value)) throw new Error("map_labels is not an object");
+    if (value.schema_version !== SCHEMA_VERSION2) throw new Error("schema_version is not 1.0.0");
+    if (value.kind !== "map_labels") throw new Error("kind is not map_labels");
+    if (!Array.isArray(value.features)) throw new Error("features is not an array");
+    return {
+      schemaVersion: SCHEMA_VERSION2,
+      kind: "map_labels",
+      features: value.features.map((feature, index) => parseFeature(feature, index))
+    };
+  }
+  function parseFeature(value, index) {
+    if (!isRecord2(value)) throw new Error(`features ${index} is not an object`);
+    const kind = value.kind;
+    if (!isLabelKind(kind)) throw new Error(`features ${index} kind is not a place-name kind`);
+    const anchors = parseAnchors(value.anchors, index);
+    return {
+      id: requireString(value.id, `features ${index} id`),
+      kind,
+      name: requireString(value.name, `features ${index} name`),
+      rank: requireNumber2(value.rank, `features ${index} rank`),
+      minZoom: requireNumber2(value.min_zoom, `features ${index} min_zoom`),
+      anchors,
+      bounds: boundsOf(anchors)
+    };
+  }
+  function parseAnchors(value, index) {
+    if (!Array.isArray(value) || value.length === 0) throw new Error(`features ${index} anchors is empty`);
+    return value.map((anchor3, anchorIndex) => {
+      if (!Array.isArray(anchor3) || anchor3.length < 3) {
+        throw new Error(`features ${index} anchors ${anchorIndex} is not a triple`);
+      }
+      return {
+        lat: requireNumber2(anchor3[0], `features ${index} anchors ${anchorIndex} lat`),
+        lng: requireNumber2(anchor3[1], `features ${index} anchors ${anchorIndex} lng`),
+        radiusM: requireNumber2(anchor3[2], `features ${index} anchors ${anchorIndex} radius`)
+      };
+    });
+  }
+  function boundsOf(anchors) {
+    let west = anchors[0].lng;
+    let east = west;
+    let south = anchors[0].lat;
+    let north = south;
+    for (const anchor3 of anchors) {
+      west = Math.min(west, anchor3.lng);
+      east = Math.max(east, anchor3.lng);
+      south = Math.min(south, anchor3.lat);
+      north = Math.max(north, anchor3.lat);
+    }
+    return { west, south, east, north };
+  }
+  function isLabelKind(value) {
+    return typeof value === "string" && LABEL_KINDS.some((kind) => kind === value);
+  }
+  function isRecord2(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function requireString(value, label) {
+    if (typeof value !== "string" || value === "") throw new Error(`${label} is not a string`);
+    return value;
+  }
+  function requireNumber2(value, label) {
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${label} is not a number`);
+    return value;
+  }
+
+  // src/shared/mapLabelPlacement.ts
+  var KIND_ORDER2 = { continent: 0, country: 1, state: 2 };
+  function placeMapLabels(input) {
+    const chosen = [];
+    for (const feature of input.features) {
+      if (!acceptsFeature(feature, input)) continue;
+      const selection = chooseAnchor(feature, input);
+      if (selection == null) continue;
+      chosen.push(selection);
+    }
+    chosen.sort(compareChosen);
+    const placed = [];
+    for (const label of chosen) {
+      if (placed.length >= MAX_LABELS_PER_FRAME) break;
+      if (placed.some((other) => boxesOverlap(label, other))) continue;
+      placed.push({
+        featureId: label.feature.id,
+        kind: label.feature.kind,
+        text: labelDisplayText(label.feature),
+        x: label.x,
+        y: label.y,
+        width: label.width,
+        height: label.height,
+        anchorIndex: label.anchorIndex
+      });
+    }
+    return placed;
+  }
+  function acceptsFeature(feature, input) {
+    if (!input.kinds.includes(feature.kind)) return false;
+    if (feature.kind === "continent") return true;
+    return feature.minZoom <= input.zoom + LABEL_MIN_ZOOM_SLACK;
+  }
+  function chooseAnchor(feature, input) {
+    const measured = input.measure(feature);
+    const usable = [];
+    feature.anchors.forEach((anchor3, index) => {
+      const point = input.project(anchor3.lat, anchor3.lng);
+      if (!insideInset(point, input.viewSize)) return;
+      if (index > 0 && !fragmentIsTallEnough(anchor3, measured.height, input.zoom)) return;
+      usable.push({ index, x: point.x, y: point.y });
+    });
+    if (usable.length === 0) return null;
+    const previous = input.previousAnchors.get(feature.id);
+    const chosen = usable.find((anchor3) => anchor3.index === previous) ?? usable.find((anchor3) => anchor3.index === 0) ?? nearestCenter(usable, input.viewSize);
+    return {
+      feature,
+      anchorIndex: chosen.index,
+      x: chosen.x,
+      y: chosen.y,
+      width: measured.width,
+      height: measured.height
+    };
+  }
+  function insideInset(point, viewSize) {
+    return point.x >= LABEL_VIEW_INSET_PX && point.y >= LABEL_VIEW_INSET_PX && point.x <= viewSize.width - LABEL_VIEW_INSET_PX && point.y <= viewSize.height - LABEL_VIEW_INSET_PX;
+  }
+  function fragmentIsTallEnough(anchor3, height, zoom) {
+    return anchor3.radiusM / mercatorMetersPerPixel(zoom) >= height;
+  }
+  function nearestCenter(usable, viewSize) {
+    const centerX = viewSize.width / 2;
+    const centerY = viewSize.height / 2;
+    let best = usable[0];
+    let bestDistance = distanceSquared(best, centerX, centerY);
+    for (const anchor3 of usable) {
+      const distance2 = distanceSquared(anchor3, centerX, centerY);
+      if (distance2 < bestDistance) {
+        best = anchor3;
+        bestDistance = distance2;
+      }
+    }
+    return best;
+  }
+  function distanceSquared(point, centerX, centerY) {
+    const dx = point.x - centerX;
+    const dy = point.y - centerY;
+    return dx * dx + dy * dy;
+  }
+  function compareChosen(left, right) {
+    const kind = KIND_ORDER2[left.feature.kind] - KIND_ORDER2[right.feature.kind];
+    if (kind !== 0) return kind;
+    if (left.feature.rank !== right.feature.rank) return left.feature.rank - right.feature.rank;
+    if (left.feature.minZoom !== right.feature.minZoom) return left.feature.minZoom - right.feature.minZoom;
+    return left.feature.id < right.feature.id ? -1 : left.feature.id > right.feature.id ? 1 : 0;
+  }
+  function boxesOverlap(candidate, placed) {
+    const candidateKind = candidate.feature.kind;
+    if (candidateKind !== placed.kind && (candidateKind === "continent" || placed.kind === "continent")) {
+      return false;
+    }
+    const pad = LABEL_COLLISION_PADDING_PX;
+    return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2 && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;
+  }
+
+  // src/renderer/map/mapLabelLayer.ts
+  var labelFeatures = [];
+  var previousAnchors = /* @__PURE__ */ new Map();
+  var measuredBoxes = /* @__PURE__ */ new Map();
+  var labelTheme = null;
+  function bindMapLabelLayer(requestRedraw3) {
+    void loadLabelDocument(requestRedraw3);
+  }
+  function resizeMapLabelCanvas(metrics) {
+    const canvas = labelCanvas();
+    if (!canvas) return;
+    canvas.width = metrics.w * metrics.dpr;
+    canvas.height = metrics.h * metrics.dpr;
+    canvas.style.width = `${metrics.w}px`;
+    canvas.style.height = `${metrics.h}px`;
+  }
+  function setMapLabelTheme(theme) {
+    labelTheme = theme;
+  }
+  function drawMapLabels() {
+    const canvas = labelCanvas();
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return;
+    const ctx = canvas.getContext("2d");
+    const metrics = rendererSharedState.canvasMetrics;
+    if (!ctx || !metrics) return;
+    ctx.setTransform(metrics.dpr, 0, 0, metrics.dpr, 0, 0);
+    ctx.clearRect(0, 0, metrics.w, metrics.h);
+    const theme = labelTheme;
+    const map = getMainLeafletMap();
+    if (!theme || !map || labelFeatures.length === 0) return;
+    const tacticalView = shouldRenderTacticalHexes();
+    const placed = labelsForFrame(map, ctx, theme, tacticalView);
+    const zoom = map.getZoom();
+    for (const label of placed) {
+      paintLabel(ctx, theme, label, labelKindOpacity(label.kind, zoom, tacticalView));
+    }
+  }
+  async function loadLabelDocument(requestRedraw3) {
+    try {
+      const text = await loadBasemapVectorText("map_labels");
+      if (text == null) return;
+      labelFeatures = parseMapLabelPack(text).features;
+      await document.fonts.load('600 13px "Agent Wars Map Sans"');
+      await document.fonts.load('400 13px "Agent Wars Map Sans"');
+      await document.fonts.load('600 13px "Agent Wars Map Serif"');
+      await document.fonts.load('400 13px "Agent Wars Map Serif"');
+      requestRedraw3();
+    } catch (error) {
+      labelFeatures = [];
+      console.error("[agent-wars] map labels failed", error);
+    }
+  }
+  function labelsForFrame(map, ctx, theme, tacticalView) {
+    const zoom = map.getZoom();
+    const bounds = map.getBounds();
+    const west = bounds.getWest();
+    const south = bounds.getSouth();
+    const east = bounds.getEast();
+    const north = bounds.getNorth();
+    const kinds = visibleLabelKinds(zoom, tacticalView);
+    const candidates = labelFeatures.filter((feature) => featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north));
+    const candidateIds = new Set(candidates.map((feature) => feature.id));
+    const size = map.getSize();
+    const center = map.getCenter();
+    const placed = placeMapLabels({
+      features: candidates,
+      kinds,
+      zoom,
+      viewSize: { width: size.x, height: size.y },
+      project: (lat, lng) => map.latLngToContainerPoint({
+        lat: clampLatitude(lat),
+        lng: alignLongitudeToReference(lng, center.lng)
+      }),
+      measure: (feature) => measureLabel(ctx, theme, feature),
+      previousAnchors
+    });
+    for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
+    for (const id of [...previousAnchors.keys()]) {
+      if (!candidateIds.has(id)) previousAnchors.delete(id);
+    }
+    return placed;
+  }
+  function featureIsCandidate(feature, kinds, zoom) {
+    if (!kinds.includes(feature.kind)) return false;
+    if (feature.kind === "continent") return true;
+    return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK;
+  }
+  function longitudeMeets(feature, west, east) {
+    const viewWest = west;
+    const viewEast = east < west ? east + 360 : east;
+    return [-360, 0, 360].some((shift) => feature.bounds.east + shift >= viewWest && feature.bounds.west + shift <= viewEast);
+  }
+  function latitudeMeets(feature, south, north) {
+    return feature.bounds.north >= south && feature.bounds.south <= north;
+  }
+  function clampLatitude(lat) {
+    return Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
+  }
+  function measureLabel(ctx, theme, feature) {
+    const text = labelDisplayText(feature);
+    const key = `${theme.id}|${feature.kind}|${text}`;
+    const cached = measuredBoxes.get(key);
+    if (cached) return cached;
+    applyLabelFont(ctx, theme, feature.kind);
+    const box = { width: ctx.measureText(text).width, height: MAP_LABEL_KIND_STYLES[feature.kind].sizePx };
+    measuredBoxes.set(key, box);
+    return box;
+  }
+  function applyLabelFont(ctx, theme, kind) {
+    const style = MAP_LABEL_KIND_STYLES[kind];
+    const family = theme.labelFont === "sans" ? "Agent Wars Map Sans" : "Agent Wars Map Serif";
+    const fallback = fallbackFamily(theme.labelFont);
+    ctx.font = `${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
+    ctx.letterSpacing = `${style.letterSpacingEm * style.sizePx}px`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+  }
+  function fallbackFamily(font) {
+    return font === "sans" ? "system-ui, sans-serif" : "Georgia, serif";
+  }
+  function paintLabel(ctx, theme, label, opacity) {
+    applyLabelFont(ctx, theme, label.kind);
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = theme.labelColors.halo;
+    ctx.fillStyle = theme.labelColors[label.kind];
+    ctx.strokeText(label.text, label.x, label.y);
+    ctx.fillText(label.text, label.x, label.y);
+    ctx.restore();
+  }
+  function labelCanvas() {
+    const canvas = document.getElementById("map-label-overlay");
+    return canvas instanceof HTMLCanvasElement ? canvas : null;
+  }
+
   // src/shared/tacticalMapOverlayConstants.ts
   var TACTICAL_MAP_OVERLAY_CITY_HALO_ALPHA = 0.55;
   var TACTICAL_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY = 0.75;
@@ -36138,6 +37076,7 @@ ${bonuses}`;
   }
   function drawGameScene(ctx, width, height, state) {
     syncTacticalTransportVectorLeafletLayer();
+    syncAdminBorderLayers();
     ctx.clearRect(0, 0, width, height);
     if (rendererSharedState.tacticalBattleSnapshot) {
       maybeScheduleTacticalAnnihilationExit();
@@ -36378,6 +37317,7 @@ ${bonuses}`;
     const w = Math.max(1, Math.floor(rect.width));
     const h = Math.max(1, Math.floor(rect.height));
     rendererSharedState.canvasMetrics = { w, h, dpr };
+    resizeMapLabelCanvas(rendererSharedState.canvasMetrics);
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = `${w}px`;
@@ -36387,6 +37327,7 @@ ${bonuses}`;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     paintMapFrame(ctx, w, h);
+    drawMapLabels();
   }
   function redraw() {
     const container = document.getElementById("canvas-container");
@@ -36400,6 +37341,7 @@ ${bonuses}`;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     paintMapFrame(ctx, w, h);
+    drawMapLabels();
   }
   function paintMapFrame(ctx, w, h) {
     const overlay = document.getElementById("game-over-overlay");
@@ -36410,6 +37352,7 @@ ${bonuses}`;
       drawNewGameMapPreview(ctx, requestRedraw2);
       hideStackCallout();
       syncTacticalTransportVectorLeafletLayer();
+      syncAdminBorderLayers();
     } else if (!rendererSharedState.gameState) {
       drawLoadingScene(ctx, w, h);
     } else {
@@ -42944,6 +43887,16 @@ ${bonuses}`;
     return !shiftKeyAlreadyActive;
   }
 
+  // src/renderer/map/mapThemeApply.ts
+  function applyActiveMapTheme() {
+    ensureMapThemeSvgFilters();
+    const theme = getActiveMapTheme();
+    applyBasemapTheme(theme);
+    applyCoastlineTheme(theme);
+    applyAdminBorderTheme(theme);
+    setMapLabelTheme(theme);
+  }
+
   // src/renderer/map/mapModeTabs.ts
   var LAYER_TABS = Object.freeze([
     { id: "map-mode-weather", read: areWeatherIconsShown, write: setWeatherIconsShown },
@@ -43034,14 +43987,15 @@ ${bonuses}`;
   function wireInitCore(deps) {
     try {
       installControlTooltip();
-      initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
-      setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
+      setAdminBorderTacticalReader(shouldRenderTacticalHexes);
+      initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), OFFLINE_HILLSHADE_ID);
+      bindMapLabelLayer(() => deps.requestRedraw());
+      applyActiveMapTheme();
       const leg = document.getElementById("terrain-legend");
       if (leg) {
         renderTerrainLegend(leg, {
-          onStyleChanged: () => {
-            setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
-            setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
+          onThemeChanged: () => {
+            applyActiveMapTheme();
             deps.requestRedraw();
           }
         });

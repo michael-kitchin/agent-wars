@@ -1,6 +1,6 @@
 /**
  * Checks of the chrome on the map for the UI smoke run: the minimap panel and its map-mode tabs, the terrain legend, and
- * Leaflet's scale and attribution.
+ * Leaflet's scale. The map does not show an attribution control.
  *
  * Purpose: Keeps the map chrome checks apart from the frame, console, and scenario checks, so each table stays readable.
  * When to use: Required by `ui-smoke-checks.cjs`, which runs these rows after the scenario checks.
@@ -45,16 +45,15 @@ const PANEL = Object.freeze({
 const MODE_TABS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production', '#map-legend-toggle']);
 
 /**
- * Leaflet's scale and attribution on the main map.
+ * Leaflet's scale and zoom control on the main map.
  *
  * Purpose: One place for the selectors the position checks read.
- * When to use: The scale and attribution check.
+ * When to use: The scale check.
  * Expected outcome: Leaflet's own class names inside `#main-map`.
  * Exceptions: None.
  */
 const LEAFLET = Object.freeze({
   scale: '#main-map .leaflet-control-scale',
-  attribution: '#main-map .leaflet-control-attribution',
   zoom: '#main-map .leaflet-control-zoom',
 });
 
@@ -236,11 +235,10 @@ const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'scale-and-attribution-bottom-right',
     scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', LEAFLET.scale, LEAFLET.attribution, LEAFLET.zoom],
+    needs: ['#canvas-container', LEAFLET.scale, LEAFLET.zoom],
     run: (p, el) => {
       const c = el('#canvas-container');
       const scale = el(LEAFLET.scale);
-      const attribution = el(LEAFLET.attribution);
       const zoom = el(LEAFLET.zoom);
       if (!scale.shown) return 'the scale is not shown';
       const bottom = c.y + c.h - PANEL.inset;
@@ -250,10 +248,7 @@ const MAP_CHROME_CHECKS = Object.freeze([
       if (!near(scale.x + scale.w, zoom.x - 6)) {
         return `the scale is at ${fmt(scale)}, expected 6 px left of the zoom buttons ${fmt(zoom)}`;
       }
-      if (!attribution.shown) return null;
-      return attribution.x + attribution.w <= scale.x + 1 && near(attribution.y + attribution.h, bottom)
-        ? null
-        : `the attribution is at ${fmt(attribution)}, expected left of the scale ${fmt(scale)} on the same bottom line`;
+      return null;
     },
   },
   {
