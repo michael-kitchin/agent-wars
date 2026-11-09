@@ -3,6 +3,7 @@
  */
 
 import type { BuildUnitType } from '../productionRules';
+import { AI_ONLY_BEAT_LIMIT_CONFIG_KEY, aiOnlyBeatLimitFromStored, type AiOnlyBeatLimit } from '../../shared/aiOnlyBeatLimit';
 import { aiOnlyBattlesFromStored, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { SIGHT_CUES_CONFIG_KEY, STORED_SIGHT_CUES_WHEN_MISSING, sightCuesFromStored } from '../../shared/sightCueSettings';
 import {
@@ -174,6 +175,26 @@ export function readAiOnlyBattles(ops: GameConfigKvDbOps): AiOnlyBattleMode {
   const mode = aiOnlyBattlesFromStored(raw);
   logTrace('gameConfigKv readAiOnlyBattles result', { mode });
   return mode;
+}
+
+/**
+ * Reads the beat limit stored for the current match.
+ *
+ * Purpose: An AI-only battle ends after this many completed beats. An old save has no row.
+ * When to use: The beat that has just resolved, before any later consult.
+ * Expected outcome: The stored number. A closed database, a missing row, or `unlimited` is null.
+ * Exceptions: None.
+ */
+export function readAiOnlyBeatLimit(ops: GameConfigKvDbOps): AiOnlyBeatLimit {
+  logTrace('gameConfigKv readAiOnlyBeatLimit');
+  if (ops.hasDb && !ops.hasDb()) {
+    logTrace('gameConfigKv readAiOnlyBeatLimit result', { limit: null });
+    return null;
+  }
+  const raw = selectGameConfigValue(ops, AI_ONLY_BEAT_LIMIT_CONFIG_KEY);
+  const limit = aiOnlyBeatLimitFromStored(raw);
+  logTrace('gameConfigKv readAiOnlyBeatLimit result', { limit });
+  return limit;
 }
 
 /**

@@ -83,6 +83,7 @@ import { getHumanNickname, setHumanNickname } from './humanNickname';
 import { HUMAN_NICKNAME_DEFAULT, normalizeSideNickname } from '../shared/sideNicknames';
 import { claimSingleInstanceLock } from './singleInstanceLock';
 import { applyUserDataDirOverride } from './userDataDirOverride';
+import { aiOnlyBeatLimitForRequest } from '../shared/aiOnlyBeatLimit';
 import { parseBonusLevel } from '../shared/bonusLevel';
 import { parseGameSize } from '../shared/gameSize';
 import {
@@ -341,6 +342,7 @@ function registerIpcHandlers(): void {
       ? getHumanNickname()
       : normalizeSideNickname(payload.humanNickname) || HUMAN_NICKNAME_DEFAULT;
     if (payload?.humanNickname !== undefined) setHumanNickname(humanNickname);
+    const aiOnlyBeatLimit = aiOnlyBeatLimitForRequest(payload?.aiOnlyBeatLimit);
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
@@ -354,6 +356,7 @@ function registerIpcHandlers(): void {
       turnLimit: payload?.turnLimit ?? null,
       victoryRule: payload?.victoryRule ?? null,
       aiOnlyBattles: payload?.aiOnlyBattles ?? null,
+      aiOnlyBeatLimit,
       sightCues: payload?.sightCues ?? null,
       humanNicknameLength: humanNickname.length,
     });
@@ -370,6 +373,7 @@ function registerIpcHandlers(): void {
       turnLimit: payload?.turnLimit,
       victoryRule: payload?.victoryRule,
       aiOnlyBattles: payload?.aiOnlyBattles,
+      aiOnlyBeatLimit,
       sightCues: payload?.sightCues,
       humanNickname,
     });

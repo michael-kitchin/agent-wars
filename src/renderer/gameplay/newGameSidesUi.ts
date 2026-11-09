@@ -33,6 +33,7 @@ import { MIN_SEATS } from '../../shared/seatIds';
 import { AI_SEAT_KIND } from '../../shared/seatRoster';
 import { normalizeSideNickname } from '../../shared/sideNicknames';
 import { closeNewGameOptionsPopover } from './newGameOptionsPopover';
+import { readNewGameAiOnlyBeatLimit } from './newGameBeatLimitUi';
 import { bindNewGameVictory, readNewGameAiOnlyBattles, readNewGameSightCues, readNewGameVictory, renderNewGameVictory, resetNewGameVictory } from './newGameVictoryUi';
 import { newGameButtonTooltipText, newGameCommanderTooltipText } from '../chrome/controlTooltipText';
 import { cachedScenarioHomeRegionNames } from './newGameRegionUi';
@@ -255,6 +256,7 @@ export function readNewGameSeatsStart(): {
   readonly turnLimit: number;
   readonly victoryRule: ReturnType<typeof readNewGameVictory>['victoryRule'];
   readonly aiOnlyBattles: ReturnType<typeof readNewGameAiOnlyBattles>;
+  readonly aiOnlyBeatLimit: ReturnType<typeof readNewGameAiOnlyBeatLimit>;
   readonly sightCues: ReturnType<typeof readNewGameSightCues>;
   readonly blocked: string | null;
 } {
@@ -265,6 +267,7 @@ export function readNewGameSeatsStart(): {
     turnLimit: victory.turnLimit,
     victoryRule: victory.victoryRule,
     aiOnlyBattles: readNewGameAiOnlyBattles(),
+    aiOnlyBeatLimit: readNewGameAiOnlyBeatLimit(),
     sightCues: readNewGameSightCues(),
     blocked,
   };

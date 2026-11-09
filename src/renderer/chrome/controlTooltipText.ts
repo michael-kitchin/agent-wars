@@ -636,3 +636,12 @@ export const annihilationExitTooltipText =
  */
 export const aiOnlyResultOkTooltipText =
   'Close this result and return to the world map. The next turn does not start until you press Ready.';
+
+/**
+ * Purpose: Ok on the timed notice skips the wait. The next turn starts only when the observe checkbox is still on.
+ * When to use: `#tactical-annihilation-exit-btn` while the beat-limit notice is counting down.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const aiOnlyTimedResultOkTooltipText =
+  'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';

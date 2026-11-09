@@ -98,7 +98,7 @@ Game Options has a Nickname setting for you, the human player. It starts as Huma
 
 Each opponent's name starts as that side's short home name, and you change it on that side's commander. The match shows those names on the top bar, in reports, and on tooltips. Observe only lets an AI commander play every side. Either map offers two rules: Deathmatch, the default, which has no turn limit, and Most city hexes at turn limit, which lasts 20, 30, 40, or 50 turns (30 unless you pick another).
 
-Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
+Game Options also has AI-only battles. Balanced, the default, fights the closest battle while you are only watching. Unbalanced fights the least equal one, Random picks one, and None leaves those battles on the world map. Beat limit, 30 by default, is the most beats one of those battles can run. Unlimited removes it. None turns it off. Sight cues, on by default, starts each watched turn's playback with lines showing which units each AI commander could see when it planned. The lines appear only while fog of war is on.
 
 ## Saving and Loading
 

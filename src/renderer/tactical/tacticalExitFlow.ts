@@ -6,6 +6,7 @@ import {
   tacticalBoundaryPlanningExitAllowed,
 } from '../../shared/tacticalStateAssertions';
 import { getTacticalAnnihilationOutcome, getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
+import { aiOnlyBattleEndPresentation, formatAiOnlyBeatLimitSentence } from '../../shared/aiOnlyBeatLimit';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { sideDisplayName } from '../../shared/sideNicknames';
@@ -16,7 +17,9 @@ import type { DestroyedBattleParent } from '../../shared/destroyedBattleParent';
 import { attachDestroyedBattleParents, waitingHeldBattleTurnUpdateId } from '../gameplay/heldBattleTurnUpdate';
 import { showHeldBattleTurnUpdate } from '../gameplay/readyResolutionAnnouncements';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
+import { aiOnlyTimedResultOkTooltipText } from '../chrome/controlTooltipText';
 import { closeTacticalAnnihilationOutcomeDialog, openAiOnlyBattleResultDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
+import { scheduleAiOnlyResultAutoClose } from './aiOnlyResultAutoClose';
 import { maybeObserveAutoAdvance } from '../gameplay/observeChrome';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
 import { invalidateBackgroundAiRequest } from '../openRouter/openRouterRuntime';
@@ -73,6 +76,15 @@ export type TacticalBattleExitIo = {
    * Exceptions: Optional; caller swallows failures so exit still restores against the last-beat snapshot.
    */
   refreshStrategicSnapshotAfterExit?: () => Promise<void>;
+  /**
+   * Ends the battle when the beat-limit notice has been up long enough.
+   *
+   * Purpose: The timer lives beside the overlay. The exit itself stays in the renderer, which owns Ready.
+   * When to use: The timed notice only. Other endings do not call it.
+   * Expected outcome: The same leave as Ok, including one next turn when the observe checkbox is still on.
+   * Exceptions: Optional. A missing callback leaves the notice up until Ok.
+   */
+  finishTimedAiOnlyResult?: () => void;
 };
 
 /**
@@ -105,10 +117,17 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
     if (S.resolutionMoveAnimation) return;
     const sentence = aiOnlyResultSentence(snap);
     if (sentence == null) return;
-    if (S.autoAdvance) {
+    const presentation = aiOnlyBattleEndPresentation(snap.aiOnlyEndReason, S.autoAdvance);
+    if (presentation === 'leave_now') {
       if (aiOnlyExitStarted) return;
       aiOnlyExitStarted = true;
       void leaveAiOnlyBattle(session, io, true);
+      return;
+    }
+    if (presentation === 'timed_dialog') {
+      openAiOnlyBattleResultDialog(sentence, aiOnlyTimedResultOkTooltipText);
+      if (io.finishTimedAiOnlyResult) scheduleAiOnlyResultAutoClose(io.finishTimedAiOnlyResult);
+      io.redraw();
       return;
     }
     openAiOnlyBattleResultDialog(sentence);
@@ -126,7 +145,7 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
  *
  * Purpose: The overlay shows this text. A missing home name uses the seat id.
  * When to use: After playback, and not for the header Exit Battle control.
- * Expected outcome: Null while the battle continues.
+ * Expected outcome: Null while the battle continues. A beat-limit ending names the completed beat count, which is one less than the stored turn number.
  * Exceptions: None.
  */
 function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
@@ -134,6 +153,7 @@ function aiOnlyResultSentence(snap: TacticalBattleSnapshot): string | null {
   if (snap.aiOnlyEndReason === 'mutual') return 'All units destroyed.';
   if (snap.aiOnlyEndReason === 'exit') return 'The commanders left the battle.';
   if (snap.aiOnlyEndReason === 'idle') return 'The battle ended with no orders left to carry out.';
+  if (snap.aiOnlyEndReason === 'beat_limit') return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
   const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
   if (winner == null || winner === 'mutual') return 'All units destroyed.';
   const winnerSeat = S.gameState?.seats?.find((seat) => seat.seatId === winner);

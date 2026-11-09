@@ -178,12 +178,12 @@ export interface TacticalBattleSnapshot {
   /**
    * Why an AI-only battle stopped, once the beat that decided it has been stored.
    *
-   * Contract: Absent while the battle continues. `elimination` is one side left, `mutual` is both gone, `idle` is three beats with no applied order, and `exit` is both commanders leaving after five beats.
+   * Contract: Absent while the battle continues. `elimination` is one side left, `mutual` is both gone, `idle` is three beats with no applied order, `exit` is both commanders leaving after five beats, and `beat_limit` is the match's stored limit reached.
    * When to use: After playback, to choose the result sentence. The header Exit Battle control does not read this field.
-   * Expected outcome: One of the four reasons, or absent.
+   * Expected outcome: One of the five reasons, or absent.
    * Exceptions: None.
    */
-  aiOnlyEndReason?: 'elimination' | 'mutual' | 'idle' | 'exit';
+  aiOnlyEndReason?: 'elimination' | 'mutual' | 'idle' | 'exit' | 'beat_limit';
   /**
    * Strategic strategic hex enclosing this tactical battle.
    *

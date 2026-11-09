@@ -16,7 +16,7 @@ import { rendererSharedState as S } from '../core/state';
 import { commanderPoolStatuses, subscribeCommanderPool } from '../openRouter/commanderPoolClient';
 import { renderBattleHeader } from './battleHeader';
 import { dismissStaleControlTooltip, setRichControlTooltip } from './controlTooltip';
-import { forcesStatTooltipText } from './frameTooltipText';
+import { allSidesForcesStatTooltipLead, allSidesProductionStatTooltipText, forcesStatTooltipLead, forcesStatTooltipText, productionStatTooltipText } from './frameTooltipText';
 import { buildSideUnitCountsTooltip } from './sideUnitCountsTooltip';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -301,8 +301,8 @@ function renderTopBarDateBlock(state: GameStateSnapshot | null): void {
  *
  * Purpose: Shows the match's standing at a glance without opening a panel.
  * When to use: From `renderTopBarStatus`.
- * Expected outcome: A turn-limit match shows Cities and hides Enemy homes. A null viewer hides both home readouts.
- *   The Forces tip lists each unit type against its cap.
+ * Expected outcome: A turn-limit match shows Cities and hides Enemy homes. A null viewer hides both home readouts
+ *   and sums Production and Forces for every side still playing. The Forces tip lists each unit type against its cap.
  * Exceptions: None.
  */
 function renderTopBarStats(state: GameStateSnapshot | null): void {
@@ -324,6 +324,7 @@ function renderTopBarStats(state: GameStateSnapshot | null): void {
   }
   const viewer = readoutViewerSeatId(state.seats ?? [], S.viewAs);
   const stats = computeTopBarStats(viewer === undefined ? state : { ...state, viewerSeatId: viewer });
+  const allSides = viewer === null;
   const parts = formatTopBarStatParts(stats);
   setText('topbar-stat-production', parts.production);
   setText('topbar-stat-production-suffix', '/turn');
@@ -338,7 +339,14 @@ function renderTopBarStats(state: GameStateSnapshot | null): void {
   setHostHidden('topbar-stat-enemy-home-host', stats.enemyHomes === null);
   setHostHidden('topbar-stat-cities-host', stats.cities === null);
   document.getElementById('topbar-stat-cities-host')?.setAttribute('data-control-tooltip', parts.citiesTooltip);
-  document.getElementById('topbar-stat-forces-host')?.setAttribute('data-control-tooltip', forcesStatTooltipText(formatForcesBreakdown(stats)));
+  document.getElementById('topbar-stat-production-host')?.setAttribute(
+    'data-control-tooltip',
+    allSides ? allSidesProductionStatTooltipText : productionStatTooltipText
+  );
+  document.getElementById('topbar-stat-forces-host')?.setAttribute(
+    'data-control-tooltip',
+    forcesStatTooltipText(formatForcesBreakdown(stats), allSides ? allSidesForcesStatTooltipLead : forcesStatTooltipLead)
+  );
   setText('topbar-stat-credits', parts.credits);
   setText('topbar-stat-credits-suffix', parts.creditsSuffix);
   setHostHidden('topbar-stat-credits-host', stats.credits === null);

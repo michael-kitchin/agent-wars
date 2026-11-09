@@ -15,6 +15,7 @@ import { resolveNewMatchSeats, type ResolvedNewMatchSeat } from './seatResolutio
 import { createSeededRng } from '../seededRng';
 import { DEFAULT_PROVIDER_SORT } from '../../shared/openRouterProviderSort';
 import { AI_SEAT_KIND, DEFAULT_DOCTRINE, DOCTRINES, HUMAN_SEAT_KIND, type Doctrine, type SeatCommander, type SeatRecord } from '../../shared/seatRoster';
+import { AI_ONLY_BEAT_LIMIT_CONFIG_KEY, aiOnlyBeatLimitForRequest, aiOnlyBeatLimitToStored, type AiOnlyBeatLimit } from '../../shared/aiOnlyBeatLimit';
 import { aiOnlyBattlesForRequest, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY, sightCuesForRequest } from '../../shared/sightCueSettings';
 import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
@@ -202,6 +203,15 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly aiOnlyBattles?: AiOnlyBattleMode;
+  /**
+   * Requested cap on an AI-only battle.
+   *
+   * Contract: Null stores Unlimited. Omitted or unlisted stores 30. A listed number is stored as itself.
+   * When to use: The new-game dialog's Beat limit control, only when Start succeeds.
+   * Expected outcome: Stored as `ai_only_beat_limit`. Changing the select does not rewrite a match that is already running.
+   * Exceptions: None.
+   */
+  readonly aiOnlyBeatLimit?: AiOnlyBeatLimit;
   /**
    * Whether observed playback opens with sight lines.
    *
@@ -430,6 +440,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   });
   clearAttackMixOnNewGame();
   const aiOnlyBattles = aiOnlyBattlesForRequest(options?.aiOnlyBattles);
+  const aiOnlyBeatLimit = aiOnlyBeatLimitForRequest(options?.aiOnlyBeatLimit);
   const sightCues = sightCuesForRequest(options?.sightCues);
   logDebug('gameDb resetGameForNewMatch', {
     fogOfWarEnabled,
@@ -437,6 +448,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     ...originBonusSettings,
     gameMapId: options?.gameMapId ?? null,
     aiOnlyBattles,
+    aiOnlyBeatLimit,
     sightCues,
   });
   if (!deps.hasDb()) return;
@@ -471,6 +483,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     upsertGameConfigValue({ run }, 'turn_limit', String(victory.turnLimit));
   }
   upsertGameConfigValue({ run }, 'ai_only_battles', aiOnlyBattles);
+  upsertGameConfigValue({ run }, AI_ONLY_BEAT_LIMIT_CONFIG_KEY, aiOnlyBeatLimitToStored(aiOnlyBeatLimit));
   upsertGameConfigValue({ run }, SIGHT_CUES_CONFIG_KEY, sightCues ? '1' : '0');
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);

@@ -8,7 +8,7 @@ import { ALL_BUILD_UNIT_TYPES, type BuildUnitType } from './ipc/productionTypes'
 import { HUMAN_SEAT_ID, type SeatId } from './seatIds';
 import { type SeatKind } from './seatRoster';
 import { sideDisplayName } from './sideNicknames';
-import { getPlayerUnitCountsByType } from './unitCountsByType';
+import { countFieldedForSides, readoutSideIds, scaleCapsForSides } from './topBarSideTotals';
 import { countCityHexesBySeat, rankSeatsByCityHexes, type VictorySettings } from './victoryRules';
 
 /**
@@ -59,9 +59,9 @@ export interface TopBarStatsInput {
   /**
    * The seat the readouts are for.
    *
-   * Contract: A seat id, null when the match has no active human seat, or omitted to mean the human seat.
-   * When to use: Pass null while observing. Omit it for a two-seat snapshot that has no roster.
-   * Expected outcome: Null omits Your home and Enemy homes.
+   * Contract: A seat id, null for All sides, or omitted to mean the human seat.
+   * When to use: Pass null for All sides. Omit it when the snapshot has no chosen viewer.
+   * Expected outcome: Null sums Production and Forces for every side still playing. A named seat uses that seat only.
    * Exceptions: None.
    */
   readonly viewerSeatId?: string | null;
@@ -207,18 +207,18 @@ export interface HomeHold {
  */
 export interface TopBarStats {
   /**
-   * Production the human player's cities can add each turn.
+   * Production the viewed side's cities can add each turn, or every side still playing when the viewer is null.
    *
-   * Contract: Matches the per-turn credit rule: current urban count, human control, no neutral-border hexes.
+   * Contract: Current urban count on hexes the viewer controls, excluding neutral-border hexes. A null viewer sums every side still playing.
    * When to use: The Production readout.
    * Expected outcome: Zero or more.
    * Exceptions: None.
    */
   readonly productionPerTurn: number;
   /**
-   * Human units fielded, by type.
+   * Units fielded by the viewed side, or by every side still playing when the viewer is null, by type.
    *
-   * Contract: Only the four buildable types are counted.
+   * Contract: Buildable types only. Mercenaries are left out. A null viewer sums every side still playing.
    * When to use: The Forces tip.
    * Expected outcome: Zero for a type with no units.
    * Exceptions: None.
@@ -227,7 +227,7 @@ export interface TopBarStats {
   /**
    * The game size's cap for each type.
    *
-   * Contract: From `getMaxUnitsPerType`.
+   * Contract: From `getMaxUnitsPerType`. A null viewer multiplies each cap by the number of sides still playing. An empty roster keeps one side's cap.
    * When to use: The Forces tip.
    * Expected outcome: Positive numbers.
    * Exceptions: None.
@@ -247,7 +247,7 @@ export interface TopBarStats {
    *
    * Contract: Equals the sum of the per-type caps.
    * When to use: The Forces readout's suffix.
-   * Expected outcome: 34 for a Small game.
+   * Expected outcome: 36 for one Small side. All sides multiplies that by the number of sides still playing.
    * Exceptions: None.
    */
   readonly unitCap: number;
@@ -294,8 +294,9 @@ export interface TopBarStats {
  *
  * Purpose: Display-only totals derived in the renderer; nothing here changes game state.
  * When to use: On every top-bar refresh with a snapshot. Pass `isNeutralBorder` only in tests.
- * Expected outcome: Production and forces are the viewer's. Your home is the viewer's own home.
- *   Enemy homes are the active enemies' homes taken together. A turn-limit match shows Cities instead.
+ * Expected outcome: Production and forces are the viewer's, or every side still playing when the viewer is null.
+ *   Your home is the viewer's own home. Enemy homes are the active enemies' homes taken together.
+ *   A turn-limit match shows Cities instead.
  * Exceptions: None; missing lists count as empty. A null viewer does not throw.
  */
 export function computeTopBarStats(
@@ -304,14 +305,19 @@ export function computeTopBarStats(
 ): TopBarStats {
   const viewer = input.viewerSeatId === undefined ? HUMAN_SEAT_ID : input.viewerSeatId;
   const control = input.strategicControl ?? [];
+  const sides = readoutSideIds(viewer, input.seats);
+  const sideSet = new Set(sides);
   const heldHexes = new Set(
-    viewer === null ? [] : control.filter((row) => row.controllerPlayerId === viewer).map((row) => row.h3Index)
+    control
+      .filter((row) => row.controllerPlayerId != null && sideSet.has(row.controllerPlayerId))
+      .map((row) => row.h3Index)
   );
   const productionPerTurn = (input.strategicInfrastructure ?? [])
     .filter((row) => heldHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index))
     .reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
-  const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), viewer ?? '');
-  const capByType = getMaxUnitsPerType(parseGameSize(input.gameSize));
+  const fieldedByType = countFieldedForSides(input.units, sides);
+  const caps = getMaxUnitsPerType(parseGameSize(input.gameSize));
+  const capByType = viewer === null ? scaleCapsForSides(caps, sides.length) : caps;
   const unitsFielded = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + fieldedByType[unitType], 0);
   const unitCap = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + capByType[unitType], 0);
   const turnLimit = input.victory?.rule === 'most_city_hexes_at_turn_limit' ? input.victory.turnLimit : null;
@@ -447,7 +453,7 @@ export interface TopBarStatParts {
    */
   readonly forces: string;
   /**
-   * The cap suffix, such as "/34".
+   * The cap suffix, such as "/36".
    *
    * Contract: Starts with "/".
    * When to use: `#topbar-stat-forces-cap`.
@@ -546,7 +552,7 @@ function formatCount(value: number): string {
  *
  * Purpose: Keeps the number format in one place.
  * When to use: After `computeTopBarStats`.
- * Expected outcome: For example production "⚒1,530", credits "¤120" or empty, forces "10" and "/34", homes "12" and "/15".
+ * Expected outcome: For example production "⚒1,530", credits "¤120" or empty, forces "10" and "/36", homes "12" and "/15".
  * Exceptions: None.
  */
 export function formatTopBarStatParts(stats: TopBarStats): TopBarStatParts {

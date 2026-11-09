@@ -587,6 +587,15 @@ victoryRule?: VictoryRule;
    */
 aiOnlyBattles?: AiOnlyBattleMode;
     /**
+   * Requested cap on an AI-only battle.
+   *
+   * Contract: Null means Unlimited. Omitted or unlisted stores 30. Stored as `ai_only_beat_limit`. Changing the select does not rewrite a match that is already running.
+   * When to use: The new-game dialog's Beat limit control, only when Start succeeds.
+   * Expected outcome: `null` or one of 20, 30, 40, and 50 on the start payload.
+   * Exceptions: None.
+   */
+aiOnlyBeatLimit?: number | null;
+    /**
    * Whether observed playback opens with sight lines.
    *
    * Contract: Omitted or not a boolean stores on. Stored as `sight_cues`. Changing the box does not rewrite a match that is already running.

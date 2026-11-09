@@ -158,8 +158,40 @@ test('computeTopBarStats omits both home readouts for a null viewer and still li
   assert.equal(stats.enemyHomes, null);
   assert.equal(stats.cities?.summary, null);
   assert.equal(stats.cities?.tooltip.includes('(you)'), false);
-  assert.equal(stats.productionPerTurn, 0);
   assert.equal(stats.credits, null);
+});
+
+test('computeTopBarStats totals every active side for a null viewer', () => {
+  const units = [...input.units, { player: 'human', unitType: 'infantry', isMercenary: true }];
+  const stats = computeTopBarStats({ ...input, units, viewerSeatId: null }, notNeutral);
+  assert.equal(stats.productionPerTurn, 152);
+  assert.equal(stats.unitsFielded, 5);
+  assert.deepEqual(stats.fieldedByType, { infantry: 3, armor: 1, naval: 0, air: 1, missile: 0 });
+  assert.equal(stats.unitCap, 72);
+  assert.equal(stats.yourHome, null);
+});
+
+test('computeTopBarStats leaves a knocked-out side and Neutral out of the all-sides totals', () => {
+  const seats = input.seats?.map((seat) => (seat.seatId === 'opponent' ? { ...seat, outTurn: 4 } : seat));
+  const units = [...input.units, { player: 'neutral', unitType: 'infantry' }];
+  const stats = computeTopBarStats({ ...input, seats, units, viewerSeatId: null }, notNeutral);
+  assert.equal(stats.productionPerTurn, 102);
+  assert.equal(stats.unitsFielded, 4);
+  assert.equal(stats.unitCap, 36);
+});
+
+test('computeTopBarStats keeps one side\'s numbers for a named viewer', () => {
+  const stats = computeTopBarStats({ ...input, viewerSeatId: 'opponent' }, notNeutral);
+  assert.equal(stats.productionPerTurn, 50);
+  assert.equal(stats.unitsFielded, 1);
+  assert.equal(stats.unitCap, 36);
+});
+
+test('computeTopBarStats keeps the human seat when viewerSeatId is omitted', () => {
+  const stats = computeTopBarStats(input, notNeutral);
+  assert.equal(stats.productionPerTurn, 102);
+  assert.equal(stats.unitsFielded, 4);
+  assert.equal(stats.unitCap, 36);
 });
 
 test('credits are short when they cannot cover upkeep', () => {

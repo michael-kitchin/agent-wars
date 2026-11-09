@@ -526,7 +526,7 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-options-popover',
     scenes: [SCENES.newGameOptions],
-    needs: ['#new-game-options-popover', '#new-game-human-nickname', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-options-popover', '#new-game-human-nickname', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-beat-limit-select', '#new-game-section-other', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
     run: (p, el) => {
       if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
       const victory = el('#new-game-victory-select');
@@ -540,15 +540,12 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (!near(turnLimit.w, victory.w) || !near(aiOnly.w, victory.w)) {
         return `the Victory selects are ${Math.round(victory.w)}, ${Math.round(turnLimit.w)}, and ${Math.round(aiOnly.w)} px wide`;
       }
+      const beatLimit = el('#new-game-beat-limit-select');
+      if (!near(beatLimit.y, aiOnly.y) || !near(beatLimit.x, turnLimit.x) || !near(beatLimit.w, turnLimit.w)) {
+        return `Beat limit is at ${fmt(beatLimit)}, expected beside AI-only and under Turn limit ${fmt(turnLimit)}`;
+      }
       if (victory.w < 80 || turnLimit.w < 80 || aiOnly.w < 80) {
         return `a Victory select is under 80 px: Rule ${Math.round(victory.w)}, Turn limit ${Math.round(turnLimit.w)}, AI-Only ${Math.round(aiOnly.w)}`;
-      }
-      const sightCues = el('#new-game-sight-cues-checkbox');
-      if (Math.abs((sightCues.y + sightCues.h / 2) - (aiOnly.y + aiOnly.h / 2)) > 4) {
-        return `Sight cues is at ${fmt(sightCues)}, expected on the AI-Only row ${fmt(aiOnly)}`;
-      }
-      if (sightCues.x < aiOnly.x + aiOnly.w) {
-        return `Sight cues is at ${fmt(sightCues)}, expected to the right of the AI-Only select ${fmt(aiOnly)}`;
       }
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
       if (!(victory.y < origin.y)) return 'Victory is not above the bonuses';
@@ -557,11 +554,23 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (!near(turnLimit.x + turnLimit.w, weather.x + weather.w)) {
         return `Turn limit ends at ${Math.round(turnLimit.x + turnLimit.w)}, Weather ends at ${Math.round(weather.x + weather.w)}`;
       }
-      const fog = el('#new-game-fog-checkbox');
-      const autoStart = el('#new-game-auto-start-checkbox');
-      return fog.shown && autoStart.shown && near(autoStart.y, fog.y) && autoStart.x > fog.x
-        ? null
-        : `Auto-start AI is at ${fmt(autoStart)}, expected right of Fog of war ${fmt(fog)} on the same line`;
+      const other = el('#new-game-section-other');
+      if (!other.shown || other.text !== 'Other' || !(other.y > weather.y)) {
+        return `Other is "${other.text}" at ${fmt(other)}, expected under Weather ${fmt(weather)}`;
+      }
+      const fog = el('label[for="new-game-fog-checkbox"]');
+      const sightCues = el('label[for="new-game-sight-cues-checkbox"]');
+      const autoStart = el('label[for="new-game-auto-start-checkbox"]');
+      if (!(fog.y > other.y) || !near(sightCues.y, fog.y) || !near(autoStart.y, fog.y)) {
+        return `the checks are Fog ${fmt(fog)}, Sight cues ${fmt(sightCues)}, Auto-start AI ${fmt(autoStart)}`;
+      }
+      if (!(fog.x < sightCues.x && sightCues.x < autoStart.x)) {
+        return `the checks are Fog ${fmt(fog)}, Sight cues ${fmt(sightCues)}, Auto-start AI ${fmt(autoStart)}`;
+      }
+      if (!near(fog.w, sightCues.w) || !near(sightCues.w, autoStart.w)) {
+        return `the Other columns are ${Math.round(fog.w)}, ${Math.round(sightCues.w)}, and ${Math.round(autoStart.w)} px`;
+      }
+      return null;
     },
   },
   {

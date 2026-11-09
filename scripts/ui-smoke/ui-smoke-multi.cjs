@@ -10,6 +10,7 @@
 'use strict';
 
 const { SCENES, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
+const { checkBeatLimitControl, runBeatLimitBattleScenes } = require('./ui-smoke-beat-limit.cjs');
 const { clickStartGame, openNewGameOverlay, startObservedMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const { readGameState } = require('./ui-smoke-map.cjs');
 const { editSavedMatch, launchApp } = require('./ui-smoke-session.cjs');
@@ -240,11 +241,18 @@ async function runMultiCommanderScenes(ctx) {
     await page.click('#new-game-observe-only');
     await page.waitForFunction(() => document.getElementById('new-game-observe-only')?.checked === true, null, { timeout: 10000 });
     await addSidesUntil(page, 4);
+    await checkBeatLimitControl(page);
     await startObservedMatch(page, 120000);
     await page.click('#console-tab-reports');
     await page.waitForTimeout(SETTLE_MS.click);
     await openViewAs(page);
     await ctx.recordScene(page, ctx.report, ctx.outDir, SCENES.matchObserve);
+    ({ app, page } = await runBeatLimitBattleScenes({
+      app,
+      page,
+      report: ctx.report,
+      reopen: (currentApp, statements) => reopenEditedMatch(ctx, currentApp, statements),
+    }));
   } finally {
     if (app) await app.close().catch(() => undefined);
   }

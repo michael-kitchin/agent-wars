@@ -1,5 +1,5 @@
 /**
- * Shows Victory and Rules for a new match in a popover under the Game Options button.
+ * Shows Victory, Rules, and Other for a new match in a popover under the Game Options button.
  *
  * Purpose: Those controls stay in the document, so the existing readers and preview listeners keep their ids.
  * When to use: `wireNewGameOptionsPopover` once at startup. `toggleNewGameOptionsPopover` from the button.
@@ -53,7 +53,7 @@ export function closeNewGameOptionsPopover(): void {
 /**
  * Opens or closes Game Options from its button.
  *
- * Purpose: The button is the only control that shows Victory and Rules.
+ * Purpose: The button is the only control that shows Victory, Rules, and Other.
  * When to use: The button's click.
  * Expected outcome: An open popover closes. A closed one closes the commander popover, then opens under the button.
  * Exceptions: None. A missing popover element does nothing.

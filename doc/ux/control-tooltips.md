@@ -32,10 +32,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Victory rule: Deathmatch ends when one side remains. Most city hexes at turn limit ends the match at the turn limit, and the side holding the most city hexes wins.
 - Turn limit: How long a Most city hexes match lasts. 30 is the usual length. Deathmatch has no turn limit.
 - AI-only battles: Balanced fights the battle where the two sides are closest in numbers. Unbalanced fights the least equal battle. Random picks one battle. None keeps those battles on the world map. This applies only while you are observing.
+- Beat limit: The most beats an AI-only battle can run. When it reaches them, the battle ends as if Exit Battle had been pressed. This applies only while you are observing. Choosing None under AI-only battles turns this off.
 - Sight cues: Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing.
 - Start game or New game, while the rows cannot start: "At least 2 sides", "Each side needs a home", or "Two sides share a home".
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- "Game Options": Nickname, victory rule, turn limit, AI-only battles, Sight cues, bonuses, fog of war, and Auto-start AI.
+- "Game Options": Nickname, victory rule, turn limit, AI-only battles, beat limit, bonuses, fog of war, Sight cues, and Auto-start AI.
 - Nickname: The name shown for you during a match. Saved on this computer, and used the next time a game starts.
 - Origin bonus: Default adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Default, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
@@ -79,8 +80,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Production map mode: Show or hide production on every world hex, the way holding T does. Off shows it only on hexes you control.
 - Legend: Show or hide the terrain legend and its map theme. (`mapLegendToggleTooltipText` in `src/renderer/chrome/frameTooltipText.ts`, and the same sentence on `#map-legend-toggle` in `static/index.html`).
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
-- Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
-- Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list.
+- Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none. While View as is All sides, the tip is `allSidesProductionStatTooltipText`: the production every side's cities can add each turn, added together, with the same building and neutral-border rule.
+- Forces readout: `forcesStatTooltipLead`, then each unit type that counts toward the cap as "infantry 3 of 12", separated by commas, ending with a period. Mercenaries are not in that list. While View as is All sides, the lead is `allSidesForcesStatTooltipLead` and each cap is that side's cap times the number of sides still playing.
 - Side chip: the human seat's own chip, and each AI seat's chip while observing, including a knocked-out AI seat. The tip opens on the name or its dot. One line per unit type that side has in the snapshot on screen, cheapest first (`unitCostFor`), as "10 Infantry". The mark is that side's mini unit token, the same circle the dice chips and loss lines use (`createLossTypeToken`). A type with none is left out. Mercenaries count under their type. The last line is a bold "Total:" and the count of those units. A side with none shows only "Total: 0". The other side names have no tip. See [top-bar.md](top-bar.md).
 - Credits readout: `formatCreditsTooltip` in `src/shared/mercenaryRules.ts`. It names the treasury, upkeep, mercenary count, and the hire amount already taken from the balance. The balance, the upkeep, and that hire amount start with `¤` (`CREDITS_SYMBOL`). The sentence that names `CREDITS_PER_ITEM` still says credits.
 - Hire marker: `Hire Units` (`hireEntryTooltipText`). Hire count, Hire, and remove: `hireCountTooltipText`, `hireSubmitTooltipText`, and `hireRemoveTooltipText` in `src/renderer/chrome/hireTooltipText.ts`.
@@ -130,7 +131,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Ignore: Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.
 - Exit Battle during a fight: Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.
 - Exit Battle on the annihilation result: Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.
-- Ok on an AI-only result: Close this result and return to the world map. The next turn does not start until you press Ready.
+- Ok on an AI-only result: Close this result and return to the world map. The next turn does not start until you press Ready. On the beat-limit notice that closes itself, the tip is `aiOnlyTimedResultOkTooltipText`: Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.
 - Build or hire close: Close this popup (`buildPopupCloseTooltipText`).
 - Single-hex queue remove: Remove this row from the queue (`singleHexQueueRemoveTooltipText`).
 - Multi-hex queue remove: Remove this row on every selected hex (`multiHexQueueRemoveTooltipText`).
@@ -201,7 +202,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/index.html` (`#control-tooltip`)
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
-- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`, `mapThemeTooltipText`)
+- `src/renderer/chrome/controlTooltipText.ts` (`launchAimTooltipText`, `launchStopTooltipText`, `KEEP_BUILDING_FORTIFICATION_NOTE`, `forcesStatTooltipLead`, `buildEntryTooltipTextFor`, `aiOnlyBattlesSelectTooltipText`, `sightCuesCheckboxTooltipText`, `humanNicknameFieldTooltipText`, `commanderNicknameTooltipText`, `newGameCommanderTooltipText`, `exitBattleTooltipText`, `annihilationExitTooltipText`, `aiOnlyResultOkTooltipText`, `aiOnlyTimedResultOkTooltipText`, `mapThemeTooltipText`)
 - `src/shared/economySymbols.ts` (`CREDITS_SYMBOL`)
 - `src/renderer/chrome/hireTooltipText.ts`
 - `src/shared/queueItemTooltipText.ts` (`queueItemTooltipText`)
@@ -211,7 +212,7 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `src/shared/mercenaryDismiss.ts` (`DISMISS_MERCENARY_TOOLTIP`, `DISMISS_MERCENARY_CANCEL_TOOLTIP`, `DISMISS_MERCENARY_CONFIRM_TOOLTIP`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/shared/missileRules.ts` (`LAUNCH_NEEDS_MISSILES_ONLY_REASON`, `MISSILES_CANNOT_FIRE_IN_BATTLE_REASON`)
-- `src/renderer/chrome/frameTooltipText.ts`
+- `src/renderer/chrome/frameTooltipText.ts` (`allSidesProductionStatTooltipText`, `allSidesForcesStatTooltipLead`)
 - `src/renderer/chrome/sideUnitCountsTooltip.ts` (`buildSideUnitCountsTooltip`)
 - `src/shared/sideUnitCounts.ts` (`countSideUnitsByType`, `formatSideUnitCountsText`)
 - `src/shared/saveLoadAvailability.ts`

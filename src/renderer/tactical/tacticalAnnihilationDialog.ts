@@ -9,6 +9,7 @@ import { updateReadyButtonState } from '../openRouter/openRouterUiHelpers';
 import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 import { syncTacticalExitButtonElementVisibility } from './tacticalExitButtonDom';
 import { aiOnlyResultOkTooltipText, annihilationExitTooltipText } from '../chrome/controlTooltipText';
+import { cancelAiOnlyResultAutoClose } from './aiOnlyResultAutoClose';
 
 /** Neutral copy when both tactical sides have zero sub-units after the same beat. */
 const TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = 'All units destroyed.';
@@ -53,10 +54,10 @@ export function openTacticalAnnihilationOutcomeDialog(outcome: TacticalAnnihilat
  *
  * Purpose: The human win/loss kind cannot hold an idle or commander-exit sentence.
  * When to use: After playback when the checkbox is off, and when the header Exit Battle control is used then.
- * Expected outcome: The message is `sentence`. Ready stays blocked until Ok. The human dialog field stays null.
+ * Expected outcome: The message is `sentence`. Ready stays blocked until Ok. The human dialog field stays null. `okTooltip` is the button tip, and it defaults to the manual-Ready sentence.
  * Exceptions: None.
  */
-export function openAiOnlyBattleResultDialog(sentence: string): void {
+export function openAiOnlyBattleResultDialog(sentence: string, okTooltip: string = aiOnlyResultOkTooltipText): void {
   S.aiOnlyBattleResultSentence = sentence;
   S.tacticalAnnihilationOutcomeDialog = null;
   void stopOpponentPlanning('teardown');
@@ -66,7 +67,7 @@ export function openAiOnlyBattleResultDialog(sentence: string): void {
   if (messageEl) messageEl.textContent = sentence;
   if (button) {
     button.textContent = 'Ok';
-    button.setAttribute('data-control-tooltip', aiOnlyResultOkTooltipText);
+    button.setAttribute('data-control-tooltip', okTooltip);
   }
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
@@ -79,10 +80,11 @@ export function openAiOnlyBattleResultDialog(sentence: string): void {
  *
  * Purpose: Prevents a stuck modal when the tactical session ends without using the overlay button.
  * When to use: Successful `tacticalPerformBattleExit`, `tacticalReleaseRendererSessionForNewStrategicMatch`, and tactical reconcile paths.
- * Expected outcome: `S.tacticalAnnihilationOutcomeDialog` null, overlay `hidden`, main map interactions restored unless another overlay owns blocking.
+ * Expected outcome: Any beat-limit timer is canceled first. `S.tacticalAnnihilationOutcomeDialog` is null, the overlay is `hidden`, and main map interactions are restored unless another overlay owns blocking.
  * Exceptions: None; safe when the dialog was never opened.
  */
 export function closeTacticalAnnihilationOutcomeDialog(): void {
+  cancelAiOnlyResultAutoClose();
   S.tacticalAnnihilationOutcomeDialog = null;
   S.aiOnlyBattleResultSentence = null;
   const button = document.getElementById('tactical-annihilation-exit-btn');

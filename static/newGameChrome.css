@@ -202,7 +202,7 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 }
 
 /* ---------- Sections ---------- */
-/* Map, Sides, and Forces, each under a small title and a divider. Victory and Rules use the same section
+/* Map, Sides, and Forces, each under a small title and a divider. Victory, Rules, and Other use the same section
    inside Game Options. Controls are 30 px tall, the same as a randomize
    square, so every row lines up. */
 .new-game-section {
@@ -469,9 +469,9 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   color: var(--chrome-muted);
   border: 1px dashed var(--chrome-border);
 }
-/* One grid of label and dropdown pairs: Rule and Turn limit, then AI-only battles in the left half.
-   Sight cues fills the right half of the AI-only battles row. Each label column is as wide as its longest label and the
-   two dropdown columns share what is left, so Rule, Turn limit, and AI-only battles are one width and fill the row. */
+/* One grid of label and dropdown pairs: Rule and Turn limit, then AI-only battles and Beat limit.
+   Each label column is as wide as its longest label and the two dropdown columns share what is left,
+   so Rule, Turn limit, AI-only battles, and Beat limit are one width and fill the row. */
 .new-game-victory {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
@@ -481,8 +481,8 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-victory > label {
   white-space: nowrap;
 }
-/* Turn limit opens the second pair, set a little apart from Rule's dropdown. */
-.new-game-victory > label:nth-of-type(2) {
+/* Turn limit and Beat limit each open the second pair on their row. */
+.new-game-victory > label:nth-of-type(2n) {
   padding-left: 10px;
 }
 .new-game-victory > select {
@@ -490,19 +490,6 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   min-width: 0;
   box-sizing: border-box;
 }
-/* Sight cues fills the right half of the AI-only battles row, set apart like Turn limit.
-   The shared check rule adds a bottom margin that lifts this label above the other labels. */
-.new-game-victory > .new-game-sight-cues {
-  grid-column: 3 / 5;
-  padding-left: 10px;
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
-.new-game-victory > .new-game-sight-cues input {
-  margin: 0;
-}
-
 /* ---------- Forces ---------- */
 .new-game-advanced-tech {
   margin: 0;
@@ -650,20 +637,20 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   width: 100%;
   min-width: 0;
 }
+/* ---------- Other ---------- */
+/* Fog of war, Sight cues, and Auto-start AI share the popover width in three equal columns. */
 .new-game-checks {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 16px;
-  row-gap: 8px;
-  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  column-gap: 8px;
 }
-.new-game-check {
-  display: inline-flex;
-  align-items: center;
+.new-game-checks .new-game-check {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  margin-top: 0;
+  min-width: 0;
+  margin: 0;
 }
 .game-over-standings[hidden] { display: none !important; }
 .game-over-standings-head,

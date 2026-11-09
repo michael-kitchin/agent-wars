@@ -14,7 +14,7 @@ import {
   getSeatRoster,
   listScenarioHomeRegions,
 } from '../gameDb';
-import { setGameOutcomeWithOps } from './gameConfigKv';
+import { readAiOnlyBeatLimit, setGameOutcomeWithOps } from './gameConfigKv';
 import { listGameMaps } from '../gameMap/listGameMaps';
 import { withSeatedTempGameDb } from '../testSupport/withSeatedTempGameDb';
 
@@ -336,3 +336,32 @@ function assertExclusiveHomesAreControlled(seats: readonly { seatId: string; hom
     }
   }
 }
+
+test('a start stores a beat limit, a stored unlimited value reads null, and an omitted field stores 30', () => {
+  const regions = largestHomeRegions(2);
+  const seats = [
+    { kind: 'human' as const, homeRegion: regions[0] },
+    { kind: 'ai' as const, homeRegion: regions[1] },
+  ];
+  const read = (): ReturnType<typeof readAiOnlyBeatLimit> => readAiOnlyBeatLimit({ getOne: dbGetOne, run: dbRun });
+  withSeatedTempGameDb('aw-beat-limit-listed-', {
+    gameMapId: 'global',
+    seats,
+    aiOnlyBeatLimit: 40,
+  }, () => {
+    assert.equal(read(), 40);
+  });
+  withSeatedTempGameDb('aw-beat-limit-unlimited-', {
+    gameMapId: 'global',
+    seats,
+    aiOnlyBeatLimit: null,
+  }, () => {
+    assert.equal(read(), null);
+  });
+  withSeatedTempGameDb('aw-beat-limit-omitted-', {
+    gameMapId: 'global',
+    seats,
+  }, () => {
+    assert.equal(read(), 30);
+  });
+});

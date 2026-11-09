@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { dbRun } from '../gameDb';
 import { setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { applyAiOnlyTacticalBeat } from './aiOnlyTacticalBeat';
 import { getActiveTacticalBattleSnapshot, isTacticalBattleActive } from './tacticalBattleSession';
@@ -12,6 +13,18 @@ import { tacticalDbFixtureRegisterDefaultAfterEach } from './testSupport/tactica
 import { emptyPlan, legalStep, storedUnit, withTwoAiBattle } from './testSupport/twoAiBattleFixture';
 
 tacticalDbFixtureRegisterDefaultAfterEach();
+
+/**
+ * Writes the beat-limit row in the temp match this test opened.
+ *
+ * Purpose: Each `withTwoAiBattle` callback has its own database, so the row has to be written inside it.
+ * When to use: Before `applyAiOnlyTacticalBeat` in a limit test.
+ * Expected outcome: The row replaces any earlier value.
+ * Exceptions: Throws when the temp database is closed.
+ */
+function storeBeatLimit(value: string): void {
+  dbRun("INSERT OR REPLACE INTO game_config (key, value) VALUES ('ai_only_beat_limit', ?)", [value]);
+}
 
 test('both drafts move their own sub-units in one beat', () => {
   withTwoAiBattle('aw-ai-only-both-move-', (battle) => {
@@ -122,5 +135,77 @@ test('a contested cell returns melee results and dice', () => {
     if (!beat.success) return;
     assert.ok(beat.meleePack.meleeCombatHexes.includes(lead.h3Index), lead.h3Index);
     assert.ok(beat.meleePack.meleeDiceRolls.length > 0);
+  });
+});
+
+test('one beat before the limit continues', () => {
+  withTwoAiBattle('aw-ai-only-beat-before-', (battle) => {
+    storeBeatLimit('20');
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 19, idleBeatStreak: 0 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : 'beat_limit', undefined);
+    assert.equal(beat.success ? beat.battle.tacticalTurnNumber : 0, 20);
+  });
+});
+
+test('the limit ends the battle after that beat', () => {
+  withTwoAiBattle('aw-ai-only-beat-limit-', (battle) => {
+    storeBeatLimit('20');
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 20, idleBeatStreak: 0 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : undefined, 'beat_limit');
+    assert.equal(beat.success ? beat.battle.tacticalTurnNumber : 0, 21);
+    assert.equal(isTacticalBattleActive(), true);
+  });
+});
+
+test('Unlimited never ends on beats', () => {
+  withTwoAiBattle('aw-ai-only-beat-unlimited-', (battle) => {
+    storeBeatLimit('unlimited');
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 500, idleBeatStreak: 0 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : 'beat_limit', undefined);
+  });
+});
+
+test('a save with no row never ends on beats', () => {
+  withTwoAiBattle('aw-ai-only-beat-missing-', (battle) => {
+    // A new match stores 30. An old save is that match with the row removed.
+    dbRun("DELETE FROM game_config WHERE key = 'ai_only_beat_limit'");
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 500, idleBeatStreak: 0 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : 'beat_limit', undefined);
+  });
+});
+
+test('idle wins on the limit beat', () => {
+  withTwoAiBattle('aw-ai-only-beat-idle-', (battle) => {
+    storeBeatLimit('20');
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 20, idleBeatStreak: 2 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : undefined, 'idle');
+  });
+});
+
+test('commander exit wins on the limit beat', () => {
+  withTwoAiBattle('aw-ai-only-beat-exit-', (battle) => {
+    storeBeatLimit('20');
+    setActiveTacticalBattleSnapshotRef({ ...battle, tacticalTurnNumber: 20, idleBeatStreak: 0 });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(true), opposingDraft: emptyPlan(true) });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : undefined, 'exit');
+  });
+});
+
+test('a wipe wins on the limit beat', () => {
+  withTwoAiBattle('aw-ai-only-beat-wipe-', (battle) => {
+    storeBeatLimit('20');
+    const lead = battle.leadPartyId!;
+    setActiveTacticalBattleSnapshotRef({
+      ...battle,
+      tacticalTurnNumber: 20,
+      subUnits: battle.subUnits.filter((unit) => unit.player === lead),
+    });
+    const beat = applyAiOnlyTacticalBeat({ leadDraft: emptyPlan(), opposingDraft: emptyPlan() });
+    assert.equal(beat.success ? beat.battle.aiOnlyEndReason : undefined, 'elimination');
   });
 });

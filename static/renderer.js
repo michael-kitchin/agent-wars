@@ -23029,6 +23029,7 @@ ${bonuses}`;
   var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
   var annihilationExitTooltipText = "Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.";
   var aiOnlyResultOkTooltipText = "Close this result and return to the world map. The next turn does not start until you press Ready.";
+  var aiOnlyTimedResultOkTooltipText = 'Close this result now and return to the world map. The next turn starts then if "Start the next turn when every commander is ready" is checked.';
 
   // src/renderer/openRouter/openRouterModelRefresh.ts
   var refreshModels = null;
@@ -24177,9 +24178,12 @@ ${bonuses}`;
   function unavailableTooltipText(name) {
     return `${name} is not available in this version.`;
   }
+  var productionStatTooltipText = "The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.";
   var forcesStatTooltipLead = "Units you have fielded, out of the most this game size allows";
-  function forcesStatTooltipText(breakdown) {
-    return `${forcesStatTooltipLead}: ${breakdown}.`;
+  var allSidesProductionStatTooltipText = "The production every side's cities can add each turn, added together. A city adds its share only while it is building, and a city on the neutral border adds none.";
+  var allSidesForcesStatTooltipLead = "Units every side still playing has fielded, out of the most this game size allows them";
+  function forcesStatTooltipText(breakdown, lead = forcesStatTooltipLead) {
+    return `${lead}: ${breakdown}.`;
   }
   var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
   var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
@@ -29762,13 +29766,6 @@ ${bonuses}`;
     return document.getElementById(id)?.value ?? "";
   }
 
-  // src/shared/aiOnlyBattles.ts
-  var AI_ONLY_BATTLE_MODES = ["balanced", "unbalanced", "random", "none"];
-  var DEFAULT_AI_ONLY_BATTLES = "balanced";
-
-  // src/shared/sightCueSettings.ts
-  var DEFAULT_SIGHT_CUES = true;
-
   // src/shared/victoryRules.ts
   var TURN_LIMIT_OPTIONS = [20, 30, 40, 50];
   var DEFAULT_TURN_LIMIT = 30;
@@ -29798,9 +29795,99 @@ ${bonuses}`;
     return places;
   }
 
+  // src/shared/aiOnlyBeatLimit.ts
+  var AI_ONLY_BEAT_LIMIT_UNLIMITED = "unlimited";
+  var AI_ONLY_BEAT_LIMIT_OPTIONS = TURN_LIMIT_OPTIONS;
+  var DEFAULT_AI_ONLY_BEAT_LIMIT = DEFAULT_TURN_LIMIT;
+  function isListedBeatLimit(value) {
+    return AI_ONLY_BEAT_LIMIT_OPTIONS.includes(value);
+  }
+  function aiOnlyBeatLimitFromStored(value) {
+    if (typeof value !== "string") return null;
+    const parsed = Number(value);
+    return isListedBeatLimit(parsed) ? parsed : null;
+  }
+  function aiOnlyBeatLimitToStored(limit) {
+    return limit === null ? AI_ONLY_BEAT_LIMIT_UNLIMITED : String(limit);
+  }
+  function formatAiOnlyBeatLimitSentence(beats) {
+    return `The battle reached its maximum of ${beats} beats.`;
+  }
+  var AI_ONLY_BEAT_LIMIT_NOTICE_MS = 3e3;
+  function aiOnlyBattleEndPresentation(reason, autoAdvance) {
+    if (!autoAdvance) return "dialog_until_ok";
+    return reason === "beat_limit" ? "timed_dialog" : "leave_now";
+  }
+  function aiOnlyLeaveStartsNextTurn(args) {
+    return args.autoAdvance && (!args.resultDialogOpen || args.endReason === "beat_limit");
+  }
+  function aiOnlyTimedNoticeStillCloses(sentence, autoAdvance) {
+    return sentence != null && autoAdvance;
+  }
+
+  // src/renderer/gameplay/newGameBeatLimitUi.ts
+  var rememberedBeatLimit = DEFAULT_AI_ONLY_BEAT_LIMIT;
+  var beatLimitChangeBound = false;
+  function beatLimitSelect() {
+    const select = document.getElementById("new-game-beat-limit-select");
+    return select instanceof HTMLSelectElement ? select : null;
+  }
+  function beatLimitOption(value, text) {
+    const option2 = document.createElement("option");
+    option2.value = value;
+    option2.textContent = text;
+    return option2;
+  }
+  function bindNewGameBeatLimit() {
+    if (beatLimitChangeBound) return;
+    const aiOnly = document.getElementById("new-game-ai-only-battles-select");
+    if (!(aiOnly instanceof HTMLSelectElement)) return;
+    beatLimitChangeBound = true;
+    aiOnly.addEventListener("change", () => {
+      renderNewGameBeatLimit();
+    });
+  }
+  function renderNewGameBeatLimit() {
+    const select = beatLimitSelect();
+    if (!select) return;
+    if (!select.disabled && select.value !== "") rememberedBeatLimit = aiOnlyBeatLimitFromStored(select.value);
+    const aiOnly = document.getElementById("new-game-ai-only-battles-select");
+    const aiOnlyValue = aiOnly instanceof HTMLSelectElement ? aiOnly.value : "";
+    if (aiOnlyValue === "none") {
+      select.replaceChildren(beatLimitOption(AI_ONLY_BEAT_LIMIT_UNLIMITED, UNLIMITED_TURN_LIMIT_LABEL));
+      select.disabled = true;
+      return;
+    }
+    select.replaceChildren(
+      ...AI_ONLY_BEAT_LIMIT_OPTIONS.map((beats) => beatLimitOption(String(beats), `${beats} beats`)),
+      beatLimitOption(AI_ONLY_BEAT_LIMIT_UNLIMITED, UNLIMITED_TURN_LIMIT_LABEL)
+    );
+    select.value = aiOnlyBeatLimitToStored(rememberedBeatLimit);
+    select.disabled = false;
+  }
+  function resetNewGameBeatLimit() {
+    rememberedBeatLimit = DEFAULT_AI_ONLY_BEAT_LIMIT;
+    const select = beatLimitSelect();
+    if (!select) return;
+    select.replaceChildren();
+  }
+  function readNewGameAiOnlyBeatLimit() {
+    const select = beatLimitSelect();
+    if (!select || select.value === "") return DEFAULT_AI_ONLY_BEAT_LIMIT;
+    return aiOnlyBeatLimitFromStored(select.value);
+  }
+
+  // src/shared/aiOnlyBattles.ts
+  var AI_ONLY_BATTLE_MODES = ["balanced", "unbalanced", "random", "none"];
+  var DEFAULT_AI_ONLY_BATTLES = "balanced";
+
+  // src/shared/sightCueSettings.ts
+  var DEFAULT_SIGHT_CUES = true;
+
   // src/renderer/gameplay/newGameVictoryUi.ts
   var rememberedTurnLimit = DEFAULT_TURN_LIMIT;
   function bindNewGameVictory() {
+    bindNewGameBeatLimit();
     const victory = document.getElementById("new-game-victory-select");
     if (victory instanceof HTMLSelectElement && victory.options.length === 0) {
       for (const rule of ["last_side_standing", "most_city_hexes_at_turn_limit"]) {
@@ -29817,6 +29904,7 @@ ${bonuses}`;
     renderNewGameVictory();
   }
   function renderNewGameVictory() {
+    renderNewGameBeatLimit();
     const limit = document.getElementById("new-game-turn-limit-select");
     if (!(limit instanceof HTMLSelectElement)) return;
     const parsed = Number(limit.value);
@@ -29871,6 +29959,7 @@ ${bonuses}`;
     if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
     const sightCues = document.getElementById("new-game-sight-cues-checkbox");
     if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
+    resetNewGameBeatLimit();
     renderNewGameVictory();
   }
   function selectedVictoryRule() {
@@ -29976,6 +30065,7 @@ ${bonuses}`;
       turnLimit: victory.turnLimit,
       victoryRule: victory.victoryRule,
       aiOnlyBattles: readNewGameAiOnlyBattles(),
+      aiOnlyBeatLimit: readNewGameAiOnlyBeatLimit(),
       sightCues: readNewGameSightCues(),
       blocked
     };
@@ -31052,16 +31142,40 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/topBarSideTotals.ts
+  function readoutSideIds(viewer, seats) {
+    if (viewer !== null) return [viewer];
+    return (seats ?? []).filter((seat) => seat.outTurn === null).map((seat) => seat.seatId);
+  }
+  function countFieldedForSides(units, sideIds) {
+    const totals = { infantry: 0, armor: 0, naval: 0, air: 0, missile: 0 };
+    const list = Array.from(units);
+    for (const sideId of sideIds) {
+      const counts = getPlayerUnitCountsByType(list, sideId);
+      for (const unitType of ALL_BUILD_UNIT_TYPES) totals[unitType] += counts[unitType];
+    }
+    return totals;
+  }
+  function scaleCapsForSides(caps, sideCount) {
+    const multiplier = Math.max(1, sideCount);
+    const scaled = { infantry: 0, armor: 0, naval: 0, air: 0, missile: 0 };
+    for (const unitType of ALL_BUILD_UNIT_TYPES) scaled[unitType] = caps[unitType] * multiplier;
+    return scaled;
+  }
+
   // src/shared/topBarStats.ts
   function computeTopBarStats(input, isNeutralBorder = isNeutralBorderHex) {
     const viewer = input.viewerSeatId === void 0 ? HUMAN_SEAT_ID : input.viewerSeatId;
     const control = input.strategicControl ?? [];
+    const sides = readoutSideIds(viewer, input.seats);
+    const sideSet = new Set(sides);
     const heldHexes = new Set(
-      viewer === null ? [] : control.filter((row) => row.controllerPlayerId === viewer).map((row) => row.h3Index)
+      control.filter((row) => row.controllerPlayerId != null && sideSet.has(row.controllerPlayerId)).map((row) => row.h3Index)
     );
     const productionPerTurn = (input.strategicInfrastructure ?? []).filter((row) => heldHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index)).reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
-    const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), viewer ?? "");
-    const capByType = getMaxUnitsPerType(parseGameSize(input.gameSize));
+    const fieldedByType = countFieldedForSides(input.units, sides);
+    const caps = getMaxUnitsPerType(parseGameSize(input.gameSize));
+    const capByType = viewer === null ? scaleCapsForSides(caps, sides.length) : caps;
     const unitsFielded = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + fieldedByType[unitType], 0);
     const unitCap = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + capByType[unitType], 0);
     const turnLimit = input.victory?.rule === "most_city_hexes_at_turn_limit" ? input.victory.turnLimit : null;
@@ -31473,6 +31587,7 @@ ${bonuses}`;
     }
     const viewer = readoutViewerSeatId(state.seats ?? [], rendererSharedState.viewAs);
     const stats = computeTopBarStats(viewer === void 0 ? state : { ...state, viewerSeatId: viewer });
+    const allSides = viewer === null;
     const parts = formatTopBarStatParts(stats);
     setText("topbar-stat-production", parts.production);
     setText("topbar-stat-production-suffix", "/turn");
@@ -31487,7 +31602,14 @@ ${bonuses}`;
     setHostHidden("topbar-stat-enemy-home-host", stats.enemyHomes === null);
     setHostHidden("topbar-stat-cities-host", stats.cities === null);
     document.getElementById("topbar-stat-cities-host")?.setAttribute("data-control-tooltip", parts.citiesTooltip);
-    document.getElementById("topbar-stat-forces-host")?.setAttribute("data-control-tooltip", forcesStatTooltipText(formatForcesBreakdown(stats)));
+    document.getElementById("topbar-stat-production-host")?.setAttribute(
+      "data-control-tooltip",
+      allSides ? allSidesProductionStatTooltipText : productionStatTooltipText
+    );
+    document.getElementById("topbar-stat-forces-host")?.setAttribute(
+      "data-control-tooltip",
+      forcesStatTooltipText(formatForcesBreakdown(stats), allSides ? allSidesForcesStatTooltipLead : forcesStatTooltipLead)
+    );
     setText("topbar-stat-credits", parts.credits);
     setText("topbar-stat-credits-suffix", parts.creditsSuffix);
     setHostHidden("topbar-stat-credits-host", stats.credits === null);
@@ -33563,6 +33685,22 @@ ${bonuses}`;
     dismissStaleControlTooltip();
   }
 
+  // src/renderer/tactical/aiOnlyResultAutoClose.ts
+  var aiOnlyResultAutoCloseHandle = null;
+  function scheduleAiOnlyResultAutoClose(onElapsed) {
+    cancelAiOnlyResultAutoClose();
+    aiOnlyResultAutoCloseHandle = setTimeout(() => {
+      aiOnlyResultAutoCloseHandle = null;
+      if (!aiOnlyTimedNoticeStillCloses(rendererSharedState.aiOnlyBattleResultSentence, rendererSharedState.autoAdvance)) return;
+      onElapsed();
+    }, AI_ONLY_BEAT_LIMIT_NOTICE_MS);
+  }
+  function cancelAiOnlyResultAutoClose() {
+    if (aiOnlyResultAutoCloseHandle == null) return;
+    clearTimeout(aiOnlyResultAutoCloseHandle);
+    aiOnlyResultAutoCloseHandle = null;
+  }
+
   // src/renderer/tactical/tacticalAnnihilationDialog.ts
   var TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = "All units destroyed.";
   function tacticalAnnihilationMessageForOutcome(outcome) {
@@ -33581,7 +33719,7 @@ ${bonuses}`;
     syncTacticalExitButtonElementVisibility();
     updateReadyButtonState();
   }
-  function openAiOnlyBattleResultDialog(sentence) {
+  function openAiOnlyBattleResultDialog(sentence, okTooltip = aiOnlyResultOkTooltipText) {
     rendererSharedState.aiOnlyBattleResultSentence = sentence;
     rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
     void stopOpponentPlanning("teardown");
@@ -33591,7 +33729,7 @@ ${bonuses}`;
     if (messageEl) messageEl.textContent = sentence;
     if (button) {
       button.textContent = "Ok";
-      button.setAttribute("data-control-tooltip", aiOnlyResultOkTooltipText);
+      button.setAttribute("data-control-tooltip", okTooltip);
     }
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled(false);
@@ -33599,6 +33737,7 @@ ${bonuses}`;
     updateReadyButtonState();
   }
   function closeTacticalAnnihilationOutcomeDialog() {
+    cancelAiOnlyResultAutoClose();
     rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
     rendererSharedState.aiOnlyBattleResultSentence = null;
     const button = document.getElementById("tactical-annihilation-exit-btn");
@@ -37697,6 +37836,7 @@ ${bonuses}`;
           turnLimit: seatsStart.turnLimit,
           victoryRule: seatsStart.victoryRule,
           aiOnlyBattles: seatsStart.aiOnlyBattles,
+          aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
           sightCues: seatsStart.sightCues,
           gameSize: readSelectedGameSizeFromDocument(),
           ...humanNickname === void 0 ? {} : { humanNickname }
@@ -38534,10 +38674,17 @@ ${bonuses}`;
       if (rendererSharedState.resolutionMoveAnimation) return;
       const sentence = aiOnlyResultSentence(snap);
       if (sentence == null) return;
-      if (rendererSharedState.autoAdvance) {
+      const presentation = aiOnlyBattleEndPresentation(snap.aiOnlyEndReason, rendererSharedState.autoAdvance);
+      if (presentation === "leave_now") {
         if (aiOnlyExitStarted) return;
         aiOnlyExitStarted = true;
         void leaveAiOnlyBattle(session, io, true);
+        return;
+      }
+      if (presentation === "timed_dialog") {
+        openAiOnlyBattleResultDialog(sentence, aiOnlyTimedResultOkTooltipText);
+        if (io.finishTimedAiOnlyResult) scheduleAiOnlyResultAutoClose(io.finishTimedAiOnlyResult);
+        io.redraw();
         return;
       }
       openAiOnlyBattleResultDialog(sentence);
@@ -38554,6 +38701,7 @@ ${bonuses}`;
     if (snap.aiOnlyEndReason === "mutual") return "All units destroyed.";
     if (snap.aiOnlyEndReason === "exit") return "The commanders left the battle.";
     if (snap.aiOnlyEndReason === "idle") return "The battle ended with no orders left to carry out.";
+    if (snap.aiOnlyEndReason === "beat_limit") return formatAiOnlyBeatLimitSentence(snap.tacticalTurnNumber - 1);
     const winner = getTwoPartyAnnihilationOutcome(snap.subUnits, snap.leadPartyId, snap.opposingPartyId);
     if (winner == null || winner === "mutual") return "All units destroyed.";
     const winnerSeat = rendererSharedState.gameState?.seats?.find((seat) => seat.seatId === winner);
@@ -44525,39 +44673,55 @@ ${bonuses}`;
       endTacticalBattle: window.gameApi?.endTacticalBattle,
       showMapToast,
       redraw,
-      runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps())
+      runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps()),
+      finishTimedAiOnlyResult: () => {
+        void performTacticalBattleExit();
+      }
     });
   }
+  var tacticalAiOnlyExitInFlight = false;
   async function performTacticalBattleExit() {
+    if (tacticalAiOnlyExitInFlight) return;
     if (rendererSharedState.tacticalBattleSnapshot?.leadPartyId != null) {
       if (rendererSharedState.aiOnlyBattleResultSentence == null && !rendererSharedState.autoAdvance) {
         openAiOnlyBattleResultDialog("The battle was left.");
         return;
       }
-      await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
-        endTacticalBattle: window.gameApi?.endTacticalBattle,
-        showMapToast,
-        redraw,
-        runReadyAfterExit: async () => {
-        },
-        refreshSidebarAfterTacticalDraftTeardown: () => {
-          hideStackCallout();
-          refreshStrategicOrderSidebars();
-        },
-        refreshStrategicSnapshotAfterExit: async () => {
-          if (!window.gameApi?.getGameState) return;
-          const nextState = await fetchMatchSnapshot();
-          await applyGameStateSnapshot2(nextState, {
-            refreshStandingOrders: false,
-            updateGameStateSidebarUi: false,
-            updateSelectionUi: false,
-            updateGameOverUi: false,
-            updateReadyButton: false,
-            refreshBuildPopup: false,
-            redraw: false
-          });
-        }
-      }, rendererSharedState.aiOnlyBattleResultSentence == null && rendererSharedState.autoAdvance);
+      cancelAiOnlyResultAutoClose();
+      tacticalAiOnlyExitInFlight = true;
+      const startsNextTurn = aiOnlyLeaveStartsNextTurn({
+        resultDialogOpen: rendererSharedState.aiOnlyBattleResultSentence != null,
+        endReason: rendererSharedState.tacticalBattleSnapshot.aiOnlyEndReason,
+        autoAdvance: rendererSharedState.autoAdvance
+      });
+      try {
+        await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
+          endTacticalBattle: window.gameApi?.endTacticalBattle,
+          showMapToast,
+          redraw,
+          runReadyAfterExit: async () => {
+          },
+          refreshSidebarAfterTacticalDraftTeardown: () => {
+            hideStackCallout();
+            refreshStrategicOrderSidebars();
+          },
+          refreshStrategicSnapshotAfterExit: async () => {
+            if (!window.gameApi?.getGameState) return;
+            const nextState = await fetchMatchSnapshot();
+            await applyGameStateSnapshot2(nextState, {
+              refreshStandingOrders: false,
+              updateGameStateSidebarUi: false,
+              updateSelectionUi: false,
+              updateGameOverUi: false,
+              updateReadyButton: false,
+              refreshBuildPopup: false,
+              redraw: false
+            });
+          }
+        }, startsNextTurn);
+      } finally {
+        tacticalAiOnlyExitInFlight = false;
+      }
       return;
     }
     await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {

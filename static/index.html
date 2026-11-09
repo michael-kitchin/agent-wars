@@ -33,7 +33,7 @@
       <span id="topbar-view-as-dot" class="topbar-side-mark" hidden></span>
       <select id="topbar-view-as-select" aria-label="View as"></select>
     </label>
-    <div class="topbar-stat" data-control-tooltip="The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.">
+    <div id="topbar-stat-production-host" class="topbar-stat" data-control-tooltip="The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.">
       <span class="topbar-stat-caption">Production</span>
       <span class="topbar-stat-value"><span id="topbar-stat-production">—</span><span id="topbar-stat-production-suffix" class="topbar-stat-suffix"></span></span>
     </div>
@@ -159,7 +159,7 @@
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">6</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
           <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/missile.svg" alt="Missile" /></span><span id="new-game-size-cap-missile" class="new-game-unit-cap">2</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-missile" class="new-game-unit-cost">$200</span></li>
         </ul>
-        <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Nickname, victory rule, turn limit, bonuses, fog of war, and Auto-start AI.">Game Options</button>
+        <button type="button" id="new-game-options-btn" class="new-game-options-btn" data-control-tooltip="Nickname, victory rule, turn limit, AI-only battles, beat limit, bonuses, fog of war, Sight cues, and Auto-start AI.">Game Options</button>
       </section>
     </div>
     <div id="new-game-panel-footer" class="new-game-panel-footer">
@@ -408,7 +408,8 @@
           <option value="random">Random</option>
           <option value="none">None</option>
         </select>
-        <label class="new-game-check new-game-sight-cues" for="new-game-sight-cues-checkbox"><input type="checkbox" id="new-game-sight-cues-checkbox" checked data-control-tooltip="Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing." /> Sight cues</label>
+        <label for="new-game-beat-limit-select">Beat limit</label>
+        <select id="new-game-beat-limit-select" data-control-tooltip="The most beats an AI-only battle can run. When it reaches them, the battle ends as if Exit Battle had been pressed. This applies only while you are observing. Choosing None under AI-only battles turns this off."></select>
       </div>
     </section>
     <section class="new-game-section" aria-labelledby="new-game-section-rules">
@@ -439,8 +440,12 @@
           <option value="high">High</option>
         </select>
       </div>
+    </section>
+    <section class="new-game-section" aria-labelledby="new-game-section-other">
+      <h2 id="new-game-section-other" class="new-game-section-title">Other</h2>
       <div class="new-game-checks">
         <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
+        <label class="new-game-check" for="new-game-sight-cues-checkbox"><input type="checkbox" id="new-game-sight-cues-checkbox" checked data-control-tooltip="Leave this checked to start each turn's playback with lines from each AI commander's units to the units they could see when they planned. This applies only while you are observing." /> Sight cues</label>
         <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when at least one AI opponent on this screen has an API key and a model. Uncheck it, or start without them, and planning stays off." /> Auto-start AI</label>
       </div>
     </section>

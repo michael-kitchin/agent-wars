@@ -339,6 +339,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         turnLimit: seatsStart.turnLimit,
         victoryRule: seatsStart.victoryRule,
         aiOnlyBattles: seatsStart.aiOnlyBattles,
+        aiOnlyBeatLimit: seatsStart.aiOnlyBeatLimit,
         sightCues: seatsStart.sightCues,
         gameSize: readSelectedGameSizeFromDocument(),
         ...(humanNickname === undefined ? {} : { humanNickname }),

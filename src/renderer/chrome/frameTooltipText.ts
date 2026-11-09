@@ -61,13 +61,30 @@ export const productionStatTooltipText =
 export const forcesStatTooltipLead = 'Units you have fielded, out of the most this game size allows';
 
 /**
- * Purpose: Lists units fielded against the game-size cap for each type.
- * When to use: Whenever the Forces readout is refreshed, with the breakdown from `formatForcesBreakdown`.
- * Expected outcome: `${forcesStatTooltipLead}: ${breakdown}.`
+ * Purpose: Says what the Production readout counts while View as is All sides.
+ * When to use: The Production readout when the viewer is null.
+ * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export function forcesStatTooltipText(breakdown: string): string {
-  return `${forcesStatTooltipLead}: ${breakdown}.`;
+export const allSidesProductionStatTooltipText =
+  "The production every side's cities can add each turn, added together. A city adds its share only while it is building, and a city on the neutral border adds none.";
+
+/**
+ * Purpose: Opens the Forces tip while View as is All sides.
+ * When to use: `forcesStatTooltipText` when the viewer is null.
+ * Expected outcome: The lead before the per-type breakdown.
+ * Exceptions: None.
+ */
+export const allSidesForcesStatTooltipLead = 'Units every side still playing has fielded, out of the most this game size allows them';
+
+/**
+ * Purpose: Lists units fielded against the game-size cap for each type.
+ * When to use: Whenever the Forces readout is refreshed, with the breakdown from `formatForcesBreakdown`.
+ * Expected outcome: `${lead}: ${breakdown}.` The default lead is one side's sentence.
+ * Exceptions: None.
+ */
+export function forcesStatTooltipText(breakdown: string, lead: string = forcesStatTooltipLead): string {
+  return `${lead}: ${breakdown}.`;
 }
 
 /**

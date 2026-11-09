@@ -1,7 +1,7 @@
 /**
  * One beat of a battle between two AI seats.
  *
- * Purpose: Both drafts resolve in the same phase order as a human beat, then the snapshot records whether the battle ended.
+ * Purpose: Both drafts resolve in the same phase order as a human beat, then the snapshot records whether the battle ended by a wipe, an idle streak, both commanders leaving, or the match's beat limit.
  * When to use: `commitHumanTacticalDraftOrders` when the active snapshot has `leadPartyId`. The caller has already taken each draft once.
  * Expected outcome: The session stays active. `aiOnlyEndReason` is set only when this beat ends the battle.
  * Exceptions: Returns a failure reason when no AI-only battle is active. Illegal rows are dropped and do not fail the beat.
@@ -13,7 +13,9 @@ import { getTwoPartyAnnihilationOutcome } from '../../shared/tacticalAnnihilatio
 import type { OwnerId } from '../../shared/seatIds';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { createCombatRng } from '../combatResolution';
-import { getGameSeed } from '../gameDb';
+import { dbGetOne, dbRun, getGameSeed } from '../gameDb';
+import { readAiOnlyBeatLimit } from '../gameDb/gameConfigKv';
+import { aiOnlyBeatLimitReached } from '../../shared/aiOnlyBeatLimit';
 import { logDebug } from '../logger';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { commitAiOnlyTacticalBeatSnapshot } from './tacticalBattleSession';
@@ -130,7 +132,7 @@ export type AiOnlyTacticalBeatResult =
 /**
  * Applies both AI drafts and records the end reason when this beat finishes the battle.
  *
- * Purpose: Elimination, then three idle beats, then both exit flags after five completed beats. The result keeps every phase the playback builder needs.
+ * Purpose: A wipe, then three idle beats, then both exit flags after five completed beats, then the stored beat limit. The limit uses the beat number before this function stores the next one. The result keeps every phase the playback builder needs.
  * When to use: After each seat's draft has been taken once.
  * Expected outcome: `battle` is the stored snapshot. `battleAfterMovementBeforeFerry` is the snapshot before embark and ferry. Removals include both ferry phases.
  * Exceptions: Failure reason `'No AI-only tactical battle is active.'` when no AI-only battle is active.
@@ -206,6 +208,9 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
   else if (streak >= 3) aiOnlyEndReason = 'idle';
   else if (drafts.leadDraft?.exitBattle === true && drafts.opposingDraft?.exitBattle === true && nextTurn >= 6) {
     aiOnlyEndReason = 'exit';
+  } else if (aiOnlyBeatLimitReached(current.tacticalTurnNumber, readAiOnlyBeatLimit({ getOne: dbGetOne, run: dbRun }))) {
+    // current.tacticalTurnNumber counts this beat. The stored number is nextTurn, one higher.
+    aiOnlyEndReason = 'beat_limit';
   }
   const battle = withFortificationOwnersFromGameDb({
     ...melee.battle,

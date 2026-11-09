@@ -8,6 +8,7 @@
  */
 
 import { AI_ONLY_BATTLE_MODES, DEFAULT_AI_ONLY_BATTLES, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
+import { bindNewGameBeatLimit, renderNewGameBeatLimit, resetNewGameBeatLimit } from './newGameBeatLimitUi';
 import { DEFAULT_SIGHT_CUES } from '../../shared/sightCueSettings';
 import {
   DEFAULT_TURN_LIMIT,
@@ -37,6 +38,7 @@ let rememberedTurnLimit = DEFAULT_TURN_LIMIT;
  * Exceptions: None.
  */
 export function bindNewGameVictory(): void {
+  bindNewGameBeatLimit();
   const victory = document.getElementById('new-game-victory-select');
   if (victory instanceof HTMLSelectElement && victory.options.length === 0) {
     for (const rule of ['last_side_standing', 'most_city_hexes_at_turn_limit'] as const) {
@@ -63,6 +65,7 @@ export function bindNewGameVictory(): void {
  * Exceptions: None.
  */
 export function renderNewGameVictory(): void {
+  renderNewGameBeatLimit();
   const limit = document.getElementById('new-game-turn-limit-select');
   if (!(limit instanceof HTMLSelectElement)) return;
   const parsed = Number(limit.value);
@@ -142,7 +145,7 @@ export function readNewGameVictory(): { readonly victoryRule: VictoryRule; reado
  *
  * Purpose: Opening the overlay starts from the default rule.
  * When to use: `refreshNewGameSides({ reset: true })` only.
- * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, AI-only battles is Balanced, and Sight cues is checked.
+ * Expected outcome: The Rule select is Deathmatch, the turn-limit select is Unlimited, AI-only battles is Balanced, Beat limit is 30, and Sight cues is checked.
  * Exceptions: None.
  */
 export function resetNewGameVictory(): void {
@@ -153,6 +156,7 @@ export function resetNewGameVictory(): void {
   if (aiOnly instanceof HTMLSelectElement) aiOnly.value = DEFAULT_AI_ONLY_BATTLES;
   const sightCues = document.getElementById('new-game-sight-cues-checkbox');
   if (sightCues instanceof HTMLInputElement) sightCues.checked = DEFAULT_SIGHT_CUES;
+  resetNewGameBeatLimit();
   renderNewGameVictory();
 }
 

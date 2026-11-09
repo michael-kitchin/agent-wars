@@ -130,7 +130,9 @@ import {
   leaveAiOnlyBattle,
   type TacticalExitSessionAccessor,
 } from './tactical/tacticalExitFlow';
+import { aiOnlyLeaveStartsNextTurn } from '../shared/aiOnlyBeatLimit';
 import { openAiOnlyBattleResultDialog } from './tactical/tacticalAnnihilationDialog';
+import { cancelAiOnlyResultAutoClose } from './tactical/aiOnlyResultAutoClose';
 import {
   performTacticalBattleExitWithGameApi,
 } from './tactical/tacticalEntryFlow';
@@ -501,46 +503,69 @@ function maybeScheduleTacticalAnnihilationExit(): void {
     showMapToast,
     redraw,
     runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
+    finishTimedAiOnlyResult: () => { void performTacticalBattleExit(); },
   });
 }
+
+/**
+ * True while an AI-only leave is already running.
+ *
+ * Purpose: Ok can run while the timed notice's leave is still awaiting the end call. Canceling the timer does not stop that call.
+ * When to use: `performTacticalBattleExit`. Set before the first await on the leave path. Cleared when that leave returns.
+ * Expected outcome: A second call returns. The next battle can leave, because the flag is clear again.
+ * Exceptions: None. The header path that only opens "The battle was left." does not set it.
+ */
+let tacticalAiOnlyExitInFlight = false;
 
 /**
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
- * When to use: Exit Battle in the battle header, and the annihilation modal's `Exit Battle` confirmation.
- * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state without reloading standing orders, restores living-unit stash drafts, then invokes Ready pipeline on success.
+ * When to use: Exit Battle in the battle header, Ok on an AI-only result, and the timed beat-limit notice.
+ * Expected outcome: An AI-only battle leaves through `leaveAiOnlyBattle`, and the next turn starts only when that leave was asked to press Ready. A second call while that leave is running returns. A human battle still runs Ready after the exit.
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */
 async function performTacticalBattleExit(): Promise<void> {
+  if (tacticalAiOnlyExitInFlight) return;
   if (S.tacticalBattleSnapshot?.leadPartyId != null) {
     if (S.aiOnlyBattleResultSentence == null && !S.autoAdvance) {
       openAiOnlyBattleResultDialog('The battle was left.');
       return;
     }
-    await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
-      endTacticalBattle: window.gameApi?.endTacticalBattle,
-      showMapToast,
-      redraw,
-      runReadyAfterExit: async () => {},
-      refreshSidebarAfterTacticalDraftTeardown: () => {
-        hideStackCallout();
-        refreshStrategicOrderSidebars();
-      },
-      refreshStrategicSnapshotAfterExit: async () => {
-        if (!window.gameApi?.getGameState) return;
-        const nextState = await fetchMatchSnapshot();
-        await applyGameStateSnapshot(nextState, {
-          refreshStandingOrders: false,
-          updateGameStateSidebarUi: false,
-          updateSelectionUi: false,
-          updateGameOverUi: false,
-          updateReadyButton: false,
-          refreshBuildPopup: false,
-          redraw: false,
-        });
-      },
-    }, S.aiOnlyBattleResultSentence == null && S.autoAdvance);
+    cancelAiOnlyResultAutoClose();
+    tacticalAiOnlyExitInFlight = true;
+    const startsNextTurn = aiOnlyLeaveStartsNextTurn({
+      resultDialogOpen: S.aiOnlyBattleResultSentence != null,
+      endReason: S.tacticalBattleSnapshot.aiOnlyEndReason,
+      autoAdvance: S.autoAdvance,
+    });
+    try {
+      await leaveAiOnlyBattle(tacticalExitSessionAccessor, {
+        endTacticalBattle: window.gameApi?.endTacticalBattle,
+        showMapToast,
+        redraw,
+        runReadyAfterExit: async () => {},
+        refreshSidebarAfterTacticalDraftTeardown: () => {
+          hideStackCallout();
+          refreshStrategicOrderSidebars();
+        },
+        refreshStrategicSnapshotAfterExit: async () => {
+          if (!window.gameApi?.getGameState) return;
+          const nextState = await fetchMatchSnapshot();
+          await applyGameStateSnapshot(nextState, {
+            refreshStandingOrders: false,
+            updateGameStateSidebarUi: false,
+            updateSelectionUi: false,
+            updateGameOverUi: false,
+            updateReadyButton: false,
+            refreshBuildPopup: false,
+            redraw: false,
+          });
+        },
+      }, startsNextTurn);
+    } finally {
+      tacticalAiOnlyExitInFlight = false;
+    }
     return;
   }
   await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {
