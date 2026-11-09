@@ -235,7 +235,7 @@ Every line of production code was written by coding agents, mostly in Cursor. I 
 - [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
 - [doc/](doc/README.md): the living product documentation, kept current with the code.
 
-**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [src/main/unitOrigin/](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
+**A trail to follow:** the [unit origin and country flags plan](.spec/completed/2026-10/2026-10-03-unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [src/main/unitOrigin/](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
 
 ### Time and Tokens
 
@@ -274,7 +274,7 @@ npm start
 - **Build:** compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
 - **Start:** runs Electron; the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
 - **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's Inside](#whats-inside).
-- **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
+- **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/2026-03/2026-03-11-packaging.md](.spec/completed/2026-03/2026-03-11-packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
 ### Terrain Data
 

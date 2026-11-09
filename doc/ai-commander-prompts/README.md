@@ -66,7 +66,7 @@ These documents keep their mechanics content. They do not override emitted promp
 - [`combat-rules-v3.md`](../combat-rules-v3.md) — mechanics reference, aligned to the engine as of 2.5.0.
 - [`hybrid-ai.md`](../hybrid-ai.md), [`ai-tools.md`](../ai-tools.md) — consult loop and tool names, not prompt copy.
 - [`devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) — historical architecture.
-- [`prompt-debug-log-split.md`](../../.spec/completed/prompt-debug-log-split.md) — which debug file each consultation writes, not what the prompt says.
+- [`prompt-debug-log-split.md`](../../.spec/completed/2026-08/2026-08-17-prompt-debug-log-split.md) — which debug file each consultation writes, not what the prompt says.
 
 Completed execution plans under [`.spec/completed/`](../../.spec/completed/) that specified prompt wording are historical. Their decisions are either reflected in the builders or were superseded.
 

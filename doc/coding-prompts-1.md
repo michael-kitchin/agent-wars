@@ -156,6 +156,10 @@ Please ensure all new and updated fields and non-overriding methods of all cardi
 
 Write working specs, execution plans, design proposals, and debugging notes as markdown files in the `.spec` directory.
 
+Start each new spec filename with the local calendar date you create the file, written `YYYY-MM-DD-` (example: `2026-11-04-ferry-playback-execution-plan.md`). That is the date of the file's first commit when the file is committed on the day it is created. Keep the same prefix when the file is edited or committed on a later day. A name that already starts with `YYYY-MM-DD-` keeps that prefix.
+
+A file placed in `.spec/completed/` keeps that prefix and goes in the month directory `YYYY-MM` taken from it (example: `.spec/completed/2026-11/2026-11-04-ferry-playback-execution-plan.md`).
+
 Living product documentation belongs in `doc/`. This includes the UX specification suite ([`doc/ux-specification.md`](ux-specification.md) and the [`doc/ux/`](ux/) folder) and the mechanics documents indexed by [`doc/README.md`](README.md). Update those documents in place; do not copy them into `.spec`.
 
 ### 6. Reusable Code

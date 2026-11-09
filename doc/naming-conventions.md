@@ -4,7 +4,7 @@ Living index for how files, directories, and exported TypeScript symbols are nam
 
 **Authoritative rules:** [naming-conventions-contract-v1.md](naming-conventions-contract-v1.md). This page does not add or weaken those rules.
 
-**Signed rename work list:** [`.spec/completed/naming-rename-ledger-v1.md`](../.spec/completed/naming-rename-ledger-v1.md) and `scripts/naming/renameLedger.json`.
+**Signed rename work list:** [`.spec/completed/2026-08/2026-08-29-naming-rename-ledger-v1.md`](../.spec/completed/2026-08/2026-08-29-naming-rename-ledger-v1.md) and `scripts/naming/renameLedger.json`.
 
 Enforcement:
 
