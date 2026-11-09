@@ -47,12 +47,12 @@ test('borders follow the label kinds', () => {
  *
  * Purpose: National lines stay stronger than state lines on every theme.
  * When to use: As the contract test for `borderLineOpacity`.
- * Expected outcome: Country groups are two thirds. State groups are one half. A disputed line matches its level.
+ * Expected outcome: Country groups are four fifths. State groups are three fifths. A disputed line matches its level.
  * Exceptions: Assertion failures name the group whose strength moved.
  */
 test('border opacity follows the line level', () => {
-  assert.equal(NATIONAL_BORDER_OPACITY, 2 / 3);
-  assert.equal(STATE_BORDER_OPACITY, 1 / 2);
+  assert.equal(NATIONAL_BORDER_OPACITY, 4 / 5);
+  assert.equal(STATE_BORDER_OPACITY, 3 / 5);
   assert.equal(borderLineOpacity('country'), NATIONAL_BORDER_OPACITY);
   assert.equal(borderLineOpacity('country_disputed'), NATIONAL_BORDER_OPACITY);
   assert.equal(borderLineOpacity('state'), STATE_BORDER_OPACITY);

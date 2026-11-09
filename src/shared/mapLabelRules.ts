@@ -19,14 +19,34 @@
 export const COUNTRY_LABEL_MIN_ZOOM = 4;
 
 /**
- * How far below a feature's own minimum zoom a label may linger.
+ * How far below a state's own minimum zoom its name may linger.
  *
- * Purpose: A label that just appeared should not vanish on a tiny zoom-out.
- * When to use: The label placement pass.
- * Expected outcome: A feature stays eligible until the zoom is this far below its minimum.
+ * Purpose: A state that just appeared should not vanish on a tiny zoom-out.
+ * When to use: The state branch of `labelFeatureIsCandidate`. Countries do not use it.
+ * Expected outcome: A state stays eligible until the zoom is this far below its minimum, and still has to cover `STATE_LABEL_MIN_RADIUS_PX`.
  * Exceptions: None.
  */
 export const LABEL_MIN_ZOOM_SLACK = 1.5;
+
+/**
+ * Levels past a country's minimum zoom before its name appears.
+ *
+ * Purpose: Minor countries share a minimum that would otherwise show as soon as country names turn on.
+ * When to use: The country branch of `labelFeatureIsCandidate`.
+ * Expected outcome: A country is eligible once the zoom reaches its minimum plus this delay. It does not linger below that zoom.
+ * Exceptions: None.
+ */
+export const COUNTRY_LABEL_ZOOM_DELAY = 1;
+
+/**
+ * Smallest on-screen inscribed radius that earns a state a name.
+ *
+ * Purpose: States that share a minimum zoom are distinguished by how large they are on screen.
+ * When to use: The state branch of `labelFeatureIsCandidate`, with the largest stored anchor.
+ * Expected outcome: A state whose largest anchor covers fewer than this many CSS pixels is omitted.
+ * Exceptions: None.
+ */
+export const STATE_LABEL_MIN_RADIUS_PX = 40;
 
 /**
  * Most labels drawn in one frame.
@@ -168,22 +188,22 @@ export const STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
 /**
  * Share of a continent name painted when country names are also drawn.
  *
- * Purpose: The broader name under the local name uses this share. A country under a state uses it too.
- * When to use: `labelKindOpacity` from the country zoom, outside a tactical view. `COUNTRY_BESIDE_STATE_OPACITY` aliases it.
- * Expected outcome: One half.
+ * Purpose: The continent name under the country names stays readable without matching their strength.
+ * When to use: `labelKindOpacity` from the country zoom, outside a tactical view.
+ * Expected outcome: Four fifths.
  * Exceptions: None.
  */
-export const CONTINENT_BESIDE_COUNTRY_OPACITY = 1 / 2;
+export const CONTINENT_BESIDE_COUNTRY_OPACITY = 4 / 5;
 
 /**
  * Share of a country name painted when state names are also drawn.
  *
- * Purpose: The country name stays visible under the state name, at the same share as a continent under a country.
+ * Purpose: The country name stays visible under the state name, quieter than a continent drawn under countries.
  * When to use: `labelKindOpacity` in a tactical view.
- * Expected outcome: `CONTINENT_BESIDE_COUNTRY_OPACITY`.
+ * Expected outcome: Three fifths.
  * Exceptions: None.
  */
-export const COUNTRY_BESIDE_STATE_OPACITY = CONTINENT_BESIDE_COUNTRY_OPACITY;
+export const COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
 
 /**
  * How strongly one kind is painted in the current view.
@@ -192,7 +212,7 @@ export const COUNTRY_BESIDE_STATE_OPACITY = CONTINENT_BESIDE_COUNTRY_OPACITY;
  * When to use: When painting a label. The kind must already be one `visibleLabelKinds` returned.
  * Expected outcome: A world-view continent is `CONTINENT_LABEL_OPACITY`. A continent beside countries is `CONTINENT_BESIDE_COUNTRY_OPACITY`.
  *   A country beside continents is `COUNTRY_LABEL_OPACITY`. A country beside states is `COUNTRY_BESIDE_STATE_OPACITY`.
- *   A state is `STATE_LABEL_OPACITY`. The name on top is the theme color. The name under it is half.
+ *   A state is `STATE_LABEL_OPACITY`. The name on top is the theme color. A continent under countries is four fifths. A country under states is three fifths.
  * Exceptions: None.
  */
 export function labelKindOpacity(kind: MapLabelKind, zoom: number, tacticalView: boolean): number {
@@ -226,7 +246,7 @@ export interface MapLabelKindStyle {
    *
    * Contract: A positive number.
    * When to use: The canvas font size.
-   * Expected outcome: 18, 13, or 11.
+   * Expected outcome: 27, 19.5, 18, 13, or 11.
    * Exceptions: None.
    */
   readonly sizePx: number;
@@ -272,8 +292,9 @@ export interface MapLabelKindStyle {
  * Styles for the three place-name kinds.
  *
  * Purpose: One table, so the measurer and the painter cannot drift.
- * When to use: Before measuring or drawing a label.
+ * When to use: `mapLabelStyleForView`, which returns these rows except while the smaller names are drawn.
  * Expected outcome: Continent 18/600, country 13/600, state 11/400, with halo widths 3, 2, and 1.
+ *   A continent beside countries is 27 px. A country beside states is 19.5 px. Both otherwise match their row.
  * Exceptions: None.
  */
 export const MAP_LABEL_KIND_STYLES: Readonly<Record<MapLabelKind, MapLabelKindStyle>> = {
@@ -281,6 +302,67 @@ export const MAP_LABEL_KIND_STYLES: Readonly<Record<MapLabelKind, MapLabelKindSt
   country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
   state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
 };
+
+/**
+ * Continent type size while country names are also drawn.
+ *
+ * Purpose: The continent name under the countries needs to stay readable at one and a half times its world-view size.
+ * When to use: `mapLabelStyleForView` for a continent from `COUNTRY_LABEL_MIN_ZOOM`, outside a tactical view.
+ * Expected outcome: 27, which is 1.5 times the continent row.
+ * Exceptions: None.
+ */
+export const CONTINENT_BESIDE_COUNTRY_SIZE_PX = 27;
+
+/**
+ * Country type size while state names are also drawn.
+ *
+ * Purpose: The country name under the states needs to stay readable at one and a half times its usual size.
+ * When to use: `mapLabelStyleForView` for a country in a tactical view.
+ * Expected outcome: 19.5, which is 1.5 times the country row.
+ * Exceptions: None.
+ */
+export const COUNTRY_BESIDE_STATE_SIZE_PX = 19.5;
+
+/**
+ * Continent style used beside country names.
+ *
+ * Purpose: One object, so each frame does not allocate a new style.
+ * When to use: `mapLabelStyleForView` when a continent is drawn with countries.
+ * Expected outcome: The continent row with `sizePx` set to `CONTINENT_BESIDE_COUNTRY_SIZE_PX`.
+ * Exceptions: None.
+ */
+const continentBesideCountryStyle: MapLabelKindStyle = {
+  ...MAP_LABEL_KIND_STYLES.continent,
+  sizePx: CONTINENT_BESIDE_COUNTRY_SIZE_PX,
+};
+
+/**
+ * Country style used beside state names.
+ *
+ * Purpose: One object, so each frame does not allocate a new style.
+ * When to use: `mapLabelStyleForView` when the kind is country and the view is tactical.
+ * Expected outcome: The country row with `sizePx` set to `COUNTRY_BESIDE_STATE_SIZE_PX`.
+ * Exceptions: None.
+ */
+const countryBesideStateStyle: MapLabelKindStyle = {
+  ...MAP_LABEL_KIND_STYLES.country,
+  sizePx: COUNTRY_BESIDE_STATE_SIZE_PX,
+};
+
+/**
+ * Style for one kind in the current view.
+ *
+ * Purpose: A broad name grows only while the smaller names are drawn with it.
+ * When to use: Before measuring or drawing a label. `zoom` and `tacticalView` are the same pair `visibleLabelKinds` uses.
+ * Expected outcome: 27 px for a continent from the country zoom, outside a tactical view. 19.5 px for a country in a tactical view.
+ *   Otherwise the table entry, including a continent below the country zoom and a continent in a tactical view.
+ * Exceptions: None.
+ */
+export function mapLabelStyleForView(kind: MapLabelKind, zoom: number, tacticalView: boolean): MapLabelKindStyle {
+  if (kind === 'continent' && !tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return continentBesideCountryStyle;
+  if (kind === 'country' && tacticalView) return countryBesideStateStyle;
+  return MAP_LABEL_KIND_STYLES[kind];
+}
 
 /**
  * The text drawn for a feature.

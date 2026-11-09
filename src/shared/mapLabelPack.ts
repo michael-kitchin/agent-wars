@@ -143,10 +143,10 @@ export interface MapLabelFeature {
    */
   readonly rank: number;
   /**
-   * Lowest zoom that names this feature, before the slack.
+   * Lowest zoom stored for this feature.
    *
    * Contract: A number. Continents are 0 and skip this test.
-   * When to use: Compared with `zoom + LABEL_MIN_ZOOM_SLACK`.
+   * When to use: `labelFeatureIsCandidate`. A state is compared with `zoom + LABEL_MIN_ZOOM_SLACK`. A country is compared with its minimum plus `COUNTRY_LABEL_ZOOM_DELAY`.
    * Expected outcome: The document's minimum zoom.
    * Exceptions: None.
    */

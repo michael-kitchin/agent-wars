@@ -16684,6 +16684,8 @@
   // src/shared/mapLabelRules.ts
   var COUNTRY_LABEL_MIN_ZOOM = 4;
   var LABEL_MIN_ZOOM_SLACK = 1.5;
+  var COUNTRY_LABEL_ZOOM_DELAY = 1;
+  var STATE_LABEL_MIN_RADIUS_PX = 40;
   var MAX_LABELS_PER_FRAME = 150;
   var LABEL_COLLISION_PADDING_PX = 4;
   var LABEL_VIEW_INSET_PX = 24;
@@ -16698,8 +16700,8 @@
   var COUNTRY_LABEL_OPACITY = 1;
   var CONTINENT_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
   var STATE_LABEL_OPACITY = COUNTRY_LABEL_OPACITY;
-  var CONTINENT_BESIDE_COUNTRY_OPACITY = 1 / 2;
-  var COUNTRY_BESIDE_STATE_OPACITY = CONTINENT_BESIDE_COUNTRY_OPACITY;
+  var CONTINENT_BESIDE_COUNTRY_OPACITY = 4 / 5;
+  var COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
   function labelKindOpacity(kind, zoom, tacticalView) {
     if (kind === "country") return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
     if (kind === "state") return STATE_LABEL_OPACITY;
@@ -16712,6 +16714,21 @@
     country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
     state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
   };
+  var CONTINENT_BESIDE_COUNTRY_SIZE_PX = 27;
+  var COUNTRY_BESIDE_STATE_SIZE_PX = 19.5;
+  var continentBesideCountryStyle = {
+    ...MAP_LABEL_KIND_STYLES.continent,
+    sizePx: CONTINENT_BESIDE_COUNTRY_SIZE_PX
+  };
+  var countryBesideStateStyle = {
+    ...MAP_LABEL_KIND_STYLES.country,
+    sizePx: COUNTRY_BESIDE_STATE_SIZE_PX
+  };
+  function mapLabelStyleForView(kind, zoom, tacticalView) {
+    if (kind === "continent" && !tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return continentBesideCountryStyle;
+    if (kind === "country" && tacticalView) return countryBesideStateStyle;
+    return MAP_LABEL_KIND_STYLES[kind];
+  }
   function labelDisplayText(feature) {
     return MAP_LABEL_KIND_STYLES[feature.kind].uppercase ? feature.name.toLocaleUpperCase("en") : feature.name;
   }
@@ -16720,8 +16737,8 @@
   }
 
   // src/shared/adminBorderRules.ts
-  var NATIONAL_BORDER_OPACITY = 2 / 3;
-  var STATE_BORDER_OPACITY = 1 / 2;
+  var NATIONAL_BORDER_OPACITY = 4 / 5;
+  var STATE_BORDER_OPACITY = 3 / 5;
   function adminBorderGroupsForView(zoom, tacticalView) {
     const kinds = visibleLabelKinds(zoom, tacticalView);
     const groups = [];
@@ -33196,7 +33213,7 @@ ${bonuses}`;
   function placeMapLabels(input) {
     const chosen = [];
     for (const feature of input.features) {
-      if (!acceptsFeature(feature, input)) continue;
+      if (!labelFeatureIsCandidate(feature, input.kinds, input.zoom)) continue;
       const selection = chooseAnchor(feature, input);
       if (selection == null) continue;
       chosen.push(selection);
@@ -33219,10 +33236,18 @@ ${bonuses}`;
     }
     return placed;
   }
-  function acceptsFeature(feature, input) {
-    if (!input.kinds.includes(feature.kind)) return false;
+  function largestAnchorRadiusM(feature) {
+    let largest = 0;
+    for (const anchor3 of feature.anchors) {
+      if (anchor3.radiusM > largest) largest = anchor3.radiusM;
+    }
+    return largest;
+  }
+  function labelFeatureIsCandidate(feature, kinds, zoom) {
+    if (!kinds.includes(feature.kind)) return false;
     if (feature.kind === "continent") return true;
-    return feature.minZoom <= input.zoom + LABEL_MIN_ZOOM_SLACK;
+    if (feature.kind === "country") return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
+    return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= STATE_LABEL_MIN_RADIUS_PX;
   }
   function chooseAnchor(feature, input) {
     const measured = input.measure(feature);
@@ -33275,12 +33300,98 @@ ${bonuses}`;
     if (kind !== 0) return kind;
     if (left.feature.rank !== right.feature.rank) return left.feature.rank - right.feature.rank;
     if (left.feature.minZoom !== right.feature.minZoom) return left.feature.minZoom - right.feature.minZoom;
+    const radius = largestAnchorRadiusM(right.feature) - largestAnchorRadiusM(left.feature);
+    if (radius !== 0) return radius;
     return left.feature.id < right.feature.id ? -1 : left.feature.id > right.feature.id ? 1 : 0;
   }
   function boxesOverlap(candidate, placed) {
-    if (candidate.feature.kind !== placed.kind) return false;
-    const pad = LABEL_COLLISION_PADDING_PX;
-    return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2 && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;
+    return candidate.feature.kind === placed.kind && centeredBoxesMeet(candidate, placed, LABEL_COLLISION_PADDING_PX);
+  }
+  function centeredBoxesMeet(a, b, paddingPx) {
+    return Math.abs(a.x - b.x) * 2 < a.width + b.width + paddingPx * 2 && Math.abs(a.y - b.y) * 2 < a.height + b.height + paddingPx * 2;
+  }
+
+  // src/shared/mapLabelNudge.ts
+  var LABEL_NUDGE_MAX_PX = 60;
+  var LABEL_NUDGE_STEP_PX = 12;
+  var LABEL_NUDGE_GAP_PX = 2;
+  var ZERO_NUDGE = { dx: 0, dy: 0 };
+  var LABEL_NUDGE_OFFSETS = buildNudgeOffsets();
+  function buildNudgeOffsets() {
+    const steps = LABEL_NUDGE_MAX_PX / LABEL_NUDGE_STEP_PX;
+    const values = Array.from({ length: steps * 2 + 1 }, (_value, index) => (index - steps) * LABEL_NUDGE_STEP_PX);
+    return values.flatMap((dx) => values.map((dy) => ({ dx, dy }))).filter((offset) => Math.hypot(offset.dx, offset.dy) <= LABEL_NUDGE_MAX_PX).sort(compareNudgeOffsets);
+  }
+  function compareNudgeOffsets(left, right) {
+    const length = Math.hypot(left.dx, left.dy) - Math.hypot(right.dx, right.dy);
+    if (length !== 0) return length;
+    const absDx = Math.abs(left.dx) - Math.abs(right.dx);
+    if (absDx !== 0) return absDx;
+    if (left.dy !== right.dy) return left.dy - right.dy;
+    return left.dx - right.dx;
+  }
+  function nudgeBroadLabels(labels, frame) {
+    if (labels.length === 0) return [];
+    const foregroundKind = labels[labels.length - 1].kind;
+    const foreground = labels.filter((label) => label.kind === foregroundKind);
+    if (foreground.length === labels.length) return labels.map((label) => withNudge(label, ZERO_NUDGE));
+    const current = labels.map((label) => withNudge(label, ZERO_NUDGE));
+    for (let index = 0; index < current.length; index += 1) {
+      const label = current[index];
+      if (label.kind === foregroundKind) continue;
+      const nudge = chooseNudge(label, current, foreground, foregroundKind, frame);
+      current[index] = withNudge(label, nudge);
+    }
+    return current;
+  }
+  function chooseNudge(label, current, foreground, foregroundKind, frame) {
+    const choice = { label, current, foreground, foregroundKind, frame };
+    if (isClear(choice, ZERO_NUDGE)) return ZERO_NUDGE;
+    const previous = frame.previousNudges.get(label.featureId);
+    if (previous != null && isClear(choice, previous)) return previous;
+    let best = null;
+    let bestCount = Number.POSITIVE_INFINITY;
+    for (const offset of LABEL_NUDGE_OFFSETS) {
+      if (!isAllowed(choice, offset)) continue;
+      const count = overlapCount(choice, offset);
+      if (count === 0) return offset;
+      if (count < bestCount) {
+        best = offset;
+        bestCount = count;
+      }
+    }
+    return best ?? ZERO_NUDGE;
+  }
+  function isClear(choice, nudge) {
+    return isAllowed(choice, nudge) && overlapCount(choice, nudge) === 0;
+  }
+  function isAllowed(choice, nudge) {
+    const box = shiftedBox(choice.label, nudge);
+    if (!insideInset(box, choice.frame.viewSize)) return false;
+    return !choice.current.some((other) => other.featureId !== choice.label.featureId && other.kind !== choice.foregroundKind && centeredBoxesMeet(box, other, LABEL_COLLISION_PADDING_PX));
+  }
+  function overlapCount(choice, nudge) {
+    const box = shiftedBox(choice.label, nudge);
+    return choice.foreground.reduce(
+      (count, label) => count + (centeredBoxesMeet(box, label, LABEL_NUDGE_GAP_PX) ? 1 : 0),
+      0
+    );
+  }
+  function shiftedBox(label, nudge) {
+    return {
+      x: label.x + nudge.dx,
+      y: label.y + nudge.dy,
+      width: label.width,
+      height: label.height
+    };
+  }
+  function withNudge(label, nudge) {
+    return {
+      ...label,
+      x: label.x + nudge.dx,
+      y: label.y + nudge.dy,
+      nudge
+    };
   }
 
   // src/renderer/map/visibleCityNames.ts
@@ -33300,6 +33411,7 @@ ${bonuses}`;
   // src/renderer/map/mapLabelLayer.ts
   var labelFeatures = [];
   var previousAnchors = /* @__PURE__ */ new Map();
+  var previousNudges = /* @__PURE__ */ new Map();
   var measuredBoxes = /* @__PURE__ */ new Map();
   var labelTheme = null;
   function bindMapLabelLayer(requestRedraw3) {
@@ -33332,7 +33444,7 @@ ${bonuses}`;
     const placed = labelsForFrame(map, ctx, theme, tacticalView);
     const zoom = map.getZoom();
     for (const label of placed) {
-      paintLabel(ctx, theme, label, labelKindOpacity(label.kind, zoom, tacticalView));
+      paintLabel(ctx, theme, label, mapLabelStyleForView(label.kind, zoom, tacticalView), labelKindOpacity(label.kind, zoom, tacticalView));
     }
     canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(",");
   }
@@ -33360,7 +33472,7 @@ ${bonuses}`;
     const north = bounds.getNorth();
     const kinds = visibleLabelKinds(zoom, tacticalView);
     const candidates = withoutStatesNamedForCities(
-      labelFeatures.filter((feature) => featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)),
+      labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)),
       getVisibleCityNameKeys()
     );
     const candidateIds = new Set(candidates.map((feature) => feature.id));
@@ -33375,19 +33487,19 @@ ${bonuses}`;
         lat: clampLatitude(lat),
         lng: alignLongitudeToReference(lng, center.lng)
       }),
-      measure: (feature) => measureLabel(ctx, theme, feature),
+      measure: (feature) => measureLabel(ctx, theme, feature, zoom, tacticalView),
       previousAnchors
     });
     for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
     for (const id of [...previousAnchors.keys()]) {
       if (!candidateIds.has(id)) previousAnchors.delete(id);
     }
-    return placed;
-  }
-  function featureIsCandidate(feature, kinds, zoom) {
-    if (!kinds.includes(feature.kind)) return false;
-    if (feature.kind === "continent") return true;
-    return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK;
+    const nudged = nudgeBroadLabels(placed, {
+      viewSize: { width: size.x, height: size.y },
+      previousNudges
+    });
+    previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
+    return nudged;
   }
   function longitudeMeets(feature, west, east) {
     const viewWest = west;
@@ -33400,18 +33512,18 @@ ${bonuses}`;
   function clampLatitude(lat) {
     return Math.max(-WEB_MERCATOR_MAX_ABS_LAT, Math.min(WEB_MERCATOR_MAX_ABS_LAT, lat));
   }
-  function measureLabel(ctx, theme, feature) {
+  function measureLabel(ctx, theme, feature, zoom, tacticalView) {
     const text = labelDisplayText(feature);
-    const key = `${theme.id}|${feature.kind}|${text}`;
+    const style = mapLabelStyleForView(feature.kind, zoom, tacticalView);
+    const key = `${theme.id}|${feature.kind}|${style.sizePx}|${text}`;
     const cached = measuredBoxes.get(key);
     if (cached) return cached;
-    applyLabelFont(ctx, theme, feature.kind);
-    const box = { width: ctx.measureText(text).width, height: MAP_LABEL_KIND_STYLES[feature.kind].sizePx };
+    applyLabelFont(ctx, theme, style);
+    const box = { width: ctx.measureText(text).width, height: style.sizePx };
     measuredBoxes.set(key, box);
     return box;
   }
-  function applyLabelFont(ctx, theme, kind) {
-    const style = MAP_LABEL_KIND_STYLES[kind];
+  function applyLabelFont(ctx, theme, style) {
     const family = theme.labelFont === "sans" ? "Agent Wars Map Sans" : "Agent Wars Map Serif";
     const fallback = fallbackFamily(theme.labelFont);
     ctx.font = `${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
@@ -33422,10 +33534,10 @@ ${bonuses}`;
   function fallbackFamily(font) {
     return font === "sans" ? "system-ui, sans-serif" : "Georgia, serif";
   }
-  function paintLabel(ctx, theme, label, opacity) {
-    applyLabelFont(ctx, theme, label.kind);
+  function paintLabel(ctx, theme, label, style, opacity) {
+    applyLabelFont(ctx, theme, style);
     ctx.save();
-    ctx.lineWidth = MAP_LABEL_KIND_STYLES[label.kind].haloWidthPx;
+    ctx.lineWidth = style.haloWidthPx;
     ctx.lineJoin = "round";
     ctx.strokeStyle = theme.labelColors.halo;
     ctx.strokeText(label.text, label.x, label.y);

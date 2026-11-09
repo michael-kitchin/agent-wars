@@ -15,20 +15,20 @@ import { visibleLabelKinds } from './mapLabelRules';
  *
  * Purpose: National lines read stronger than state lines, on every theme.
  * When to use: `borderLineOpacity` for `country` and `country_disputed`.
- * Expected outcome: Two thirds.
+ * Expected outcome: Four fifths.
  * Exceptions: None.
  */
-export const NATIONAL_BORDER_OPACITY = 2 / 3;
+export const NATIONAL_BORDER_OPACITY = 4 / 5;
 
 /**
  * Opacity of a state or province border, including a disputed state line.
  *
  * Purpose: State lines stay visible under the national lines.
  * When to use: `borderLineOpacity` for `state` and `state_disputed`.
- * Expected outcome: One half.
+ * Expected outcome: Three fifths.
  * Exceptions: None.
  */
-export const STATE_BORDER_OPACITY = 1 / 2;
+export const STATE_BORDER_OPACITY = 3 / 5;
 
 /**
  * Border groups visible with the current names.

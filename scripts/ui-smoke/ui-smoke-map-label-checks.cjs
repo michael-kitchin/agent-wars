@@ -53,6 +53,7 @@ async function readDrawnLabelKinds(page) {
  * Purpose: Opening New game from the menu must not be left open, and must not end the battle.
  * When to use: Once, while a battle is on screen and Ready has not been clicked for the beat.
  * Expected outcome: The world-names check, the restored-names check, and the battle-still-there check are recorded.
+ *   World names are continents. Battle names are countries, and states only when one is large enough on screen.
  *   The overlay is closed. Start is not clicked. A missing battle stops the run after that check is recorded.
  * Exceptions: Throws a Playwright timeout when the overlay does not open or close, and throws when the battle header is gone.
  */
@@ -76,7 +77,7 @@ async function checkNewGameOverBattleLabels(page, report) {
   );
   await page.waitForTimeout(SETTLE_MS.resize);
   const restored = await readDrawnLabelKinds(page);
-  const restoredOk = restored != null && restored.includes('state') && !restored.includes('continent');
+  const restoredOk = restored != null && restored.includes('country') && !restored.includes('continent');
   record(
     report,
     'closing new game restores battle names',

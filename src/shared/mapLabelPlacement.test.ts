@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { MapLabelAnchor, MapLabelFeature } from './mapLabelPack';
 import { parseMapLabelPack } from './mapLabelPack';
-import { placeMapLabels, type LabelPlacementInput } from './mapLabelPlacement';
+import { labelFeatureIsCandidate, placeMapLabels, type LabelPlacementInput } from './mapLabelPlacement';
 import {
   CONTINENT_BESIDE_COUNTRY_OPACITY,
   CONTINENT_LABEL_OPACITY,
@@ -38,9 +38,9 @@ test('label kinds follow zoom and the tactical view', () => {
 /**
  * Confirms how strongly each kind is painted.
  *
- * Purpose: Country zoom fades continents and countries. A tactical view fades countries and states and omits continents.
+ * Purpose: Country zoom fades continents. A tactical view fades countries and omits continents.
  * When to use: As the contract test for `labelKindOpacity`.
- * Expected outcome: A lone continent, a country beside continents, and a state are the theme color. A continent beside countries, and a country beside states, are half.
+ * Expected outcome: A lone continent, a country beside continents, and a state are the theme color. A continent beside countries is four fifths. A country beside states is three fifths.
  * Exceptions: Assertion failures name the kind whose strength moved.
  */
 test('label opacity follows the view', () => {
@@ -51,10 +51,10 @@ test('label opacity follows the view', () => {
   assert.equal(labelKindOpacity('country', 3, true), COUNTRY_BESIDE_STATE_OPACITY);
   assert.equal(labelKindOpacity('state', 3, true), STATE_LABEL_OPACITY);
   assert.equal(COUNTRY_LABEL_OPACITY, 1);
-  assert.equal(CONTINENT_BESIDE_COUNTRY_OPACITY, 1 / 2);
+  assert.equal(CONTINENT_BESIDE_COUNTRY_OPACITY, 4 / 5);
   assert.equal(CONTINENT_LABEL_OPACITY, COUNTRY_LABEL_OPACITY);
   assert.equal(STATE_LABEL_OPACITY, COUNTRY_LABEL_OPACITY);
-  assert.equal(COUNTRY_BESIDE_STATE_OPACITY, CONTINENT_BESIDE_COUNTRY_OPACITY);
+  assert.equal(COUNTRY_BESIDE_STATE_OPACITY, 3 / 5);
 });
 
 /**
@@ -102,7 +102,7 @@ test('the previous anchor is kept while it stays usable', () => {
 test('a state that overlaps a country is painted over it', () => {
   const placed = placeMapLabels(input({
     features: [
-      named('adm1:BBB', 'state', [anchor(100, 100, 0)], 'State'),
+      named('adm1:BBB', 'state', [anchor(100, 100, 1_000_000_000)], 'State'),
       named('adm0:AAA', 'country', [anchor(100, 100, 0)], 'Country'),
     ],
     kinds: ['country', 'state'],
@@ -121,8 +121,8 @@ test('a state that overlaps a country is painted over it', () => {
 test('two overlapping states keep one', () => {
   const placed = placeMapLabels(input({
     features: [
-      named('adm1:BBB', 'state', [anchor(100, 100, 0)], 'Second'),
-      named('adm1:AAA', 'state', [anchor(100, 100, 0)], 'First'),
+      named('adm1:BBB', 'state', [anchor(100, 100, 1_000_000_000)], 'Second'),
+      named('adm1:AAA', 'state', [anchor(100, 100, 1_000_000_000)], 'First'),
     ],
     kinds: ['state'],
   }));
@@ -165,6 +165,88 @@ test('a fragment thinner than the text is rejected', () => {
 });
 
 /**
+ * Confirms a country waits one level past its stored minimum, with no linger.
+ *
+ * Purpose: Minor countries share a minimum of 5, so they must stay hidden at 5.25 and return at 6.
+ * When to use: As the contract test for country eligibility.
+ * Expected outcome: Minima 2, 3, and 4 pass at 5.25. Minimum 5 fails at 5.25 and 5.75, and passes at 6.
+ * Exceptions: Assertion failures name the zoom that showed or hid the wrong country.
+ */
+test('a country waits one zoom level past its minimum', () => {
+  const country = (minZoom: number) => named('adm0:X', 'country', [anchor(0, 0, 1)], 'X', minZoom);
+  const kinds: MapLabelKind[] = ['continent', 'country'];
+  for (const minZoom of [2, 3, 4]) assert.equal(labelFeatureIsCandidate(country(minZoom), kinds, 5.25), true);
+  assert.equal(labelFeatureIsCandidate(country(5), kinds, 5.25), false);
+  assert.equal(labelFeatureIsCandidate(country(5), kinds, 5.75), false);
+  assert.equal(labelFeatureIsCandidate(country(5), kinds, 6), true);
+});
+
+/**
+ * Confirms a state needs room on screen and may appear before its stored minimum.
+ *
+ * Purpose: Minor states share a minimum, so on-screen size is what removes them, while a large state lingers across a small zoom-out.
+ * When to use: As the contract test for state eligibility.
+ * Expected outcome: 55,108 m passes at zoom 7 and 41,520 m does not. 41,520 m passes at 7.5.
+ *   A minimum of 8 still passes at zoom 7. A minimum of 8.6 does not.
+ * Exceptions: Assertion failures name the radius or minimum that was judged the wrong way.
+ */
+test('a state needs its minimum zoom, the linger, and room on screen', () => {
+  const state = (radiusM: number, minZoom: number) => named('adm1:X', 'state', [anchor(0, 0, radiusM)], 'X', minZoom);
+  const kinds: MapLabelKind[] = ['country', 'state'];
+  assert.equal(labelFeatureIsCandidate(state(55_108, 6.7), kinds, 7), true);
+  assert.equal(labelFeatureIsCandidate(state(41_520, 6.7), kinds, 7), false);
+  assert.equal(labelFeatureIsCandidate(state(41_520, 6.7), kinds, 7.5), true);
+  assert.equal(labelFeatureIsCandidate(state(55_108, 8), kinds, 7), true);
+  assert.equal(labelFeatureIsCandidate(state(55_108, 8.6), kinds, 7), false);
+});
+
+/**
+ * Confirms a small primary anchor does not hide a state that has a large fragment.
+ *
+ * Purpose: The stored primary point can sit on a sliver while a larger piece of the same state is nameable.
+ * When to use: As the contract test for which radius the size rule reads.
+ * Expected outcome: The state is a candidate at zoom 7.
+ * Exceptions: Assertion failures when the primary radius is the one that was tested.
+ */
+test('the largest anchor decides whether a state has room', () => {
+  const state = named('adm1:X', 'state', [anchor(0, 0, 1_371), anchor(1, 1, 55_108)], 'X', 6.6);
+  assert.equal(labelFeatureIsCandidate(state, ['state'], 7), true);
+});
+
+/**
+ * Confirms continents skip the zoom and size tests, and a kind that is not in view is refused.
+ *
+ * Purpose: A world view names every continent. A detail view does not.
+ * When to use: As the contract test for kind filtering.
+ * Expected outcome: The continent passes at zoom 1.5 in a continent view and fails in a country-and-state view.
+ * Exceptions: Assertion failures when a continent is dropped or a hidden kind is kept.
+ */
+test('a continent has no zoom or size test, and another kind is refused', () => {
+  const continent = named('continent:X', 'continent', [anchor(0, 0, 0)], 'X', 99);
+  assert.equal(labelFeatureIsCandidate(continent, ['continent'], 1.5), true);
+  assert.equal(labelFeatureIsCandidate(continent, ['country', 'state'], 7), false);
+});
+
+/**
+ * Confirms the larger state wins when rank and minimum zoom match.
+ *
+ * Purpose: Two states that share a place should keep the one with more room for its name.
+ * When to use: As the contract test for the radius tie-break.
+ * Expected outcome: The state with the larger anchor remains. The lesser id does not win.
+ * Exceptions: Assertion failures when both states are placed or the smaller one wins.
+ */
+test('the state with more room wins a collision between equal ranks', () => {
+  const placed = placeMapLabels(input({
+    features: [
+      named('adm1:AAA', 'state', [anchor(100, 100, 1_000_000_000)]),
+      named('adm1:BBB', 'state', [anchor(100, 100, 2_000_000_000)]),
+    ],
+    kinds: ['state'],
+  }));
+  assert.deepEqual(placed.map((label) => label.featureId), ['adm1:BBB']);
+});
+
+/**
  * Confirms a document with an unknown kind is rejected.
  *
  * Purpose: Only continents, countries, and states are named.
@@ -186,18 +268,19 @@ test('a city kind is rejected', () => {
  *
  * Purpose: The tests choose coordinates directly instead of through Mercator.
  * When to use: From each placement test.
- * Expected outcome: An input at zoom 4 with a 200-pixel view and a 20 by 10 measure.
+ * Expected outcome: An input at the given zoom, or zoom 4, with a 200-pixel view and a 20 by 10 measure.
  * Exceptions: None.
  */
 function input(partial: {
   features: readonly MapLabelFeature[];
   kinds: readonly MapLabelKind[];
   previousAnchors?: ReadonlyMap<string, number>;
+  zoom?: number;
 }): LabelPlacementInput {
   return {
     features: partial.features,
     kinds: partial.kinds,
-    zoom: 4,
+    zoom: partial.zoom ?? 4,
     viewSize: VIEW,
     project: (lat, lng) => ({ x: lng, y: lat }),
     measure: () => MEASURE,
@@ -210,7 +293,7 @@ function input(partial: {
  *
  * Purpose: The tests name the fields that matter and share the rest.
  * When to use: From a placement test.
- * Expected outcome: A feature whose bounds cover its anchors.
+ * Expected outcome: A feature whose bounds cover its anchors and whose minimum zoom is the given value, or 1.
  * Exceptions: None.
  */
 function named(
@@ -218,6 +301,7 @@ function named(
   kind: MapLabelKind,
   anchors: readonly MapLabelAnchor[],
   name = id,
+  minZoom = 1,
 ): MapLabelFeature {
   let west = anchors[0]!.lng;
   let east = west;
@@ -229,7 +313,7 @@ function named(
     south = Math.min(south, anchor.lat);
     north = Math.max(north, anchor.lat);
   }
-  return { id, kind, name, rank: 0, minZoom: 1, anchors, bounds: { west, south, east, north } };
+  return { id, kind, name, rank: 0, minZoom, anchors, bounds: { west, south, east, north } };
 }
 
 /**

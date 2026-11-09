@@ -10,10 +10,12 @@
 
 import type { MapLabelAnchor, MapLabelFeature } from './mapLabelPack';
 import {
+  COUNTRY_LABEL_ZOOM_DELAY,
   LABEL_COLLISION_PADDING_PX,
   LABEL_MIN_ZOOM_SLACK,
   LABEL_VIEW_INSET_PX,
   MAX_LABELS_PER_FRAME,
+  STATE_LABEL_MIN_RADIUS_PX,
   labelDisplayText,
   mercatorMetersPerPixel,
   type MapLabelKind,
@@ -53,7 +55,7 @@ export interface LabelPlacementInput {
    *
    * Contract: A number.
    * When to use: The minimum-zoom test and the fragment-height test.
-   * Expected outcome: Compared with each feature's `minZoom`, plus the slack.
+   * Expected outcome: Passed to `labelFeatureIsCandidate` and the fragment-height test.
    * Exceptions: None.
    */
   readonly zoom: number;
@@ -248,7 +250,7 @@ interface ChosenLabel {
  *
  * Purpose: The same rules run in tests and on the map.
  * When to use: From the label canvas, once per draw.
- * Expected outcome: Labels in kind, rank, minimum zoom, then id order, stopping at the frame cap.
+ * Expected outcome: Labels in kind, rank, minimum zoom, largest anchor radius, then id order, stopping at the frame cap.
  *   A label is skipped only when it meets another label of the same kind. A later kind is painted on top.
  *   The previous anchor is kept while it stays usable. Otherwise the primary anchor wins, then the usable anchor nearest the center.
  * Exceptions: None.
@@ -256,7 +258,7 @@ interface ChosenLabel {
 export function placeMapLabels(input: LabelPlacementInput): PlacedMapLabel[] {
   const chosen: ChosenLabel[] = [];
   for (const feature of input.features) {
-    if (!acceptsFeature(feature, input)) continue;
+    if (!labelFeatureIsCandidate(feature, input.kinds, input.zoom)) continue;
     const selection = chooseAnchor(feature, input);
     if (selection == null) continue;
     chosen.push(selection);
@@ -281,18 +283,41 @@ export function placeMapLabels(input: LabelPlacementInput): PlacedMapLabel[] {
 }
 
 /**
- * Whether a feature belongs in this frame before its anchors are tested.
+ * Largest inscribed radius stored for a feature.
  *
- * Purpose: Kind and minimum zoom are cheaper than projection.
- * When to use: The first filter in `placeMapLabels`.
- * Expected outcome: False for a kind that is not visible. Continents skip the minimum-zoom test.
- *   Other kinds stay eligible through `zoom + LABEL_MIN_ZOOM_SLACK`.
+ * Purpose: The primary anchor can sit on a sliver while another piece of the same feature is large enough to name.
+ * When to use: The state size test and the collision tie-break.
+ * Expected outcome: The greatest `radiusM` among the anchors. Zero when the feature has none.
  * Exceptions: None.
  */
-function acceptsFeature(feature: MapLabelFeature, input: LabelPlacementInput): boolean {
-  if (!input.kinds.includes(feature.kind)) return false;
+function largestAnchorRadiusM(feature: MapLabelFeature): number {
+  let largest = 0;
+  for (const anchor of feature.anchors) {
+    if (anchor.radiusM > largest) largest = anchor.radiusM;
+  }
+  return largest;
+}
+
+/**
+ * Whether a feature belongs in this frame before its anchors are tested.
+ *
+ * Purpose: Kind, minimum zoom, and state size are cheaper than projection, and the canvas uses the same test for memory.
+ * When to use: The first filter in `placeMapLabels`, and before the bounds test on the label canvas.
+ * Expected outcome: False for a kind that is not visible. Continents pass with no further test.
+ *   A country passes once the zoom reaches its minimum plus `COUNTRY_LABEL_ZOOM_DELAY`.
+ *   A state passes from `LABEL_MIN_ZOOM_SLACK` below its minimum, once its largest anchor covers `STATE_LABEL_MIN_RADIUS_PX`.
+ * Exceptions: None.
+ */
+export function labelFeatureIsCandidate(
+  feature: MapLabelFeature,
+  kinds: readonly MapLabelKind[],
+  zoom: number,
+): boolean {
+  if (!kinds.includes(feature.kind)) return false;
   if (feature.kind === 'continent') return true;
-  return feature.minZoom <= input.zoom + LABEL_MIN_ZOOM_SLACK;
+  if (feature.kind === 'country') return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
+  return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK
+    && largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= STATE_LABEL_MIN_RADIUS_PX;
 }
 
 /**
@@ -336,7 +361,7 @@ function chooseAnchor(feature: MapLabelFeature, input: LabelPlacementInput): Cho
  * Expected outcome: True when the point is at least `LABEL_VIEW_INSET_PX` from each edge.
  * Exceptions: None.
  */
-function insideInset(
+export function insideInset(
   point: { readonly x: number; readonly y: number },
   viewSize: { readonly width: number; readonly height: number },
 ): boolean {
@@ -407,7 +432,7 @@ function distanceSquared(
  *
  * Purpose: Later kinds are painted on top, so a state sits over a country and a country sits over a continent.
  * When to use: Before the greedy pass.
- * Expected outcome: Continent, then country, then state. Within a kind, smaller rank, then smaller minimum zoom, then id.
+ * Expected outcome: Continent, then country, then state. Within a kind, smaller rank, then smaller minimum zoom, then larger anchor radius, then id.
  * Exceptions: None.
  */
 function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
@@ -415,6 +440,8 @@ function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
   if (kind !== 0) return kind;
   if (left.feature.rank !== right.feature.rank) return left.feature.rank - right.feature.rank;
   if (left.feature.minZoom !== right.feature.minZoom) return left.feature.minZoom - right.feature.minZoom;
+  const radius = largestAnchorRadiusM(right.feature) - largestAnchorRadiusM(left.feature);
+  if (radius !== 0) return radius;
   return left.feature.id < right.feature.id ? -1 : left.feature.id > right.feature.id ? 1 : 0;
 }
 
@@ -428,8 +455,66 @@ function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
  * Exceptions: None.
  */
 function boxesOverlap(candidate: ChosenLabel, placed: PlacedMapLabel): boolean {
-  if (candidate.feature.kind !== placed.kind) return false;
-  const pad = LABEL_COLLISION_PADDING_PX;
-  return Math.abs(candidate.x - placed.x) * 2 < candidate.width + placed.width + pad * 2
-    && Math.abs(candidate.y - placed.y) * 2 < candidate.height + placed.height + pad * 2;
+  return candidate.feature.kind === placed.kind
+    && centeredBoxesMeet(candidate, placed, LABEL_COLLISION_PADDING_PX);
+}
+
+/**
+ * A centered label box.
+ *
+ * Purpose: Collision and the broad-name shift share one overlap test.
+ * When to use: `centeredBoxesMeet`.
+ * Expected outcome: Center, width, and height in CSS pixels.
+ * Exceptions: None.
+ */
+export interface LabelBox {
+  /**
+   * Horizontal center in CSS pixels.
+   *
+   * Contract: A number.
+   * When to use: The overlap test.
+   * Expected outcome: The box center.
+   * Exceptions: None.
+   */
+  readonly x: number;
+  /**
+   * Vertical center in CSS pixels.
+   *
+   * Contract: A number.
+   * When to use: The overlap test.
+   * Expected outcome: The box center.
+   * Exceptions: None.
+   */
+  readonly y: number;
+  /**
+   * Width in CSS pixels.
+   *
+   * Contract: A non-negative number.
+   * When to use: The overlap test.
+   * Expected outcome: The box width.
+   * Exceptions: None.
+   */
+  readonly width: number;
+  /**
+   * Height in CSS pixels.
+   *
+   * Contract: A non-negative number.
+   * When to use: The overlap test.
+   * Expected outcome: The box height.
+   * Exceptions: None.
+   */
+  readonly height: number;
+}
+
+/**
+ * Whether two centered boxes meet, including a gap.
+ *
+ * Purpose: Same-kind collision and the broad-name shift use one comparison.
+ * When to use: With `LABEL_COLLISION_PADDING_PX` for two names of the same kind, or a smaller gap against a name drawn on top.
+ * Expected outcome: True when the gap between the boxes is below `paddingPx`.
+ * Exceptions: None.
+ */
+export function centeredBoxesMeet(a: LabelBox, b: LabelBox, paddingPx: number): boolean {
+  return Math.abs(a.x - b.x) * 2 < a.width + b.width + paddingPx * 2
+    && Math.abs(a.y - b.y) * 2 < a.height + b.height + paddingPx * 2;
 }

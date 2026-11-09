@@ -8,16 +8,16 @@
  */
 
 import {
-  LABEL_MIN_ZOOM_SLACK,
-  MAP_LABEL_KIND_STYLES,
   labelDisplayText,
   labelKindOpacity,
+  mapLabelStyleForView,
   visibleLabelKinds,
-  type MapLabelKind,
+  type MapLabelKindStyle,
 } from '../../shared/mapLabelRules';
 import { withoutStatesNamedForCities } from '../../shared/mapLabelCityNames';
 import { parseMapLabelPack, type MapLabelFeature } from '../../shared/mapLabelPack';
-import { placeMapLabels, type PlacedMapLabel } from '../../shared/mapLabelPlacement';
+import { labelFeatureIsCandidate, placeMapLabels, type PlacedMapLabel } from '../../shared/mapLabelPlacement';
+import { nudgeBroadLabels, type LabelNudge, type NudgedMapLabel } from '../../shared/mapLabelNudge';
 import type { MapLabelFontId, MapTheme } from '../../shared/mapThemes';
 import { WEB_MERCATOR_MAX_ABS_LAT, alignLongitudeToReference } from '../../shared/webMercator';
 import { rendererSharedState as S } from '../core/state';
@@ -113,7 +113,10 @@ let labelFeatures: readonly MapLabelFeature[] = [];
 /** Anchor index used last time each feature was a candidate. */
 const previousAnchors = new Map<string, number>();
 
-/** Measured boxes, keyed by theme, kind, and text. */
+/** Shift used last time each drawn label was painted. A label that was not drawn is dropped. */
+let previousNudges = new Map<string, LabelNudge>();
+
+/** Measured boxes, keyed by theme, kind, size, and text. */
 const measuredBoxes = new Map<string, { width: number; height: number }>();
 
 /** Theme applied to the next draw. Null until the theme pass runs. */
@@ -186,7 +189,7 @@ export function drawMapLabels(): void {
   const placed = labelsForFrame(map, ctx, theme, tacticalView);
   const zoom = map.getZoom();
   for (const label of placed) {
-    paintLabel(ctx, theme, label, labelKindOpacity(label.kind, zoom, tacticalView));
+    paintLabel(ctx, theme, label, mapLabelStyleForView(label.kind, zoom, tacticalView), labelKindOpacity(label.kind, zoom, tacticalView));
   }
   canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(',');
 }
@@ -216,11 +219,11 @@ async function loadLabelDocument(requestRedraw: () => void): Promise<void> {
 }
 
 /**
- * Chooses the labels for one frame and updates the anchor memory.
+ * Chooses the labels for one frame and updates the anchor and shift memory.
  *
  * Purpose: Placement is shared. This function supplies the view, the projection, and the measurement. The tactical flag is read once by the caller, because that read can change the flag.
  * When to use: From `drawMapLabels`, after the canvas is clear.
- * Expected outcome: The placed labels, using `tacticalView` for which kinds appear. A state whose name matches a city recorded for this frame is not a candidate. Memory keeps a candidate that was not drawn and forgets a feature that was not a candidate.
+ * Expected outcome: The placed labels, shifted off the smaller names. `tacticalView` chooses the kinds and the country size. The zoom chooses the continent size from the country zoom up. A state whose name matches a city recorded for this frame is not a candidate. Anchor memory keeps a candidate that was not drawn. Shift memory keeps only labels drawn this frame.
  * Exceptions: None.
  */
 function labelsForFrame(
@@ -228,7 +231,7 @@ function labelsForFrame(
   ctx: CanvasRenderingContext2D,
   theme: MapTheme,
   tacticalView: boolean,
-): PlacedMapLabel[] {
+): NudgedMapLabel[] {
   const zoom = map.getZoom();
   const bounds = map.getBounds();
   const west = bounds.getWest();
@@ -238,7 +241,7 @@ function labelsForFrame(
   const kinds = visibleLabelKinds(zoom, tacticalView);
   const candidates = withoutStatesNamedForCities(
     labelFeatures.filter((feature) => (
-      featureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)
+      labelFeatureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)
     )),
     getVisibleCityNameKeys(),
   );
@@ -254,32 +257,19 @@ function labelsForFrame(
       lat: clampLatitude(lat),
       lng: alignLongitudeToReference(lng, center.lng),
     }),
-    measure: (feature) => measureLabel(ctx, theme, feature),
+    measure: (feature) => measureLabel(ctx, theme, feature, zoom, tacticalView),
     previousAnchors,
   });
   for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
   for (const id of [...previousAnchors.keys()]) {
     if (!candidateIds.has(id)) previousAnchors.delete(id);
   }
-  return placed;
-}
-
-/**
- * Whether a feature passes the kind and zoom tests.
- *
- * Purpose: The same tests `placeMapLabels` applies, so memory can tell a candidate from a feature that is simply off screen.
- * When to use: Before the bounds test.
- * Expected outcome: Continents skip the minimum zoom. Other kinds stay eligible through the slack.
- * Exceptions: None.
- */
-function featureIsCandidate(
-  feature: MapLabelFeature,
-  kinds: readonly string[],
-  zoom: number,
-): boolean {
-  if (!kinds.includes(feature.kind)) return false;
-  if (feature.kind === 'continent') return true;
-  return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK;
+  const nudged = nudgeBroadLabels(placed, {
+    viewSize: { width: size.x, height: size.y },
+    previousNudges,
+  });
+  previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
+  return nudged;
 }
 
 /**
@@ -323,24 +313,27 @@ function clampLatitude(lat: number): number {
 }
 
 /**
- * Measures one name, reusing an earlier measurement of the same theme, kind, and text.
+ * Measures one name, reusing an earlier measurement of the same theme, kind, size, and text.
  *
  * Purpose: Measuring thousands of names on every frame is wasted work.
  * When to use: As the `measure` callback.
- * Expected outcome: The text width and the kind's font size as the height.
+ * Expected outcome: The text width and the view's font size as the height. A width measured at 13 px is not reused at 19.5 px, and one measured at 18 px is not reused at 27 px.
  * Exceptions: None.
  */
 function measureLabel(
   ctx: CanvasRenderingContext2D,
   theme: MapTheme,
   feature: MapLabelFeature,
+  zoom: number,
+  tacticalView: boolean,
 ): { width: number; height: number } {
   const text = labelDisplayText(feature);
-  const key = `${theme.id}|${feature.kind}|${text}`;
+  const style = mapLabelStyleForView(feature.kind, zoom, tacticalView);
+  const key = `${theme.id}|${feature.kind}|${style.sizePx}|${text}`;
   const cached = measuredBoxes.get(key);
   if (cached) return cached;
-  applyLabelFont(ctx, theme, feature.kind);
-  const box = { width: ctx.measureText(text).width, height: MAP_LABEL_KIND_STYLES[feature.kind].sizePx };
+  applyLabelFont(ctx, theme, style);
+  const box = { width: ctx.measureText(text).width, height: style.sizePx };
   measuredBoxes.set(key, box);
   return box;
 }
@@ -350,11 +343,10 @@ function measureLabel(
  *
  * Purpose: Measuring and painting must use the same font or the boxes will not match the glyphs.
  * When to use: Before `measureText`, `strokeText`, and `fillText`.
- * Expected outcome: The theme's family, the kind's size and weight, and centered middle alignment.
+ * Expected outcome: The theme's family, the style's size and weight, and centered middle alignment.
  * Exceptions: None.
  */
-function applyLabelFont(ctx: CanvasRenderingContext2D, theme: MapTheme, kind: MapLabelKind): void {
-  const style = MAP_LABEL_KIND_STYLES[kind];
+function applyLabelFont(ctx: CanvasRenderingContext2D, theme: MapTheme, style: MapLabelKindStyle): void {
   const family = theme.labelFont === 'sans' ? 'Agent Wars Map Sans' : 'Agent Wars Map Serif';
   const fallback = fallbackFamily(theme.labelFont);
   ctx.font = `${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
@@ -387,11 +379,12 @@ function paintLabel(
   ctx: CanvasRenderingContext2D,
   theme: MapTheme,
   label: PlacedMapLabel,
+  style: MapLabelKindStyle,
   opacity: number,
 ): void {
-  applyLabelFont(ctx, theme, label.kind);
+  applyLabelFont(ctx, theme, style);
   ctx.save();
-  ctx.lineWidth = MAP_LABEL_KIND_STYLES[label.kind].haloWidthPx;
+  ctx.lineWidth = style.haloWidthPx;
   ctx.lineJoin = 'round';
   ctx.strokeStyle = theme.labelColors.halo;
   ctx.strokeText(label.text, label.x, label.y);
