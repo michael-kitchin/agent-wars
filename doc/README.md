@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **2.21.1** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **2.21.2** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **2.21.2** waits one extra zoom level before a country name appears, and shows a state or province name when that area is large enough on screen. Continent names grow while country names are on the map, and country names grow in the close view that draws states. A larger name moves off a smaller one and returns when its original spot is clear. Continent names drawn with countries, and national borders, are four fifths strength. Country names drawn with states, and state borders, are three fifths.
 
 Release **2.21.1** lets an AI-only battle stop after a chosen number of beats, 30 unless you pick another. Unlimited removes that limit, and None turns it off. Reaching it ends the battle and shows how many beats it ran. While turns advance on their own, that notice stays for 3 seconds. While you watch every side, Production and Forces add up the sides still playing. Fog of war, Sight cues, and Auto-start AI sit together under Other.
 
