@@ -232,9 +232,16 @@ def build_keep_filter(
         When the plan does not cover the full timeline, so the picture must be re-encoded.
         A long match can have hundreds of stretches. One ``select`` expression runs out of
         memory while ffmpeg initializes it, so each stretch is its own ``trim``.
+        The source is read once. Naming ``[0:v]`` in every chain makes each chain a separate
+        graph input, and ffmpeg then holds decoded frames for every input that ``concat`` has
+        not reached yet, which grows with the source read until memory runs out or the encode
+        stalls. One flat ``split`` avoids that but sends every frame to every stretch, which is
+        slow with a thousand stretches. So stretches are grouped, about the square root of
+        their count per group, and each frame reaches only the group trims and its own group.
     What to expect:
-        A ``filter_complex`` graph labeled ``[out]``. Each stretch is ``trim`` then
-        ``setpts``, and ``concat`` joins them. The span that reaches the end of the file
+        A ``filter_complex`` graph labeled ``[out]``. One ``split`` feeds a ``trim`` per group,
+        and each group's ``split`` feeds its stretches. Each stretch is ``trim`` then ``setpts``,
+        and ``concat`` joins them in order. The span that reaches the end of the file
         is padded by one frame so rounding does not drop the last source frame.
         Kept frames are retimed to ``frames_per_second``.
     Exceptions:
@@ -247,17 +254,23 @@ def build_keep_filter(
     if frames_per_second <= 0:
         raise ValueError("frames_per_second must be positive.")
     frame_seconds = 1.0 / float(frames_per_second)
-    chains: list[str] = []
+    group_size = math.isqrt(len(spans) - 1) + 1
+    groups = [range(first, min(first + group_size, len(spans))) for first in range(0, len(spans), group_size)]
+    chains: list[str] = [f"[0:v]split={len(groups)}" + "".join(f"[g{number}]" for number in range(len(groups)))]
     labels: list[str] = []
-    for index, span in enumerate(spans):
-        end_seconds = span.end_seconds
-        if duration_seconds - end_seconds <= frame_seconds:
-            end_seconds += frame_seconds
-        label = f"v{index}"
-        labels.append(f"[{label}]")
+    for number, members in enumerate(groups):
+        ends = [_trim_end(spans[index], duration_seconds, frame_seconds) for index in members]
         chains.append(
-            f"[0:v]trim=start={span.start_seconds:.6f}:end={end_seconds:.6f},setpts=PTS-STARTPTS[{label}]"
+            f"[g{number}]trim=start={spans[members[0]].start_seconds:.6f}:end={ends[-1]:.6f},"
+            f"split={len(members)}" + "".join(f"[s{index}]" for index in members)
         )
+        for index, end_seconds in zip(members, ends):
+            label = f"v{index}"
+            labels.append(f"[{label}]")
+            chains.append(
+                f"[s{index}]trim=start={spans[index].start_seconds:.6f}:end={end_seconds:.6f},"
+                f"setpts=PTS-STARTPTS[{label}]"
+            )
     rate = format(float(frames_per_second), ".10f")
     joined = "".join(labels)
     graph = (
@@ -331,6 +344,21 @@ def _freeze_field(line: str) -> tuple[str | None, float | None]:
     if not math.isfinite(number):
         return None, None
     return kind.strip(), number
+
+
+def _trim_end(span: TimeSpan, duration_seconds: float, frame_seconds: float) -> float:
+    """
+    Why this exists:
+        Keep the last source frame when a stretch reaches the end of the file.
+    When to use:
+        For each stretch's ``trim`` end in ``build_keep_filter``.
+    What to expect:
+        The stretch's end, padded by one frame when it is within a frame of the file's end.
+    """
+
+    if duration_seconds - span.end_seconds <= frame_seconds:
+        return span.end_seconds + frame_seconds
+    return span.end_seconds
 
 
 def _merge_spans(spans: Sequence[TimeSpan], gap_seconds: float) -> list[TimeSpan]:

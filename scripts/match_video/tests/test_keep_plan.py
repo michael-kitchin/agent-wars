@@ -98,6 +98,20 @@ class KeepPlanTests(unittest.TestCase):
         self.assertIn("concat=n=200:v=1:a=0", graph)
         self.assertNotIn("select=", graph)
 
+    def test_keep_filter_reads_the_source_once(self) -> None:
+        spans = [TimeSpan(float(index), float(index) + 0.4) for index in range(200)]
+        graph = build_keep_filter(spans, Fraction(10, 1), 200.0)
+        self.assertEqual(graph.count("[0:v]"), 1)
+        self.assertTrue(graph.startswith("[0:v]split=14[g0][g1]"))
+        self.assertIn("[g0]trim=start=0.000000:end=14.400000,split=15[s0]", graph)
+        self.assertIn("[s199]trim=start=199.000000:end=199.400000,setpts=PTS-STARTPTS[v199]", graph)
+        self.assertIn("".join(f"[v{index}]" for index in range(200)) + "concat=n=200", graph)
+
+    def test_single_span_still_builds_a_graph(self) -> None:
+        graph = build_keep_filter([TimeSpan(2.0, 3.0)], Fraction(10, 1), 10.0)
+        self.assertTrue(graph.startswith("[0:v]split=1[g0];[g0]trim=start=2.000000:end=3.000000,split=1[s0]"))
+        self.assertIn("concat=n=1:v=1:a=0", graph)
+
     def test_bad_duration_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             build_keep_intervals(0.0, [], 1.0, 0.1)
