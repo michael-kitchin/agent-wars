@@ -36,6 +36,23 @@ class KeepPlanTests(unittest.TestCase):
         spans = finish_freezes([FreezeEvent(1.0, None)], 4.0)
         self.assertEqual(spans, [TimeSpan(1.0, 4.0)])
 
+    def test_touching_freezes_stay_separate(self) -> None:
+        events = [FreezeEvent(0.0, 0.4), FreezeEvent(0.4, 0.8), FreezeEvent(0.8, None)]
+        spans = finish_freezes(events, 1.2)
+        self.assertEqual(_spans(spans), [(0.0, 0.4), (0.4, 0.8), (0.8, 1.2)])
+
+    def test_overlapping_freezes_are_joined(self) -> None:
+        spans = finish_freezes([FreezeEvent(0.0, 0.5), FreezeEvent(0.4, 0.8)], 1.0)
+        self.assertEqual(_spans(spans), [(0.0, 0.8)])
+
+    def test_one_frame_change_between_stills_keeps_each_head(self) -> None:
+        freezes = finish_freezes([FreezeEvent(0.0, 0.4), FreezeEvent(0.4, 0.8), FreezeEvent(0.8, None)], 1.2)
+        spans = build_keep_intervals(1.2, freezes, 0.1, 0.1)
+        self.assertEqual(len(spans), 3)
+        for actual, expected in zip(_spans(spans), [(0.0, 0.1), (0.4, 0.5), (0.8, 0.9)]):
+            self.assertAlmostEqual(actual[0], expected[0])
+            self.assertAlmostEqual(actual[1], expected[1])
+
     def test_middle_freeze_keeps_one_second_then_the_following_motion(self) -> None:
         spans = build_keep_intervals(6.0, [TimeSpan(0.0, 5.0)], 1.0, 0.1)
         self.assertEqual(_spans(spans), [(0.0, 1.0), (5.0, 6.0)])

@@ -13,6 +13,7 @@ import type {
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
+import type { FortificationReport } from '../../shared/ipc/fortificationTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { removedUnitSnapshot } from '../../shared/lossFlagFacts';
 import { HUMAN_SEAT_ID } from '../../shared/seatIds';
@@ -235,6 +236,15 @@ export type TacticalAirRangedPhaseAccum = {
   killsByReturnFire: KillEdge[];
   removedUnits: RemovedUnitSnapshot[];
   infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+  /**
+   * Cells whose fortification absorbed a hit in this air and ranged phase.
+   *
+   * Purpose: The beat report names those cells. Support-only projections may ignore the list.
+   * When to use: Copy onto a `TacticalBeatOutcome`. Do not copy onto a support-only result.
+   * Expected outcome: One report per cell, or an empty list when nothing was absorbed.
+   * Exceptions: None.
+   */
+  fortificationReports: FortificationReport[];
   airStrikeAttemptCount: number;
   /**
    * Air-strike animation rows for tactical resolution playback (mirrors strategic `resolveAirStrikePhase.strikeMoves`).
@@ -762,6 +772,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   if (infrastructureDestroyedEvents.length > 0 || rangedTerrainMutated) {
     workBattle = refreshTacticalBattleTerrainFromGameDb(workBattle);
   }
+  const fortificationReports = fortificationHooks.absorbedReports();
   tacticalLogMutate('applyTacticalAirStrikeThenRangedPhaseOnBattle complete', {
     battleId: battle.battleId,
     airAttempts: airStrikeAttemptCount,
@@ -774,6 +785,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     shotLineCount: rangedResolutionShotLines.length,
     airDiceRollCount: airDiceLog.rolls.length,
     rangedDiceRollCount: rangedDiceLog.rolls.length,
+    fortificationReportCount: fortificationReports.length,
   });
   syncStrategicUnitsDbWhenTacticalParentsEliminated(battle.subUnits, workBattle.subUnits);
   return {
@@ -783,6 +795,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     killsByReturnFire,
     removedUnits,
     infrastructureDestroyedEvents,
+    fortificationReports,
     airStrikeAttemptCount,
     airStrikePlaybackMoves: strikeMoves,
     airDropPlaybackMoves: dropOutcome.moves,

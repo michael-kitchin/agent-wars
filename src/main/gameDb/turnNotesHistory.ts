@@ -8,6 +8,16 @@ import type { GuardedDbOps } from './dbOps';
 export type TurnNotesScope = 'strategic' | 'tactical';
 
 /**
+ * How many prior turns or beats a commander prompt includes.
+ *
+ * Purpose: One limit for strategic briefings and tactical beat prompts.
+ * When to use: The default of `getRecentTurnNotes`, and the prompt section builder.
+ * Expected outcome: At most ten rows, strictly before the turn being planned.
+ * Exceptions: None. A caller may pass a smaller limit.
+ */
+export const RECENT_TURN_NOTES_LIMIT = 10;
+
+/**
  * One row from `turn_notes_history` returned to prompt builders.
  *
  * Purpose: Carries strategy text and serialized loss JSON for recent-turn prompt sections.
@@ -169,7 +179,7 @@ export function upsertTurnLossNote(
 /**
  * Reads the most recent turn/beat notes strictly before `beforeTurnNumber`.
  *
- * Purpose: Supplies the three-entry window for recent-turn prompt sections.
+ * Purpose: Supplies the ten-entry window for recent-turn prompt sections.
  * When to use: Strategic briefing and tactical operational map prompt assembly.
  * Expected outcome: Up to `limit` rows ordered ascending by `turn_number` after a descending query.
  * Exceptions: Returns empty array when DB unavailable.
@@ -180,7 +190,7 @@ export function getRecentTurnNotes(
   scope: TurnNotesScope,
   battleId: string,
   beforeTurnNumber: number,
-  limit = 3
+  limit = RECENT_TURN_NOTES_LIMIT
 ): TurnNoteRow[] {
   logTrace('turnNotesHistory getRecentTurnNotes', { seatId, scope, battleId, beforeTurnNumber, limit });
   if (!ops.hasDb()) return [];

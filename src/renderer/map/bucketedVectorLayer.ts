@@ -364,6 +364,35 @@ export interface BucketedVectorLayer {
 }
 
 /**
+ * Skips a canvas redraw once Leaflet has deleted the drawing context.
+ *
+ * Purpose: Removing the renderer deletes `_ctx`, and a zoom event can still call `_update` or `_clear`. Those call
+ *   `clearRect` on the missing context.
+ * When to use: On the renderer from `leaflet.canvas`, before any path is added.
+ * Expected outcome: A redraw with no context returns. A redraw with a context uses Leaflet's own method.
+ * Exceptions: None.
+ */
+function ignoreRedrawWithoutContext(renderer: {
+  remove?: () => void;
+  _ctx?: unknown;
+  _update?: () => void;
+  _clear?: () => void;
+  _draw?: () => void;
+  _redraw?: () => void;
+} | undefined): void {
+  if (!renderer) return;
+  const names = ['_update', '_clear', '_draw', '_redraw'] as const;
+  for (const name of names) {
+    const original = renderer[name];
+    if (typeof original !== 'function') continue;
+    renderer[name] = function redrawWhenContextExists(this: { _ctx?: unknown }) {
+      if (!this._ctx) return;
+      original.call(this);
+    };
+  }
+}
+
+/**
  * Creates the pane, the renderer, and the path cache.
  *
  * Purpose: Each feature module supplies cells. This module owns the Leaflet paths.
@@ -378,6 +407,7 @@ export function createBucketedVectorLayer(options: BucketedVectorLayerOptions): 
     pane.style.pointerEvents = 'none';
   }
   const renderer = options.leaflet.canvas?.({ pane: options.paneName, padding: 0.5 });
+  ignoreRedrawWithoutContext(renderer);
   const paths = new Map<string, VectorPath>();
   let source: VectorCellSource | null = null;
   let style: VectorPathStyle = {

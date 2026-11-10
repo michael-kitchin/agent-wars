@@ -54,7 +54,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Operational Map` | `buildStrategicOperationalMapSectionMarkdown` | `operational.trim().length > 0` | heading plus `(No units — map not rendered.)` when neither side has units. Otherwise one fenced block per connected patch of the window (`selectStrategicMapWindowCells`). An empty window draws the loaded set. A Shown line appears when the window is smaller than that set, and when `get_map` is enabled it also says to call `get_map` for cells outside the window |
 | `### Best Options This Turn` | `formatBestOptionsThisTurnSubsection` | at least one aggregated row | heading and table omitted |
 | `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
-| `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 3 turns has a message, strategy, or loss | omitted |
+| `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 10 turns has a message, strategy, or loss | omitted |
 | `## Production Status` | `buildProductionBriefingBlock`, then `shiftMarkdownHeadings` inside the briefing | `flags.productionEnabled` | omitted |
 | `# Mercenaries` | `buildMercenariesBriefingBlock` | strategic, `mercenaryEconomy` present, and production on or the seat has a mercenary | omitted. Production off uses `buildMercenaryUpkeepRule` and skips hire tables |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
@@ -121,7 +121,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Attention Flags` | `buildAttentionFlags(..., 'tactical', false)` | always | `None.` |
 | `## Operational Map` | `buildTacticalOperationalMapSectionMarkdown` | always when briefing is built | `_No tactical cells — map not rendered._` |
 | `### Best Options This Turn` | same as strategic | at least one aggregated row | omitted |
-| `## Recent Turn Notes` | `scope: 'tactical'` | at least one qualifying prior row | omitted |
+| `## Recent Turn Notes` | `buildRecentTurnNotesSection` with `scope: 'tactical'` | at least one of the previous 10 periods has a message, strategy, or loss (`RECENT_TURN_NOTES_LIMIT`) | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
 Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`.

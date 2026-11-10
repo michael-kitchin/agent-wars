@@ -116,12 +116,12 @@ test('a missile sentence follows cause lines and precedes hex sentences', () => 
     HUMAN_SEAT_ID,
     roster,
     hexLines,
-    new Map([[HUMAN_SEAT_ID, ['Missile strike on Osaka: 1 city cell destroyed.']]])
+    new Map([[HUMAN_SEAT_ID, ['Missile strike in AA destroyed 1 city cell.']]])
   );
   assert.deepEqual(lines, [
     '## Your Losses',
     'Ranged attack: 1st Infantry',
-    'Missile strike on Osaka: 1 city cell destroyed.',
+    'Missile strike in AA destroyed 1 city cell.',
     'You lost 1 hex to E. Turkey.',
   ]);
 });
@@ -132,9 +132,9 @@ test('a side with only a missile sentence still has a section', () => {
     null,
     [{ seatId: AI_SEAT_IDS[0], seatOrder: 1, homeRegion: 'Western Turkey', nickname: null, kind: 'ai' as const }],
     undefined,
-    new Map([[AI_SEAT_IDS[0], ['Missile strike on Osaka: 0 airports destroyed.']]])
+    new Map([[AI_SEAT_IDS[0], ['Missile strike in AA destroyed nothing.']]])
   );
-  assert.deepEqual(lines, ['## W. Turkey Losses', 'Missile strike on Osaka: 0 airports destroyed.']);
+  assert.deepEqual(lines, ['## W. Turkey Losses', 'Missile strike in AA destroyed nothing.']);
 });
 
 test('lossSectionOwnerId reads the header and breaks a shared name by seat order', () => {

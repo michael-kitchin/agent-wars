@@ -98,7 +98,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 
 #### `## Recent Turn Notes`
 
-Include when at least one prior period in this battle has a message, strategy, or loss; omit otherwise. Scoped to this battle, not to the strategic timeline.
+Include when at least one of the previous ten periods in this battle has a message, strategy, or loss (`RECENT_TURN_NOTES_LIMIT`); omit otherwise. The blocks are those periods in ascending order, labeled `Turn N:`. Scoped to this battle, not to the strategic timeline.
 
 #### `## Active Callbacks`
 

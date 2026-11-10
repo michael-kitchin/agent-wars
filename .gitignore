@@ -28,3 +28,6 @@ data/generated/**/*.csv
 
 # UI smoke run output (screenshots and report.json)
 .test/
+
+# Local screen recordings
+OBS/

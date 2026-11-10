@@ -80,7 +80,7 @@ import {
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './gameDb/aiState';
-export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './gameDb/turnNotesHistory';
+export { RECENT_TURN_NOTES_LIMIT, type TurnConsultationNoteTexts, type TurnNoteRow, type TurnNotesScope } from './gameDb/turnNotesHistory';
 export type { BuildQueueRow, HexControlRow, StrategicInfrastructureRow, TacticalFeatureOverrideRow } from './gameDb/controlInfrastructure';
 export {
   clearBuildQueueAndProgressForHex,

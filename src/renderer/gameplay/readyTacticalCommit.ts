@@ -15,7 +15,7 @@ import { currentConsoleReportTag } from '../chrome/consoleReports';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
-import { reconcileSelectionToCurrentState } from '../core/selection';
+import { getExploredHexSet, reconcileSelectionToCurrentState } from '../core/selection';
 import { rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { fetchMatchSnapshot } from '../core/matchSnapshotClient';
 import { readCommanderPoolAndApply } from '../openRouter/commanderPoolClient';
@@ -260,6 +260,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
         removedUnits: tacticalReadySlice.removedUnits,
       })
     );
+    const battleForReport = commitResult.tacticalBattle ?? S.tacticalBattleSnapshot;
     await announceResolutionTurnUpdate(
       {
         readySlice: tacticalReadySlice,
@@ -270,6 +271,12 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
           killsByMelee: playback.killsByMelee,
           killsByAirStrike: playback.killsByAirStrike,
         },
+        hexCodeBattle: battleForReport ?? null,
+        // A battle has no fog, so an opponent's absorbed hits are visible. visibleHexes does not feed this filter.
+        exploredHexes: new Set([
+          ...getExploredHexSet(S.gameState),
+          ...(battleForReport?.tacticalChildH3Indexes ?? []),
+        ]),
       },
       deps
     );

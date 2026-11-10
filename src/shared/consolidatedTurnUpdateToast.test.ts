@@ -88,7 +88,7 @@ test('a paused fortification line follows a neutral missile sentence and precede
     readyResult: { success: true },
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
-    missileStrikeLines: [{ controllerId: NEUTRAL_OWNER_ID, line: 'Missile strike on Vienna: 1 city cell destroyed.' }],
+    missileStrikeLines: [{ controllerId: NEUTRAL_OWNER_ID, line: 'Missile strike in C2 destroyed 1 city cell.' }],
     fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
     unknownBattleLine: 'A battle was fought somewhere you could not see.',
   });
@@ -96,7 +96,7 @@ test('a paused fortification line follows a neutral missile sentence and precede
     message,
     [
       '## Updates',
-      'Missile strike on Vienna: 1 city cell destroyed.',
+      'Missile strike in C2 destroyed 1 city cell.',
       'Every city cell at Prague is fortified, so its build queue is paused.',
       'A battle was fought somewhere you could not see.',
     ].join('\n')
@@ -109,8 +109,8 @@ test('a missile line for a neutral or uncontrolled hex stays in Updates before t
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: ['• Combat continued.'],
     missileStrikeLines: [
-      { controllerId: null, line: 'Missile strike on Osaka: nothing there to destroy.' },
-      { controllerId: NEUTRAL_OWNER_ID, line: 'Missile strike on Vienna: 1 city cell destroyed.' },
+      { controllerId: null, line: 'Missile strike in AA destroyed nothing.' },
+      { controllerId: NEUTRAL_OWNER_ID, line: 'Missile strike in C2 destroyed 1 city cell.' },
     ],
     unknownBattleLine: 'A battle was fought somewhere you could not see.',
   });
@@ -119,8 +119,8 @@ test('a missile line for a neutral or uncontrolled hex stays in Updates before t
     [
       '## Updates',
       'Combat continued.',
-      'Missile strike on Osaka: nothing there to destroy.',
-      'Missile strike on Vienna: 1 city cell destroyed.',
+      'Missile strike in AA destroyed nothing.',
+      'Missile strike in C2 destroyed 1 city cell.',
       'A battle was fought somewhere you could not see.',
     ].join('\n')
   );
@@ -136,9 +136,9 @@ test('a seat-controlled strike with nothing to destroy still opens that side sec
       seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' }],
       transitions: [],
     },
-    missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike on Osaka: nothing there to destroy.' }],
+    missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike in AA destroyed nothing.' }],
   });
-  assert.equal(message, ['## Your Losses', 'Missile strike on Osaka: nothing there to destroy.'].join('\n'));
+  assert.equal(message, ['## Your Losses', 'Missile strike in AA destroyed nothing.'].join('\n'));
 });
 
 test('a seat fortification line follows that side missile sentence and precedes its hex sentence', () => {
@@ -154,15 +154,15 @@ test('a seat fortification line follows that side missile sentence and precedes 
       ],
       transitions: [{ h3Index: '8928308280fffff', from: HUMAN_SEAT_ID, to: AI_SEAT_IDS[0] }],
     },
-    missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike on Vienna: 1 city cell destroyed.' }],
-    fortificationReportLines: [{ ownerId: HUMAN_SEAT_ID, line: 'Fortifications at Vienna absorbed 1 hit.' }],
+    missileStrikeLines: [{ controllerId: HUMAN_SEAT_ID, line: 'Missile strike in C2 destroyed 1 city cell.' }],
+    fortificationReportLines: [{ ownerId: HUMAN_SEAT_ID, line: 'Fortifications in AA absorbed 1 hit.' }],
   });
   assert.equal(
     message,
     [
       '## Your Losses',
-      'Missile strike on Vienna: 1 city cell destroyed.',
-      'Fortifications at Vienna absorbed 1 hit.',
+      'Missile strike in C2 destroyed 1 city cell.',
+      'Fortifications in AA absorbed 1 hit.',
       'You lost 1 hex to W. Turkey.',
     ].join('\n')
   );
@@ -178,9 +178,9 @@ test('a neutral fortification line lands under Neutral Losses', () => {
       seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Levant', nickname: null, kind: 'human' }],
       transitions: [],
     },
-    fortificationReportLines: [{ ownerId: NEUTRAL_OWNER_ID, line: 'Fortifications at Vienna absorbed 1 hit.' }],
+    fortificationReportLines: [{ ownerId: NEUTRAL_OWNER_ID, line: 'Fortifications in AA absorbed 1 hit.' }],
   });
-  assert.equal(message, ['## Neutral Losses', 'Fortifications at Vienna absorbed 1 hit.'].join('\n'));
+  assert.equal(message, ['## Neutral Losses', 'Fortifications in AA absorbed 1 hit.'].join('\n'));
 });
 
 test('a fortification line with no owner lands in Updates', () => {
@@ -188,14 +188,14 @@ test('a fortification line with no owner lands in Updates', () => {
     readyResult: { success: true },
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
-    fortificationReportLines: [{ ownerId: null, line: 'Fortifications at Vienna absorbed 1 hit.' }],
+    fortificationReportLines: [{ ownerId: null, line: 'Fortifications in AA absorbed 1 hit.' }],
     fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
   });
   assert.equal(
     message,
     [
       '## Updates',
-      'Fortifications at Vienna absorbed 1 hit.',
+      'Fortifications in AA absorbed 1 hit.',
       'Every city cell at Prague is fortified, so its build queue is paused.',
     ].join('\n')
   );
@@ -215,14 +215,14 @@ test('a seat-controlled missile line is only in that side section', () => {
       ],
       transitions: [],
     },
-    missileStrikeLines: [{ controllerId: seat, line: 'Missile strike on Osaka: 1 city cell destroyed.' }],
+    missileStrikeLines: [{ controllerId: seat, line: 'Missile strike in AA destroyed 1 city cell.' }],
     unknownBattleLine: 'A battle was fought somewhere you could not see.',
   });
   assert.equal(
     message,
     [
       '## W. Turkey Losses',
-      'Missile strike on Osaka: 1 city cell destroyed.',
+      'Missile strike in AA destroyed 1 city cell.',
       '## Updates',
       'A battle was fought somewhere you could not see.',
     ].join('\n')

@@ -606,6 +606,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       killsByReturnFire: acc.killsByReturnFire,
       removedUnits: [...acc.removedUnits, ...bAfterHumanFerry.removedUnits, ...bAfterOppFerry.removedUnits],
       infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
+      fortificationReports: acc.fortificationReports,
       airStrikeAttemptCount: acc.airStrikeAttemptCount,
       airStrikePlaybackMoves: acc.airStrikePlaybackMoves,
       airDropPlaybackMoves: acc.airDropPlaybackMoves,

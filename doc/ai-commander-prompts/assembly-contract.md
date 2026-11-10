@@ -64,7 +64,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `## Operational Map` | always inside the briefing. Strategic: one fenced block per connected patch of the window around own units, visible enemies, controlled cities, and listed targets. An empty window draws the loaded set. A Shown line appears when the window is smaller than that set, and when `get_map` is enabled it also says to call `get_map` for cells outside the window | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
 | `### Best Options This Turn` | when at least one option row exists | when at least one option row exists | omit heading and table |
 | `## Supplemental Hex Intelligence` | when at least one hex assessment exists | never | omit |
-| `## Recent Turn Notes` | when at least one of the previous three periods has a message, strategy, or loss | when the same condition holds for this battle | omit |
+| `## Recent Turn Notes` | when at least one of the previous ten periods has a message, strategy, or loss | when the same condition holds for this battle | omit |
 | `## Production Status` | when production tools are enabled. H1 when the briefing is absent | never | omit |
 | `## Controlled Hex Queues` | when production is present and at least one controlled cell has an editable queue | never | replace the table with `No currently controlled hexes with editable production queues.` |
 | `## Your Strategic Memory` | when memory tools are enabled. H1 when the briefing is absent | never | omit |

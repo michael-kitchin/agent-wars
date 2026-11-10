@@ -124,10 +124,6 @@
     const noun = intactCityCells === 1 ? "city cell" : "city cells";
     return `${fortified} of ${intactCityCells} ${noun}`;
   }
-  function formatFortificationReportLine(args) {
-    const hitWord = args.lost === 1 ? "hit" : "hits";
-    return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}.`;
-  }
   function formatFortificationsBuiltLine(count) {
     return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
   }
@@ -17056,6 +17052,18 @@
   }
 
   // src/renderer/map/bucketedVectorLayer.ts
+  function ignoreRedrawWithoutContext(renderer) {
+    if (!renderer) return;
+    const names = ["_update", "_clear", "_draw", "_redraw"];
+    for (const name of names) {
+      const original = renderer[name];
+      if (typeof original !== "function") continue;
+      renderer[name] = function redrawWhenContextExists() {
+        if (!this._ctx) return;
+        original.call(this);
+      };
+    }
+  }
   function createBucketedVectorLayer(options) {
     const pane = options.map.getPane?.(options.paneName) ?? options.map.createPane?.(options.paneName);
     if (pane) {
@@ -17063,6 +17071,7 @@
       pane.style.pointerEvents = "none";
     }
     const renderer = options.leaflet.canvas?.({ pane: options.paneName, padding: 0.5 });
+    ignoreRedrawWithoutContext(renderer);
     const paths = /* @__PURE__ */ new Map();
     let source = null;
     let style = {
@@ -38206,30 +38215,74 @@ ${bonuses}`;
     return sections.join("\n");
   }
 
+  // src/shared/turnReportHexCodes.ts
+  var TURN_REPORT_UNKNOWN_HEX = "an unidentified hex";
+  function formatTurnReportHexList(codes) {
+    const known = /* @__PURE__ */ new Set();
+    let unknown = false;
+    for (const code of codes) {
+      const trimmed = code?.trim() ?? "";
+      if (trimmed.length === 0) unknown = true;
+      else known.add(trimmed);
+    }
+    const sorted = [...known].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+    if (unknown) sorted.push(TURN_REPORT_UNKNOWN_HEX);
+    return joinWithSerialComma(sorted);
+  }
+
   // src/shared/missileStrikeReport.ts
-  var MISSILE_STRIKE_UNNAMED_PLACE = "an unnamed hex";
   function missileLaunchVisibleToViewer(record, viewerSeatId2, visibleHexes) {
     if (viewerSeatId2 === null) return true;
     if (record.player === viewerSeatId2) return true;
     if (record.targetControllerId === viewerSeatId2) return true;
     return visibleHexes.has(record.targetH3Index);
   }
-  function flagPhrase(destroyed, before, singular, plural) {
-    if (before <= 0) return null;
-    return `${destroyed} ${destroyed === 1 ? singular : plural}`;
+  function countPhrase(count, singular, plural) {
+    if (count <= 0) return null;
+    return `${count} ${count === 1 ? singular : plural}`;
   }
-  function formatMissileStrikeLine(args) {
-    const record = args.record;
-    const parts = [
-      flagPhrase(record.urbanDestroyed, record.urbanBefore, "city cell", "city cells"),
-      flagPhrase(record.airportsDestroyed, record.airportsBefore, "airport", "airports"),
-      flagPhrase(record.seaportsDestroyed, record.seaportsBefore, "seaport", "seaports"),
-      flagPhrase(record.fortificationsDestroyed, record.fortificationsBefore, "fortification", "fortifications")
+  function formatMissileStrikeSummaryLine(entries) {
+    if (entries.length === 0) return null;
+    let urban = 0;
+    let airports = 0;
+    let seaports = 0;
+    let fortifications = 0;
+    let squadrons = 0;
+    const codes = [];
+    for (const entry of entries) {
+      urban += entry.record.urbanDestroyed;
+      airports += entry.record.airportsDestroyed;
+      seaports += entry.record.seaportsDestroyed;
+      fortifications += entry.record.fortificationsDestroyed;
+      squadrons += entry.record.destroyedAirUnitIds.length;
+      codes.push(entry.hexCode);
+    }
+    const phrases = [
+      countPhrase(urban, "city cell", "city cells"),
+      countPhrase(airports, "airport", "airports"),
+      countPhrase(seaports, "seaport", "seaports"),
+      countPhrase(fortifications, "fortification", "fortifications")
     ].filter((part) => part !== null);
-    if (parts.length === 0) return `Missile strike on ${args.placeName}: nothing there to destroy.`;
-    const air = record.destroyedAirUnitIds.length;
-    const squadrons = air === 0 ? "" : `; ${air} ${air === 1 ? "squadron" : "squadrons"} lost`;
-    return `Missile strike on ${args.placeName}: ${joinWithSerialComma(parts)} destroyed${squadrons}.`;
+    const destroyed = phrases.length === 0 ? "destroyed nothing" : `destroyed ${joinWithSerialComma(phrases)}`;
+    const squadronClause = squadrons === 0 ? "" : `; ${squadrons} ${squadrons === 1 ? "squadron" : "squadrons"} lost`;
+    const strike = entries.length === 1 ? "strike" : "strikes";
+    return `Missile ${strike} in ${formatTurnReportHexList(codes)} ${destroyed}${squadronClause}.`;
+  }
+  function buildMissileStrikeToastLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const controller = entry.record.targetControllerId;
+      const key = controller !== null && isSeatId(controller) ? controller : null;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    const lines = [];
+    for (const [controllerId, group] of groups) {
+      const line = formatMissileStrikeSummaryLine(group);
+      if (line !== null) lines.push({ controllerId, line });
+    }
+    return lines;
   }
   function buildMissilePlaybackMoves(records) {
     return records.map((record) => ({
@@ -38425,6 +38478,33 @@ ${bonuses}`;
     if (viewerSeatId2 === report.ownerId) return true;
     return exploredHexes.has(report.h3Index);
   }
+  function formatFortificationSummaryLine(entries) {
+    let total = 0;
+    const codes = [];
+    for (const entry of entries) {
+      if (entry.report.lost <= 0) continue;
+      total += entry.report.lost;
+      codes.push(entry.hexCode);
+    }
+    if (total === 0) return null;
+    const hit = total === 1 ? "hit" : "hits";
+    return `Fortifications in ${formatTurnReportHexList(codes)} absorbed ${total} ${hit}.`;
+  }
+  function buildFortificationToastLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const key = entry.report.ownerId;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    const lines = [];
+    for (const [ownerId, group] of groups) {
+      const line = formatFortificationSummaryLine(group);
+      if (line !== null) lines.push({ ownerId, line });
+    }
+    return lines;
+  }
 
   // src/renderer/gameplay/fortificationUpdateLines.ts
   async function fortificationUpdateLinesFor(readySlice) {
@@ -38446,23 +38526,13 @@ ${bonuses}`;
     }
     return names;
   }
-  async function fortificationReportLinesFor(readySlice, viewer) {
-    const lines = [];
+  function fortificationReportLinesFor(readySlice, viewer, hexCodeBattle) {
+    const entries = [];
     for (const report of readySlice.fortificationReports ?? []) {
       if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
-      let placeName = FORTIFICATION_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: report.h3Index, resolution: 1 });
-        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("fortification place name failed", err);
-      }
-      lines.push({
-        ownerId: report.ownerId,
-        line: formatFortificationReportLine({ placeName, lost: report.lost })
-      });
+      entries.push({ report, hexCode: orderTargetHexCode(report.h3Index, hexCodeBattle) });
     }
-    return lines;
+    return buildFortificationToastLines(entries);
   }
 
   // src/shared/productionBuildability.ts
@@ -38574,6 +38644,7 @@ ${bonuses}`;
       rangedRemovedUnits: playback.rangedRemovedUnits,
       airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
       infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
+      fortificationReports: playback.fortificationReports?.length ? playback.fortificationReports : void 0,
       airStrikeAttemptCount: playback.airStrikeAttemptCount,
       meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
       meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
@@ -38684,13 +38755,17 @@ ${bonuses}`;
         unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
       }
     }
-    const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
+    const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
     const fortificationLines = await fortificationUpdateLinesFor(readySlice);
     const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
-    const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
-      viewerSeatId: viewerSeatId2,
-      exploredHexes: args.exploredHexes ?? getExploredHexSet(rendererSharedState.gameState)
-    });
+    const fortificationReportLines = fortificationReportLinesFor(
+      readySlice,
+      {
+        viewerSeatId: viewerSeatId2,
+        exploredHexes: args.exploredHexes ?? getExploredHexSet(rendererSharedState.gameState)
+      },
+      args.hexCodeBattle ?? null
+    );
     const updateText = buildConsolidatedTurnUpdateToastMessage({
       readyResult: readySlice,
       turnLossSummary,
@@ -38748,19 +38823,12 @@ ${bonuses}`;
       held2.deps
     );
   }
-  async function missileStrikeLinesFor(launches) {
-    const lines = [];
-    for (const record of launches ?? []) {
-      let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: record.targetH3Index, resolution: 1 });
-        placeName = caption?.text.trim() || MISSILE_STRIKE_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("missile strike place name failed", err);
-      }
-      lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
-    }
-    return lines;
+  function missileStrikeLinesFor(launches) {
+    const entries = (launches ?? []).map((record) => ({
+      record,
+      hexCode: orderTargetHexCode(record.targetH3Index, null)
+    }));
+    return buildMissileStrikeToastLines(entries);
   }
   function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
     if (needsPlayback) {
@@ -40673,6 +40741,7 @@ ${bonuses}`;
           removedUnits: tacticalReadySlice.removedUnits
         })
       );
+      const battleForReport = commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot;
       await announceResolutionTurnUpdate(
         {
           readySlice: tacticalReadySlice,
@@ -40682,7 +40751,13 @@ ${bonuses}`;
           extraKills: {
             killsByMelee: playback.killsByMelee,
             killsByAirStrike: playback.killsByAirStrike
-          }
+          },
+          hexCodeBattle: battleForReport ?? null,
+          // A battle has no fog, so an opponent's absorbed hits are visible. visibleHexes does not feed this filter.
+          exploredHexes: /* @__PURE__ */ new Set([
+            ...getExploredHexSet(rendererSharedState.gameState),
+            ...battleForReport?.tacticalChildH3Indexes ?? []
+          ])
         },
         deps
       );

@@ -9,6 +9,7 @@
 import type { AirDropAnimationMove, AirStrikeAnimationMove } from '../../shared/ipcTypes';
 import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
+import type { FortificationReport } from '../../shared/ipc/fortificationTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -86,6 +87,15 @@ export interface TacticalBeatOutcome {
    * Exceptions: None.
    */
   readonly infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+  /**
+   * Cells whose fortification absorbed a hit this beat.
+   *
+   * Contract: The list the air-and-ranged phase recorded. Empty when nothing was absorbed.
+   * When to use: Playback and the beat report.
+   * Expected outcome: One report per cell. `remaining` is 0 because the sentence does not read it.
+   * Exceptions: None.
+   */
+  readonly fortificationReports: readonly FortificationReport[];
   /**
    * How many air strikes were attempted.
    *

@@ -127,7 +127,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 #### `## Recent Turn Notes`
 
-- **Shape:** up to three prior turns in ascending order; each block gives that turn's message, strategy, and losses on each side. Loss lines name units by snapshot id, never by display name.
+- **Shape:** up to ten prior turns (`RECENT_TURN_NOTES_LIMIT`) in ascending order; each block gives that turn's message, strategy, and losses on each side. Loss lines name units by snapshot id, never by display name.
 - **Items:** `RECENT_TURN_NOTES`.
 - **Include:** when at least one of those turns has a message, strategy, or loss. **Omit** otherwise.
 - **Model use:** continuity, so a plan begun two turns ago is not silently abandoned.

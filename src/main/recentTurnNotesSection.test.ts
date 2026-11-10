@@ -152,21 +152,21 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
 /**
 
- * Verifies the three-entry window returns only the three most recent qualifying turns.
+ * Verifies the ten-entry window returns only the ten most recent qualifying turns.
 
  *
 
- * Purpose: Guards `getRecentTurnNotes(..., limit=3)` integration from the section builder.
+ * Purpose: Guards the recent-notes limit integration from the section builder.
 
  * When to use: After changing recent-note query or filtering rules.
 
- * Expected outcome: Turns 2–4 appear when querying before turn 5; turn 1 omitted by window.
+ * Expected outcome: Turns 2–11 appear when querying before turn 12; turn 1 omitted by window.
 
  * Exceptions: None.
 
  */
 
-async function testThreeEntryWindow(): Promise<void> {
+async function testTenEntryWindow(): Promise<void> {
 
   const gameDb = await import('./gameDb');
 
@@ -180,7 +180,7 @@ async function testThreeEntryWindow(): Promise<void> {
 
     gameDb.openGameDatabaseAtPathForTests(dbPath);
 
-    for (let turn = 1; turn <= 4; turn += 1) {
+    for (let turn = 1; turn <= 11; turn += 1) {
 
       gameDb.upsertTurnStrategyNote('opponent', 'strategic', '', turn, { strategyText: `Plan ${turn}`, messageText: null });
 
@@ -192,21 +192,21 @@ async function testThreeEntryWindow(): Promise<void> {
 
       battleId: '',
 
-      currentTurnNumber: 5,
+      currentTurnNumber: 12,
 
       heading: 'Recent Turn Notes',
 
     });
 
-    assert.ok(out.includes('Turn 2:'));
+    for (let turn = 2; turn <= 11; turn += 1) {
 
-    assert.ok(out.includes('Turn 3:'));
+      assert.ok(out.includes(`Turn ${turn}:`), `turn ${turn} is inside the ten-entry window`);
 
-    assert.ok(out.includes('Turn 4:'));
+    }
 
-    assert.ok(!out.includes('Turn 1:'), 'turn 1 falls outside three-entry window');
+    assert.ok(!out.includes('Turn 1:'), 'turn 1 falls outside ten-entry window');
 
-    assert.ok(!out.includes('Turn 5:'), 'current planning turn is excluded');
+    assert.ok(!out.includes('Turn 12:'), 'current planning turn is excluded');
 
   } finally {
 
@@ -224,7 +224,7 @@ async function run(): Promise<void> {
 
   await testRecentTurnNotesFormatting();
 
-  await testThreeEntryWindow();
+  await testTenEntryWindow();
 
   console.log('recentTurnNotesSection.test.ts passed');
 

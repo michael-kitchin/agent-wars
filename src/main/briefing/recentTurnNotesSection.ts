@@ -8,7 +8,7 @@ import {
   playerHasAnyLoss,
 } from '../../shared/lossSummary';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
-import { getRecentTurnNotes, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
+import { getRecentTurnNotes, RECENT_TURN_NOTES_LIMIT, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
 import { logTrace } from '../logger';
 import { subHeading } from '../openRouter/promptSpec/sectionHeadings';
 
@@ -117,7 +117,7 @@ function formatTurnBlock(row: TurnNoteRow): string {
 /**
  * Builds the recent turn notes markdown block for AI prompts.
  *
- * Purpose: Replaces the legacy losses-since-consultation table with rolling three-entry history.
+ * Purpose: Replaces the legacy losses-since-consultation table with rolling ten-entry history.
  * When to use: Strategic `formatBriefing` and tactical block in `requestOrdersFlow` (both use `Turn N:` labels).
  * Expected outcome: Empty string when no qualifying prior turns; otherwise `## heading` plus per-turn bullets.
  * Exceptions: None.
@@ -133,7 +133,7 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
     args.scope,
     args.battleId,
     args.currentTurnNumber,
-    3
+    RECENT_TURN_NOTES_LIMIT
   ).filter(rowHasPromptContent);
   if (rows.length === 0) return '';
   const blocks = rows.map((row) => formatTurnBlock(row));

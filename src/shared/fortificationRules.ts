@@ -1,7 +1,7 @@
 /**
  * Fortification queue identity, cost multiplier, and player-facing sentences.
  *
- * Purpose: Production, tooltips, the turn report, and the AI briefing share one spelling of the fortification item.
+ * Purpose: Production, tooltips, the paused-queue sentence, and the AI briefing share one spelling of the fortification item.
  * When to use: Any label or sentence about fortifying a city cell. Cost lookup stays in `fortificationCostPerCell`.
  * Expected outcome: Stable strings. Formatters return one sentence or one label fragment.
  * Exceptions: None.
@@ -61,22 +61,6 @@ export const FORTIFIED_MAP_LEGEND_FRAGMENT = ', F/f fortified city cell (F = you
 export function formatFortifiedTooltipValue(fortified: number, intactCityCells: number): string {
   const noun = intactCityCells === 1 ? 'city cell' : 'city cells';
   return `${fortified} of ${intactCityCells} ${noun}`;
-}
-
-/**
- * Formats one strategic-map fortification loss line.
- *
- * Purpose: The turn report names the hex and the hits absorbed.
- * When to use: Once per hex that lost fortifications on the strategic map this turn.
- * Expected outcome: `Fortifications at Vienna absorbed 1 hit.` or `hits.` The sentence does not say how many remain.
- * Exceptions: None.
- */
-export function formatFortificationReportLine(args: {
-  readonly placeName: string;
-  readonly lost: number;
-}): string {
-  const hitWord = args.lost === 1 ? 'hit' : 'hits';
-  return `Fortifications at ${args.placeName} absorbed ${args.lost} ${hitWord}.`;
 }
 
 /**

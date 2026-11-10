@@ -1,5 +1,6 @@
 import { type MissileStrikeToastLine } from '../../shared/consolidatedTurnUpdateToast';
-import { formatMissileStrikeLine, MISSILE_STRIKE_UNNAMED_PLACE } from '../../shared/missileStrikeReport';
+import { buildMissileStrikeToastLines } from '../../shared/missileStrikeReport';
+import { orderTargetHexCode, type OrderHexCodeBattle } from '../../shared/orderTargetHexCode';
 import type { MissileLaunchRecord } from '../../shared/ipc/missileTypes';
 import type { ReadyResult, RemovedUnitSnapshot, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import {
@@ -207,6 +208,7 @@ export function buildTacticalCommitReadyResultForToast(playback: TacticalCommitR
       playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0
         ? playback.infrastructureDestroyedEvents
         : undefined,
+    fortificationReports: playback.fortificationReports?.length ? playback.fortificationReports : undefined,
     airStrikeAttemptCount: playback.airStrikeAttemptCount,
     meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
     meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
@@ -417,6 +419,15 @@ export async function announceResolutionTurnUpdate(
      * Exceptions: None.
      */
     exploredHexes?: ReadonlySet<string>;
+    /**
+     * The battle whose cells the report's hex codes name.
+     *
+     * Contract: Omitted or null names world-map hexes.
+     * When to use: A battle beat report. Strategic Ready omits it.
+     * Expected outcome: Fortification sentences use the battle's cell codes. Missile sentences stay on world-map codes.
+     * Exceptions: None.
+     */
+    hexCodeBattle?: OrderHexCodeBattle | null;
   },
   deps: Pick<ReadyHandlerDeps, 'showMapToast' | 'appendOpenRouterLog' | 'formatUnknownBattleAnnouncement'>
 ): Promise<void> {
@@ -471,13 +482,17 @@ export async function announceResolutionTurnUpdate(
       unknownBattleLine = deps.formatUnknownBattleAnnouncement([]);
     }
   }
-  const missileStrikeLines = await missileStrikeLinesFor(missileLaunches);
+  const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
   const fortificationLines = await fortificationUpdateLinesFor(readySlice);
   const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
-  const fortificationReportLines = await fortificationReportLinesFor(readySlice, {
-    viewerSeatId,
-    exploredHexes: args.exploredHexes ?? getExploredHexSet(S.gameState),
-  });
+  const fortificationReportLines = fortificationReportLinesFor(
+    readySlice,
+    {
+      viewerSeatId,
+      exploredHexes: args.exploredHexes ?? getExploredHexSet(S.gameState),
+    },
+    args.hexCodeBattle ?? null
+  );
   const updateText = buildConsolidatedTurnUpdateToastMessage({
     readyResult: readySlice,
     turnLossSummary,
@@ -547,26 +562,19 @@ export async function showHeldBattleTurnUpdate(includeBattleLines = true): Promi
 }
 
 /**
- * Builds the Updates lines for launches the caller already decided the viewer may see.
+ * Builds the strike lines for launches the caller already decided the viewer may see.
  *
- * Purpose: Each line names the target hex the way the hex tooltip does.
- * When to use: From `announceResolutionTurnUpdate` only.
- * Expected outcome: One entry per record, with that launch's controller id. A missing or failed caption uses the unnamed-hex words.
- * Exceptions: A rejected caption lookup is logged and becomes the unnamed place. It is not rethrown.
+ * Purpose: Each line names the target hex the way the hex tooltip does, totaled by controller.
+ * When to use: From `announceResolutionTurnUpdate` only. Missiles exist only on the world map.
+ * Expected outcome: One line per controller from `buildMissileStrikeToastLines`. A missing code uses the unidentified-hex words.
+ * Exceptions: None.
  */
-async function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | undefined): Promise<MissileStrikeToastLine[]> {
-  const lines: MissileStrikeToastLine[] = [];
-  for (const record of launches ?? []) {
-    let placeName = MISSILE_STRIKE_UNNAMED_PLACE;
-    try {
-      const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: record.targetH3Index, resolution: 1 });
-      placeName = caption?.text.trim() || MISSILE_STRIKE_UNNAMED_PLACE;
-    } catch (err) {
-      console.error('missile strike place name failed', err);
-    }
-    lines.push({ controllerId: record.targetControllerId, line: formatMissileStrikeLine({ placeName, record }) });
-  }
-  return lines;
+function missileStrikeLinesFor(launches: readonly MissileLaunchRecord[] | undefined): MissileStrikeToastLine[] {
+  const entries = (launches ?? []).map((record) => ({
+    record,
+    hexCode: orderTargetHexCode(record.targetH3Index, null),
+  }));
+  return buildMissileStrikeToastLines(entries);
 }
 
 /**

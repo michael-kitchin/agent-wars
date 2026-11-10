@@ -8,9 +8,14 @@
  */
 
 import type { FortificationToastLine } from '../../shared/consolidatedTurnUpdateToast';
-import { fortificationReportVisibleToViewer } from '../../shared/fortificationReport';
-import { FORTIFICATION_UNNAMED_PLACE, formatFortificationQueuePausedLine, formatFortificationReportLine } from '../../shared/fortificationRules';
+import {
+  buildFortificationToastLines,
+  fortificationReportVisibleToViewer,
+  type FortificationReportEntry,
+} from '../../shared/fortificationReport';
+import { FORTIFICATION_UNNAMED_PLACE, formatFortificationQueuePausedLine } from '../../shared/fortificationRules';
 import type { ReadyResult } from '../../shared/ipcTypes';
+import { orderTargetHexCode, type OrderHexCodeBattle } from '../../shared/orderTargetHexCode';
 
 /**
  * Names each paused hex and formats the Updates sentence.
@@ -50,31 +55,22 @@ export async function placeNamesForHexes(hexes: readonly string[]): Promise<stri
 }
 
 /**
- * Names each visible fortification loss.
+ * Totals each visible fortification loss by owner.
  *
- * Purpose: The toast builder files finished sentences by owner and does not look up places.
- * When to use: `announceResolutionTurnUpdate`, with the viewer's seat and explored hexes.
- * Expected outcome: One line per report the viewer may see, in report order.
- * Exceptions: A rejected caption lookup is logged and uses `FORTIFICATION_UNNAMED_PLACE`.
+ * Purpose: The toast builder files finished sentences by owner and does not look up hex codes.
+ * When to use: `announceResolutionTurnUpdate`, with the viewer's seat, explored hexes, and the battle when the report is a beat.
+ * Expected outcome: One line per owner the viewer may see, from `buildFortificationToastLines`. A null battle names world-map hexes.
+ * Exceptions: None.
  */
-export async function fortificationReportLinesFor(
+export function fortificationReportLinesFor(
   readySlice: ReadyResult,
-  viewer: { readonly viewerSeatId: string | null; readonly exploredHexes: ReadonlySet<string> }
-): Promise<FortificationToastLine[]> {
-  const lines: FortificationToastLine[] = [];
+  viewer: { readonly viewerSeatId: string | null; readonly exploredHexes: ReadonlySet<string> },
+  hexCodeBattle: OrderHexCodeBattle | null
+): FortificationToastLine[] {
+  const entries: FortificationReportEntry[] = [];
   for (const report of readySlice.fortificationReports ?? []) {
     if (!fortificationReportVisibleToViewer(report, viewer.viewerSeatId, viewer.exploredHexes)) continue;
-    let placeName = FORTIFICATION_UNNAMED_PLACE;
-    try {
-      const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index: report.h3Index, resolution: 1 });
-      placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
-    } catch (err) {
-      console.error('fortification place name failed', err);
-    }
-    lines.push({
-      ownerId: report.ownerId,
-      line: formatFortificationReportLine({ placeName, lost: report.lost }),
-    });
+    entries.push({ report, hexCode: orderTargetHexCode(report.h3Index, hexCodeBattle) });
   }
-  return lines;
+  return buildFortificationToastLines(entries);
 }

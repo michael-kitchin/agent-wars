@@ -120,7 +120,8 @@ def finish_freezes(events: Sequence[FreezeEvent], duration_seconds: float) -> li
     When to use:
         After ``parse_freezedetect_log``, once the container duration is known.
     What to expect:
-        Non-overlapping spans sorted by start. A missing end becomes ``duration_seconds``.
+        Non-overlapping spans sorted by start. Overlapping spans are joined; touching spans are not.
+        A missing end becomes ``duration_seconds``.
         Spans outside the video are dropped.
     Exceptions:
         ``ValueError`` when ``duration_seconds`` is not a positive finite number.
@@ -139,7 +140,9 @@ def finish_freezes(events: Sequence[FreezeEvent], duration_seconds: float) -> li
     closed.sort()
     merged: list[TimeSpan] = []
     for span in closed:
-        if not merged or span.start_seconds > merged[-1].end_seconds:
+        # Touching spans stay separate. freezedetect starts the next freeze on the frame that
+        # ended the last one, so joining them would cut a change that lasts one frame.
+        if not merged or span.start_seconds >= merged[-1].end_seconds:
             merged.append(span)
             continue
         previous = merged[-1]

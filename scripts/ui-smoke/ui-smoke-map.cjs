@@ -460,16 +460,41 @@ function marchDestinations(state, fromHex) {
 }
 
 /**
+ * Selects one human land unit from the unit list of a hex that holds more than one unit.
+ *
+ * Purpose: After a turn, a land unit often shares its hex, so a plain hex click opens the list instead of selecting it.
+ * When to use: From `queueLoneUnitMarch` when no land unit stands alone.
+ * Expected outcome: The selection panel lists only that unit, and the map camera is back where it started.
+ * Exceptions: Throws when the list does not open or the unit's select button does not select it.
+ */
+async function selectOneHumanFromStack(page, unit) {
+  await clearSelection(page);
+  const revealed = await revealStackHex(page, unit.h3Index);
+  try {
+    await page.mouse.click(revealed.point.x, revealed.point.y);
+    await page.waitForSelector('#stack-callout:not(.hidden)', { timeout: MAP_WAIT_MS.order });
+    await page.locator(`#stack-callout-list li[data-unit-id="${unit.id}"] button.stack-unit-toggle`).click();
+    await waitForSelectedUnits(page, [unit.id]);
+  } catch (err) {
+    await page.keyboard.press('Escape').catch(() => undefined);
+    throw err;
+  } finally {
+    await restoreMapCamera(page, revealed.camera);
+  }
+}
+
+/**
  * Selects a unit and double-clicks each destination in turn until the Movement group counts one order.
  *
  * Purpose: World-map and battle marches are queued the same way; a destination the rules refuse is skipped.
- * When to use: While nothing is queued in the Movement group, after `captureMainMap`.
+ * When to use: While nothing is queued in the Movement group, after `captureMainMap`. Pass `selectUnit` when the unit
+ *   does not stand alone in its hex.
  * Expected outcome: True once the Movement count reads 1; false when no destination took the order.
  * Exceptions: Throws a Playwright timeout when the unit cannot be selected.
  */
-async function queueMarchToFirstFree(page, unit, destinations) {
+async function queueMarchToFirstFree(page, unit, destinations, selectUnit = selectUnitInItsHex) {
   for (const destination of destinations) {
-    await selectUnitInItsHex(page, unit);
+    await selectUnit(page, unit);
     const point = await hexClientPoint(page, destination);
     await page.mouse.dblclick(point.x, point.y);
     const queued = await page.waitForFunction(() => document.getElementById('pending-orders-count')?.textContent === '1', null, { timeout: MAP_WAIT_MS.order })
@@ -480,12 +505,27 @@ async function queueMarchToFirstFree(page, unit, destinations) {
 }
 
 /**
- * Queues a one-hex march with the first lone land unit that can make one.
+ * Lists the player's land units that share a hex, in type order.
+ *
+ * Purpose: A march can still be queued for one of them by selecting it from the unit list.
+ * When to use: From `queueLoneUnitMarch` after the lone-unit attempts.
+ * Expected outcome: Every human unit of the given types whose hex holds at least one other unit, armor before infantry.
+ * Exceptions: None; the list may be empty.
+ */
+function stackedHumanLandUnits(units, unitTypes) {
+  const countByHex = unitCountByHex(units);
+  return [].concat(unitTypes).flatMap((unitType) => units.filter((unit) => unit.player === 'human'
+    && unit.unitType === unitType && (countByHex.get(unit.h3Index) || 0) >= 2));
+}
+
+/**
+ * Queues a one-hex march with the first land unit that can make one.
  *
  * Purpose: Gives the Orders tab one movement row to show, at the start of the match or after a played turn.
- * When to use: After `captureMainMap`, while nothing is queued. Armor is tried first, then infantry.
+ * When to use: After `captureMainMap`, while nothing is queued. Armor is tried first, then infantry. A unit that
+ *   stands alone is clicked in its hex; a unit that shares its hex is selected from the unit list.
  * Expected outcome: The Movement count reads 1. Returns the unit.
- * Exceptions: Throws when no lone land unit has a neighbor that takes the order.
+ * Exceptions: Throws when no land unit has a neighbor that takes the order.
  */
 async function queueLoneUnitMarch(page, unitTypes = LAND_UNIT_TYPES) {
   const state = await readGameState(page);
@@ -493,7 +533,13 @@ async function queueLoneUnitMarch(page, unitTypes = LAND_UNIT_TYPES) {
   for (const unit of lone) {
     if (await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index))) return unit;
   }
-  throw new Error(`no lone land unit could queue a one-hex march (${lone.length} lone)`);
+  const stacked = stackedHumanLandUnits(state.units, unitTypes);
+  for (const unit of stacked) {
+    const queued = await queueMarchToFirstFree(page, unit, marchDestinations(state, unit.h3Index), selectOneHumanFromStack)
+      .catch(() => false);
+    if (queued) return unit;
+  }
+  throw new Error(`no land unit could queue a one-hex march (${lone.length} lone, ${stacked.length} stacked)`);
 }
 
 /**

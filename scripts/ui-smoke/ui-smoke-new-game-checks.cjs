@@ -446,10 +446,8 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (Math.abs(doctrine.w - reasoning.w) > 8) {
         return `Doctrine width is ${doctrine.w} and Reasoning width is ${reasoning.w}, expected them within 8`;
       }
-      const doctrineCenter = doctrine.y + doctrine.h / 2;
-      const descriptionCenter = description.y + description.h / 2;
-      if (Math.abs(descriptionCenter - doctrineCenter) > 8) {
-        return `the description center is ${descriptionCenter} and the Doctrine center is ${doctrineCenter}, expected them within 8`;
+      if (Math.abs(description.y - doctrine.y) > 4) {
+        return `the description top is ${description.y} and the Doctrine top is ${doctrine.y}, expected them within 4`;
       }
       const doctrineMiddle = doctrine.x + doctrine.w / 2;
       if (!(description.x > doctrineMiddle)) {
@@ -526,7 +524,7 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-options-popover',
     scenes: [SCENES.newGameOptions],
-    needs: ['#new-game-options-popover', '#new-game-human-nickname', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-beat-limit-select', '#new-game-section-other', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
+    needs: ['#new-game-options-popover', '#new-game-human-nickname', '#new-game-victory-select', '#new-game-turn-limit-select', '#new-game-ai-only-battles-select', '#new-game-beat-limit-select', '#new-game-section-other', '#new-game-sight-cues-checkbox', ...BONUS_SELECTS, '#new-game-fog-checkbox', '#new-game-auto-start-checkbox', 'label[for="new-game-fog-checkbox"]', 'label[for="new-game-sight-cues-checkbox"]', 'label[for="new-game-auto-start-checkbox"]'],
     run: (p, el) => {
       if (!el('#new-game-options-popover').shown) return 'Game Options is hidden';
       const victory = el('#new-game-victory-select');

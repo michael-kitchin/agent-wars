@@ -4,6 +4,7 @@ import type { AirStrikeAnimationMove } from './ordersTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
 import type { CombatDicePlaybackFields } from './combatDiceTypes';
+import type { FortificationReport } from './fortificationTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from './readyTypes';
 
 /**
@@ -108,6 +109,15 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    * Exceptions: Omitted when empty.
    */
   infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
+  /**
+   * Battle cells whose fortification absorbed a hit this beat.
+   *
+   * Purpose: The beat report totals those hits under the hex controller.
+   * When to use: After `buildTacticalCombatPlaybackFields`. Omitted when empty.
+   * Expected outcome: One report per cell. The sentence does not read `remaining`.
+   * Exceptions: None.
+   */
+  fortificationReports?: FortificationReport[];
   /**
    * Count of tactical human air strike **orders** that entered resolution (including infrastructure strikes).
    *

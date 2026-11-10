@@ -3,7 +3,7 @@
  *
  * Purpose: Battle soak strips the flag once and never saves an attacker or a margin cell.
  * When to use: After changing `createTacticalFortificationHooks`.
- * Expected outcome: The defender is absorbed once. The attacker and a cell outside the core are not.
+ * Expected outcome: The defender is absorbed once. The attacker and a cell outside the core are not. A second hit on the same cell adds no second report.
  * Exceptions: None. The case removes its temporary match.
  */
 
@@ -41,6 +41,7 @@ test('a fortified core cell absorbs one hit on the controller and none on anyone
       coreChildH3Indexes: footprint.coreChildH3Indexes,
       tacticalChildH3Indexes: [...footprint.h3Indexes],
     });
+    assert.deepEqual(hooks.absorbedReports(), []);
     assert.equal(getHexController(row.h3Index), HUMAN_SEAT_ID);
     assert.equal(hooks.absorbHit({ player: AI_SEAT_IDS[0], h3Index: fortified }), false);
     assert.equal(isTacticalCellFortified(fortified), true);
@@ -48,6 +49,7 @@ test('a fortified core cell absorbs one hit on the controller and none on anyone
     assert.equal(hooks.absorbHit({ player: HUMAN_SEAT_ID, h3Index: fortified }), true);
     assert.equal(isTacticalCellFortified(fortified), false);
     assert.equal(hooks.absorbHit({ player: HUMAN_SEAT_ID, h3Index: fortified }), false);
+    assert.deepEqual(hooks.absorbedReports(), [{ h3Index: fortified, ownerId: HUMAN_SEAT_ID, lost: 1, remaining: 0 }]);
     assert.equal(hooks.isEnemyFortifiedHex, undefined);
     assert.equal(hooks.stripOne, undefined);
   });

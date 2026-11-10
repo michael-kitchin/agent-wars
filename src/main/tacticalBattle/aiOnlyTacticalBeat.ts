@@ -241,6 +241,7 @@ export function applyAiOnlyTacticalBeat(drafts: AiOnlyTacticalBeatDrafts): AiOnl
       ...afterOpposingFerry.removedUnits,
     ],
     infrastructureDestroyedEvents: airAndRanged.infrastructureDestroyedEvents,
+    fortificationReports: airAndRanged.fortificationReports,
     airStrikeAttemptCount: airAndRanged.airStrikeAttemptCount,
     airStrikePlaybackMoves: airAndRanged.airStrikePlaybackMoves,
     airDropPlaybackMoves: airAndRanged.airDropPlaybackMoves,

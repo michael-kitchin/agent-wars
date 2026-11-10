@@ -158,6 +158,7 @@ export function buildTacticalCombatPlaybackFields(
     battleId: outcome.battle.battleId,
     rangedTargetCount: rangedTargetHexes.length,
     removedCount: outcome.removedUnits.length,
+    fortificationReportCount: outcome.fortificationReports.length,
   });
   const rangedCombatHexes = [...new Set(rangedTargetHexes)];
   const casualtyHexSet = new Set(outcome.removedUnits.map((unit) => unit.h3Index));
@@ -173,6 +174,7 @@ export function buildTacticalCombatPlaybackFields(
     killsByAirStrike: outcome.killsByAirStrike.length > 0 ? outcome.killsByAirStrike : undefined,
     infrastructureDestroyedEvents:
       outcome.infrastructureDestroyedEvents.length > 0 ? outcome.infrastructureDestroyedEvents : undefined,
+    fortificationReports: outcome.fortificationReports.length > 0 ? [...outcome.fortificationReports] : undefined,
     airStrikeAttemptCount: outcome.airStrikeAttemptCount > 0 ? outcome.airStrikeAttemptCount : undefined,
     ...(outcome.airStrikePlaybackMoves.length > 0 ? { airStrikeMoves: outcome.airStrikePlaybackMoves } : {}),
     ...(outcome.airDropPlaybackMoves && outcome.airDropPlaybackMoves.length > 0

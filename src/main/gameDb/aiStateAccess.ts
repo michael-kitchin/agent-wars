@@ -23,6 +23,7 @@ import {
   getRecentTurnNotes as getRecentTurnNotesFromModule,
   upsertTurnLossNote as upsertTurnLossNoteFromModule,
   upsertTurnStrategyNote as upsertTurnStrategyNoteFromModule,
+  RECENT_TURN_NOTES_LIMIT,
   type TurnConsultationNoteTexts,
   type TurnNoteRow,
   type TurnNotesScope,
@@ -241,7 +242,7 @@ export function upsertTurnLossNote(
  *
  * Purpose: Public facade over `turnNotesHistory.getRecentTurnNotes`.
  * When to use: `buildRecentTurnNotesSection` when assembling AI system prompts.
- * Expected outcome: Up to three prior rows in ascending turn order.
+ * Expected outcome: Up to `RECENT_TURN_NOTES_LIMIT` prior rows in ascending turn order.
  * Exceptions: None; returns empty array when DB unavailable.
  */
 export function getRecentTurnNotes(
@@ -249,7 +250,7 @@ export function getRecentTurnNotes(
   scope: TurnNotesScope,
   battleId: string,
   beforeTurnNumber: number,
-  limit = 3
+  limit = RECENT_TURN_NOTES_LIMIT
 ): TurnNoteRow[] {
   return getRecentTurnNotesFromModule(gameDbOps, seatId, scope, battleId, beforeTurnNumber, limit);
 }

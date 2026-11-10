@@ -1,8 +1,8 @@
 /**
  * Strike lines and who may see a launch.
  *
- * Purpose: The example sentence and the visibility rule stay fixed.
- * When to use: After changing `formatMissileStrikeLine` or `missileLaunchVisibleToViewer`.
+ * Purpose: The combined sentence and the visibility rule stay fixed.
+ * When to use: After changing `formatMissileStrikeSummaryLine`, `buildMissileStrikeToastLines`, or `missileLaunchVisibleToViewer`.
  * Expected outcome: The cases below.
  * Exceptions: None.
  */
@@ -10,22 +10,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MissileLaunchRecord } from './ipc/missileTypes';
-import { AI_SEAT_IDS, HUMAN_SEAT_ID } from './seatIds';
-import { formatMissileStrikeLine, missileLaunchVisibleToViewer } from './missileStrikeReport';
+import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from './seatIds';
+import {
+  buildMissileStrikeToastLines,
+  formatMissileStrikeSummaryLine,
+  missileLaunchVisibleToViewer,
+  type MissileStrikeEntry,
+} from './missileStrikeReport';
 
 /**
  * A launch record with the counts a case cares about.
  *
  * Purpose: Keeps the required fields filled so each case sets only what it checks.
  * When to use: The cases in this file.
- * Expected outcome: A record aimed at `target`.
+ * Expected outcome: A record aimed at `target`, controlled by the human seat unless the case says otherwise.
  * Exceptions: None.
  */
-function record(partial: Partial<MissileLaunchRecord> & Pick<MissileLaunchRecord, 'player' | 'targetControllerId'>): MissileLaunchRecord {
+function record(partial: Partial<MissileLaunchRecord> = {}): MissileLaunchRecord {
   return {
     unitId: 'h1-m1',
+    player: HUMAN_SEAT_ID,
     fromH3Index: 'from',
     targetH3Index: 'target',
+    targetControllerId: HUMAN_SEAT_ID,
     urbanBefore: 0,
     urbanDestroyed: 0,
     airportsBefore: 0,
@@ -39,63 +46,114 @@ function record(partial: Partial<MissileLaunchRecord> & Pick<MissileLaunchRecord
   };
 }
 
-test('formatMissileStrikeLine names the destroyed flags and a lost squadron', () => {
-  const line = formatMissileStrikeLine({
-    placeName: 'Osaka',
-    record: record({
-      player: HUMAN_SEAT_ID,
-      targetControllerId: AI_SEAT_IDS[0],
-      urbanBefore: 290,
-      urbanDestroyed: 276,
-      airportsBefore: 2,
-      airportsDestroyed: 2,
-      destroyedAirUnitIds: ['a2-a1'],
-    }),
-  });
-  assert.equal(line, 'Missile strike on Osaka: 276 city cells and 2 airports destroyed; 1 squadron lost.');
-});
+/**
+ * One strike the summary can total.
+ *
+ * Purpose: A case sets the counts and the hex code without repeating the record shell.
+ * When to use: The summary and grouping cases.
+ * Expected outcome: An entry whose record fills every count the case did not set with 0.
+ * Exceptions: None.
+ */
+function entry(partial: Partial<MissileLaunchRecord>, hexCode: string | null): MissileStrikeEntry {
+  return { record: record(partial), hexCode };
+}
 
-test('formatMissileStrikeLine counts fortifications after city cells', () => {
-  const line = formatMissileStrikeLine({
-    placeName: 'Vienna',
-    record: record({
-      player: HUMAN_SEAT_ID,
-      targetControllerId: AI_SEAT_IDS[0],
-      urbanBefore: 21,
-      urbanDestroyed: 9,
-      fortificationsBefore: 12,
-      fortificationsDestroyed: 10,
-    }),
-  });
-  assert.equal(line, 'Missile strike on Vienna: 9 city cells and 10 fortifications destroyed.');
-});
-
-test('formatMissileStrikeLine says when the hex had nothing to destroy', () => {
-  const line = formatMissileStrikeLine({
-    placeName: 'Osaka',
-    record: record({ player: HUMAN_SEAT_ID, targetControllerId: null }),
-  });
-  assert.equal(line, 'Missile strike on Osaka: nothing there to destroy.');
-});
-
-test('formatMissileStrikeLine uses singular nouns for one of each and plural squadrons', () => {
-  const line = formatMissileStrikeLine({
-    placeName: 'Osaka',
-    record: record({
-      player: HUMAN_SEAT_ID,
-      targetControllerId: null,
-      urbanBefore: 1,
-      urbanDestroyed: 1,
-      airportsBefore: 1,
-      airportsDestroyed: 0,
-      seaportsBefore: 1,
-      seaportsDestroyed: 1,
-      destroyedAirUnitIds: ['a1', 'a2'],
-    }),
-  });
+test('one strike names one city cell', () => {
   assert.equal(
-    line,
-    'Missile strike on Osaka: 1 city cell, 0 airports, and 1 seaport destroyed; 2 squadrons lost.'
+    formatMissileStrikeSummaryLine([entry({ urbanBefore: 3, urbanDestroyed: 1 }, 'AA')]),
+    'Missile strike in AA destroyed 1 city cell.'
+  );
+});
+
+test('strikes total their counts and sort their hexes', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([
+      entry(
+        {
+          urbanBefore: 4,
+          urbanDestroyed: 2,
+          airportsBefore: 1,
+          airportsDestroyed: 1,
+          destroyedAirUnitIds: ['a1', 'a2'],
+        },
+        'C2'
+      ),
+      entry(
+        {
+          urbanBefore: 2,
+          urbanDestroyed: 1,
+          fortificationsBefore: 2,
+          fortificationsDestroyed: 2,
+        },
+        'AA'
+      ),
+    ]),
+    'Missile strikes in AA and C2 destroyed 3 city cells, 1 airport, and 2 fortifications; 2 squadrons lost.'
+  );
+});
+
+test('a kind that was present but survived is not named', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([
+      entry({ airportsBefore: 2, airportsDestroyed: 0, seaportsBefore: 1, seaportsDestroyed: 1 }, 'AA'),
+    ]),
+    'Missile strike in AA destroyed 1 seaport.'
+  );
+});
+
+test('strikes that destroyed nothing say so', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([entry({}, 'AA'), entry({}, 'AA')]),
+    'Missile strikes in AA destroyed nothing.'
+  );
+});
+
+test('the same hex struck twice sums', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([
+      entry({ urbanBefore: 1, urbanDestroyed: 1 }, 'AA'),
+      entry({ urbanBefore: 2, urbanDestroyed: 2 }, 'AA'),
+    ]),
+    'Missile strikes in AA destroyed 3 city cells.'
+  );
+});
+
+test('flags that were present and all survived say nothing was destroyed', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([entry({ airportsBefore: 2, airportsDestroyed: 0 }, 'AA')]),
+    'Missile strike in AA destroyed nothing.'
+  );
+});
+
+test('two missing codes are named once and both counts still add', () => {
+  assert.equal(
+    formatMissileStrikeSummaryLine([
+      entry({ urbanBefore: 1, urbanDestroyed: 1, destroyedAirUnitIds: ['a1'] }, null),
+      entry({ seaportsBefore: 1, seaportsDestroyed: 1, destroyedAirUnitIds: ['a2'] }, null),
+    ]),
+    'Missile strikes in an unidentified hex destroyed 1 city cell and 1 seaport; 2 squadrons lost.'
+  );
+});
+
+test('no strikes give no sentence', () => {
+  assert.equal(formatMissileStrikeSummaryLine([]), null);
+});
+
+test('toast lines group by seat and share one line for neutral and uncontrolled hexes', () => {
+  const city = { urbanBefore: 1, urbanDestroyed: 1 };
+  assert.deepEqual(
+    buildMissileStrikeToastLines([
+      entry({ ...city, targetControllerId: HUMAN_SEAT_ID }, 'AA'),
+      entry({ ...city, targetControllerId: AI_SEAT_IDS[0] }, 'C2'),
+      entry({ ...city, targetControllerId: HUMAN_SEAT_ID }, 'E5'),
+      entry({ ...city, targetControllerId: NEUTRAL_OWNER_ID }, 'G1'),
+      entry({ ...city, targetControllerId: null }, 'H2'),
+    ]),
+    [
+      { controllerId: HUMAN_SEAT_ID, line: 'Missile strikes in AA and E5 destroyed 2 city cells.' },
+      { controllerId: AI_SEAT_IDS[0], line: 'Missile strike in C2 destroyed 1 city cell.' },
+      { controllerId: null, line: 'Missile strikes in G1 and H2 destroyed 2 city cells.' },
+    ]
   );
 });
 

@@ -169,9 +169,9 @@ export interface ConsolidatedTurnUpdateToastArgs {
   /**
    * Missile strike sentences, each with the hex controller at launch.
    *
-   * Contract: One entry per launch the viewer may see. `line` is already formatted. `controllerId` is a seat id, `neutral`, or null.
+   * Contract: One entry per side from `buildMissileStrikeToastLines`. `line` is already formatted. `controllerId` is a seat id or null.
    * When to use: Strategic Ready after visibility filtering.
-   * Expected outcome: A seat controller's line is that side's loss section, after the cause lines and before the hex sentences. `neutral` and null stay in Updates, after deployments or the combat-activity fallback, and before the unknown-battle line.
+   * Expected outcome: A seat controller's line is that side's loss section, after the cause lines and before the hex sentences. Null stays in Updates, after deployments or the combat-activity fallback, and before the unknown-battle line. Neutral and uncontrolled strikes share that null line.
    * Exceptions: None. Omitted, or a blank line, adds nothing. A seat line is not copied into Updates.
    */
   missileStrikeLines?: readonly MissileStrikeToastLine[];
@@ -196,8 +196,8 @@ export interface ConsolidatedTurnUpdateToastArgs {
   /**
    * Fortification sentences, each with the owner who held the hex.
    *
-   * Contract: The toast files a seat or Neutral line in that side's section, after its missile sentences.
-   * When to use: Strategic Ready, after visibility filtering.
+   * Contract: One entry per owner from `buildFortificationToastLines`. A seat or Neutral line sits in that side's section, after its missile sentence.
+   * When to use: Strategic Ready and a battle beat, after visibility filtering.
    * Expected outcome: A null owner goes to Updates, after missile sentences that stay there and before the paused-queue lines.
    * Exceptions: None. A blank line is dropped.
    */
@@ -234,7 +234,7 @@ export interface FortificationToastLine {
   /**
    * The formatted fortification sentence.
    *
-   * Contract: Output of `formatFortificationReportLine`, possibly with surrounding whitespace.
+   * Contract: Output of `formatFortificationSummaryLine`, possibly with surrounding whitespace.
    * When to use: The body line. A blank value is dropped.
    * Expected outcome: The trimmed sentence.
    * Exceptions: None.
@@ -263,7 +263,7 @@ export interface MissileStrikeToastLine {
   /**
    * The formatted strike sentence.
    *
-   * Contract: Output of `formatMissileStrikeLine`, possibly with surrounding whitespace.
+   * Contract: Output of `formatMissileStrikeSummaryLine`, possibly with surrounding whitespace.
    * When to use: The body line. A blank value is dropped.
    * Expected outcome: The trimmed sentence.
    * Exceptions: None.
