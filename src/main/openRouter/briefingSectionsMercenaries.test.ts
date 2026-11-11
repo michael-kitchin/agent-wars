@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { SECTION_TITLE_MERCENARIES } from './promptSpec/sectionHeadings';
-import { getGameStateForPlayer, getScenarioHomeRegionHexes, getSeatRoster, setTreasuryCredits } from '../gameDb';
+import { getGameStateForPlayer, getScenarioHomeRegionHexes, getSeatRoster, setTreasuryCredits, dbGetAll, dbRun, setHexController } from '../gameDb';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { createStrategicUnit } from '../gameActions/strategicUnitSpawn';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { buildMercenariesBriefingBlock } from './briefingSectionsMercenaries';
@@ -58,5 +59,34 @@ test('zero credits with nothing to rehire is one line, and an owned mercenary ke
     assert.ok(full.includes('each mercenary costs its upkeep'));
     assert.ok(full.includes('## Your Mercenaries'));
     assert.equal(full.includes('No one to rehire.'), false);
+  });
+});
+
+test('a raise cell that would restart a paused city is marked and listed first', () => {
+  withTempGameDb('aw-brief-merc-resume-', () => {
+    const seat = AI_SEAT_IDS[0];
+    const homes = new Set(getSeatRoster().flatMap((row) => getScenarioHomeRegionHexes(row.homeRegion)));
+    const hex = dbGetAll<{ h3Index: string }>(
+      'SELECT h3_index AS h3Index FROM res_s_infrastructure WHERE urban_hex_count >= 10 AND fortified_count = 0'
+    )
+      .map((row) => row.h3Index)
+      .find((h3Index) => !homes.has(h3Index) && !isNeutralBorderHex(h3Index));
+    assert.ok(hex, 'fixture needs a city outside every home');
+    setHexController(hex, seat);
+    dbRun('DELETE FROM units WHERE h3_index = ?', [hex]);
+    setTreasuryCredits(seat, 40);
+    const loaded = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const state = { ...loaded, exploredHexes: [...new Set([...(loaded.exploredHexes ?? []), hex])] };
+    const block = buildMercenariesBriefingBlock(state, (h3Index) => h3Index, 'strategic', { productionEnabled: true });
+    assert.ok(block.includes('| Hex | Capacity | Resumes building | Options |'), block);
+    const raiseRows = block
+      .slice(block.indexOf('## Raise Options'))
+      .split('\n')
+      .filter((line) => line.startsWith('| ') && !line.startsWith('| Hex |') && !line.startsWith('| --- |'));
+    const hexIndex = raiseRows.findIndex((line) => line.startsWith(`| ${hex} | `));
+    const firstNo = raiseRows.findIndex((line) => line.includes(' | no | '));
+    assert.ok(hexIndex >= 0, raiseRows.join('\n'));
+    assert.ok(raiseRows[hexIndex]?.includes(' | yes | '), raiseRows[hexIndex]);
+    assert.ok(firstNo === -1 || hexIndex < firstNo, 'yes rows must sort before no rows');
   });
 });

@@ -17,6 +17,7 @@ import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
 import { formatProductionAttentionBullet } from './productionAttention';
+import { formatPausedProductionPointer } from './pausedProductionAttention';
 
 /**
  * Gates and snapshot needed to build the three status injection strings.
@@ -151,10 +152,19 @@ export interface StatusInjectionTexts {
    *
    * Contract: Null when production tools are off or no controlled hex is idle. Otherwise the sentence from `formatProductionAttentionBullet`.
    * When to use: `formatBriefing` appends it after the unit attention bullets. The opening message only needs to know whether it is present.
-   * Expected outcome: Names at most six idle hexes.
+   * Expected outcome: Names up to `PRODUCTION_ATTENTION_LISTED_HEXES` idle hexes.
    * Exceptions: None.
    */
   readonly productionAttention: string | null;
+  /**
+   * One-line pointer to the paused-queue subsection, without a leading list marker.
+   *
+   * Contract: Null when production tools are off or no queue is paused for occupation or a full city.
+   * When to use: `formatBriefing` appends it after the production bullet. The subsection itself is already in `productionText`.
+   * Expected outcome: Null unless production is on and a queue is paused for occupation or a full city. The sentence is the pointer, not the subsection.
+   * Exceptions: None.
+   */
+  readonly pausedProductionAttention: string | null;
 }
 
 /**
@@ -187,11 +197,12 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         resolveToH3: args.resolveToH3,
         formatHexLabel: args.formatHexLabel,
       })
-    : { text: '', idleHexes: [] };
+    : { text: '', idleHexes: [], pausedHexes: [] };
   return {
     memoryText,
     standingOrderText,
     productionText: production.text,
     productionAttention: args.productionEnabled ? formatProductionAttentionBullet(production.idleHexes) : null,
+    pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,
   };
 }

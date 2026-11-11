@@ -34,6 +34,10 @@ import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import { creditsSpendStep } from './creditsProduction';
 import { fortificationSpendStep, fortifyCellsForHex } from './fortificationProduction';
 import { readBuildabilityContext } from './productionBuildability';
+import { listQueuePauseReasons } from '../../shared/queuePauseReasons';
+import type { QueuePause, QueuePauseReason } from '../../shared/queuePauseTypes';
+import { maxedUnitTypesFor, recordQueuePause, selectNewlyPausedQueues } from './queuePauseRecording';
+import { readPausedQueueHexes, writePausedQueueHexes } from '../gameDb/queuePauseMemory';
 import { spawnProducedUnitsForHex } from './strategicUnitSpawn';
 
 /**
@@ -228,26 +232,26 @@ export function resolveStrategicControlAfterCombatAndMovement(
  * When to use: After control resolution in the Ready pipeline, before returning deployed/cap summaries.
  * Expected outcome: Queues and stored points persisted; units spawned; Keep building cleared only when an
  * armed type is ineligible at refill time; iteration guard logs an error if the refill/spend loop exceeds
- * its safety cap.
+ * its safety cap. Paused queues are remembered in the `queue_paused_hexes` row. `newlyPausedQueuesByPlayer`
+ * holds only the queues that paused this pass, each with every reason that applies.
  * Exceptions: None (DB/spawn failures surface from callees).
  */
 export function processProductionAfterControlResolution(): {
   deployedByPlayer: ReadonlyMap<SeatId, DeployedUnitsByType>;
   capReachedByPlayer: ReadonlyMap<SeatId, BuildUnitType[]>;
   fortificationsBuiltByPlayer: ReadonlyMap<SeatId, number>;
-  fortificationPausedHexesByPlayer: ReadonlyMap<SeatId, readonly string[]>;
   creditsAddedByPlayer: ReadonlyMap<SeatId, number>;
-  buildPausedHexesByPlayer: ReadonlyMap<SeatId, readonly string[]>;
+  newlyPausedQueuesByPlayer: ReadonlyMap<SeatId, readonly QueuePause[]>;
 } {
   logDebug('gameActions processProductionAfterControlResolution');
   const maxUnitsPerType = readPersistedMaxUnitsPerType({ run: dbRun, getOne: dbGetOne });
   const deployedByPlayer = new Map<SeatId, DeployedUnitsByType>();
   const capReachedByPlayer = new Map<SeatId, BuildUnitType[]>();
   const fortificationsBuiltByPlayer = new Map<SeatId, number>();
-  const fortificationPausedHexesByPlayer = new Map<SeatId, string[]>();
   const creditsAddedByPlayer = new Map<SeatId, number>();
   const buildability = readBuildabilityContext();
-  const buildPausedHexesByPlayer = new Map<SeatId, string[]>();
+  const previouslyPaused = readPausedQueueHexes({ getOne: dbGetOne });
+  const queuePausesByPlayer = new Map<SeatId, QueuePause[]>();
   for (const seat of getSeatRoster()) {
     deployedByPlayer.set(seat.seatId, {});
     capReachedByPlayer.set(seat.seatId, []);
@@ -292,9 +296,19 @@ export function processProductionAfterControlResolution(): {
     let points = Math.max(0, Math.trunc(storedPoints)) + (neutralBorder ? 0 : Math.max(0, Math.trunc(urbanHexCount)));
     if (!buildability.isBuildable(controllerPlayerId, control.h3Index, fortifiedCount)) {
       setBuildProgressPointsForHex(control.h3Index, points);
-      const paused = buildPausedHexesByPlayer.get(controllerPlayerId) ?? [];
-      paused.push(control.h3Index);
-      buildPausedHexesByPlayer.set(controllerPlayerId, paused);
+      recordQueuePause(
+        queuePausesByPlayer,
+        controllerPlayerId,
+        control.h3Index,
+        listQueuePauseReasons({
+          buildable: false,
+          nextItemType:
+            queueWorking[0]?.unitType ??
+            (standingAtStart.keepBuilding ? standingAtStart.keepBuildingUnitType : null),
+          fortifiableLeft: neutralBorder ? 0 : fortifiableCount,
+          maxedUnitTypes: maxedUnitTypesFor(controllerPlayerId, unitCountsByPlayerType, maxUnitsPerType),
+        })
+      );
       continue;
     }
     let creditsToAdd = 0;
@@ -441,11 +455,10 @@ export function processProductionAfterControlResolution(): {
         (creditsAddedByPlayer.get(controllerPlayerId) ?? 0) + creditsToAdd
       );
     }
-    if (fortificationPaused) {
-      const paused = fortificationPausedHexesByPlayer.get(controllerPlayerId) ?? [];
-      paused.push(control.h3Index);
-      fortificationPausedHexesByPlayer.set(controllerPlayerId, paused);
-    }
+    const pausedReasons: QueuePauseReason[] = [];
+    if (fortificationPaused) pausedReasons.push('allCellsFortified');
+    if (blockedByCapType) pausedReasons.push('unitCap');
+    recordQueuePause(queuePausesByPlayer, controllerPlayerId, control.h3Index, pausedReasons);
     const standingAfter = getKeepBuildingForHex(control.h3Index);
     if (standingAfter.keepBuilding) {
       const confirmedType =
@@ -485,13 +498,19 @@ export function processProductionAfterControlResolution(): {
     });
     capArray.splice(0, capArray.length, ...DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)));
   }
+  writePausedQueueHexes(
+    { run: dbRun },
+    new Map(
+      [...queuePausesByPlayer].map(([seatId, pauses]): [SeatId, string[]] => [seatId, pauses.map((pause) => pause.h3Index)])
+    )
+  );
+  const newlyPausedQueuesByPlayer = selectNewlyPausedQueues(previouslyPaused, queuePausesByPlayer);
   return {
     deployedByPlayer,
     capReachedByPlayer,
     fortificationsBuiltByPlayer,
-    fortificationPausedHexesByPlayer,
     creditsAddedByPlayer,
-    buildPausedHexesByPlayer,
+    newlyPausedQueuesByPlayer,
   };
 }
 

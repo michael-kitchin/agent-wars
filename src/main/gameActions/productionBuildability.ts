@@ -7,9 +7,14 @@
  * Exceptions: Propagates SQLite errors.
  */
 
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import { isBuildUnitType, type BuildUnitType } from '../../shared/ipc/productionTypes';
 import { isHexBuildableForSeat } from '../../shared/productionBuildability';
+import { listQueuePauseReasons } from '../../shared/queuePauseReasons';
+import type { QueuePauseReason } from '../../shared/queuePauseTypes';
 import type { SeatId } from '../../shared/seatIds';
-import { dbGetAll, dbGetOne, getScenarioHomeRegionHexes, getSeatRoster } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getScenarioHomeRegionHexes, getSeatRoster } from '../gameDb';
+import { readPersistedMaxUnitsPerType } from '../gameDb/gameSizeConfig';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -88,5 +93,58 @@ export function isHexBuildableNow(seatId: SeatId, h3Index: string, fortifiedCoun
     homeHexes,
     seatUnitHexes: present ? new Set([h3Index]) : new Set<string>(),
     fortifiedCount,
+  });
+}
+
+/**
+ * Unit types this seat already has at its deployment cap.
+ *
+ * Purpose: A queued unit type at the cap is a pause reason. The count leaves mercenaries out, matching the spend loop.
+ * When to use: When a caller has no cap set yet. `query_production` passes the set it already built and does not call this.
+ * Expected outcome: The capped unit types for that seat.
+ * Exceptions: Propagates SQLite errors.
+ */
+export function readMaxedUnitTypesForSeat(seatId: SeatId): Set<BuildUnitType> {
+  logTrace('gameActions readMaxedUnitTypesForSeat', { seatId });
+  const caps = readPersistedMaxUnitsPerType({ run: dbRun, getOne: dbGetOne });
+  const rows = dbGetAll<{ unitType: string; count: number }>(
+    `SELECT unit_type AS unitType, COUNT(*) AS count
+     FROM units
+     WHERE player = ? AND is_mercenary = 0
+     GROUP BY unit_type`,
+    [seatId]
+  );
+  const maxed = new Set<BuildUnitType>();
+  for (const row of rows) {
+    if (isBuildUnitType(row.unitType) && row.count >= caps[row.unitType]) maxed.add(row.unitType);
+  }
+  return maxed;
+}
+
+/**
+ * Every reason the next queued item on this hex is not spending.
+ *
+ * Purpose: The build-queue view and `query_production` use the same reasons as the production pass.
+ * When to use: When the requester controls a hex with city cells. Pass the caller's cap set. This does not query for it.
+ * Expected outcome: Reasons in print order. Empty when nothing is queued or nothing blocks the next item.
+ * Exceptions: None.
+ */
+export function readQueuePauseReasonsForHex(args: {
+  readonly seatId: SeatId;
+  readonly h3Index: string;
+  readonly buildable: boolean;
+  readonly fortifiableCount: number;
+  readonly queueRows: readonly { readonly id: number; readonly queueIndex: number; readonly unitType: string }[];
+  readonly keepBuildingUnitType: string | null;
+  readonly maxedUnitTypes: ReadonlySet<string>;
+}): QueuePauseReason[] {
+  logTrace('gameActions readQueuePauseReasonsForHex', { seatId: args.seatId, h3Index: args.h3Index });
+  const next = [...args.queueRows].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id)[0];
+  const nextItemType = next ? next.unitType : args.keepBuildingUnitType;
+  return listQueuePauseReasons({
+    buildable: args.buildable,
+    nextItemType,
+    fortifiableLeft: isNeutralBorderHex(args.h3Index) ? 0 : args.fortifiableCount,
+    maxedUnitTypes: args.maxedUnitTypes,
   });
 }

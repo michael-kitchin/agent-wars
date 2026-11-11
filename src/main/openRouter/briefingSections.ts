@@ -23,11 +23,13 @@ import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
 import { findIdleProductionHexes, selectNextQueueEntry, type IdleProductionHex } from './productionAttention';
+import { findPausedProductionHexes, formatPausedQueuesSection, type PausedProductionHex } from './pausedProductionAttention';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import {
   SECTION_TITLE_CONTROLLED_HEX_QUEUES,
+  SECTION_TITLE_PAUSED_QUEUES,
   SECTION_TITLE_PRODUCTION_STATUS,
   subHeading,
   topLevelHeading,
@@ -169,7 +171,7 @@ seaports: number;
    *
    * Contract: `paused` or `yes`.
    * When to use: The Building column.
-   * Expected outcome: `paused` only when the snapshot says building is paused.
+   * Expected outcome: `paused` when the snapshot says building is paused or the row has any pause reason.
    * Exceptions: None.
    */
   building: string;
@@ -239,7 +241,7 @@ function normalizeControlledHexQueueRow(
     airports,
     seaports,
     fortified: `${fortifiedCount}/${fortifiedCount + fortifiableCount}`,
-    building: row.buildPaused === true ? 'paused' : 'yes',
+    building: row.buildPaused === true || (Array.isArray(row.pausedReasons) && row.pausedReasons.length > 0) ? 'paused' : 'yes',
     available,
     entries,
     hasQueuedEntries: entriesList.length > 0,
@@ -251,7 +253,7 @@ function normalizeControlledHexQueueRow(
  *
  * Purpose: The section text is unchanged. The idle list feeds Attention Flags and is computed from every queue, including queues the table does not show.
  * When to use: `buildProductionBriefingBlock` and `buildStatusInjectionTexts`.
- * Expected outcome: `text` is the production section, or empty when production is off. `idleHexes` is empty when production is off, the snapshot failed, or no hex is idle.
+ * Expected outcome: `text` is the production section, or empty when production is off. `idleHexes` is empty when production is off, the snapshot failed, or no hex is idle. `pausedHexes` lists queues paused for occupation or a full city. The section text includes `### Paused Queues` only after `formatBriefing` shifts the heading.
  * Exceptions: None.
  */
 export function buildProductionBriefing(args: {
@@ -260,12 +262,12 @@ export function buildProductionBriefing(args: {
   latLngByH3: Map<string, [number, number]>;
   resolveToH3: (lat: number, lng: number) => string | undefined;
   formatHexLabel: (ll: [number, number]) => string;
-}): { readonly text: string; readonly idleHexes: readonly IdleProductionHex[] } {
+}): { readonly text: string; readonly idleHexes: readonly IdleProductionHex[]; readonly pausedHexes: readonly PausedProductionHex[] } {
   logDebug('briefingSections buildProductionBriefing', {
     productionEnabled: args.productionEnabled,
     turnNumber: args.state.turnNumber,
   });
-  if (!args.productionEnabled) return { text: '', idleHexes: [] };
+  if (!args.productionEnabled) return { text: '', idleHexes: [], pausedHexes: [] };
   const ownSeat = briefingOwnSeatId(args.state);
   const snapshot = executeProductionTools(ownSeat, 'query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
     status?: string;
@@ -277,12 +279,14 @@ export function buildProductionBriefing(args: {
     return {
       text: `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`,
       idleHexes: [],
+      pausedHexes: [],
     };
   }
   if (typeof snapshot.unavailableReason === 'string' && snapshot.unavailableReason.trim().length > 0) {
     return {
       text: `${topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS)}\n\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`,
       idleHexes: [],
+      pausedHexes: [],
     };
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
@@ -301,7 +305,9 @@ export function buildProductionBriefing(args: {
     `Your current unit counts: ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${opponentCounts[unitType]}/${caps[unitType]}`).join(', ')}.`
   );
   lines.push(buildProductionIncomeRule());
+  lines.push('');
   lines.push(buildBuildabilityRule());
+  lines.push('');
   if (maxedTypes.length > 0) {
     lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);
     lines.push(PRODUCTION_CAP_QUEUE_GUIDANCE);
@@ -309,9 +315,17 @@ export function buildProductionBriefing(args: {
   lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
   const maxedTypeSet = new Set(maxedTypes);
   const idleHexes = findIdleProductionHexes(queues as ControlledHexQueueSnapshot[], maxedTypeSet, args.formatHexLabel);
+  const pausedHexes = findPausedProductionHexes(queues as ControlledHexQueueSnapshot[], args.formatHexLabel);
+  const pausedSection = formatPausedQueuesSection(pausedHexes);
+  if (pausedSection) {
+    lines.push('');
+    lines.push(subHeading(SECTION_TITLE_PAUSED_QUEUES));
+    lines.push('');
+    lines.push(pausedSection);
+  }
   if (queues.length === 0) {
     lines.push(PRODUCTION_EMPTY_QUEUES_SENTENCE);
-    return { text: lines.join('\n'), idleHexes };
+    return { text: lines.join('\n'), idleHexes, pausedHexes };
   }
   lines.push('');
   lines.push(subHeading(SECTION_TITLE_CONTROLLED_HEX_QUEUES));
@@ -339,7 +353,7 @@ export function buildProductionBriefing(args: {
       ['—', '—', '—', '—', '—', '—', '—', '—']
     )
   );
-  return { text: lines.join('\n'), idleHexes };
+  return { text: lines.join('\n'), idleHexes, pausedHexes };
 }
 
 /**

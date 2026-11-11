@@ -139,6 +139,8 @@ Use tools selectively for memory lookup (memory_read) and production queue check
   When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.
 
   When the Production attention flag is present, it names the hexes to queue and the types they can still build.
+
+  When an attention bullet names paused queues, apply the fix in Paused Queues under Production Status.
 - Write a short persistent note under the key turn_objectives, naming this turn's objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.
 - Subscribe only to events from the engine's event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a turn it is not consulted for is a turn in which it issued nothing.
@@ -485,7 +487,9 @@ Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile
 
 A controlled cell earns production points equal to its urban count each turn and spends them in queue order.
 
-You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn. Elsewhere a queue pauses and keeps banking its points.
+You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.
+
+Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.
 
 You are currently at maximum for: infantry, naval, air.
 

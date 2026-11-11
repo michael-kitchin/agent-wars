@@ -453,15 +453,19 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
 
 
 /**
- * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): HexBuildQueueView).
+ * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID, maxedUnitTypes?: ReadonlySet<string>): HexBuildQueueView).
 
- * Purpose: Supports maintainability by documenting why `getHexBuildQueue` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: IPC handlers and production tools share one entry point for a hex's queue view.
+ * When to use: After a queue edit, and from `query_production` when it already has the seat's cap set.
+ * Expected outcome: The queue view from `readHexBuildQueue`, including a forwarded cap set.
+ * Exceptions: Propagates a database error from the queue read.
  */
-export function getHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_PLAYER_ID): HexBuildQueueView {
-  return readHexBuildQueue(h3Index, requestingPlayerId);
+export function getHexBuildQueue(
+  h3Index: string,
+  requestingPlayerId: string = HUMAN_PLAYER_ID,
+  maxedUnitTypes?: ReadonlySet<string>
+): HexBuildQueueView {
+  return readHexBuildQueue(h3Index, requestingPlayerId, maxedUnitTypes);
 }
 
 /**

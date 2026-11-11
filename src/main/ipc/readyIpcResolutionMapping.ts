@@ -282,11 +282,10 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'humanDeploymentCapReachedUnitTypes'
   | 'humanFortificationsBuilt'
   | 'humanCreditsAdded'
-  | 'humanBuildPausedHexes'
+  | 'humanNewlyPausedQueues'
   | 'humanMercenariesHired'
   | 'humanUnitsDeserted'
   | 'humanHireOrdersUnfilled'
-  | 'humanFortificationQueuePausedHexes'
   | 'fortificationReports'
   | 'deploymentCapReachedUnitTypesBySeat'
   | 'humanHexesLostCount'
@@ -347,11 +346,10 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     humanDeploymentCapReachedUnitTypes: source.humanDeploymentCapReachedUnitTypes,
     humanFortificationsBuilt: source.humanFortificationsBuilt,
     humanCreditsAdded: source.humanCreditsAdded,
-    humanBuildPausedHexes: source.humanBuildPausedHexes,
+    humanNewlyPausedQueues: source.humanNewlyPausedQueues,
     humanMercenariesHired: source.humanMercenariesHired,
     humanUnitsDeserted: source.humanUnitsDeserted,
     humanHireOrdersUnfilled: source.humanHireOrdersUnfilled,
-    humanFortificationQueuePausedHexes: source.humanFortificationQueuePausedHexes,
     fortificationReports: source.fortificationReports,
     deploymentCapReachedUnitTypesBySeat: source.deploymentCapReachedUnitTypesBySeat,
     humanHexesLostCount: source.humanHexesLostCount,

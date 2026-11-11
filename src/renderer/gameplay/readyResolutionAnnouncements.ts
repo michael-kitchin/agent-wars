@@ -29,8 +29,8 @@ import {
   notifyResolutionPlaybackFinished,
 } from '../openRouter/resolutionPlaybackDeferral';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
-import { fortificationReportLinesFor, fortificationUpdateLinesFor } from './fortificationUpdateLines';
-import { productionPauseUpdateLinesFor } from './productionPauseUpdateLines';
+import { fortificationReportLinesFor } from './fortificationUpdateLines';
+import { queuePauseUpdateLinesFor } from './queuePauseUpdateLines';
 import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
 
 /**
@@ -483,8 +483,7 @@ export async function announceResolutionTurnUpdate(
     }
   }
   const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
-  const fortificationLines = await fortificationUpdateLinesFor(readySlice);
-  const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
+  const queuePauseLines = queuePauseUpdateLinesFor(readySlice);
   const fortificationReportLines = fortificationReportLinesFor(
     readySlice,
     {
@@ -504,8 +503,7 @@ export async function announceResolutionTurnUpdate(
     },
     unknownBattleLine,
     missileStrikeLines,
-    fortificationLines,
-    productionPauseLines,
+    queuePauseLines,
     fortificationReportLines,
     battleLinesByOwner,
   });

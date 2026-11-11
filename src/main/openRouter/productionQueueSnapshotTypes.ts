@@ -126,6 +126,24 @@ seaportCount?: unknown;
    * Exceptions: None.
    */
   buildPaused?: unknown;
+  /**
+   * Why the next queued item is not spending.
+   *
+   * Contract: Reason texts from `QUEUE_PAUSE_REASON_TEXT`. Present on the requester's hexes only when at least one reason applies.
+   * When to use: Grouping paused queues in the briefing.
+   * Expected outcome: One or more reason texts, or absent.
+   * Exceptions: None.
+   */
+  pausedReasons?: unknown;
+  /**
+   * Banked production points on the hex.
+   *
+   * Contract: Present on a hex the requester controls.
+   * When to use: The paused-queue briefing, which totals points waiting in paused cells.
+   * Expected outcome: A non-negative number, or absent.
+   * Exceptions: None.
+   */
+  storedPoints?: unknown;
     /**
    * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes?: unknown;).
 

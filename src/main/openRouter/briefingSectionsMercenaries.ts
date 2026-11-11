@@ -11,6 +11,7 @@ import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRang
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { unitCostFor } from '../../shared/gameRules';
 import { isHireableUnitType, mercenaryUpkeepFor } from '../../shared/mercenaryRules';
+import { listOccupationPausedHexes } from '../../shared/productionBuildability';
 import { NEUTRAL_OWNER_ID } from '../../shared/seatIds';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { listHireOrdersForSeat } from '../gameDb/mercenaryStateAccess';
@@ -83,7 +84,7 @@ export function buildMercenariesBriefingBlock(
   const context = buildHireContext(state, ownSeat);
   const ownHexes = state.units.filter((unit) => unit.player === ownSeat).map((unit) => unit.h3Index);
   lines.push('', subHeading(SECTION_TITLE_REHIRE_CANDIDATES), '', rehireTable(state, context, orderedRehires, ownHexes, format));
-  lines.push('', subHeading(SECTION_TITLE_RAISE_OPTIONS), '', raiseTable(context, orders, ownHexes, format));
+  lines.push('', subHeading(SECTION_TITLE_RAISE_OPTIONS), '', raiseTable(context, orders, ownHexes, format, listOccupationPausedHexes(state, ownSeat)));
   return lines.join('\n');
 }
 
@@ -160,18 +161,19 @@ function rehireTable(
 }
 
 /**
- * Hexes that can still raise, nearest first.
+ * Hexes that can still raise, with cells that restart a paused city first.
  *
  * Purpose: Capacity left subtracts this seat's raise orders. The function does not rebuild the snapshot.
  * When to use: When production tools are on.
- * Expected outcome: A table, or the none-line.
+ * Expected outcome: Cells that would restart a paused city sort first and show `yes` under Resumes building. A table, or the none-line.
  * Exceptions: None.
  */
 function raiseTable(
   context: ReturnType<typeof buildHireContext>,
   orders: ReturnType<typeof listHireOrdersForSeat>,
   ownHexes: readonly string[],
-  format: (h3Index: string) => string
+  format: (h3Index: string) => string,
+  resumable: ReadonlySet<string>
 ): string {
   const rows = listHireEntryHexes(context).flatMap((h3Index) => {
     const evaluation = evaluateHexHire(context, h3Index);
@@ -182,15 +184,20 @@ function raiseTable(
     const options = evaluation.raiseOptions.filter((option) => option.unitCost <= capacityLeft);
     if (options.length === 0) return [];
     const text = options.map((option) => `${option.unitType} (fee ${option.fee}, upkeep ${option.upkeep})`).join('; ');
-    return [{ h3Index, capacityLeft, text }];
+    return [{ h3Index, capacityLeft, text, resumes: resumable.has(h3Index) }];
   });
   if (rows.length === 0) return NO_RAISE_OPTIONS_LINE;
   const shown = rows
-    .sort((left, right) => compareDistance(left.h3Index, right.h3Index, ownHexes) || left.h3Index.localeCompare(right.h3Index))
+    .sort(
+      (left, right) =>
+        Number(right.resumes) - Number(left.resumes) ||
+        compareDistance(left.h3Index, right.h3Index, ownHexes) ||
+        left.h3Index.localeCompare(right.h3Index)
+    )
     .slice(0, MERCENARY_BRIEFING_MAX_ROWS);
   return buildPromptTableLines(
-    ['Hex', 'Capacity', 'Options'],
-    shown.map((row) => [format(row.h3Index), String(row.capacityLeft), row.text])
+    ['Hex', 'Capacity', 'Resumes building', 'Options'],
+    shown.map((row) => [format(row.h3Index), String(row.capacityLeft), row.resumes ? 'yes' : 'no', row.text])
   ).join('\n');
 }
 

@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GameStateSnapshot } from './ipc/gameStateTypes';
-import { formatBuildPausedLine, isHexBuildableForSeat, withBuildPausedFlags } from './productionBuildability';
+import { isHexBuildableForSeat, listOccupationPausedHexes, withBuildPausedFlags } from './productionBuildability';
 
 const empty = new Set<string>();
 
@@ -51,13 +51,30 @@ test('paused flags mark only the viewer, and every seat when the viewer is absen
   assert.equal(allView.strategicBuildQueueTotals?.find((row) => row.h3Index === 'neutral-hex')?.buildPaused, undefined);
 });
 
-test('the paused line names one place or three', () => {
-  assert.equal(
-    formatBuildPausedLine(['Prague']),
-    'Building is paused at Prague, which holds none of your units or fortifications.'
-  );
-  assert.equal(
-    formatBuildPausedLine(['Prague', 'Vienna', 'Oslo']),
-    'Building is paused at Prague, Vienna, and Oslo, which hold none of your units or fortifications.'
-  );
+test('occupation-paused hexes are the seat production cells it cannot build in', () => {
+  const state = {
+    units: [
+      { player: 'opponent', h3Index: 'garrisoned' },
+      { player: 'human', h3Index: 'occupied' },
+    ],
+    hexes: [],
+    homeRegionHexesBySeat: { opponent: ['home'] },
+    strategicControl: [
+      { h3Index: 'home', controllerPlayerId: 'opponent' },
+      { h3Index: 'garrisoned', controllerPlayerId: 'opponent' },
+      { h3Index: 'fortified', controllerPlayerId: 'opponent' },
+      { h3Index: 'occupied', controllerPlayerId: 'opponent' },
+      { h3Index: 'rural', controllerPlayerId: 'opponent' },
+      { h3Index: 'theirs', controllerPlayerId: 'human' },
+    ],
+    strategicInfrastructure: [
+      { h3Index: 'home', urbanHexCount: 3, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+      { h3Index: 'garrisoned', urbanHexCount: 2, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+      { h3Index: 'fortified', urbanHexCount: 2, airportCount: 0, seaportCount: 0, fortifiedCount: 1 },
+      { h3Index: 'occupied', urbanHexCount: 2, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+      { h3Index: 'rural', urbanHexCount: 0, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+      { h3Index: 'theirs', urbanHexCount: 2, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+    ],
+  } as unknown as GameStateSnapshot;
+  assert.deepEqual([...listOccupationPausedHexes(state, 'opponent')], ['occupied']);
 });

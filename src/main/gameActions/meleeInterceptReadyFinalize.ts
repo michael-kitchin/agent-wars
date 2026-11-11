@@ -551,8 +551,8 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     humanCreditsAdded: (productionSummary.creditsAddedByPlayer.get(HUMAN_SEAT_ID) ?? 0) > 0
       ? productionSummary.creditsAddedByPlayer.get(HUMAN_SEAT_ID)
       : undefined,
-    humanBuildPausedHexes: (productionSummary.buildPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
-      ? productionSummary.buildPausedHexesByPlayer.get(HUMAN_SEAT_ID)
+    humanNewlyPausedQueues: (productionSummary.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
+      ? productionSummary.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)
       : undefined,
     humanMercenariesHired: (mercenarySummary.hiredBySeat.get(HUMAN_SEAT_ID) ?? 0) > 0
       ? mercenarySummary.hiredBySeat.get(HUMAN_SEAT_ID)
@@ -563,10 +563,6 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     humanHireOrdersUnfilled: (mercenarySummary.unfilledOrdersBySeat.get(HUMAN_SEAT_ID) ?? 0) > 0
       ? mercenarySummary.unfilledOrdersBySeat.get(HUMAN_SEAT_ID)
       : undefined,
-    humanFortificationQueuePausedHexes:
-      (productionSummary.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.length ?? 0) > 0
-        ? productionSummary.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)
-        : undefined,
     fortificationReports: fortificationReports.length > 0 ? fortificationReports : undefined,
     deploymentCapReachedUnitTypesBySeat: deploymentCapsBySeat(productionSummary.capReachedByPlayer),
     combatParticipantUnitIdsBySeat,

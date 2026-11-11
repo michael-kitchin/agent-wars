@@ -12,6 +12,7 @@ import {
   buildAvailableToolsIntro,
   buildProductionSubmitClause,
 } from './promptText';
+import { buildBuildabilityRule } from './promptSpec/gameRuleMercenaryText';
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -277,6 +278,28 @@ function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
     'flag sentence must tell the model to queue the named hexes'
   );
   assert.ok(!guidance.includes('names each such hex'), 'flag sentence must not claim every idle hex is named');
+  assert.ok(
+    guidance.includes('When an attention bullet names paused queues, apply the fix in Paused Queues under Production Status.'),
+    'production guidance must point at the Paused Queues subsection'
+  );
+}
+
+/**
+ * The buildability rule names where a queue spends and how a paused queue restarts.
+ *
+ * Purpose: The model needs the fix in its own paragraph, not glued to the income rule.
+ * When to use: After edits to `buildBuildabilityRule`.
+ * Expected outcome: Two paragraphs separated by a blank line.
+ * Exceptions: None.
+ */
+function testBuildabilityRuleNamesTheFix(): void {
+  assert.equal(
+    buildBuildabilityRule(),
+    [
+      'You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.',
+      'Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.',
+    ].join('\n\n')
+  );
 }
 
 /**
@@ -581,6 +604,10 @@ const tests = [
   {
     name: 'production guidance skips types at deployment cap',
     fn: testProductionGuidanceSkipsTypesAtDeploymentCap,
+  },
+  {
+    name: 'buildability rule names the fix',
+    fn: testBuildabilityRuleNamesTheFix,
   },
   {
     name: 'production submit requires blocked queue replacement',

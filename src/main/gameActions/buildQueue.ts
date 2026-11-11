@@ -12,7 +12,8 @@ import {
 import { logDebug, logError, logTrace } from '../logger';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { isSeatId } from '../../shared/seatIds';
-import { isHexBuildableNow } from './productionBuildability';
+import { isHexBuildableNow, readMaxedUnitTypesForSeat, readQueuePauseReasonsForHex } from './productionBuildability';
+import type { QueuePauseReason } from '../../shared/queuePauseTypes';
 import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
@@ -209,11 +210,20 @@ entries: HexBuildQueueEntryView[];
    * Whether production is paused on this hex.
    *
    * Contract: Present and true only when the requester controls the hex and cannot build there. Omitted otherwise.
-   * When to use: The build popup's paused note.
+   * When to use: The map label `∞t`, for an occupied-or-home check only. The popup reads `pausedReasons`.
    * Expected outcome: True, or absent.
    * Exceptions: None.
    */
   buildPaused?: boolean;
+  /**
+   * Why the next queued item is not spending.
+   *
+   * Contract: Present only when the requester controls a hex with city cells. Empty when nothing is queued or nothing blocks the next item.
+   * When to use: The build popup's paused note and `query_production`.
+   * Expected outcome: Reasons in print order, or absent when the requester does not control a city hex.
+   * Exceptions: None.
+   */
+  pausedReasons?: readonly QueuePauseReason[];
 }
 
 /**
@@ -329,15 +339,25 @@ function syncStandingOrderAfterQueueMutation(h3Index: string): void {
  *
  * Purpose: Single place that maps DB queue, progress, infrastructure, and Keep-building standing order into IPC shape.
  * When to use: Reads after mutations and for getHexBuildQueue.
- * Expected outcome: Snapshot fields including keepBuilding / keepBuildingUnitType match durable state.
+ * Expected outcome: Snapshot fields match durable state. `buildPaused` is present only when the requester cannot build there. `pausedReasons` is present for a city the requester controls, and empty when nothing is queued or nothing blocks the next item. A passed cap set, including an empty one, is used as given.
  * Exceptions: None.
  */
-function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
+function buildQueueViewForRequester(
+  h3Index: string,
+  requestingPlayerId: string,
+  maxedUnitTypes?: ReadonlySet<string>
+): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
   const infra = getStrategicInfrastructureForHex(h3Index);
   const productionView = buildProductionEligibilityView(h3Index, infra);
   const standing = getKeepBuildingForHex(h3Index);
+  const queueRows = listBuildQueueRowsForHex(h3Index);
+  const seatId = controlledByRequester && isSeatId(requestingPlayerId) ? requestingPlayerId : null;
+  const buildableNow = seatId === null || isHexBuildableNow(seatId, h3Index, infra.fortifiedCount);
+  const maxed =
+    maxedUnitTypes ??
+    (seatId !== null && productionView.urbanHexCount > 0 ? readMaxedUnitTypesForSeat(seatId) : new Set<string>());
   return {
     h3Index,
     controllerPlayerId,
@@ -349,7 +369,7 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
     availableUnitTypes: productionView.availableUnitTypes,
     buildSectionVisible: productionView.buildSectionVisible,
     noBuildReason: productionView.noBuildReason,
-    entries: listBuildQueueRowsForHex(h3Index).map((row) => ({
+    entries: queueRows.map((row) => ({
       id: row.id,
       queueIndex: row.queueIndex,
       unitType: row.unitType,
@@ -357,8 +377,19 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
     })),
     keepBuilding: standing.keepBuilding,
     keepBuildingUnitType: standing.keepBuildingUnitType,
-    ...(controlledByRequester && isSeatId(requestingPlayerId) && !isHexBuildableNow(requestingPlayerId, h3Index, infra.fortifiedCount)
-      ? { buildPaused: true as const }
+    ...(seatId !== null && !buildableNow ? { buildPaused: true as const } : {}),
+    ...(seatId !== null && productionView.urbanHexCount > 0
+      ? {
+          pausedReasons: readQueuePauseReasonsForHex({
+            seatId,
+            h3Index,
+            buildable: buildableNow,
+            fortifiableCount: infra.fortifiableCount,
+            queueRows,
+            keepBuildingUnitType: standing.keepBuilding ? standing.keepBuildingUnitType : null,
+            maxedUnitTypes: maxed,
+          }),
+        }
       : {}),
   };
 }
@@ -394,16 +425,20 @@ function validateBuildQueueMutationContext(args: {
 }
 
 /**
- * Defines the `readHexBuildQueue` function shape (export function readHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): HexBuildQueueView).
+ * Defines the `readHexBuildQueue` function shape (export function readHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID, maxedUnitTypes?: ReadonlySet<string>): HexBuildQueueView).
 
- * Purpose: Supports maintainability by documenting why `readHexBuildQueue` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Callers outside this file read one hex's queue without repeating the view assembly.
+ * When to use: After a queue edit, from the build-queue IPC handler, and from `query_production` when it already has the seat's cap set.
+ * Expected outcome: The queue view. An optional cap set is forwarded, and an empty set is used as given rather than querying again.
+ * Exceptions: Propagates a database error from the queue read.
  */
-export function readHexBuildQueue(h3Index: string, requestingPlayerId: string = HUMAN_SEAT_ID): HexBuildQueueView {
-  logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
-  return buildQueueViewForRequester(h3Index, requestingPlayerId);
+export function readHexBuildQueue(
+  h3Index: string,
+  requestingPlayerId: string = HUMAN_SEAT_ID,
+  maxedUnitTypes?: ReadonlySet<string>
+): HexBuildQueueView {
+  logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId, hasMaxedUnitTypes: maxedUnitTypes !== undefined });
+  return buildQueueViewForRequester(h3Index, requestingPlayerId, maxedUnitTypes);
 }
 
 /**

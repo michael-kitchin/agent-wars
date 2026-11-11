@@ -244,6 +244,7 @@ export async function requestOrdersFlow(
 
   let briefingOverride: string | undefined;
   let productionAttention: string | null = null;
+  let pausedProductionAttention: string | null = null;
   if (!tacticalBattle) {
     expireAndUpdateStatus(seatId, planState);
     // Map-first contract: strategic prompts always include the Commander briefing with operational map.
@@ -271,6 +272,7 @@ export async function requestOrdersFlow(
     const subscriptions = getSubscriptions(seatId);
     const productionBriefing = injection.productionText;
     productionAttention = injection.productionAttention;
+    pausedProductionAttention = injection.pausedProductionAttention;
     const possibleActionsIndexed = buildPossibleActionsIndexedState(planState);
     briefingOverride = formatBriefing(
       planState,
@@ -284,6 +286,7 @@ export async function requestOrdersFlow(
         indexedState: possibleActionsIndexed,
         includeProductionSection: flags.productionEnabled,
         productionAttention,
+        pausedProductionAttention,
         mentionGetMap: enabledToolNames.includes('get_map'),
       }
     );

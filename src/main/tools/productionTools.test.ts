@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { getGameState, setHexController, setStrategicInfrastructureForHex } from '../gameDb';
+import { getGameState, replaceBuildQueueForHex, setHexController, setStrategicInfrastructureForHex } from '../gameDb';
 import { addHexBuildQueueEntry, getHexBuildQueue } from '../gameActions';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
@@ -226,9 +226,9 @@ function testOpponentBuildQueueAppliesDuringTacticalBattle(): void {
 /**
  * A queue outside the seat's home, with none of its units there, reports that building is paused.
  *
- * Purpose: The model must see the pause the engine already applies.
+ * Purpose: The model must see the pause the engine already applies, the reasons, and the banked points.
  * When to use: After `query_production` copies `buildPaused` for the requesting seat.
- * Expected outcome: `buildPaused` is true.
+ * Expected outcome: `buildPaused` is true, `pausedReasons` names the occupation, and `storedPoints` is a number.
  * Exceptions: None.
  */
 function testQueryProductionReportsBuildPausedOutsideHome(): void {
@@ -239,6 +239,7 @@ function testQueryProductionReportsBuildPausedOutsideHome(): void {
     assert.ok(hex);
     setHexController(hex.h3Index, 'opponent');
     setStrategicInfrastructureForHex(hex.h3Index, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(hex.h3Index, [{ unitType: 'infantry', remainingCount: 1 }]);
     const fresh = getGameState();
     const { latLngByH3, resolveToH3 } = buildCoordHelpers(fresh);
     const position = latLngByH3.get(hex.h3Index);
@@ -247,6 +248,10 @@ function testQueryProductionReportsBuildPausedOutsideHome(): void {
     assert.equal(result.status, 'ok');
     const production = result.status === 'ok' && typeof result.production === 'object' && result.production ? result.production : undefined;
     assert.equal(production && 'buildPaused' in production ? production.buildPaused : undefined, true);
+    assert.deepEqual(production && 'pausedReasons' in production ? production.pausedReasons : undefined, [
+      'occupying units or fortifications required',
+    ]);
+    assert.equal(typeof (production && 'storedPoints' in production ? production.storedPoints : undefined), 'number');
   });
 }
 

@@ -7,20 +7,8 @@
  * Exceptions: None.
  */
 
-import { joinWithSerialComma } from './consolidatedTurnUpdateToast';
 import type { GameStateSnapshot } from './ipc/gameStateTypes';
 import { isSeatId } from './seatIds';
-
-/**
- * Note in the build popup when the hex is paused.
- *
- * Purpose: The player sees why the queue is not spending.
- * When to use: The single-hex build popup, when the hex is paused for the human.
- * Expected outcome: This sentence.
- * Exceptions: None.
- */
-export const BUILD_PAUSED_NOTE =
-  'Building is paused here: this hex is outside your home region and holds none of your units or fortifications. Its points still bank. Have a unit here at the end of a turn to build again.';
 
 /**
  * Whether the controlling seat may build on this hex.
@@ -83,16 +71,29 @@ export function withBuildPausedFlags(state: GameStateSnapshot, viewerSeatId: str
 }
 
 /**
- * The Updates sentence for hexes whose production paused.
+ * Hexes where a raise would let the seat build again.
  *
- * Purpose: The turn report names the places that banked points instead of building.
- * When to use: When at least one hex paused.
- * Expected outcome: One sentence. One name uses "holds". Several names use "hold" and a serial comma.
+ * Purpose: The Raise Options table marks the cells where a raise would let the seat build again.
+ * When to use: With the snapshot the seat is briefed on. It reads only that seat's control, units, and home.
+ * Expected outcome: The H3 indexes the seat controls that have city cells and fail `isHexBuildableForSeat`.
  * Exceptions: None.
  */
-export function formatBuildPausedLine(placeNames: readonly string[]): string {
-  if (placeNames.length === 1) {
-    return `Building is paused at ${placeNames[0]}, which holds none of your units or fortifications.`;
+export function listOccupationPausedHexes(state: GameStateSnapshot, seatId: string): Set<string> {
+  const homeHexes = new Set(state.homeRegionHexesBySeat?.[seatId] ?? []);
+  const seatUnitHexes = new Set(state.units.filter((unit) => unit.player === seatId).map((unit) => unit.h3Index));
+  const infrastructure = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
+  const paused = new Set<string>();
+  for (const row of state.strategicControl ?? []) {
+    if (row.controllerPlayerId !== seatId) continue;
+    const infra = infrastructure.get(row.h3Index);
+    if (!infra || infra.urbanHexCount <= 0) continue;
+    const buildable = isHexBuildableForSeat({
+      h3Index: row.h3Index,
+      homeHexes,
+      seatUnitHexes,
+      fortifiedCount: infra.fortifiedCount ?? 0,
+    });
+    if (!buildable) paused.add(row.h3Index);
   }
-  return `Building is paused at ${joinWithSerialComma(placeNames)}, which hold none of your units or fortifications.`;
+  return paused;
 }

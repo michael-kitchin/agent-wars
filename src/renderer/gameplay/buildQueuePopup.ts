@@ -18,12 +18,13 @@ import {
 } from './buildQueueKeepBuilding';
 import {
   createBuildCountInput,
-  createBuildPausedNote,
+  createQueuePausedNote,
   createBuildPopupCloseRow,
   escapeBuildPopupHtml,
   readSanitizedBuildCount,
   sanitizeBuildCountInputText,
 } from './buildQueuePopupFormatting';
+import { formatQueuePausedNote } from '../../shared/queuePauseReasons';
 import { renderBuildOrHirePopupIntoMount, type BuildHirePopupDeps } from './buildHirePopup';
 import { isHumanBuildEntryHexIndex } from './productionOverlayHelpers';
 import {
@@ -393,9 +394,8 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     const productionSpacer = document.createElement('div');
     productionSpacer.style.height = '0.5em';
     section.appendChild(productionSpacer);
-    if (snapshot.controlledByRequester && snapshot.buildPaused === true) {
-      section.appendChild(createBuildPausedNote());
-    }
+    const pausedNote = snapshot.controlledByRequester ? formatQueuePausedNote(snapshot.pausedReasons ?? []) : null;
+    if (pausedNote) section.appendChild(createQueuePausedNote(pausedNote));
 
     if (!snapshot.controlledByRequester) {
       mount.appendChild(section);

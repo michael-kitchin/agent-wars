@@ -119,24 +119,12 @@
   var FORTIFIED_CELL_VARIANT_LABEL = "Fortified urban";
   var FORTIFIED_CELL_BLOCKED_REASON = "Enemy fortifications block that cell. Destroy them with fire first.";
   var FORTIFIED_CELL_BLOCKED_HOVER = "Blocked: Fortified";
-  var FORTIFICATION_UNNAMED_PLACE = "an unnamed hex";
   function formatFortifiedTooltipValue(fortified, intactCityCells) {
     const noun = intactCityCells === 1 ? "city cell" : "city cells";
     return `${fortified} of ${intactCityCells} ${noun}`;
   }
   function formatFortificationsBuiltLine(count) {
     return count === 1 ? "1 city cell fortified." : `${count} city cells fortified.`;
-  }
-  function joinPlaceNames(placeNames) {
-    if (placeNames.length <= 1) return placeNames[0] ?? "";
-    if (placeNames.length === 2) return `${placeNames[0]} and ${placeNames[1]}`;
-    return `${placeNames.slice(0, -1).join(", ")}, and ${placeNames[placeNames.length - 1]}`;
-  }
-  function formatFortificationQueuePausedLine(placeNames) {
-    if (placeNames.length === 1) {
-      return `Every city cell at ${placeNames[0]} is fortified, so its build queue is paused.`;
-    }
-    return `Every city cell is fortified at ${joinPlaceNames(placeNames)}, so their build queues are paused.`;
   }
 
   // src/shared/gameRules.ts
@@ -38200,12 +38188,10 @@ ${bonuses}`;
       otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
     }
     const unknownBattleLine = args.unknownBattleLine?.trim() ?? "";
-    const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
     if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
     if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
-    if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
-    const productionPauseLines = (args.productionPauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-    if (productionPauseLines.length > 0) otherLines = [...otherLines, ...productionPauseLines];
+    const queuePauseLines = (args.queuePauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (queuePauseLines.length > 0) otherLines = [...otherLines, ...queuePauseLines];
     if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
     if (otherLines.length > 0) {
       sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
@@ -38507,25 +38493,6 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/fortificationUpdateLines.ts
-  async function fortificationUpdateLinesFor(readySlice) {
-    const hexes = readySlice.humanFortificationQueuePausedHexes ?? [];
-    if (hexes.length === 0) return [];
-    return [formatFortificationQueuePausedLine(await placeNamesForHexes(hexes))];
-  }
-  async function placeNamesForHexes(hexes) {
-    const names = [];
-    for (const h3Index of hexes) {
-      let placeName = FORTIFICATION_UNNAMED_PLACE;
-      try {
-        const caption = await window.gameApi?.getHexNamingTooltipLine?.({ h3Index, resolution: 1 });
-        placeName = caption?.text.trim() || FORTIFICATION_UNNAMED_PLACE;
-      } catch (err) {
-        console.error("place name lookup failed", err);
-      }
-      names.push(placeName);
-    }
-    return names;
-  }
   function fortificationReportLinesFor(readySlice, viewer, hexCodeBattle) {
     const entries = [];
     for (const report of readySlice.fortificationReports ?? []) {
@@ -38535,20 +38502,44 @@ ${bonuses}`;
     return buildFortificationToastLines(entries);
   }
 
-  // src/shared/productionBuildability.ts
-  var BUILD_PAUSED_NOTE = "Building is paused here: this hex is outside your home region and holds none of your units or fortifications. Its points still bank. Have a unit here at the end of a turn to build again.";
-  function formatBuildPausedLine(placeNames) {
-    if (placeNames.length === 1) {
-      return `Building is paused at ${placeNames[0]}, which holds none of your units or fortifications.`;
+  // src/shared/queuePauseReasons.ts
+  var QUEUE_PAUSE_REASON_ORDER = ["occupation", "allCellsFortified", "unitCap"];
+  var QUEUE_PAUSE_REASON_TEXT = {
+    occupation: "occupying units or fortifications required",
+    allCellsFortified: "every city cell fortified",
+    unitCap: "unit cap reached"
+  };
+  function sortQueuePauseReasons(reasons) {
+    return QUEUE_PAUSE_REASON_ORDER.filter((reason) => reasons.includes(reason));
+  }
+  function formatQueuePausedNote(reasons) {
+    const sorted = sortQueuePauseReasons(reasons);
+    if (sorted.length === 0) return null;
+    return `Queue paused: ${joinWithSerialComma(sorted.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]))}.`;
+  }
+  function formatQueuePausedLines(entries) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const reasons = sortQueuePauseReasons(entry.reasons);
+      if (reasons.length === 0) continue;
+      const key = reasons.map((reason) => QUEUE_PAUSE_REASON_ORDER.indexOf(reason)).join(",");
+      const group = groups.get(key) ?? { reasons, codes: [] };
+      group.codes.push(entry.hexCode);
+      groups.set(key, group);
     }
-    return `Building is paused at ${joinWithSerialComma(placeNames)}, which hold none of your units or fortifications.`;
+    return [...groups.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, group]) => {
+      const noun = group.codes.length === 1 ? "Queue" : "Queues";
+      const reasons = joinWithSerialComma(group.reasons.map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]));
+      return `${noun} paused at ${formatTurnReportHexList(group.codes)}: ${reasons}.`;
+    });
   }
 
-  // src/renderer/gameplay/productionPauseUpdateLines.ts
-  async function productionPauseUpdateLinesFor(readySlice) {
-    const hexes = readySlice.humanBuildPausedHexes ?? [];
-    if (hexes.length === 0) return [];
-    return [formatBuildPausedLine(await placeNamesForHexes(hexes))];
+  // src/renderer/gameplay/queuePauseUpdateLines.ts
+  function queuePauseUpdateLinesFor(readySlice) {
+    const pauses = readySlice.humanNewlyPausedQueues ?? [];
+    return formatQueuePausedLines(
+      pauses.map((pause) => ({ hexCode: orderTargetHexCode(pause.h3Index, null), reasons: pause.reasons }))
+    );
   }
 
   // src/renderer/gameplay/readyResolutionAnnouncements.ts
@@ -38756,8 +38747,7 @@ ${bonuses}`;
       }
     }
     const missileStrikeLines = missileStrikeLinesFor(missileLaunches);
-    const fortificationLines = await fortificationUpdateLinesFor(readySlice);
-    const productionPauseLines = await productionPauseUpdateLinesFor(readySlice);
+    const queuePauseLines = queuePauseUpdateLinesFor(readySlice);
     const fortificationReportLines = fortificationReportLinesFor(
       readySlice,
       {
@@ -38777,8 +38767,7 @@ ${bonuses}`;
       },
       unknownBattleLine,
       missileStrikeLines,
-      fortificationLines,
-      productionPauseLines,
+      queuePauseLines,
       fortificationReportLines,
       battleLinesByOwner
     });
@@ -39129,10 +39118,10 @@ ${bonuses}`;
     if (input.value !== raw) input.value = raw;
     return parseInt(raw, 10);
   }
-  function createBuildPausedNote() {
+  function createQueuePausedNote(text) {
     const note2 = document.createElement("div");
     note2.className = "build-no-urban";
-    note2.textContent = BUILD_PAUSED_NOTE;
+    note2.textContent = text;
     return note2;
   }
 
@@ -39968,9 +39957,8 @@ ${bonuses}`;
       const productionSpacer = document.createElement("div");
       productionSpacer.style.height = "0.5em";
       section.appendChild(productionSpacer);
-      if (snapshot2.controlledByRequester && snapshot2.buildPaused === true) {
-        section.appendChild(createBuildPausedNote());
-      }
+      const pausedNote = snapshot2.controlledByRequester ? formatQueuePausedNote(snapshot2.pausedReasons ?? []) : null;
+      if (pausedNote) section.appendChild(createQueuePausedNote(pausedNote));
       if (!snapshot2.controlledByRequester) {
         mount.appendChild(section);
         placeOpenBuildPopup();

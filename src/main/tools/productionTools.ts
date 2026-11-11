@@ -13,6 +13,7 @@ import {
   isBuildUnitType,
   isValidBuildCount,
 } from '../productionRules';
+import { QUEUE_PAUSE_REASON_TEXT } from '../../shared/queuePauseReasons';
 import { getStrategicInfrastructureForHex } from '../gameDb';
 import {
   addHexBuildQueueEntry,
@@ -69,7 +70,7 @@ function toDisplayLatLng(ll: [number, number]): [number, number] {
  *
  * Purpose: AI summaries must list the same queueable types as the production briefing (omit capped types when an alternative exists).
  * When to use: After reading or mutating a hex queue in this module.
- * Expected outcome: Display lat/lng hex, filtered `availableUnitTypes`, and entry rows; does not change stored availability for the human UI.
+ * Expected outcome: Display lat/lng hex, filtered `availableUnitTypes`, and entry rows. A hex the requester controls also reports `buildPaused`, `storedPoints`, and `pausedReasons` when at least one reason applies. `pausedReasons` is omitted when empty. Does not change stored availability for the human UI.
  * Exceptions: None.
  */
 function summarizeQueue(
@@ -93,7 +94,15 @@ function summarizeQueue(
     seaportCount: queue.seaportCount,
     ...(counts ? { fortifiedCount: counts.fortifiedCount, fortifiableCount: counts.fortifiableCount } : {}),
     availableUnitTypes,
-    ...(queue.controlledByRequester ? { buildPaused: queue.buildPaused === true } : {}),
+    ...(queue.controlledByRequester
+      ? {
+          buildPaused: queue.buildPaused === true,
+          ...((queue.pausedReasons ?? []).length > 0
+            ? { pausedReasons: (queue.pausedReasons ?? []).map((reason) => QUEUE_PAUSE_REASON_TEXT[reason]) }
+            : {}),
+          storedPoints: Math.max(0, Math.trunc(queue.storedPoints)),
+        }
+      : {}),
     buildSectionVisible: queue.buildSectionVisible,
     noBuildReason: queue.noBuildReason,
     entries: queue.entries.map((entry) => ({
@@ -135,11 +144,11 @@ function queryProduction(
   if (args.hex !== undefined) {
     const resolved = resolveHexArgument(args, resolveToH3);
     if (!resolved.ok) return { status: 'error', error: resolved.error };
-    const queue = getHexBuildQueue(resolved.h3Index, seatId);
+    const queue = getHexBuildQueue(resolved.h3Index, seatId, maxedTypes);
     return { status: 'ok', production: summarizeQueue(queue, latLngByH3, maxedTypes) };
   }
   const snapshots = state.hexes
-    .map((hex) => getHexBuildQueue(hex.h3Index, seatId))
+    .map((hex) => getHexBuildQueue(hex.h3Index, seatId, maxedTypes))
     .filter((queue) => queue.controlledByRequester)
     .map((queue) => summarizeQueue(queue, latLngByH3, maxedTypes));
   return { status: 'ok', production: { controlledHexQueues: snapshots } };

@@ -88,6 +88,15 @@ export type FormatBriefingSharedContext = {
    */
   productionAttention?: string | null;
   /**
+   * The one-line pointer from `formatPausedProductionPointer`.
+   *
+   * Contract: Null or omitted when no queue is paused for occupation or a full city.
+   * When to use: Strategic `formatBriefing` only. Appended after the production bullet.
+   * Expected outcome: The Paused Queues subsection is already inside the production section. This line only points at it.
+   * Exceptions: None.
+   */
+  pausedProductionAttention?: string | null;
+  /**
    * Whether a cropped strategic map tells the model to call `get_map`.
    *
    * Contract: Passed through to the operational map. The sentence appears only when the window is smaller than the loaded set.
@@ -869,14 +878,17 @@ export function formatBriefing(
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
   sections.push(
     appendProductionAttentionBullet(
-      buildAttentionFlags(
-        precomputed.unitAssessments,
-        'strategic',
-        standingOrdersActive,
-        orderlessAction,
-        airStrikeRowUnitIds
+      appendProductionAttentionBullet(
+        buildAttentionFlags(
+          precomputed.unitAssessments,
+          'strategic',
+          standingOrdersActive,
+          orderlessAction,
+          airStrikeRowUnitIds
+        ),
+        sharedContext?.productionAttention ?? null
       ),
-      sharedContext?.productionAttention ?? null
+      sharedContext?.pausedProductionAttention ?? null
     )
   );
   const operational = buildStrategicOperationalMapSectionMarkdown({

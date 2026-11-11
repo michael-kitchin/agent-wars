@@ -176,23 +176,14 @@ export interface ConsolidatedTurnUpdateToastArgs {
    */
   missileStrikeLines?: readonly MissileStrikeToastLine[];
   /**
-   * Paused-fortification sentences for the Updates section.
+   * Paused-queue sentences for the Updates section.
    *
-   * Contract: The renderer names the hexes, because this builder does not look up places.
-   * When to use: Strategic Ready, after the paused-hex names are known.
-   * Expected outcome: Trimmed lines are appended after missile sentences that stay in Updates, and before the unknown-battle line.
+   * Contract: Finished sentences from `formatQueuePausedLines` for the queues that paused this turn. This builder does not look up hex codes.
+   * When to use: Strategic Ready, when at least one queue paused this turn.
+   * Expected outcome: Trimmed lines are appended after missile and fortification sentences that stay in Updates, and before the unknown-battle line.
    * Exceptions: None. Blank lines are dropped.
    */
-  fortificationLines?: readonly string[];
-  /**
-   * Sentences for production that paused away from the seat's units.
-   *
-   * Contract: The renderer names the hexes.
-   * When to use: Strategic Ready, after the paused-hex names are known.
-   * Expected outcome: Trimmed lines follow the fortification pause lines.
-   * Exceptions: None. Blank lines are dropped.
-   */
-  productionPauseLines?: readonly string[];
+  queuePauseLines?: readonly string[];
   /**
    * Fortification sentences, each with the owner who held the hex.
    *
@@ -402,12 +393,10 @@ export function buildConsolidatedTurnUpdateToastMessage(args: ConsolidatedTurnUp
     otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
   }
   const unknownBattleLine = args.unknownBattleLine?.trim() ?? '';
-  const fortificationLines = (args.fortificationLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
   if (missileLines.updates.length > 0) otherLines = [...otherLines, ...missileLines.updates];
   if (fortificationReports.updates.length > 0) otherLines = [...otherLines, ...fortificationReports.updates];
-  if (fortificationLines.length > 0) otherLines = [...otherLines, ...fortificationLines];
-  const productionPauseLines = (args.productionPauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
-  if (productionPauseLines.length > 0) otherLines = [...otherLines, ...productionPauseLines];
+  const queuePauseLines = (args.queuePauseLines ?? []).map((line) => line.trim()).filter((line) => line.length > 0);
+  if (queuePauseLines.length > 0) otherLines = [...otherLines, ...queuePauseLines];
   if (unknownBattleLine.length > 0) otherLines = [...otherLines, unknownBattleLine];
   if (otherLines.length > 0) {
     sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);

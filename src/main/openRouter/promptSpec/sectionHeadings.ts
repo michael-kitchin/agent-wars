@@ -105,6 +105,16 @@ export const SECTION_TITLE_PRODUCTION_STATUS = 'Production Status' as const;
 export const SECTION_TITLE_CONTROLLED_HEX_QUEUES = 'Controlled Hex Queues' as const;
 
 /**
+ * Title of the paused-queue subsection, without ATX hashes.
+ *
+ * Purpose: The production section names paused queues under their own heading.
+ * When to use: `subHeading` in the production briefing, the attention pointer, and the coaching sentence.
+ * Expected outcome: The words `Paused Queues`.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_PAUSED_QUEUES = 'Paused Queues' as const;
+
+/**
  * Title of the memory injection block, without ATX hashes.
  *
  * Purpose: Persistent and triggered notes the model wrote for itself. assembly-contract.md section 3.

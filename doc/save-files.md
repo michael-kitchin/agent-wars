@@ -34,7 +34,7 @@ The `seats` table stays in the file. That includes each seat's `nickname`, `mode
 
 A new machine-local row has to be added to `MACHINE_LOCAL_CONFIG_KEYS` in the same change, or saves will carry it.
 
-The match row `ai_only_battles` stays in the file. It is not one of those seven keys. A missing row reads as None (`aiOnlyBattlesFromStored`). The match row `ai_only_beat_limit` stays in the file too. A missing row reads as Unlimited (`aiOnlyBeatLimitFromStored`). The match rows `sight_cues` and `sight_cue_seen_units` stay in the file too. A missing `sight_cues` row reads as off (`sightCuesFromStored`).
+The match row `ai_only_battles` stays in the file. It is not one of those seven keys. A missing row reads as None (`aiOnlyBattlesFromStored`). The match row `ai_only_beat_limit` stays in the file too. A missing row reads as Unlimited (`aiOnlyBeatLimitFromStored`). The match rows `sight_cues` and `sight_cue_seen_units` stay in the file too. A missing `sight_cues` row reads as off (`sightCuesFromStored`). The match row `queue_paused_hexes` stays in the file too. A missing row reads as no paused queues (`readPausedQueueHexes`), so the first turn after loading an older save reports every paused queue once.
 
 ## Version
 

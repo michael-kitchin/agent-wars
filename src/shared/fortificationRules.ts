@@ -1,7 +1,7 @@
 /**
  * Fortification queue identity, cost multiplier, and player-facing sentences.
  *
- * Purpose: Production, tooltips, the paused-queue sentence, and the AI briefing share one spelling of the fortification item.
+ * Purpose: Production, tooltips, and the AI briefing share one spelling of the fortification item.
  * When to use: Any label or sentence about fortifying a city cell. Cost lookup stays in `fortificationCostPerCell`.
  * Expected outcome: Stable strings. Formatters return one sentence or one label fragment.
  * Exceptions: None.
@@ -38,9 +38,6 @@ export const FORTIFIED_CELL_BLOCKED_REASON = 'Enemy fortifications block that ce
 /** Hover chip when a destination cell is fortified by another owner. */
 export const FORTIFIED_CELL_BLOCKED_HOVER = 'Blocked: Fortified';
 
-/** Place name when a hex has no naming tooltip. */
-export const FORTIFICATION_UNNAMED_PLACE = 'an unnamed hex';
-
 /** Rejection when a hex has no intact city cell left to fortify. */
 export const FORTIFICATION_NOT_AVAILABLE_REASON = 'This hex has no intact city cell to fortify.';
 
@@ -73,35 +70,6 @@ export function formatFortifiedTooltipValue(fortified: number, intactCityCells: 
  */
 export function formatFortificationsBuiltLine(count: number): string {
   return count === 1 ? '1 city cell fortified.' : `${count} city cells fortified.`;
-}
-
-/**
- * Joins place names with a serial comma.
- *
- * Purpose: Paused-queue sentences match other Updates lists without importing the toast module.
- * When to use: Only from `formatFortificationQueuePausedLine`.
- * Expected outcome: One name, `A and B`, or `A, B, and C`.
- * Exceptions: None.
- */
-function joinPlaceNames(placeNames: readonly string[]): string {
-  if (placeNames.length <= 1) return placeNames[0] ?? '';
-  if (placeNames.length === 2) return `${placeNames[0]} and ${placeNames[1]}`;
-  return `${placeNames.slice(0, -1).join(', ')}, and ${placeNames[placeNames.length - 1]}`;
-}
-
-/**
- * Formats the Updates line for queues paused because every city cell is fortified.
- *
- * Purpose: The player sees which hexes stopped building.
- * When to use: When at least one hex paused for that reason.
- * Expected outcome: One sentence naming the hex or hexes.
- * Exceptions: None.
- */
-export function formatFortificationQueuePausedLine(placeNames: readonly string[]): string {
-  if (placeNames.length === 1) {
-    return `Every city cell at ${placeNames[0]} is fortified, so its build queue is paused.`;
-  }
-  return `Every city cell is fortified at ${joinPlaceNames(placeNames)}, so their build queues are paused.`;
 }
 
 /**

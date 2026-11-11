@@ -239,6 +239,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         standingOrderText: '',
         productionText: '',
         productionAttention: input.productionAttention ?? null,
+        pausedProductionAttention: null,
       };
   const memoryBlock = flags.memoryEnabled ? injection.memoryText + '\n\n' : '';
   const standingOrderBlock = flags.ordersEnabled ? injection.standingOrderText + '\n\n' : '';

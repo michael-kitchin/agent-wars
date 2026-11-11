@@ -83,7 +83,10 @@ test('a full city pauses the fortification row and does not build the infantry b
     );
     assert.equal(getBuildProgressPointsForHex(hex), stored + urban);
     assert.equal(dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE h3_index = ?', [hex])?.count, unitsBefore);
-    assert.ok(result.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.includes(hex));
+    assert.deepEqual(
+      result.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
+      ['allCellsFortified']
+    );
   });
 });
 
@@ -100,6 +103,9 @@ test('keep building fortifies the last cell and then pauses', () => {
     assert.equal(getStrategicInfrastructureForHex(hex).fortifiedCount, before + 1);
     assert.equal(standing.keepBuilding, true);
     assert.equal(standing.keepBuildingUnitType, FORTIFICATION_QUEUE_ITEM);
-    assert.ok(result.fortificationPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.includes(hex));
+    assert.deepEqual(
+      result.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
+      ['allCellsFortified']
+    );
   });
 });

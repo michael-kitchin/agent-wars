@@ -54,13 +54,16 @@ export function buildCreditsProductionRulePart(): string {
 /**
  * Where a queue is allowed to spend.
  *
- * Purpose: A queue outside the seat's home, units, and fortifications pauses.
+ * Purpose: The second paragraph names the fix.
  * When to use: The production block, after the income rule.
- * Expected outcome: One sentence.
+ * Expected outcome: Two paragraphs separated by a blank line, not one sentence.
  * Exceptions: None.
  */
 export function buildBuildabilityRule(): string {
-  return 'You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn. Elsewhere a queue pauses and keeps banking its points.';
+  return [
+    'You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.',
+    'Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.',
+  ].join('\n\n');
 }
 
 /**

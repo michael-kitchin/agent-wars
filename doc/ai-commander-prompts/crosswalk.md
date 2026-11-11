@@ -111,13 +111,14 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | Narrative paragraph | Kept — 1.6 |
 | `## Unit Status and Threats` | Kept — 1.6, uncapped |
 | Omniscient hop line | Kept, re-gated on the meaning of the distances — 1.6 and [`variants.md`](variants.md) 1.2 |
-| `## Attention Flags` | Kept with an explicit overflow contract — 1.6 |
+| `## Attention Flags` | Kept with an explicit overflow contract — 1.6. A production bullet may follow the five unit bullets, and a paused-queue pointer may follow that bullet. Neither counts against the cap. |
 | `## Operational Map` | Kept — 1.6 |
 | `### Best Options This Turn` | Kept — 1.6, with a contracted absent case |
 | `## Supplemental Hex Intelligence` | Kept — 1.6 |
 | `## Recent Turn Notes` | Kept — 1.6 |
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
-| `# Mercenaries` | Added. Treasury, upkeep, and, when production tools are on, rehire and raise tables. Production off keeps the upkeep-only form when the seat has mercenaries. |
+| `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
+| `# Mercenaries` | Added. Treasury, upkeep, and, when production tools are on, rehire and raise tables. Raise Options includes `Resumes building`. Production off keeps the upkeep-only form when the seat has mercenaries. |
 | `## Controlled Hex Queues` | Kept — 1.6 and 2 |
 | `## Your Strategic Memory` | Kept and extended — 1.6 adds write limits |
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |

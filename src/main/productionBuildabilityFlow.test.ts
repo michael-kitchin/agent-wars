@@ -39,10 +39,14 @@ test('an empty hex outside home banks points and keeps the queue', () => {
     setBuildProgressPointsForHex(hex, 40);
     const urban = getStrategicInfrastructureForHex(hex).urbanHexCount;
     assert.equal(getHexBuildQueue(hex, HUMAN_SEAT_ID).buildPaused, true);
+    assert.deepEqual(getHexBuildQueue(hex, HUMAN_SEAT_ID).pausedReasons, ['occupation']);
     const summary = processProductionAfterControlResolution();
     assert.equal(listBuildQueueRowsForHex(hex).length, 1);
     assert.equal(getBuildProgressPointsForHex(hex), 40 + urban);
-    assert.ok(summary.buildPausedHexesByPlayer.get(HUMAN_SEAT_ID)?.includes(hex));
+    assert.deepEqual(
+      summary.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
+      ['occupation']
+    );
     const spawned = dbGetOne<{ n: number }>(
       "SELECT COUNT(*) AS n FROM units WHERE player = 'human' AND unit_type = 'infantry' AND h3_index = ? AND is_mercenary = 0",
       [hex]
@@ -92,6 +96,47 @@ test('a fortification on the hex lets production build', () => {
       [hex]
     );
     assert.equal(spawned?.n, 1);
+  });
+});
+
+test('a fortification queue in a fully fortified city reports every city cell fortified', () => {
+  withTempGameDb('aw-pause-full-', () => {
+    const hex = outsideHomeCity();
+    setHexController(hex, HUMAN_SEAT_ID);
+    dbRun('DELETE FROM units WHERE player = ? AND h3_index = ?', [HUMAN_SEAT_ID, hex]);
+    for (const cell of listFortifiableCellsForHex(hex)) setTacticalCellFortified(cell, true);
+    assert.equal(getStrategicInfrastructureForHex(hex).fortifiableCount, 0, 'fixture must leave no fortifiable cell');
+    replaceBuildQueueForHex(hex, [{ unitType: 'fortification', remainingCount: 1 }]);
+    assert.deepEqual(getHexBuildQueue(hex, HUMAN_SEAT_ID).pausedReasons, ['allCellsFortified']);
+  });
+});
+
+test('a paused queue is reported on the turn it pauses, and again only after it resumes', () => {
+  withTempGameDb('aw-pause-once-', () => {
+    const hex = outsideHomeCity();
+    setHexController(hex, HUMAN_SEAT_ID);
+    dbRun('DELETE FROM units WHERE player = ? AND h3_index = ?', [HUMAN_SEAT_ID, hex]);
+    replaceBuildQueueForHex(hex, [{ unitType: 'infantry', remainingCount: 1 }]);
+    const reportedThisPass = (): boolean =>
+      processProductionAfterControlResolution()
+        .newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)
+        ?.some((pause) => pause.h3Index === hex) === true;
+    assert.equal(reportedThisPass(), true, 'first paused pass');
+    assert.equal(reportedThisPass(), false, 'still paused');
+    insertUnitRow(dbRun, {
+      id: 'h1-i951',
+      player: HUMAN_SEAT_ID,
+      unitType: 'infantry',
+      displayOrder: 951,
+      h3Index: hex,
+      origin: null,
+      formedTurn: 1,
+    });
+    setBuildProgressPointsForHex(hex, 100);
+    assert.equal(reportedThisPass(), false, 'building again');
+    dbRun('DELETE FROM units WHERE player = ? AND h3_index = ?', [HUMAN_SEAT_ID, hex]);
+    replaceBuildQueueForHex(hex, [{ unitType: 'infantry', remainingCount: 1 }]);
+    assert.equal(reportedThisPass(), true, 'paused again after resuming');
   });
 });
 

@@ -42,20 +42,22 @@ test('one fortified city cell is reported after deployments', () => {
   ]);
 });
 
-test('a production pause line follows the fortification pause line', () => {
+test('paused-queue lines land in Updates', () => {
   const message = buildConsolidatedTurnUpdateToastMessage({
     readyResult: { success: true },
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
-    fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
-    productionPauseLines: ['Building is paused at Vienna, which holds none of your units or fortifications.'],
+    queuePauseLines: [
+      'Queues paused at AA and C2: occupying units or fortifications required.',
+      'Queue paused at DD: every city cell fortified.',
+    ],
   });
   assert.equal(
     message,
     [
       '## Updates',
-      'Every city cell at Prague is fortified, so its build queue is paused.',
-      'Building is paused at Vienna, which holds none of your units or fortifications.',
+      'Queues paused at AA and C2: occupying units or fortifications required.',
+      'Queue paused at DD: every city cell fortified.',
     ].join('\n')
   );
 });
@@ -89,7 +91,7 @@ test('a paused fortification line follows a neutral missile sentence and precede
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
     missileStrikeLines: [{ controllerId: NEUTRAL_OWNER_ID, line: 'Missile strike in C2 destroyed 1 city cell.' }],
-    fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
+    queuePauseLines: ['Queue paused at DD: every city cell fortified.'],
     unknownBattleLine: 'A battle was fought somewhere you could not see.',
   });
   assert.equal(
@@ -97,7 +99,7 @@ test('a paused fortification line follows a neutral missile sentence and precede
     [
       '## Updates',
       'Missile strike in C2 destroyed 1 city cell.',
-      'Every city cell at Prague is fortified, so its build queue is paused.',
+      'Queue paused at DD: every city cell fortified.',
       'A battle was fought somewhere you could not see.',
     ].join('\n')
   );
@@ -189,14 +191,14 @@ test('a fortification line with no owner lands in Updates', () => {
     turnLossSummary: emptyTurnLossSummary(),
     combatFallbackBullets: [],
     fortificationReportLines: [{ ownerId: null, line: 'Fortifications in AA absorbed 1 hit.' }],
-    fortificationLines: ['Every city cell at Prague is fortified, so its build queue is paused.'],
+    queuePauseLines: ['Queue paused at DD: every city cell fortified.'],
   });
   assert.equal(
     message,
     [
       '## Updates',
       'Fortifications in AA absorbed 1 hit.',
-      'Every city cell at Prague is fortified, so its build queue is paused.',
+      'Queue paused at DD: every city cell fortified.',
     ].join('\n')
   );
 });

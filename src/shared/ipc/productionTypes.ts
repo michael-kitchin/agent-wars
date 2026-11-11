@@ -1,3 +1,5 @@
+import type { QueuePauseReason } from '../queuePauseTypes';
+
 /**
  * Canonical deployment / build-queue iteration order: infantry, armor, naval, air, missile.
  *
@@ -277,11 +279,20 @@ entries: HexBuildQueueEntrySnapshot[];
    * Whether production is paused on this hex.
    *
    * Contract: Present and true only when the requester controls the hex and cannot build there. Omitted otherwise.
-   * When to use: The build popup's paused note. Edits stay allowed.
+   * When to use: The map label and the Building column, for an occupied-or-home check only. Edits stay allowed. The popup reads `pausedReasons`.
    * Expected outcome: True, or absent.
    * Exceptions: None.
    */
   buildPaused?: boolean;
+  /**
+   * Why the next queued item is not spending.
+   *
+   * Contract: Present only when the requester controls a hex with city cells. Empty when nothing is queued or nothing blocks the next item.
+   * When to use: The build popup's paused note and `query_production`.
+   * Expected outcome: Reasons in print order, or absent when the requester does not control a city hex.
+   * Exceptions: None.
+   */
+  pausedReasons?: readonly QueuePauseReason[];
 }
 
 /**

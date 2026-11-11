@@ -1,6 +1,5 @@
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
 import { buildPopupCloseTooltipText } from '../../shared/popupControlTooltipText';
-import { BUILD_PAUSED_NOTE } from '../../shared/productionBuildability';
 
 /**
  * Normalizes a build count input to the one-to-99 digits-only contract.
@@ -92,16 +91,16 @@ export function readSanitizedBuildCount(input: HTMLInputElement): number {
 }
 
 /**
- * The paused-building note for the single-hex popup.
+ * The paused-queue note for the single-hex popup.
  *
- * Purpose: The player sees why a queue outside home is not spending.
- * When to use: When the snapshot says the hex is paused and the viewer controls it.
- * Expected outcome: A `div.build-no-urban` holding `BUILD_PAUSED_NOTE`.
+ * Purpose: The player sees in one line why the queue is not spending.
+ * When to use: When `formatQueuePausedNote` returns text for a hex the viewer controls.
+ * Expected outcome: A `div.build-no-urban` holding that text.
  * Exceptions: None.
  */
-export function createBuildPausedNote(): HTMLDivElement {
+export function createQueuePausedNote(text: string): HTMLDivElement {
   const note = document.createElement('div');
   note.className = 'build-no-urban';
-  note.textContent = BUILD_PAUSED_NOTE;
+  note.textContent = text;
   return note;
 }

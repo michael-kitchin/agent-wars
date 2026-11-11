@@ -11,6 +11,7 @@ import type { MeleeCandidateRow } from './meleeInterceptTypes';
 import type { TechLevel } from '../techBonusTypes';
 import type { UnitOrigin } from '../unitOriginTypes';
 import type { WeatherState } from '../weatherBonusTypes';
+import type { QueuePause } from '../queuePauseTypes';
 
 export type { RangedResolutionShotLine };
 export interface GameReadyIpcPayload {
@@ -651,14 +652,14 @@ humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
    */
   humanCreditsAdded?: number;
   /**
-   * Hexes where the human seat's production paused this turn.
+   * The human seat's queues that paused this turn, each with every reason that applies.
    *
-   * Contract: The Updates line names these hexes.
-   * When to use: After production, when at least one hex paused.
-   * Expected outcome: Omitted when the list is empty.
+   * Contract: Only queues that were not paused after the previous production pass. A queue that stays paused is not repeated. One entry per hex.
+   * When to use: The Updates section, which prints one sentence per reason set.
+   * Expected outcome: Omitted when no queue paused this turn.
    * Exceptions: None.
    */
-  humanBuildPausedHexes?: readonly string[];
+  humanNewlyPausedQueues?: readonly QueuePause[];
   /**
    * Mercenaries the human seat hired this turn.
    *
@@ -686,15 +687,6 @@ humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
    * Exceptions: None.
    */
   humanHireOrdersUnfilled?: number;
-  /**
-   * Hexes whose fortification queue paused because no city cell remains.
-   *
-   * Contract: The Updates paused line names these hexes.
-   * When to use: After production, when at least one hex paused.
-   * Expected outcome: Omitted when the list is empty.
-   * Exceptions: None.
-   */
-  humanFortificationQueuePausedHexes?: readonly string[];
   /**
    * Strategic fortifications lost this turn, one row per hex.
    *
