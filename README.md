@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v2.21.3.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v2.21.3.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v2.22.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.22.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -144,7 +144,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, air drops, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1766 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1779 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -289,7 +289,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 2.21.3, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 2.22.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -299,6 +299,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **2.22.0** discards a paused queue's production points at the end of the turn. A queue that is still building keeps the points it could not spend. The pause is outside your home with none of your units or fortifications on the hex, a city whose cells are all fortified, or a unit type at its cap. The turn report names that queue on the turn it pauses. A build-only popup is 200 px wide, and hire goes to 280 px.
 - **2.21.3** puts a side's visible missile strikes on one line and its fortification hits on one line, both naming the hexes by code. A battle beat has the fortification line and no missile line. A commander is shown up to ten prior turns of notes.
 - **2.21.2** waits one extra zoom level before a country name appears, and shows a state or province name when that area is large enough on screen. Continent names grow while country names are on the map, and country names grow in the close view that draws states. A larger name moves off a smaller one and returns when its original spot is clear. Continent names drawn with countries, and national borders, are four fifths strength. Country names drawn with states, and state borders, are three fifths.
 - **2.21.1** lets an AI-only battle stop after a chosen number of beats, 30 unless you pick another. Unlimited removes that limit, and None turns it off. Reaching it ends the battle and shows how many beats it ran. While turns advance on their own, that notice stays for 3 seconds. While you watch every side, Production and Forces add up the sides still playing. Fog of war, Sight cues, and Auto-start AI sit together under Other.
