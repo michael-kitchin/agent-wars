@@ -485,11 +485,11 @@ Deployment caps (per side): infantry 12, armor 8, naval 8, air 6, missile 2.
 
 Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile 0/2.
 
-A controlled cell earns production points equal to its urban count each turn and spends them in queue order.
+A controlled cell earns production points equal to its urban count each turn and spends them in queue order. A queue that is building keeps its unspent points toward the next item. A paused queue loses its points at the end of the turn.
 
 You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.
 
-Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.
+Elsewhere a queue pauses, and its points are lost at the end of each turn until you end a turn with a unit there or raise a mercenary there.
 
 You are currently at maximum for: infantry, naval, air.
 

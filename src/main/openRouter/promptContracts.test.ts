@@ -297,7 +297,7 @@ function testBuildabilityRuleNamesTheFix(): void {
     buildBuildabilityRule(),
     [
       'You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.',
-      'Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.',
+      'Elsewhere a queue pauses, and its points are lost at the end of each turn until you end a turn with a unit there or raise a mercenary there.',
     ].join('\n\n')
   );
 }

@@ -226,7 +226,7 @@ function testOpponentBuildQueueAppliesDuringTacticalBattle(): void {
 /**
  * A queue outside the seat's home, with none of its units there, reports that building is paused.
  *
- * Purpose: The model must see the pause the engine already applies, the reasons, and the banked points.
+ * Purpose: The model must see the pause the engine already applies, the reasons, and the carried points.
  * When to use: After `query_production` copies `buildPaused` for the requesting seat.
  * Expected outcome: `buildPaused` is true, `pausedReasons` names the occupation, and `storedPoints` is a number.
  * Exceptions: None.

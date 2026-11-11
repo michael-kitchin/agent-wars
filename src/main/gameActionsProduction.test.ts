@@ -574,7 +574,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
       'SELECT stored_points FROM res_s_build_progress WHERE h3_index = ?',
       [targetHex]
     )?.stored_points ?? 0;
-    assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by cap');
+    assert.strictEqual(progressAfter, 0, 'a queue blocked by the cap keeps no points');
   });
 }
 
@@ -583,7 +583,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
  *
  * Purpose: Match size must change the live deployment ceiling, not only snapshot metadata.
  * When to use: After changing production cap reads or `game_size` persistence.
- * Expected outcome: 12 infantry still spawn on Medium, with a birth origin in the producing hex; 24 infantry block and accumulate points.
+ * Expected outcome: 12 infantry still spawn on Medium, with a birth origin in the producing hex; 24 infantry block and the queue keeps no points.
  * Exceptions: None.
  */
 function testProductionSpawnsPastSmallCapWhenMedium(): void {
@@ -662,7 +662,7 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
       'SELECT stored_points FROM res_s_build_progress WHERE h3_index = ?',
       [targetHex]
     )?.stored_points ?? 0;
-    assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by medium cap');
+    assert.strictEqual(progressAfter, 0, 'a queue blocked by the medium cap keeps no points');
   });
 }
 
@@ -799,8 +799,8 @@ function testKeepBuildingMutationContracts(): void {
  * Purpose: Locks same-turn leftover spend, multi-refill loop, planning residue, and cap stall.
  * When to use: After changing Keep-building production refill timing or sizing.
  * Expected outcome: Owner $40/1-infantry example deploys 2 and leaves 1 queued; empty-start works;
- * cap stall retains refilled rows without infinite looping; ineligible refill clears standing order;
- * finite queues without Keep building still stop empty with leftover points banked.
+ * cap stall retains refilled rows and keeps no points, without infinite looping; ineligible refill clears standing order;
+ * finite queues without Keep building still stop empty with leftover points kept.
  * Exceptions: None.
  */
 /**
@@ -920,6 +920,7 @@ function testKeepBuildingSameTurnRefill(): void {
     assert.strictEqual(armorPulse.entries[0]?.count, 2);
     assert.strictEqual(armorPulse.keepBuilding, true);
     assert.strictEqual(armorPulse.keepBuildingUnitType, 'armor');
+    assert.strictEqual(armorPulse.storedPoints, 0);
 
     // Ineligible standing type at refill → clear Keep building; leave queue empty.
     setStrategicInfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });

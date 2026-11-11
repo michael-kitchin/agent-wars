@@ -1,7 +1,7 @@
 /**
  * Paused-queue sentences for the situation message.
  *
- * Purpose: The subsection groups the same reasons as the turn report, then names banked points and the remedy.
+ * Purpose: The subsection groups the same reasons as the turn report, then says a paused queue loses its points, then names the remedy.
  * When to use: After changing `formatPausedQueuesSection` or the pointer.
  * Expected outcome: The cases below.
  * Exceptions: None.
@@ -17,6 +17,7 @@ import {
 import {
   PAUSED_FORTIFICATION_REMEDY,
   PAUSED_OCCUPATION_REMEDY,
+  PAUSED_POINTS_LOST,
   findPausedProductionHexes,
   formatPausedProductionPointer,
   formatPausedQueuesSection,
@@ -30,27 +31,27 @@ const label = (ll: [number, number]): string => `H${ll[0]}`;
 const pointer = `Paused queues: see ${SECTION_TITLE_PAUSED_QUEUES} under ${SECTION_TITLE_PRODUCTION_STATUS}.`;
 
 /**
- * One controlled-hex row with the pause texts and banked points under test.
+ * One controlled-hex row with the pause texts under test.
  *
- * Purpose: The finder reads only `hex`, `pausedReasons`, and `storedPoints`.
+ * Purpose: The finder reads only `hex` and `pausedReasons`.
  * When to use: Inside this file.
  * Expected outcome: A snapshot row whose center is `[id, 0]`.
  * Exceptions: None.
  */
-function row(id: number, reasons: readonly string[], storedPoints: number): ControlledHexQueueSnapshot {
-  return { hex: [id, 0], availableUnitTypes: [], entries: [], pausedReasons: [...reasons], storedPoints };
+function row(id: number, reasons: readonly string[]): ControlledHexQueueSnapshot {
+  return { hex: [id, 0], availableUnitTypes: [], entries: [], pausedReasons: [...reasons] };
 }
 
 test('paused hexes keep occupation and full-city pauses and leave cap-only pauses to the idle flag', () => {
   const paused = findPausedProductionHexes(
     [
-      row(3, [occupied], 40),
-      row(1, [occupied], 25),
-      row(2, [full], 0),
-      row(4, [capped], 7),
-      row(5, [], 9),
-      row(6, [occupied, full], 10),
-      row(8, [occupied, capped], 5),
+      row(3, [occupied]),
+      row(1, [occupied]),
+      row(2, [full]),
+      row(4, [capped]),
+      row(5, []),
+      row(6, [occupied, full]),
+      row(8, [occupied, capped]),
     ],
     label
   );
@@ -62,7 +63,7 @@ test('paused hexes keep occupation and full-city pauses and leave cap-only pause
       'Queue paused at H6: occupying units or fortifications required and every city cell fortified.',
       'Queue paused at H8: occupying units or fortifications required and unit cap reached.',
       'Queue paused at H2: every city cell fortified.',
-      '80 banked production points are waiting in these cells.',
+      PAUSED_POINTS_LOST,
       PAUSED_OCCUPATION_REMEDY,
       PAUSED_FORTIFICATION_REMEDY,
     ].join('\n\n')
@@ -70,28 +71,28 @@ test('paused hexes keep occupation and full-city pauses and leave cap-only pause
   assert.equal(formatPausedProductionPointer(paused), pointer);
 });
 
-test('one point is singular, zero points are omitted, and nothing paused is null', () => {
+test('the points-lost paragraph is stated once, and nothing paused is null', () => {
   assert.equal(
-    formatPausedQueuesSection(findPausedProductionHexes([row(7, [occupied], 1)], label)),
+    formatPausedQueuesSection(findPausedProductionHexes([row(7, [occupied])], label)),
     [
       'Queue paused at H7: occupying units or fortifications required.',
-      '1 banked production point is waiting in this cell.',
+      PAUSED_POINTS_LOST,
       PAUSED_OCCUPATION_REMEDY,
     ].join('\n\n')
   );
   assert.equal(
-    formatPausedQueuesSection(findPausedProductionHexes([row(7, [occupied], 1), row(2, [full], 0)], label)),
+    formatPausedQueuesSection(findPausedProductionHexes([row(7, [occupied]), row(2, [full])], label)),
     [
       'Queue paused at H7: occupying units or fortifications required.',
       'Queue paused at H2: every city cell fortified.',
-      '1 banked production point is waiting in these cells.',
+      PAUSED_POINTS_LOST,
       PAUSED_OCCUPATION_REMEDY,
       PAUSED_FORTIFICATION_REMEDY,
     ].join('\n\n')
   );
   assert.equal(
-    formatPausedQueuesSection(findPausedProductionHexes([row(2, [full], 0)], label)),
-    ['Queue paused at H2: every city cell fortified.', PAUSED_FORTIFICATION_REMEDY].join('\n\n')
+    formatPausedQueuesSection(findPausedProductionHexes([row(2, [full])], label)),
+    ['Queue paused at H2: every city cell fortified.', PAUSED_POINTS_LOST, PAUSED_FORTIFICATION_REMEDY].join('\n\n')
   );
   assert.equal(formatPausedQueuesSection([]), null);
   assert.equal(formatPausedProductionPointer([]), null);

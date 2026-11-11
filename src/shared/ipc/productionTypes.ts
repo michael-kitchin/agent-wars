@@ -198,7 +198,7 @@ urbanHexCount: StrategicProductionContextSnapshot['urbanHexCount'];
    * Specifies the contract for the `storedPoints` member (storedPoints: number;).
 
    * Contract: Carry-over production points for this hex before the next urban capacity pulse is applied.
-   * When to use: UI that simulates queue completion time or mirrors in-game production banked points.
+   * When to use: UI that simulates queue completion time from the points carried toward the next item. A paused queue keeps none.
    * Expected outcome: Non-negative integer matching `res_s_build_progress.stored_points` for the same hex.
    * Exceptions: None.
    */

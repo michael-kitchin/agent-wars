@@ -1,7 +1,7 @@
 /**
  * Production pauses outside home until a unit or a fortification is there.
  *
- * Purpose: Points bank and the queue stays. Standing on the hex, or fortifying it, lets it build.
+ * Purpose: A paused queue drops its points and keeps its rows. Standing on the hex, or fortifying it, lets it build. A queue that is still building keeps what it cannot yet spend.
  * When to use: After changing the production pause.
  * Expected outcome: The cases below. Each case removes its temporary match.
  * Exceptions: None.
@@ -25,24 +25,24 @@ import {
   replaceBuildQueueForHex,
   setBuildProgressPointsForHex,
   setHexController,
+  setStrategicInfrastructureForHex,
   setTacticalCellFortified,
 } from './gameDb';
 import { insertUnitRow } from './gameDb/unitInsert';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
-test('an empty hex outside home banks points and keeps the queue', () => {
+test('an empty hex outside home discards its points and keeps the queue', () => {
   withTempGameDb('aw-pause-bank-', () => {
     const hex = outsideHomeCity();
     setHexController(hex, HUMAN_SEAT_ID);
     dbRun('DELETE FROM units WHERE player = ? AND h3_index = ?', [HUMAN_SEAT_ID, hex]);
     replaceBuildQueueForHex(hex, [{ unitType: 'infantry', remainingCount: 1 }]);
     setBuildProgressPointsForHex(hex, 40);
-    const urban = getStrategicInfrastructureForHex(hex).urbanHexCount;
     assert.equal(getHexBuildQueue(hex, HUMAN_SEAT_ID).buildPaused, true);
     assert.deepEqual(getHexBuildQueue(hex, HUMAN_SEAT_ID).pausedReasons, ['occupation']);
     const summary = processProductionAfterControlResolution();
     assert.equal(listBuildQueueRowsForHex(hex).length, 1);
-    assert.equal(getBuildProgressPointsForHex(hex), 40 + urban);
+    assert.equal(getBuildProgressPointsForHex(hex), 0);
     assert.deepEqual(
       summary.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
       ['occupation']
@@ -52,6 +52,29 @@ test('an empty hex outside home banks points and keeps the queue', () => {
       [hex]
     );
     assert.equal(spawned?.n, 0);
+  });
+});
+
+test('a buildable queue that cannot afford its next item keeps its points', () => {
+  withTempGameDb('aw-pause-keep-', () => {
+    const hex = outsideHomeCity();
+    setHexController(hex, HUMAN_SEAT_ID);
+    dbRun('DELETE FROM units WHERE player = ? AND h3_index = ?', [HUMAN_SEAT_ID, hex]);
+    insertUnitRow(dbRun, {
+      id: 'h1-i949',
+      player: HUMAN_SEAT_ID,
+      unitType: 'infantry',
+      displayOrder: 949,
+      h3Index: hex,
+      origin: null,
+      formedTurn: 1,
+    });
+    setStrategicInfrastructureForHex(hex, { urbanHexCount: 4, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(hex, [{ unitType: 'infantry', remainingCount: 1 }]);
+    setBuildProgressPointsForHex(hex, 3);
+    processProductionAfterControlResolution();
+    assert.equal(listBuildQueueRowsForHex(hex).length, 1);
+    assert.equal(getBuildProgressPointsForHex(hex), 7);
   });
 });
 

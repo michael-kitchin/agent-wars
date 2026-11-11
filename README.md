@@ -206,7 +206,7 @@ Production is based on real-world urban land cover: the Natural Earth urban area
 
 Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3:10 for infantry, armor, naval, air, and missiles, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)). A Credits item costs that map's infantry price and still adds 20 credits. Mercenary upkeep stays the global figures: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15).
 
-A queue spends in the side's home, or on a hex that holds one of its units or fortifications. Elsewhere it pauses and keeps its points.
+A queue spends in the side's home, or on a hex that holds one of its units or fortifications. Elsewhere it pauses and loses its points at the end of the turn.
 
 ### The Opponent's Tools
 

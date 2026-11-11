@@ -475,12 +475,15 @@ export function buildHoldFireRule(): string {
  *
  * Purpose: Caps and costs are already printed; without income the model cannot tell a cheap queue from an unaffordable one.
  * When to use: Production status block, after current counts and before the maxed-type list.
- * Expected outcome: Urban count becomes points each turn; spend is in queue order.
+ * Expected outcome: One paragraph. Urban count becomes points each turn and spend is in queue order. A building queue keeps its remainder. A paused queue loses its points.
  * Exceptions: None.
  */
 export function buildProductionIncomeRule(): string {
   logTrace('promptSpec buildProductionIncomeRule', {});
-  return 'A controlled cell earns production points equal to its urban count each turn and spends them in queue order.';
+  return (
+    'A controlled cell earns production points equal to its urban count each turn and spends them in queue order. ' +
+    'A queue that is building keeps its unspent points toward the next item. A paused queue loses its points at the end of the turn.'
+  );
 }
 
 /**

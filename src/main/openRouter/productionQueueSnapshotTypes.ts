@@ -136,10 +136,10 @@ seaportCount?: unknown;
    */
   pausedReasons?: unknown;
   /**
-   * Banked production points on the hex.
+   * Points carried toward the next queued item.
    *
-   * Contract: Present on a hex the requester controls.
-   * When to use: The paused-queue briefing, which totals points waiting in paused cells.
+   * Contract: Present on a hex the requester controls. A paused queue keeps none, so this is 0 after a paused pass.
+   * When to use: Reading partial progress of a queue that is still building.
    * Expected outcome: A non-negative number, or absent.
    * Exceptions: None.
    */

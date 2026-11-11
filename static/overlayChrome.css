@@ -243,9 +243,10 @@ aside#sidebar.tactical-strategic-suppress {
   position: fixed;
   pointer-events: auto;
   padding: 0.35rem 0.5rem;
-  min-width: 0;
+  /* Every appearance is at least this wide. The plain cap equals it, so a short queue stays this wide. Hire raises only the cap. */
+  min-width: 200px;
   width: fit-content;
-  max-width: 150px;
+  max-width: 200px;
   background: var(--chrome-bg);
   color: var(--chrome-text);
   color-scheme: dark;
@@ -559,7 +560,8 @@ aside#sidebar.tactical-strategic-suppress {
 .melee-intercept-table tr {
   border-bottom: 1px solid var(--chrome-border);
 }
-.build-popup.build-popup-wide { max-width: 210px; }
+/* Hire, and a hex that can both build and hire. The plain minimum still applies. */
+.build-popup.build-popup-wide { max-width: 280px; }
 .hire-panel .build-queue-row > span {
   min-width: 0;
   overflow-wrap: anywhere;

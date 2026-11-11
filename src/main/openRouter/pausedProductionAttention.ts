@@ -1,7 +1,7 @@
 /**
  * Paused queues in the situation message.
  *
- * Purpose: The situation message names the seat's paused queues, their banked points, and how to restart them, in the same sentences as the turn report, one paragraph each.
+ * Purpose: The situation message names the seat's paused queues, that those queues lose their points, and how to restart them, in the same pause sentences as the turn report, one paragraph each.
  * When to use: While building Production Status, and when Attention Flags needs the one-line pointer.
  * Expected outcome: The subsection body, or null when nothing qualifies, and a pointer that names the heading.
  * Exceptions: None.
@@ -18,7 +18,7 @@ import type { ControlledHexQueueSnapshot } from './productionQueueSnapshotTypes'
  *
  * Purpose: The subsection and the pointer share one list, so a cap-only pause stays out of both.
  * When to use: The result of `findPausedProductionHexes`.
- * Expected outcome: A briefing code, the reasons that apply, and the banked points.
+ * Expected outcome: A briefing code and the reasons that apply.
  * Exceptions: None.
  */
 export interface PausedProductionHex {
@@ -40,15 +40,6 @@ export interface PausedProductionHex {
    * Exceptions: None.
    */
   readonly reasons: readonly QueuePauseReason[];
-  /**
-   * Banked production points on the hex.
-   *
-   * Contract: Never negative. A missing or non-numeric snapshot value is 0.
-   * When to use: The points paragraph, which is omitted when the total is 0.
-   * Expected outcome: A non-negative integer.
-   * Exceptions: None.
-   */
-  readonly storedPoints: number;
 }
 
 /**
@@ -75,6 +66,16 @@ export const PAUSED_FORTIFICATION_REMEDY =
   `To clear "${QUEUE_PAUSE_REASON_TEXT.allCellsFortified}", replace that cell's queue with set_build_queue.`;
 
 /**
+ * The points a paused queue does not keep.
+ *
+ * Purpose: The subsection says the loss once, for every listed hex, rather than totaling points that will be discarded.
+ * When to use: After the grouped pause sentences, before the remedies.
+ * Expected outcome: One paragraph.
+ * Exceptions: None.
+ */
+export const PAUSED_POINTS_LOST = 'A paused queue loses its production points at the end of each turn.';
+
+/**
  * Controlled hexes paused for occupation or a full city.
  *
  * Purpose: Hexes paused only by the cap are left to the Production idle flag.
@@ -94,12 +95,10 @@ export function findPausedProductionHexes(
       .map((text) => queuePauseReasonForText(text))
       .filter((reason): reason is QueuePauseReason => reason !== null);
     if (!reasons.includes('occupation') && !reasons.includes('allCellsFortified')) continue;
-    const points = Number(row.storedPoints);
     const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
     paused.push({
       hexText: hex ? formatHexLabel(hex) : null,
       reasons,
-      storedPoints: Number.isFinite(points) ? Math.max(0, Math.trunc(points)) : 0,
     });
   }
   return paused;
@@ -108,19 +107,16 @@ export function findPausedProductionHexes(
 /**
  * The Paused Queues body, without its heading.
  *
- * Purpose: The production briefing adds the heading. This function keeps the sentences and the remedies.
+ * Purpose: The production briefing adds the heading. This function keeps the pause sentences, the points-lost paragraph, and the remedies.
  * When to use: After `findPausedProductionHexes`, including when the queue table is empty.
- * Expected outcome: Paragraphs separated by a blank line: one grouped pause sentence each, then banked points when above 0, then one remedy paragraph per reason present. One hex says `this cell`. More than one says `these cells`. Null when nothing is paused. No heading.
+ * Expected outcome: Paragraphs separated by a blank line: one grouped pause sentence each, then the points-lost paragraph, then one remedy paragraph per reason present. Null when nothing is paused. No heading.
  * Exceptions: None.
  */
 export function formatPausedQueuesSection(paused: readonly PausedProductionHex[]): string | null {
   logTrace('pausedProductionAttention formatPausedQueuesSection', { pausedCount: paused.length });
   if (paused.length === 0) return null;
   const paragraphs = formatQueuePausedLines(paused.map((hex) => ({ hexCode: hex.hexText, reasons: hex.reasons })));
-  const points = paused.reduce((sum, hex) => sum + hex.storedPoints, 0);
-  const where = paused.length === 1 ? 'this cell' : 'these cells';
-  if (points === 1) paragraphs.push(`1 banked production point is waiting in ${where}.`);
-  else if (points > 1) paragraphs.push(`${points} banked production points are waiting in ${where}.`);
+  paragraphs.push(PAUSED_POINTS_LOST);
   if (paused.some((hex) => hex.reasons.includes('occupation'))) paragraphs.push(PAUSED_OCCUPATION_REMEDY);
   if (paused.some((hex) => hex.reasons.includes('allCellsFortified'))) paragraphs.push(PAUSED_FORTIFICATION_REMEDY);
   return paragraphs.join('\n\n');

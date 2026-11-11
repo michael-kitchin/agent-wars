@@ -36,7 +36,7 @@ import { fortificationSpendStep, fortifyCellsForHex } from './fortificationProdu
 import { readBuildabilityContext } from './productionBuildability';
 import { listQueuePauseReasons } from '../../shared/queuePauseReasons';
 import type { QueuePause, QueuePauseReason } from '../../shared/queuePauseTypes';
-import { maxedUnitTypesFor, recordQueuePause, selectNewlyPausedQueues } from './queuePauseRecording';
+import { maxedUnitTypesFor, pointsKeptAfterPass, recordQueuePause, selectNewlyPausedQueues } from './queuePauseRecording';
 import { readPausedQueueHexes, writePausedQueueHexes } from '../gameDb/queuePauseMemory';
 import { spawnProducedUnitsForHex } from './strategicUnitSpawn';
 
@@ -229,11 +229,12 @@ export function resolveStrategicControlAfterCombatAndMovement(
  * Purpose: Accrues stored+urban points once per hex, spends the build queue head-first under costs and
  * deployment caps, and when Keep building is armed refills the empty queue in-loop from leftover points
  * until `$` or a cap stalls (leaving a planning residue when points cannot afford another unit).
+ * A queue that ends the pass paused stores 0. A queue that is still building keeps what it could not spend.
  * When to use: After control resolution in the Ready pipeline, before returning deployed/cap summaries.
  * Expected outcome: Queues and stored points persisted; units spawned; Keep building cleared only when an
  * armed type is ineligible at refill time; iteration guard logs an error if the refill/spend loop exceeds
- * its safety cap. Paused queues are remembered in the `queue_paused_hexes` row. `newlyPausedQueuesByPlayer`
- * holds only the queues that paused this pass, each with every reason that applies.
+ * its safety cap. Paused queues are remembered in the `queue_paused_hexes` row and store 0 points.
+ * `newlyPausedQueuesByPlayer` holds only the queues that paused this pass, each with every reason that applies.
  * Exceptions: None (DB/spawn failures surface from callees).
  */
 export function processProductionAfterControlResolution(): {
@@ -295,20 +296,16 @@ export function processProductionAfterControlResolution(): {
       .sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
     let points = Math.max(0, Math.trunc(storedPoints)) + (neutralBorder ? 0 : Math.max(0, Math.trunc(urbanHexCount)));
     if (!buildability.isBuildable(controllerPlayerId, control.h3Index, fortifiedCount)) {
-      setBuildProgressPointsForHex(control.h3Index, points);
-      recordQueuePause(
-        queuePausesByPlayer,
-        controllerPlayerId,
-        control.h3Index,
-        listQueuePauseReasons({
-          buildable: false,
-          nextItemType:
-            queueWorking[0]?.unitType ??
-            (standingAtStart.keepBuilding ? standingAtStart.keepBuildingUnitType : null),
-          fortifiableLeft: neutralBorder ? 0 : fortifiableCount,
-          maxedUnitTypes: maxedUnitTypesFor(controllerPlayerId, unitCountsByPlayerType, maxUnitsPerType),
-        })
-      );
+      const reasons = listQueuePauseReasons({
+        buildable: false,
+        nextItemType:
+          queueWorking[0]?.unitType ??
+          (standingAtStart.keepBuilding ? standingAtStart.keepBuildingUnitType : null),
+        fortifiableLeft: neutralBorder ? 0 : fortifiableCount,
+        maxedUnitTypes: maxedUnitTypesFor(controllerPlayerId, unitCountsByPlayerType, maxUnitsPerType),
+      });
+      setBuildProgressPointsForHex(control.h3Index, pointsKeptAfterPass(control.h3Index, points, reasons));
+      recordQueuePause(queuePausesByPlayer, controllerPlayerId, control.h3Index, reasons);
       continue;
     }
     let creditsToAdd = 0;
@@ -432,11 +429,14 @@ export function processProductionAfterControlResolution(): {
     for (let i = 0; i < queueWorking.length; i++) {
       queueWorking[i]!.queueIndex = i;
     }
+    const pausedReasons: QueuePauseReason[] = [];
+    if (fortificationPaused) pausedReasons.push('allCellsFortified');
+    if (blockedByCapType) pausedReasons.push('unitCap');
     replaceBuildQueueForHex(
       control.h3Index,
       queueWorking.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
     );
-    setBuildProgressPointsForHex(control.h3Index, points);
+    setBuildProgressPointsForHex(control.h3Index, pointsKeptAfterPass(control.h3Index, points, pausedReasons));
     if (fortificationsToBuild > 0) {
       const fortified = fortifyCellsForHex({
         h3Index: control.h3Index,
@@ -455,9 +455,6 @@ export function processProductionAfterControlResolution(): {
         (creditsAddedByPlayer.get(controllerPlayerId) ?? 0) + creditsToAdd
       );
     }
-    const pausedReasons: QueuePauseReason[] = [];
-    if (fortificationPaused) pausedReasons.push('allCellsFortified');
-    if (blockedByCapType) pausedReasons.push('unitCap');
     recordQueuePause(queuePausesByPlayer, controllerPlayerId, control.h3Index, pausedReasons);
     const standingAfter = getKeepBuildingForHex(control.h3Index);
     if (standingAfter.keepBuilding) {

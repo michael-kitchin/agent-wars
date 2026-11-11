@@ -128,7 +128,7 @@ urbanHexCount: number;
     /**
    * Specifies the contract for the `storedPoints` member (storedPoints: number;).
 
-   * Contract: Banked production points for this hex after the last resolution pulse, before the next turn adds urban capacity.
+   * Contract: Points carried toward the next item after the last resolution pulse, before the next turn adds urban capacity. A paused queue keeps none.
    * When to use: Expose alongside queue rows so the renderer can estimate full-queue completion time.
    * Expected outcome: Same value as `getBuildProgressPointsForHex` for `h3Index`.
    * Exceptions: None.

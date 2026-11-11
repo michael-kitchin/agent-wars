@@ -7,6 +7,7 @@
  * Exceptions: None.
  */
 
+import { logTrace } from '../../logger';
 import { CREDITS_PER_ITEM } from '../../../shared/creditsRules';
 import { creditsItemCost } from '../../../shared/gameRules';
 import type { MercenaryFunds } from '../../../shared/ipc/mercenaryTypes';
@@ -54,15 +55,16 @@ export function buildCreditsProductionRulePart(): string {
 /**
  * Where a queue is allowed to spend.
  *
- * Purpose: The second paragraph names the fix.
+ * Purpose: The second paragraph says a paused queue loses its points, and names the fix.
  * When to use: The production block, after the income rule.
  * Expected outcome: Two paragraphs separated by a blank line, not one sentence.
  * Exceptions: None.
  */
 export function buildBuildabilityRule(): string {
+  logTrace('promptSpec buildBuildabilityRule', {});
   return [
     'You can build only in your home region and in cells that hold one of your units or fortifications at the end of the turn.',
-    'Elsewhere a queue pauses and keeps banking its points until you end a turn with a unit there or raise a mercenary there.',
+    'Elsewhere a queue pauses, and its points are lost at the end of each turn until you end a turn with a unit there or raise a mercenary there.',
   ].join('\n\n');
 }
 

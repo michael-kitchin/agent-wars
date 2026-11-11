@@ -527,7 +527,7 @@ export function setKeepBuildingForHex(
 /**
  * Defines the `setBuildProgressPointsForHex` function shape (export function setBuildProgressPointsForHex(ops: ControlDbOps, h3Index: string, storedPoints: number): void).
 
- * Purpose: Updates banked production points without clearing Keep-building columns.
+ * Purpose: Updates the points carried toward the next item without clearing Keep-building columns. A paused queue stores 0.
  * When to use: After a production spend pulse or test setup that only adjusts stored points.
  * Expected outcome: `stored_points` set; existing `keep_building` / `keep_building_unit_type` preserved on conflict.
  * Exceptions: None.

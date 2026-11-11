@@ -67,13 +67,11 @@ test('a full city pauses the fortification row and does not build the infantry b
   withTempGameDb('aw-fort-pause-', () => {
     const hex = humanCityHex();
     for (const cell of listFortifiableCellsForHex(hex)) setTacticalCellFortified(cell, true);
-    const stored = 40;
     replaceBuildQueueForHex(hex, [
       { unitType: FORTIFICATION_QUEUE_ITEM, remainingCount: 1 },
       { unitType: 'infantry', remainingCount: 1 },
     ]);
-    setBuildProgressPointsForHex(hex, stored);
-    const urban = getStrategicInfrastructureForHex(hex).urbanHexCount;
+    setBuildProgressPointsForHex(hex, 40);
     const unitsBefore = dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE h3_index = ?', [hex])?.count;
     const result = processProductionAfterControlResolution();
     const rows = listBuildQueueRowsForHex(hex);
@@ -81,7 +79,7 @@ test('a full city pauses the fortification row and does not build the infantry b
       rows.map((row) => row.unitType),
       [FORTIFICATION_QUEUE_ITEM, 'infantry']
     );
-    assert.equal(getBuildProgressPointsForHex(hex), stored + urban);
+    assert.equal(getBuildProgressPointsForHex(hex), 0);
     assert.equal(dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE h3_index = ?', [hex])?.count, unitsBefore);
     assert.deepEqual(
       result.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
@@ -103,6 +101,7 @@ test('keep building fortifies the last cell and then pauses', () => {
     assert.equal(getStrategicInfrastructureForHex(hex).fortifiedCount, before + 1);
     assert.equal(standing.keepBuilding, true);
     assert.equal(standing.keepBuildingUnitType, FORTIFICATION_QUEUE_ITEM);
+    assert.equal(getBuildProgressPointsForHex(hex), 0);
     assert.deepEqual(
       result.newlyPausedQueuesByPlayer.get(HUMAN_SEAT_ID)?.find((pause) => pause.h3Index === hex)?.reasons,
       ['allCellsFortified']

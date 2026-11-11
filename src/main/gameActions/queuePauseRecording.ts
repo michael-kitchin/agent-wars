@@ -1,7 +1,7 @@
 /**
- * The production pass collects paused queues and picks out the ones that paused this pass.
+ * The production pass collects paused queues, decides how many points a hex keeps, and picks out the ones that paused this pass.
  *
- * Purpose: The turn report names a queue on the turn it pauses, with every reason that applies.
+ * Purpose: The turn report names a queue on the turn it pauses, with every reason that applies. A paused queue keeps no points.
  * When to use: From `processProductionAfterControlResolution`.
  * Expected outcome: Per-seat lists of pauses, and the subset that is new this pass.
  * Exceptions: None.
@@ -32,6 +32,29 @@ export function recordQueuePause(
   const list = byPlayer.get(seatId) ?? [];
   list.push({ h3Index, reasons: [...reasons] });
   byPlayer.set(seatId, list);
+}
+
+/**
+ * Production points a hex keeps after one pass.
+ *
+ * Purpose: A paused queue starts the next turn from nothing. A queue that is still building keeps what it could not spend.
+ * When to use: At the end of a hex's production pass, with that hex's pause reasons. An empty list means the queue is not paused.
+ * Expected outcome: 0 when any reason applies. Otherwise the points, truncated at 0. Points already spent this pass are not in `points`.
+ * Exceptions: None.
+ */
+export function pointsKeptAfterPass(
+  h3Index: string,
+  points: number,
+  reasons: readonly QueuePauseReason[]
+): number {
+  const kept = reasons.length > 0 ? 0 : Math.max(0, Math.trunc(points));
+  logDebug('queuePauseRecording pointsKeptAfterPass', {
+    h3Index,
+    points,
+    reasonCount: reasons.length,
+    kept,
+  });
+  return kept;
 }
 
 /**
