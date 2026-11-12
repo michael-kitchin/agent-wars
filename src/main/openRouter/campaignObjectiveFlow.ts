@@ -67,11 +67,20 @@ export interface CampaignStateInputs {
    * Visible units of active enemy seats.
    *
    * Contract: The snapshot's unit list is already limited to units this seat can see.
-   * When to use: Contact and home defense. Intel is not included.
+   * When to use: Contact. Intel is not included.
    * Expected outcome: H3 indexes.
    * Exceptions: None.
    */
   readonly enemyUnitHexes: readonly string[];
+  /**
+   * Visible infantry and armor of active enemy seats, one entry per unit.
+   *
+   * Contract: A subset of `enemyUnitHexes`. Embarked units are included when the snapshot lists them.
+   * When to use: Home-defense threats. Only these units can take a city.
+   * Expected outcome: H3 indexes. Stacked units repeat their hex.
+   * Exceptions: None.
+   */
+  readonly enemyGroundUnitHexes: readonly string[];
   /**
    * Enemy cities under the fog rule.
    *
@@ -104,7 +113,7 @@ export interface CampaignStateInputs {
 /**
  * Derives campaign inputs from one briefing snapshot.
  *
- * Purpose: Ground units are the seat's infantry and armor that are not aboard a carrier. Enemy units are visible units of active enemy seats. Cities follow `knownCampaignCities`. A hex in more than one enemy home has no assumed owner.
+ * Purpose: Ground units are the seat's infantry and armor that are not aboard a carrier. Enemy units are visible units of active enemy seats, and enemy ground units are the infantry and armor among them. Cities follow `knownCampaignCities`. A hex in more than one enemy home has no assumed owner.
  * When to use: Once per resolve and once per plan build.
  * Expected outcome: The inputs above. An unexplored hex in two enemy homes is not a candidate.
  * Exceptions: None.
@@ -122,7 +131,11 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
         !unit.embarkedOnCarrierUnitId
     )
     .map((unit) => ({ id: unit.id, h3Index: unit.h3Index }));
-  const enemyUnitHexes = state.units.filter((unit) => activeEnemySeatIds.has(unit.player)).map((unit) => unit.h3Index);
+  const enemyUnits = state.units.filter((unit) => activeEnemySeatIds.has(unit.player));
+  const enemyUnitHexes = enemyUnits.map((unit) => unit.h3Index);
+  const enemyGroundUnitHexes = enemyUnits
+    .filter((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor')
+    .map((unit) => unit.h3Index);
   const homeSeatByH3 = new Map<string, string>();
   const inSeveralHomes = new Set<string>();
   for (const enemySeatId of activeEnemySeatIds) {
@@ -147,6 +160,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
   logTrace('campaignObjectiveFlow campaignInputsFromState', {
     seatId,
     groundUnitCount: groundUnits.length,
+    enemyGroundUnitCount: enemyGroundUnitHexes.length,
     cityCount: cities.length,
   });
   return {
@@ -154,6 +168,7 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
     groundUnits,
     ownHomeHexes: new Set(ownHomeHexes(state)),
     enemyUnitHexes,
+    enemyGroundUnitHexes,
     cities,
     ownControlledLandHexes,
     hexSet: new Set(state.hexes.map((hex) => hex.h3Index)),
@@ -271,6 +286,7 @@ export function campaignPlanForState(state: GameStateSnapshot): CampaignPlan | n
     groundUnits: inputs.groundUnits,
     ownHomeHexes: inputs.ownHomeHexes,
     enemyUnitHexes: inputs.enemyUnitHexes,
+    enemyGroundUnitHexes: inputs.enemyGroundUnitHexes,
     landStepsFromWaypoint: campaignLandSteps(inputs, landMass, [campaignWaypoint(objective)]),
     hopDistance: computeGridDistanceWithPathFallbackPure,
   });
@@ -278,6 +294,9 @@ export function campaignPlanForState(state: GameStateSnapshot): CampaignPlan | n
     seatId,
     waypoint: plan.waypointH3,
     campaignUnitCount: plan.campaignUnitIds.size,
+    defenderCount: plan.defenderUnitIds.length,
+    homeThreatCount: plan.homeThreatCount,
+    homeDefenseCapped: plan.homeDefenseCapped,
   });
   return plan;
 }

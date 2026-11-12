@@ -138,9 +138,9 @@ The engine picks one enemy city for your ground units to take: the campaign targ
 
 In the assemble phase, campaign units march to the staging hex and hold there. When enough of them are within 2 hexes of it, the phase becomes assault and they march on the target together. Units that arrive one at a time are destroyed one at a time.
 
-Ground units in your home region with an enemy unit within 3 hexes are home defenders and stay out of the campaign. A unit within 1 hex of an enemy keeps fighting it.
+When enemy ground units are within 3 hexes of your ground units at home, the engine keeps one home unit per enemy unit as a home defender, nearest the enemy first, and never more than half your ground units. Home defenders stay out of the campaign. A unit within 1 hex of an enemy keeps fighting it.
 
-Campaign Orders, under Standing Order Status, lists each campaign unit whose standing order should change. Give each listed unit the order its row names. A campaign unit without a standing order has the campaign hex as its Suggested Destination.
+Campaign Orders, under Standing Order Status, lists each campaign unit whose standing order should change, and each home defender still marching on the campaign target or staging hex. Give each listed unit the order its row names. A campaign unit without a standing order has the campaign hex as its Suggested Destination.
 
 Best Options lists advance rows for campaign units. An advance row is a one-step move toward the campaign hex. Copy it into explicit_move like an approach row.
 

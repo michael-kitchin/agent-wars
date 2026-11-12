@@ -44,12 +44,22 @@ export const CAMPAIGN_ASSAULT_MIN_UNITS = 6;
 /**
  * Hops to an enemy that make a home unit a defender.
  *
- * Purpose: A raid on a home city keeps that unit home.
- * When to use: `isHomeDefender`.
+ * Purpose: An enemy ground unit this close to a home unit is a threat, and each threat keeps one home unit home.
+ * When to use: `chooseHomeDefenders`.
  * Expected outcome: 3.
  * Exceptions: None.
  */
 export const CAMPAIGN_HOME_DEFENSE_RADIUS = 3;
+
+/**
+ * Largest share of the ground force that stays home as defenders.
+ *
+ * Purpose: A side whose home borders the enemy still sends a force to the campaign.
+ * When to use: `chooseHomeDefenders`. The campaign rule text and the Campaign Objective defender bullet say "half"; change them when this changes.
+ * Expected outcome: 0.5. The cap is the ground-unit count times this share, rounded down, so a side with one ground unit keeps no defender.
+ * Exceptions: None.
+ */
+export const CAMPAIGN_HOME_DEFENDER_MAX_SHARE = 0.5;
 
 /**
  * Hops to an enemy that leave a unit fighting.
@@ -131,7 +141,7 @@ export interface CampaignPlan {
    * Ground units that follow the campaign this consult.
    *
    * Contract: Excludes home defenders, units in contact, and units that cannot reach the waypoint by land.
-   * When to use: Best Options and Campaign Orders.
+   * When to use: Best Options, and Campaign Orders for these units. A recalled home defender is listed from `defenderUnitIds` instead.
    * Expected outcome: A set of unit ids.
    * Exceptions: None.
    */
@@ -148,12 +158,30 @@ export interface CampaignPlan {
   /**
    * Home defenders, in roster order.
    *
-   * Contract: Ground units inside the home region with a visible enemy inside the defense radius.
-   * When to use: The briefing defender bullet.
+   * Contract: The units `chooseHomeDefenders` keeps home. At most one per threat and at most `CAMPAIGN_HOME_DEFENDER_MAX_SHARE` of the ground force.
+   * When to use: The briefing defender bullet and the Campaign Orders recall.
    * Expected outcome: Unit ids in the order they were given.
    * Exceptions: None.
    */
   readonly defenderUnitIds: readonly string[];
+  /**
+   * Enemy ground units near the home units.
+   *
+   * Contract: The `threatCount` from `chooseHomeDefenders`.
+   * When to use: The Campaign Objective defender bullet.
+   * Expected outcome: Zero or more. `defenderUnitIds` is never longer than this.
+   * Exceptions: None.
+   */
+  readonly homeThreatCount: number;
+  /**
+   * Whether the half-force cap left a home unit out.
+   *
+   * Contract: True only when more home units were in range than the cap and that cap is smaller than the threat count.
+   * When to use: The Campaign Objective defender bullet.
+   * Expected outcome: False when every in-range home unit was kept, and false when the threat count was the limit rather than the share.
+   * Exceptions: None.
+   */
+  readonly homeDefenseCapped: boolean;
   /**
    * Ground units near the mass centers.
    *
@@ -289,24 +317,56 @@ export function campaignWaypoint(objective: CampaignObjective): string {
 }
 
 /**
- * Whether a ground unit stays to defend its home.
+ * Hops from one hex to the nearest of the targets.
  *
- * Purpose: A home unit with a visible enemy within `CAMPAIGN_HOME_DEFENSE_RADIUS` hops is not a campaign unit.
- * When to use: Once per ground unit while building the plan.
- * Expected outcome: True only inside the side's own home region and near a visible enemy.
- * Exceptions: None.
+ * Purpose: Defenders are ranked by how close the nearest threat is.
+ * When to use: `chooseHomeDefenders`. Do not log here; it runs once per home unit.
+ * Expected outcome: The smallest measured distance, or null when no pair can be measured or the list is empty.
+ * Exceptions: None. An unmeasurable pair is skipped.
  */
-export function isHomeDefender(args: {
-  readonly unitH3: string;
+function nearestHops(fromH3: string, targets: readonly string[], hopDistance: HopDistance): number | null {
+  return targets.reduce<number | null>((nearest, h3) => {
+    const distance = hopDistance(fromH3, h3);
+    return distance !== null && (nearest === null || distance < nearest) ? distance : nearest;
+  }, null);
+}
+
+/**
+ * The home units that stay home this consult.
+ *
+ * Purpose: One defender per enemy ground unit near home, nearest the enemy first, so a border fight does not hold back the whole force.
+ * When to use: Once per consult, from `buildCampaignPlan`. Pass only enemy infantry and armor as `enemyGroundUnitHexes`, one entry per unit.
+ * Expected outcome: `threatCount` is the number of entries within `CAMPAIGN_HOME_DEFENSE_RADIUS` hops of a ground unit on a home hex. Defenders are home units within that radius of a threat, ranked by hops to the nearest threat and then by unit id, limited to the threat count and to `CAMPAIGN_HOME_DEFENDER_MAX_SHARE` of all ground units, rounded down. Defenders come back in roster order. `homeDefenseCapped` is true only when more home units were in range than that limit and the limit is below the threat count.
+ * Exceptions: None. An unmeasurable pair does not count.
+ */
+export function chooseHomeDefenders(args: {
+  readonly groundUnits: readonly CampaignUnitInput[];
   readonly ownHomeHexes: ReadonlySet<string>;
-  readonly enemyUnitHexes: readonly string[];
+  readonly enemyGroundUnitHexes: readonly string[];
   readonly hopDistance: HopDistance;
-}): boolean {
-  const defender =
-    args.ownHomeHexes.has(args.unitH3) &&
-    anyWithinHops(args.unitH3, args.enemyUnitHexes, CAMPAIGN_HOME_DEFENSE_RADIUS, args.hopDistance);
-  logTrace('campaignRules isHomeDefender', { unitH3: args.unitH3, defender });
-  return defender;
+}): { readonly defenderUnitIds: readonly string[]; readonly threatCount: number; readonly homeDefenseCapped: boolean } {
+  const homeUnits = args.groundUnits.filter((unit) => args.ownHomeHexes.has(unit.h3Index));
+  const threatHexes = args.enemyGroundUnitHexes.filter((enemyH3) =>
+    homeUnits.some((unit) => anyWithinHops(unit.h3Index, [enemyH3], CAMPAIGN_HOME_DEFENSE_RADIUS, args.hopDistance))
+  );
+  const ranked = homeUnits
+    .flatMap((unit) => {
+      const hops = nearestHops(unit.h3Index, threatHexes, args.hopDistance);
+      return hops !== null && hops <= CAMPAIGN_HOME_DEFENSE_RADIUS ? [{ unit, hops }] : [];
+    })
+    .sort((a, b) => a.hops - b.hops || (a.unit.id < b.unit.id ? -1 : a.unit.id > b.unit.id ? 1 : 0));
+  const cap = Math.min(threatHexes.length, Math.floor(args.groundUnits.length * CAMPAIGN_HOME_DEFENDER_MAX_SHARE));
+  const chosen = new Set(ranked.slice(0, cap).map((entry) => entry.unit.id));
+  const defenderUnitIds = args.groundUnits.filter((unit) => chosen.has(unit.id)).map((unit) => unit.id);
+  const homeDefenseCapped = ranked.length > cap && cap < threatHexes.length;
+  logDebug('campaignRules chooseHomeDefenders', {
+    homeUnitCount: homeUnits.length,
+    threatCount: threatHexes.length,
+    cap,
+    defenderCount: defenderUnitIds.length,
+    homeDefenseCapped,
+  });
+  return { defenderUnitIds, threatCount: threatHexes.length, homeDefenseCapped };
 }
 
 /**
@@ -413,7 +473,7 @@ export function campaignAssaultReady(args: {
 /**
  * The units that follow the objective this consult.
  *
- * Purpose: Defenders and units in contact keep today's suggestions. Every other ground unit that can reach the waypoint by land is a campaign unit. During assemble, a campaign unit already within the mass radius holds.
+ * Purpose: `chooseHomeDefenders` keeps defenders home, and units in contact keep today's suggestions. Every other ground unit that can reach the waypoint by land is a campaign unit. During assemble, a campaign unit already within the mass radius holds.
  * When to use: Once per consult, after the objective is stored.
  * Expected outcome: A plan whose orders match `campaignOrderFor`.
  * Exceptions: None.
@@ -423,6 +483,7 @@ export function buildCampaignPlan(args: {
   readonly groundUnits: readonly CampaignUnitInput[];
   readonly ownHomeHexes: ReadonlySet<string>;
   readonly enemyUnitHexes: readonly string[];
+  readonly enemyGroundUnitHexes: readonly string[];
   readonly landStepsFromWaypoint: ReadonlyMap<string, number>;
   readonly hopDistance: HopDistance;
 }): CampaignPlan {
@@ -430,18 +491,15 @@ export function buildCampaignPlan(args: {
   const assembling = args.objective.phase === 'assemble' && args.objective.stagingH3 !== null;
   const campaignUnitIds = new Set<string>();
   const holdUnitIds = new Set<string>();
-  const defenderUnitIds: string[] = [];
+  const homeDefense = chooseHomeDefenders({
+    groundUnits: args.groundUnits,
+    ownHomeHexes: args.ownHomeHexes,
+    enemyGroundUnitHexes: args.enemyGroundUnitHexes,
+    hopDistance: args.hopDistance,
+  });
+  const defenderIds = new Set(homeDefense.defenderUnitIds);
   for (const unit of args.groundUnits) {
-    const defender = isHomeDefender({
-      unitH3: unit.h3Index,
-      ownHomeHexes: args.ownHomeHexes,
-      enemyUnitHexes: args.enemyUnitHexes,
-      hopDistance: args.hopDistance,
-    });
-    if (defender) {
-      defenderUnitIds.push(unit.id);
-      continue;
-    }
+    if (defenderIds.has(unit.id)) continue;
     if (anyWithinHops(unit.h3Index, args.enemyUnitHexes, CAMPAIGN_CONTACT_RADIUS, args.hopDistance)) continue;
     if (!args.landStepsFromWaypoint.has(unit.h3Index)) continue;
     campaignUnitIds.add(unit.id);
@@ -455,7 +513,9 @@ export function buildCampaignPlan(args: {
     waypointH3,
     campaignUnitIds,
     holdUnitIds,
-    defenderUnitIds,
+    defenderUnitIds: homeDefense.defenderUnitIds,
+    homeThreatCount: homeDefense.threatCount,
+    homeDefenseCapped: homeDefense.homeDefenseCapped,
     massedCount: countMassedUnits(unitHexes, campaignMassCenters(args.objective), args.hopDistance),
     threshold: campaignAssaultThreshold(unitHexes.length),
   };
@@ -463,7 +523,9 @@ export function buildCampaignPlan(args: {
     waypointH3,
     campaignUnitCount: campaignUnitIds.size,
     holdCount: holdUnitIds.size,
-    defenderCount: defenderUnitIds.length,
+    defenderCount: homeDefense.defenderUnitIds.length,
+    homeThreatCount: homeDefense.threatCount,
+    homeDefenseCapped: homeDefense.homeDefenseCapped,
   });
   return plan;
 }

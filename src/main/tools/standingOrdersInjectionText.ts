@@ -385,7 +385,7 @@ export function getInjectionText(
 }
 
 /**
- * One campaign unit whose standing order does not match the campaign.
+ * One unit whose standing order does not match the campaign.
  *
  * Purpose: The Campaign Orders table and the attention count share one row shape.
  * When to use: The value of `buildCampaignOrderRows`.
@@ -396,7 +396,7 @@ export interface CampaignOrderRow {
   /**
    * Unit the row orders.
    *
-   * Contract: A campaign unit that still exists on the snapshot.
+   * Contract: A campaign unit, or a home defender still marching on the campaign, that exists on the snapshot.
    * When to use: The Unit ID column.
    * Expected outcome: An id the model can put in assign_order.
    * Exceptions: None.
@@ -423,7 +423,7 @@ export interface CampaignOrderRow {
   /**
    * The order the campaign wants.
    *
-   * Contract: `march` or `defend` plus the briefing hex.
+   * Contract: `march` or `defend` plus the briefing hex. A recalled home defender gets `defend` on its own hex.
    * When to use: The Campaign Order column.
    * Expected outcome: The text the model copies into assign_order.
    * Exceptions: None.
@@ -432,11 +432,36 @@ export interface CampaignOrderRow {
 }
 
 /**
- * Lists campaign units whose stored standing order differs from the campaign order.
+ * The order that recalls a home defender still marching on the campaign.
+ *
+ * Purpose: A unit sent toward the campaign can become a home defender later. Its old march would carry it away from home, so Campaign Orders tells it to stay.
+ * When to use: `buildCampaignOrderRows`, for a unit that `campaignOrderFor` does not cover.
+ * Expected outcome: Defend on the unit's hex when the unit is a home defender and its stored order is a march to the campaign target or staging hex. Otherwise null, so a defender's other orders are left alone.
+ * Exceptions: None.
+ */
+function homeDefenderRecallOrder(args: {
+  readonly plan: CampaignPlan;
+  readonly unitId: string;
+  readonly unitH3: string;
+  readonly storedOrderType: string;
+  readonly storedH3: string | undefined;
+}): { readonly orderType: 'defend'; readonly destinationH3: string } | null {
+  const { objective } = args.plan;
+  const marchingOnCampaign =
+    args.storedOrderType === 'march' &&
+    args.storedH3 !== undefined &&
+    (args.storedH3 === objective.targetH3 || args.storedH3 === objective.stagingH3);
+  const recall = marchingOnCampaign && args.plan.defenderUnitIds.includes(args.unitId);
+  logTrace('standingOrders homeDefenderRecallOrder', { unitId: args.unitId, recall });
+  return recall ? { orderType: 'defend', destinationH3: args.unitH3 } : null;
+}
+
+/**
+ * Lists campaign units whose stored standing order differs from the campaign order, and home defenders still marching on the campaign.
  *
  * Purpose: Units that already hold the campaign order must not be told to change it.
  * When to use: After `expireAndUpdateStatus`, from the standing-order injection and the attention count.
- * Expected outcome: One row per differing order. Units with no standing order are absent. An empty list means every campaign unit already matches.
+ * Expected outcome: One row per differing campaign order, and one `defend` row per home defender whose stored march goes to the target or staging hex. Units with no standing order are absent. An empty list means nothing needs to change.
  * Exceptions: None. A missing unit is skipped.
  */
 export function buildCampaignOrderRows(args: {
@@ -454,12 +479,20 @@ export function buildCampaignOrderRows(args: {
   for (const row of rows) {
     const unit = unitsById.get(row.unit_id);
     if (!unit) continue;
-    const desired = campaignOrderFor(args.plan, { id: unit.id, h3Index: unit.h3Index });
-    if (desired === null) continue;
     const params = parseOrderParams(row);
     const stored = row.order_type === 'march' ? params.destination : row.order_type === 'defend' ? params.defendHex : undefined;
     const storedH3 =
       Array.isArray(stored) && stored.length >= 2 ? resolveToH3(Number(stored[0]), Number(stored[1])) : undefined;
+    const desired =
+      campaignOrderFor(args.plan, { id: unit.id, h3Index: unit.h3Index }) ??
+      homeDefenderRecallOrder({
+        plan: args.plan,
+        unitId: unit.id,
+        unitH3: unit.h3Index,
+        storedOrderType: row.order_type,
+        storedH3,
+      });
+    if (desired === null) continue;
     if (row.order_type === desired.orderType && storedH3 === desired.destinationH3) continue;
     const currentTarget =
       storedH3 !== undefined

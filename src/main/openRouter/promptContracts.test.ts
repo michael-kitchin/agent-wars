@@ -697,6 +697,8 @@ function testCampaignRuleAppearsOnlyWhenEnabled(): void {
   const enabled = buildStrategicContextCoaching({ ...gates, campaignEnabled: true });
   assert.ok(enabled.includes('## Campaign'));
   assert.ok(enabled.includes('Copy it into explicit_move like an approach row.'));
+  assert.ok(enabled.includes('never more than half your ground units'));
+  assert.ok(enabled.includes('each home defender still marching on the campaign target or staging hex'));
   const disabled = buildStrategicContextCoaching({ ...gates, campaignEnabled: false });
   assert.ok(!disabled.includes('## Campaign'));
   assert.ok(!disabled.includes('Copy it into explicit_move like an approach row.'));

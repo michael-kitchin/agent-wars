@@ -148,7 +148,7 @@ export const SECTION_TITLE_CAMPAIGN_OBJECTIVE = 'Campaign Objective' as const;
 /**
  * Title of the campaign-orders table, without ATX hashes.
  *
- * Purpose: Lists campaign units whose standing order should change.
+ * Purpose: Lists campaign units whose standing order should change, and home defenders still marching on the campaign.
  * When to use: A subsection under Standing Order Status when a campaign plan exists.
  * Expected outcome: The model copies each row into an assign_order entry.
  * Exceptions: None.

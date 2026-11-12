@@ -65,7 +65,7 @@ function fortificationPhrase(state: GameStateSnapshot, targetH3: string): string
  *
  * Purpose: The situation message names the city, the staging hex, and why the phase is what it is.
  * When to use: When a campaign plan exists. Omit the section when it does not.
- * Expected outcome: An H1 heading and one bullet per fact. A null staging hex says the assault has already started.
+ * Expected outcome: An H1 heading and one bullet per fact. A null staging hex says the assault has already started. The defender bullet names the enemy ground units near home and says when the half-force cap held units back.
  * Exceptions: None.
  */
 export function buildCampaignObjectiveSection(args: {
@@ -105,8 +105,10 @@ export function buildCampaignObjectiveSection(args: {
     }
   }
   if (plan.defenderUnitIds.length > 0) {
+    const threatNoun = plan.homeThreatCount === 1 ? 'enemy ground unit is' : 'enemy ground units are';
+    const capSentence = plan.homeDefenseCapped ? ' At most half your ground units stay home.' : '';
     lines.push(
-      `- Home defenders: ${plan.defenderUnitIds.join(', ')}. Each has an enemy unit within ${CAMPAIGN_HOME_DEFENSE_RADIUS} hexes, so it stays home.`
+      `- Home defenders: ${plan.defenderUnitIds.join(', ')}. ${plan.homeThreatCount} ${threatNoun} within ${CAMPAIGN_HOME_DEFENSE_RADIUS} hexes of your units at home, so these units stay home.${capSentence}`
     );
   }
   logTrace('briefingSectionsCampaign buildCampaignObjectiveSection', { target, phase: objective.phase });

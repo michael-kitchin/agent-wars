@@ -198,7 +198,7 @@ export interface StatusInjectionTexts {
 }
 
 /**
- * The attention sentence for campaign units whose standing order should change.
+ * The attention sentence for units whose standing order Campaign Orders changes.
  *
  * Purpose: Attention Flags names the count. The table itself lists the rows.
  * When to use: After `buildCampaignOrderRows`, when standing orders are on.

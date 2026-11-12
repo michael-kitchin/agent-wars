@@ -86,14 +86,6 @@ function testBlindLandMarchAndOrderlessAirDefendCells(): void {
 }
 
 /**
- * Opens a temporary game database, runs the cell contract, and closes the database.
- *
- * Purpose: `getInjectionText` reads standing orders, so it needs an open database even when no orders exist.
- * When to use: Direct node invocation of this file.
- * Expected outcome: The cell contract passes and the temporary database is closed.
- * Exceptions: Closes the database if the contract throws, then rethrows.
- */
-/**
  * Campaign Orders names only a unit whose stored order differs.
  *
  * Purpose: A unit already marching to the campaign hex must not be told to change its order.
@@ -135,6 +127,8 @@ function testCampaignOrdersListOnlyDifferingUnits(): void {
     campaignUnitIds: new Set([unitA.id, unitB.id]),
     holdUnitIds: new Set(),
     defenderUnitIds: [],
+    homeThreatCount: 0,
+    homeDefenseCapped: false,
     massedCount: 0,
     threshold: 1,
   };
@@ -150,6 +144,75 @@ function testCampaignOrdersListOnlyDifferingUnits(): void {
   assert.ok(!without.includes('Campaign Orders'));
 }
 
+/**
+ * Campaign Orders recalls a home defender still marching on the campaign.
+ *
+ * Purpose: A unit that became a defender after it was sent to the target must be told to stay, and its other orders are left alone.
+ * When to use: After edits to `buildCampaignOrderRows` or the home-defender recall.
+ * Expected outcome: One row for the defender marching on the target, naming defend on its own hex. No row for the defender marching elsewhere. A second plan whose staging hex is that other destination adds a row for the second unit.
+ * Exceptions: Throws when the seeded match has fewer than two ground units or fewer than two spare hexes.
+ */
+function testCampaignOrdersRecallMarchingDefenders(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const seat = 'opponent' as const;
+  const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+  const ground = state.units.filter(
+    (unit) =>
+      unit.player === seat &&
+      (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+      !unit.embarkedOnCarrierUnitId
+  );
+  assert.ok(ground.length >= 2, 'expected two ground units');
+  const unitA = ground[0]!;
+  const unitB = ground[1]!;
+  const spare = state.hexes
+    .map((hex) => hex.h3Index)
+    .filter((h3) => h3 !== unitA.h3Index && h3 !== unitB.h3Index);
+  assert.ok(spare.length >= 2, 'expected two spare hexes');
+  const target = spare[0]!;
+  const elsewhere = spare[1]!;
+  dbRun('DELETE FROM standing_orders WHERE player_id = ?', [seat]);
+  for (const [unit, destination] of [
+    [unitA, target],
+    [unitB, elsewhere],
+  ] as const) {
+    const [lat, lng] = cellToLatLng(destination);
+    dbRun(
+      `INSERT INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, 'march', ?, NULL, 'en_route', ?, ?)`,
+      [seat, unit.id, JSON.stringify({ type: 'march', destination: [lat, lng] }), state.turnNumber, JSON.stringify(cellToLatLng(unit.h3Index))]
+    );
+  }
+  const plan: CampaignPlan = {
+    objective: { targetH3: target, stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: state.turnNumber },
+    waypointH3: target,
+    campaignUnitIds: new Set(),
+    holdUnitIds: new Set(),
+    defenderUnitIds: [unitA.id, unitB.id],
+    homeThreatCount: 2,
+    homeDefenseCapped: false,
+    massedCount: 0,
+    threshold: 1,
+  };
+  const rows = buildCampaignOrderRows({ playerId: seat, state, plan, coordinateContext: STRATEGIC });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0]?.unitId, unitA.id);
+  assert.strictEqual(rows[0]?.currentOrder, `march ${h3ToCode(target, STRATEGIC)}`);
+  assert.strictEqual(rows[0]?.campaignOrder, `defend ${h3ToCode(unitA.h3Index, STRATEGIC)}`);
+  const staged: CampaignPlan = { ...plan, objective: { ...plan.objective, stagingH3: elsewhere } };
+  const both = buildCampaignOrderRows({ playerId: seat, state, plan: staged, coordinateContext: STRATEGIC });
+  assert.strictEqual(both.length, 2);
+  assert.strictEqual(both.find((row) => row.unitId === unitB.id)?.campaignOrder, `defend ${h3ToCode(unitB.h3Index, STRATEGIC)}`);
+}
+
+/**
+ * Opens a temporary game database, runs the cell contract, and closes the database.
+ *
+ * Purpose: `getInjectionText` reads standing orders, so it needs an open database even when no orders exist.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: The cell contract passes and the temporary database is closed.
+ * Exceptions: Closes the database if the contract throws, then rethrows.
+ */
 function run(): void {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-orderless-mission-'));
   openGameDatabaseAtPathForTests(path.join(tempDir, 't.sqlite'));
@@ -159,6 +222,8 @@ function run(): void {
     console.log('OK standing order injection renders a blind march and an orderless-air defend cell');
     testCampaignOrdersListOnlyDifferingUnits();
     console.log('OK campaign orders list only units whose standing order differs from their campaign order');
+    testCampaignOrdersRecallMarchingDefenders();
+    console.log('OK campaign orders recall a home defender still marching on the campaign');
   } finally {
     closeGameDatabaseForTests();
   }

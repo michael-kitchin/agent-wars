@@ -116,8 +116,8 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Campaign Objective`
 
 - **Include:** when a campaign plan exists. **Omit** otherwise. Inside the briefing the heading is shifted to H2. A no-briefing situation message keeps the H1 and places the section immediately before Standing Order Status.
-- **Content:** one bullet for the target (briefing code, home name or `an enemy city`, urban count, known fortifications, and who chose it on which turn), one for the staging hex or the sentence that none exists, one for the phase, and one for home defenders when any exist. An unexplored city names a home only when exactly one active enemy home contains it, and it reports no known fortifications. Assemble states how many of the threshold stand within `CAMPAIGN_MASS_RADIUS` (2) of the staging hex. Assault states how many stand within that radius of the staging hex or the target, and the count that falls back to assemble.
-- **Model use:** the city and the hex campaign units are gathering on. Campaign Orders and Suggested Destination name the order for each unit.
+- **Content:** one bullet for the target (briefing code, home name or `an enemy city`, urban count, known fortifications, and who chose it on which turn), one for the staging hex or the sentence that none exists, one for the phase, and one for home defenders when any exist. The defender bullet names the number of enemy ground units within `CAMPAIGN_HOME_DEFENSE_RADIUS` (3) of the units at home, and adds `At most half your ground units stay home.` when `homeDefenseCapped` is true. An unexplored city names a home only when exactly one active enemy home contains it, and it reports no known fortifications. Assemble states how many of the threshold stand within `CAMPAIGN_MASS_RADIUS` (2) of the staging hex. Assault states how many stand within that radius of the staging hex or the target, and the count that falls back to assemble.
+- **Model use:** the city and the hex campaign units are gathering on. Campaign Orders names the standing order for each campaign unit that should change, and for each home defender still marching on the target or staging hex. A campaign unit with no standing order gets that order as its Suggested Destination.
 
 #### `### Best Options This Turn`
 
@@ -172,7 +172,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `### Campaign Orders`
 
 - **Include:** when a campaign plan exists, inside Standing Order Status. **Omit** when there is no plan.
-- **Content:** `Unit ID`, `Unit Type`, `Current Order`, `Campaign Order`. A row appears only when the stored standing order differs from the campaign order. Units with no standing order stay in Units Without Standing Orders; their Suggested Destination is the campaign order.
+- **Content:** `Unit ID`, `Unit Type`, `Current Order`, `Campaign Order`. A row appears only when the stored standing order differs from the campaign order, or when a home defender's stored order is a march to the target or staging hex; that row's Campaign Order is `defend` on the defender's own hex. A campaign unit with no standing order stays in Units Without Standing Orders; its Suggested Destination is the campaign order. An orderless home defender keeps the non-campaign Suggested Destination.
 - **Model use:** copy each row into an `assign_order` entry.
 
 #### `### Units Without Standing Orders`

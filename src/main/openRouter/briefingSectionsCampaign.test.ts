@@ -50,6 +50,8 @@ function planFor(args: {
   source: 'engine' | 'commander';
   massedCount: number;
   defenders?: readonly string[];
+  homeThreatCount?: number;
+  homeDefenseCapped?: boolean;
 }): CampaignPlan {
   return {
     objective: {
@@ -63,6 +65,8 @@ function planFor(args: {
     campaignUnitIds: new Set(),
     holdUnitIds: new Set(),
     defenderUnitIds: args.defenders ?? [],
+    homeThreatCount: args.homeThreatCount ?? 0,
+    homeDefenseCapped: args.homeDefenseCapped ?? false,
     massedCount: args.massedCount,
     threshold: 6,
   };
@@ -97,12 +101,29 @@ test('an explored assault names known forts, the commander, and the defenders', 
       source: 'commander',
       massedCount: 1,
       defenders: ['a1-i3', 'a1-t2'],
+      homeThreatCount: 4,
+      homeDefenseCapped: true,
     }),
     format,
   });
   assert.ok(text.includes('- Target: T1, a Western Europe city with 54 city cells and 3 known fortified cells. You chose it on turn 12.'));
   assert.ok(text.includes('- Phase: assault. 1 ground unit is within 2 hexes of S1 or T1. The campaign falls back to assemble below 3.'));
-  assert.ok(text.includes('- Home defenders: a1-i3, a1-t2. Each has an enemy unit within 3 hexes, so it stays home.'));
+  assert.ok(text.includes('- Home defenders: a1-i3, a1-t2. 4 enemy ground units are within 3 hexes of your units at home, so these units stay home. At most half your ground units stay home.'));
+  const uncapped = buildCampaignObjectiveSection({
+    state: cityState(true, false),
+    plan: planFor({
+      stagingH3: 's1',
+      phase: 'assault',
+      source: 'commander',
+      massedCount: 1,
+      defenders: ['a1-i3', 'a1-t2'],
+      homeThreatCount: 4,
+      homeDefenseCapped: false,
+    }),
+    format,
+  });
+  assert.ok(uncapped.includes('4 enemy ground units are within 3 hexes'));
+  assert.equal(uncapped.includes('At most half'), false);
 });
 
 test('a missing staging hex starts the assault on the target', () => {

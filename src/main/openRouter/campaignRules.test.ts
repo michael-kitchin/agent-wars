@@ -11,6 +11,7 @@ import {
   campaignAssaultReady,
   campaignAssaultThreshold,
   campaignOrderFor,
+  chooseHomeDefenders,
   nextCampaignPhase,
   resolveCampaignObjective,
 } from './campaignRules';
@@ -35,6 +36,33 @@ const hop = (a: string, b: string): number => {
   const [bx, by] = b.split(':').map(Number);
   return Math.max(Math.abs(ax! - bx!), Math.abs(ay! - by!));
 };
+
+/**
+ * Six home hexes in a row, for the home-defense cases.
+ *
+ * Purpose: The cases need a home region that every unit below stands in.
+ * When to use: Home-defense tests in this file.
+ * Expected outcome: The hexes `0:0` through `5:0`.
+ * Exceptions: None.
+ */
+const HOME_ROW = new Set(['0:0', '1:0', '2:0', '3:0', '4:0', '5:0']);
+
+/**
+ * One ground unit on each home hex.
+ *
+ * Purpose: A six-unit force gives a defender cap of three.
+ * When to use: Home-defense tests in this file.
+ * Expected outcome: Units `a1` through `a6`, on `0:0` through `5:0`.
+ * Exceptions: None.
+ */
+const SIX_AT_HOME = [
+  { id: 'a1', h3Index: '0:0' },
+  { id: 'a2', h3Index: '1:0' },
+  { id: 'a3', h3Index: '2:0' },
+  { id: 'a4', h3Index: '3:0' },
+  { id: 'a5', h3Index: '4:0' },
+  { id: 'a6', h3Index: '5:0' },
+];
 
 /**
  * One city row for the rank tests.
@@ -270,6 +298,7 @@ test('defenders and units in contact stay out of the campaign, and massed units 
     ],
     ownHomeHexes: new Set(['0:0', '1:0']),
     enemyUnitHexes: ['0:2', '3:6'],
+    enemyGroundUnitHexes: ['0:2', '3:6'],
     landStepsFromWaypoint: new Map([
       ['0:0', 1],
       ['3:5', 1],
@@ -279,6 +308,8 @@ test('defenders and units in contact stay out of the campaign, and massed units 
     hopDistance: hop,
   });
   assert.deepEqual(plan.defenderUnitIds, ['d1']);
+  assert.equal(plan.homeThreatCount, 1);
+  assert.equal(plan.homeDefenseCapped, false);
   assert.deepEqual([...plan.campaignUnitIds], ['h1', 'g1']);
   assert.deepEqual([...plan.holdUnitIds], ['h1']);
   assert.equal(plan.waypointH3, '5:0');
@@ -287,6 +318,88 @@ test('defenders and units in contact stay out of the campaign, and massed units 
   assert.equal(campaignOrderFor(plan, { id: 'd1', h3Index: '0:0' }), null);
   assert.equal(plan.massedCount, 1);
   assert.equal(plan.threshold, 5);
+});
+
+test('home defenders match the enemy ground units near home and never exceed half the force', () => {
+  assert.deepEqual(
+    chooseHomeDefenders({ groundUnits: SIX_AT_HOME, ownHomeHexes: HOME_ROW, enemyGroundUnitHexes: ['0:2'], hopDistance: hop }),
+    { defenderUnitIds: ['a1'], threatCount: 1, homeDefenseCapped: false }
+  );
+  assert.deepEqual(
+    chooseHomeDefenders({
+      groundUnits: SIX_AT_HOME,
+      ownHomeHexes: HOME_ROW,
+      enemyGroundUnitHexes: ['5:1', '5:1', '4:2', '5:3', '3:3'],
+      hopDistance: hop,
+    }),
+    { defenderUnitIds: ['a3', 'a5', 'a6'], threatCount: 5, homeDefenseCapped: true }
+  );
+  assert.deepEqual(
+    chooseHomeDefenders({
+      groundUnits: [{ id: 'a1', h3Index: '0:0' }],
+      ownHomeHexes: HOME_ROW,
+      enemyGroundUnitHexes: ['0:1'],
+      hopDistance: hop,
+    }),
+    { defenderUnitIds: [], threatCount: 1, homeDefenseCapped: true }
+  );
+  assert.deepEqual(
+    chooseHomeDefenders({
+      groundUnits: [
+        { id: 'a1', h3Index: '0:0' },
+        { id: 'a2', h3Index: '1:0' },
+        { id: 'b1', h3Index: '9:9' },
+        { id: 'b2', h3Index: '9:8' },
+        { id: 'b3', h3Index: '9:7' },
+        { id: 'b4', h3Index: '9:6' },
+      ],
+      ownHomeHexes: new Set(['0:0', '1:0']),
+      enemyGroundUnitHexes: ['0:1', '0:1', '0:1', '0:1', '0:1'],
+      hopDistance: hop,
+    }),
+    { defenderUnitIds: ['a1', 'a2'], threatCount: 5, homeDefenseCapped: false }
+  );
+  const fiveAtHome = ['a1', 'a2', 'a3', 'a4', 'a5'].map((id, index) => ({ id, h3Index: `${index}:0` }));
+  assert.deepEqual(
+    chooseHomeDefenders({
+      groundUnits: fiveAtHome,
+      ownHomeHexes: new Set(fiveAtHome.map((unit) => unit.h3Index)),
+      enemyGroundUnitHexes: ['4:1', '4:1', '4:1', '4:1', '4:1'],
+      hopDistance: hop,
+    }),
+    { defenderUnitIds: ['a4', 'a5'], threatCount: 5, homeDefenseCapped: true }
+  );
+});
+
+test('home units the defense does not keep join the campaign, and enemy air is not a threat', () => {
+  const plan = buildCampaignPlan({
+    objective: { targetH3: '9:0', stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: 1 },
+    groundUnits: SIX_AT_HOME,
+    ownHomeHexes: HOME_ROW,
+    enemyUnitHexes: ['5:1', '5:1', '4:2', '5:3', '3:3', '0:3'],
+    enemyGroundUnitHexes: ['5:1', '5:1', '4:2', '5:3', '3:3'],
+    landStepsFromWaypoint: new Map<string, number>([...HOME_ROW].map((h3) => [h3, 1])),
+    hopDistance: hop,
+  });
+  assert.deepEqual(plan.defenderUnitIds, ['a3', 'a5', 'a6']);
+  assert.equal(plan.homeThreatCount, 5);
+  assert.equal(plan.homeDefenseCapped, true);
+  assert.deepEqual([...plan.campaignUnitIds], ['a1', 'a2', 'a4']);
+});
+
+test('a home unit left out of the defense still stays in a contact fight', () => {
+  const plan = buildCampaignPlan({
+    objective: { targetH3: '9:0', stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: 1 },
+    groundUnits: SIX_AT_HOME,
+    ownHomeHexes: HOME_ROW,
+    enemyUnitHexes: ['0:1'],
+    enemyGroundUnitHexes: ['0:1'],
+    landStepsFromWaypoint: new Map<string, number>([...HOME_ROW].map((h3) => [h3, 1])),
+    hopDistance: hop,
+  });
+  assert.deepEqual(plan.defenderUnitIds, ['a1']);
+  assert.equal(plan.campaignUnitIds.has('a2'), false);
+  assert.equal(plan.campaignUnitIds.has('a3'), true);
 });
 
 test('an assembly is ready once the threshold stands near the staging hex', () => {

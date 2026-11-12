@@ -732,6 +732,8 @@ function testCampaignUnitMarchesToTheCampaignHexOrDefendsWhenItHolds(): void {
     campaignUnitIds: new Set([unitId]),
     holdUnitIds: new Set(hold ? [unitId] : []),
     defenderUnitIds: [],
+    homeThreatCount: 0,
+    homeDefenseCapped: false,
     massedCount: 0,
     threshold: 1,
   });
