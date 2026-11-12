@@ -18,11 +18,15 @@ Tactical battle map: the enclosing strategic hex's tactical cells plus up to thr
 
 Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for targetUnitId. Never emit raw H3 strings or latitude/longitude pairs.
 
-# Combat and Movement Rules
+# Rules
+
+## Combat
 
 Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17. infantry: 3 attack / 7 defense, range 2; armor: 10 attack / 7 defense, range 5; naval: 7 attack / 7 defense, range 10.
 
 Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
+
+## Bonuses
 
 Origin bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. That area is its birth country in a global game and its origin area in a regional game.
 
@@ -36,6 +40,8 @@ The two bonuses do not stack; the most is +2. Casualty order still uses the prin
 
 Tech bonus is on. An Advanced unit, born in a hex with at least 21 urban cells, adds 2 to its attack. A Basic unit adds nothing. The tech bonus does not change defense. Casualty order still uses printed defense.
 
+## Weather
+
 Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex's weather.
 
 Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain.
@@ -46,42 +52,56 @@ None of these penalties applies to a unit tagged for that weather; a tag is earn
 
 The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.
 
+## Terrain Cover
+
 Terrain cover: ranged fire at a forest, mountain, urban, or rubble cell needs a roll 2 lower, or 1 lower for wetlands. An air strike on units in a forest, urban, or rubble cell needs a roll 1 lower. Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.
+
+## Resolution Order
 
 This beat resolves as embark, then air strikes, then air drops, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step. Ranged uses pre-move positions. At most one ranged_attack per unit from beat-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId. A unit may fire at a cell and move into that same cell in the same beat; the shot resolves first. Infantry and armor fire at their tactical baselines (infantry 2, armor 5); forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of range. Copy each ranged row that Best Options This Turn lists for that unit, and choose among those listed rows. Do not invent a target the table does not list. Those attacks resolve from beat-start positions and do not prevent movement in the same beat. Drop invalid attacks before submit.
 
-Clear of weather, the point budget is 2 points for infantry, 4 for armor, 3 for naval, and air does not march.
+## Movement
 
-Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. Armor in forest is penalised to the infantry baseline.
-
-Entering an intact road cell costs 1/2 point and an intact rail cell costs 1/3 point, for every terrain, for infantry and armor. That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell.
-
-Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. A non-air unit always retains at least one point.
-
-A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.
+Clear of weather, the point budget is 2 points for infantry, 4 for armor, 3 for naval, and air does not march. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. Armor in forest is penalised to the infantry baseline. Entering an intact road cell costs 1/2 point and an intact rail cell costs 1/3 point, for every terrain, for infantry and armor. That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell. Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. A non-air unit always retains at least one point. A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.
 
 Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
+
+## Rule Lookup
 
 Call rules(topic) for a rule that is not printed above. Topics: weather, movement, line-of-sight, casualties, stacking, naval, air, fortifications, missiles, mercenaries, resolution, combat-stats.
 
 # Battle Context
 
-
 - Your priority is to engage enemy forces and inflict losses when advantageous
 - Your strategy is:
-    (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
-    (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
-    (3) Create maximum disruption with minimum force
+    (1) Attack where you outnumber the defenders, and avoid fights where you do not.
+    (2) Strike gaps the enemy cannot reinforce quickly.
+    (3) Keep the initiative: move toward your objective every beat.
+- Your doctrine is balanced:
+    (1) Advance on the nearest enemy home region while your home cities are safe.
+    (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not.
 - Your message is:
     Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
 
+# Reading the Briefing
+
+## Map Legend
+
+- Each cell: top = tactical hex code, bottom = terrain + overlay.
+- Terrain: x = land, . = water.
+- Overlay: - = nothing here, * = your units, ! = enemy units, including neutral garrisons, # = contested.
+- Features: A/a airport, S/s seaport, B/b both, U/u urban only, F/f fortified city cell (F = yours); uppercase = your control.
+- Odd rows are indented one space. Use only hex codes from this map or tables.
+
+## Best Options Odds
+
+Odds is Kill, Hurt, and Loss for every listed unit taking part. Kill is the chance the defenders are wiped out. Hurt is the chance at least one hit lands, including a hit that only removes a fortification. Loss is the chance you lose a unit. An em dash is not a fight, or it could not be estimated.
+
 # Available Tools
 
-Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move; copy ranged Target Hexes or Target Units into ranged_attack; pick one row per sub-unit per action.
+Use the Commander's Briefing in the situation message for assessments and possible unit actions. When Best Options This Turn lists a target for a sub-unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the sub-unit idle. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move; copy ranged Target Hexes or Target Units into ranged_attack; pick one row per sub-unit per action.
 
 Never copy a Target Hex from a row that does not list that sub-unit.
-
-When Best Options This Turn lists a target for a sub-unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the sub-unit idle.
 
 1. plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination.
 2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.
@@ -92,26 +112,25 @@ When Best Options This Turn lists a target for a sub-unit, copy it and do not ca
 
 ## How to Use These Tools Effectively
 
-- The Commander's Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.
+- The Commander's Briefing in the situation message already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.
 - assess_unit is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.
 - Batch independent tool calls: when you need the same tool for several units or hexes, request all of those calls together in one reply as parallel tool calls instead of one call per reply. Wait for a result only when the next call's arguments depend on it.
+
+# Orders Guidance
+
+## Using the Briefing
+
 - Copy a listed shot from Best Options unless its Odds show Kill below 50% and Loss at least 50%. An em dash is not that case. A shot resolves before movement and does not use the move. Do not invent a target.
 - Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat.
-- Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry.
+- When Best Options This Turn lists a target for a sub-unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the sub-unit idle. Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee); copy a ranged Target Hex or Target Unit into a ranged_attack entry.
 
   Each sub-unit gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; do not copy overlapping rows that relist the same sub-unit.
 
   Never copy a Target Hex from a row that does not list that sub-unit; if that sub-unit has no row, call plan_route or leave it idle.
-- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. When that shortened step is not the ordered cell and the sub-unit can already shoot an enemy from its current cell, the move is dropped and the sub-unit stays there, unless the shortened step enters a cell that holds an enemy.
+- A destination beyond this beat's point budget is clamped to the first reachable leg. When that shortened step is not the ordered cell and the sub-unit can already shoot, the move is dropped unless the step enters a cell that holds an enemy.
 
-  Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat.
+## Callbacks and Messages
 
-  Entering an intact road cell costs 1/2 point and an intact rail cell costs 1/3 point, for every terrain, for infantry and armor. That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell.
-
-  Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain.
-- Infantry and armor fire at tactical baselines of 2 and 5; forest, urban, or rubble caps them to range 1. A mountain cell between the shooter and the target blocks armor and naval shots. The cell the shooter stands on and the target cell do not. Infantry is exempt. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.
-- Hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. Missiles are always hit last.
-- Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.
 - Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.
 - The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.
 - The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent.
@@ -137,31 +156,22 @@ The "strategy" field is a one-line summary of your plan for this beat.
 
 The "orders" array is processed in list order. Each entry includes "action" and "unitId" or "unitIds" (copy several ids from one Best Options row into unitIds instead of one object per unit).
 
-Actions: explicit_move, ranged_attack.
+Actions:
 
-explicit_move (include "destination": briefing hex code for this beat's march; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; every type with a tactical reach, infantry included). Do not emit assign_order or cancel_order for tactical sub-unit ids.
+- explicit_move: include "destination": briefing hex code for this beat's march; auto-debarks embarked cargo before marching.
+- ranged_attack: include exactly one of targetHexCode or targetUnitId; every type with a tactical reach, infantry included.
+
+Do not emit assign_order or cancel_order for tactical sub-unit ids.
 
 The top level must be a JSON object; a top-level array is invalid. Do not use top-level movementOrders or rangedAttacks (legacy).
 
-An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. An explicit_move to the sub-unit's current cell is ignored as already arrived; the unit holds.
+An entry missing a required field is dropped without comment. More than one ranged action for the same unit in the same period is not honoured. Raw H3 strings and latitude/longitude pairs are never valid field values. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. Memory updates and production orders are not accepted this beat. Strategic hex codes are never valid field values this beat. An explicit_move to the sub-unit's current cell is ignored as already arrived; the unit holds.
 
-Do not emit assign_order or cancel_order for tactical sub-unit ids. Memory updates and production orders are not accepted this beat.
-
-Strategic hex codes are never valid field values this beat.
-
-For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there.
-
-Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready).
-
-When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback.
-
-Copy a Best Options This Turn approach or move/melee Target Hex for that unit, or plan_route's orderToHexCode, not a guessed adjacent code.
+For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there. Copy a Best Options This Turn approach or move/melee Target Hex for that unit, or plan_route's orderToHexCode, not a guessed adjacent code.
 
 Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) for unit-scoped events (e.g. unit_destroyed, unit_engaged); subscriptions are evaluated after each tactical beat when event-driven mode is on and are cleared when the battle ends. Each response replaces the whole callbacks list; omit the array or send [] to clear every subscription.
 
-Legal events and their parameters: turns (n: fires after n turns have passed since the subscription); unit_engaged (unitId: fires when that unit takes part in combat); unit_destroyed (side or unitId: fires when an own or enemy unit, or a named unit, is destroyed); threat_escalation (unitId, severity: fires when that unit's threat reaches the named severity); infrastructure_destroyed (targetType, hex (omit both for an unfiltered watch): fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any).
-
-In battle, unit-scoped events use sub-unit ids, not strategic parent ids. 
+Legal events and their parameters: turns (n: fires after n turns have passed since the subscription); unit_engaged (unitId: fires when that unit takes part in combat); unit_destroyed (side or unitId: fires when an own or enemy unit, or a named unit, is destroyed); threat_escalation (unitId, severity: fires when that unit's threat reaches the named severity); infrastructure_destroyed (targetType, hex (omit both for an unfiltered watch): fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any). In battle, unit-scoped events use sub-unit ids, not strategic parent ids.
 
 ## Example Response
 
@@ -239,90 +249,80 @@ Tactical beat 4: you command 13 sub-unit(s); enemy sub-units in this battle: 4 (
 
 ## Operational Map
 
-Each cell: top = tactical hex code, bottom = terrain + overlay.
-
-Terrain: x = land, . = water.
-
-Overlay: * = your units, ! = enemy units, including neutral garrisons, # = contested.
-
-Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.
-
-Odd rows are indented one space. Use only hex codes from this map or tables.
-
 ```text
 P6 PN O3 OI NZ       LZ K8 KJ JR IZ                                                                                       
-x. x. x. x. x.       x. x. x. x. x.                                                                                       
+x- x- x- x- x-       x- x- x- x- x-                                                                                       
     P8 PQ O6 OL N0 ND MQ L2 LC KK JS I2 IA HI GQ                                                                           
-    x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                                                           
+    x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                                                           
 QQ QB PS O8 ON N3 NH MT L4 LE KN JW I4 IB HL GU F2                                                                        
-x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                                                        
+x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                                                        
     QS QD PU PA OQ N5 NJ MW L7 LH KP JY I7 IF HN GV F5 FF                                                                  
-    x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. xU x. x.                                                                  
+    x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- xU x- x-                                                                  
    QU QF PW PD OS N7 NM MZ MA LK KS J1 I9 IH HQ GY F7 FG ES                                                               
-   x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                                               
+   x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                                               
        QW QH PZ PF OU OA NO M1 MD LN KV J3 JC IJ HS G1 F9 FJ EV D7                                                         
-       x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. xU                                                         
+       x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- xU                                                         
       QY QJ P1 PI OX OC NQ M3 MG LP KY J7 JF IM HV G3 GB FM EX EA                                                         
-      x. x. x. x! x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                                         
+      x- x- x- x! x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                                         
              QK P3 PK O0 OF NT M6 MI LS K0 J9 JH IP HY G6 GE FO EZ EC DP                                                   
-             x. x. xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                                   
+             x- x- xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                                   
             QM P4 PL O1 OH NW M9 ML LV K3 KC JK IS H0 G9 GH FR E1 EE DR C5 CL                                             
-            x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                             
+            x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                             
              Q0 QO P7 PO O4 OJ NX NB MO LY K7 KF JN IU H3 HB GK FU E4 EG DT C8 CN B2                                       
-             x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.                                       
+             x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-                                       
             Q1 QR QA PR O7 OM N1 NE MP L0 LA KI JQ IY H6 HE GM FV E6 EI DW DA CP B4 BL                                    
-            x. x. x. x. x. x. x. x. x. x. x. x! x. x. x. x. x. x. x. x. x. x. x. x. x.                                    
+            x- x- x- x- x- x- x- x- x- x- x- x! x- x- x- x- x- x- x- x- x- x- x- x- x-                                    
                 Q2 QT QE PV PB OP N4 NI MU L5 LD KL JU I1 H9 HH GP FY E8 EK DX DC CS B7 BN A4                              
-                x. x. x. x. x. x. x. x. x. x. x. x* xU x. x. x. x. x. x. x. x. x. x. x. x. x.                              
+                x- x- x- x- x- x- x- x- x- x- x- x* xU x- x- x- x- x- x- x- x- x- x- x- x- x-                              
                Q3 QV QG PY PE OT N8 NL MY L9 LI KQ JX I5 IC HK GS F1 FB EN D0 DE CT B8 BQ A7 AR                           
-               x. x. x. x. x. x. x. x. x. x. x. x. x. xU x. x. x. x. x. x. x. x. x. x. x. x. x.                           
+               x- x- x- x- x- x- x- x- x- x- x- x- x- xU x- x- x- x- x- x- x- x- x- x- x- x- x-                           
                    Q4 QX QI P0 PH OW OB NP M2 MC LM KU J2 JA IG HO GW F3 FD EP D3 DH CW CB BR A8 AS                        
-                   x. xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x* x. x. xU x. x. x. x. x.                        
+                   x- xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x* x- x- xU x- x- x- x- x-                        
                      QZ QL P2 PJ OZ OE NS M5 MH LQ KX J5 JD IL HT G0 F8 FH ER D5 DJ CZ CE BU BB AU AF                     
-                     xU xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. xU xU xU x. x. x. x. x.                     
+                     xU xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- xU xU xU x- x- x- x- x-                     
                             QN P5 PM O2 OG NU M8 MK LU K2 KA JI IO HW G4 GD FL EW D8 DL C0 CG BW BE AW AH AA               
-                            x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. xU xU xU x. x. x. x. x. x.               
+                            x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- xU xU xU x- x- x- x- x- x-               
                            QP P9 PP O5 OK NY NA MM LW K6 KE JM IT H1 G8 GG FP E0 EB DO C3 CI BY BG AY AJ AB               
-                           x. xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.               
+                           x- xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-               
                                   QC PT O9 OO N2 NF MR L1 K9 KG JO IX H5 HD GL FT E3 EF DS C6 CK B0 BH AZ AK AC            
-                                  x. x. xU xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.            
+                                  x- x- xU xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-            
                                     PX PC OR N6 NK MV L6 LF KM JT I0 H7 HF GO FX E7 EJ DV C9 CO B3 BJ A1 AM AD            
-                                    x. x. xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.            
+                                    x- x- xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-            
                                            PG OV N9 NN M0 MB LJ KR JZ I6 ID HJ GR FZ E9 EM DZ DD CR B6 BM A3 AO AE         
-                                           x. x. x. x. x. x. xU x. x. x. x. x. x. x. x. x. x. x. x. x. x. xU x. x.         
+                                           x- x- x- x- x- x- xU x- x- x- x- x- x- x- x- x- x- x- x- x- x- xU x- x-         
                                              OY OD NR M4 MF LO KW J4 JB II HP GX F4 FC EO D1 DF CV CA BP A6 AQ            
-                                             x. x. x. x. x. x. xU xU xU x. x. x. x. x. x. x. x. x. x. x. x. x.            
+                                             x- x- x- x- x- x- xU xU xU x- x- x- x- x- x- x- x- x- x- x- x- x-            
                                                        NV M7 MJ LT K1 J8 JG IN HU G2 GA FI ET D4 DI CX CC BS A9 AT         
-                                                       x. x. x. x. x. x. xU x. x. x. x. x. x. x. x. x. x. x. x. x.         
+                                                       x- x- x- x- x- x- xU x- x- x- x- x- x- x- x- x- x- x- x- x-         
                                                          NC MN LX K5 KD JL IR HZ G7 GF FN EY D9 DM C1 CF BV BC AV AG      
-                                                         x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.      
+                                                         x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-      
                                                              NG MS L3 LB KH JP IW H4 HC GJ FS E2 ED DQ C4 CJ BZ BF AX AI   
-                                                             .. x. x. x. x. x. x. x. xA xU x. x. x. x. x. x. x. x. x. x.   
+                                                             .- x- x- x- x- x- x- x- xA xU x- x- x- x- x- x- x- x- x- x-   
                                                                MX L8 LG KO JV I3 H8 HG GN FW E5 EH DU C7 CM B1 BI A0 AL   
-                                                               .. x. x. x. x. x. x. xU xU x. x. x. xU x. x. x. x. x. x.   
+                                                               .- x- x- x- x- x- x- xU xU x- x- x- xU x- x- x- x- x- x-   
                                                                       ME LL KT J0 I8 IE HM GT F0 FA EL DY DB CQ B5 BK A2 AN
-                                                                      .. x. x. x. x. x. x. xU x. x. x. xU x. x. x. x. x. x.
+                                                                      .- x- x- x- x- x- x- xU x- x- x- xU x- x- x- x- x- x-
                                                                         LR KZ J6 JE IK HR GZ F6 FE EQ D2 DG CU B9 BO A5 AP
-                                                                        .. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x. x.
+                                                                        .- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x- x-
                                                                                K4 KB JJ IQ HX G5 GC FK EU D6 DK CY CD BT BA
-                                                                               .. x. x. x. x. x. x. x. x. x. x. x. x. x. x.
+                                                                               .- x- x- x- x- x- x- x- x- x- x- x- x- x- x-
                                                                                        IV H2 HA GI FQ       DN C2 CH BX BD
-                                                                                       x. x. x. x. x.       x. x. x. x. x.
+                                                                                       x- x- x- x- x-       x- x- x- x- x-
 ```
 
 Units at featured hexes: PI(A), KI(U)
 
 ### Best Options This Turn
 
-| Unit IDs | Action | Target Hexes | Target Units | Target Infrastructure |
-| --- | --- | --- | --- | --- |
-| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | F3 | h1-t1-s3, h1-t2-s3 | — |
-| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | F1 | h1-t1-s3, h1-t2-s3 | — |
-| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GW | h1-t1-s3, h1-t2-s3 | — |
-| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GS | h1-t1-s3, h1-t2-s3 | — |
-| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GP | h1-t1-s3, h1-t2-s3 | — |
-| a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4 | ranged | KI | 2 armor | urban |
-| a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4 | move/melee | KI | 2 armor | urban |
+| Unit IDs | Action | Target Hexes | Target Units | Target Infrastructure | Odds |
+| --- | --- | --- | --- | --- | --- |
+| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | F3 | h1-t1-s3, h1-t2-s3 | — | — |
+| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | F1 | h1-t1-s3, h1-t2-s3 | — | — |
+| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GW | h1-t1-s3, h1-t2-s3 | — | — |
+| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GS | h1-t1-s3, h1-t2-s3 | — | — |
+| a1-i1-s1, a1-i1-s2, a1-i1-s3, a1-i1-s4, a1-i1-s5, a1-i1-s6, a1-i1-s7 | approach | GP | h1-t1-s3, h1-t2-s3 | — | — |
+| a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4 | ranged | KI | 2 armor | urban | Kill: 61%, Hurt: 96%, Loss: 0% |
+| a1-t1-s3, a1-t1-s4, a1-t2-s1, a1-t2-s2, a1-t2-s3, a1-t2-s4 | move/melee | KI | 2 armor | urban | Kill: 72%, Hurt: 95%, Loss: 64% |
 
 ## Recent Turn Notes
 
@@ -346,10 +346,10 @@ Turn 3:
 
 | Event | Details |
 | --- | --- |
-| — | None. Omitting callbacks or sending [] leaves this list empty. You have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now. |
+| — | None. |
 
-# Unit Roster
+## Unit Roster
 
 Enemy units (currently observed): Enemy: h1-t1-s1 (armor) at PI; h1-t1-s3 (armor) at KI; h1-t2-s1 (armor) at PI; h1-t2-s3 (armor) at KI
 
-Use the Commander's Briefing above. Copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; use the routing tool only for an unlisted destination.
+Use the Commander's Briefing above. Copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; use the routing tool only for an unlisted destination. Then submit JSON with "message", "strategy", "orders", "callbacks". Do not emit assign_order or cancel_order for tactical sub-unit ids.

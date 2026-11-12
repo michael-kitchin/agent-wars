@@ -11,6 +11,7 @@ import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, for
 import { getOrderedHexList } from './mapData';
 import { FOG_PATH_DISTANCE_BRIEFING_LINE, OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
 import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
+import { briefingDistanceCaveatLines } from './briefing/briefingDistanceCaveat';
 
 /**
  * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).
@@ -203,7 +204,8 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('## Standing Order Status'), 'standing order block');
   assert.ok(out.includes('MARCH to AB — en_route'), 'SO detail stays in Standing Order Status');
   assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
-  assert.ok(out.includes('engine-forced'), 'empty callbacks state the event-driven consequence');
+  assert.ok(out.includes('| — | None. |'), 'empty callbacks row is None');
+  assert.ok(!out.includes('engine-forced'), 'the empty-list consequence stays in coaching');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
 }
 
@@ -772,11 +774,11 @@ function testHopCloseIsActionNeededWhenPathEtaIsLonger(): void {
 }
 
 /**
- * Verifies the grid-hops honesty line appears only for fog-off strategic snapshots.
+ * Verifies distance-caveat sentences leave the briefing and follow the fog setting.
  *
- * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
- * When to use: After changing formatBriefing omniscient copy.
- * Expected outcome: Line present for fog false + strategic; absent for fog true + strategic, and for the shared res3 fixture even with fog false.
+ * Purpose: Those sentences are turn-invariant, so the system prompt prints them. The briefing must not.
+ * When to use: After moving the caveat lines out of formatBriefing.
+ * Expected outcome: The briefing contains none of the three sentences. The caveat helper returns the grid line only for fog-off strategic cells, and staleness plus the path line only for fog-on strategic cells.
  * Exceptions: None.
  */
 function testFormatBriefingGridProximityHonestyLine(): void {
@@ -789,11 +791,10 @@ function testFormatBriefingGridProximityHonestyLine(): void {
   };
   const fogOffStrategic = formatBriefing(strategicState, precomputed, '', '');
   assert.ok(
-    fogOffStrategic.includes(
-      `## Unit Status and Threats\n\n${OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE}\n\n| Unit ID | Type | Hex |`
-    ),
-    'fog-off res1 briefing places grid-hops sentence immediately after Unit Status heading, then the table'
+    !fogOffStrategic.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
+    'fog-off res1 briefing omits the grid-hops sentence'
   );
+  assert.deepEqual(briefingDistanceCaveatLines(strategicState), [OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE]);
   assert.ok(
     !fogOffStrategic.includes(buildIntelStalenessRule()),
     'fog-off res1 briefing omits the intel staleness sentence'
@@ -806,13 +807,14 @@ function testFormatBriefingGridProximityHonestyLine(): void {
     'fog-on res1 briefing omits grid-hops sentence'
   );
   assert.ok(
-    fogOnOut.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
-    'fog-on res1 briefing includes the path-vs-Best-Options sentence'
+    !fogOnOut.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
+    'fog-on res1 briefing omits the path-vs-Best-Options sentence'
   );
   assert.ok(
-    fogOnOut.includes(buildIntelStalenessRule()),
-    'fog-on res1 briefing includes the intel staleness sentence'
+    !fogOnOut.includes(buildIntelStalenessRule()),
+    'fog-on res1 briefing omits the intel staleness sentence'
   );
+  assert.deepEqual(briefingDistanceCaveatLines(fogOnStrategic), [buildIntelStalenessRule(), FOG_PATH_DISTANCE_BRIEFING_LINE]);
 
   const fogOffRes3: GameStateSnapshot = { ...fixtureState, fogOfWarEnabled: false };
   const fogOffRes3Out = formatBriefing(fogOffRes3, precomputed, '', '');
@@ -831,9 +833,10 @@ function testFormatBriefingGridProximityHonestyLine(): void {
     'fog-on non-res1 fixture omits the path-vs-Best-Options sentence'
   );
   assert.ok(
-    fogOnRes3Out.includes(buildIntelStalenessRule()),
-    'fog-on non-res1 fixture still includes the intel staleness sentence'
+    !fogOnRes3Out.includes(buildIntelStalenessRule()),
+    'fog-on non-res1 briefing omits the intel staleness sentence'
   );
+  assert.deepEqual(briefingDistanceCaveatLines(fogOnRes3), [buildIntelStalenessRule()]);
   assert.ok(
     !formatBriefing(fixtureState, precomputed, '', '').includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
     'shared fixture without fog flag omits grid-hops sentence'

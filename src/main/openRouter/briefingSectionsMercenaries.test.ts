@@ -15,7 +15,7 @@ import { getGameStateForPlayer, getScenarioHomeRegionHexes, getSeatRoster, setTr
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { createStrategicUnit } from '../gameActions/strategicUnitSpawn';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { buildMercenariesBriefingBlock } from './briefingSectionsMercenaries';
+import { buildMercenariesBriefingBlock, compareByCampaignTarget } from './briefingSectionsMercenaries';
 
 test('the section names the treasury and the mercenary, and a battle omits it', () => {
   withTempGameDb('aw-brief-merc-', () => {
@@ -89,4 +89,25 @@ test('a raise cell that would restart a paused city is marked and listed first',
     assert.ok(raiseRows[hexIndex]?.includes(' | yes | '), raiseRows[hexIndex]);
     assert.ok(firstNo === -1 || hexIndex < firstNo, 'yes rows must sort before no rows');
   });
+});
+
+/**
+ * Chebyshev distance on `x:y` labels.
+ *
+ * Purpose: The sort cases do not need a real H3 grid.
+ * When to use: The campaign-target comparison below.
+ * Expected outcome: The larger axis gap. A null pair is not used.
+ * Exceptions: None.
+ */
+const hop = (a: string, b: string): number | null => {
+  if (a === 'missing' || b === 'missing') return null;
+  const [ax, ay] = a.split(':').map(Number);
+  const [bx, by] = b.split(':').map(Number);
+  return Math.max(Math.abs(ax! - bx!), Math.abs(ay! - by!));
+};
+
+test('raise options sort the nearer cell first, treat a null target as a tie, and sort a null distance last', () => {
+  assert.ok(compareByCampaignTarget('1:0', '4:0', '0:0', hop) < 0);
+  assert.equal(compareByCampaignTarget('1:0', '4:0', null, hop), 0);
+  assert.ok(compareByCampaignTarget('missing', '1:0', '0:0', hop) > 0);
 });

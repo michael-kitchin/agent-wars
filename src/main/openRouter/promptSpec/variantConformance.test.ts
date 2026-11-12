@@ -9,6 +9,7 @@ import { latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
 import type { UnitAssessmentResult } from '../../precomputation';
 import { buildAttentionFlags, formatBriefing } from '../../briefingFormatter';
+import { briefingDistanceCaveatLines } from '../../briefing/briefingDistanceCaveat';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { getOrderedHexList } from '../../mapData';
 import { PRODUCTION_EMPTY_QUEUES_SENTENCE, buildEmptyProductionQueuesSection } from '../briefingSections';
@@ -34,7 +35,7 @@ import {
 import { buildEnemyUnitsPromptLine } from '../promptText';
 import {
   GENERIC_OBJECTIVE_SENTENCE,
-  buildRegionVsRegionScenarioObjectiveBlock,
+  buildScenarioObjectiveRulesBlock,
   buildWinConditionReminderClause,
 } from '../scenarioGoals';
 import { REQUEST_ORDERS_MAX_TOOL_ROUNDS, buildToolBudgetExceededWarning } from '../requestOrdersFlowSupport';
@@ -161,14 +162,23 @@ test('fog: hop-distance caveat only with fog off at strategic resolution; stalen
     turnNumber: 2,
     pendingOrders: [],
   };
-  const fogOff = formatBriefing({ ...base, fogOfWarEnabled: false }, precomputed, '', '');
-  const fogOn = formatBriefing({ ...base, fogOfWarEnabled: true }, precomputed, '', '');
-  assert.ok(fogOff.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+  const fogOffState = { ...base, fogOfWarEnabled: false };
+  const fogOnState = { ...base, fogOfWarEnabled: true };
+  const fogOff = formatBriefing(fogOffState, precomputed, '', '');
+  const fogOn = formatBriefing(fogOnState, precomputed, '', '');
+  const fogOffCaveat = briefingDistanceCaveatLines(fogOffState).join('\n');
+  const fogOnCaveat = briefingDistanceCaveatLines(fogOnState).join('\n');
+  assert.ok(!fogOff.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+  assert.ok(fogOffCaveat.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
   assert.ok(!fogOff.includes(buildIntelStalenessRule()));
-  assert.ok(fogOn.includes(buildIntelStalenessRule()));
-  assert.ok(fogOn.includes(String(STALE_INTEL_TURNS)));
-  assert.ok(fogOn.includes(FOG_PATH_DISTANCE_BRIEFING_LINE));
+  assert.ok(!fogOffCaveat.includes(buildIntelStalenessRule()));
+  assert.ok(!fogOn.includes(buildIntelStalenessRule()));
+  assert.ok(fogOnCaveat.includes(buildIntelStalenessRule()));
+  assert.ok(fogOnCaveat.includes(String(STALE_INTEL_TURNS)));
+  assert.ok(!fogOn.includes(FOG_PATH_DISTANCE_BRIEFING_LINE));
+  assert.ok(fogOnCaveat.includes(FOG_PATH_DISTANCE_BRIEFING_LINE));
   assert.ok(!fogOn.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+  assert.ok(!fogOnCaveat.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
 
   const res3State: GameStateSnapshot = {
     ...base,
@@ -251,9 +261,9 @@ test('roster: no observed enemy uses the empty-roster phrasing and scouting coac
   assert.match(line, /currently observed\): none/i);
   assert.match(line, /out of view/i);
   const coaching = buildCoachingBullets(strategicCoaching({ hasObservedEnemy: false })).join('\n');
-  assert.doesNotMatch(coaching, /move to regain contact/i);
+  assert.match(coaching, /move to regain contact/i);
   const withEnemy = buildCoachingBullets(strategicCoaching({ hasObservedEnemy: true })).join('\n');
-  assert.doesNotMatch(withEnemy, /move to regain contact/i);
+  assert.match(withEnemy, /move to regain contact/i);
 });
 
 test('roster: no option rows omit copy-from-table wording in coaching and the opening message', () => {
@@ -270,12 +280,12 @@ test('scenarios: region-versus-region keeps the objective section; absent and un
     ...rosterState([{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '810ebffffffffff' }]),
     scenarioId: 'region_vs_region',
   };
-  const objective = buildRegionVsRegionScenarioObjectiveBlock(recognised);
+  const objective = buildScenarioObjectiveRulesBlock(recognised);
   assert.ok(objective.includes(SECTION_TITLE_SCENARIO_OBJECTIVE));
   assert.ok(objective.includes('Scenario: region_vs_region'));
   assert.equal(buildWinConditionReminderClause({ scenarioId: 'region_vs_region' }).includes('home region'), true);
 
-  assert.equal(buildRegionVsRegionScenarioObjectiveBlock(rosterState([])), '');
+  assert.equal(buildScenarioObjectiveRulesBlock(rosterState([])), '');
   assert.equal(buildWinConditionReminderClause({}), GENERIC_OBJECTIVE_SENTENCE);
   assert.equal(buildWinConditionReminderClause({ scenarioId: 'unknown_pack' }), GENERIC_OBJECTIVE_SENTENCE);
   const coaching = buildCoachingBullets(strategicCoaching({ includeScenarioWinPaths: false })).join('\n');

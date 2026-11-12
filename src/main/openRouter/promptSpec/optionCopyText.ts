@@ -37,8 +37,9 @@ export function buildOptionCopyMappingClause(args: {
   const airChoice = args.hasAirUnits
     ? ` An air ${actor} picks only one of air strike, air drop, and ferry. When its Aboard column is none, embark one infantry ${actor} from its hex in the same orders list.`
     : '';
+  const moveKinds = actor === 'unit' ? 'approach, advance, or move/melee' : 'approach or move/melee';
   return (
-    `Copy a Target Hex from a row listing that ${actor} into explicit_move.destination (approach or move/melee); ` +
+    `Copy a Target Hex from a row listing that ${actor} into explicit_move.destination (${moveKinds}); ` +
     `copy a ranged Target Hex or Target Unit into a ranged_attack entry` +
     ferry +
     air +
@@ -102,8 +103,10 @@ export function buildToolsIntroCopySentence(args: {
   const ferry = args.hasAirUnits ? '; copy ferry Target Hexes into ferryOrders and air drop Target Hexes into airDrops' : '';
   const air = args.hasAirUnits ? '; copy air strike Target Hexes into airStrikes' : '';
   const airChoice = args.hasAirUnits ? ` An air ${actor} picks only one of air strike, air drop, and ferry.` : '';
+  const movePhrase =
+    args.coordinateMode === 'strategic' ? 'approach, advance, and move/melee' : 'approach and move/melee';
   return (
-    `Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move${oneStep}; ` +
+    `Copy Best Options This Turn ${movePhrase} Target Hexes into explicit_move${oneStep}; ` +
     `copy ranged Target Hexes or Target Units into ranged_attack${ferry}${air}; ` +
     `pick one row per ${actor} per action.` +
     airChoice +

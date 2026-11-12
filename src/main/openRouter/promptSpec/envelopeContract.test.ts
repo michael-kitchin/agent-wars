@@ -83,6 +83,7 @@ test('ENVELOPE_FIELD_ORDER is the canonical field sequence', () => {
     'callbacks',
     'memoryUpdates',
     'productionOrders',
+    'campaignTarget',
   ]);
 });
 
@@ -94,7 +95,10 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
     includeMemoryUpdates: true,
     includeProductionOrders: true,
   });
-  assert.deepEqual(strategicAll, ENVELOPE_FIELD_ORDER.filter((field) => field !== 'exitBattle'));
+  assert.deepEqual(
+    strategicAll,
+    ENVELOPE_FIELD_ORDER.filter((field) => field !== 'exitBattle' && field !== 'campaignTarget')
+  );
 
   const noAir = envelopeFieldsForGates({
     coordinateMode: 'strategic',
@@ -137,6 +141,23 @@ test('envelopeFieldsForGates drops tails by flag and always drops memory and pro
   });
   const ordersAt = aiOnly.indexOf('orders');
   assert.equal(aiOnly[ordersAt + 1], 'exitBattle');
+
+  const campaignOn = envelopeFieldsForGates({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+    includeCampaignTarget: true,
+  });
+  assert.equal(campaignOn[campaignOn.length - 1], 'campaignTarget');
+  const campaignTactical = envelopeFieldsForGates({
+    coordinateMode: 'tactical',
+    includeAirActions: true,
+    includeMemoryUpdates: true,
+    includeProductionOrders: true,
+    includeCampaignTarget: true,
+  });
+  assert.ok(!campaignTactical.includes('campaignTarget'));
   assert.equal(aiOnly[ordersAt + 2], 'airStrikes');
   const repair = buildRepairSchemaText({
     coordinateMode: 'tactical',

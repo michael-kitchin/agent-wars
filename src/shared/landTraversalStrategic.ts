@@ -160,6 +160,60 @@ export function canLandUnitTraverseEdge(fromH3: string, toH3: string, data: Land
 }
 
 /**
+ * Reports whether two land-mass records can appear on the same land route.
+ *
+ * Purpose: A march between two hexes needs a shared continent or island id.
+ * When to use: Blind-march checks and any caller that previously compared id lists by hand.
+ * Expected outcome: True when the records share at least one continent id or one island id. An empty id list never matches.
+ * Exceptions: None.
+ */
+export function landMassRecordsShareId(a: StrategicLandMassRecord, b: StrategicLandMassRecord): boolean {
+  return idsIntersect(a.continentIds, b.continentIds) || idsIntersect(a.islandIds, b.islandIds);
+}
+
+/**
+ * Land-step distances from a set of origins.
+ *
+ * Purpose: Campaign scoring needs land route length, not straight hops, because a target across water cannot be marched to.
+ * When to use: From the campaign flow, with the snapshot hex set and the terrain cache. Armor's stop-on-entering rule is ignored; the count measures distance, not this turn's move.
+ * Expected outcome: Every hex reachable by land within `maxDepth` steps of any origin, with its smallest step count. Origins are 0. Origins not in `hexSet` are skipped.
+ * Exceptions: None. A cell `gridDisk` rejects is skipped.
+ */
+export function getLandStepDistances(args: {
+  readonly originH3s: readonly string[];
+  readonly hexSet: ReadonlySet<string>;
+  readonly data: LandMassByH3;
+  readonly maxDepth: number;
+}): Map<string, number> {
+  const steps = new Map<string, number>();
+  const queue: string[] = [];
+  for (const origin of args.originH3s) {
+    if (!args.hexSet.has(origin) || steps.has(origin)) continue;
+    steps.set(origin, 0);
+    queue.push(origin);
+  }
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index]!;
+    const depth = steps.get(current) ?? 0;
+    if (depth >= args.maxDepth) continue;
+    let neighbors: string[];
+    try {
+      neighbors = gridDisk(current, 1);
+    } catch {
+      continue;
+    }
+    for (const neighbor of neighbors) {
+      if (neighbor === current || steps.has(neighbor)) continue;
+      if (!args.hexSet.has(neighbor) || !isOnMap(neighbor)) continue;
+      if (!canLandUnitTraverseEdge(current, neighbor, args.data)) continue;
+      steps.set(neighbor, depth + 1);
+      queue.push(neighbor);
+    }
+  }
+  return steps;
+}
+
+/**
  * Defines the `getLandMassRouteBlockReason` function shape (export function getLandMassRouteBlockReason(routeH3: readonly string[], data: LandMassByH3): string | null).
 
  * Purpose: Reports the first land-mass step that blocks a proposed land-unit route.

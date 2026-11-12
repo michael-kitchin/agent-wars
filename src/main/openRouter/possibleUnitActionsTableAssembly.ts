@@ -237,6 +237,16 @@ export const ACTION_MOVES_MELEE = 'move/melee';
  */
 export const ACTION_APPROACH = 'approach';
 
+/**
+ * Action label for a one-step move toward the campaign hex.
+ *
+ * Purpose: A one-step move toward the campaign hex, kept apart from approach rows, which close on the nearest enemy.
+ * When to use: The campaign branch of `applyInterestOrApproach`.
+ * Expected outcome: The Action column shows `advance`.
+ * Exceptions: None.
+ */
+export const ACTION_ADVANCE = 'advance';
+
 /** Action label for ranged attack rows. */
 export const ACTION_RANGED = 'ranged attack';
 
@@ -291,11 +301,11 @@ export function omitThisTurnFerryRowsForStrikingAir(
  *
  * Purpose: Approach dests omit stay-put stacks; urban count must not outrank a closer closing hex.
  * When to use: `compareTableRowsForUnitPriority` only.
- * Expected outcome: `0` for rows whose action types include `approach`; otherwise the row's `urbanHexCount`.
+ * Expected outcome: `0` for rows whose action types include `approach` or `advance`; otherwise the row's `urbanHexCount`.
  * Exceptions: None.
  */
 function urbanCountForRowPriority(row: PossibleActionTableRow): number {
-  return row.actionTypes.includes(ACTION_APPROACH) ? 0 : row.urbanHexCount;
+  return row.actionTypes.includes(ACTION_APPROACH) || row.actionTypes.includes(ACTION_ADVANCE) ? 0 : row.urbanHexCount;
 }
 
 /**
@@ -350,6 +360,7 @@ const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance'
 
 const ACTION_TYPE_ORDER: Record<string, number> = {
   [ACTION_APPROACH]: 0,
+  [ACTION_ADVANCE]: 0,
   [ACTION_FERRY]: 1,
   [ACTION_MOVES_MELEE]: 2,
   [ACTION_RANGED]: 3,
@@ -374,7 +385,7 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
  *
  * Purpose: Picks one Action label when a caller needs a single priority, with shots ahead of moves.
  * When to use: Callers that cannot list every action. The Best Options table uses `bestOptionsActionLabels` instead, so a shared hex keeps both the shot and the move.
- * Expected outcome: One of `air strike`, `air drop`, `ranged`, `approach`, `ferry`, `move/melee`, or the raw
+ * Expected outcome: One of `air strike`, `air drop`, `ranged`, `advance`, `approach`, `ferry`, `move/melee`, or the raw
  *   `actionTypes` string as fallback. A row that includes an air strike still returns `air strike`.
  * Exceptions: None.
  */
@@ -382,13 +393,14 @@ export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): st
   if (r.actionTypes.includes('air strike') || r.actionTypes.includes('air_strike')) return 'air strike';
   if (r.actionTypes.includes('air drop')) return 'air drop';
   if (r.actionTypes.includes('ranged')) return 'ranged';
+  if (r.actionTypes.includes('advance')) return 'advance';
   if (r.actionTypes.includes('approach')) return 'approach';
   if (r.actionTypes.includes('ferry')) return 'ferry';
   if (r.actionTypes.includes('move') || r.actionTypes.includes('melee')) return 'move/melee';
   return r.actionTypes;
 }
 
-const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'air drop', 'ranged', 'approach', 'ferry', 'move/melee'] as const;
+const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'air drop', 'ranged', 'advance', 'approach', 'ferry', 'move/melee'] as const;
 
 /**
  * Maps one aggregated action token onto the Best Options Action column label.
@@ -403,6 +415,7 @@ function canonicalBestOptionsAction(token: string): string {
   if (token === ACTION_AIR_STRIKES || token === 'air_strike') return 'air strike';
   if (token === ACTION_AIR_DROP) return 'air drop';
   if (token === ACTION_RANGED || token === 'ranged') return 'ranged';
+  if (token === ACTION_ADVANCE) return 'advance';
   if (token === ACTION_APPROACH) return 'approach';
   if (token === ACTION_FERRY) return 'ferry';
   if (token === ACTION_MOVES_MELEE || token === 'move' || token === 'melee') return 'move/melee';

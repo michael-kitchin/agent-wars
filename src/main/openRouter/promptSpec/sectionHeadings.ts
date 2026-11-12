@@ -3,7 +3,8 @@
  *
  * Purpose: One spelling of every briefing and status heading so strategic, tactical, and injection
  * blocks cannot drift. Hash level stays in the helpers (or in `markdownHeading1` / `markdownHeading2`)
- * because those already own spacing.
+ * because those already own spacing. The H2 titles inside the system prompt's Rules, Reading the
+ * Briefing, and Orders Guidance sections are in `subsectionHeadings`.
  * When to use: Any emitter of a named prompt section.
  * Expected outcome: Title text without leading hashes; callers choose the heading level.
  * Exceptions: None.
@@ -135,6 +136,36 @@ export const SECTION_TITLE_STRATEGIC_MEMORY = 'Your Strategic Memory' as const;
 export const SECTION_TITLE_STANDING_ORDER_STATUS = 'Standing Order Status' as const;
 
 /**
+ * Title of the campaign objective block, without ATX hashes.
+ *
+ * Purpose: The situation message names the city, the staging hex, and the phase.
+ * When to use: Strategic consults that have a campaign plan. H1 alone, H2 inside the briefing.
+ * Expected outcome: Coaching can point at this section without restating the heading string.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_CAMPAIGN_OBJECTIVE = 'Campaign Objective' as const;
+
+/**
+ * Title of the campaign-orders table, without ATX hashes.
+ *
+ * Purpose: Lists campaign units whose standing order should change.
+ * When to use: A subsection under Standing Order Status when a campaign plan exists.
+ * Expected outcome: The model copies each row into an assign_order entry.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_CAMPAIGN_ORDERS = 'Campaign Orders' as const;
+
+/**
+ * Title of the campaign rules in the system prompt, without ATX hashes.
+ *
+ * Purpose: The cached explanation of assemble, assault, defenders, and advance rows.
+ * When to use: Strategic context coaching when the campaign gate is on.
+ * Expected outcome: An H2 under Strategic Context. Battle prompts omit it.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_CAMPAIGN = 'Campaign' as const;
+
+/**
  * Title of the callback subscription list, without ATX hashes.
  *
  * Purpose: What events will bring the model back. assembly-contract.md section 5 and 7.
@@ -205,6 +236,26 @@ export const SECTION_TITLE_AVAILABLE_TOOLS = 'Available Tools' as const;
 export const SECTION_TITLE_SCENARIO_OBJECTIVE = 'Scenario Objective (Required)' as const;
 
 /**
+ * Title of the cached section that explains how to read a precomputed briefing.
+ *
+ * Purpose: Names the section that holds turn-invariant briefing rules.
+ * When to use: When the briefing was precomputed for this consultation.
+ * Expected outcome: H1 text `Reading the Briefing`.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_READING_THE_BRIEFING = 'Reading the Briefing' as const;
+
+/**
+ * Title of the turn-varying scenario progress.
+ *
+ * Purpose: Names the control and urban-share lines that stay in the situation message.
+ * When to use: On every strategic consultation. Explored and controlled lines are always present. Home-control and urban-share lines are added only for region versus region.
+ * Expected outcome: The bare title. The situation message prints it as H1, or as H2 inside a precomputed briefing.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_SCENARIO_PROGRESS = 'Scenario Progress' as const;
+
+/**
  * Title of the opening identity line, without ATX hashes.
  *
  * Purpose: The role sentence needs a heading so a reader can find who is being briefed.
@@ -235,14 +286,24 @@ export const SECTION_TITLE_CURRENT_SITUATION = 'Current Situation' as const;
 export const SECTION_TITLE_COORDINATES = 'Coordinates' as const;
 
 /**
- * Title of the combat and movement rules, without ATX hashes.
+ * Title of the rules section.
  *
- * Purpose: The rules paragraph is a section a reviewer can jump to.
- * When to use: Immediately before `buildCombatRulesParagraph` in both modes.
- * Expected outcome: H1.
+ * Purpose: Combat, movement, and production rules share one heading.
+ * When to use: Immediately before `buildRulesSections` in both modes.
+ * Expected outcome: H1 text `Rules`.
  * Exceptions: None.
  */
-export const SECTION_TITLE_COMBAT_AND_MOVEMENT_RULES = 'Combat and Movement Rules' as const;
+export const SECTION_TITLE_RULES = 'Rules' as const;
+
+/**
+ * Title of the orders-guidance section.
+ *
+ * Purpose: Coaching bullets are guidance, not tool instructions.
+ * When to use: After Available Tools and before Response Format.
+ * Expected outcome: H1 text `Orders Guidance`.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_ORDERS_GUIDANCE = 'Orders Guidance' as const;
 
 /**
  * Title of the strategic situation block, without ATX hashes.

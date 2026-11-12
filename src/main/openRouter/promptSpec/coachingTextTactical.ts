@@ -10,24 +10,63 @@
 import { logTrace } from '../../logger';
 import type { CoachingGates } from './coachingGates';
 import { buildDoctrineBlock } from './doctrineText';
-import { MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET, STRATEGY_BLOCK } from './coachingTextStrategic';
+import { buildStrategyBlock, MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET } from './coachingTextStrategic';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
+import {
+  SECTION_TITLE_AIR_AND_NAVAL_UNITS,
+  SECTION_TITLE_CALLBACKS_AND_MESSAGES,
+  SECTION_TITLE_USING_THE_BRIEFING,
+} from './subsectionHeadings';
 
 /**
  * Engage-priority, doctrine, and message guidance for the tactical context block.
  *
  * Purpose: Battle prompts keep a single engage priority instead of the five strategic goals.
  * When to use: `buildContextCoaching` in tactical mode.
- * Expected outcome: The priority, the strategy list, an aggressive or cautious block when that doctrine is set, and the message. Balanced adds nothing between the strategy list and the message.
+ * Expected outcome: The priority, the strategy list, the doctrine block, and the message. Balanced adds its own block.
  * Exceptions: None.
  */
 export function buildTacticalContextCoaching(gates: CoachingGates): string {
-  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced');
+  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced', gates.campaignEnabled === true);
   logTrace('promptSpec buildTacticalContextCoaching', { doctrineBlock: doctrine.length > 0 });
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
   return `${TACTICAL_PRIORITY_BLOCK}
-${STRATEGY_BLOCK}${doctrineLine}
+${buildStrategyBlock('tactical')}${doctrineLine}
 ${MESSAGE_BLOCK}`;
+}
+
+/**
+ * Battle coaching sections.
+ *
+ * Purpose: Orders Guidance prints these as subsections. The flat bullet list is their concatenation.
+ * When to use: `buildCoachingSections` in tactical mode.
+ * Expected outcome: Using the Briefing, then Air and Naval Units when the roster has them, then Callbacks and Messages. No home-region, production, or memory coaching.
+ * Exceptions: None.
+ */
+export function buildTacticalCoachingSections(gates: CoachingGates): readonly { readonly title: string; readonly bullets: readonly string[] }[] {
+  logTrace('promptSpec buildTacticalCoachingSections', { ...gates });
+  const airAndNaval: string[] = [];
+  if (gates.hasAirUnits) airAndNaval.push(AIR_STRIKE_BULLET);
+  if (gates.hasNavalUnits) airAndNaval.push(SEALIFT_BULLET);
+  const callbacks = [
+    CALLBACK_BULLET,
+    UNCONSULTED_BEAT_BULLET,
+    MESSAGE_DISCIPLINE_BULLET,
+    ...(gates.includeExitBattle === true ? [EXIT_BATTLE_BULLET] : []),
+  ];
+  return [
+    {
+      title: SECTION_TITLE_USING_THE_BRIEFING,
+      bullets: [
+        tempoBullet(gates.hasAirUnits),
+        STANDING_ORDERS_INERT_BULLET,
+        buildOptionCopyOrRoutingBullet(gates, 'this-beat', 'sub-unit'),
+        REACH_BULLET,
+      ],
+    },
+    { title: SECTION_TITLE_AIR_AND_NAVAL_UNITS, bullets: airAndNaval },
+    { title: SECTION_TITLE_CALLBACKS_AND_MESSAGES, bullets: callbacks },
+  ].filter((section) => section.bullets.length > 0);
 }
 
 /**
@@ -35,24 +74,12 @@ ${MESSAGE_BLOCK}`;
  *
  * Purpose: Same membership test as strategic, with battle substitutions.
  * When to use: `buildCoachingBullets` in tactical mode.
- * Expected outcome: No home-region, production, memory, or assign_order coaching.
+ * Expected outcome: The section bullets, in section order. No home-region, production, memory, or assign_order coaching.
  * Exceptions: None.
  */
 export function buildTacticalCoachingBullets(gates: CoachingGates): readonly string[] {
   logTrace('promptSpec buildTacticalCoachingBullets', { ...gates });
-  const bullets: string[] = [
-    tempoBullet(gates.hasAirUnits),
-    STANDING_ORDERS_INERT_BULLET,
-    buildOptionCopyOrRoutingBullet(gates, 'this-beat', 'sub-unit'),
-    REACH_BULLET,
-  ];
-  if (gates.hasAirUnits) bullets.push(AIR_STRIKE_BULLET);
-  if (gates.hasNavalUnits) bullets.push(SEALIFT_BULLET);
-  bullets.push(CALLBACK_BULLET);
-  bullets.push(UNCONSULTED_BEAT_BULLET);
-  bullets.push(MESSAGE_DISCIPLINE_BULLET);
-  if (gates.includeExitBattle === true) bullets.push(EXIT_BATTLE_BULLET);
-  return bullets;
+  return buildTacticalCoachingSections(gates).flatMap((section) => section.bullets);
 }
 
 /**

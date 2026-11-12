@@ -120,18 +120,18 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the naval transport section when the roster also has no air. When it has air, the section is the heading plus the airlift sentence and there is no ship table. Omit the naval clause from the combat paragraph, and the routing tool's land-target clause. |
+| system | Omit the naval transport section. Air without ships does not print that heading. The airlift sentence is `## Transport` when the side has air. Omit the naval clause from `# Rules`, and the routing tool's land-target clause. |
 | user | unchanged |
 | tools | The routing tool's line is emitted without its naval suffix. |
 | envelope | Omit `transport_move`. Omit `embark` and `disembark` only when the roster also has no air. Air without ships keeps those two. |
 | coaching | Drop the naval-routing rule and the sealift rule. |
-| empty-state | With no air, the section is omitted rather than emitted with dashes, same reasoning as 3.1. With air and no ships, the section is the airlift sentence and not a dash table. |
+| empty-state | The naval section is omitted rather than emitted with dashes, same reasoning as 3.1, including when the side has air and no ships. |
 
 ### 3.3 No observed enemy units
 
 | Surface | Contract |
 | --- | --- |
-| system | Include the scouting directive. When the commander still has units, the narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. When the commander has no units, that sentence stops after the counts, the scout clause is omitted, and the next sentence says the side is still in the match and should set production on the cities it still holds. Nearest-enemy cells in the unit table are em dashes. Suggested Destination follows section 3.5. The observed-enemy roster line uses its empty phrasing. |
+| system | The scouting bullet under `## Using the Briefing` is always present, including when an enemy is observed. The situation message does not add a scouting sentence. When the commander still has units, the narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. When the commander has no units, that sentence stops after the counts, the scout clause is omitted, and the next sentence says the side is still in the match and should set production on the cities it still holds. Nearest-enemy cells in the unit table are em dashes. Suggested Destination follows section 3.5. The observed-enemy roster line uses its empty phrasing. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
@@ -168,18 +168,18 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 
 | Surface | Contract |
 | --- | --- |
-| system | Include the scenario objective section with the scenario id, both region names when present, both win paths, and the always-visible-outlines statement. Include the home-region bullets in the coaching block: own home control, own home cells when the region sets differ, control of the enemy home region, enemy home cells when the sets differ, and the shared-cell line when the regions intersect. |
+| system | Include `# Scenario Objective (Required)` in the system message with the scenario id, both region names when present, both win paths, and the always-visible-outlines statement, then the home hex lists and `## Sides`. `# Scenario Progress` in the situation message carries explored, controlled, and home-control counts, plus the urban-share lines. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Include the win-path rule. Include the shared-home-cell rule only when an intersection exists. |
+| coaching | Include the win-path rule. Include the shared-home-cell rule only when an intersection exists. On a strategic consult with standing orders on, the doctrine blocks name the campaign target, and Cautious gathers to the campaign staging hex. Otherwise they name the nearest enemy home region. Balanced has its own block in every case. |
 | empty-state | A region with no cells produces a progress line of zero of zero rather than a missing bullet. When the two regions are the same set, the exclusive hex lists are omitted and only the shared line and the progress lines appear. |
 
 ### 4.2 Scenario id absent or unrecognised
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the scenario objective section. Omit every home-region bullet. The goal statement becomes the generic objective: destroy enemy forces and take ground. **Do not reuse region-versus-region sentences.** |
+| system | Omit the scenario objective section. Omit every home-region bullet. The goal statement becomes the generic objective: destroy enemy forces where you outnumber them, mass before each attack, and keep every city building. **Do not reuse region-versus-region sentences.** |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |

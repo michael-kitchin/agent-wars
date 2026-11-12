@@ -7,6 +7,7 @@
  * unit orderless again next turn, permanently idle. Putting a legal mission beside the question breaks that loop.
  * When an enemy is visible the mission is still a one-step march that closes on that enemy. When none is visible, a
  * ground unit is pointed at the enemy home region. An air unit is told to defend where it sits, strike or not.
+ * Campaign units take the campaign order.
  * When to use: Strategic `getInjectionText` and the strategic briefing, for the ids being listed as having no standing order.
  * Expected outcome: A march or defend suggestion per unit that should be ordered, never a march to the unit's current hex.
  * Units with nowhere useful to go are absent from the map so the caller can render an em dash.
@@ -20,6 +21,7 @@ import { enemyHomeHexes } from '../briefing/briefingPerspective';
 import { collectAggregatedPossibleActionRows } from '../openRouter/possibleUnitActions';
 import { formatLatLng } from '../openRouter/promptText';
 import {
+  landMassRecordsShareId,
   landUnitCanOccupyHex,
   STRATEGIC_LAND_MAX_WATER_PCT,
   type LandMassByH3,
@@ -34,15 +36,17 @@ import {
   pickApproachHexesTowardNearestEnemy,
 } from './assessUnitProximity';
 import {
+  ACTION_ADVANCE,
   ACTION_AIR_STRIKES,
   ACTION_APPROACH,
   ACTION_MOVES_MELEE,
 } from '../openRouter/possibleUnitActionsTableAssembly';
+import { campaignOrderFor, type CampaignPlan } from '../openRouter/campaignRules';
 import { standingOrderTypeRejectionReason } from './standingOrdersShared';
 import { stayPutFriendlyOccupiedHexes, readStandingThisPeriodMoves } from './stayPutFriendlyOccupancy';
 
 /** Action labels that count as a one-step move the model can copy this turn. */
-const ONE_STEP_MOVE_LABELS = new Set<string>([ACTION_APPROACH, ACTION_MOVES_MELEE]);
+const ONE_STEP_MOVE_LABELS = new Set<string>([ACTION_ADVANCE, ACTION_APPROACH, ACTION_MOVES_MELEE]);
 
 /**
  * Stand-in land-mass map for a naval blind march.
@@ -62,7 +66,7 @@ const EMPTY_LAND_MASS: LandMassByH3 = new Map();
  * must come from a single row collection rather than a second search per unit.
  * When to use: The value of `orderlessMissionSignalsFromActionRows`.
  * Expected outcome: `airStrikeUnitIds` names units with an air strike row. `oneStepMoveUnitIds` names units with an
- * approach or move/melee row.
+ * advance, approach, or move/melee row.
  * Exceptions: None.
  */
 export interface OrderlessMissionActionSignals {
@@ -78,7 +82,7 @@ export interface OrderlessMissionActionSignals {
   /**
    * Units with a this-turn approach or move/melee row, so Action needed can count that step.
    *
-   * Contract: Names units whose Best Options row includes approach or move/melee.
+   * Contract: Names units whose Best Options row includes advance, approach, or move/melee.
    * When to use: Marking Action needed for a listed one-step move.
    * Expected outcome: A unit in both this set and `airStrikeUnitIds` appears in both.
    * Exceptions: None.
@@ -120,7 +124,7 @@ export function orderlessMissionSignalsFromActionRows(
  * treat a bare neighbor step as either one.
  * When to use: The optional argument on `buildUnitStatusTable` and `buildAttentionFlags`.
  * Expected outcome: `suggestedUnitIds` are units with a march or defend mission. `oneStepMoveUnitIds` are units with
- * an approach or move/melee row.
+ * an advance, approach, or move/melee row.
  * Exceptions: None.
  */
 export interface OrderlessActionNeededSets {
@@ -136,7 +140,7 @@ export interface OrderlessActionNeededSets {
   /**
    * Units with a Best Options approach or move/melee row this turn.
    *
-   * Contract: The same id set as `OrderlessMissionActionSignals.oneStepMoveUnitIds` for this pass.
+   * Contract: The same id set as `OrderlessMissionActionSignals.oneStepMoveUnitIds` for this pass, including advance rows.
    * When to use: Action needed when the unit has a listed step and no standing order.
    * Expected outcome: A neighbor step that Best Options did not list is absent.
    * Exceptions: None.
@@ -162,6 +166,15 @@ export function collectOrderlessMissionContext(args: {
   orderlessUnitIds: readonly string[];
   latLngByH3?: ReadonlyMap<string, [number, number]>;
   thisPeriodMoveByUnitId?: ReadonlyMap<string, string>;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's suggested destinations and Best Options rows.
+   * When to use: Strategic consults that resolved a campaign.
+   * Expected outcome: Campaign units are offered the campaign order, and their Best Options rows advance toward it.
+   * Exceptions: None.
+   */
+  campaignPlan?: CampaignPlan | null;
 }): { suggestions: ReadonlyMap<string, OrderlessMissionSuggestion> } &
   OrderlessActionNeededSets & { airStrikeUnitIds: ReadonlySet<string> } {
   const latLngByH3 = args.latLngByH3 ?? latLngForState(args.state);
@@ -171,6 +184,7 @@ export function collectOrderlessMissionContext(args: {
       latLngByH3: new Map(latLngByH3),
       formatLatLng: (ll) => formatLatLng(ll, LATLNG_DECIMAL_PLACES),
       forThisTurnOptionsTable: true,
+      campaignPlan: args.campaignPlan ?? null,
     })
   );
   const suggestions = suggestApproachDestinationsForOrderlessUnits(
@@ -178,7 +192,8 @@ export function collectOrderlessMissionContext(args: {
     args.state,
     args.orderlessUnitIds,
     args.thisPeriodMoveByUnitId,
-    signals.airStrikeUnitIds
+    signals.airStrikeUnitIds,
+    { campaignPlan: args.campaignPlan }
   );
   logDebug('orderlessUnitSuggestions collectOrderlessMissionContext', {
     playerId: args.playerId,
@@ -247,7 +262,7 @@ function latLngForState(state: GameStateSnapshot): Map<string, [number, number]>
  * When to use: Unit Status and the mission attention bullet, after the suggestion map and Best Options rows exist.
  * Do not call the collectors from here.
  * Expected outcome: True only for a strategic orderless unit, with standing orders active, that has a suggestion, a
- * legal attack, or an approach or move/melee row. False for tactical rows and for units that already have an order.
+ * legal attack, or an advance, approach, or move/melee row. False for tactical rows and for units that already have an order.
  * Exceptions: None.
  */
 export function orderlessUnitNeedsMission(args: {
@@ -295,16 +310,16 @@ export function orderlessMissionAttentionText(count: number): string {
  *
  * Purpose: A bare hex and a defend order are different orders, and the renderer must not guess which one a string is.
  * When to use: As the value of `suggestApproachDestinationsForOrderlessUnits`.
- * Expected outcome: `march` names a hex other than the unit's own. `defend` names the air unit's current hex.
+ * Expected outcome: `march` names a hex other than the unit's own. `defend` names the air unit's current hex, or a holding campaign unit's current hex.
  * Exceptions: None.
  */
 export interface OrderlessMissionSuggestion {
   /**
    * `assign_order` type the cell is asking for.
    *
-   * Contract: `march` is a ground unit; `defend` is an air unit, on the hex it already occupies.
+   * Contract: `march` is a ground unit. `defend` is an air unit, or a holding campaign unit, on the hex it already occupies.
    * When to use: Choosing the standing-order type to copy into the prompt.
-   * Expected outcome: `defend` pairs with the air unit's current hex.
+   * Expected outcome: `defend` pairs with the unit's current hex.
    * Exceptions: None.
    */
   orderType: 'march' | 'defend';
@@ -366,25 +381,6 @@ function bestClosingDestination(
 }
 
 /**
- * Reports whether two land-mass records can appear on the same land route.
- *
- * Purpose: `assignOrder` rejects a march when `plan_route` cannot reach the hex, and a nearer home hex on another
- * landmass is a march the engine will drop. Sharing a continent id or an island id is the same overlap that route
- * edges require, without walking the path.
- * When to use: Before offering a land or armor unit a home-region hex.
- * Expected outcome: True when the records share at least one continent id or one island id.
- * Exceptions: None.
- */
-function sharesLandMassId(origin: StrategicLandMassRecord, candidate: StrategicLandMassRecord): boolean {
-  const originContinents = new Set(origin.continentIds);
-  const originIslands = new Set(origin.islandIds);
-  return (
-    candidate.continentIds.some((id) => originContinents.has(id)) ||
-    candidate.islandIds.some((id) => originIslands.has(id))
-  );
-}
-
-/**
  * Decides whether a home-region hex is a legal blind march for this unit.
  *
  * Purpose: The home-region list mixes inland, coastal, and foreign-landmass cells. A naval unit can only be sent to
@@ -407,7 +403,7 @@ function blindHomeHexIsPassable(
   if (!originRecord) return false;
   if (!landUnitCanOccupyHex(h3, landMass)) return false;
   const candidate = landMass.get(h3);
-  if (!candidate || !sharesLandMassId(originRecord, candidate)) return false;
+  if (!candidate || !landMassRecordsShareId(originRecord, candidate)) return false;
   return candidate.waterPct < STRATEGIC_LAND_MAX_WATER_PCT;
 }
 
@@ -458,8 +454,8 @@ function nearestEnemyHomeMarchHex(args: {
  * including the turns when no enemy unit has been seen yet.
  * When to use: Strategic briefing assembly, passing only the ids being listed as orderless. This runs a destination
  * search per distinct unit, so do not call it for the whole roster. `airStrikeUnitIds` is recorded in the debug log
- * and is not used to choose the mission.
- * Expected outcome: `unitId -> mission`. When any enemy is visible, a closing one-step march, enemy-occupied preferred,
+ * and is not used to choose the mission. `options.campaignPlan` sends a campaign unit to the campaign order when it has no contact step.
+ * Expected outcome: `unitId -> mission`. A campaign unit with no enemy-occupied legal step takes the campaign order: march to the waypoint, or defend on its own hex when it holds. When any enemy is visible and the unit is not a campaign unit, a closing one-step march, enemy-occupied preferred,
  * and no home-region substitute when that step is missing. When no enemy is visible, a march toward the enemy home
  * region. An air unit is defend on its current hex whether or not it can strike and whether or not an enemy is visible.
  * A missile is omitted. Omitted when the unit is missing, cannot take the mission, or has no legal hex. A march is never the unit's own hex.
@@ -471,7 +467,8 @@ export function suggestApproachDestinationsForOrderlessUnits(
   state: GameStateSnapshot,
   unitIds: readonly string[],
   thisPeriodMoveByUnitId?: ReadonlyMap<string, string>,
-  airStrikeUnitIds?: ReadonlySet<string>
+  airStrikeUnitIds?: ReadonlySet<string>,
+  options?: { readonly campaignPlan?: CampaignPlan | null }
 ): ReadonlyMap<string, OrderlessMissionSuggestion> {
   const suggestions = new Map<string, OrderlessMissionSuggestion>();
   if (unitIds.length === 0) {
@@ -500,9 +497,11 @@ export function suggestApproachDestinationsForOrderlessUnits(
     return landMass ?? EMPTY_LAND_MASS;
   };
   const enemyVisible = enemyOccupiedH3.size > 0;
+  const campaignPlan = options?.campaignPlan ?? null;
   for (const unitId of unitIds) {
     const unit = unitsById.get(unitId);
     if (!unit) continue;
+    const campaignOrder = campaignOrderFor(campaignPlan, { id: unit.id, h3Index: unit.h3Index });
     let suggestion: OrderlessMissionSuggestion | null = null;
     if (standingOrderTypeRejectionReason(unit.unitType, 'march') !== null) {
       if (unit.unitType === 'air') {
@@ -511,11 +510,18 @@ export function suggestApproachDestinationsForOrderlessUnits(
     } else if (enemyVisible) {
       const legal = getValidDestinations(unit, state).filter((h3) => h3 !== unit.h3Index);
       const contact = legal.filter((h3) => enemyOccupiedH3.has(h3));
-      const approach = legal.filter((h3) => !enemyOccupiedH3.has(h3) && !stayPut.has(h3));
-      const destination =
-        bestClosingDestination(unit.h3Index, contact, enemyOccupiedH3) ??
-        bestClosingDestination(unit.h3Index, approach, enemyOccupiedH3);
-      if (destination !== null) suggestion = { orderType: 'march', destinationH3: destination };
+      const contactDestination = bestClosingDestination(unit.h3Index, contact, enemyOccupiedH3);
+      if (contactDestination !== null) {
+        suggestion = { orderType: 'march', destinationH3: contactDestination };
+      } else if (campaignOrder !== null) {
+        suggestion = campaignOrder;
+      } else {
+        const approach = legal.filter((h3) => !enemyOccupiedH3.has(h3) && !stayPut.has(h3));
+        const destination = bestClosingDestination(unit.h3Index, approach, enemyOccupiedH3);
+        if (destination !== null) suggestion = { orderType: 'march', destinationH3: destination };
+      }
+    } else if (campaignOrder !== null) {
+      suggestion = campaignOrder;
     } else {
       const destination = nearestEnemyHomeMarchHex({
         unitH3: unit.h3Index,
@@ -535,6 +541,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
       orderType: suggestion?.orderType ?? null,
       destination: suggestion?.destinationH3 ?? null,
       enemyVisible,
+      campaign: campaignOrder !== null,
     });
   }
   logDebug('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits', {

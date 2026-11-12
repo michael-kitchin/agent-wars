@@ -13,6 +13,39 @@ import {
   buildProductionSubmitClause,
 } from './promptText';
 import { buildBuildabilityRule } from './promptSpec/gameRuleMercenaryText';
+import { buildStrategicContextCoaching } from './promptSpec/coachingTextStrategic';
+import { buildOrdersGuidanceSection } from './promptSpec/coachingText';
+import type { PromptToolFlags } from './promptText';
+
+/**
+ * Orders Guidance for the gates `buildToolUsageGuidance` used to assume.
+ *
+ * Purpose: Coaching left the tool-usage section. These tests still lock the coaching sentences.
+ * When to use: A test that used to read a coaching sentence from `buildToolUsageGuidance`.
+ * Expected outcome: The same default gates, with `campaignEnabled` false.
+ * Exceptions: None.
+ */
+function ordersGuidanceFor(
+  flags: PromptToolFlags,
+  hasPrecomputedBriefing: boolean,
+  coordinateMode: 'strategic' | 'tactical'
+): string {
+  return buildOrdersGuidanceSection({
+    coordinateMode,
+    planningEnabled: flags.planningEnabled,
+    ordersEnabled: flags.ordersEnabled && coordinateMode !== 'tactical',
+    memoryEnabled: flags.memoryEnabled && coordinateMode !== 'tactical',
+    productionEnabled: flags.productionEnabled && coordinateMode !== 'tactical',
+    hasAirUnits: true,
+    hasNavalUnits: true,
+    hasBestOptionsTable: hasPrecomputedBriefing,
+    homeRegionsOverlap: false,
+    hasObservedEnemy: true,
+    includeScenarioWinPaths: coordinateMode !== 'tactical',
+    includeExitBattle: false,
+    campaignEnabled: false,
+  });
+}
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -119,7 +152,7 @@ function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
  */
 function testStrategicSealiftGuidanceUsesCargoAboard(): void {
   const flags = getToolFlags(undefined);
-  const text = buildToolUsageGuidance(flags, true, 'strategic');
+  const text = ordersGuidanceFor(flags, true, 'strategic');
   assert.ok(text.includes('cargo already aboard'));
   assert.ok(text.includes('nearest embark hex'));
   assert.ok(!text.includes('co-located land'));
@@ -135,7 +168,7 @@ function testStrategicSealiftGuidanceUsesCargoAboard(): void {
  */
 function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
   const flags = getToolFlags(['plan_route']);
-  const guidance = buildToolUsageGuidance(flags, true, 'tactical');
+  const guidance = ordersGuidanceFor(flags, true, 'tactical');
   assert.ok(guidance.includes('Best Options This Turn'));
   assert.ok(guidance.includes('Target Hexes'));
   assert.ok(guidance.includes('unitIds'), 'tactical guidance teaches grouped unitIds');
@@ -169,7 +202,7 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
  */
 function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOverride(): void {
   const flags = getToolFlags(undefined);
-  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  const guidance = ordersGuidanceFor(flags, true, 'strategic');
   assert.ok(guidance.includes('Best Options This Turn'));
   assert.ok(guidance.includes('Target Hexes'));
   assert.ok(guidance.includes('unitIds'), 'strategic guidance teaches grouped unitIds');
@@ -214,12 +247,12 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
  */
 function testStrategicPromptRoutesFerryBestOptionsToFerryOrders(): void {
   const flags = getToolFlags(undefined);
-  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  const guidance = ordersGuidanceFor(flags, true, 'strategic');
   assert.ok(guidance.includes('ferryOrders'), 'tool guidance must name ferryOrders for ferry dests');
   assert.ok(guidance.includes('ferry'), 'tool guidance must mention ferry rows');
   assert.ok(
-    /approach or move\/melee/i.test(guidance),
-    'explicit_move copy must be limited to approach or move/melee rows'
+    /approach, advance, or move\/melee/i.test(guidance),
+    'explicit_move copy must be limited to approach, advance, or move/melee rows'
   );
   const intro = buildAvailableToolsIntro(flags, true, 'strategic');
   assert.ok(intro.includes('ferryOrders'));
@@ -229,7 +262,7 @@ function testStrategicPromptRoutesFerryBestOptionsToFerryOrders(): void {
   const noAirUser = getInitialUserMessage(flags, true, 'strategic', { hasAirUnits: false });
   assert.ok(!noAirUser.includes('"ferryOrders"'));
   const move = getMovementOrderInstruction(flags, 'strategic');
-  assert.ok(/approach or move\/melee/i.test(move));
+  assert.ok(/approach, advance, or move\/melee/i.test(move));
 }
 
 /**
@@ -242,7 +275,7 @@ function testStrategicPromptRoutesFerryBestOptionsToFerryOrders(): void {
  */
 function testStrategicPromptDoesNotMarchToCurrentHex(): void {
   const flags = getToolFlags(undefined);
-  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  const guidance = ordersGuidanceFor(flags, true, 'strategic');
   assert.ok(/already arrived/i.test(guidance), 'must warn that current-hex marches are dropped');
   assert.ok(/defend to hold/i.test(guidance));
   assert.match(guidance, /explicit_move to the unit's current Hex is ignored as already arrived/i);
@@ -259,7 +292,7 @@ function testStrategicPromptDoesNotMarchToCurrentHex(): void {
  */
 function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
   const flags = getToolFlags(undefined);
-  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  const guidance = ordersGuidanceFor(flags, true, 'strategic');
   assert.ok(guidance.includes('at maximum'), 'tool guidance must mention deployment-cap maximums');
   assert.ok(
     /do not queue types at maximum/i.test(guidance),
@@ -398,7 +431,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   assert.match(tactical, /compact JSON/i);
   assert.match(tactical, /no markdown fence/i);
   assert.match(tactical, /replac/i);
-  assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
+  assert.ok(!tactical.includes('- assign_order:'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
     includeProductionOrders: false,
@@ -408,7 +441,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
     coordinateMode: 'strategic',
   });
   assert.ok(!strategic.includes('tactical beat'));
-  assert.ok(strategic.includes('Actions: assign_order'));
+  assert.ok(strategic.includes('- assign_order:'));
   assert.ok(strategic.includes('operational-map'));
   assert.ok(strategic.includes('not plan_route orderToHexCode'));
   assert.ok(!strategic.includes('ranged-only'), 'strategic envelope must not call fire ranged-only');
@@ -511,7 +544,7 @@ function testStandingOrderActionsGatedByIncludeStandingOrderActions(): void {
     submitMemoryClause: '',
     productionSubmitClause: '',
   });
-  assert.ok(withStanding.includes('Actions: assign_order'), 'default strategic contract lists assign_order');
+  assert.ok(withStanding.includes('- assign_order:'), 'default strategic contract lists assign_order');
   const withoutStanding = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
     includeProductionOrders: false,
@@ -520,7 +553,7 @@ function testStandingOrderActionsGatedByIncludeStandingOrderActions(): void {
     submitMemoryClause: '',
     productionSubmitClause: '',
   });
-  assert.ok(!withoutStanding.includes('Actions: assign_order'), 'orders-off contract omits assign_order from the action list');
+  assert.ok(!withoutStanding.includes('- assign_order:'), 'orders-off contract omits assign_order from the action list');
   assert.ok(!withoutStanding.includes('cancel_order'), 'orders-off contract omits cancel_order');
   assert.ok(withoutStanding.includes('explicit_move'), 'orders-off contract still lists explicit_move');
   const example = getFinalJsonOrdersExampleBlock({
@@ -625,6 +658,10 @@ const tests = [
     name: 'fallback memory example includes content and planning omits the suffix',
     fn: testFallbackMemoryExampleIncludesContent,
   },
+  {
+    name: 'campaign rule appears only when the campaign gate is on',
+    fn: testCampaignRuleAppearsOnlyWhenEnabled,
+  },
 ];
 
 /**
@@ -635,6 +672,36 @@ const tests = [
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * The Campaign section is taught only when the campaign gate is on.
+ *
+ * Purpose: A battle prompt and an orders-off prompt must not grow a campaign section.
+ * When to use: After edits to `buildStrategicContextCoaching` or `buildCampaignRuleBlock`.
+ * Expected outcome: The heading and the advance-row sentence appear only when `campaignEnabled` is true.
+ * Exceptions: None.
+ */
+function testCampaignRuleAppearsOnlyWhenEnabled(): void {
+  const gates = {
+    coordinateMode: 'strategic' as const,
+    planningEnabled: true,
+    ordersEnabled: true,
+    memoryEnabled: false,
+    productionEnabled: false,
+    hasAirUnits: false,
+    hasNavalUnits: false,
+    hasBestOptionsTable: true,
+    homeRegionsOverlap: false,
+    hasObservedEnemy: true,
+    includeScenarioWinPaths: true,
+  };
+  const enabled = buildStrategicContextCoaching({ ...gates, campaignEnabled: true });
+  assert.ok(enabled.includes('## Campaign'));
+  assert.ok(enabled.includes('Copy it into explicit_move like an approach row.'));
+  const disabled = buildStrategicContextCoaching({ ...gates, campaignEnabled: false });
+  assert.ok(!disabled.includes('## Campaign'));
+  assert.ok(!disabled.includes('Copy it into explicit_move like an approach row.'));
+}
+
 function run(): void {
   for (const t of tests) {
     try {

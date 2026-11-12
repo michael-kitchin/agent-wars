@@ -24,6 +24,7 @@ import {
 } from './tacticalAsciiGridProjection';
 import { emptyOverlayGlyph, renderHexAsciiMap, type HexMapCellState } from './hexMapRenderer';
 import { STRATEGIC_MAP_WINDOW_RADIUS } from './strategicMapWindow';
+import { STRATEGIC_MAP_LEGEND_LINES, TACTICAL_MAP_LEGEND_LINES } from '../../openRouter/promptSpec/briefingGuideText';
 import { renderDisplacedFeaturesLine } from './briefingTables';
 import type { HexGrid } from './hexGridProjection';
 
@@ -113,7 +114,8 @@ function testStrategicOperationalMapWindowsAroundUnitsAndCities(): void {
   assert.equal(allFenceBodies(md).length, 2);
   assert.match(md, /Shown: \d+ of \d+ cells in 2 areas around your units/);
   assert.ok(!md.includes('Call get_map'));
-  assert.ok(md.includes('Each fenced block is one connected area.'));
+  assert.ok(!md.includes('Each fenced block is one connected area.'));
+  assert.ok(STRATEGIC_MAP_LEGEND_LINES.some((line) => line.includes('Each fenced block is one connected area.')));
   const withTool = buildStrategicOperationalMapSectionMarkdown({ state, latLngByH3, mentionGetMap: true });
   assert.ok(withTool.includes('Call get_map(center, radius) for cells outside this window.'));
   const full = listStrategicH3Indexes();
@@ -422,7 +424,8 @@ function testTacticalMapShowsChildTerrainAndUrban(): void {
     latLngByH3,
     tacticalBattle: tactical,
   });
-  assert.ok(/Features:.*U\/u urban/i.test(md), 'tactical legend must name urban');
+  assert.ok(!/Features:.*U\/u urban/i.test(md), 'the battle map no longer repeats the legend');
+  assert.ok(TACTICAL_MAP_LEGEND_LINES.some((line) => /Features:.*U\/u urban/i.test(line)), 'the system legend names urban');
   const body = firstFenceBody(md);
   const tacticalCtx = { mode: 'tactical' as const, battleId: tactical.battleId };
   const landCode = getHexCodeForContext(landChild, tacticalCtx);

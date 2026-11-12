@@ -426,6 +426,24 @@ function testInfrastructureDestroyedCallbackStoresH3NotBriefingCode(): void {
  * Expected outcome: Every entry has a `name` and `fn` that runs without async.
  * Exceptions: None.
  */
+/**
+ * Reads `campaignTarget` only when it is one two-character code.
+ *
+ * Purpose: A number or other shape must not reach the override, and the model must see why.
+ * When to use: After the envelope parse of `campaignTarget`.
+ * Expected outcome: `"AB"` is kept. `7` is absent and names the drop reason.
+ * Exceptions: None.
+ */
+function testCampaignTargetCodeOrDropReason(): void {
+  const kept = parseFixture(`{"strategy":"hold","orders":[],"campaignTarget":"AB"}`);
+  assert.ok(kept);
+  assert.strictEqual(kept!.campaignTargetCode, 'AB');
+  const dropped = parseFixture(`{"strategy":"hold","orders":[],"campaignTarget":7}`);
+  assert.ok(dropped);
+  assert.strictEqual(dropped!.campaignTargetCode, undefined);
+  assert.ok(dropped!.dropReasons?.includes('campaignTarget dropped: expected one two-character hex code.'));
+}
+
 const tests = [
   { name: 'parseOrdersResponse null strategy and empty orders', fn: testAcceptsNullStrategyAndOmittedOrders },
   { name: 'parseOrdersResponse coerces message like strategy', fn: testCoercesMessageLikeStrategy },
@@ -443,6 +461,7 @@ const tests = [
   },
   { name: 'parseOrdersResponse disembark clears assignment and enqueues movement', fn: testDisembarkClearsAssignmentAndEnqueuesMovement },
   { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
+  { name: 'parseOrdersResponse campaignTarget keeps a code and drops a non-code', fn: testCampaignTargetCodeOrDropReason },
 ];
 
 /**

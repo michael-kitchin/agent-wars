@@ -103,9 +103,9 @@ export interface CoachingGates {
   /**
    * Whether any enemy unit is currently observed.
    *
-   * Contract: Scouting coaching applies only when the observed roster is empty.
+   * Contract: Callers still set this from the observed roster. Strategic coaching no longer reads it; the scouting bullet is always present.
    * When to use: Set from the filtered human roster. Always treated as true in tactical mode.
-   * Expected outcome: True omits the scouting item.
+   * Expected outcome: The flag does not add or remove a coaching bullet.
    * Exceptions: None.
    */
   readonly hasObservedEnemy: boolean;
@@ -148,9 +148,9 @@ export interface CoachingGates {
   /**
    * Stored doctrine of the commander being briefed.
    *
-   * Contract: `'balanced'` and absent add no block. `'aggressive'` and `'cautious'` add theirs after the strategy list.
+   * Contract: Each doctrine adds its block after the strategy list. Absent means balanced.
    * When to use: Set from the seat's stored doctrine. A hidden random draw is read from the roster, not from the snapshot.
-   * Expected outcome: The context block matches a prompt with no doctrine field when this is balanced or omitted.
+   * Expected outcome: The block names the campaign target when `campaignEnabled` is true, and the nearest enemy home region otherwise.
    * Exceptions: None.
    */
   readonly doctrine?: Doctrine;
@@ -163,4 +163,13 @@ export interface CoachingGates {
    * Exceptions: None.
    */
   readonly includeExitBattle?: boolean;
+  /**
+   * Whether this consult teaches the campaign.
+   *
+   * Contract: True on a strategic `region_vs_region` consult with standing orders on. Fixed for a match, so the system prompt stays cacheable.
+   * When to use: Set from the scenario, the mode, and `ordersEnabled`.
+   * Expected outcome: True appends the Campaign section to strategic context coaching.
+   * Exceptions: None.
+   */
+  readonly campaignEnabled?: boolean;
 }

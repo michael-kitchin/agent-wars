@@ -560,6 +560,15 @@ export function parseOrdersResponse(
   exitBattle: boolean;
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
+  /**
+   * Briefing code the commander named as the next campaign city.
+   *
+   * Contract: Present only when the strategic envelope's `campaignTarget` is one two-character code. Absent otherwise, including every tactical envelope.
+   * When to use: `applyCampaignTargetOverride` after the orders are stored.
+   * Expected outcome: The trimmed code. A present non-code adds a drop reason and leaves this absent.
+   * Exceptions: None.
+   */
+  campaignTargetCode?: string;
   productionAppliedCount?: number;
   /**
    * Units whose standing order this response assigned or cancelled.
@@ -690,6 +699,11 @@ export function parseOrdersResponse(
         }
         const callbacks = normalizeCallbacks(obj.callbacks, context);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
+        const rawCampaignTarget = obj.campaignTarget;
+        const campaignTargetCode =
+          context.mode !== 'tactical' && typeof rawCampaignTarget === 'string' && HEX_CODE_PATTERN.test(rawCampaignTarget.trim())
+            ? rawCampaignTarget.trim()
+            : undefined;
         const dropReasons = [
           ...orderRowDropReasons,
           ...productionDropReasons,
@@ -698,6 +712,9 @@ export function parseOrdersResponse(
           ...normalizedAirDrops.dropReasons,
           ...normalizedMissileLaunches.dropReasons,
         ];
+        if (rawCampaignTarget !== undefined && campaignTargetCode === undefined) {
+          dropReasons.push('campaignTarget dropped: expected one two-character hex code.');
+        }
         return {
           movementOrders,
           rangedAttacks,
@@ -711,6 +728,7 @@ export function parseOrdersResponse(
           exitBattle,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
+          campaignTargetCode,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

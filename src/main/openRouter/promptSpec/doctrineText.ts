@@ -1,36 +1,41 @@
 /**
- * Aggressive and Cautious blocks added after the shared strategy list.
+ * Doctrine blocks added after the shared strategy list.
  *
- * Purpose: Balanced is that shared list and adds nothing. The other two doctrines add one block.
- * When to use: The strategic and tactical context builders, immediately after `STRATEGY_BLOCK`.
- * Expected outcome: The block text, or an empty string for Balanced. An empty string adds no line.
+ * Purpose: Balanced, Aggressive, and Cautious each add one block. The campaign flag chooses the city those lines name.
+ * When to use: The strategic and tactical context builders, immediately after `buildStrategyBlock`.
+ * Expected outcome: One block. With the campaign on, the lines name the campaign target or staging hex. Otherwise they name the nearest enemy home region.
  * Exceptions: None.
  */
 
 import type { Doctrine } from '../../../shared/seatRoster';
 import { logTrace } from '../../logger';
 
-const AGGRESSIVE_BLOCK = `- Your doctrine is aggressive:
-    (1) Seize the initiative from the first turn: advance on the nearest enemy home region and engage every enemy force you can reach.
-    (2) Accept losses when a trade gains ground, cities, or tempo. Do not hold units back to preserve them.
-    (3) Strike enemy cities, airports, and seaports even when you cannot hold them; production you deny is production they lose.
-    (4) Keep only enough force at home to stop a raid from taking it.`;
-
-const CAUTIOUS_BLOCK = `- Your doctrine is cautious:
-    (1) Secure your home region and the cities next to it before you advance.
-    (2) Fight only from cover or with clear superiority. Pull back exposed units rather than lose them.
-    (3) Build up production and forces first. Attack an enemy that is already weakened or busy fighting another side.`;
-
 /**
- * The doctrine block for one commander, or an empty string for Balanced.
+ * The doctrine block for one commander.
  *
- * Purpose: Aggressive and Cautious add judgment the shared strategy list does not state. Balanced is that list.
- * When to use: After `STRATEGY_BLOCK` in both context builders. Pass the stored doctrine, not the choice.
- * Expected outcome: The aggressive or cautious block, or `''` for `'balanced'`.
+ * Purpose: Taking the named city is the judgment the strategy list does not state. Balanced states the trade. Aggressive and Cautious state how far to push.
+ * When to use: After `buildStrategyBlock` in both context builders. Pass the stored doctrine, not the choice, and whether this consult has a campaign.
+ * Expected outcome: The block for that doctrine. `{objective}` is the campaign target or the nearest enemy home region. Cautious sends the spare force to the staging hex or toward that home region.
  * Exceptions: None.
  */
-export function buildDoctrineBlock(doctrine: Doctrine): string {
-  const block = doctrine === 'aggressive' ? AGGRESSIVE_BLOCK : doctrine === 'cautious' ? CAUTIOUS_BLOCK : '';
-  logTrace('promptSpec buildDoctrineBlock', { doctrine, included: block.length > 0 });
+export function buildDoctrineBlock(doctrine: Doctrine, campaignEnabled: boolean): string {
+  const objective = campaignEnabled ? 'the campaign target' : 'the nearest enemy home region';
+  const gather = campaignEnabled ? 'to the campaign staging hex' : 'toward the nearest enemy home region';
+  const block =
+    doctrine === 'aggressive'
+      ? `- Your doctrine is aggressive:
+    (1) Advance on ${objective} from the first turn, and engage every enemy force you can reach on the way.
+    (2) Accept losses when a trade gains ground, cities, or tempo. At your unit caps, a lost unit is usually rebuilt within a turn or two.
+    (3) Strike enemy cities, airports, and seaports even when you cannot hold them; production you deny is production they lose.
+    (4) Keep only enough force at home to stop a raid from taking it.`
+      : doctrine === 'cautious'
+        ? `- Your doctrine is cautious:
+    (1) Hold your home region and the cities next to it, and send the rest ${gather}.
+    (2) Attack only from cover or with your full massed force. Pull back exposed units rather than lose them.
+    (3) Prefer a target an enemy is already fighting a third side for.`
+        : `- Your doctrine is balanced:
+    (1) Advance on ${objective} while your home cities are safe.
+    (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not.`;
+  logTrace('promptSpec buildDoctrineBlock', { doctrine, campaignEnabled, included: block.length > 0 });
   return block;
 }

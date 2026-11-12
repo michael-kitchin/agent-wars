@@ -19,6 +19,7 @@ import { logDebug } from '../logger';
 import type { AiSeatId } from '../../shared/seatIds';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
+import { applyCampaignTargetOverride } from './campaignTargetOverride';
 import { createPathfindingSession } from '../tools/pathfinding';
 import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { moveDefendPostsToExplicitMoveDestinations } from '../tools/standingOrdersDefendPost';
@@ -604,6 +605,15 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     memoryEnabled,
   });
   dropReasons.push(...memoryResult.dropReasons);
+
+  if (!tacticalBattle && ordersEnabled && parsed.campaignTargetCode) {
+    const campaignResult = applyCampaignTargetOverride({
+      state: planState,
+      code: parsed.campaignTargetCode,
+      context: { mode: 'strategic' },
+    });
+    dropReasons.push(...campaignResult.dropReasons);
+  }
 
   markSuccessfulConsultation(parsed.strategy, parsed.message);
   logDebug('openRouter requestOrders: orders applied', {

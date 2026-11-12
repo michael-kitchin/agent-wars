@@ -7,6 +7,8 @@
  * Exceptions: None.
  */
 
+import { CREDITS_QUEUE_ITEM } from '../../shared/creditsRules';
+import { FORTIFICATION_QUEUE_ITEM } from '../../shared/fortificationRules';
 import { logTrace } from '../logger';
 import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
@@ -51,7 +53,7 @@ export interface IdleProductionHex {
   /**
    * Available build types that are not at the deployment cap.
    *
-   * Contract: Uncapped unit types, plus `fortification` and `credits` when the hex lists them. Never empty on an idle hex.
+   * Contract: Uncapped unit types, then `credits`, then `fortification` when the hex is exposed, then any other listed item. Never empty on an idle hex.
    * When to use: The `can build` list of the hex's group in the attention bullet.
    * Expected outcome: Type names in snapshot order.
    * Exceptions: None.
@@ -129,13 +131,14 @@ export function selectNextQueueEntry(
  *
  * Purpose: Attention Flags names these hexes. A hex whose unit types are all capped, and which lists neither fortification nor credits, is not idle.
  * When to use: Every controlled-hex queue from `query_production`, not only the rows shown in the table.
- * Expected outcome: Row order is kept. Buildable types are uncapped unit types plus fortification and credits when listed. A hex is `empty` when it has no queue entry and at least one buildable type, and `blocked` when its next entry is a capped unit type while something is still buildable. A hex whose unit types are all capped and which lists neither extra is not idle.
+ * Expected outcome: Row order is kept. Buildable types are uncapped unit types, then credits, then fortification when `isExposed` says the hex is exposed, then any other listed item. A missing `isExposed` treats every hex as exposed. A hex is `empty` when it has no queue entry and at least one buildable type, and `blocked` when its next entry is a capped unit type while something is still buildable. A hex whose unit types are all capped and which lists neither extra is not idle.
  * Exceptions: None.
  */
 export function findIdleProductionHexes(
   rows: readonly ControlledHexQueueSnapshot[],
   maxedTypes: ReadonlySet<string>,
-  formatHexLabel: (ll: [number, number]) => string
+  formatHexLabel: (ll: [number, number]) => string,
+  isExposed: (row: ControlledHexQueueSnapshot) => boolean = () => true
 ): IdleProductionHex[] {
   logTrace('productionAttention findIdleProductionHexes', { rowCount: rows.length, maxedCount: maxedTypes.size });
   const idle: IdleProductionHex[] = [];
@@ -145,7 +148,10 @@ export function findIdleProductionHexes(
       : [];
     const unitTypes = available.filter((item) => isBuildUnitType(item));
     const extras = available.filter((item) => isBuildQueueItemType(item) && !isBuildUnitType(item));
-    const buildableTypes = [...unitTypes.filter((unitType) => !maxedTypes.has(unitType)), ...extras];
+    const credits = extras.filter((item) => item === CREDITS_QUEUE_ITEM);
+    const fortification = extras.filter((item) => item === FORTIFICATION_QUEUE_ITEM && isExposed(row));
+    const others = extras.filter((item) => item !== CREDITS_QUEUE_ITEM && item !== FORTIFICATION_QUEUE_ITEM);
+    const buildableTypes = [...unitTypes.filter((unitType) => !maxedTypes.has(unitType)), ...credits, ...fortification, ...others];
     if (buildableTypes.length === 0) continue;
     const entries = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
     const nextEntry = selectNextQueueEntry(entries);
@@ -215,7 +221,7 @@ export function formatProductionAttentionBullet(idle: readonly IdleProductionHex
 /**
  * Adds the production bullet after the unit attention bullets.
  *
- * Purpose: The production bullet is outside the five-bullet unit cap, and it is the whole section when no unit needs attention.
+ * Purpose: The production bullet is outside the five-bullet unit cap, and it is the whole section when no unit needs attention. It also appends the campaign bullet.
  * When to use: `formatBriefing` after `buildAttentionFlags`.
  * Expected outcome: Unchanged when `bullet` is null. `- {bullet}` when the flags are `None.`. Otherwise the flags plus a new bullet line.
  * Exceptions: None.

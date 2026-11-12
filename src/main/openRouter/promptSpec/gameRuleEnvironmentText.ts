@@ -2,7 +2,7 @@
  * Weather and terrain-cover sentences for the combat paragraph.
  *
  * Purpose: Those sentences are long enough to stand apart from dice, movement, and reach.
- * When to use: `buildCombatRulesParagraph` after the tech or origin sentence, and before occupancy.
+ * When to use: `buildRulesSections` after the tech or origin sentence, and before occupancy.
  * Expected outcome: Weather is five paragraphs when the bonus is on, and null when it is off. Cover is one sentence in both modes.
  * Exceptions: None.
  */

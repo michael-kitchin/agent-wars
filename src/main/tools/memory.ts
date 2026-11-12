@@ -12,14 +12,14 @@ import { buildPromptTableLines } from '../promptTableHelpers';
 import { SECTION_TITLE_STRATEGIC_MEMORY, topLevelHeading } from '../openRouter/promptSpec/sectionHeadings';
 
 /**
- * Documents the module-scope binding `PERSISTENT_LIMIT` (PERSISTENT_LIMIT).
-
- * Purpose: Supports maintainability by documenting why `PERSISTENT_LIMIT` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * How many persistent memory slots one side may keep.
+ *
+ * Purpose: A new persistent key past this limit replaces the oldest persistent note.
+ * When to use: When storing memory and when the system prompt states the limit.
+ * Expected outcome: Five slots.
  * Exceptions: None.
  */
-const PERSISTENT_LIMIT = 5;
+export const PERSISTENT_LIMIT = 5;
 /**
  * Documents the module-scope binding `STORED_LIMIT` (STORED_LIMIT).
 
@@ -299,15 +299,10 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
   lines.push(
     `Persistent: ${persistentCount} of ${PERSISTENT_LIMIT} slots used. Stored: ${storedCount} of ${STORED_LIMIT} slots used.`
   );
-  lines.push(
-    `A new persistent key replaces the oldest persistent note when all ${PERSISTENT_LIMIT} persistent slots are full.`
-  );
   if (storedNotTriggeredSummary) {
+    lines.push('');
     lines.push(storedNotTriggeredSummary);
   }
-  lines.push(
-    'Use memory_read to retrieve stored memories by key or tag. To add, update, or remove memories, use "memoryUpdates" in your final JSON (write/delete actions); there are no memory_write or memory_delete tools.'
-  );
   return lines.join('\n');
 }
 

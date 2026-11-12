@@ -102,10 +102,10 @@ const grouped = findIdleProductionHexes(
 assert.strictEqual(
   formatProductionAttentionBullet(grouped),
   'Production: 5 controlled hexes can build but are not building — ' +
-    'empty queue, can build fortification, credits: H1, H3; ' +
-    'empty queue, can build air, fortification, credits: H2; ' +
-    'blocked at cap, can build fortification, credits: H4; ' +
-    'blocked at cap, can build air, fortification, credits: H5. ' +
+    'empty queue, can build credits, fortification: H1, H3; ' +
+    'empty queue, can build air, credits, fortification: H2; ' +
+    'blocked at cap, can build credits, fortification: H4; ' +
+    'blocked at cap, can build air, credits, fortification: H5. ' +
     'Add a set_build_queue row to productionOrders for each.'
 );
 
@@ -137,4 +137,14 @@ assert.strictEqual(
   '- a1 faces a moderate threat.\n- Production: listed.'
 );
 assert.strictEqual(appendProductionAttentionBullet('- a1 faces a moderate threat.', null), '- a1 faces a moderate threat.');
+
+const hiddenFortification = findIdleProductionHexes(
+  [hexRow(7, ['credits', 'fortification'], [])],
+  new Set(),
+  label,
+  () => false
+);
+assert.deepStrictEqual(hiddenFortification[0]?.buildableTypes, ['credits']);
+assert.ok(!hiddenFortification[0]?.buildableTypes.includes('fortification'));
+
 console.log('productionAttention.test.ts: ok');

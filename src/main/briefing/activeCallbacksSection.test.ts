@@ -59,8 +59,8 @@ test('territory_changed outside the battle registry says specified territory', (
 
 test('empty Active Callbacks row states the event-driven empty-list consequence', () => {
   const table = buildActiveCallbacksSection([], strategicCtx);
-  assert.match(table, /engine-forced/);
-  assert.match(table, /subscribe/i);
+  assert.match(table, /\| — \| None\. \|/);
+  assert.doesNotMatch(table, /engine-forced/);
   assert.doesNotMatch(table, /You may add callbacks in your response JSON to be consulted on specific events/);
 });
 

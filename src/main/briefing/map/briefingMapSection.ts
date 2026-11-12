@@ -3,7 +3,7 @@
  *
  * Purpose: Map + displaced footnote + Best Options This Turn when non-empty (no Unit Roster — Unit Status covers threats/nearest).
  * When to use: Replace the legacy `# Possible Unit Actions` block for strategic and tactical precomputed briefings.
- * Expected outcome: Self-contained markdown with legend, ASCII map, and compact tables using hex codes.
+ * Expected outcome: Markdown with the Shown line, ASCII map, and compact tables using hex codes. The glyph legend is in the system prompt.
  * Exceptions: Returns a short fallback message if no friendly/enemy units exist (strategic map not rendered in that case).
  */
 
@@ -11,8 +11,8 @@ import { briefingOwnSeatId } from '../briefingPerspective';
 import type { GameStateSnapshot } from '../../gameDb';
 import { logDebug } from '../../logger';
 import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openRouter/possibleUnitActions';
+import type { CampaignPlan } from '../../openRouter/campaignRules';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
-import { FORTIFIED_MAP_LEGEND_FRAGMENT } from '../../../shared/fortificationRules';
 import type { CoordinateContext } from './coordinateContext';
 import {
   ensureStrategicCoordinateRegistryInitialized,
@@ -26,13 +26,13 @@ import {
 } from './tacticalAsciiGridProjection';
 import type { HexMapCellState } from './hexMapRenderer';
 import { bindBestOptionsOdds } from './bestOptionsOdds';
-import { emptyOverlayGlyph, renderHexAsciiMap } from './hexMapRenderer';
+import { renderHexAsciiMap } from './hexMapRenderer';
 import {
   controlledCityH3ForStrategicMap,
   groupConnectedMapPatches,
   renderStrategicWindowPatchesMarkdown,
   selectStrategicMapWindowCells,
-  strategicOperationalMapLegend,
+  strategicOperationalMapShownBlock,
   strategicWindowShownLine,
   visibleEnemyH3ForStrategicMap,
 } from './strategicMapWindow';
@@ -82,6 +82,15 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
    * Exceptions: None.
    */
   mentionGetMap?: boolean;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's Best Options rows.
+   * When to use: Strategic `formatBriefing` after the consult resolved a campaign.
+   * Expected outcome: Passed through to the this-turn row collector. The tactical map never receives it.
+   * Exceptions: None.
+   */
+  campaignPlan?: CampaignPlan | null;
 }): string {
   logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown', {
     turn: args.state.turnNumber,
@@ -108,6 +117,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     formatLatLng: () => '',
     forThisTurnOptionsTable: true,
     indexedState: args.indexedState,
+    campaignPlan: args.campaignPlan ?? null,
   });
   const mapHexes = listStrategicH3Indexes();
   const windowCells = selectStrategicMapWindowCells({
@@ -141,10 +151,10 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
       })
     : '';
 
+  const displacedGap = rendered.displacedLine.length > 0 ? `\n\n${rendered.displacedLine}` : '';
   return (
-    `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${strategicOperationalMapLegend(shown)}` +
-    `${rendered.blocks}\n\n` +
-    `${rendered.displacedLine}\n` +
+    `${subHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${strategicOperationalMapShownBlock(shown)}` +
+    `${rendered.blocks}${displacedGap}\n\n` +
     `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
 }
@@ -314,26 +324,15 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     })
   );
   const displacedLine = renderDisplacedFeaturesLine(displacedFeatures);
-  const fortifiedLegend = [...gameByH3.values()].some((cell) => cell.features.fortifiedByAi !== undefined)
-    ? FORTIFIED_MAP_LEGEND_FRAGMENT
+  const shownBlock = cropped
+    ? `Shown: ${windowCells.length} of ${mapHexes.length} cells around your units and the listed targets.${
+        args.mentionGetMap ? ' Call get_map(center, radius) for cells outside this window.' : ''
+      }\n\n`
     : '';
 
-  const legend =
-    'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
-    'Terrain: x = land, . = water.\n' +
-    `Overlay: ${emptyOverlayGlyph} = nothing here, * = your units, ! = enemy units, including neutral garrisons, # = contested.\n` +
-    `Features: A/a airport, S/s seaport, B/b both, U/u urban only${fortifiedLegend}; uppercase = your control.\n` +
-    'Odd rows are indented one space. Use only hex codes from this map or tables.\n' +
-    (cropped
-      ? `Shown: ${windowCells.length} of ${mapHexes.length} cells around your units and the listed targets.${
-          args.mentionGetMap ? ' Call get_map(center, radius) for cells outside this window.' : ''
-        }\n`
-      : '') +
-    '\n';
-
+  const displacedGap = displacedLine.length > 0 ? `\n\n${displacedLine}` : '';
   return (
-    `${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
-    `${displacedLine}\n` +
+    `${shownBlock}\`\`\`\n${mapString}\n\`\`\`${displacedGap}\n\n` +
     `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
 }
@@ -390,11 +389,11 @@ function buildTacticalHexGameStateMap(
 }
 
 /**
- * Legend and fenced grid for a caller-chosen set of footprint cells.
+ * Fenced grid for a caller-chosen set of footprint cells.
  *
  * Purpose: `get_map` draws the same map as the briefing, around the cell the model asked for.
  * When to use: After the center and radius have been checked against the footprint.
- * Expected outcome: Legend, then a fenced grid. No Shown line and no Best Options table.
+ * Expected outcome: A fenced grid. No legend, no Shown line, and no Best Options table.
  * Exceptions: Throws when a window cell has no tactical briefing code.
  */
 export function renderTacticalWindowGridMarkdown(args: {
@@ -416,15 +415,6 @@ export function renderTacticalWindowGridMarkdown(args: {
   const grid = projectTacticalMapWindow({ footprint, window: args.windowCells, context });
   const gameByH3 = buildTacticalHexGameStateMap(args.state, args.tacticalBattle, [...args.windowCells]);
   const { mapString } = renderHexAsciiMap(grid, gameByH3);
-  const fortifiedLegend = [...gameByH3.values()].some((cell) => cell.features.fortifiedByAi !== undefined)
-    ? FORTIFIED_MAP_LEGEND_FRAGMENT
-    : '';
-  const legend =
-    'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
-    'Terrain: x = land, . = water.\n' +
-    `Overlay: ${emptyOverlayGlyph} = nothing here, * = your units, ! = enemy units, including neutral garrisons, # = contested.\n` +
-    `Features: A/a airport, S/s seaport, B/b both, U/u urban only${fortifiedLegend}; uppercase = your control.\n` +
-    'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
-  return `${legend}\`\`\`\n${mapString}\n\`\`\``;
+  return `\`\`\`\n${mapString}\n\`\`\``;
 }
 

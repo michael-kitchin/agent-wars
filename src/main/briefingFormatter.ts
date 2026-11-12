@@ -23,14 +23,14 @@ import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex
 import { h3ToCode } from './briefing/map/hexCodeTranslator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import type { PossibleActionsIndexedState } from './openRouter/possibleUnitActions';
+import type { CampaignPlan } from './openRouter/campaignRules';
 import { buildActiveCallbacksSection } from './briefing/activeCallbacksSection';
 import { buildEmptyProductionQueuesSection } from './openRouter/briefingSections';
 import {
   FOG_PATH_DISTANCE_BRIEFING_LINE,
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
-  usesFogPathDistanceBriefing,
-  usesOmniscientGridProximity,
 } from './tools/assessUnitProximity';
+import { briefingDistanceCaveatLines } from './briefing/briefingDistanceCaveat';
 import { getMovementBudgetForUnit } from './pathfinding';
 import { formatBriefingWeatherCell } from '../shared/weatherBonusRules';
 import { recedingOrderAttentionText, standingOrderRecedesFromNearestEnemy, standingOrderTypeOf } from './tools/standingMarchReceding';
@@ -52,7 +52,6 @@ import {
   shiftMarkdownHeadings,
   topLevelHeading,
 } from './openRouter/promptSpec/sectionHeadings';
-import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
 import { formatBonusTableCellWithTech } from '../shared/techBonusRules';
 import { ORIGIN_BONUS_OFF, originBonusSettingsFromSnapshot } from '../shared/originBonusRules';
 import { strategicWeatherApplies } from './openRouter/promptSpec/gameRuleSituationGates';
@@ -105,6 +104,33 @@ export type FormatBriefingSharedContext = {
    * Exceptions: None.
    */
   mentionGetMap?: boolean;
+  /**
+   * The Campaign Objective section.
+   *
+   * Contract: Empty or omitted when there is no campaign. Otherwise the H1 section from `buildCampaignObjectiveSection`.
+   * When to use: Strategic `formatBriefing` after the injection is built.
+   * Expected outcome: Shifted one level and placed after the operational map.
+   * Exceptions: None.
+   */
+  campaignText?: string;
+  /**
+   * The campaign attention bullet, without a leading list marker.
+   *
+   * Contract: Null or omitted when no campaign unit needs a new standing order.
+   * When to use: Strategic `formatBriefing`, after the production bullets.
+   * Expected outcome: The last attention bullet.
+   * Exceptions: None.
+   */
+  campaignAttention?: string | null;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's orderless suggestions and Best Options rows.
+   * When to use: Strategic `formatBriefing` after the consult resolved a campaign.
+   * Expected outcome: Passed to the orderless-mission collector and the operational map.
+   * Exceptions: None.
+   */
+  campaignPlan?: CampaignPlan | null;
 };
 
 /**
@@ -538,8 +564,8 @@ export function buildUnitStatusTable(
       : '';
     rows.push(`| ${selfLabel} | ${type} | ${pos} |${bonusCell}${weatherCell} ${nearestStr} | ${severity} | ${actionCell} |`);
   }
-  if (rows.length === 0) return `${header}\n${sep}\n(No AI units)\n`;
-  return `${[header, sep, ...rows].join('\n')}\n`;
+  if (rows.length === 0) return `${header}\n${sep}\n(No AI units)`;
+  return [header, sep, ...rows].join('\n');
 }
 
 /**
@@ -767,26 +793,6 @@ function missionActionNeeded(
 }
 
 /**
- * Honesty sentence when Unit Status distances use grid hops instead of march paths.
- *
- * Purpose: Fog-off strategic assessments report H3 grid distance; the model must not treat that as a legal march ETA.
- * When to use: formatBriefing immediately after the Unit Status heading (caller appends a blank line before the table).
- * Expected outcome: The shared briefing line when fog is off and hexes are strategic; otherwise empty.
- * Exceptions: Empty hex list yields empty string.
- */
-function omniscientGridProximityBriefingLine(state: GameStateSnapshot): string {
-  logTrace('briefingFormatter omniscientGridProximityBriefingLine', {
-    turnNumber: state.turnNumber,
-    fogOfWarEnabled: state.fogOfWarEnabled ?? null,
-    hexCount: state.hexes.length,
-  });
-  const h3Index = state.hexes[0]?.h3Index;
-  if (!h3Index) return '';
-  if (!usesOmniscientGridProximity({ fogOfWarEnabled: state.fogOfWarEnabled, h3Index })) return '';
-  return OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE;
-}
-
-/**
  * Assembles the strategic Commander briefing markdown for the opponent AI system prompt.
  *
  * Purpose: Single map-first briefing (status, attention, operational map, memory, optional Standing Order Status, callbacks).
@@ -834,25 +840,12 @@ export function formatBriefing(
   sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
   sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
-  const gridProximityLine = omniscientGridProximityBriefingLine(state);
-  const h3Index = state.hexes[0]?.h3Index;
-  const fogPathLine =
-    h3Index && usesFogPathDistanceBriefing({ fogOfWarEnabled: state.fogOfWarEnabled, h3Index })
-      ? FOG_PATH_DISTANCE_BRIEFING_LINE
-      : '';
+  const distanceCaveats = briefingDistanceCaveatLines(state);
   logDebug('briefingFormatter formatBriefing: distance caveat', {
     turnNumber: state.turnNumber,
-    omniscient: gridProximityLine.length > 0,
-    fogPath: fogPathLine.length > 0,
+    omniscient: distanceCaveats.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
+    fogPath: distanceCaveats.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
   });
-  if (gridProximityLine.length > 0) {
-    sections.push(gridProximityLine + '\n\n');
-  } else {
-    const caveatParts: string[] = [];
-    if (state.fogOfWarEnabled === true) caveatParts.push(buildIntelStalenessRule());
-    if (fogPathLine.length > 0) caveatParts.push(fogPathLine);
-    if (caveatParts.length > 0) sections.push(caveatParts.join('\n\n') + '\n\n');
-  }
   const orderlessAction = standingOrdersActive
     ? collectOrderlessMissionContext({
         playerId: briefingOwnSeatId(state),
@@ -861,6 +854,7 @@ export function formatBriefing(
           .filter((assessment) => assessment.result.unit?.currentStandingOrder == null)
           .map((assessment) => assessment.unitId),
         latLngByH3,
+        campaignPlan: sharedContext?.campaignPlan ?? null,
       })
     : undefined;
   const airStrikeRowUnitIds =
@@ -879,16 +873,19 @@ export function formatBriefing(
   sections.push(
     appendProductionAttentionBullet(
       appendProductionAttentionBullet(
-        buildAttentionFlags(
-          precomputed.unitAssessments,
-          'strategic',
-          standingOrdersActive,
-          orderlessAction,
-          airStrikeRowUnitIds
+        appendProductionAttentionBullet(
+          buildAttentionFlags(
+            precomputed.unitAssessments,
+            'strategic',
+            standingOrdersActive,
+            orderlessAction,
+            airStrikeRowUnitIds
+          ),
+          sharedContext?.productionAttention ?? null
         ),
-        sharedContext?.productionAttention ?? null
+        sharedContext?.pausedProductionAttention ?? null
       ),
-      sharedContext?.pausedProductionAttention ?? null
+      sharedContext?.campaignAttention ?? null
     )
   );
   const operational = buildStrategicOperationalMapSectionMarkdown({
@@ -896,9 +893,14 @@ export function formatBriefing(
     latLngByH3,
     indexedState: sharedContext?.indexedState,
     mentionGetMap: sharedContext?.mentionGetMap === true,
+    campaignPlan: sharedContext?.campaignPlan ?? null,
   });
   if (operational.trim().length > 0) {
     sections.push('\n\n' + operational.trim());
+  }
+  const campaignText = sharedContext?.campaignText ?? '';
+  if (campaignText.trim().length > 0) {
+    sections.push('\n\n' + shiftMarkdownHeadings(campaignText.trim(), 1));
   }
   const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments, coordCtx);
   if (supplementalHex.trim().length > 0) {

@@ -14,6 +14,7 @@ import * as path from 'path';
 import { test } from 'node:test';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
 import { closeGameDatabaseForTests, createFreshGameDatabaseAt } from '../gameDb';
+import { MEMORY_SLOT_RULES } from './promptSpec/briefingGuideText';
 import { executeMemory, getInjectionText } from '../tools/memory';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import type { MemoryUpdateItem } from './orderResponseParsing';
@@ -367,10 +368,11 @@ test('promoting a stored key into a full persistent tier replaces the oldest per
   });
 });
 
-test('the memory briefing says a new persistent key replaces the oldest note', () => {
+test('the memory slot rules say a new persistent key replaces the oldest note', () => {
   withMemoryDb(() => {
     const text = getInjectionText(seatId, 1);
-    assert.match(text, /replaces the oldest persistent note/);
+    assert.doesNotMatch(text, /replaces the oldest persistent note/);
+    assert.match(MEMORY_SLOT_RULES, /replaces the oldest persistent note/);
   });
 });
 

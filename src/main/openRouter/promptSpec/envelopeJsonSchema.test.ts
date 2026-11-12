@@ -483,6 +483,7 @@ function run(): void {
   testTaughtCallbackParametersFitSchema();
   testMissileLaunchesSchemaFollowsTheFlag();
   testExitBattleSchemaFollowsTheGate();
+  testCampaignTargetSchemaFollowsTheGate();
   testProductionOrderEnumIncludesFortification();
   console.log('envelopeJsonSchema.test.ts passed');
 }
@@ -541,6 +542,30 @@ function testExitBattleSchemaFollowsTheGate(): void {
  * Expected outcome: The enum lists `fortification`.
  * Exceptions: None.
  */
+/**
+ * Verifies `campaignTarget` is a string only when the strategic gate is on.
+ *
+ * Purpose: Structured output must not require a campaign city the prompt omitted.
+ * When to use: After the envelope field list changes.
+ * Expected outcome: The property is a string and not required when the gate is on, and absent when the gate is off or the mode is tactical.
+ * Exceptions: None.
+ */
+function testCampaignTargetSchemaFollowsTheGate(): void {
+  const onSchema = envelopeSchema({ ...STRATEGIC_ALL_ON, includeCampaignTarget: true });
+  const on = asRecord(onSchema.properties, 'properties');
+  assert.equal(asRecord(on.campaignTarget, 'campaignTarget').type, 'string');
+  assert.ok(!(onSchema.required as string[]).includes('campaignTarget'));
+  const names = Object.keys(on);
+  assert.equal(names[names.length - 1], 'campaignTarget');
+  const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  assert.ok(!('campaignTarget' in off));
+  const tactical = asRecord(
+    envelopeSchema({ ...TACTICAL, includeCampaignTarget: true }).properties,
+    'properties'
+  );
+  assert.ok(!('campaignTarget' in tactical));
+}
+
 function testProductionOrderEnumIncludesFortification(): void {
   const properties = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
   const production = asRecord(properties.productionOrders, 'productionOrders');

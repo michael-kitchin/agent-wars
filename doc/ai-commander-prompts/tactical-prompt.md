@@ -37,9 +37,9 @@ The battle-local goal from section 1.3, followed by a pointer to the rules below
 
 Two paragraphs. First: the battle map is the enclosing strategic hex's tactical cells plus up to three neighboring rings, cells beyond a regional map's edge are not part of the battle, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
 
-### 2.5 Combat and attack rules
+### 2.5 `# Rules`
 
-Same clause order as strategic section 1.5, with these substitutions:
+Same subsection order as strategic section 1.5. A battle omits Production, Holding Fire, and the strategic missile employment subsection. `## Rule Lookup` is present when the `rules` tool is on. Substitutions:
 
 | Clause | Tactical value |
 | --- | --- |
@@ -71,7 +71,7 @@ Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distan
 - **Weather column.** Follows `Bonus` when the weather rules are in the combat paragraph. Mild weather omits it. The cell names the battle weather, with birth tags in parentheses.
 - **No standing-order column.** Standing orders do not act in a beat, so a column for them would invite the model to rely on one. The row's current-order value is null by construction even when the parent unit has a standing order at strategic level.
 - **No quiet annotation.** Every sub-unit in the footprint is in the battle; there is no rear area.
-- **No distance-basis caveat line.** Distances here are res4 steps inside a small footprint.
+- **No distance-basis caveat.** Distances here are res4 steps inside a small footprint. `# Reading the Briefing` still carries `## Map Legend` and `## Best Options Odds`, and `## Air Operations Table` or `## Transport` when the battle roster has that arm.
 - **Rows:** one per own sub-unit, uncapped.
 - **Empty-state:** header row plus `(No AI units)`.
 
@@ -82,9 +82,9 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 #### `## Operational Map`
 
 - **Example:** one rendered grid from a single consultation is in [`example-tactical-prompt.md`](example-tactical-prompt.md).
-- **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `-` is an empty overlay, so bare land is `x-` and bare water is `.-`; `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; when a cell is fortified the legend adds `, F/f fortified city cell (F = yours)` and that cell shows `F` or `f` in place of `U` or `u` (`FORTIFIED_MAP_LEGEND_FRAGMENT`); uppercase means the enclosing cell is AI-controlled; odd rows are indented one space, and a crop keeps that indent when its first row was indented on the full footprint; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
+- **Legend contract:** the legend is `## Map Legend` in the system prompt, not beside the fence. Each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `-` is an empty overlay, so bare land is `x-` and bare water is `.-`; `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban, and `F/f` fortified city cell (`FORTIFIED_MAP_LEGEND_FRAGMENT`, always printed so the cached legend does not change when a cell is fortified); a fortified cell shows `F` or `f` in place of `U` or `u`; uppercase means the enclosing cell is AI-controlled; odd rows are indented one space, and a crop keeps that indent when its first row was indented on the full footprint; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
 - **Displaced-features footnote:** included when a unit overlay hides a feature marker; omitted when empty.
-- **Window:** the rendered grid is the cells within two grid steps of any sub-unit, plus every Best Options target that is inside the footprint. When that set is smaller than the footprint, the legend adds `Shown: N of M cells around your units and the listed targets.` When `get_map` is enabled, that line also says to call `get_map(center, radius)` for cells outside the window. A row that is indented on the full footprint stays indented in the crop.
+- **Window:** the rendered grid is the cells within two grid steps of any sub-unit, plus every Best Options target that is inside the footprint. When that set is smaller than the footprint, the map section adds `Shown: N of M cells around your units and the listed targets.` When `get_map` is enabled, that line also says to call `get_map(center, radius)` for cells outside the window. A row that is indented on the full footprint stays indented in the crop.
 - **Empty footprint:** the map body states that there are no tactical cells to render.
 - **Must not contain:** a unit-roster subsection.
 
@@ -104,7 +104,7 @@ Include when at least one of the previous ten periods in this battle has a messa
 
 - **Columns:** `Event`, `Details`.
 - **Ids:** unit-scoped subscriptions use sub-unit ids. Subscriptions naming a unit that is not in this battle's roster are filtered out before the table is built, so every row the model sees is actionable.
-- **Empty-state:** one row whose event cell is `—` and whose detail cell states that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now.
+- **Empty-state:** one row whose event cell is `—` and whose detail cell is `None.` The callbacks coaching bullet states the empty-list rule.
 - **Detail-cell contract:** as strategic — the parameters, not just the event name.
 
 ### 2.7 Always omitted in battle
@@ -132,7 +132,7 @@ Each row states what is omitted and why the model must not be given it.
 Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
-2. **Strategy**, the same three lines as strategic. Balanced is those lines alone. Aggressive and Cautious add the same doctrine block strategic adds, immediately after the strategy list.
+2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add the same doctrine block strategic adds, immediately after the strategy list. A battle does not name the campaign target.
 3. **Message guidance**, identical to strategic.
 
 **Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing.
@@ -140,13 +140,13 @@ Tactical variant, bullets in this order:
 ### 2.9 `# Air Operations Status`
 
 - **Include:** when the opponent has at least one air sub-unit in this battle. **Omit** the section otherwise, along with the strike list and every air clause.
-- **Content:** the tactical air rules line — strikes and drops cover this battle footprint, ferry is one hop between intact airport cells, and an air sub-unit carries one infantry sub-unit — then own and enemy air counts and a per-unit table. Columns are `Unit ID`, `Hex`, `Aboard`, `Enemy Unit Targets`. `Aboard` is the infantry sub-unit id, or `none`.
+- **Content:** own and enemy air counts and a per-unit table. The tactical air-rules sentence is `## Air Operations Table`. Columns are `Unit ID`, `Hex`, `Aboard`, `Enemy Unit Targets`. `Aboard` is the infantry sub-unit id, or `none`.
 - **Omitted columns relative to strategic:** base intact, base controlled, and the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat. Ferry dests appear on Best Options, not as extra Air Operations columns.
 
 ### 2.10 `# Naval Transport Status`
 
 - **Include:** when the opponent has at least one naval sub-unit in this battle. **Omit** otherwise, along with the sealift actions.
-- **Content:** embark rules, capacity, and a per-sub-unit table of what is aboard.
+- **Content:** a per-sub-unit table of what is aboard. The tactical sealift sentence and the airlift sentence are `## Transport`. Air without ships omits this heading.
 - **Omitted column relative to strategic:** the nearest embark cell. In a footprint the whole map is visible on one screen of text and the option rows already carry reachable cells.
 
 ### 2.11 `# Available Tools`
@@ -154,15 +154,16 @@ Tactical variant, bullets in this order:
 - **Enabled set in battle:** the routing tool, the distance tool, `get_map`, and `rules` when planning tools are enabled, `assess_unit` when assessment tools are enabled, and `estimate_combat` when estimation tools are enabled. `assess_hex` and the memory, standing-order, and production tools are stripped. A strategic consult also offers `get_map`, clipped to the loaded strategic cells. When `rules` is enabled, the combat-rules section ends by telling the model to call `rules(topic)` for a rule that is not printed above.
 - **Tool lines:** `assess_unit` and `estimate_combat` use battle-specific lines. `assess_unit` reports which enemies the sub-unit can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each nearby unit. `estimate_combat` predicts ranged or melee engagements under battle range, terrain, and line-of-sight rules from beat-start positions, and does not cover air strikes. `plan_route` keeps the ferry-into-`ferryOrders` clause and omits `AIR_PLAN_ROUTE_PROMPT_SUFFIX`.
 - **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping. It names the routing tool only when planning tools are enabled.
-- **Guidance bullets, in this order:**
-  1. The briefing already contains unit status, attention flags, and this beat's options.
+- **Tool lines under `## How to Use These Tools Effectively`** (`buildToolUsageGuidance`), in this order:
+  1. The briefing in the situation message already contains unit status, attention flags, and this beat's options.
   2. When assessment tools are enabled: `assess_unit` is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.
-  3. When estimation tools are enabled: Best Options already gives Odds for a listed fight. Use `estimate_combat` for a fight the table does not list. It does not cover air strikes.
-  4. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
-  5. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; an air drop target into `airDrops` when air is present; and a ferry target into `ferryOrders`; an air sub-unit picks only one of air strike, air drop, and ferry, and embarks one infantry sub-unit from its cell in the same orders when Aboard is none; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
-  6. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
-  7. The tempo rule for the beat, per section 4 item 1.
-  8. The sealift bullet, included only when the naval status section is present.
+  3. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
+
+  The `estimate_combat` tool line itself says Best Options already gives Odds for a listed fight, and to use the tool for a fight the table does not list.
+- **`# Orders Guidance`**, after the tools section (`buildTacticalCoachingSections`). Subsections, in this order, each omitted when it has no bullet:
+  1. Using the Briefing: the tempo rule (section 4 item 1), standing orders inert (item 2), copy option rows (item 3), and the clamped destination (item 4). The copy bullet maps a move or approach target into the move field, a ranged target into a `ranged_attack` entry, and, when air is present, an air strike, air drop, or ferry target into its list. An air sub-unit picks only one of air strike, air drop, and ferry, and embarks one infantry sub-unit from its cell in the same orders when Aboard is none.
+  2. Air and Naval Units: the air bullet when air is present (item 5), and the sealift bullet when the naval status section is present (item 6).
+  3. Callbacks and Messages: callbacks (item 7), the unconsulted beat (item 8), message discipline (item 9), and leaving a decided battle when it applies (item 10).
 - **Empty-state:** the heading plus `No tools available.`
 
 ### 2.12 Observed enemy roster line
@@ -217,6 +218,8 @@ Section 3. Always included; the example must match the contract. Example unit id
 8. An explicit_move to the sub-unit's current cell is ignored as already arrived; the unit holds.
 
 ## 4. Required tactical coaching
+
+Printed by `buildOrdersGuidanceSection` under `# Orders Guidance`.
 
 1. **Fire every beat.** Copy a listed shot from Best Options unless its Odds show Kill below 50% and Loss at least 50%. An em dash is not that case, so an air-strike row is still copied. A shot resolves from the beat-start position and does not use the move. The model must not invent a target the table does not list. The air-strike half of this sentence is omitted when the opponent has no air sub-units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 2. **Nothing moves unless ordered.** Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.

@@ -10,12 +10,11 @@
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
 import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
-import { strategicFerryRangeHexes } from '../../shared/weatherBonusRules';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
 import { SECTION_TITLE_AIR_OPERATIONS_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';
@@ -74,9 +73,6 @@ export function buildAirOperationsBriefingBlock(
     const lines: string[] = [];
     lines.push(topLevelHeading(SECTION_TITLE_AIR_OPERATIONS_STATUS));
     lines.push('');
-    lines.push(
-      'Air rules (tactical): strikes and drops cover this battle footprint; ferry is one hop between intact airport cells; an air sub-unit carries one infantry sub-unit.'
-    );
     lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
     lines.push('');
     const airStatusRows: Array<Array<unknown>> = opponentAir.map((air) => {
@@ -107,9 +103,6 @@ export function buildAirOperationsBriefingBlock(
   const rangeEnvelopeCache: RangeEnvelopeCache = new Map();
   lines.push(topLevelHeading(SECTION_TITLE_AIR_OPERATIONS_STATUS));
   lines.push('');
-  lines.push(
-    `Air rules: an air unit ferries any distance by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${strategicFerryRangeHexes({ weatherAtDestination: 'snow', tags: [], enabled: true })} into snow when the unit lacks the snow tag. It strikes and drops within ${AIR_STRIKE_RANGE_HEXES} of its current airport. Ferry Destinations lists at most 8 nearest reachable airports; any other airport you control may be legal, and plan_route confirms the chain. One air action per unit per turn.`
-  );
   lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
   lines.push('');
   const airStatusRows: Array<Array<unknown>> = [];
@@ -164,9 +157,6 @@ export function buildAirOperationsBriefingBlock(
   lines.push('');
   lines.push(
     `Enemy infrastructure in your current strike envelope: airports=${threatenedHumanAirports}, seaports=${threatenedHumanSeaports}.`
-  );
-  lines.push(
-    'Callback support: subscribe with event "infrastructure_destroyed" and parameters targetType plus the briefing hex code to be re-consulted after successful infra strikes.'
   );
   return lines.join('\n');
 }

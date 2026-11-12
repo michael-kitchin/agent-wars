@@ -122,7 +122,7 @@ export function buildActiveCallbacksSection(subscriptions: CallbackSubscription[
   const header = '| Event | Details |';
   const sep = '| --- | --- |';
   if (subscriptions.length === 0) {
-    return `${header}\n${sep}\n| — | None. Omitting callbacks or sending [] leaves this list empty. You have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now. |`;
+    return `${header}\n${sep}\n| — | None. |`;
   }
   const rows = subscriptions.map((s) => `| ${s.event} | ${formatCallbackLine(s, ctx)} |`);
   return [header, sep, ...rows].join('\n');

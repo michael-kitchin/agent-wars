@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
+import { NAVAL_EMBARK_RULE } from './promptSpec/briefingGuideText';
 
 /** Water hex with no seaport (briefing B0). */
 const WATER_NO_PORT = '810ebffffffffff';
@@ -62,7 +63,8 @@ function testStrategicEmbarkSentenceMatchesEngine(): void {
     (h3) => h3,
     'strategic'
   );
-  assert.match(md, /Embark: coastal or land seaport \(control not required\), or a water seaport you control\./);
+  assert.doesNotMatch(md, /Embark: coastal/);
+  assert.match(NAVAL_EMBARK_RULE, /Embark: coastal or land seaport \(control not required\), or a water seaport you control\./);
   assert.doesNotMatch(md, /your-controlled coastal hex/);
 }
 

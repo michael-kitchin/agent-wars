@@ -11,7 +11,8 @@ import {
   GENERIC_OBJECTIVE_SENTENCE,
   REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET,
   WIN_CONDITION_REMINDER_FIRST_SENTENCE,
-  buildRegionVsRegionScenarioObjectiveBlock,
+  buildScenarioObjectiveRulesBlock,
+  buildScenarioProgressLines,
   buildWinConditionReminderClause,
 } from './scenarioGoals';
 
@@ -41,13 +42,14 @@ test('the objective block can name both progress lines', () => {
     ai: { heldUrbanCells: 90, totalUrbanCells: 100, neededUrbanCells: 75, controlWinMet: true },
     human: { heldUrbanCells: 10, totalUrbanCells: 80, neededUrbanCells: 60, controlWinMet: false },
   };
-  const withProgress = buildRegionVsRegionScenarioObjectiveBlock(state, { controlWinMinUrbanShare: 0.75, progress });
-  assert.match(withProgress, /South home urban cells in hexes you control: 90 of 100 \(you need 75\)/);
-  assert.match(withProgress, /Your home urban cells in hexes South controls: 10 of 80 \(they need 60\)/);
-  const plain = buildRegionVsRegionScenarioObjectiveBlock(state);
-  assert.equal(plain, buildRegionVsRegionScenarioObjectiveBlock(state, {}));
+  const progressLines = buildScenarioProgressLines(state, { controlWinMinUrbanShare: 0.75, progress });
+  assert.match(progressLines.join('\n'), /South home urban cells in hexes you control: 90 of 100 \(you need 75\)/);
+  assert.match(progressLines.join('\n'), /Your home urban cells in hexes South controls: 10 of 80 \(they need 60\)/);
+  const plain = buildScenarioObjectiveRulesBlock(state);
+  assert.equal(plain, buildScenarioObjectiveRulesBlock(state, {}));
   assert.ok(plain.includes(REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET));
   assert.equal(plain.includes('you need'), false);
+  assert.equal(buildScenarioProgressLines(state).length, 0);
 });
 
 test('absent or unrecognised scenario id uses only the generic objective', () => {

@@ -15,10 +15,10 @@ import {
   filterQueueableUnitTypes,
   isEveryAvailableTypeAtCap,
   ALL_AVAILABLE_TYPES_AT_CAP_NOTE,
-  PRODUCTION_CAP_QUEUE_GUIDANCE,
 } from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
+import { EXPOSED_COLUMN_HEADER, listExposedCityHexes } from './productionExposure';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
@@ -34,8 +34,7 @@ import {
   subHeading,
   topLevelHeading,
 } from './promptSpec/sectionHeadings';
-import { buildProductionCostRulesLine, buildProductionIncomeRule } from './promptSpec/gameRuleText';
-import { BUILD_STATUS_COLUMN_HEADER, buildBuildabilityRule } from './promptSpec/gameRuleMercenaryText';
+import { BUILD_STATUS_COLUMN_HEADER } from './promptSpec/gameRuleMercenaryText';
 
 /**
  * Sentence used when production tools are on but no controlled hex has an editable queue.
@@ -167,6 +166,15 @@ seaports: number;
    */
   fortified: string;
   /**
+   * Whether an active enemy is close enough that this city should queue fortification.
+   *
+   * Contract: `yes` or `no`.
+   * When to use: The Exposed column.
+   * Expected outcome: `yes` when `listExposedCityHexes` contains this hex.
+   * Exceptions: None.
+   */
+  exposed: string;
+  /**
    * Whether this hex is building.
    *
    * Contract: `paused` or `yes`.
@@ -215,7 +223,8 @@ hasQueuedEntries: boolean;
 function normalizeControlledHexQueueRow(
   row: ControlledHexQueueSnapshot,
   formatHexLabel: (ll: [number, number]) => string,
-  maxedTypes: ReadonlySet<string>
+  maxedTypes: ReadonlySet<string>,
+  isExposed: (row: ControlledHexQueueSnapshot) => boolean
 ): NormalizedControlledHexQueueRow {
   const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
   const hexText = hex ? formatHexLabel(hex) : '[unknown]';
@@ -241,6 +250,7 @@ function normalizeControlledHexQueueRow(
     airports,
     seaports,
     fortified: `${fortifiedCount}/${fortifiedCount + fortifiableCount}`,
+    exposed: isExposed(row) ? 'yes' : 'no',
     building: row.buildPaused === true || (Array.isArray(row.pausedReasons) && row.pausedReasons.length > 0) ? 'paused' : 'yes',
     available,
     entries,
@@ -269,6 +279,12 @@ export function buildProductionBriefing(args: {
   });
   if (!args.productionEnabled) return { text: '', idleHexes: [], pausedHexes: [] };
   const ownSeat = briefingOwnSeatId(args.state);
+  const exposedH3 = listExposedCityHexes(args.state, ownSeat);
+  const isExposed = (row: ControlledHexQueueSnapshot): boolean => {
+    const ll = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
+    const h3 = ll ? args.resolveToH3(ll[0], ll[1]) : undefined;
+    return h3 !== undefined && exposedH3.has(h3);
+  };
   const snapshot = executeProductionTools(ownSeat, 'query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
     status?: string;
     production?: { controlledHexQueues?: Array<Record<string, unknown>> };
@@ -297,24 +313,15 @@ export function buildProductionBriefing(args: {
   const lines: string[] = [];
   lines.push(topLevelHeading(SECTION_TITLE_PRODUCTION_STATUS));
   lines.push('');
-  lines.push(buildProductionCostRulesLine());
-  lines.push(
-    `Deployment caps (per side): ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${caps[unitType]}`).join(', ')}.`
-  );
   lines.push(
     `Your current unit counts: ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${opponentCounts[unitType]}/${caps[unitType]}`).join(', ')}.`
   );
-  lines.push(buildProductionIncomeRule());
-  lines.push('');
-  lines.push(buildBuildabilityRule());
-  lines.push('');
   if (maxedTypes.length > 0) {
+    lines.push('');
     lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);
-    lines.push(PRODUCTION_CAP_QUEUE_GUIDANCE);
   }
-  lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
   const maxedTypeSet = new Set(maxedTypes);
-  const idleHexes = findIdleProductionHexes(queues as ControlledHexQueueSnapshot[], maxedTypeSet, args.formatHexLabel);
+  const idleHexes = findIdleProductionHexes(queues as ControlledHexQueueSnapshot[], maxedTypeSet, args.formatHexLabel, isExposed);
   const pausedHexes = findPausedProductionHexes(queues as ControlledHexQueueSnapshot[], args.formatHexLabel);
   const pausedSection = formatPausedQueuesSection(pausedHexes);
   if (pausedSection) {
@@ -331,7 +338,7 @@ export function buildProductionBriefing(args: {
   lines.push(subHeading(SECTION_TITLE_CONTROLLED_HEX_QUEUES));
   lines.push('');
   const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
-    normalizeControlledHexQueueRow(row, args.formatHexLabel, maxedTypeSet)
+    normalizeControlledHexQueueRow(row, args.formatHexLabel, maxedTypeSet, isExposed)
   );
   normalizedRows.sort((a, b) => {
     if (a.urban !== b.urban) return b.urban - a.urban;
@@ -348,9 +355,9 @@ export function buildProductionBriefing(args: {
   }
   lines.push(
     ...buildPromptTableLines(
-      ['Hex', 'Urban Hexes', FORTIFIED_COLUMN_HEADER, 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue', BUILD_STATUS_COLUMN_HEADER],
-      selectedRows.map((row) => [row.hexText, row.urban, row.fortified, row.airports, row.seaports, row.available, row.entries, row.building]),
-      ['—', '—', '—', '—', '—', '—', '—', '—']
+      ['Hex', 'Urban Hexes', FORTIFIED_COLUMN_HEADER, EXPOSED_COLUMN_HEADER, 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue', BUILD_STATUS_COLUMN_HEADER],
+      selectedRows.map((row) => [row.hexText, row.urban, row.fortified, row.exposed, row.airports, row.seaports, row.available, row.entries, row.building]),
+      ['—', '—', '—', '—', '—', '—', '—', '—', '—']
     )
   );
   return { text: lines.join('\n'), idleHexes, pausedHexes };

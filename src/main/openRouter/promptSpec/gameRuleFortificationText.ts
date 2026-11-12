@@ -2,7 +2,7 @@
  * Fortification sentences for the combat-rules paragraph and the production cost line.
  *
  * Purpose: Keeps that wording out of the combat-rules module.
- * When to use: `buildCombatRulesParagraph` and `buildProductionCostRulesLine`.
+ * When to use: `buildRulesSections` and `buildProductionCostRulesLine`.
  * Expected outcome: The combat rule is omitted when `includeFortificationRule` is false. When that flag is true, a battle hears the cell sentence and a strategic consult hears the hex sentence. When the flag is omitted, a strategic consult still hears the hex sentence and a battle hears the cell sentence only when a cell is fortified. The queue name and cost appear only on the production line.
  * Exceptions: None. A type import of the gate type avoids a runtime cycle.
  */

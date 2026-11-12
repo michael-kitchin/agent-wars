@@ -23,7 +23,7 @@ import { getSubscriptions } from '../callbackSubscriptions';
 import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
-import { assertHeadingsNest, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
+import { assertHeadingsNest, assertNoTripleBlankLines, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
 
 /**
  * Always-present strategic headings, in outline order.
@@ -35,11 +35,17 @@ import { assertHeadingsNest, assertProseLinesWithinLimit, headingOutline } from 
  */
 const STRATEGIC_ALWAYS_PRESENT: readonly string[] = [
   '# Your Command',
+  '# Scenario Objective (Required)',
+  '## Sides',
   '# Coordinates',
-  '# Combat and Movement Rules',
+  '# Rules',
+  '## Combat',
   '# Strategic Context',
+  '# Reading the Briefing',
+  '## Map Legend',
   '# Available Tools',
   '## How to Use These Tools Effectively',
+  '# Orders Guidance',
   '# Response Format',
   '## Example Response',
   '# Current Situation',
@@ -47,7 +53,8 @@ const STRATEGIC_ALWAYS_PRESENT: readonly string[] = [
   '## Unit Status and Threats',
   '## Attention Flags',
   '## Operational Map',
-  '# Unit Roster',
+  '## Scenario Progress',
+  '## Unit Roster',
 ];
 
 /**
@@ -112,6 +119,7 @@ try {
   });
   const outline = headingOutline(prompt);
   assertHeadingsNest(outline);
+  assertNoTripleBlankLines(prompt);
   assertSubsequence(outline, STRATEGIC_ALWAYS_PRESENT);
   assert.ok(!prompt.split('\n').includes('Strategic context:'));
   assert.ok(!prompt.split('\n').includes('HOW TO USE THESE TOOLS EFFECTIVELY:'));

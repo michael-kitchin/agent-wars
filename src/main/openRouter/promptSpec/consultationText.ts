@@ -83,6 +83,15 @@ export interface OpeningMessageGates {
    */
   readonly hasProductionAttention?: boolean;
   /**
+   * Whether Campaign Orders lists at least one unit.
+   *
+   * Contract: Omitted means false. True only for a strategic consult when a campaign unit's standing order should change.
+   * When to use: From the consultation's campaign attention sentence.
+   * Expected outcome: True adds the clause that tells the model to copy each Campaign Orders row.
+   * Exceptions: None.
+   */
+  readonly hasCampaignOrders?: boolean;
+  /**
    * Whether the adjacent-cell fallback listing is in the situation message.
    *
    * Contract: Used when planning and standing orders are both off.
@@ -196,7 +205,11 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
       gates.ordersEnabled
         ? ' Give the units in the orderless table standing orders.'
         : '';
-    return optionsClause + orderlessClause;
+    const campaignClause =
+      gates.ordersEnabled && gates.hasCampaignOrders === true
+        ? ' Give each unit in Campaign Orders the order its row names.'
+        : '';
+    return optionsClause + orderlessClause + campaignClause;
   }
   if (gates.planningEnabled && !gates.hasBriefing) {
     return 'Use the listed tools to derive destinations; there is no options table.';

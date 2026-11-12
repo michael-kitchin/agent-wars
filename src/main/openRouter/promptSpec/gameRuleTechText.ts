@@ -2,7 +2,7 @@
  * The tech-bonus sentence in the combat rules paragraph.
  *
  * Purpose: Keeps the new sentence out of the combat-rules module, which is already near the file-size limit.
- * When to use: `buildCombatRulesParagraph`, after the origin-bonus sentence.
+ * When to use: `buildRulesSections`, after the origin-bonus sentence.
  * Expected outcome: Null when tech is off, so a prompt with tech off stays unchanged. Low names attack only and says the tech bonus does not change defense. High names attack and defense.
  * Exceptions: None.
  */

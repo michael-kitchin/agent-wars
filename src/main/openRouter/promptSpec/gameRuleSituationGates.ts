@@ -243,7 +243,7 @@ export function strategicWeatherApplies(hexes: readonly { readonly weather?: str
  * Builds the combat-rule gates for one consultation.
  *
  * Purpose: One place reads the roster, the map, and the battle so the assembler stays a caller.
- * When to use: `buildSystemPromptForTools` immediately before `buildCombatRulesParagraph`.
+ * When to use: `buildSystemPromptForTools` immediately before `buildRulesSections`.
  * Expected outcome: Clauses that cannot apply are off. An empty roster or a missing weather value leaves them on.
  * Exceptions: None.
  */

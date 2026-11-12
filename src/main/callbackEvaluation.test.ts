@@ -4,13 +4,17 @@
  */
 
 import * as assert from 'assert';
+import { latLngToCell } from 'h3-js';
 import { AI_SEAT_IDS } from '../shared/seatIds';
+import { dbGetOne, dbRun, type GameStateSnapshot } from './gameDb';
+import { withTempGameDb } from './testSupport/withTempGameDb';
+import { writeCampaignObjectiveForSeat } from './gameDb/campaignObjectiveMemory';
+import { campaignReadyOverride } from './openRouter/afterResolution';
 import {
   evaluateMandatoryOverrides,
   evaluateSubscriptionEvents,
   evaluateTacticalMandatoryOverrides,
 } from './callbackEvaluation';
-import type { GameStateSnapshot } from './gameDb';
 import type { CallbackSubscription } from './callbackSubscriptions';
 
 /**
@@ -279,7 +283,49 @@ function testInfrastructureDestroyedSubscriptionEventFires(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * An assembled campaign asks for a consult, and an assault or orders-off does not.
+ *
+ * Purpose: The assault must not wait for the next scheduled consult, and disabling orders must not consult forever.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: `campaign_ready` only for a massed assemble objective while orders are on.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testCampaignReadyOverride(): void {
+  withTempGameDb('aw-campaign-ready-', () => {
+    const h3 = latLngToCell(10, 10, 1);
+    const state = {
+      hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains' }],
+      units: [{ id: 'opponent-inf-1', player: 'opponent', unitType: 'infantry', h3Index: h3 }],
+      phase: 'planning',
+      turnNumber: 4,
+      pendingOrders: [],
+      scenarioId: 'region_vs_region',
+      playerPerspective: 'opponent',
+    } as unknown as GameStateSnapshot;
+    const ops = { getOne: dbGetOne, run: dbRun };
+    writeCampaignObjectiveForSeat(ops, 'opponent', {
+      targetH3: h3,
+      stagingH3: h3,
+      phase: 'assemble',
+      source: 'engine',
+      chosenTurn: 1,
+    });
+    assert.equal(campaignReadyOverride(state, 'opponent', true)?.type, 'campaign_ready');
+    assert.equal(campaignReadyOverride(state, 'opponent', false), null);
+    writeCampaignObjectiveForSeat(ops, 'opponent', {
+      targetH3: h3,
+      stagingH3: h3,
+      phase: 'assault',
+      source: 'engine',
+      chosenTurn: 1,
+    });
+    assert.equal(campaignReadyOverride(state, 'opponent', true), null);
+  });
+}
+
 function run(): void {
+  testCampaignReadyOverride();
   testFirstConsultationFires();
   testFirstCombatFires();
   testUnitDestroyedFires();

@@ -80,6 +80,7 @@ import {
   tacticalBestOptionsUrbanHexCount,
   type TacticalBestOptionsInterestContext,
 } from './possibleUnitActionsBestOptionsInterest';
+import { campaignRoleForUnit, type CampaignPlan } from './campaignRules';
 
 export { buildPossibleActionsIndexedState, partitionHomelandNearestOther };
 export type { PossibleActionsIndexedState };
@@ -225,6 +226,15 @@ export function collectAggregatedPossibleActionRows(args: {
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: The consult's campaign plan. Omitted or null means today's rows.
+   * When to use: Strategic briefing builders.
+   * Expected outcome: Campaign units get advance rows toward the waypoint. Other units are unchanged.
+   * Exceptions: None.
+   */
+  campaignPlan?: CampaignPlan | null;
   /** Pre-built indexed state; when omitted, built from `state` on this call. */
   indexedState?: PossibleActionsIndexedState;
 }): PossibleActionTableRow[] {
@@ -357,6 +367,7 @@ export function collectAggregatedPossibleActionRows(args: {
         moveActionType = resolved.actionType;
         moveEnemySummaryOverride = resolved.enemySummaryOverride;
       } else {
+        const campaignRole = campaignRoleForUnit(args.campaignPlan, unit.id);
         const resolved = applyInterestOrApproach({
           unitH3: unit.h3Index,
           legalHexes: moveHexes,
@@ -364,6 +375,7 @@ export function collectAggregatedPossibleActionRows(args: {
           enemyOccupiedH3: strategicEnemyOccupiedH3,
           indexed,
           stayPutFriendlyH3,
+          ...(campaignRole ? { campaign: campaignRole } : {}),
         });
         moveHexes = resolved.hexes;
         moveActionType = resolved.actionType;

@@ -451,6 +451,8 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
       return arraySchema({ anyOf: memoryUpdateRowSchemas() });
     case 'productionOrders':
       return arraySchema({ anyOf: PRODUCTION_ORDER_ACTIONS.map((action) => productionOrderRowSchema(action)) });
+    case 'campaignTarget':
+      return { ...STRING_SCHEMA };
     default:
       throw new Error(`envelopeJsonSchema: no schema for envelope field "${field}"`);
   }

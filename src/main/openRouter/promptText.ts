@@ -3,7 +3,6 @@ import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { logDebug, logTrace } from '../logger';
-import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
 import { buildOpeningUserMessage } from './promptSpec/consultationText';
 import { SECTION_TITLE_TOOL_USAGE_GUIDANCE, subHeading } from './promptSpec/sectionHeadings';
@@ -243,7 +242,7 @@ export function buildAvailableToolsIntro(
     );
   }
   if (coordinateMode === 'tactical') {
-    const briefingLead = 'Use the Commander\'s Briefing above for assessments and possible unit actions.';
+    const briefingLead = 'Use the Commander\'s Briefing in the situation message for assessments and possible unit actions.';
     const { lead, neverCopy } = splitNeverCopySentence(
       buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits })
     );
@@ -267,7 +266,7 @@ export function buildAvailableToolsIntro(
     ? `When Best Options This Turn lists a target for a unit, copy it and do not call plan_route for it. When it lists none, call plan_route or leave the unit idle. ${lead}`
     : lead;
   paragraphs.push(
-    `Use the Commander's Briefing above for assessments and possible unit actions. ${copyLead}`,
+    `Use the Commander's Briefing in the situation message for assessments and possible unit actions. ${copyLead}`,
     neverCopy
   );
   if (flags.ordersEnabled) {
@@ -280,38 +279,35 @@ export function buildAvailableToolsIntro(
 }
 
 /**
- * Builds tool-mechanic bullets, then appends the gated coaching list.
+ * Builds the tool-mechanic bullets.
  *
- * Purpose: The HOW TO USE header owns tool mechanics (when to call which tool). Rules and heuristics come from
- * `buildCoachingBullets` so they have one home and one test.
- * When to use: `buildSystemPromptForTools` after computing flags, briefing presence, and coaching gates.
- * Expected outcome: Markdown bullets under `## How to Use These Tools Effectively`.
+ * Purpose: The HOW TO USE header owns tool mechanics. Coaching lives in Orders Guidance.
+ * When to use: `buildSystemPromptForTools` after computing flags and briefing presence.
+ * Expected outcome: Markdown bullets under `## How to Use These Tools Effectively`. The briefing lines point at the situation message.
  * Exceptions: None.
  */
 export function buildToolUsageGuidance(
   flags: PromptToolFlags,
   hasPrecomputedBriefing = false,
-  coordinateMode: 'strategic' | 'tactical' = 'strategic',
-  coachingGates?: CoachingGates
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
 ): string {
   logDebug('promptText buildToolUsageGuidance', {
     coordinateMode,
     hasPrecomputedBriefing,
-    hasExplicitGates: coachingGates != null,
   });
   const lines: string[] = [];
   if (hasPrecomputedBriefing) {
     lines.push(
       coordinateMode === 'tactical'
-        ? '- The Commander\'s Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.'
-        : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
+        ? '- The Commander\'s Briefing in the situation message already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.'
+        : '- The Commander\'s Briefing in the situation message already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
     );
     if (coordinateMode === 'tactical' && flags.assessmentEnabled) {
       lines.push('- assess_unit is optional. Call it only when the briefing does not show what that sub-unit can reach or shoot. On a shared cell, assess one sub-unit per parent.');
     }
   } else {
     if (flags.ordersEnabled || flags.memoryEnabled) {
-      lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
+      lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are in the situation message).');
     }
     if (flags.assessmentEnabled) {
       lines.push('- assess_unit is optional. Call it only when you cannot tell what that unit can reach or shoot.');
@@ -333,21 +329,6 @@ export function buildToolUsageGuidance(
       '- Production: use query_production to inspect controlled-hex queues and constraints; use set_build_queue to set one unit type/count for a queue (this replaces existing queue entries). If skipping tools, you may include productionOrders in final JSON.'
     );
   }
-  const resolvedGates: CoachingGates = coachingGates ?? {
-    coordinateMode,
-    planningEnabled: flags.planningEnabled,
-    ordersEnabled: flags.ordersEnabled && coordinateMode !== 'tactical',
-    memoryEnabled: flags.memoryEnabled && coordinateMode !== 'tactical',
-    productionEnabled: flags.productionEnabled && coordinateMode !== 'tactical',
-    hasAirUnits: true,
-    hasNavalUnits: true,
-    hasBestOptionsTable: hasPrecomputedBriefing,
-    homeRegionsOverlap: false,
-    hasObservedEnemy: true,
-    includeScenarioWinPaths: coordinateMode !== 'tactical',
-    includeExitBattle: false,
-  };
-  lines.push(...buildCoachingBullets(resolvedGates));
   if (lines.length === 0) return '';
   return '\n\n' + subHeading(SECTION_TITLE_TOOL_USAGE_GUIDANCE) + '\n\n' + lines.join('\n');
 }
@@ -438,8 +419,9 @@ export function getMovementOrderInstruction(
         tacticalMarchReachabilityClause
       );
     }
+    const moveKinds = coordinateMode === 'strategic' ? 'approach, advance, or move/melee' : 'approach or move/melee';
     return (
-      ' For each explicit_move entry: set "destination" to a Target Hex from that unit\'s Best Options This Turn approach or move/melee row (copy the two-character code exactly), or to the exact orderToHexCode from that unit\'s plan_route result when the dest is not listed there.' +
+      ` For each explicit_move entry: set "destination" to a Target Hex from that unit's Best Options This Turn ${moveKinds} row (copy the two-character code exactly), or to the exact orderToHexCode from that unit's plan_route result when the dest is not listed there.` +
       tacticalMarchReachabilityClause
     );
   }
@@ -527,6 +509,7 @@ export function getInitialUserMessage(
     readonly hasBestOptionsTable?: boolean;
     readonly includeExitBattle?: boolean;
     readonly hasProductionAttention?: boolean;
+    readonly hasCampaignOrders?: boolean;
   } = {}
 ): string {
   logDebug('promptText getInitialUserMessage', {
@@ -537,6 +520,7 @@ export function getInitialUserMessage(
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
     includeExitBattle: roster.includeExitBattle === true,
     hasProductionAttention: roster.hasProductionAttention === true,
+    hasCampaignOrders: roster.hasCampaignOrders === true,
   });
   return buildOpeningUserMessage({
     coordinateMode,
@@ -551,5 +535,6 @@ export function getInitialUserMessage(
     hasBestOptionsTable: roster.hasBestOptionsTable ?? hasPrecomputedBriefing,
     includeExitBattle: roster.includeExitBattle === true,
     hasProductionAttention: roster.hasProductionAttention === true,
+    hasCampaignOrders: roster.hasCampaignOrders === true,
   });
 }

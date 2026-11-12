@@ -300,10 +300,14 @@ async function run(): Promise<void> {
         assert.ok(!systemPrompt.includes('# Air Operations Status'), `air-ops section must be omitted when roster has no air, mask=${mask}`);
         assert.ok(!systemPrompt.includes('airStrikes'), `airStrikes must be omitted when roster has no air, mask=${mask}`);
       }
-      if (hasNaval || hasAir) {
+      if (hasNaval) {
         assert.ok(systemPrompt.includes('# Naval Transport Status'), `naval transport missing for mask=${mask}`);
+        assert.ok(systemPrompt.includes('Embark: coastal'), `embark rule missing for mask=${mask}`);
       } else {
-        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when roster has no naval and no air, mask=${mask}`);
+        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when the roster has no naval unit, mask=${mask}`);
+      }
+      if (hasAir) {
+        assert.ok(systemPrompt.includes('An air unit carries one infantry unit'), `airlift rule missing for mask=${mask}`);
       }
       if (hasNaval) {
         assert.ok(systemPrompt.includes('transport_move'), `sealift actions missing for mask=${mask}`);
@@ -333,39 +337,39 @@ async function run(): Promise<void> {
         `removed passive-movement coaching should not appear for mask=${mask}`
       );
       assert.ok(systemPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), `win-condition reminder paragraph missing for mask=${mask}`);
-      assert.ok(systemPrompt.includes('- Your goals are:'), `goals coaching header missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes('- Your goals are, in priority order:'), `goals coaching header missing for mask=${mask}`);
       assert.ok(
-        systemPrompt.includes('(1) Engage enemy forces to reduce their combat effectiveness'),
+        systemPrompt.includes('(1) Take and hold enemy cities. Taking cities is how you knock sides out.'),
         `goal (1) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(2) Disperse your units to maximize visibility'),
+        systemPrompt.includes('(2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.'),
         `goal (2) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(3) Maximize your own unit production'),
+        systemPrompt.includes('(3) Keep enough units at home to stop a raid on your cities.'),
         `goal (3) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("(4) Protect your home region's production capacity"),
+        systemPrompt.includes('(4) Keep every city building. At your unit caps, bank credits and hire mercenaries.'),
         `goal (4) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("(5) Degrade or eliminate enemy home regions' urban production capacity"),
+        systemPrompt.includes('(5) Scout with a few units, not your main force.'),
         `goal (5) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
       assert.ok(systemPrompt.includes('- Your message is:'), `message coaching header missing for mask=${mask}`);
       assert.ok(
-        systemPrompt.includes('(1) Use speed, surprise, and initiative to break the enemy\'s cohesion and morale'),
+        systemPrompt.includes('(1) Attack where you outnumber the defenders, and avoid fights where you do not.'),
         `strategy (1) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(2) Attack the enemy\'s weaknesses (gaps) and avoid their strengths (surfaces)'),
+        systemPrompt.includes('(2) Strike gaps the enemy cannot reinforce quickly.'),
         `strategy (2) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(3) Create maximum disruption with minimum force'),
+        systemPrompt.includes('(3) Keep the initiative: move toward your objective every turn.'),
         `strategy (3) coaching missing for mask=${mask}`
       );
       assert.ok(
@@ -592,6 +596,10 @@ async function run(): Promise<void> {
       'tactical prompt includes single engage priority'
     );
     assert.ok(tacticalSystemPrompt.includes('- Your strategy is:'), 'tactical prompt includes strategy coaching');
+    assert.ok(
+      tacticalSystemPrompt.includes('move toward your objective every beat'),
+      'tactical strategy line uses the beat'
+    );
     assert.ok(tacticalSystemPrompt.includes('- Your message is:'), 'tactical prompt includes message coaching');
     assert.ok(
       !tacticalSystemPrompt.includes('(4) Protect your home region'),
@@ -632,8 +640,12 @@ async function run(): Promise<void> {
       'absent scenarioId must not teach region-versus-region win-path coaching'
     );
     assert.ok(
-      !noScenarioPrompt.includes("Protect your home region's production capacity"),
-      'absent scenarioId must not reuse home-region goals'
+      !noScenarioPrompt.includes('Take and hold enemy cities'),
+      'absent scenarioId must not reuse the city-knockout goals'
+    );
+    assert.ok(
+      noScenarioPrompt.includes('Destroy enemy forces where you outnumber them'),
+      'absent scenarioId uses the generic goals'
     );
     const recognisedPrompt = buildSystemPromptModule.buildSystemPromptForTools(
       state,

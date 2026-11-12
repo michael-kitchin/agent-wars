@@ -69,16 +69,24 @@ function groupThisTurnOptionRowsByTarget(
 }
 
 /**
+ * Glossary for the Odds column of Best Options This Turn.
+ *
+ * Purpose: The definition does not change from turn to turn, so the system prompt prints it once.
+ * When to use: In the Best Options Odds subsection, and nowhere under the table.
+ * Expected outcome: Kill, Hurt, and Loss, plus the em-dash meaning.
+ * Exceptions: None.
+ */
+export const BEST_OPTIONS_ODDS_LINE =
+  'Odds is Kill, Hurt, and Loss for every listed unit taking part. Kill is the chance the defenders are wiped out. Hurt is the chance at least one hit lands, including a hit that only removes a fortification. Loss is the chance you lose a unit. An em dash is not a fight, or it could not be estimated.';
+
+/**
  * Renders the consolidated **Best Options This Turn** table from aggregated possible-action rows.
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units`, `Target Infrastructure`, and `Odds`. At most five target hexes per unit. An absent odds resolver fills Odds with an em dash.
+ * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units`, `Target Infrastructure`, and `Odds`. At most five target hexes per unit. An absent odds resolver fills Odds with an em dash. The odds glossary is not appended.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
-const BEST_OPTIONS_ODDS_LINE =
-  'Odds is Kill, Hurt, and Loss for every listed unit taking part. Kill is the chance the defenders are wiped out. Hurt is the chance at least one hit lands, including a hit that only removes a fortification. Loss is the chance you lose a unit. An em dash is not a fight, or it could not be estimated.';
-
 export function renderThisTurnOptionsTableMarkdown(
   rows: PossibleActionTableRow[],
   latLngByH3: Map<string, [number, number]>,
@@ -122,7 +130,7 @@ export function renderThisTurnOptionsTableMarkdown(
     ['Unit IDs', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure', 'Odds'],
     body
   );
-  return `${lines.join('\n')}\n\n${BEST_OPTIONS_ODDS_LINE}\n`;
+  return lines.join('\n');
 }
 
 /**

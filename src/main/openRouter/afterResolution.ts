@@ -11,6 +11,7 @@ import { isAiSeatId, isNeutralOwnerId, type AiSeatId } from '../../shared/seatId
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
+  dbGetOne,
   getAiLastConsultationTurn,
   setAiLastConsultationTurn,
   getCombatSinceConsultation,
@@ -25,8 +26,13 @@ import {
   evaluateMandatoryOverrides,
   evaluateSubscriptionEvents,
   evaluateTacticalMandatoryOverrides,
+  type MandatoryOverrideResult,
   type ResolutionContext,
 } from '../callbackEvaluation';
+import { readCampaignObjectives } from '../gameDb/campaignObjectiveMemory';
+import { campaignAssaultReady } from './campaignRules';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import { getToolFlags } from './openRouterToolGroups';
 import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../../shared/ipc/tacticalOpponentPlanMerge';
@@ -184,6 +190,45 @@ function reportedToolCounts(
 }
 
 /**
+ * Whether this seat should be consulted because its assembly is complete.
+ *
+ * Purpose: The assault starts on the turn the force finishes gathering, instead of waiting for the next scheduled consult.
+ * When to use: After `evaluateMandatoryOverrides` and before the consult trigger is computed. Pass whether standing orders are enabled for this consult.
+ * Expected outcome: `{ type: 'campaign_ready' }` when orders are on, the match is region versus region, and enough ground units stand near the staging hex. Otherwise null. Orders off does not consult, because the phase only advances on an orders-enabled consult.
+ * Exceptions: None. A missing row is null.
+ */
+export function campaignReadyOverride(
+  state: GameStateSnapshot,
+  seatId: AiSeatId,
+  ordersEnabled: boolean
+): Extract<MandatoryOverrideResult, { type: 'campaign_ready' }> | null {
+  if (!ordersEnabled || state.scenarioId !== 'region_vs_region') {
+    logTrace('afterResolution campaignReadyOverride', { seatId, ready: false, ordersEnabled, scenarioId: state.scenarioId ?? null });
+    return null;
+  }
+  const campaign = readCampaignObjectives({ getOne: dbGetOne }).get(seatId) ?? null;
+  if (!campaign) {
+    logTrace('afterResolution campaignReadyOverride', { seatId, ready: false, stored: false });
+    return null;
+  }
+  const groundUnitHexes = state.units
+    .filter(
+      (unit) =>
+        unit.player === seatId &&
+        (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
+        !unit.embarkedOnCarrierUnitId
+    )
+    .map((unit) => unit.h3Index);
+  const ready = campaignAssaultReady({
+    objective: campaign,
+    groundUnitHexes,
+    hopDistance: computeGridDistanceWithPathFallbackPure,
+  });
+  logDebug('afterResolution campaignReadyOverride', { seatId, ready, phase: campaign.phase });
+  return ready ? { type: 'campaign_ready' } : null;
+}
+
+/**
  * Consults one AI seat after a strategic turn and stores the orders it returns.
  *
  * Purpose: Event-driven mode plans the next turn from the resolution that just finished.
@@ -218,6 +263,8 @@ export async function afterResolution(
     removedOpponentUnitIds,
     consumeFogNewContactsForPlayer(seatId)
   );
+  const campaignReady = campaignReadyOverride(state, seatId, getToolFlags(deps.enabledToolNames).ordersEnabled);
+  if (campaignReady) mandatoryFired.push(campaignReady);
 
   addCombatSinceConsultation(seatId, opponentCombatants);
 

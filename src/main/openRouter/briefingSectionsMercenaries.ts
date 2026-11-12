@@ -8,6 +8,7 @@
  */
 
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import type { HopDistance } from './campaignRules';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { unitCostFor } from '../../shared/gameRules';
 import { isHireableUnitType, mercenaryUpkeepFor } from '../../shared/mercenaryRules';
@@ -23,7 +24,6 @@ import {
   MERCENARY_FUNDS_WARNING,
   NO_RAISE_OPTIONS_LINE,
   NO_REHIRE_CANDIDATES_LINE,
-  MERCENARY_ENVELOPE_ROWS_SENTENCE,
   buildMercenaryRule,
   buildMercenaryUpkeepRule,
   formatMercenaryFundsLine,
@@ -49,7 +49,18 @@ export function buildMercenariesBriefingBlock(
   state: GameStateSnapshot,
   format: (h3Index: string) => string,
   mode: 'strategic' | 'tactical',
-  options: { readonly productionEnabled: boolean }
+  options: {
+    readonly productionEnabled: boolean;
+    /**
+     * Campaign city the raise table sorts toward.
+     *
+     * Contract: Null or omitted leaves the distance-to-units sort in place after the resume key.
+     * When to use: When the consult has a campaign plan.
+     * Expected outcome: Cells nearer this hex sort ahead of farther cells after rows that resume building.
+     * Exceptions: None.
+     */
+    readonly campaignTargetH3?: string | null;
+  }
 ): string {
   const economy = state.mercenaryEconomy;
   const ownSeat = briefingOwnSeatId(state);
@@ -72,7 +83,6 @@ export function buildMercenariesBriefingBlock(
     }
   }
   const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', options.productionEnabled ? buildMercenaryRule() : buildMercenaryUpkeepRule()];
-  if (options.productionEnabled) lines.push('', MERCENARY_ENVELOPE_ROWS_SENTENCE);
   lines.push('', formatMercenaryFundsLine(economy));
   if (economy.credits < economy.upkeepPerTurn) lines.push(MERCENARY_FUNDS_WARNING);
   if (mercenaries.length > 0) {
@@ -84,7 +94,12 @@ export function buildMercenariesBriefingBlock(
   const context = buildHireContext(state, ownSeat);
   const ownHexes = state.units.filter((unit) => unit.player === ownSeat).map((unit) => unit.h3Index);
   lines.push('', subHeading(SECTION_TITLE_REHIRE_CANDIDATES), '', rehireTable(state, context, orderedRehires, ownHexes, format));
-  lines.push('', subHeading(SECTION_TITLE_RAISE_OPTIONS), '', raiseTable(context, orders, ownHexes, format, listOccupationPausedHexes(state, ownSeat)));
+  lines.push(
+    '',
+    subHeading(SECTION_TITLE_RAISE_OPTIONS),
+    '',
+    raiseTable(context, orders, ownHexes, format, listOccupationPausedHexes(state, ownSeat), options.campaignTargetH3 ?? null)
+  );
   return lines.join('\n');
 }
 
@@ -165,7 +180,7 @@ function rehireTable(
  *
  * Purpose: Capacity left subtracts this seat's raise orders. The function does not rebuild the snapshot.
  * When to use: When production tools are on.
- * Expected outcome: Cells that would restart a paused city sort first and show `yes` under Resumes building. A table, or the none-line.
+ * Expected outcome: Cells that would restart a paused city sort first and show `yes` under Resumes building. Then cells nearest the campaign target. A table, or the none-line.
  * Exceptions: None.
  */
 function raiseTable(
@@ -173,7 +188,8 @@ function raiseTable(
   orders: ReturnType<typeof listHireOrdersForSeat>,
   ownHexes: readonly string[],
   format: (h3Index: string) => string,
-  resumable: ReadonlySet<string>
+  resumable: ReadonlySet<string>,
+  campaignTargetH3: string | null
 ): string {
   const rows = listHireEntryHexes(context).flatMap((h3Index) => {
     const evaluation = evaluateHexHire(context, h3Index);
@@ -191,6 +207,7 @@ function raiseTable(
     .sort(
       (left, right) =>
         Number(right.resumes) - Number(left.resumes) ||
+        compareByCampaignTarget(left.h3Index, right.h3Index, campaignTargetH3, computeGridDistanceWithPathFallbackPure) ||
         compareDistance(left.h3Index, right.h3Index, ownHexes) ||
         left.h3Index.localeCompare(right.h3Index)
     )
@@ -199,6 +216,29 @@ function raiseTable(
     ['Hex', 'Capacity', 'Resumes building', 'Options'],
     shown.map((row) => [format(row.h3Index), String(row.capacityLeft), row.resumes ? 'yes' : 'no', row.text])
   ).join('\n');
+}
+
+/**
+ * Orders two cells by hop distance to the campaign city.
+ *
+ * Purpose: Raise Options should spend credits nearest the city the campaign is taking.
+ * When to use: After the resume-building comparison, before distance to the seat's units.
+ * Expected outcome: Zero when the target is null or the distances match. A null distance sorts last. Otherwise the nearer cell is first.
+ * Exceptions: None.
+ */
+export function compareByCampaignTarget(
+  leftH3: string,
+  rightH3: string,
+  targetH3: string | null,
+  hopDistance: HopDistance
+): number {
+  if (targetH3 === null) return 0;
+  const left = hopDistance(leftH3, targetH3);
+  const right = hopDistance(rightH3, targetH3);
+  if (left === right) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+  return left - right;
 }
 
 /**

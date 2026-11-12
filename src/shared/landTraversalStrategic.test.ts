@@ -4,12 +4,16 @@
  */
 
 import * as assert from 'assert';
+import { gridDisk, latLngToCell } from 'h3-js';
 import {
   canLandUnitTraverseEdge,
+  getLandStepDistances,
+  landMassRecordsShareId,
   landUnitCanOccupyHex,
   storedStrategicTerrainKind,
   strategicMapFillTerrainKind,
   STRATEGIC_LAND_MAX_WATER_PCT,
+  type LandMassByH3,
   type StrategicLandMassRecord,
 } from './landTraversalStrategic';
 
@@ -280,7 +284,40 @@ function testStrategicMapFillTerrainKind(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Land steps grow one per edge and stop at a cell on another continent.
+ *
+ * Purpose: Campaign reach walks land edges, not straight hops.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: Ring 1 is one step except the blocked continent. Ring 2 that is reached is two steps. Depth 1 does not reach ring 2.
+ * Exceptions: None.
+ */
+function testLandStepDistances(): void {
+  const origin = latLngToCell(10, 10, 1);
+  const disk = gridDisk(origin, 2);
+  const ring1 = gridDisk(origin, 1).filter((h3) => h3 !== origin);
+  const blocked = ring1[0]!;
+  const data: LandMassByH3 = new Map(
+    disk.map((h3) => [h3, { h3Index: h3, waterPct: 0, continentIds: h3 === blocked ? [2] : [1], islandIds: [] }])
+  );
+  const steps = getLandStepDistances({ originH3s: [origin], hexSet: new Set(disk), data, maxDepth: 2 });
+  assert.equal(steps.get(origin), 0);
+  for (const h3 of ring1) {
+    if (h3 !== blocked) assert.equal(steps.get(h3), 1);
+  }
+  assert.equal(steps.has(blocked), false);
+  const ring2 = disk.filter((h3) => h3 !== origin && !ring1.includes(h3));
+  const reachedRing2 = ring2.filter((h3) => steps.has(h3));
+  assert.ok(reachedRing2.length > 0);
+  assert.ok(reachedRing2.every((h3) => steps.get(h3) === 2));
+  const shallow = getLandStepDistances({ originH3s: [origin], hexSet: new Set(disk), data, maxDepth: 1 });
+  assert.equal(ring2.some((h3) => shallow.has(h3)), false);
+  assert.equal(landMassRecordsShareId(data.get(origin)!, data.get(blocked)!), false);
+  assert.equal(landMassRecordsShareId(data.get(origin)!, data.get(ring1[1]!)!), true);
+}
+
 function run(): void {
+  testLandStepDistances();
   testStoredStrategicTerrainKind();
   testStrategicMapFillTerrainKind();
   testSameContinentLowWater();

@@ -22,7 +22,7 @@ import { combatRuleGatesForPrompt } from './gameRuleSituationGates';
 import {
   buildAirEmploymentRule,
   buildCasualtySortRule,
-  buildCombatRulesParagraph,
+  buildRulesSections,
   buildCombatStatsLine,
   buildDestinationOccupancyRule,
   buildHoldFireRule,
@@ -42,7 +42,7 @@ import { MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
  * Default gates for composing the combat paragraph in tests.
  *
  * Purpose: Each case only overrides the field under test.
- * When to use: `buildCombatRulesParagraph` cases in this file.
+ * When to use: `buildRulesSections` cases in this file.
  * Expected outcome: A complete gate object.
  * Exceptions: None.
  */
@@ -138,7 +138,7 @@ test('buildOriginBonusRule appears only when a flag applies in the mode', () => 
   const strategicAir = buildOriginBonusRule(gates({ originBonusSettings: countryOnly, hasAirUnits: true }));
   assert.match(strategicAir ?? '', /An air unit qualifies by the hex of its base/);
 
-  assert.ok(buildCombatRulesParagraph(gates({ originBonusSettings: countryOnly })).includes(strategic ?? '\u0000'));
+  assert.ok(buildRulesSections(gates({ originBonusSettings: countryOnly })).includes(strategic ?? '\u0000'));
 });
 
 test('tactical buildOriginBonusRule notes no stacking only when both flags are on', () => {
@@ -329,23 +329,23 @@ test('buildIntelStalenessRule quotes the engine retention window', () => {
 });
 
 test('combat stats omit the air type when the roster has no air', () => {
-  const noAir = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasAirUnits: false }));
+  const noAir = buildRulesSections(gates({ coordinateMode: 'tactical', hasAirUnits: false }));
   assert.doesNotMatch(noAir, /air: \d+ attack/);
   assert.doesNotMatch(noAir, /strike anywhere/);
-  const withAir = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasAirUnits: true }));
+  const withAir = buildRulesSections(gates({ coordinateMode: 'tactical', hasAirUnits: true }));
   assert.match(withAir, /air: \d+ attack/);
   assert.match(withAir, /strike anywhere/);
 });
 
-test('buildCombatRulesParagraph keeps strike radius out of tactical and MP wording out of strategic', () => {
-  const tactical = buildCombatRulesParagraph(
+test('buildRulesSections keeps strike radius out of tactical and MP wording out of strategic', () => {
+  const tactical = buildRulesSections(
     gates({ coordinateMode: 'tactical', hasAirUnits: true, ordersEnabled: true })
   );
   assert.ok(!tactical.includes(`strike radius of ${AIR_STRIKE_RANGE_HEXES}`));
   assert.match(tactical, /anywhere in the battle/i);
   assert.match(tactical, /Clear of weather, the point budget is/);
   assert.doesNotMatch(tactical, /\b(snow|rain|heat)\b/i);
-  const weatherOn = buildCombatRulesParagraph(
+  const weatherOn = buildRulesSections(
     gates({
       coordinateMode: 'tactical',
       originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
@@ -353,13 +353,13 @@ test('buildCombatRulesParagraph keeps strike radius out of tactical and MP wordi
   );
   assert.match(weatherOn, /Clear of weather, the point budget is/);
   assert.match(weatherOn, /armor's point budget is 2 in snow or rain/);
-  const strategic = buildCombatRulesParagraph(
+  const strategic = buildRulesSections(
     gates({ coordinateMode: 'strategic', hasAirUnits: true, ordersEnabled: true })
   );
   assert.ok(!/movement[- ]points?/i.test(strategic));
   assert.ok(strategic.includes(buildAirEmploymentRule(gates({ coordinateMode: 'strategic', hasAirUnits: true }))));
   assert.ok(strategic.includes(buildHoldFireRule()));
-  const noOrders = buildCombatRulesParagraph(gates({ ordersEnabled: false }));
+  const noOrders = buildRulesSections(gates({ ordersEnabled: false }));
   assert.ok(!noOrders.includes(buildHoldFireRule()));
 });
 
@@ -390,8 +390,8 @@ test('the terrain cover sentences keep their exact wording', () => {
 });
 
 test('the combat paragraph does not mention a tech bonus when that option is off', () => {
-  const paragraph = buildCombatRulesParagraph(gates());
-  const weatherOn = buildCombatRulesParagraph(gates({
+  const paragraph = buildRulesSections(gates());
+  const weatherOn = buildRulesSections(gates({
     originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
   }));
   assert.ok(!/tech bonus/i.test(paragraph));
@@ -401,10 +401,10 @@ test('the combat paragraph does not mention a tech bonus when that option is off
 });
 
 test('the combat paragraph names the tech bonus at Low and at High', () => {
-  const low = buildCombatRulesParagraph(gates({
+  const low = buildRulesSections(gates({
     originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'low' },
   }));
-  const high = buildCombatRulesParagraph(gates({
+  const high = buildRulesSections(gates({
     originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'high' },
   }));
   assert.ok(low.includes('at least 21 urban cells'));
@@ -417,11 +417,11 @@ test('the combat paragraph names the tech bonus at Low and at High', () => {
 
 test('the combat paragraph always states cover, after the weather sentence when weather is on', () => {
   const cover = buildTerrainCoverRule('strategic');
-  assert.ok(buildCombatRulesParagraph(gates()).includes(cover));
+  assert.ok(buildRulesSections(gates()).includes(cover));
   const weatherOn = gates({
     originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
   });
-  const paragraph = buildCombatRulesParagraph(weatherOn);
+  const paragraph = buildRulesSections(weatherOn);
   const weather = buildWeatherRule(weatherOn) ?? '\u0000';
   assert.ok(paragraph.indexOf(weather) >= 0 && paragraph.indexOf(cover) > paragraph.indexOf(weather));
 });
@@ -438,15 +438,15 @@ test('the system-prompt assembler delegates combat-rule prose to this module', (
     path.resolve(process.cwd(), 'src/main/openRouter/consultPromptParts.ts'),
     'utf8'
   );
-  assert.ok(assembler.includes('buildCombatRulesParagraph'));
+  assert.ok(assembler.includes('buildRulesSections'));
   assert.ok(!assembler.includes('d20 per shot'));
   assert.ok(!assembler.includes('Hits land on the lowest-defense'));
 });
 
 test('the missile rule appears only when the roster has a missile', () => {
-  const without = buildCombatRulesParagraph(gates());
+  const without = buildRulesSections(gates());
   assert.equal(without.includes('missileLaunches'), false);
-  const strategic = buildCombatRulesParagraph(gates({ hasMissileUnits: true }));
+  const strategic = buildRulesSections(gates({ hasMissileUnits: true }));
   assert.match(strategic, /missile launches, then air strikes/);
   assert.match(strategic, /within \d+ hexes/);
   assert.match(
@@ -454,7 +454,7 @@ test('the missile rule appears only when the roster has a missile', () => {
     new RegExp(`its own d20 roll is at or below the air unit's attack of ${getAttack('air')}`)
   );
   assert.equal(strategic.includes('roll is a 20'), false);
-  const tactical = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasMissileUnits: true }));
+  const tactical = buildRulesSections(gates({ coordinateMode: 'tactical', hasMissileUnits: true }));
   assert.match(tactical, /Missile sub-units never move or fire/);
   assert.equal(tactical.includes('missileLaunches'), false);
 });
@@ -466,7 +466,7 @@ const WEATHER_ON = {
 } as const;
 
 test('tactical mild weather omits the weather rules', () => {
-  const paragraph = buildCombatRulesParagraph(gates({
+  const paragraph = buildRulesSections(gates({
     coordinateMode: 'tactical',
     originBonusSettings: WEATHER_ON,
     weatherApplies: false,
@@ -476,7 +476,7 @@ test('tactical mild weather omits the weather rules', () => {
 });
 
 test('tactical snow weather keeps the battle budget and drops the strategic weather sentences', () => {
-  const paragraph = buildCombatRulesParagraph(gates({
+  const paragraph = buildRulesSections(gates({
     coordinateMode: 'tactical',
     originBonusSettings: WEATHER_ON,
     weatherApplies: true,
@@ -488,7 +488,7 @@ test('tactical snow weather keeps the battle budget and drops the strategic weat
 });
 
 test('infantry omits the armor terrain-entry sentence and keeps the terrain-bonus dice sentence', () => {
-  const paragraph = buildCombatRulesParagraph(gates({
+  const paragraph = buildRulesSections(gates({
     coordinateMode: 'tactical',
     originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: true, terrainBonusLevel: 'low' },
     includeArmorTerrainEntry: false,
@@ -498,7 +498,7 @@ test('infantry omits the armor terrain-entry sentence and keeps the terrain-bonu
 });
 
 test('an infantry battle omits the mountain line-of-sight sentence and keeps terrain cover', () => {
-  const paragraph = buildCombatRulesParagraph(gates({
+  const paragraph = buildRulesSections(gates({
     coordinateMode: 'tactical',
     includeMountainLineOfSight: false,
     tacticalTypesPresent: ['infantry'],
@@ -510,14 +510,14 @@ test('an infantry battle omits the mountain line-of-sight sentence and keeps ter
 });
 
 test('a roster with no missile omits the hit-last sentence', () => {
-  const paragraph = buildCombatRulesParagraph(gates({ includeMissileCasualty: false }));
+  const paragraph = buildRulesSections(gates({ includeMissileCasualty: false }));
   assert.doesNotMatch(paragraph, /hit last/);
 });
 
 test('a mild strategic map omits weather and one snow hex keeps strategic movement', () => {
-  const mild = buildCombatRulesParagraph(gates({ originBonusSettings: WEATHER_ON, weatherApplies: false }));
+  const mild = buildRulesSections(gates({ originBonusSettings: WEATHER_ON, weatherApplies: false }));
   assert.doesNotMatch(mild, /Weather bonus is on/);
-  const snow = buildCombatRulesParagraph(gates({ originBonusSettings: WEATHER_ON, weatherApplies: true }));
+  const snow = buildRulesSections(gates({ originBonusSettings: WEATHER_ON, weatherApplies: true }));
   assert.match(snow, /Armor strategic movement/);
 });
 

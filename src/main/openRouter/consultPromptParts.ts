@@ -16,6 +16,7 @@ import { buildMercenariesBriefingBlock } from './briefingSectionsMercenaries';
 import { isMissileUnitType } from '../../shared/missileRules';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
+import type { CampaignPlan } from './campaignRules';
 import {
   buildAdjacentCellsFallbackBlock,
   formatControlProgressLine,
@@ -29,7 +30,7 @@ import {
   getInitialUserMessage,
   getMovementOrderInstruction,
 } from './promptText';
-import { buildRegionVsRegionScenarioObjectiveBlock, buildTacticalBattleGoalClause, buildWinConditionReminderClause } from './scenarioGoals';
+import { buildScenarioObjectiveRulesBlock, buildScenarioProgressLines, buildTacticalBattleGoalClause, buildWinConditionReminderClause } from './scenarioGoals';
 import {
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
   NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
@@ -56,11 +57,12 @@ import {
   SECTION_TITLE_BATTLE_CONTEXT,
   SECTION_TITLE_CURRENT_SITUATION,
   SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
-  SECTION_TITLE_COMBAT_AND_MOVEMENT_RULES,
+  SECTION_TITLE_RULES,
   SECTION_TITLE_COORDINATES,
   SECTION_TITLE_EXAMPLE_RESPONSE,
   SECTION_TITLE_RESPONSE_FORMAT,
   SECTION_TITLE_STRATEGIC_CONTEXT,
+  SECTION_TITLE_SCENARIO_PROGRESS,
   SECTION_TITLE_UNIT_ROSTER,
   SECTION_TITLE_YOUR_COMMAND,
   shiftMarkdownHeadings,
@@ -68,10 +70,13 @@ import {
   topLevelHeading,
   wrapLongProseLines,
 } from './promptSpec/sectionHeadings';
-import { buildCombatRulesParagraph } from './promptSpec/gameRuleText';
+import { buildProductionRulesParagraphs, buildRulesSections } from './promptSpec/gameRuleText';
+import { buildBriefingGuideSection } from './promptSpec/briefingGuideText';
+import { briefingDistanceCaveatLines } from '../briefing/briefingDistanceCaveat';
+import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { RULES_POINTER_LINE } from '../tools/referenceTools';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
-import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';
+import { buildContextCoaching, buildOrdersGuidanceSection, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
 
 /**
@@ -120,6 +125,24 @@ export function buildConsultPromptParts(input: {
    * Exceptions: None.
    */
   readonly productionAttention?: string | null;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's standing-order suggestions on the no-briefing path.
+   * When to use: `requestOrdersFlow` after it resolved the campaign.
+   * Expected outcome: Passed to `buildStatusInjectionTexts`. A precomputed briefing does not read it again.
+   * Exceptions: None.
+   */
+  readonly campaignPlan?: CampaignPlan | null;
+  /**
+   * Campaign attention sentence already computed for this briefing.
+   *
+   * Contract: Omit to compute it here. Pass the briefing's value, including null, so the opening matches the briefing.
+   * When to use: `requestOrdersFlow`, after it has already built the briefing injection.
+   * Expected outcome: The opening names Campaign Orders only when this string is non-null.
+   * Exceptions: None.
+   */
+  readonly campaignAttention?: string | null;
 }): { staticSystemText: string; situationText: string } {
   const state = input.state;
   const coordMap = input.coordMap;
@@ -190,6 +213,7 @@ export function buildConsultPromptParts(input: {
     homeRegionsOverlap: state.scenarioId === 'region_vs_region' && sharedHomeHexes.length > 0,
     hasObservedEnemy: enemyGroups.some((group) => group.roster.length > 0),
     includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
+    campaignEnabled: coordinateContext.mode !== 'tactical' && state.scenarioId === 'region_vs_region' && flags.ordersEnabled,
     controlWinMinUrbanShare: controlWinMinUrbanShare ?? null,
     seatCount,
     turnLimitVictory: state.victory?.rule === 'most_city_hexes_at_turn_limit',
@@ -210,7 +234,7 @@ export function buildConsultPromptParts(input: {
     hasAirUnits: hasAir,
     hasBestOptionsTable,
   });
-  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode, coachingGates);
+  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode);
   const toolsSection =
     filtered.length === 0
       ? `${topLevelHeading(SECTION_TITLE_AVAILABLE_TOOLS)}\n\nNo tools available.`
@@ -233,6 +257,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
           return h3 ? format(h3) : formatLatLng(ll);
         },
         coordinateContext,
+        campaignPlan: input.campaignPlan ?? null,
       })
     : {
         memoryText: '',
@@ -240,18 +265,26 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         productionText: '',
         productionAttention: input.productionAttention ?? null,
         pausedProductionAttention: null,
+        campaignText: '',
+        campaignAttention: input.campaignAttention ?? null,
       };
   const memoryBlock = flags.memoryEnabled ? injection.memoryText + '\n\n' : '';
+  const campaignBlock = injection.campaignText.trim().length > 0 ? `${injection.campaignText}\n\n` : '';
   const standingOrderBlock = flags.ordersEnabled ? injection.standingOrderText + '\n\n' : '';
   const productionBlock = flags.productionEnabled ? injection.productionText + '\n\n' : '';
   const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
   const missileRaw = buildMissileForcesBriefingBlock(state, format, coordinateContext.mode);
-  const mercenaryRaw = buildMercenariesBriefingBlock(state, format, coordinateContext.mode, { productionEnabled: flags.productionEnabled });
+  const mercenaryRaw = buildMercenariesBriefingBlock(state, format, coordinateContext.mode, {
+    productionEnabled: flags.productionEnabled,
+    campaignTargetH3: input.campaignPlan?.objective.targetH3 ?? null,
+  });
   const sealiftRaw = buildSealiftBriefingBlock(state, format, coordinateContext.mode);
-  const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
-  const missileBlock = missileRaw ? `${missileRaw}\n\n` : '';
-  const mercenaryBlock = mercenaryRaw ? `${mercenaryRaw}\n\n` : '';
-  const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
+  const underBriefing = (block: string): string =>
+    hasPrecomputedBriefing && block.length > 0 ? shiftMarkdownHeadings(block, 1) : block;
+  const airOpsBlock = airOpsRaw ? `${underBriefing(airOpsRaw)}\n\n` : '';
+  const missileBlock = missileRaw ? `${underBriefing(missileRaw)}\n\n` : '';
+  const mercenaryBlock = mercenaryRaw ? `${underBriefing(mercenaryRaw)}\n\n` : '';
+  const sealiftBlock = sealiftRaw ? `${underBriefing(sealiftRaw)}\n\n` : '';
 
   const hasRanged = opponentUnits.some((u) => unitHasDirectRangedPlanning(u.unitType, tacticalBattleActive));
 
@@ -296,56 +329,63 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     (row) => row.controllerPlayerId === ownSeat && landHexSet.has(row.h3Index)
   ).length;
   const ownHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], ownHomeHexes(state), ownSeat);
-  let regionHomeProgressAndHexBullets = '';
+  const homeControlLines: string[] = [];
+  const scenarioHomeLines: string[] = [];
   if (state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical' && enemyHomes.length > 0) {
-    const lineOwn = formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total);
+    homeControlLines.push(formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total));
     const ownExclusive = homePartitions
       ? (!homePartitions.equalAsSets ? homePartitions.aiExclusive : [])
       : ownHomeHexes(state).filter((hex) => !sharedHomeHexes.includes(hex));
-    const aiHexLine = ownExclusive.length > 0
-      ? `\n- Your home region hexes are: ${formatHomeRegionHexCodesForPrompt(ownExclusive)}`
-      : '';
-    const enemyLines = enemyHomes.map((home) => {
+    if (ownExclusive.length > 0) {
+      scenarioHomeLines.push(`- Your home region hexes are: ${formatHomeRegionHexCodesForPrompt(ownExclusive)}`);
+    }
+    for (const home of enemyHomes) {
       const counts = countControlledHexesInRegion(state.strategicControl ?? [], home.hexes, ownSeat);
-      const controlLine = formatControlProgressLine(`Your control of ${home.name}'s home region`, counts.controlled, counts.total);
+      homeControlLines.push(formatControlProgressLine(`Your control of ${home.name}'s home region`, counts.controlled, counts.total));
       const exclusive = homePartitions
         ? (!homePartitions.equalAsSets ? homePartitions.humanExclusive : [])
         : home.hexes.filter((hex) => !sharedHomeHexes.includes(hex));
-      const hexLine = exclusive.length > 0
-        ? `\n- ${home.name} home region hexes are: ${formatHomeRegionHexCodesForPrompt(exclusive)}`
-        : '';
-      return `\n${controlLine}${hexLine}`;
-    }).join('');
-    const overlapLine = sharedHomeHexes.length > 0
-      ? `\n- These hexes are in more than one home region: ${formatHomeRegionHexCodesForPrompt(sharedHomeHexes)}`
-      : '';
-    const territorySentence =
-      typeof controlWinMinUrbanShare === 'number'
-        ? '\n- Those hex counts are territory, and the control win is the urban-cell share in the scenario objective.'
-        : '';
-    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}${enemyLines}${overlapLine}${territorySentence}`;
+      if (exclusive.length > 0) {
+        scenarioHomeLines.push(`- ${home.name} home region hexes are: ${formatHomeRegionHexCodesForPrompt(exclusive)}`);
+      }
+    }
+    if (sharedHomeHexes.length > 0) {
+      scenarioHomeLines.push(`- These hexes are in more than one home region: ${formatHomeRegionHexCodesForPrompt(sharedHomeHexes)}`);
+    }
+    if (typeof controlWinMinUrbanShare === 'number') {
+      scenarioHomeLines.push('- Those hex counts are territory, and the control win is the urban-cell share in the scenario objective.');
+    }
   }
 
   const contextCoaching = buildContextCoaching(coachingGates);
   const coachingContextBlock = `${topLevelHeading(
     coordinateContext.mode === 'tactical' ? SECTION_TITLE_BATTLE_CONTEXT : SECTION_TITLE_STRATEGIC_CONTEXT
   )}\n\n${contextCoaching}`;
-  const progressBlock =
-    coordinateContext.mode === 'tactical'
-      ? ''
-      : `- ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}\n- ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${regionHomeProgressAndHexBullets}\n\n`;
-
-  const scenarioObjectiveBlock =
-    coordinateContext.mode === 'tactical'
-      ? ''
-      : buildRegionVsRegionScenarioObjectiveBlock(state, {
-          controlWinMinUrbanShare,
-          enemyProgress: homeControl?.pairs.map((pair) => ({
-            name: pair.enemyName,
-            ownAgainstEnemy: pair.ownAgainstEnemy,
-            enemyAgainstOwn: pair.enemyAgainstOwn,
-          })),
-        });
+  const urbanProgress = coordinateContext.mode === 'tactical'
+    ? []
+    : buildScenarioProgressLines(state, {
+        controlWinMinUrbanShare,
+        enemyProgress: homeControl?.pairs.map((pair) => ({
+          name: pair.enemyName,
+          ownAgainstEnemy: pair.ownAgainstEnemy,
+          enemyAgainstOwn: pair.enemyAgainstOwn,
+        })),
+      });
+  const progressLines = coordinateContext.mode === 'tactical'
+    ? []
+    : [
+        formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes'),
+        formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes'),
+        ...homeControlLines,
+        ...urbanProgress,
+      ];
+  const progressBlock = progressLines.length > 0
+    ? `${underBriefing(`${topLevelHeading(SECTION_TITLE_SCENARIO_PROGRESS)}\n\n${progressLines.join('\n')}`)}\n\n`
+    : '';
+  const scenarioRules = coordinateContext.mode === 'tactical'
+    ? ''
+    : buildScenarioObjectiveRulesBlock(state, { controlWinMinUrbanShare });
+  const scenarioSystem = [scenarioRules, scenarioHomeLines.join('\n')].filter((part) => part.length > 0).join('\n');
   const sidesBlock = coordinateContext.mode === 'tactical'
     ? ''
     : buildSidesPromptBlock({
@@ -354,13 +394,9 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         includeNeutral: state.units.some((unit) => isNeutralOwnerId(unit.player)),
         includeMercenaryNote: state.units.some((unit) => unit.isMercenary === true),
       });
-  const sidesPrefix = sidesBlock.length > 0
-    ? `${hasPrecomputedBriefing ? sidesBlock : shiftMarkdownHeadings(sidesBlock, -1)}\n\n`
-    : '';
-  const scenarioPrefix = scenarioObjectiveBlock.length > 0 ? `${scenarioObjectiveBlock}\n\n` : '';
   const liveStatus = hasPrecomputedBriefing
     ? `${briefingOverride}\n\n`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}`;
+    : `${memoryBlock}${campaignBlock}${standingOrderBlock}${productionBlock}`;
   const rosterBody = hasPrecomputedBriefing ? humanUnitsLine : `${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
@@ -372,6 +408,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     includeNavalActions: hasNaval,
     includeStandingOrderActions: standingOrdersIssuable,
     includeExitBattle,
+    includeCampaignTarget: coachingGates.campaignEnabled === true,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
@@ -387,10 +424,6 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     includeExitBattle,
     coordinateMode: coordinateContext.mode,
   });
-  const scoutingSentence =
-    coordinateContext.mode === 'tactical' || enemyGroups.some((group) => group.roster.length > 0)
-      ? ''
-      : 'With no enemy observed, move to regain contact along plausible approaches rather than holding position.\n\n';
   const limitExceededLastTurn = getAndClearAiToolLimitExceededLastTurn(ownSeat);
   const warning =
     limitExceededLastTurn && (flags.planningEnabled || flags.ordersEnabled)
@@ -409,22 +442,40 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
       : buildLatLngPreamble();
-  const combatRulesParagraph = buildCombatRulesParagraph(combatRuleGatesForPrompt({
-    units: state.units,
-    hexes: state.hexes,
-    strategicInfrastructure: state.strategicInfrastructure,
-    coordinateContext,
-    ownSeat,
+  const rulesBody = buildRulesSections({
+    ...combatRuleGatesForPrompt({
+      units: state.units,
+      hexes: state.hexes,
+      strategicInfrastructure: state.strategicInfrastructure,
+      coordinateContext,
+      ownSeat,
+      hasAirUnits: hasAir,
+      hasNavalUnits: hasNaval,
+      hasMissileUnits: hasMissile,
+      standingOrdersIssuable,
+      originBonusSettings: originBonusSettingsFromSnapshot(state),
+      rangedTargetHint: combatTargetHint,
+      productionEnabled: flags.productionEnabled && coordinateContext.mode !== 'tactical',
+      tacticalSubUnits: tacticalBattle?.subUnits,
+    }),
+    navalPlanRouteHint: navalPlanRouteHint.trim(),
+    extraCombatText: combatAssessHint.trim(),
+    productionRules: flags.productionEnabled && coordinateContext.mode !== 'tactical'
+      ? buildProductionRulesParagraphs(getMaxUnitsPerType(parseGameSize(state.gameSize)))
+      : [],
+    rulesPointer: filtered.some((tool) => tool.name === 'rules') ? RULES_POINTER_LINE : '',
+  });
+  const ordersGuidance = buildOrdersGuidanceSection(coachingGates);
+  const briefingGuide = buildBriefingGuideSection({
+    coordinateMode: coordinateContext.mode === 'tactical' ? 'tactical' : 'strategic',
+    hasPrecomputedBriefing,
+    distanceCaveatLines: briefingDistanceCaveatLines(state),
+    includeOddsKey: hasPrecomputedBriefing,
+    memoryEnabled: flags.memoryEnabled,
     hasAirUnits: hasAir,
     hasNavalUnits: hasNaval,
     hasMissileUnits: hasMissile,
-    standingOrdersIssuable,
-    originBonusSettings: originBonusSettingsFromSnapshot(state),
-    rangedTargetHint: combatTargetHint,
-    productionEnabled: flags.productionEnabled && coordinateContext.mode !== 'tactical',
-    tacticalSubUnits: tacticalBattle?.subUnits,
-  }));
-  const rulesPointer = filtered.some((tool) => tool.name === 'rules') ? `\n\n${RULES_POINTER_LINE}` : '';
+  });
   const dateClause = state.currentDateLabel ? `, date: ${state.currentDateLabel}` : '';
   const turnPhaseHeader =
     coordinateContext.mode === 'tactical'
@@ -436,26 +487,27 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     hasBestOptionsTable,
     includeExitBattle,
     hasProductionAttention: injection.productionAttention !== null,
+    hasCampaignOrders: injection.campaignAttention !== null,
   });
   const staticSystemText = wrapLongProseLines(`${topLevelHeading(SECTION_TITLE_YOUR_COMMAND)}
 
 You command ${commandedSideName(state)} in a WEGO (simultaneous movement) hex wargame with ${seatCount} sides. Every other side is your enemy, and so are neutral garrisons.
 
-${winConditionReminder}
+${winConditionReminder}${scenarioSystem.length > 0 ? `\n\n${scenarioSystem}` : ''}${sidesBlock.length > 0 ? `\n\n${sidesBlock}` : ''}
 
 ${topLevelHeading(SECTION_TITLE_COORDINATES)}
 
 ${latLngBlock}
 
-${topLevelHeading(SECTION_TITLE_COMBAT_AND_MOVEMENT_RULES)}
+${topLevelHeading(SECTION_TITLE_RULES)}
 
-${[combatRulesParagraph + rulesPointer, navalPlanRouteHint.trim(), combatAssessHint.trim()].filter((part) => part.length > 0).join('\n\n')}
+${rulesBody}
 
 ${coachingContextBlock}
 
-${toolsSection}
+${briefingGuide.length > 0 ? `${briefingGuide}\n\n` : ''}${toolsSection}
 
-${topLevelHeading(SECTION_TITLE_RESPONSE_FORMAT)}
+${ordersGuidance.length > 0 ? `${ordersGuidance}\n\n` : ''}${topLevelHeading(SECTION_TITLE_RESPONSE_FORMAT)}
 
 ${finalJsonContract}
 
@@ -466,7 +518,7 @@ ${finalJsonExample}`);
 
 ${turnPhaseHeader}
 
-${scoutingSentence}${warning}${liveStatus}${sidesPrefix}${scenarioPrefix}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
+${warning}${liveStatus}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${hasPrecomputedBriefing ? subHeading(SECTION_TITLE_UNIT_ROSTER) : topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
 
 ${rosterBody}
 

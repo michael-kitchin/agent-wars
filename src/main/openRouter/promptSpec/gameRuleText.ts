@@ -6,7 +6,7 @@
  * Purpose: These facts used to live inline in the assembler or not at all. Every number
  * is read from the engine constant so a rules change fails the prompt test instead of
  * silently diverging.
- * When to use: Combat paragraph assembly, the production status block, and fog-on briefing copy.
+ * When to use: The Rules section, including Production and the intel-age sentence the reading guide quotes.
  * Expected outcome: One wording per fact, gated by mode and roster where the spec requires it.
  * Exceptions: None.
  */
@@ -21,8 +21,24 @@ import {
 import { buildTechBonusRule } from './gameRuleTechText';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
+import { subHeading } from './sectionHeadings';
+import {
+  SECTION_TITLE_AIR_UNITS,
+  SECTION_TITLE_BONUSES,
+  SECTION_TITLE_COMBAT,
+  SECTION_TITLE_FORTIFICATIONS,
+  SECTION_TITLE_HOLDING_FIRE,
+  SECTION_TITLE_MISSILES,
+  SECTION_TITLE_MOVEMENT,
+  SECTION_TITLE_NAVAL_UNITS,
+  SECTION_TITLE_PRODUCTION,
+  SECTION_TITLE_RESOLUTION_ORDER,
+  SECTION_TITLE_RULE_LOOKUP,
+  SECTION_TITLE_TERRAIN_COVER,
+  SECTION_TITLE_WEATHER,
+} from './subsectionHeadings';
 import { isMissileUnitType } from '../../../shared/missileRules';
-import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
+import { ALL_BUILD_UNIT_TYPES, type BuildUnitType } from '../../../shared/ipc/productionTypes';
 import { BUILD_PREREQUISITES_BY_TYPE } from '../../productionRules';
 import { buildMinimumUrbanCells, unitCostFor } from '../../../shared/gameRules';
 import { NAVAL_MOVEMENT_PROMPT_RULE } from '../../navalMovementMessages';
@@ -44,7 +60,7 @@ import { buildTerrainCoverRule, buildWeatherRule } from './gameRuleEnvironmentTe
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
 import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 import { buildFortificationProductionRulePart, buildFortificationRule } from './gameRuleFortificationText';
-import { buildCreditsProductionRulePart } from './gameRuleMercenaryText';
+import { buildBuildabilityRule, buildCreditsProductionRulePart } from './gameRuleMercenaryText';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 export { buildTerrainCoverRule, buildWeatherRule };
@@ -53,7 +69,7 @@ export { buildTerrainCoverRule, buildWeatherRule };
  * Roster and tool flags that choose optional combat-rule clauses.
  *
  * Purpose: The combat paragraph must not teach air, naval, or hold-fire rules the consultation cannot use.
- * When to use: Passed to `buildCombatRulesParagraph` and `buildAirEmploymentRule`.
+ * When to use: Passed to `buildRulesSections` and `buildAirEmploymentRule`.
  * Expected outcome: Clauses appear only when their gate is true.
  * Exceptions: None.
  */
@@ -193,6 +209,42 @@ export interface GameRuleTextGates {
    * Exceptions: None.
    */
   readonly rangedTargetHint?: string;
+  /**
+   * Land-target plan_route hint for a naval side.
+   *
+   * Contract: Omitted or blank adds nothing. Printed after the naval clause.
+   * When to use: Planning tools are on and the side has a naval unit.
+   * Expected outcome: The hint is the second paragraph of Naval Units.
+   * Exceptions: None.
+   */
+  readonly navalPlanRouteHint?: string;
+  /**
+   * Attack hint used when no briefing lists the shot.
+   *
+   * Contract: Omitted or blank adds nothing. It is not a combat-stats sentence.
+   * When to use: Assessment tools are on, a ranged unit exists, and the briefing was not precomputed.
+   * Expected outcome: The hint is the last paragraph of Combat.
+   * Exceptions: None.
+   */
+  readonly extraCombatText?: string;
+  /**
+   * Turn-invariant production paragraphs.
+   *
+   * Contract: Omitted or empty omits the Production subsection.
+   * When to use: Strategic consultations with production on. Pass `buildProductionRulesParagraphs`.
+   * Expected outcome: Those paragraphs, in order, under Production.
+   * Exceptions: None.
+   */
+  readonly productionRules?: readonly string[];
+  /**
+   * Pointer to the rules tool.
+   *
+   * Contract: Omitted or blank omits Rule Lookup.
+   * When to use: The rules tool is in the enabled set.
+   * Expected outcome: One paragraph under Rule Lookup.
+   * Exceptions: None.
+   */
+  readonly rulesPointer?: string;
 }
 
 /**
@@ -230,7 +282,7 @@ function formatReachClause(unitType: string, mode: PromptCoordinateMode): string
  * Dice model plus per-type attack, defense, and reach.
  *
  * Purpose: strategic-prompt.md section 1.5 items 1–2. The model cannot choose a target without the stats.
- * When to use: First clause of `buildCombatRulesParagraph`.
+ * When to use: First clause of `buildRulesSections`.
  * Expected outcome: The "Combat: d20 per shot" sentence with the hit-number floor, the cap, and engine stats interpolated. Air is omitted when `hasAirUnits` is false. A non-empty tactical type list names only those types.
  * Exceptions: None.
  */
@@ -461,7 +513,7 @@ export function buildAirEmploymentRule(gates: GameRuleTextGates): string {
  * What a fire-withholding standing order does, and what omitting an attack does not do.
  *
  * Purpose: `hold_fire` is listed as a legal order with no other explanation today.
- * When to use: Combat paragraph only when standing-order tools are enabled; also as a coaching item.
+ * When to use: The Holding Fire subsection when standing-order tools are enabled.
  * Expected outcome: Suppresses automatic engagement until replaced; leaving a unit without an attack is not the same.
  * Exceptions: None.
  */
@@ -474,7 +526,7 @@ export function buildHoldFireRule(): string {
  * How a controlled cell earns and spends production points.
  *
  * Purpose: Caps and costs are already printed; without income the model cannot tell a cheap queue from an unaffordable one.
- * When to use: Production status block, after current counts and before the maxed-type list.
+ * When to use: The Production subsection of Rules, after the caps line.
  * Expected outcome: One paragraph. Urban count becomes points each turn and spend is in queue order. A building queue keeps its remainder. A paused queue loses its points.
  * Exceptions: None.
  */
@@ -490,7 +542,7 @@ export function buildProductionIncomeRule(): string {
  * Unit costs and build prerequisites interpolated from the engine tables.
  *
  * Purpose: The production status block must not retype costs or urban minima as literals.
- * When to use: Production Status rules line.
+ * When to use: The first paragraph of the Production subsection of Rules.
  * Expected outcome: Each buildable type names its cost from `unitCostFor` and its urban minimum from `buildMinimumUrbanCells`. Seaport minimums come from `BUILD_PREREQUISITES_BY_TYPE`. Air also requires an airport.
  * Exceptions: None.
  */
@@ -511,7 +563,7 @@ export function buildProductionCostRulesLine(): string {
  * How long a last-known enemy position remains on the briefing after contact is lost.
  *
  * Purpose: Fog-on nearest-enemy cells show a last-seen turn with no window, so the model cannot tell current from expired.
- * When to use: Strategic briefing next to the other fog wording, only when fog is on.
+ * When to use: The Distances and Intel Age subsection when fog is on. The briefing no longer prints it.
  * Expected outcome: Quotes `STALE_INTEL_TURNS` and states that older reports are dropped, not shown as old.
  * Exceptions: None.
  */
@@ -542,7 +594,7 @@ export function buildNavalClause(mode: PromptCoordinateMode): string {
  * One-attack-per-unit and target-field constraints, plus the period-start tempo sentence.
  *
  * Purpose: One attack per unit, the reach sentence, and the Best Options tempo sentence. Air-strike wording joins that sentence only when air is present.
- * When to use: Inside `buildCombatRulesParagraph`.
+ * When to use: Inside `buildRulesSections`.
  * Expected outcome: One target field, a sentence that a unit may fire at a cell and move into it, a tempo clause that copies listed Best Options rows, and the "does not prevent movement" fact.
  * Exceptions: None.
  */
@@ -561,19 +613,29 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
 }
 
 /**
- * Composes the combat-and-attack-rules paragraph for this consultation.
+ * One rules subsection, or '' when it has no paragraph.
  *
- * Purpose: Replaces the inline `Combat: ...` template in `buildSystemPromptForTools` so every clause
- * has one home. Clause order follows strategic-prompt.md section 1.5, with tactical substitutions from 2.5.
- * Resolution order, the pre-move sentence, and the attack constraints stay one paragraph. The other clauses are separate paragraphs.
- * When to use: Once per assembled system prompt, after roster and tool flags are known.
- * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist.
- * Weather, fortifications, the missile hit-last sentence, the mountain line-of-sight sentence, and the terrain-entry sentence follow the flags on `gates`.
- * The origin bonus sentence only when a flag applies in this mode; the tech sentence only when that option is on, between origin and weather; the terrain cover sentence always, after weather.
+ * Purpose: Empty topics must not leave a heading.
+ * When to use: From `buildRulesSections` only.
+ * Expected outcome: `## Title`, a blank line, and the paragraphs separated by blank lines.
  * Exceptions: None.
  */
-export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
-  logDebug('promptSpec buildCombatRulesParagraph', { ...gates });
+function rulesSubsection(title: string, paragraphs: readonly string[]): string {
+  const body = paragraphs.map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
+  if (body.length === 0) return '';
+  return `${subHeading(title)}\n\n${body.join('\n\n')}`;
+}
+
+/**
+ * Composes the rules subsections for this consultation.
+ *
+ * Purpose: Each topic has its own heading. The words are the same sentences the single rules block used to print.
+ * When to use: Once per assembled system prompt, after roster and tool flags are known.
+ * Expected outcome: Subsections in topic order. A topic with no paragraph is omitted. Hold-fire only when orders are on. Air, naval, and missiles only when those units exist.
+ * Exceptions: None.
+ */
+export function buildRulesSections(gates: GameRuleTextGates): string {
+  logDebug('promptSpec buildRulesSections', { ...gates });
   const originBonus = buildOriginBonusRule(gates);
   const techBonus = buildTechBonusRule(gates.originBonusSettings);
   const weatherRule = buildWeatherRule(gates);
@@ -582,26 +644,52 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),
   ].join(' ');
-  const parts: string[] = [
-    buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits, gates.tacticalTypesPresent ?? []),
-    buildCasualtySortRule(gates.includeMissileCasualty !== false),
-    ...(originBonus ? [originBonus] : []),
-    ...(techBonus ? [techBonus] : []),
-    ...(weatherRule ? [weatherRule] : []),
-    buildTerrainCoverRule(gates.coordinateMode),
-    resolutionParagraph,
-    buildMovementBudgetRule(gates.coordinateMode, gates.ordersEnabled),
-    buildDestinationOccupancyRule(gates.coordinateMode),
-  ];
-  if (gates.hasNavalUnits) {
-    parts.push(buildNavalClause(gates.coordinateMode).trim());
-  }
+  const naval = gates.hasNavalUnits
+    ? [buildNavalClause(gates.coordinateMode).trim(), gates.navalPlanRouteHint ?? '']
+    : [];
   const air = buildAirEmploymentRule(gates);
-  if (air) parts.push(air);
   const missile = buildMissileEmploymentRule(gates);
-  if (missile) parts.push(missile);
   const fortification = buildFortificationRule(gates);
-  if (fortification) parts.push(fortification);
-  if (gates.ordersEnabled) parts.push(buildHoldFireRule());
-  return parts.join('\n\n');
+  const sections = [
+    rulesSubsection(SECTION_TITLE_COMBAT, [
+      buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits, gates.tacticalTypesPresent ?? []),
+      buildCasualtySortRule(gates.includeMissileCasualty !== false),
+      gates.extraCombatText ?? '',
+    ]),
+    rulesSubsection(SECTION_TITLE_BONUSES, [originBonus ?? '', techBonus ?? '']),
+    rulesSubsection(SECTION_TITLE_WEATHER, weatherRule ? [weatherRule] : []),
+    rulesSubsection(SECTION_TITLE_TERRAIN_COVER, [buildTerrainCoverRule(gates.coordinateMode)]),
+    rulesSubsection(SECTION_TITLE_RESOLUTION_ORDER, [resolutionParagraph]),
+    rulesSubsection(SECTION_TITLE_MOVEMENT, [
+      buildMovementBudgetRule(gates.coordinateMode, gates.ordersEnabled),
+      buildDestinationOccupancyRule(gates.coordinateMode),
+    ]),
+    rulesSubsection(SECTION_TITLE_NAVAL_UNITS, naval),
+    rulesSubsection(SECTION_TITLE_AIR_UNITS, air ? [air] : []),
+    rulesSubsection(SECTION_TITLE_MISSILES, missile ? [missile] : []),
+    rulesSubsection(SECTION_TITLE_FORTIFICATIONS, fortification ? [fortification] : []),
+    rulesSubsection(SECTION_TITLE_HOLDING_FIRE, gates.ordersEnabled ? [buildHoldFireRule()] : []),
+    rulesSubsection(SECTION_TITLE_PRODUCTION, gates.productionRules ?? []),
+    rulesSubsection(SECTION_TITLE_RULE_LOOKUP, gates.rulesPointer ? [gates.rulesPointer] : []),
+  ];
+  return sections.filter((section) => section.length > 0).join('\n\n');
+}
+
+/**
+ * Turn-invariant production sentences for the rules section.
+ *
+ * Purpose: Cost, caps, income, buildability, and spawn timing do not change during a match.
+ * When to use: Under Production when production is on for a strategic consultation.
+ * Expected outcome: Five paragraphs, in that order. The caps line uses the supplied per-type limits.
+ * Exceptions: None.
+ */
+export function buildProductionRulesParagraphs(caps: Readonly<Record<BuildUnitType, number>>): string[] {
+  logDebug('promptSpec buildProductionRulesParagraphs', { caps });
+  return [
+    buildProductionCostRulesLine(),
+    `Deployment caps (per side): ${ALL_BUILD_UNIT_TYPES.map((unitType) => `${unitType} ${caps[unitType]}`).join(', ')}.`,
+    buildProductionIncomeRule(),
+    buildBuildabilityRule(),
+    'Production progress/spawn resolves after Ready, after combat and control resolution.',
+  ];
 }

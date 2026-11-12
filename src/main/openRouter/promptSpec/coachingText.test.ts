@@ -125,8 +125,8 @@ test('strategic conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /embark at a legal cell/i);
   assert.doesNotMatch(joined(strategicGates({ homeRegionsOverlap: false })), /more than one home region/i);
   assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /When it lists none, call plan_route or leave the unit idle/);
-  assert.doesNotMatch(joined(strategicGates({ hasObservedEnemy: true })), /move to regain contact/i);
-  assert.doesNotMatch(joined(strategicGates({ hasObservedEnemy: false })), /move to regain contact/i);
+  assert.match(joined(strategicGates({ hasObservedEnemy: true })), /move to regain contact/i);
+  assert.match(joined(strategicGates({ hasObservedEnemy: false })), /move to regain contact/i);
   assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false })), /last side standing/i);
   assert.doesNotMatch(joined(strategicGates({ includeScenarioWinPaths: false, homeRegionsOverlap: true })), /more than one home region/i);
   assert.doesNotMatch(
@@ -143,13 +143,13 @@ test('strategic conditional items disappear when their gate is off', () => {
   );
 });
 
-test('absent scenario id drops home-region goals from the context block', () => {
+test('absent scenario id drops the city-knockout goals from the context block', () => {
   const withScenario = buildContextCoaching(strategicGates());
-  assert.match(withScenario, /Protect your home region's production capacity/);
-  assert.match(withScenario, /enemy home regions' urban production/);
+  assert.match(withScenario, /Take and hold enemy cities/);
+  assert.match(withScenario, /Keep enough units at home to stop a raid on your cities/);
   const withoutScenario = buildContextCoaching(strategicGates({ includeScenarioWinPaths: false }));
-  assert.doesNotMatch(withoutScenario, /home region/);
-  assert.match(withoutScenario, /Engage enemy forces/);
+  assert.doesNotMatch(withoutScenario, /Take and hold enemy cities/);
+  assert.match(withoutScenario, /Destroy enemy forces where you outnumber them/);
 });
 
 test('tactical coaching includes every required item when its gate is on', () => {

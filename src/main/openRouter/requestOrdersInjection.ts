@@ -9,15 +9,18 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import type { AiSeatId } from '../../shared/seatIds';
 import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
+import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
+import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
 import { formatProductionAttentionBullet } from './productionAttention';
 import { formatPausedProductionPointer } from './pausedProductionAttention';
+import type { CampaignPlan } from './campaignRules';
 
 /**
  * Gates and snapshot needed to build the three status injection strings.
@@ -109,6 +112,15 @@ export interface StatusInjectionArgs {
    * Exceptions: None.
    */
   readonly seatId?: AiSeatId;
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's standing-order suggestions.
+   * When to use: Strategic consults that resolved a campaign.
+   * Expected outcome: Passed to the standing-order injection. Memory and production ignore it.
+   * Exceptions: None.
+   */
+  readonly campaignPlan?: CampaignPlan | null;
 }
 
 /**
@@ -165,6 +177,39 @@ export interface StatusInjectionTexts {
    * Exceptions: None.
    */
   readonly pausedProductionAttention: string | null;
+  /**
+   * The Campaign Objective section, or empty when there is no plan.
+   *
+   * Contract: Empty when orders are off, the mode is tactical, or no campaign plan was passed.
+   * When to use: The no-briefing situation message, and `formatBriefing`.
+   * Expected outcome: An H1 section naming the target, staging hex, and phase.
+   * Exceptions: None.
+   */
+  readonly campaignText: string;
+  /**
+   * The campaign attention bullet, or null when no campaign unit needs a new order.
+   *
+   * Contract: Null when the Campaign Orders table would be empty.
+   * When to use: The last attention bullet, and the opening-message gate.
+   * Expected outcome: The sentence that tells the model to copy each Campaign Orders row.
+   * Exceptions: None.
+   */
+  readonly campaignAttention: string | null;
+}
+
+/**
+ * The attention sentence for campaign units whose standing order should change.
+ *
+ * Purpose: Attention Flags names the count. The table itself lists the rows.
+ * When to use: After `buildCampaignOrderRows`, when standing orders are on.
+ * Expected outcome: Null for zero. Otherwise the Campaign sentence with `1 unit needs` or `N units need`.
+ * Exceptions: None.
+ */
+export function formatCampaignAttentionBullet(count: number): string | null {
+  logTrace('requestOrdersInjection formatCampaignAttentionBullet', { count });
+  if (count <= 0) return null;
+  const subject = count === 1 ? '1 unit needs' : `${count} units need`;
+  return `Campaign: ${subject} a new standing order. Copy each Campaign Orders row into an assign_order entry.`;
 }
 
 /**
@@ -187,8 +232,28 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   });
   const memoryText = args.memoryEnabled ? getInjectionText(seatId, args.state.turnNumber) : '';
   const standingOrderText = args.ordersEnabled
-    ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext)
+    ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext, args.campaignPlan ?? null)
     : '';
+  const campaignPlan = args.campaignPlan ?? null;
+  const formatCampaignHex = (h3: string): string => {
+    const ll = args.latLngByH3.get(h3);
+    return ll ? args.formatHexLabel(ll) : h3;
+  };
+  const campaignText =
+    args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
+      ? buildCampaignObjectiveSection({ state: args.state, plan: campaignPlan, format: formatCampaignHex })
+      : '';
+  const campaignAttention =
+    args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
+      ? formatCampaignAttentionBullet(
+          buildCampaignOrderRows({
+            playerId: seatId,
+            state: args.state,
+            plan: campaignPlan,
+            coordinateContext: { mode: 'strategic' },
+          }).length
+        )
+      : null;
   const production = args.productionEnabled
     ? buildProductionBriefing({
         productionEnabled: true,
@@ -204,5 +269,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     productionText: production.text,
     productionAttention: args.productionEnabled ? formatProductionAttentionBullet(production.idleHexes) : null,
     pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,
+    campaignText,
+    campaignAttention,
   };
 }

@@ -130,7 +130,7 @@ export function buildMissileForcesBriefingBlock(
   );
   const targetRows = missileTargetRows(state, ownSeat, reaches, format);
   const targetBlock = targetRows.length > 0
-    ? `${MISSILE_TARGETS_TABLE_INTRO}\n\n${buildPromptTableLines(
+    ? `${buildPromptTableLines(
         ['Target', 'Owner', 'City Cells', 'Airports', 'Seaports', FORTIFIED_COLUMN_HEADER, 'Enemy Air Based', 'In Range Of'],
         targetRows
       ).join('\n')}`

@@ -15,6 +15,8 @@ import { parseOrdersResponse } from './orderResponseParsing';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
 import { createPathfindingSession } from '../tools/pathfinding';
 import { expireAndUpdateStatus } from '../tools/standingOrders';
+import { campaignPlanForState, resolveCampaignObjectiveForSeat } from './campaignObjectiveFlow';
+import type { CampaignPlan } from './campaignRules';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -245,8 +247,14 @@ export async function requestOrdersFlow(
   let briefingOverride: string | undefined;
   let productionAttention: string | null = null;
   let pausedProductionAttention: string | null = null;
+  let campaignPlan: CampaignPlan | null = null;
+  let campaignAttention: string | null = null;
   if (!tacticalBattle) {
     expireAndUpdateStatus(seatId, planState);
+    if (flags.ordersEnabled) {
+      resolveCampaignObjectiveForSeat(planState);
+      campaignPlan = campaignPlanForState(planState);
+    }
     // Map-first contract: strategic prompts always include the Commander briefing with operational map.
     const precomputed = runPrecomputation(planState, { latLngByH3, resolveToH3 });
     if (usePrecomputation) {
@@ -266,6 +274,7 @@ export async function requestOrdersFlow(
         return h3 ? coordMap.format(h3) : formatLatLng(ll);
       },
       coordinateContext: { mode: 'strategic' },
+      campaignPlan,
     });
     const standingOrderText = injection.standingOrderText;
     const memoryText = injection.memoryText;
@@ -273,6 +282,7 @@ export async function requestOrdersFlow(
     const productionBriefing = injection.productionText;
     productionAttention = injection.productionAttention;
     pausedProductionAttention = injection.pausedProductionAttention;
+    campaignAttention = injection.campaignAttention;
     const possibleActionsIndexed = buildPossibleActionsIndexedState(planState);
     briefingOverride = formatBriefing(
       planState,
@@ -288,6 +298,9 @@ export async function requestOrdersFlow(
         productionAttention,
         pausedProductionAttention,
         mentionGetMap: enabledToolNames.includes('get_map'),
+        campaignPlan,
+        campaignText: injection.campaignText,
+        campaignAttention: injection.campaignAttention,
       }
     );
     if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {
@@ -338,6 +351,8 @@ export async function requestOrdersFlow(
     tacticalBattle: tacticalBattle ?? null,
     structuredOutputs: requestProfile.structuredOutputs && !isStructuredOutputsRejectedForModel(modelId),
     productionAttention,
+    campaignPlan,
+    campaignAttention,
   });
   const messages: RequestOrdersChatMessage[] = buildConsultMessages(
     promptParts,
@@ -406,6 +421,7 @@ export async function requestOrdersFlow(
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
+    includeCampaignTarget: !tacticalBattle && flags.ordersEnabled && planState.scenarioId === 'region_vs_region',
     includeExitBattle,
   };
   const wallClockStart = Date.now();

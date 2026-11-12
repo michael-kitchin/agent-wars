@@ -70,7 +70,7 @@ export function controlWinUrbanSharePercent(share: number): number {
  * Control branch of the regional scenario objective.
  *
  * Purpose: Line (1) of the win block names the urban-cell share.
- * When to use: `buildRegionVsRegionScenarioObjectiveBlock` when the effective share is a number.
+ * When to use: `buildScenarioObjectiveRulesBlock` when the effective share is a number.
  * Expected outcome: The percent comes from `controlWinUrbanSharePercent`.
  * Exceptions: None.
  */
@@ -142,7 +142,7 @@ export function buildTacticalBattleGoalClause(): string {
  * Urban progress against one enemy home, and that enemy's progress against ours.
  *
  * Purpose: The objective block prints one pair of lines per enemy instead of a single human-and-opponent pair.
- * When to use: `buildRegionVsRegionScenarioObjectiveBlock` when a share is in force.
+ * When to use: `buildScenarioProgressLines` when a share is in force.
  * Expected outcome: `ownAgainstEnemy` is always printed. `enemyAgainstOwn` is printed only when that enemy holds any of our home's urban cells.
  * Exceptions: None.
  */
@@ -215,25 +215,20 @@ function ownHomeName(state: GameStateSnapshot): string {
 }
 
 /**
- * Builds the Markdown “Scenario Objective” section for `region_vs_region`, or an empty string for other scenarios.
+ * Builds the turn-invariant Scenario Objective section for `region_vs_region`.
  *
- * Contract: When `state.scenarioId === 'region_vs_region'`, returns a fixed heading plus home-region labels (when present) and the two win paths the prompt still states; otherwise returns ''.
- * When to use: Strategic system prompt assembly only (`buildSystemPromptForTools`), not tactical-only prompts unless explicitly wired.
- * Expected outcome: Scenario id, own home name, one combined enemy-homes line, win bullets, one urban-progress line per enemy, and the visibility note.
+ * Purpose: Home names, win paths, and the visibility sentence do not change during a match, so they belong in the system prompt.
+ * When to use: Strategic system-prompt assembly when `scenarioId` is `region_vs_region`.
+ * Expected outcome: The heading, the scenario id, home names, the two win paths, and the outline sentence. '' for any other scenario. No urban-share counts.
  * Exceptions: None.
  */
-export function buildRegionVsRegionScenarioObjectiveBlock(
+export function buildScenarioObjectiveRulesBlock(
   state: GameStateSnapshot,
-  options?: {
-    readonly controlWinMinUrbanShare?: number | null;
-    readonly progress?: { readonly ai: HomeControlProgress; readonly human: HomeControlProgress } | null;
-    readonly enemyProgress?: readonly EnemyUrbanProgress[] | null;
-  }
+  options?: { readonly controlWinMinUrbanShare?: number | null }
 ): string {
-  logDebug('scenarioGoals buildRegionVsRegionScenarioObjectiveBlock', {
+  logDebug('scenarioGoals buildScenarioObjectiveRulesBlock', {
     scenarioId: state.scenarioId,
     controlWinMinUrbanShare: options?.controlWinMinUrbanShare ?? null,
-    enemyProgressCount: options?.enemyProgress?.length ?? 0,
   });
   if (state.scenarioId !== 'region_vs_region') return '';
   const lines: string[] = [
@@ -243,12 +238,8 @@ export function buildRegionVsRegionScenarioObjectiveBlock(
   ];
   const aiName = ownHomeName(state);
   const enemyNames = enemyHomeNames(state);
-  if (aiName.length > 0) {
-    lines.push(`- Your home region: ${aiName}`);
-  }
-  if (enemyNames.length > 0) {
-    lines.push(`- Enemy home regions: ${enemyNames.join(', ')}`);
-  }
+  if (aiName.length > 0) lines.push(`- Your home region: ${aiName}`);
+  if (enemyNames.length > 0) lines.push(`- Enemy home regions: ${enemyNames.join(', ')}`);
   const share = options?.controlWinMinUrbanShare;
   const controlSnippet = typeof share === 'number' ? regionalControlSnippet(share) : REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET;
   lines.push(
@@ -256,28 +247,50 @@ export function buildRegionVsRegionScenarioObjectiveBlock(
       `    (1) ${controlSnippet}, OR\n` +
       `    (2) ${REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET}.`
   );
-  const listed = enemyProgressRows(state, options);
-  if (typeof share === 'number') {
-    for (const row of listed) {
-      lines.push(
-        `- ${row.name} home urban cells in hexes you control: ${row.ownAgainstEnemy.heldUrbanCells} of ${row.ownAgainstEnemy.totalUrbanCells} (you need ${row.ownAgainstEnemy.neededUrbanCells}).`
-      );
-      if (row.enemyAgainstOwn.heldUrbanCells > 0) {
-        lines.push(
-          `- Your home urban cells in hexes ${row.name} controls: ${row.enemyAgainstOwn.heldUrbanCells} of ${row.enemyAgainstOwn.totalUrbanCells} (they need ${row.enemyAgainstOwn.neededUrbanCells}).`
-        );
-      }
-    }
-  }
   lines.push('- Every home-region outline is always visible on the map.');
   return lines.join('\n');
 }
 
 /**
- * Progress rows for the objective block.
+ * Urban-share progress bullets for the situation message.
+ *
+ * Purpose: These counts change as hexes change hands, so they stay out of the cached system prompt.
+ * When to use: Under Scenario Progress on a strategic region-versus-region consultation.
+ * Expected outcome: One or two bullets per enemy when a share is set and progress was supplied. [] otherwise.
+ * Exceptions: None.
+ */
+export function buildScenarioProgressLines(
+  state: GameStateSnapshot,
+  options?: {
+    readonly controlWinMinUrbanShare?: number | null;
+    readonly progress?: { readonly ai: HomeControlProgress; readonly human: HomeControlProgress } | null;
+    readonly enemyProgress?: readonly EnemyUrbanProgress[] | null;
+  }
+): string[] {
+  logDebug('scenarioGoals buildScenarioProgressLines', {
+    scenarioId: state.scenarioId,
+    controlWinMinUrbanShare: options?.controlWinMinUrbanShare ?? null,
+    enemyProgressCount: options?.enemyProgress?.length ?? 0,
+  });
+  if (state.scenarioId !== 'region_vs_region' || typeof options?.controlWinMinUrbanShare !== 'number') return [];
+  return enemyProgressRows(state, options).flatMap((row) => {
+    const lines = [
+      `- ${row.name} home urban cells in hexes you control: ${row.ownAgainstEnemy.heldUrbanCells} of ${row.ownAgainstEnemy.totalUrbanCells} (you need ${row.ownAgainstEnemy.neededUrbanCells}).`,
+    ];
+    if (row.enemyAgainstOwn.heldUrbanCells > 0) {
+      lines.push(
+        `- Your home urban cells in hexes ${row.name} controls: ${row.enemyAgainstOwn.heldUrbanCells} of ${row.enemyAgainstOwn.totalUrbanCells} (they need ${row.enemyAgainstOwn.neededUrbanCells}).`
+      );
+    }
+    return lines;
+  });
+}
+
+/**
+ * Progress rows for the urban-share bullets.
  *
  * Purpose: Callers may pass per-enemy pairs, or the older two-sided pair, which is labeled with the human home name.
- * When to use: Only from `buildRegionVsRegionScenarioObjectiveBlock`.
+ * When to use: Only from `buildScenarioProgressLines`.
  * Expected outcome: Per-enemy rows when supplied. Otherwise one row from `progress` when that object is present. Otherwise none.
  * Exceptions: None.
  */

@@ -17,7 +17,7 @@ import { ensureStrategicCoordinateRegistryInitialized } from './hexCoordinates';
 import { projectToGrid } from './hexGridProjection';
 import { tryProjectLocalIjGrid } from './localIjGridProjection';
 import type { HexMapCellState } from './hexMapRenderer';
-import { emptyOverlayGlyph, renderHexAsciiMap } from './hexMapRenderer';
+import { renderHexAsciiMap } from './hexMapRenderer';
 import { renderDisplacedFeaturesLine } from './briefingTables';
 
 /**
@@ -156,24 +156,16 @@ export function controlledCityH3ForStrategicMap(state: GameStateSnapshot): strin
 }
 
 /**
- * Legend shared by the strategic briefing map and strategic `get_map`.
+ * The Shown line for a cropped strategic window.
  *
- * Purpose: Both surfaces name the same glyphs. Only the briefing adds a Shown line.
- * When to use: Before the fenced blocks.
- * Expected outcome: Legend text ending with a blank line. `shownLine` is appended when non-empty.
+ * Purpose: The glyph legend lives in the system prompt. Only the crop note stays with the map.
+ * When to use: Before the fenced blocks when the window is smaller than the loaded set.
+ * Expected outcome: The Shown line plus a blank line, or '' when there is no crop.
  * Exceptions: None.
  */
-export function strategicOperationalMapLegend(shownLine: string): string {
-  const shown = shownLine.length > 0 ? `${shownLine}\n` : '';
-  return (
-    'Each cell: top = hex code, bottom = terrain + overlay.\n' +
-    'Terrain: x = land, . = water.\n' +
-    `Overlay: ${emptyOverlayGlyph} = nothing here, * = your units, ! = enemy units, including neutral garrisons, # = contested, ? = undiscovered intel.\n` +
-    'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
-    'Each fenced block is one connected area. Odd rows in that block are indented one space. Use only hex codes from these blocks or the tables.\n' +
-    shown +
-    '\n'
-  );
+export function strategicOperationalMapShownBlock(shownLine: string): string {
+  logTrace('strategicMapWindow strategicOperationalMapShownBlock', { shown: shownLine.length > 0 });
+  return shownLine.length > 0 ? `${shownLine}\n\n` : '';
 }
 
 /**
@@ -202,11 +194,11 @@ export function renderStrategicWindowPatchesMarkdown(args: {
 }
 
 /**
- * Legend and fenced grid for a caller-chosen set of strategic cells.
+ * Fenced grid for a caller-chosen set of strategic cells.
  *
  * Purpose: `get_map` draws the same patches as the briefing, around the cell the model asked for.
  * When to use: After the center and radius have been checked against the loaded strategic cells.
- * Expected outcome: Legend, then one fence per connected patch. No Shown line and no Best Options table.
+ * Expected outcome: One fence per connected patch. No legend, no Shown line, and no Best Options table.
  * Exceptions: Throws when a fallback patch has no briefing code.
  */
 export function renderStrategicWindowGridMarkdown(args: {
@@ -220,7 +212,7 @@ export function renderStrategicWindowGridMarkdown(args: {
     context: { mode: 'strategic' },
     gameByH3: args.gameByH3,
   });
-  return `${strategicOperationalMapLegend('')}${rendered.blocks}`;
+  return rendered.blocks;
 }
 
 /**

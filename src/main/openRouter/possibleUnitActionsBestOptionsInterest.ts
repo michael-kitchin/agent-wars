@@ -4,7 +4,8 @@
  * Purpose: Keeps occupancy/control interest (enemy ∪ uncontrolled unoccupied infra), empty-interest approach,
  * and this-turn air-strike filters out of `possibleUnitActions.ts` so both files stay under the source-size limit.
  * When to use: From `collectAggregatedPossibleActionRows` after legal this-turn dests / strike hexes are collected.
- * Expected outcome: Interest hexes as move/melee, or approach hexes that strictly close on the nearest observed enemy;
+ * Expected outcome: Interest hexes as move/melee, approach hexes that strictly close on the nearest observed enemy,
+ * or advance rows that close on the campaign hex. A holding campaign unit gets no move hexes.
  * this-turn air strikes limited to enemy-occupied or human-controlled infra (strategic) / human-occupied (tactical).
  * Exceptions: Does not change legal-target collectors or order validation.
  */
@@ -14,7 +15,7 @@ import { gridHopDistanceBetween, pickApproachHexesTowardNearestEnemy } from '../
 import { logDebug, logTrace } from '../logger';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { AI_SEAT_IDS } from '../../shared/seatIds';
-import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
+import { ACTION_ADVANCE, ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
 /**
  * How many nearest enemy ids an approach row names before it counts the rest.
@@ -339,8 +340,8 @@ function filterApproachMoveHexesForThisTurnOptionsTable(
  *
  * Purpose: Shared this-turn move resolution for strategic and tactical Best Options tables.
  * When to use: After computing `interest` from the mode-specific occupancy/infra filter.
- * Expected outcome: Enemy-contact interest as `move/melee`; otherwise approach when any closing dest exists that is
- * not stay-put occupied and not enemy-occupied; infra-only interest as `move/melee` only when approach cannot run.
+ * Expected outcome: Enemy contact still wins. A campaign unit otherwise gets uncontrolled cities on a closing step
+ * as move/melee, else its closing steps as advance, else no move hexes. Without a campaign, approach runs as before.
  * Exceptions: None.
  */
 export function applyInterestOrApproach(args: {
@@ -365,20 +366,24 @@ export function applyInterestOrApproach(args: {
    * Exceptions: None.
    */
   stayPutFriendlyH3?: ReadonlySet<string>;
+  /**
+   * Campaign waypoint for this unit, when it follows the campaign.
+   *
+   * Contract: Set only for a campaign unit on a strategic this-turn table. Omitted in battle.
+   * When to use: From `campaignRoleForUnit`.
+   * Expected outcome: Enemy contact still wins. Otherwise a holding unit gets no move hexes. Any other campaign unit gets uncontrolled cities on a closing step as move/melee, else its closing steps as advance, else no move hexes. It never falls back to closing on the nearest enemy.
+   * Exceptions: None.
+   */
+  campaign?: { readonly waypointH3: string; readonly hold: boolean };
 }): { hexes: string[]; actionType: string; enemySummaryOverride?: string } {
   const hasEnemyContact = args.interest.some((h3) => args.enemyOccupiedH3.has(h3));
   let result: { hexes: string[]; actionType: string; enemySummaryOverride?: string };
   if (hasEnemyContact) {
     result = { hexes: args.interest, actionType: ACTION_MOVES_MELEE };
+  } else if (args.campaign) {
+    result = campaignMoveResult(args, args.campaign);
   } else {
-    const occupied = new Set<string>(args.enemyOccupiedH3);
-    if (args.stayPutFriendlyH3) {
-      for (const h3 of args.stayPutFriendlyH3) occupied.add(h3);
-    } else {
-      for (const [h3, units] of args.indexed.friendlyUnitsByHex) {
-        if ((units?.length ?? 0) > 0) occupied.add(h3);
-      }
-    }
+    const occupied = occupiedForApproach(args);
     const unoccupiedLegal = args.legalHexes.filter((h3) => !occupied.has(h3));
     const approach = filterApproachMoveHexesForThisTurnOptionsTable(
       args.unitH3,
@@ -404,10 +409,54 @@ export function applyInterestOrApproach(args: {
     enemyOccupiedCount: args.enemyOccupiedH3.size,
     stayPutFriendlyCount: args.stayPutFriendlyH3?.size ?? null,
     hasEnemyContact,
+    campaign: Boolean(args.campaign),
     actionType: result.actionType,
     outCount: result.hexes.length,
   });
   return result;
+}
+
+/**
+ * Hexes an approach or advance step must not enter.
+ *
+ * Purpose: Both branches skip enemy stacks and friendly hexes that are still held this period.
+ * When to use: The approach fallback and `campaignMoveResult`.
+ * Expected outcome: Enemy-occupied hexes plus stay-put friendly hexes, or every currently friendly hex when stay-put was omitted.
+ * Exceptions: None.
+ */
+function occupiedForApproach(args: Parameters<typeof applyInterestOrApproach>[0]): Set<string> {
+  const occupied = new Set<string>(args.enemyOccupiedH3);
+  if (args.stayPutFriendlyH3) {
+    for (const h3 of args.stayPutFriendlyH3) occupied.add(h3);
+  } else {
+    for (const [h3, units] of args.indexed.friendlyUnitsByHex) {
+      if ((units?.length ?? 0) > 0) occupied.add(h3);
+    }
+  }
+  return occupied;
+}
+
+/**
+ * Move rows for a campaign unit that is not in enemy contact this turn.
+ *
+ * Purpose: The unit steps toward the campaign hex, or stands still when it is already massed.
+ * When to use: `applyInterestOrApproach` when `campaign` is set and no interest hex is enemy-occupied.
+ * Expected outcome: No hexes when the unit holds. Otherwise a closing city as move/melee, else closing steps as advance, else no hexes.
+ * Exceptions: None.
+ */
+function campaignMoveResult(
+  args: Parameters<typeof applyInterestOrApproach>[0],
+  campaign: { readonly waypointH3: string; readonly hold: boolean }
+): { hexes: string[]; actionType: string; enemySummaryOverride?: string } {
+  if (campaign.hold) return { hexes: [], actionType: ACTION_ADVANCE };
+  const occupied = occupiedForApproach(args);
+  const candidates = args.legalHexes.filter(
+    (h3) => !occupied.has(h3) || (h3 === campaign.waypointH3 && !args.enemyOccupiedH3.has(h3))
+  );
+  const closing = pickApproachHexesTowardNearestEnemy(args.unitH3, candidates, new Set([campaign.waypointH3]));
+  const grabs = args.interest.filter((h3) => closing.includes(h3));
+  if (grabs.length > 0) return { hexes: grabs, actionType: ACTION_MOVES_MELEE };
+  return { hexes: closing, actionType: ACTION_ADVANCE, enemySummaryOverride: '—' };
 }
 
 /**

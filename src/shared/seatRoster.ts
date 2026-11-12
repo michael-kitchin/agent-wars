@@ -44,7 +44,7 @@ export type SeatKind = typeof HUMAN_SEAT_KIND | typeof AI_SEAT_KIND;
 /**
  * The three doctrines a commander can play.
  *
- * Purpose: Random draws one of these. Balanced is the default and adds no prompt block.
+ * Purpose: Random draws one of these. Balanced is the default.
  * When to use: Stored doctrine and prompt selection.
  * Expected outcome: `'aggressive'`, `'balanced'`, or `'cautious'`.
  * Exceptions: None.

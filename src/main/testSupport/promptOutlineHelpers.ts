@@ -62,13 +62,47 @@ export function assertHeadingsNest(outline: readonly string[]): void {
 const PROSE_LINE_SECTIONS: ReadonlySet<string> = new Set([
   'Your Command',
   'Coordinates',
-  'Combat and Movement Rules',
+  'Rules',
+  'Orders Guidance',
+  'Reading the Briefing',
   'Strategic Context',
   'Battle Context',
   'Mercenaries',
   'Available Tools',
   'Response Format',
 ]);
+
+/**
+ * Fails when three newlines in a row appear outside a fence.
+ *
+ * Purpose: A heading or paragraph that is separated by two blank lines is a join bug.
+ * When to use: Beside `assertHeadingsNest` on an assembled prompt.
+ * Expected outcome: Returns when every blank run outside a fence is a single blank line.
+ * Exceptions: Throws when a run of three or more newlines is outside a fence.
+ */
+export function assertNoTripleBlankLines(prompt: string): void {
+  const lines = prompt.split('\n');
+  let fenced = false;
+  let run = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (line.startsWith('```')) {
+      fenced = !fenced;
+      run = 0;
+      continue;
+    }
+    if (fenced) continue;
+    if (line.length === 0) {
+      run += 1;
+      if (run >= 2) {
+        const next = lines.slice(index + 1).find((row) => row.length > 0) ?? '';
+        throw new Error(`three newlines outside a fence, before: ${next.slice(0, 120)}`);
+      }
+    } else {
+      run = 0;
+    }
+  }
+}
 
 /**
  * Requires prose lines in the named sections to stay within a character limit.

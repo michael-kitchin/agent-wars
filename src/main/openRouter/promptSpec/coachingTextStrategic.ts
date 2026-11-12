@@ -8,107 +8,159 @@
  */
 
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
+import { PRODUCTION_EXPOSED_RADIUS } from '../productionExposure';
 import { logTrace } from '../../logger';
 import { regionalWinPathsBullet } from '../scenarioGoals';
 import { buildDoctrineBlock } from './doctrineText';
 import type { CoachingGates } from './coachingGates';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 import { SECTION_TITLE_PAUSED_QUEUES, SECTION_TITLE_PRODUCTION_STATUS } from './sectionHeadings';
+import {
+  SECTION_TITLE_AIR_AND_NAVAL_UNITS,
+  SECTION_TITLE_MEMORY_AND_CALLBACKS,
+  SECTION_TITLE_MESSAGES_AND_ROUNDS,
+  SECTION_TITLE_PRODUCTION_QUEUES,
+  SECTION_TITLE_STANDING_ORDERS_GUIDANCE,
+  SECTION_TITLE_USING_THE_BRIEFING,
+  SECTION_TITLE_WINNING,
+} from './subsectionHeadings';
+import { buildCampaignRuleBlock } from './campaignRuleText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
  *
  * Purpose: These used to live in the assembler; they are coaching, not computed state.
  * When to use: `buildContextCoaching` in strategic mode.
- * Expected outcome: The existing `- Your goals are:` / strategy / message wording so matrix tests stay stable.
+ * Expected outcome: The goals, the strategy lines, the doctrine block, and the message. When `campaignEnabled` is true, the Campaign section follows that block.
  * Exceptions: None.
  */
 export function buildStrategicContextCoaching(gates: CoachingGates): string {
-  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced');
+  const campaignEnabled = gates.campaignEnabled === true;
+  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced', campaignEnabled);
   logTrace('promptSpec buildStrategicContextCoaching', {
     includeScenarioWinPaths: gates.includeScenarioWinPaths,
+    campaignEnabled,
     doctrineBlock: doctrine.length > 0,
   });
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
-  return `${buildStrategicGoalsBlock(gates)}
-${STRATEGY_BLOCK}${doctrineLine}
+  const message = `${buildStrategicGoalsBlock(gates)}
+${buildStrategyBlock('strategic')}${doctrineLine}
 ${MESSAGE_BLOCK}`;
+  return gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock()}` : message;
+}
+
+/**
+ * Scouting reminder. It does not depend on whether an enemy is visible this turn.
+ *
+ * Purpose: The situation message no longer repeats a scouting sentence, and the cached coaching always carries it.
+ * When to use: Every strategic coaching list, immediately after the copy-or-route bullet.
+ * Expected outcome: One bullet telling the model to move along plausible approaches when the briefing shows no enemy.
+ * Exceptions: None.
+ */
+const SCOUTING_BULLET =
+  '- When the briefing shows no observed enemy unit, move to regain contact along plausible approaches rather than holding position.';
+
+/**
+ * One coaching section: a title and the bullets whose gates hold.
+ *
+ * Purpose: Orders Guidance prints these as subsections. The flat bullet list is their concatenation.
+ * When to use: `buildCoachingSections` in strategic mode.
+ * Expected outcome: Sections with no bullets are omitted. Scouting is always in Using the Briefing.
+ * Exceptions: None.
+ */
+export function buildStrategicCoachingSections(gates: CoachingGates): readonly { readonly title: string; readonly bullets: readonly string[] }[] {
+  logTrace('promptSpec buildStrategicCoachingSections', { ...gates });
+  const winning: string[] = [];
+  if (gates.includeScenarioWinPaths) {
+    const winPaths = typeof gates.controlWinMinUrbanShare === 'number'
+      ? regionalWinPathsBullet(gates.controlWinMinUrbanShare)
+      : WIN_PATHS_BULLET;
+    winning.push(gates.turnLimitVictory ? `${winPaths}${TURN_LIMIT_WIN_SENTENCE}` : winPaths);
+  }
+  if ((gates.seatCount ?? 0) >= 3) winning.push(FREE_FOR_ALL_BULLET);
+  if (gates.includeScenarioWinPaths && gates.homeRegionsOverlap) winning.push(SHARED_HOME_BULLET);
+  const usingTheBriefing = [
+    buildOptionCopyOrRoutingBullet(gates, 'this-turn', 'unit'),
+    SCOUTING_BULLET,
+    FIRE_STILL_MOVES_BULLET,
+    tempoBullet(gates.hasAirUnits),
+  ];
+  const standing: string[] = [];
+  if (gates.ordersEnabled) standing.push(ORDERLESS_BULLET, LEAVE_MISSIONS_BULLET);
+  const airAndNaval: string[] = [];
+  if (gates.hasAirUnits) airAndNaval.push(IDLE_AIR_BULLET, AIRLIFT_PREFERENCE_BULLET);
+  if (gates.hasNavalUnits) airAndNaval.push(NAVAL_ROUTING_BULLET, SEALIFT_BULLET);
+  const production = gates.productionEnabled ? [PRODUCTION_BULLET] : [];
+  const memoryAndCallbacks = [
+    ...(gates.memoryEnabled ? [memoryBullet(gates.campaignEnabled === true)] : []),
+    CALLBACK_BULLET,
+    UNCONSULTED_TURN_BULLET,
+  ];
+  const messages = [MESSAGE_DISCIPLINE_BULLET, TOOL_BUDGET_BULLET];
+  return [
+    { title: SECTION_TITLE_WINNING, bullets: winning },
+    { title: SECTION_TITLE_USING_THE_BRIEFING, bullets: usingTheBriefing },
+    { title: SECTION_TITLE_STANDING_ORDERS_GUIDANCE, bullets: standing },
+    { title: SECTION_TITLE_AIR_AND_NAVAL_UNITS, bullets: airAndNaval },
+    { title: SECTION_TITLE_PRODUCTION_QUEUES, bullets: production },
+    { title: SECTION_TITLE_MEMORY_AND_CALLBACKS, bullets: memoryAndCallbacks },
+    { title: SECTION_TITLE_MESSAGES_AND_ROUNDS, bullets: messages },
+  ].filter((section) => section.bullets.length > 0);
 }
 
 /**
  * Section-4 strategic bullets for the current gates.
  *
- * Purpose: One list the composer can concatenate; each item is omitted when its gate is off.
+ * Purpose: One flat list for tests that still read bullets rather than sections.
  * When to use: `buildCoachingBullets` in strategic mode.
- * Expected outcome: Markdown bullets. The copy-or-route sentence stays the same when Best Options has no rows. Planning off uses the adjacent-cell sentence.
+ * Expected outcome: The section bullets, in section order. The scouting sentence is always present.
  * Exceptions: None.
  */
 export function buildStrategicCoachingBullets(gates: CoachingGates): readonly string[] {
   logTrace('promptSpec buildStrategicCoachingBullets', { ...gates });
-  const bullets: string[] = [];
-  if (gates.includeScenarioWinPaths) {
-    const winPaths = typeof gates.controlWinMinUrbanShare === 'number'
-      ? regionalWinPathsBullet(gates.controlWinMinUrbanShare)
-      : WIN_PATHS_BULLET;
-    bullets.push(gates.turnLimitVictory ? `${winPaths}${TURN_LIMIT_WIN_SENTENCE}` : winPaths);
-  }
-  if ((gates.seatCount ?? 0) >= 3) bullets.push(FREE_FOR_ALL_BULLET);
-  bullets.push(FIRE_STILL_MOVES_BULLET, tempoBullet(gates.hasAirUnits));
-  bullets.push(buildOptionCopyOrRoutingBullet(gates, 'this-turn', 'unit'));
-  if (gates.ordersEnabled) {
-    bullets.push(ORDERLESS_BULLET);
-    bullets.push(LEAVE_MISSIONS_BULLET);
-  }
-  if (gates.hasAirUnits) {
-    bullets.push(IDLE_AIR_BULLET);
-    bullets.push(AIRLIFT_PREFERENCE_BULLET);
-  }
-  if (gates.hasNavalUnits) {
-    bullets.push(NAVAL_ROUTING_BULLET);
-    bullets.push(SEALIFT_BULLET);
-  }
-  if (gates.productionEnabled) bullets.push(PRODUCTION_BULLET);
-  if (gates.includeScenarioWinPaths && gates.homeRegionsOverlap) bullets.push(SHARED_HOME_BULLET);
-  if (gates.memoryEnabled) bullets.push(MEMORY_BULLET);
-  bullets.push(CALLBACK_BULLET);
-  bullets.push(UNCONSULTED_TURN_BULLET);
-  bullets.push(MESSAGE_DISCIPLINE_BULLET);
-  bullets.push(TOOL_BUDGET_BULLET);
-  return bullets;
+  return buildStrategicCoachingSections(gates).flatMap((section) => section.bullets);
 }
 
 /**
  * Goals list for the strategic context block.
  *
- * Purpose: Five numbered objectives so territorial and production effort has a named target.
+ * Purpose: Taking cities wins, so it is ranked first; massing comes second because piecemeal attacks fail.
  * When to use: `buildStrategicContextCoaching`.
  * Expected outcome: Five numbered objectives when the region-versus-region scenario is active; otherwise the first three only.
  * Exceptions: None.
  */
 function buildStrategicGoalsBlock(gates: CoachingGates): string {
-  const homeRegionGoals = gates.includeScenarioWinPaths
-    ? `
-    (4) Protect your home region's production capacity
-    (5) Degrade or eliminate enemy home regions' urban production capacity`
-    : '';
-  return `- Your goals are:
-    (1) Engage enemy forces to reduce their combat effectiveness
-    (2) Disperse your units to maximize visibility
-    (3) Maximize your own unit production${homeRegionGoals}`;
+  logTrace('promptSpec buildStrategicGoalsBlock', { includeScenarioWinPaths: gates.includeScenarioWinPaths });
+  if (gates.includeScenarioWinPaths) {
+    return `- Your goals are, in priority order:
+    (1) Take and hold enemy cities. Taking cities is how you knock sides out.
+    (2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.
+    (3) Keep enough units at home to stop a raid on your cities.
+    (4) Keep every city building. At your unit caps, bank credits and hire mercenaries.
+    (5) Scout with a few units, not your main force.`;
+  }
+  return `- Your goals are, in priority order:
+    (1) Destroy enemy forces where you outnumber them.
+    (2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.
+    (3) Keep every city building.`;
 }
 
 /**
- * Doctrine lines shared with the tactical context block.
+ * Strategy lines shared with the tactical context block.
  *
- * Purpose: Judgment aids with no engine symbol; presented as doctrine, not as rules.
- * When to use: Both mode context builders.
- * Expected outcome: Speed, gaps, and disruption.
+ * Purpose: Judgment aids with no engine symbol; presented as strategy, not as rules.
+ * When to use: Both mode context builders. Pass the mode so the period word matches the consult.
+ * Expected outcome: Outnumber, gaps, and a move toward the objective every turn or beat.
  * Exceptions: None.
  */
-export const STRATEGY_BLOCK = `- Your strategy is:
-    (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
-    (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
-    (3) Create maximum disruption with minimum force`;
+export function buildStrategyBlock(mode: 'strategic' | 'tactical'): string {
+  const period = mode === 'tactical' ? 'beat' : 'turn';
+  logTrace('promptSpec buildStrategyBlock', { mode });
+  return `- Your strategy is:
+    (1) Attack where you outnumber the defenders, and avoid fights where you do not.
+    (2) Strike gaps the enemy cannot reinforce quickly.
+    (3) Keep the initiative: move toward your objective every ${period}.`;
+}
 
 /**
  * Player-facing message discipline for the context block.
@@ -190,7 +242,7 @@ function tempoBullet(hasAirUnits: boolean): string {
 const ORDERLESS_BULLET =
   '- For every unit listed in the Units Without Standing Orders table, add an orders[] entry with action assign_order. When Suggested Destination is a bare hex, march there. That hex may be the enemy-occupied hex. When an enemy is observed, it is a legal destination that closes on the nearest enemy. When no enemy is observed, that hex may lie beyond this turn\'s movement budget; it is still the march destination. Use pursue only when you supply an enemy unit id, not in place of that hex.' +
   '\n\n  When Suggested Destination starts with defend, assign defend on that hex, including when no enemy is observed. Do not march an air unit. When the cell is —, do not invent a march and do not invent a defend. Never march to the unit\'s current Hex; that order is ignored as already arrived and the unit holds. An explicit_move to the unit\'s current Hex is ignored as already arrived and the unit holds.' +
-  '\n\n  Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
+  '\n\n  Copy a Suggested Destination hex into explicit_move only when Best Options lists that same hex for that unit this turn. Otherwise, when you need a one-step explicit_move this turn, copy a Best Options approach, advance, or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
 
 /**
  * Working standing orders should be left alone.
@@ -255,7 +307,7 @@ const AIRLIFT_PREFERENCE_BULLET =
  *
  * Purpose: An empty legal queue is wasted income; a capped queue should be swapped unless every type is capped.
  * When to use: When production tools are enabled.
- * Expected outcome: Queue something when empty. When every unit type is capped, queue fortification or credits if listed; otherwise leave the queue. The Production attention sentence tells the model to queue the hexes the flag names. The next paragraph tells the model to apply the fix in Paused Queues under Production Status.
+ * Expected outcome: Queue something when empty. When every unit type is capped, queue credits and fortify only an exposed city. The last paragraph says a city is exposed within `PRODUCTION_EXPOSED_RADIUS` hexes of a seen or remembered enemy. The Production attention sentence tells the model to queue the hexes the flag names. The next paragraph tells the model to apply the fix in Paused Queues under Production Status.
  * Exceptions: None.
  */
 const PRODUCTION_BULLET =
@@ -266,7 +318,8 @@ const PRODUCTION_BULLET =
   ) +
   '\n\n  When every unit type for that cell is capped and it lists neither fortification nor credits, leave the queue alone so it resumes when the cap frees.' +
   '\n\n  When the Production attention flag is present, it names the hexes to queue and the types they can still build.' +
-  `\n\n  When an attention bullet names paused queues, apply the fix in ${SECTION_TITLE_PAUSED_QUEUES} under ${SECTION_TITLE_PRODUCTION_STATUS}.`;
+  `\n\n  When an attention bullet names paused queues, apply the fix in ${SECTION_TITLE_PAUSED_QUEUES} under ${SECTION_TITLE_PRODUCTION_STATUS}.` +
+  `\n\n  A city is exposed when an enemy unit you can see or remember is within ${PRODUCTION_EXPOSED_RADIUS} hexes.`;
 
 /**
  * Shared home cells count for every home that lists them.
@@ -283,12 +336,20 @@ const SHARED_HOME_BULLET =
  * Persist intent, not briefing data.
  *
  * Purpose: Enemy positions are supplied fresh each turn; persisting them wastes slots and goes stale.
- * When to use: When memory tools are enabled.
- * Expected outcome: A short persistent note every strategic turn. A new key at capacity replaces the oldest persistent note. Enemy positions and rosters stay out of memory.
+ * When to use: When memory tools are enabled. Pass whether this consult has a campaign.
+ * Expected outcome: A short persistent note every strategic turn. A new key at capacity replaces the oldest persistent note. Enemy positions and rosters stay out of memory. With a campaign, the campaign target stays out too.
  * Exceptions: None.
  */
-const MEMORY_BULLET =
-  '- Write a short persistent note under the key turn_objectives, naming this turn\'s objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
+function memoryBullet(campaignEnabled: boolean): string {
+  const campaignNote = campaignEnabled
+    ? ' Do not persist the campaign target either; the Campaign Objective section supplies it.'
+    : '';
+  logTrace('promptSpec memoryBullet', { campaignEnabled });
+  return (
+    '- Write a short persistent note under the key turn_objectives, naming this turn\'s objectives and the units assigned to them. Overwrite that same key every strategic turn. Never put the turn number in a key. When all 5 persistent slots are full, a new key replaces the oldest persistent note. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.' +
+    campaignNote
+  );
+}
 
 /**
  * Callbacks replace the whole subscription list.

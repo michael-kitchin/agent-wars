@@ -105,6 +105,15 @@ export interface EnvelopeGates {
    * Exceptions: None.
    */
   readonly includeNavalActions?: boolean;
+  /**
+   * Whether this consult may name a campaign target.
+   *
+   * Contract: Strategic `region_vs_region` consults with standing orders on.
+   * When to use: Set from the scenario, the mode, and `ordersEnabled`.
+   * Expected outcome: `campaignTarget` is last in the field list. Omitted means the field is absent.
+   * Exceptions: None.
+   */
+  readonly includeCampaignTarget?: boolean;
 }
 
 /**
@@ -127,6 +136,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'callbacks',
   'memoryUpdates',
   'productionOrders',
+  'campaignTarget',
 ] as const;
 
 /**
@@ -198,6 +208,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
     if (field === 'missileLaunches') return gates.coordinateMode !== 'tactical' && gates.includeMissileActions === true;
     if (field === 'memoryUpdates') return includeMemory;
     if (field === 'productionOrders') return includeProduction;
+    if (field === 'campaignTarget') return gates.coordinateMode !== 'tactical' && gates.includeCampaignTarget === true;
     return false;
   });
 }

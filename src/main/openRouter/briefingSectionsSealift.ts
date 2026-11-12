@@ -82,20 +82,10 @@ export function buildSealiftBriefingBlock(
     opponentNavalCount: opponentNaval.length,
   });
 
-  const opponentAir = state.units.filter((unit) => unit.player === ownSeat && unit.unitType === 'air');
-  const airliftSentence =
-    mode === 'tactical'
-      ? 'An air sub-unit carries one infantry sub-unit, boarded with embark, unloaded with disembark or airDrops.'
-      : 'An air unit carries one infantry unit, boarded with embark, moved with ferryOrders, unloaded with disembark or airDrops.';
-  if (opponentNaval.length === 0 && opponentAir.length === 0) return '';
-  if (opponentNaval.length === 0) {
-    return [topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS), '', airliftSentence].join('\n');
-  }
+  if (opponentNaval.length === 0) return '';
 
   if (mode === 'tactical') {
     lines.push(topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS));
-    lines.push('');
-    lines.push('Tactical sealift: capacity 1 armor or 2 infantry per naval sub-unit. Debark before independent land marches.');
     lines.push('');
     const navalRows: Array<Array<unknown>> = [];
     for (const naval of opponentNaval) {
@@ -109,7 +99,6 @@ export function buildSealiftBriefingBlock(
       navalRows.push([naval.id, format(naval.h3Index), aboardIds, `${capacityUsed}/2`]);
     }
     lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Aboard', 'Capacity Used'], navalRows));
-    if (opponentAir.length > 0) lines.push('', airliftSentence);
     return lines.join('\n');
   }
 
@@ -117,10 +106,6 @@ export function buildSealiftBriefingBlock(
   const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 
   lines.push(topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS));
-  lines.push('');
-  lines.push(
-    'Embark: coastal or land seaport (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.'
-  );
   lines.push('');
   const navalRows: Array<Array<unknown>> = [];
   for (const naval of opponentNaval) {
@@ -149,6 +134,5 @@ export function buildSealiftBriefingBlock(
       navalRows
     )
   );
-  if (opponentAir.length > 0) lines.push('', airliftSentence);
   return lines.join('\n');
 }

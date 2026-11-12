@@ -22,25 +22,25 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 
 | # | Block | Nature |
 | --- | --- | --- |
-| 1 | `# Your Command` — role and goal. No clock | system message |
-| 2 | `# Coordinates` | system message |
-| 3 | `# Combat and Movement Rules` | system message |
-| 4 | `# Strategic Context`, or `# Battle Context` in a battle — coaching only | system message |
-| 5 | `# Available Tools`, then `## How to Use These Tools Effectively` | system message |
-| 6 | `# Response Format`, then `## Example Response` | system message, last |
-| 7 | A fixed user message: `The current situation is in the next message.` | between the two |
-| 8 | `# Current Situation` — clock, scouting when no enemy is observed, and the previous-consult tool-budget warning | situation message |
-| 9 | `# Commander's Briefing` and its subsections | situation message |
-| 10 | `# Scenario Objective (Required)`, Sides, and the explored and controlled counts | situation message, strategic |
-| 11 | `# Air Operations Status`, `# Missile Forces`, `# Naval Transport Status` | situation message, gated |
-| 12 | `# Unit Roster` | situation message |
-| 13 | The opening instruction | end of the situation message |
+| 1 | `# Your Command` — role, win reminder. No clock | system message |
+| 2 | `# Scenario Objective (Required)`, the home-region hex lists, and `## Sides` | system message, strategic. The objective block is `region_vs_region` only. Sides is every strategic prompt |
+| 3 | `# Coordinates` | system message |
+| 4 | `# Rules` and its subsections (`## Combat`, and the gated subsections through `## Rule Lookup`) | system message |
+| 5 | `# Strategic Context`, or `# Battle Context` in a battle. `## Campaign` when the campaign gate is on | system message |
+| 6 | `# Reading the Briefing` and the subsections whose gates hold | system message, omitted when none hold |
+| 7 | `# Available Tools`, then `## How to Use These Tools Effectively` — tool lines only | system message |
+| 8 | `# Orders Guidance` and its subsections | system message, omitted when there are no coaching bullets |
+| 9 | `# Response Format`, then `## Example Response`. The action list is one bullet per action | system message, last |
+| 10 | A fixed user message: `The current situation is in the next message.` | between the two |
+| 11 | `# Current Situation` — clock and the previous-consult tool-budget warning | situation message |
+| 12 | `# Commander's Briefing` and its subsections, or the standalone production, memory, and standing-order sections when no briefing is attached | situation message |
+| 13 | Scenario Progress, the status sections, and Unit Roster | situation message. H2 when a briefing is attached, H1 when it is not |
 
-Headings nest: the first is H1, and no heading is more than one level deeper than the one before it. Section builders keep the level they use when they stand alone. `formatBriefing` passes production, memory, and standing-order text through `shiftMarkdownHeadings(markdown, 1)`, so those H1 sections become H2 inside the briefing and their H2 subsections become H3. The operational map is H2 in both briefings. `## Sides` stays H2 when a briefing is present. The no-briefing prompt passes that block through `shiftMarkdownHeadings(sidesBlock, -1)`, so it is H1 beside the other standalone sections. A line of three backticks toggles a fence, and headings inside a fence are not shifted.
+Headings nest: the first is H1, and no heading is more than one level deeper than the one before it. Section builders keep the level they use when they stand alone. `formatBriefing` passes production, memory, and standing-order text through `shiftMarkdownHeadings(markdown, 1)`, so those H1 sections become H2 inside the briefing and their H2 subsections become H3. The operational map is H2 in both briefings. Scenario Progress, Air Operations Status, Missile Forces, Mercenaries, Naval Transport Status, and Unit Roster are shifted the same way when a briefing is attached, and stay H1 when it is not. `## Sides` is always H2, under the Scenario section in the system message. A line of three backticks toggles a fence, and headings inside a fence are not shifted.
 
 Ordering rules that must not be relaxed:
 
-- Rules precede data. The system message is rules, tools, and the envelope. The situation message is the clock and the briefing.
+- Rules precede data. The system message holds every turn-invariant sentence: the scenario rules, the rules subsections, the reading guide, the tool lines, and the orders guidance. The situation message is the clock, the briefing, and the counts that change this turn.
 - The envelope contract is last in the system message, immediately followed by its example, because that is what the model must produce.
 - Only one `# Commander's Briefing` block exists per prompt. When a precomputed briefing is supplied it carries the memory, standing-order, and production sections; when it is absent those sections are emitted directly and there is no briefing heading. The two paths must never both emit the same section.
 
@@ -52,15 +52,15 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | --- | --- | --- | --- |
 | Role line | always | always | n/a. The clock is `# Current Situation`, not this line |
 | Goal statement | always (win conditions) | always (battle-local goal) | strategic with no scenario set falls back to the generic objective in [`strategic-prompt.md`](strategic-prompt.md) 1.2; never reuse scenario wording |
-| Scouting directive | when no enemy unit is observed | never | omit |
+| Scouting directive | always, as a bullet under `## Using the Briefing` in `# Orders Guidance`. Not in the situation message | never | n/a |
 | Tool-budget warning | when the previous consultation reached the tool-round limit before it submitted orders, and planning or orders tools are enabled | when the same condition holds | omit |
 | Coordinate preamble | always (strategic wording) | always (tactical wording) | n/a |
-| Combat and attack rules | always | always | n/a |
+| `# Rules` | always. Subsections with no paragraph are omitted. `## Production` is strategic and production-on. `## Rule Lookup` is when the `rules` tool is on | always, with the battle substitutions | n/a |
 | `# Commander's Briefing` | when a briefing body is supplied | when a briefing body is supplied | omit the heading and emit the standalone sections instead |
 | Narrative paragraph | always inside the briefing | always inside the briefing | never empty; own count 0 omits the scout clause and adds the still-in-match sentence ([`strategic-prompt.md`](strategic-prompt.md)) |
 | `## Unit Status and Threats` | always inside the briefing | always inside the briefing | header row plus `(No AI units)` |
-| Distance-basis caveat line | fog off on the strategic map: hop-count honesty line; fog on: path-vs-Best-Options line (after the staleness sentence) | never | omit |
-| `## Attention Flags` | always inside the briefing. Five unit bullets, then at most one production bullet from `findIdleProductionHexes` when production is on and a hex is idle, then at most one paused-queue pointer from `formatPausedProductionPointer`. The production bullet replaces `None.` when it is the only bullet and does not count against the five-bullet cap. It names at most `PRODUCTION_ATTENTION_LISTED_HEXES` (60) hexes, grouped by queue state and buildable types. Past that it counts the rest and asks for a `set_build_queue` row only for the listed hexes. The pointer does not count against the cap either. | always inside the briefing, without the production bullet | `None.` |
+| `# Reading the Briefing` | when any subsection applies. Distances, the map legend, and the odds key require a precomputed briefing. Memory, air, missiles, and transport follow their own gates and print without a briefing | map legend and odds key when a briefing is attached; air and transport when the battle roster has them. No distances | omit the heading |
+| `## Attention Flags` | always inside the briefing. Five unit bullets, then at most one production bullet from `findIdleProductionHexes` when production is on and a hex is idle, then at most one paused-queue pointer from `formatPausedProductionPointer`, then at most one campaign bullet from `formatCampaignAttentionBullet` when Campaign Orders has a row. The production bullet replaces `None.` when it is the only bullet and does not count against the five-bullet cap. It names at most `PRODUCTION_ATTENTION_LISTED_HEXES` (60) hexes, grouped by queue state and buildable types. Past that it counts the rest and asks for a `set_build_queue` row only for the listed hexes. The pointer and the campaign bullet do not count against the cap either. | always inside the briefing, without the production bullet or the campaign bullet | `None.` |
 | `## Operational Map` | always inside the briefing. Strategic: one fenced block per connected patch of the window around own units, visible enemies, controlled cities, and listed targets. An empty window draws the loaded set. A Shown line appears when the window is smaller than that set, and when `get_map` is enabled it also says to call `get_map` for cells outside the window | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
 | `### Best Options This Turn` | when at least one option row exists | when at least one option row exists | omit heading and table |
 | `## Supplemental Hex Intelligence` | when at least one hex assessment exists | never | omit |
@@ -69,24 +69,29 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `### Paused Queues` | in the situation message when production is on and a queue is paused for occupation or a full city. `## Paused Queues` when that section stands alone. The paragraphs are the body from `formatPausedQueuesSection` | never | omit |
 | `## Controlled Hex Queues` | when production is present and at least one controlled cell has an editable queue | never | replace the table with `No currently controlled hexes with editable production queues.` |
 | `## Your Strategic Memory` | when memory tools are enabled. H1 when the briefing is absent | never | omit |
+| `## Campaign Objective` | when a campaign plan exists. H2 inside the briefing; H1 immediately before Standing Order Status when the briefing is absent | never | omit |
 | `## Standing Order Status` | when standing-order tools are enabled. H1 when the briefing is absent | never | omit |
+| `### Campaign Orders` | inside Standing Order Status when a campaign plan exists | never | omit |
 | `## Units Without Standing Orders` | when the standing-order block is present | never | one row of `—` |
-| `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and the empty-list sentence that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now |
-| `# Scenario Objective (Required)` | when `scenarioId === 'region_vs_region'` | never | omit |
-| `# Strategic Context` | always | `# Battle Context` | n/a |
-| `# Air Operations Status` | when the opponent has at least one air unit | when the opponent has at least one air sub-unit in this battle | omit the section |
-| `# Missile Forces` | when the opponent has at least one missile | never | omit the section |
-| `# Mercenaries` | when the snapshot has an economy and production is on, or the seat has a mercenary | never | omit. Production off keeps the upkeep-only form when the seat has a mercenary |
-| `# Naval Transport Status` | when the opponent has at least one naval unit | when the opponent has at least one naval sub-unit in this battle | omit the section |
-| `# Available Tools` | always | always | `No tools available.` |
+| `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and `None.` The callbacks coaching bullet states the empty-list rule |
+| `# Scenario Objective (Required)` | system message, when `scenarioId === 'region_vs_region'`. Home hex lists, the shared-hex line, and the territory sentence are in that section. `## Sides` follows them | never | omit |
+| `# Strategic Context` | always. `## Campaign` follows the message guidance when the consult is strategic `region_vs_region` and standing orders are on | `# Battle Context` | n/a |
+| `# Scenario Progress` | situation message, when `scenarioId === 'region_vs_region'`. H2 inside a briefing, H1 without one. Explored, controlled, home-control, and urban-share counts | never | omit |
+| `# Mercenaries` | when the snapshot has an economy and production is on, or the seat has a mercenary. The envelope-rows sentence stays in the response format | never | omit. Production off keeps the upkeep-only form when the seat has a mercenary |
+| `# Air Operations Status` | when the opponent has at least one air unit. Counts and the table only; the air rules and the callback sentence are `## Air Operations Table` | when the opponent has at least one air sub-unit in this battle | omit the section |
+| `# Missile Forces` | when the opponent has at least one missile. The range line and the tables stay here. `Best missile targets are explored enemy hexes` is `## Missile Targets` | never | omit the section |
+| `# Naval Transport Status` | when the opponent has at least one naval unit. The table only. Embark and airlift are `## Transport` | when the opponent has at least one naval sub-unit in this battle | omit the section. Air without ships does not print an empty heading |
+| `# Available Tools` | always. `## How to Use These Tools Effectively` holds the tool lines only | always | `No tools available.` |
+| `# Orders Guidance` | when any coaching section has a bullet. Subsections are Winning, Using the Briefing, Standing Orders, Air and Naval Units, Production Queues, Memory and Callbacks, Messages and Rounds | Using the Briefing, Air and Naval Units when the roster has them, Callbacks and Messages | omit the heading |
 | Observed enemy roster line | always | always | the helper's empty-roster phrasing |
-| Response envelope contract | always | always | n/a |
+| Response envelope contract | always. The orders action list is `Actions:` and one bullet per action | always | n/a |
 | Response envelope example | always | always | n/a |
 
 Live assembler notes that match the matrix above:
 
-- Air and naval status sections are **omitted** when the opponent has none of that arm (`buildAirOperationsBriefingBlock` / `buildSealiftBriefingBlock` return `''`). A dash table is not emitted.
-- The distance-basis caveat follows **what the numbers mean**, not the fog flag alone. Fog off on the strategic map prints hop counts, so the hop-versus-path line is emitted. Fog on prints march or sail path lengths (falling back to hops when no path exists), so the path-versus-Best-Options line is emitted. Neither line appears in a battle prompt.
+- The system prompt holds every turn-invariant sentence. A count, a table, the Shown line, and the roster stay in the situation message.
+- Air and naval status sections are **omitted** when the opponent has none of that arm (`buildAirOperationsBriefingBlock` / `buildSealiftBriefingBlock` return `''`). A dash table is not emitted. Air without ships does not print a Naval Transport heading; the airlift sentence is `## Transport`.
+- Distance caveats are `briefingDistanceCaveatLines` in `## Distances and Intel Age`, not under the unit table. Fog off on the strategic map prints the hop-count line. Fog on prints the staleness sentence, then the path-versus-Best-Options line when that line applies. Neither line appears in a battle prompt. The odds key prints in both modes when a briefing is attached.
 
 ## 4. Tools versus envelope writes
 
@@ -138,6 +143,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
 | `memoryUpdates` | array | present when memory tools are enabled | Write or delete. A write requires `content` and `tier`. A strategic consult applies the rows through `executeMemory` when memory tools are enabled. A valid persistent write at capacity deletes the oldest persistent note for that seat and then stores the write. A stored write at capacity, and any invalid row, is a drop reason. A battle consult does not apply them. A list sent while the group is off is not stored. |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
+| `campaignTarget` | string | present on a strategic `region_vs_region` consult with standing orders on | Optional hex code of an enemy city. Omit it to keep the target. Sending the current target changes nothing. The engine keeps the target until it is taken, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped. |
 
 Envelope-wide rules the prompt must state:
 
@@ -179,7 +185,7 @@ System-prompt content, both modes. Each item states the rule and why the model n
 6. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_REPLACE_SEMANTICS`.
 7. **`strategy` is for continuity.** One line naming what this period is trying to achieve, so the next consultation inherits intent rather than re-deriving it. Carries `JSON_ENVELOPE`.
 8. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
-9. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.
+9. **Doctrine.** Attack where you outnumber the defenders and avoid fights where you do not; strike gaps the enemy cannot reinforce quickly; keep the initiative and move toward the objective every period. Balanced adds its own block after that list: advance on the objective while home cities are safe, and trade a unit for a city when the odds favor you. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.
 
 Casualty order and friendly stacking are rules-block items, not coaching items. The combat rules paragraph states both. Hits fall on the lowest-defense defender first, then infantry, armor, naval, air, and a missile is hit last. Friendly units may stack on the same cell, and a cell holding an enemy is legal as move/melee contact. Hold fire is in that same paragraph, and only when standing-order tools are on.
 

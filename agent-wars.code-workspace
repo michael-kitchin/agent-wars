@@ -7,6 +7,9 @@
 		{
 			"name": "Data",
 			"path": "../../../Data"
+		},
+		{
+			"path": "E:/Files/Sync/Videos/Personal"
 		}
 	],
 	"settings": {}

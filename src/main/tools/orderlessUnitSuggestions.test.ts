@@ -11,6 +11,7 @@
 
 import * as assert from 'assert';
 import { gridDisk, gridDistance } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import {
   landUnitCanOccupyHex,
   STRATEGIC_LAND_MAX_WATER_PCT,
@@ -23,6 +24,7 @@ import {
 } from '../testSupport/strategicLandChainFixtures';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { suggestApproachDestinationsForOrderlessUnits } from './orderlessUnitSuggestions';
+import type { CampaignPlan } from '../openRouter/campaignRules';
 
 /**
  * Ensures an orderless unit is offered a legal hex that closes on the distant enemy.
@@ -689,7 +691,81 @@ const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
     name: 'suggestApproachDestinationsForOrderlessUnits omits a unit already on the enemy',
     fn: testUnitAlreadyOnTheEnemyIsOmitted,
   },
+  {
+    name: 'a campaign unit is told to march to the campaign hex, or to defend where it is when it holds',
+    fn: testCampaignUnitMarchesToTheCampaignHexOrDefendsWhenItHolds,
+  },
 ];
+
+/**
+ * A campaign unit is sent to the campaign hex, and a holding unit defends where it stands.
+ *
+ * Purpose: A visible enemy that is not a legal step must not pull the unit off the campaign.
+ * When to use: After changing the campaign branch of `suggestApproachDestinationsForOrderlessUnits`.
+ * Expected outcome: March to the waypoint, defend on hold, and the same suggestion as no plan for a unit left out of the plan.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists, or no hex six hops away is outside this turn's steps.
+ */
+function testCampaignUnitMarchesToTheCampaignHexOrDefendsWhenItHolds(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const origin = chain[0]!;
+  const waypoint = chain[2]!;
+  const unitId = 'opponent-inf-idle';
+  const friendly = { id: unitId, player: 'opponent', unitType: 'infantry', h3Index: origin };
+  const bare = buildLandChainState({ chain, units: [friendly] });
+  const legal = new Set(getValidDestinations(friendly, bare));
+  const enemy = gridDisk(origin, 6).find((h3) => {
+    if (legal.has(h3) || h3 === waypoint) return false;
+    try {
+      return gridDistance(origin, h3) === 6;
+    } catch {
+      return computeGridDistanceWithPathFallbackPure(origin, h3) === 6;
+    }
+  });
+  assert.ok(enemy, 'expected a hex six hops away that is not a legal step');
+  const state = buildLandChainState({
+    chain,
+    units: [friendly, { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: enemy }],
+  });
+  const plan = (hold: boolean): CampaignPlan => ({
+    objective: { targetH3: waypoint, stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: 1 },
+    waypointH3: waypoint,
+    campaignUnitIds: new Set([unitId]),
+    holdUnitIds: new Set(hold ? [unitId] : []),
+    defenderUnitIds: [],
+    massedCount: 0,
+    threshold: 1,
+  });
+  assert.equal(legal.has(enemy), false);
+  const marching = suggestApproachDestinationsForOrderlessUnits(
+    'opponent',
+    state,
+    [unitId],
+    new Map(),
+    undefined,
+    { campaignPlan: plan(false) }
+  );
+  assert.deepStrictEqual(marching.get(unitId), { orderType: 'march', destinationH3: waypoint });
+  const holding = suggestApproachDestinationsForOrderlessUnits(
+    'opponent',
+    state,
+    [unitId],
+    new Map(),
+    undefined,
+    { campaignPlan: plan(true) }
+  );
+  assert.deepStrictEqual(holding.get(unitId), { orderType: 'defend', destinationH3: origin });
+  const leftOut: CampaignPlan = { ...plan(false), campaignUnitIds: new Set(), holdUnitIds: new Set() };
+  const omitted = suggestApproachDestinationsForOrderlessUnits(
+    'opponent',
+    state,
+    [unitId],
+    new Map(),
+    undefined,
+    { campaignPlan: leftOut }
+  );
+  const without = suggestApproachDestinationsForOrderlessUnits('opponent', state, [unitId], new Map(), undefined);
+  assert.deepStrictEqual(omitted.get(unitId), without.get(unitId));
+}
 
 /**
  * Runs the suggested-destination contracts and exits non-zero on the first failure.

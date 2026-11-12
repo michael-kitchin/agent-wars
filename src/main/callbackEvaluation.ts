@@ -280,7 +280,18 @@ type: 'deadman';   /**
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-turnsSince: number };
+turnsSince: number }
+  | {
+      /**
+       * The stored campaign is assembling and enough ground units stand near its staging hex.
+       *
+       * Contract: The stored campaign is assembling and enough ground units stand near its staging hex.
+       * When to use: After resolution, so the next consult can start the assault.
+       * Expected outcome: The post-resolution runner consults this seat.
+       * Exceptions: None.
+       */
+      type: 'campaign_ready';
+    };
 
 /**
  * Documents the module-scope binding `DEADMAN_TURNS` (DEADMAN_TURNS).

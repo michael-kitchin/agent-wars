@@ -7,6 +7,7 @@ import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/he
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import {
+  SECTION_TITLE_CAMPAIGN_ORDERS,
   SECTION_TITLE_STANDING_ORDER_STATUS,
   SECTION_TITLE_UNITS_WITHOUT_STANDING_ORDERS,
   subHeading,
@@ -23,6 +24,7 @@ import {
   type OrderlessMissionSuggestion,
 } from './orderlessUnitSuggestions';
 import { expireAndUpdateStatus } from './standingOrdersGeneration';
+import { campaignOrderFor, type CampaignPlan } from '../openRouter/campaignRules';
 import { marchStepRecedesFromEnemy, nearestObservedEnemyH3 } from './standingMarchReceding';
 
 /**
@@ -265,7 +267,16 @@ function suggestedDestinationCell(
 export function getInjectionText(
   playerId: string,
   state: GameStateSnapshot,
-  coordinateContext?: CoordinateContext
+  coordinateContext?: CoordinateContext,
+  /**
+   * The consult's campaign plan.
+   *
+   * Contract: Omitted or null keeps today's suggested destinations.
+   * When to use: Strategic consults that resolved a campaign.
+   * Expected outcome: Orderless campaign units are offered the campaign order.
+   * Exceptions: None.
+   */
+  campaignPlan?: CampaignPlan | null
 ): string {
   const ctx: CoordinateContext = coordinateContext ?? { mode: 'strategic' };
   if (ctx.mode === 'tactical') {
@@ -341,6 +352,7 @@ export function getInjectionText(
     playerId,
     state,
     orderlessUnitIds: unitIdsWithoutOrders,
+    campaignPlan,
   }).suggestions;
   const withoutOrderHeaders = ['Unit ID', 'Unit Type', 'Suggested Destination'];
   const withoutOrderBlanks = ['—', '—', '—'];
@@ -356,5 +368,112 @@ export function getInjectionText(
       withoutOrderBlanks
     )
   );
+  if (campaignPlan) {
+    const campaignRows = buildCampaignOrderRows({ playerId, state, plan: campaignPlan, coordinateContext: ctx });
+    lines.push('');
+    lines.push(subHeading(SECTION_TITLE_CAMPAIGN_ORDERS));
+    lines.push('');
+    lines.push(
+      ...buildPromptTableLines(
+        ['Unit ID', 'Unit Type', 'Current Order', 'Campaign Order'],
+        campaignRows.map((row) => [row.unitId, row.unitType, row.currentOrder, row.campaignOrder]),
+        ['—', '—', '—', '—']
+      )
+    );
+  }
   return lines.join('\n');
+}
+
+/**
+ * One campaign unit whose standing order does not match the campaign.
+ *
+ * Purpose: The Campaign Orders table and the attention count share one row shape.
+ * When to use: The value of `buildCampaignOrderRows`.
+ * Expected outcome: `campaignOrder` is the order to copy. `currentOrder` is what is stored now.
+ * Exceptions: None.
+ */
+export interface CampaignOrderRow {
+  /**
+   * Unit the row orders.
+   *
+   * Contract: A campaign unit that still exists on the snapshot.
+   * When to use: The Unit ID column.
+   * Expected outcome: An id the model can put in assign_order.
+   * Exceptions: None.
+   */
+  readonly unitId: string;
+  /**
+   * The unit's type.
+   *
+   * Contract: The snapshot type, such as infantry or armor.
+   * When to use: The Unit Type column.
+   * Expected outcome: The same type the roster uses.
+   * Exceptions: None.
+   */
+  readonly unitType: string;
+  /**
+   * The standing order that is stored now.
+   *
+   * Contract: The order type plus its hex or pursue target when one is stored.
+   * When to use: The Current Order column.
+   * Expected outcome: A short label, not a second decoder of the route.
+   * Exceptions: None.
+   */
+  readonly currentOrder: string;
+  /**
+   * The order the campaign wants.
+   *
+   * Contract: `march` or `defend` plus the briefing hex.
+   * When to use: The Campaign Order column.
+   * Expected outcome: The text the model copies into assign_order.
+   * Exceptions: None.
+   */
+  readonly campaignOrder: string;
+}
+
+/**
+ * Lists campaign units whose stored standing order differs from the campaign order.
+ *
+ * Purpose: Units that already hold the campaign order must not be told to change it.
+ * When to use: After `expireAndUpdateStatus`, from the standing-order injection and the attention count.
+ * Expected outcome: One row per differing order. Units with no standing order are absent. An empty list means every campaign unit already matches.
+ * Exceptions: None. A missing unit is skipped.
+ */
+export function buildCampaignOrderRows(args: {
+  readonly playerId: string;
+  readonly state: GameStateSnapshot;
+  readonly plan: CampaignPlan;
+  readonly coordinateContext: CoordinateContext;
+}): CampaignOrderRow[] {
+  const rows = dbGetAll<StandingOrderRow>('SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id', [
+    args.playerId,
+  ]);
+  const { resolveToH3 } = buildLatLngCoordinateMap(args.state.hexes.map((hex) => hex.h3Index));
+  const unitsById = new Map(args.state.units.map((unit) => [unit.id, unit]));
+  const result: CampaignOrderRow[] = [];
+  for (const row of rows) {
+    const unit = unitsById.get(row.unit_id);
+    if (!unit) continue;
+    const desired = campaignOrderFor(args.plan, { id: unit.id, h3Index: unit.h3Index });
+    if (desired === null) continue;
+    const params = parseOrderParams(row);
+    const stored = row.order_type === 'march' ? params.destination : row.order_type === 'defend' ? params.defendHex : undefined;
+    const storedH3 =
+      Array.isArray(stored) && stored.length >= 2 ? resolveToH3(Number(stored[0]), Number(stored[1])) : undefined;
+    if (row.order_type === desired.orderType && storedH3 === desired.destinationH3) continue;
+    const currentTarget =
+      storedH3 !== undefined
+        ? ` ${h3ToBriefingHexDisplay(storedH3, args.coordinateContext)}`
+        : row.order_type === 'pursue' && params.targetUnitId
+          ? ` ${String(params.targetUnitId)}`
+          : '';
+    result.push({
+      unitId: unit.id,
+      unitType: unit.unitType,
+      currentOrder: `${row.order_type}${currentTarget}`,
+      campaignOrder: `${desired.orderType} ${h3ToBriefingHexDisplay(desired.destinationH3, args.coordinateContext)}`,
+    });
+  }
+  logTrace('standingOrders buildCampaignOrderRows', { playerId: args.playerId, rowCount: result.length });
+  return result;
 }

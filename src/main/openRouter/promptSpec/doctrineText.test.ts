@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import type { GameStateSnapshot } from '../../gameDb';
 import { buildSystemPromptForTools } from '../openRouterBuildSystemPrompt';
 import { buildContextCoaching, type CoachingGates } from './coachingText';
+import { buildDoctrineBlock } from './doctrineText';
 
 /**
  * Gates with every strategic item off except the ones the context block always prints.
@@ -85,9 +86,10 @@ test('balanced coaching matches coaching with no doctrine field', () => {
   const balanced = buildContextCoaching(gates('balanced', 'strategic'));
   const omitted = buildContextCoaching(gates(undefined, 'strategic'));
   assert.equal(balanced, omitted);
-  assert.equal(balanced.includes('Your doctrine is'), false);
+  assert.match(balanced, /Your doctrine is balanced/);
   const tactical = buildContextCoaching(gates('balanced', 'tactical'));
   assert.equal(tactical, buildContextCoaching(gates(undefined, 'tactical')));
+  assert.match(tactical, /every beat/);
 });
 
 test('aggressive and cautious blocks follow the strategy list in both prompts', () => {
@@ -101,5 +103,21 @@ test('aggressive and cautious blocks follow the strategy list in both prompts', 
     }
   }
   const balanced = promptFor('balanced', 'strategic');
-  assert.equal(balanced.includes('Your doctrine is'), false);
+  assert.match(balanced, /Your doctrine is balanced/);
+});
+
+test('each doctrine names the campaign target only when the campaign is on', () => {
+  for (const doctrine of ['balanced', 'aggressive', 'cautious'] as const) {
+    const on = buildDoctrineBlock(doctrine, true);
+    const off = buildDoctrineBlock(doctrine, false);
+    assert.match(on, new RegExp(`Your doctrine is ${doctrine}`));
+    assert.match(off, new RegExp(`Your doctrine is ${doctrine}`));
+    if (doctrine === 'cautious') {
+      assert.match(on, /to the campaign staging hex/);
+      assert.match(off, /toward the nearest enemy home region/);
+    } else {
+      assert.match(on, /Advance on the campaign target/);
+      assert.match(off, /Advance on the nearest enemy home region/);
+    }
+  }
 });

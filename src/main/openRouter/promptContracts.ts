@@ -10,10 +10,57 @@ import {
   buildInvalidOutputRulesClause,
   buildMemoryWriteLimitsClause,
   envelopeFieldsForGates,
-  legalOrderActionsForMode,
   TACTICAL_STANDING_ORDER_PROHIBITION,
   type EnvelopeGates,
 } from './promptSpec/envelopeContract';
+
+/**
+ * Renders the orders action list as one bullet per action.
+ *
+ * Purpose: A comma-separated sentence hides which words belong to which action.
+ * When to use: The orders paragraphs of the JSON contract.
+ * Expected outcome: `Actions:`, a blank line, then one bullet per legal action. Naval and standing-order bullets follow their gates. The tactical prohibition, or the place-field sentence, follows the list.
+ * Exceptions: None.
+ */
+function formatOrderActionList(args: {
+  readonly coordinateMode: 'strategic' | 'tactical';
+  readonly includeAirActions: boolean;
+  readonly includeNavalActions: boolean;
+  readonly standingOrdersIssuable: boolean;
+}): string {
+  const moveNoun = args.coordinateMode === 'tactical' ? "beat's march" : "turn's move";
+  const rangedReach = args.coordinateMode === 'tactical'
+    ? 'every type with a tactical reach, infantry included'
+    : 'units with a strategic ranged reach of at least one, never infantry';
+  const bullets: string[] = [];
+  if (args.standingOrdersIssuable) {
+    const airNote = args.includeAirActions
+      ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, airDrops to land embarked infantry, or a "defend" order to keep striking targets in range.'
+      : '';
+    bullets.push(
+      '- assign_order: include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... }. Required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.' +
+        airNote
+    );
+    bullets.push('- cancel_order');
+  }
+  bullets.push(
+    `- explicit_move: include "destination": briefing hex code for this ${moveNoun}; auto-debarks embarked cargo before marching.`
+  );
+  bullets.push(`- ranged_attack: include exactly one of targetHexCode or targetUnitId; ${rangedReach}.`);
+  if (args.includeNavalActions) {
+    bullets.push('- transport_move: include "navalUnitId" and "destination" hex code.');
+  }
+  if (args.includeNavalActions || args.includeAirActions) {
+    bullets.push('- disembark: include "unitId" and "destination" hex code — clears cargo assignment then moves in one action.');
+    bullets.push('- embark: include "unitId" and "navalUnitId".');
+  }
+  const tail = args.coordinateMode === 'tactical'
+    ? TACTICAL_STANDING_ORDER_PROHIBITION
+    : args.standingOrdersIssuable
+      ? 'assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.'
+      : 'Best Options Target Hexes are this-turn dests only.';
+  return `Actions:\n\n${bullets.join('\n')}\n\n${tail}`;
+}
 
 /**
  * Defines the `buildFinalJsonContractInstruction` function shape (export function buildFinalJsonContractInstruction(args: { includeMemoryUpdates: boolean; includeProductionOrders: boolean; movementOrderInstruction: st).
@@ -71,6 +118,15 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includeExitBattle?: boolean;
+  /**
+   * When true, the contract names optional `campaignTarget` last.
+   *
+   * Contract: Omitted means false. True on a strategic regional consult with standing orders on.
+   * When to use: Pass from `buildConsultPromptParts` when `campaignEnabled` is true.
+   * Expected outcome: The header and one paragraph name the field. The example omits it.
+   * Exceptions: None.
+   */
+  includeCampaignTarget?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -101,6 +157,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeStandingOrderActions = true,
     includeMissileActions = false,
     includeExitBattle = false,
+    includeCampaignTarget = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -115,6 +172,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeStandingOrderActions,
     includeMissileActions,
     includeExitBattle,
+    includeCampaignTarget,
     coordinateMode,
     structuredOutputs,
   });
@@ -127,6 +185,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeMissileActions: coordinateMode !== 'tactical' && includeMissileActions,
     includeExitBattle,
     includeNavalActions,
+    includeCampaignTarget: coordinateMode !== 'tactical' && includeCampaignTarget,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -141,6 +200,7 @@ export function buildFinalJsonContractInstruction(args: {
     callbacks: '"callbacks": [...]',
     memoryUpdates: '"memoryUpdates": [...]',
     productionOrders: '"productionOrders": [...]',
+    campaignTarget: '"campaignTarget": "<optional hex code>"',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
@@ -151,47 +211,18 @@ export function buildFinalJsonContractInstruction(args: {
     'The "message" field is a one-line in-character taunt or threat addressed to your enemies (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent).',
     `The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`,
   ];
-  const airUnitOrderNote = includeAirActions
-    ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, airDrops to land embarked infantry, or a "defend" order to keep striking targets in range'
-    : '';
   const standingOrdersIssuable = coordinateMode !== 'tactical' && includeStandingOrderActions;
-  const actionList = legalOrderActionsForMode(
-    coordinateMode,
-    includeNavalActions,
-    standingOrdersIssuable,
-    includeAirActions
-  ).join(', ');
-  const sealiftActionClause = includeNavalActions
-    ? ', transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
-    : includeAirActions
-      ? ', disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
-      : '';
-  const rangedReachClause =
-    coordinateMode === 'tactical'
-      ? 'every type with a tactical reach, infantry included'
-      : 'units with a strategic ranged reach of at least one, never infantry';
-  const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ${rangedReachClause})${sealiftActionClause}`;
   const actorIdClause =
     'Each entry includes "action" and "unitId" or "unitIds" (copy several ids from one Best Options row into unitIds instead of one object per unit)';
-  const ordersParagraphs =
-    coordinateMode === 'tactical'
-      ? [
-          `The "orders" array is processed in list order. ${actorIdClause}.`,
-          `Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`,
-        ]
-      : standingOrdersIssuable
-        ? [
-            `The "orders" array is processed in list order. ${actorIdClause}.`,
-            `Actions: ${actionList}.`,
-            `assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
-              airUnitOrderNote +
-              `), cancel_order, ${sharedMoveFireClause}.`,
-            'assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.',
-          ]
-        : [
-            `The "orders" array is processed in list order. ${actorIdClause}.`,
-            `Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`,
-          ];
+  const ordersParagraphs = [
+    `The "orders" array is processed in list order. ${actorIdClause}.`,
+    formatOrderActionList({
+      coordinateMode,
+      includeAirActions,
+      includeNavalActions,
+      standingOrdersIssuable,
+    }),
+  ];
   const airClause = includeAirActions
     ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }, airDrops[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
     : '';
@@ -205,6 +236,10 @@ export function buildFinalJsonContractInstruction(args: {
   const memoryClause = coordinateMode === 'tactical' ? '' : submitMemoryClause;
   const productionClause = coordinateMode === 'tactical' ? '' : productionSubmitClause;
   const memoryParagraph = [memoryClause, memoryLimits].map((part) => part.trim()).filter((part) => part.length > 0).join(' ');
+  const campaignParagraph =
+    gates.includeCampaignTarget === true
+      ? 'Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.'
+      : '';
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
     ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
@@ -214,6 +249,7 @@ export function buildFinalJsonContractInstruction(args: {
     ...invalidOutputClause.split('\n\n'),
     movementOrderInstruction.trim(),
     ...callbacksClause.split('\n\n'),
+    campaignParagraph,
     memoryParagraph,
     ...productionClause.split('\n\n'),
   ].map((part) => part.trim()).filter((part) => part.length > 0);

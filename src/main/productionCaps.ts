@@ -25,12 +25,12 @@ export const ALL_AVAILABLE_TYPES_AT_CAP_NOTE = 'all unit types at cap';
  *
  * Purpose: One sentence shared by tool guidance, submit clauses, and the production briefing so the model is not told conflicting cap rules.
  * When to use: Strategic production prompt surfaces and the Production Status block when any type is maxed.
- * Expected outcome: Verbatim inclusion; does not itself reject queues (engine uses `shouldRejectCappedQueueType`).
+ * Expected outcome: Verbatim inclusion. At the caps, queue credits, and queue fortification only for an exposed city. Does not itself reject queues (engine uses `shouldRejectCappedQueueType`).
  * Exceptions: None.
  */
 export const PRODUCTION_CAP_QUEUE_GUIDANCE =
   'Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. ' +
-  'When every unit type a hex can build is at cap, queue fortification or credits if they are listed. ' +
+  'When every unit type a hex can build is at cap, queue credits and spend them on mercenaries. Queue fortification only in a city whose Exposed column says yes, and replace a fortification queue in a city that is not exposed with credits. ' +
   `A hex whose available types are marked "${ALL_AVAILABLE_TYPES_AT_CAP_NOTE}" and which lists neither has no alternative — leave that queue as it is so it resumes when the cap frees up.`;
 
 /**

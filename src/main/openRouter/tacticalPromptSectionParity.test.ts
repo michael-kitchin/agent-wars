@@ -51,7 +51,7 @@ import {
   tacticalCallbackStashConfigExists,
 } from '../tacticalBattle/tacticalCallbackStashPersistence';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
-import { assertHeadingsNest, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
+import { assertHeadingsNest, assertNoTripleBlankLines, assertProseLinesWithinLimit, headingOutline } from '../testSupport/promptOutlineHelpers';
 import { WIN_CONDITION_REMINDER_FIRST_SENTENCE } from './scenarioGoals';
 import { initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
 
@@ -604,13 +604,20 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(!prompt.includes('prioritize scouting this turn'));
     const outline = headingOutline(prompt);
     assertHeadingsNest(outline);
+    assertNoTripleBlankLines(prompt);
     const tacticalAlways = [
       '# Your Command',
       '# Coordinates',
-      '# Combat and Movement Rules',
+      '# Rules',
+      '## Combat',
       '# Battle Context',
+      '# Reading the Briefing',
+      '## Map Legend',
       '# Available Tools',
       '## How to Use These Tools Effectively',
+      '# Orders Guidance',
+      '## Using the Briefing',
+      '## Callbacks and Messages',
       '# Response Format',
       '## Example Response',
       '# Current Situation',
@@ -618,7 +625,7 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
       '## Unit Status and Threats',
       '## Attention Flags',
       '## Operational Map',
-      '# Unit Roster',
+      '## Unit Roster',
     ];
     let cursor = 0;
     for (const heading of tacticalAlways) {

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
+import { AIR_OPERATIONS_TABLE_RULES } from './promptSpec/briefingGuideText';
 
 /** Water hex reused as an air-base fixture so `gridDisk` can supply neighbors. */
 const WATER_NO_PORT = '810ebffffffffff';
@@ -57,8 +58,9 @@ function testStrikeableInfraCountsOnlyHumanControlled(): void {
   assert.equal(cells[7], '1', 'Strikeable Airports must count only the human-controlled hex');
   assert.equal(cells[8], '1', 'Strikeable Seaports must count only the human-controlled hex');
   assert.match(md, /Enemy infrastructure in your current strike envelope: airports=1, seaports=1/);
-  assert.match(md, /infrastructure_destroyed/);
-  assert.match(md, /targetType/i);
+  assert.doesNotMatch(md, /infrastructure_destroyed/);
+  assert.match(AIR_OPERATIONS_TABLE_RULES, /infrastructure_destroyed/);
+  assert.match(AIR_OPERATIONS_TABLE_RULES, /targetType/i);
   assert.doesNotMatch(md, /h3Index/);
 }
 
