@@ -47,6 +47,7 @@ When this guide and the running app disagree, the app wins until this file is up
 | Console tab rail bg | `#141f2d` | `--chrome-rail-bg` |
 | Dividers inside the top bar and the rail | `#243246` | `--chrome-divider` |
 | Battle header bg / bottom edge | `#17141f` / `#4a3247` | `--battle-header-bg` / `--battle-header-border`. The top bar's face while a battle is open, so the theater reads at a glance |
+| Beats left, 5 or fewer | `#B91C1C` | `--order-missile`, the same value as `RANGE_PERIMETER_MISSILE_COLOR`. The "(N left)" suffix on an AI-only battle header when N is `AI_ONLY_BEATS_LEFT_URGENT_AT` or smaller. A larger count keeps the muted status color |
 | Force bar, seat 1 / seat 2 | `#1B8A82` / `#B02A62` | `--force-bar-human` / `--force-bar-opponent`, the same values as `--seat-1-bar` / `--seat-2-bar`. Seats 3 and 4 use `--seat-3-bar` `#EA580C` and `--seat-4-bar` `#3B82F6`. Brighter forms of the seat colors, so the battle header's force bar reads on its dark face |
 | Panel, popup, tooltip, and toast bg | `#1b2838` | Console, game menu, legend, hex tooltip, control tips, stack callout, build popup, new-game setup panel, tactical-battles dialog, update toast, message toast, and Reports tab |
 | Chrome text / muted | `#f4f6f8` / `#b7c4d4` | Off-white body; blue-gray for secondary lines |

@@ -22,7 +22,7 @@ Emit order. Sections shared with strategic keep the same heading strings; the di
 
 ### 2.1 Role line
 
-Same role sentence as strategic, with no clock on that line. The beat clock is the first line under `# Current Situation`: `Strategic turn: {N}, date: {D}, tactical beat: {B}, phase: {P}.` The date clause is omitted when `currentDateLabel` is absent. The role line names the consulted commander's side. In an AI-only battle each commander is briefed as its own side, with its own sub-units as "yours".
+Same role sentence as strategic, with no clock on that line. The beat clock is the first line under `# Current Situation`: `Strategic turn: {N}, date: {D}, tactical beat: {B}, phase: {P}.` The date clause is omitted when `currentDateLabel` is absent. When the battle is AI-only and the match stored a numeric beat limit, the next paragraph is `Beats left before this battle ends on its own: {M}. This count is 0 on the last beat. This beat still resolves, and the battle ends after the beat where the count is 0. Use the beats you have on the fight in front of you.` M is `aiOnlyBeatsLeft` of the beat and `aiOnlyBeatLimit` (`formatAiOnlyBeatsLeftPrompt`). A human battle and an unlimited limit omit that paragraph. It stays in the situation message, so the cached system text does not change with the count. The role line names the consulted commander's side. In an AI-only battle each commander is briefed as its own side, with its own sub-units as "yours".
 
 ### 2.2 Goal statement
 

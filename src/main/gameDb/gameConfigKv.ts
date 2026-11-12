@@ -181,7 +181,7 @@ export function readAiOnlyBattles(ops: GameConfigKvDbOps): AiOnlyBattleMode {
  * Reads the beat limit stored for the current match.
  *
  * Purpose: An AI-only battle ends after this many completed beats. An old save has no row.
- * When to use: The beat that has just resolved, before any later consult.
+ * When to use: The game-state snapshot, which the header and the tactical prompt read, and the check after a beat resolves.
  * Expected outcome: The stored number. A closed database, a missing row, or `unlimited` is null.
  * Exceptions: None.
  */

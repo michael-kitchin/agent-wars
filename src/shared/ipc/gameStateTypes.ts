@@ -399,6 +399,15 @@ victory?: VictorySettings;
    */
 aiOnlyBattles?: AiOnlyBattleMode;
     /**
+   * The most beats one AI-only battle can run.
+   *
+   * Contract: Beside `aiOnlyBattles`. Null is Unlimited. A missing field is Unlimited.
+   * When to use: The battle header and the tactical situation message.
+   * Expected outcome: A listed count, or null when the match stored unlimited or has no row.
+   * Exceptions: Absent on a snapshot built before this field existed. Readers treat that as unlimited.
+   */
+aiOnlyBeatLimit?: number | null;
+    /**
    * Why the match ended.
    *
    * Contract: Absent while the match is still being played. One of last side standing, the turn limit, a mutual wipe, or the human ending the match.

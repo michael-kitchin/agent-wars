@@ -38,7 +38,7 @@ Ready stays disabled while a deferred opponent consultation is still outstanding
 
 ### Tactical planning
 
-The player sees the battle map for one contested hex, the top bar as the battle header with Exit Battle, and the same console. The battle header names the battle and shows the beat. The player drafts tactical orders and presses Ready to commit a beat. Exit Battle is enabled while the player drafts. It is disabled from the tactical Ready commit until that beat's playback ends, and hidden while the annihilation dialog is open. The header's status line reads "Beat N · Tactical planning" while drafting. While a beat resolves it reads "Beat N · Tactical resolution", and N is already the next beat.
+The player sees the battle map for one contested hex, the top bar as the battle header with Exit Battle, and the same console. The battle header names the battle and shows the beat. The player drafts tactical orders and presses Ready to commit a beat. Exit Battle is enabled while the player drafts. It is disabled from the tactical Ready commit until that beat's playback ends, and hidden while the annihilation dialog is open. The header's status line reads "Beat N · Tactical planning" while drafting. While a beat resolves it reads "Beat N · Tactical resolution", and N is already the next beat. On an AI-only battle with a beat limit, the beat number is followed by " (M left)", crimson when M is 5 or less. See [top-bar.md](top-bar.md).
 
 Clicks outside the battle area show an error toast and do not issue an order. The console stays usable. Strategic drafts are hidden for the duration of the battle and restored when it ends, except drafts whose units no longer exist.
 

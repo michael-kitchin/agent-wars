@@ -29828,6 +29828,18 @@ ${bonuses}`;
     return `The battle reached its maximum of ${beats} beats.`;
   }
   var AI_ONLY_BEAT_LIMIT_NOTICE_MS = 3e3;
+  var AI_ONLY_BEATS_LEFT_URGENT_AT = 5;
+  function aiOnlyBeatsLeft(beat, limit) {
+    if (limit === null || !Number.isInteger(beat) || !Number.isInteger(limit)) return null;
+    const left = limit - beat;
+    return left > 0 ? left : 0;
+  }
+  function aiOnlyBeatsLeftIsUrgent(left) {
+    return left <= AI_ONLY_BEATS_LEFT_URGENT_AT;
+  }
+  function formatAiOnlyBeatsLeftLabel(left) {
+    return ` (${left} left)`;
+  }
   function aiOnlyBattleEndPresentation(reason, autoAdvance) {
     if (!autoAdvance) return "dialog_until_ok";
     return reason === "beat_limit" ? "timed_dialog" : "leave_now";
@@ -31303,13 +31315,13 @@ ${bonuses}`;
   function formatBattleHeaderTitle(hexCode) {
     return hexCode ? `Battle at (${hexCode})` : "Battle";
   }
-  function formatBattleBeatLine(beat, beatPlaybackActive) {
-    return `Beat ${beat} \xB7 ${beatPlaybackActive ? "Tactical resolution" : "Tactical planning"}`;
-  }
-  function formatBattleHeaderStatus(input) {
-    const beatLine = formatBattleBeatLine(input.beat, input.beatPlaybackActive);
-    const dated = input.dateLabel.length > 0 ? `${beatLine} \xB7 ${input.dateLabel}` : beatLine;
-    return input.garrisonDefendsInPlace ? `${dated} \xB7 The garrison defends in place` : dated;
+  function formatBattleHeaderStatusParts(input) {
+    const phase = input.beatPlaybackActive ? "Tactical resolution" : "Tactical planning";
+    const beatsLeftLabel = input.beatsLeft == null ? null : formatAiOnlyBeatsLeftLabel(input.beatsLeft);
+    let afterBeatsLeft = ` \xB7 ${phase}`;
+    if (input.dateLabel.length > 0) afterBeatsLeft += ` \xB7 ${input.dateLabel}`;
+    if (input.garrisonDefendsInPlace) afterBeatsLeft += " \xB7 The garrison defends in place";
+    return { beforeBeatsLeft: `Beat ${input.beat}`, beatsLeftLabel, afterBeatsLeft };
   }
 
   // src/shared/orderTargetHexCode.ts
@@ -31404,12 +31416,24 @@ ${bonuses}`;
     if (titleEl) titleEl.textContent = formatBattleHeaderTitle(orderTargetHexCode(battle.enclosingStrategicH3Index, null));
     const statusEl = document.getElementById("battle-header-status");
     if (statusEl) {
-      statusEl.textContent = formatBattleHeaderStatus({
+      const beatsLeft = battle.leadPartyId != null ? aiOnlyBeatsLeft(battle.tacticalTurnNumber, state.aiOnlyBeatLimit ?? null) : null;
+      const parts = formatBattleHeaderStatusParts({
         beat: battle.tacticalTurnNumber,
         beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null,
         dateLabel: state.currentDateLabel ?? "",
-        garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId)
+        garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId),
+        beatsLeft
       });
+      const beatLabel = document.createElement("span");
+      beatLabel.className = "battle-beat-count";
+      beatLabel.append(document.createTextNode(parts.beforeBeatsLeft));
+      if (parts.beatsLeftLabel != null && beatsLeft != null) {
+        const suffix = document.createElement("span");
+        suffix.textContent = parts.beatsLeftLabel;
+        if (aiOnlyBeatsLeftIsUrgent(beatsLeft)) suffix.className = "battle-beats-left-urgent";
+        beatLabel.append(suffix);
+      }
+      statusEl.replaceChildren(beatLabel, document.createTextNode(parts.afterBeatsLeft));
       if (battle.weather) statusEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
     }
     renderBattleHeaderCaption(battle);

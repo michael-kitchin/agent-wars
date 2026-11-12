@@ -34,3 +34,14 @@ test('formatBattleHeaderStatus names a neutral garrison', () => {
     'Beat 1 · Tactical planning · April, Year 1 · The garrison defends in place'
   );
 });
+
+test('formatBattleHeaderStatus names the beats left, and 0 is the last beat', () => {
+  assert.equal(
+    formatBattleHeaderStatus({ beat: 25, beatPlaybackActive: false, dateLabel: 'April, Year 1', beatsLeft: 5 }),
+    'Beat 25 (5 left) · Tactical planning · April, Year 1'
+  );
+  assert.equal(
+    formatBattleHeaderStatus({ beat: 30, beatPlaybackActive: true, dateLabel: '', beatsLeft: 0 }),
+    'Beat 30 (0 left) · Tactical resolution'
+  );
+});

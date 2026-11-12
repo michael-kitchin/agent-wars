@@ -65,7 +65,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `HEX_IDENTITY` | Every cell the model may name is a two-character briefing code drawn from the map or a table | `h3ToCode`, `CoordinateContext` | n/a | 3, 5, 7, 8, 9, 18, 19 | both | required |
 | `UNIT_IDENTITY` | Strategic unit id, type, side, current hex | `GameStateSnapshot.units` | fog-filtered for enemies | 3, 5, 6, 7, 8 | strategic | required |
 | `SUBUNIT_IDENTITY` | Sub-unit id is `parent:slot`; enemy sub-unit ids are legal targets | `TacticalSubUnitSnapshot.id` | full in battle | 16, 17, 22 | tactical | required |
-| `TURN_CLOCK` | Strategic turn number and phase; tactical beat number when in battle | `turnNumber`, `phase`, `tacticalTurnNumber` | n/a | 1, 13, 16 | both | required |
+| `TURN_CLOCK` | Strategic turn number and phase; tactical beat number when in battle; beats left when an AI-only battle has a numeric limit, 0 on the last beat | `turnNumber`, `phase`, `tacticalTurnNumber`, `aiOnlyBeatLimit`, `aiOnlyBeatsLeft` | n/a | 1, 13, 16 | both | required |
 | `BATTLE_FRAME` | This is one battle inside one strategic hex, and the goal is local | `enclosingStrategicH3Index`, `buildTacticalBattleGoalClause` | n/a | 16 | tactical | required |
 | `FOG_MODE` | Whether enemy information is complete or a filtered report | `fogOfWarEnabled` | n/a | 15, 23 | strategic | required |
 

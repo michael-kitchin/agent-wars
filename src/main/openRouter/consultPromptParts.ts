@@ -1,3 +1,4 @@
+import { aiOnlyBeatsLeft, formatAiOnlyBeatsLeftPrompt } from '../../shared/aiOnlyBeatLimit';
 import { briefingOwnSeatId, ownHomeHexes } from '../briefing/briefingPerspective';
 import { isNeutralOwnerId } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
@@ -84,7 +85,7 @@ import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
  *
  * Purpose: The system text can be cached. The situation carries the clock, the briefing, and the opening.
  * When to use: `buildSystemPromptForTools` and `buildConsultMessages`.
- * Expected outcome: Two wrapped strings. The system text has no turn, date, or unit positions. The situation starts with `# Current Situation`.
+ * Expected outcome: Two wrapped strings. The system text has no turn, date, unit positions, or beats left. The situation starts with `# Current Situation`. An AI-only battle with a numeric beat limit puts the beats-left paragraph on the next line after the clock.
  * Exceptions: A home-control lookup failure is logged and the progress lines use what remains.
  */
 export function buildConsultPromptParts(input: {
@@ -150,6 +151,12 @@ export function buildConsultPromptParts(input: {
   const briefingOverride = input.briefingOverride;
   const coordinateContext = input.coordinateContext ?? { mode: 'strategic' as const };
   const includeExitBattle = input.includeExitBattle === true;
+  const beatsLeft =
+    coordinateContext.mode === 'tactical' &&
+    includeExitBattle &&
+    typeof coordinateContext.tacticalTurnNumber === 'number'
+      ? aiOnlyBeatsLeft(coordinateContext.tacticalTurnNumber, state.aiOnlyBeatLimit ?? null)
+      : null;
   const structuredOutputs = input.structuredOutputs === true;
   const tacticalBattle = input.tacticalBattle ?? null;
   logDebug('openRouter buildConsultPromptParts', {
@@ -160,6 +167,7 @@ export function buildConsultPromptParts(input: {
     coordinateMode: coordinateContext.mode,
     battleId: coordinateContext.battleId ?? null,
     includeExitBattle,
+    beatsLeft,
     structuredOutputs,
     skippedStatusInjection: Boolean(briefingOverride?.length) && input.productionAttention !== undefined,
   });
@@ -518,7 +526,7 @@ ${finalJsonExample}`);
 
 ${turnPhaseHeader}
 
-${warning}${liveStatus}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${hasPrecomputedBriefing ? subHeading(SECTION_TITLE_UNIT_ROSTER) : topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
+${beatsLeft === null ? '' : `${formatAiOnlyBeatsLeftPrompt(beatsLeft)}\n\n`}${warning}${liveStatus}${progressBlock}${airOpsBlock}${missileBlock}${mercenaryBlock}${sealiftBlock}${hasPrecomputedBriefing ? subHeading(SECTION_TITLE_UNIT_ROSTER) : topLevelHeading(SECTION_TITLE_UNIT_ROSTER)}
 
 ${rosterBody}
 

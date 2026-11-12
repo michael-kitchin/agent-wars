@@ -13,7 +13,11 @@ import {
   aiOnlyBeatLimitToStored,
   aiOnlyLeaveStartsNextTurn,
   aiOnlyTimedNoticeStillCloses,
+  aiOnlyBeatsLeft,
+  aiOnlyBeatsLeftIsUrgent,
   formatAiOnlyBeatLimitSentence,
+  formatAiOnlyBeatsLeftLabel,
+  formatAiOnlyBeatsLeftPrompt,
 } from './aiOnlyBeatLimit';
 
 test('aiOnlyBeatLimitForRequest keeps null and a listed number, and stores 30 otherwise', () => {
@@ -66,4 +70,31 @@ test('aiOnlyTimedNoticeStillCloses stops when the sentence is gone or auto-advan
   assert.equal(aiOnlyTimedNoticeStillCloses('The battle reached its maximum of 30 beats.', true), true);
   assert.equal(aiOnlyTimedNoticeStillCloses('The battle reached its maximum of 30 beats.', false), false);
   assert.equal(aiOnlyTimedNoticeStillCloses(null, true), false);
+});
+
+test('aiOnlyBeatsLeft counts down to 0 on the last beat', () => {
+  assert.equal(aiOnlyBeatsLeft(1, 30), 29);
+  assert.equal(aiOnlyBeatsLeft(30, 30), 0);
+  assert.equal(aiOnlyBeatsLeft(31, 30), 0);
+  assert.equal(aiOnlyBeatsLeft(25, null), null);
+  assert.equal(aiOnlyBeatsLeft(1.5, 30), null);
+  assert.equal(aiOnlyBeatsLeft(1, 30.5), null);
+});
+
+test('aiOnlyBeatsLeftIsUrgent is true at 5 and below', () => {
+  assert.equal(aiOnlyBeatsLeftIsUrgent(6), false);
+  assert.equal(aiOnlyBeatsLeftIsUrgent(5), true);
+  assert.equal(aiOnlyBeatsLeftIsUrgent(0), true);
+});
+
+test('formatAiOnlyBeatsLeftLabel keeps one wording, including 0', () => {
+  assert.equal(formatAiOnlyBeatsLeftLabel(5), ' (5 left)');
+  assert.equal(formatAiOnlyBeatsLeftLabel(0), ' (0 left)');
+});
+
+test('formatAiOnlyBeatsLeftPrompt says the last beat still resolves', () => {
+  const text = formatAiOnlyBeatsLeftPrompt(0);
+  assert.ok(text.includes('Beats left before this battle ends on its own: 0.'));
+  assert.ok(text.includes('This count is 0 on the last beat.'));
+  assert.ok(text.includes('This beat still resolves'));
 });

@@ -5,7 +5,8 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { countBattleForces, countTwoPartyForces } from '../../shared/battleForceCounts';
-import { formatBattleHeaderStatus, formatBattleHeaderTitle } from '../../shared/battleHeaderText';
+import { aiOnlyBeatsLeft, aiOnlyBeatsLeftIsUrgent } from '../../shared/aiOnlyBeatLimit';
+import { formatBattleHeaderStatusParts, formatBattleHeaderTitle } from '../../shared/battleHeaderText';
 import { paletteForOwner } from '../../shared/seatPalette';
 import { HUMAN_SEAT_ID, isNeutralOwnerId } from '../../shared/seatIds';
 import { sideDisplayName } from '../../shared/sideNicknames';
@@ -137,7 +138,8 @@ function renderBattleForceBar(battle: TacticalBattleSnapshot): void {
  * Purpose: In a battle the player needs where the fight is and which beat it is, not the world-map readouts.
  * When to use: From `renderTopBarStatus`, with the latest game state and `S.tacticalBattleSnapshot`.
  * Expected outcome: With a game state and a battle, the bar switches to the battle header: the title, such as "Battle at
- *   (E8)", the hex caption, and the status line, such as "Beat 2 · Tactical planning · April, Year 1", ending with the
+ *   (E8)", the hex caption, and the status line, such as "Beat 2 · Tactical planning · April, Year 1". An AI-only battle
+ *   with a beat limit shows " (N left)" immediately to the right of "Beat N", crimson when N is 5 or less. The line ends with the
  *   battle's weather when it has one, and the force bar from `renderBattleForceBar`. Otherwise the bar shows the match
  *   status, and the next battle's caption and counts are written afresh.
  * Exceptions: None; missing elements are skipped.
@@ -156,12 +158,26 @@ export function renderBattleHeader(state: GameStateSnapshot | null, battle: Tact
   if (titleEl) titleEl.textContent = formatBattleHeaderTitle(orderTargetHexCode(battle.enclosingStrategicH3Index, null));
   const statusEl = document.getElementById('battle-header-status');
   if (statusEl) {
-    statusEl.textContent = formatBattleHeaderStatus({
+    const beatsLeft = battle.leadPartyId != null
+      ? aiOnlyBeatsLeft(battle.tacticalTurnNumber, state.aiOnlyBeatLimit ?? null)
+      : null;
+    const parts = formatBattleHeaderStatusParts({
       beat: battle.tacticalTurnNumber,
       beatPlaybackActive: S.resolutionMoveAnimation != null,
       dateLabel: state.currentDateLabel ?? '',
       garrisonDefendsInPlace: battle.opposingPartyId != null && isNeutralOwnerId(battle.opposingPartyId),
+      beatsLeft,
     });
+    const beatLabel = document.createElement('span');
+    beatLabel.className = 'battle-beat-count';
+    beatLabel.append(document.createTextNode(parts.beforeBeatsLeft));
+    if (parts.beatsLeftLabel != null && beatsLeft != null) {
+      const suffix = document.createElement('span');
+      suffix.textContent = parts.beatsLeftLabel;
+      if (aiOnlyBeatsLeftIsUrgent(beatsLeft)) suffix.className = 'battle-beats-left-urgent';
+      beatLabel.append(suffix);
+    }
+    statusEl.replaceChildren(beatLabel, document.createTextNode(parts.afterBeatsLeft));
     if (battle.weather) statusEl.insertAdjacentHTML('beforeend', ` · ${formatWeatherIconHtml(battle.weather)}`);
   }
   renderBattleHeaderCaption(battle);

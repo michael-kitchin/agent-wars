@@ -291,6 +291,14 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 11.5px;
   line-height: 1.1;
 }
+/* "Beat N" and " (N left)" stay on one line, at the start of the status line. */
+.battle-beat-count {
+  white-space: nowrap;
+}
+/* The beats-left suffix, crimson once five or fewer beats remain. */
+.battle-beats-left-urgent {
+  color: var(--order-missile);
+}
 /* The middle of the header, holding the force bar. It fills the space between the title and the controls on the right,
    and never narrows past the bar, so the title's caption gives way first. */
 .battle-header-center {

@@ -23,7 +23,7 @@ import { readSeatHasApiKey } from './seatApiKeyFlags';
 import { activeSeats, toSeatSnapshot } from '../../shared/seatRoster';
 import type { SeatId } from '../../shared/seatIds';
 import { readPersistedGameSize } from './gameSizeConfig';
-import { readAiOnlyBattles, readGameEndReason, readVictorySettings } from './gameConfigKv';
+import { readAiOnlyBattles, readAiOnlyBeatLimit, readGameEndReason, readVictorySettings } from './gameConfigKv';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { formatGameDateForTurn, gameCalendarKindForMap, parseStartMonth } from '../../shared/gameCalendar';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
@@ -301,7 +301,8 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const turnNumber = turnRow?.turnNumber ?? 1;
   const calendarKind = gameCalendarKindForMap(activeGameMap().id);
   const currentDateLabel = formatGameDateForTurn(turnNumber, startMonth, calendarKind);
-  logDebug('fogState getGameStateSnapshot date', { turnNumber, calendarKind, currentDateLabel });
+  const aiOnlyBeatLimit = readAiOnlyBeatLimit(ops);
+  logDebug('fogState getGameStateSnapshot date', { turnNumber, calendarKind, currentDateLabel, aiOnlyBeatLimit });
   const originFlags = {
     originBonusEnabled: originBonusSettings.originBonusEnabled,
     terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
@@ -330,6 +331,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     gameSize: readPersistedGameSize(ops),
     victory: readVictorySettings(ops),
     aiOnlyBattles: readAiOnlyBattles(ops),
+    aiOnlyBeatLimit,
     ...(gameEndReason ? { gameEndReason } : {}),
     ...originFlags,
     startMonth,

@@ -160,3 +160,39 @@ test('the plan_route air sentence is only on a strategic prompt that has air', (
   assert.ok(!tacticalAir.includes(AIR_PLAN_ROUTE_PROMPT_SUFFIX));
   assert.ok(tacticalAir.includes('ferry into ferryOrders'));
 });
+
+test('an AI-only battle with a beat limit names the beats left in the situation', () => {
+  const coordMap = {
+    latLngByH3: new Map<string, [number, number]>([['cell-a', [1, 2]]]),
+    resolveToH3: () => 'cell-a',
+    format: (h3: string) => h3,
+  };
+  const limited = { ...battleState(3, 'March, Year 1', 'cell-a', 'infantry'), aiOnlyBeatLimit: 30 };
+  const partsFor = (tacticalTurnNumber: number, includeExitBattle: boolean, state: GameStateSnapshot = limited) =>
+    buildConsultPromptParts({
+      state,
+      coordMap,
+      enabledToolNames: ['plan_route'],
+      coordinateContext: { mode: 'tactical', battleId: 'limited', tacticalTurnNumber },
+      includeExitBattle,
+    });
+  const fiveLeft = partsFor(25, true);
+  const clockAt = fiveLeft.situationText.indexOf('tactical beat: 25');
+  const leftAt = fiveLeft.situationText.indexOf('Beats left before this battle ends on its own: 5.');
+  assert.ok(clockAt >= 0 && leftAt > clockAt);
+  assert.ok(fiveLeft.situationText.includes('Beats left before this battle ends on its own: 5.'));
+  assert.ok(fiveLeft.situationText.includes('This count is 0 on the last beat.'));
+  assert.ok(fiveLeft.situationText.includes('This beat still resolves'));
+  assert.ok(!fiveLeft.staticSystemText.includes('Beats left'));
+  assert.ok(partsFor(30, true).situationText.includes('Beats left before this battle ends on its own: 0.'));
+  assert.ok(!partsFor(25, false).situationText.includes('Beats left'));
+  assert.ok(!partsFor(25, true, battleState(3, 'March, Year 1', 'cell-a', 'infantry')).situationText.includes('Beats left'));
+  const strategic = buildConsultPromptParts({
+    state: limited,
+    coordMap,
+    enabledToolNames: ['plan_route'],
+    coordinateContext: { mode: 'strategic' },
+    includeExitBattle: true,
+  });
+  assert.ok(!strategic.situationText.includes('Beats left'));
+});

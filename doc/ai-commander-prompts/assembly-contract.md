@@ -32,7 +32,7 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 | 8 | `# Orders Guidance` and its subsections | system message, omitted when there are no coaching bullets |
 | 9 | `# Response Format`, then `## Example Response`. The action list is one bullet per action | system message, last |
 | 10 | A fixed user message: `The current situation is in the next message.` | between the two |
-| 11 | `# Current Situation` — clock and the previous-consult tool-budget warning | situation message |
+| 11 | `# Current Situation` — clock, the beats left when an AI-only battle has a beat limit, and the previous-consult tool-budget warning | situation message |
 | 12 | `# Commander's Briefing` and its subsections, or the standalone production, memory, and standing-order sections when no briefing is attached | situation message |
 | 13 | Scenario Progress, the status sections, and Unit Roster | situation message. H2 when a briefing is attached, H1 when it is not |
 
@@ -203,7 +203,7 @@ Every item marked `required` in [`information-decision-model.md`](information-de
 | `HEX_IDENTITY` | Coordinate preamble; restated in `# Available Tools` |
 | `UNIT_IDENTITY`, `OWN_UNIT_TABLE`, `ACTION_NEEDED_FLAG`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY` | `## Unit Status and Threats` |
 | `SUBUNIT_IDENTITY`, `BATTLE_FRAME` | Role line; coordinate preamble |
-| `TURN_CLOCK` | `# Current Situation` |
+| `TURN_CLOCK` | `# Current Situation`, including the beats-left paragraph when an AI-only battle has a numeric limit |
 | `FOG_MODE` | Narrative paragraph |
 | `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES` | `## Operational Map` |
 | `BEST_OPTIONS_ROWS`, `BEST_OPTIONS_ODDS`, `RANGED_LEGAL_TARGETS`, `LEGAL_DEST_OCCUPANCY` | `### Best Options This Turn` plus the options bullet in `# Available Tools`. `BEST_OPTIONS_ODDS` is the Odds column |

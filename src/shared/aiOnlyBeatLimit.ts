@@ -147,6 +147,66 @@ export function formatAiOnlyBeatLimitSentence(beats: number): string {
 export const AI_ONLY_BEAT_LIMIT_NOTICE_MS = 3000;
 
 /**
+ * Beats-left count at which the header suffix turns crimson.
+ *
+ * Purpose: A short battle should read as urgent before it ends on its own.
+ * When to use: The battle header, after `aiOnlyBeatsLeft`.
+ * Expected outcome: 5. A count of 5, and every smaller count, uses `--order-missile`.
+ * Exceptions: None.
+ */
+export const AI_ONLY_BEATS_LEFT_URGENT_AT = 5;
+
+/**
+ * Beats still ahead of the beat now on screen.
+ *
+ * Purpose: The header and the battle prompt count down to the automatic end, and the last beat reads 0.
+ * When to use: An AI-only battle whose match stored a numeric beat limit. Pass the beat number the header or the prompt is naming.
+ * Expected outcome: The limit minus that beat, and 0 when the beat is the last one or already past it. Null when the limit is unlimited.
+ * Exceptions: A beat or limit that is not a whole number returns null, so the header and the prompt omit the count.
+ */
+export function aiOnlyBeatsLeft(beat: number, limit: AiOnlyBeatLimit): number | null {
+  if (limit === null || !Number.isInteger(beat) || !Number.isInteger(limit)) return null;
+  const left = limit - beat;
+  return left > 0 ? left : 0;
+}
+
+/**
+ * Whether the beats-left suffix should be crimson.
+ *
+ * Purpose: The last few beats are easier to see than the ordinary status color.
+ * When to use: Painting the header suffix from `aiOnlyBeatsLeft`.
+ * Expected outcome: True when the count is `AI_ONLY_BEATS_LEFT_URGENT_AT` or smaller.
+ * Exceptions: None.
+ */
+export function aiOnlyBeatsLeftIsUrgent(left: number): boolean {
+  return left <= AI_ONLY_BEATS_LEFT_URGENT_AT;
+}
+
+/**
+ * The header suffix for the beats still ahead.
+ *
+ * Purpose: The status line keeps one wording for every count, including 0.
+ * When to use: Immediately after the beat number, only when `aiOnlyBeatsLeft` returned a number.
+ * Expected outcome: ` (N left)`, with the leading space.
+ * Exceptions: None.
+ */
+export function formatAiOnlyBeatsLeftLabel(left: number): string {
+  return ` (${left} left)`;
+}
+
+/**
+ * The situation paragraph that tells a commander how many beats remain.
+ *
+ * Purpose: The model can see that the battle will end on its own, and that the last beat still resolves.
+ * When to use: The tactical situation message, under the beat clock, when `aiOnlyBeatsLeft` returned a number.
+ * Expected outcome: One paragraph naming the count and what 0 means.
+ * Exceptions: None.
+ */
+export function formatAiOnlyBeatsLeftPrompt(left: number): string {
+  return `Beats left before this battle ends on its own: ${left}. This count is 0 on the last beat. This beat still resolves, and the battle ends after the beat where the count is 0. Use the beats you have on the fight in front of you.`;
+}
+
+/**
  * How an ended AI-only battle is shown.
  *
  * Purpose: The beat-limit notice is the only ending that both shows a dialog and can close itself.
