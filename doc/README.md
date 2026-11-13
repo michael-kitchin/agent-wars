@@ -2,7 +2,7 @@
 
 Authoritative product and mechanics documentation for Agent Wars. **The engine under `src/` is first authority.** If a number, phase order, cap, range, or legality rule here disagrees with a symbol in code, the code is correct and this folder should be updated.
 
-Shipping version as of this writing: **2.23.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
+Shipping version as of this writing: **2.24.0** (`package.json`). Phase 0 (hybrid AI) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone **2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45).
 
 Release **2.6.0** redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left.
 
@@ -33,6 +33,8 @@ Release **2.15.0** lets each commander choose an OpenRouter host, gives a model 
 Release **2.16.0** shortens commander prompts, lists the odds of each fight the briefing already shows, stops planning after 20 tool rounds and asks once more for orders, and marks a knocked-out side with the turn in parentheses.
 
 Release **2.17.0** lets an air unit carry one infantry unit, drop it within strike range, or ferry it through your airports, and shows Kill, Hurt, and Loss for a ranged shot.
+
+Release **2.24.0** names oceans, seas, gulfs, bays, straits, channels, and large lakes on the map. Zoomed out, ocean names are italic capitals. Closer in, seas and lakes appear once they are large enough on screen. The close view drops the ocean names and adds the smaller seas and lakes. The type is italic and a quieter blue than the land names. A water name moves aside for a land name, or for a water name already drawn.
 
 Release **2.23.0** points each AI commander on a regional map, when standing orders are on, at one enemy city. The ground force gathers, then assaults that city, while a home guard stays behind: one unit per nearby enemy ground unit, and never more than half the ground force. At the unit caps, that commander is told to bank credits and hire mercenaries, and to fortify only a city with an enemy nearby. An AI-only battle with a beat limit shows the beats left beside the beat number, in crimson at 5 or fewer.
 
