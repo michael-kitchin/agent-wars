@@ -49,8 +49,8 @@ I currently plan to:
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v2.24.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v2.24.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v2.25.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.25.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 ### Getting started
@@ -144,7 +144,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Hex Scales](#hex-scales) and [Where the Data Comes From](#where-the-data-comes-from).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, air drops, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1823 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (1847 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ### Hex Scales
 
@@ -289,7 +289,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 ## Status
 
-- **Version:** 2.24.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 2.25.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline. The written plan is the [development plan (v3.4)](doc/devleopment-plan-v3.4.md).
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (acceptance is up to me).
@@ -299,6 +299,7 @@ The match basemap is the generated hillshade under `data/generated/basemap/`, no
 
 Published builds, newest first. 2.8.0 through 2.8.4 shipped in 2.8.5. The version numbers jump at 2.7 and 2.11.
 
+- **2.25.0** tells a commander to keep one city queued on credits, and names a city for a missile, a ship, or credits when one is worth building. A commander that can build a ship or a missile reads those rules before it owns one. Balanced and cautious commanders are told to strike enemy production their ground units cannot reach. Raise Options shows distance, nearby enemies, and chokepoints, and attention names one affordable raise and a missile that can launch.
 - **2.24.0** names oceans, seas, gulfs, bays, straits, channels, and large lakes on the map. Zoomed out, ocean names are italic capitals. Closer in, seas and lakes appear once they are large enough on screen. The close view drops the ocean names and adds the smaller seas and lakes. The type is italic and a quieter blue than the land names. A water name moves aside for a land name, or for a water name already drawn.
 - **2.23.0** points each AI commander on a regional map, when standing orders are on, at one enemy city. The ground force gathers, then assaults that city, while a home guard stays behind: one unit per nearby enemy ground unit, and never more than half the ground force. At the unit caps, that commander is told to bank credits and hire mercenaries, and to fortify only a city with an enemy nearby. An AI-only battle with a beat limit shows the beats left beside the beat number, in crimson at 5 or fewer.
 - **2.22.0** discards a paused queue's production points at the end of the turn. A queue that is still building keeps the points it could not spend. The pause is outside your home with none of your units or fortifications on the hex, a city whose cells are all fortified, or a unit type at its cap. The turn report names that queue on the turn it pauses. A build-only popup is 200 px wide, and hire goes to 280 px.
