@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { annotationViewIsDetail, mapLabelStyleForView } from './mapLabelRules';
+import { annotationViewIsDetail, labelKindOpacity, mapLabelStyleForView, visibleWaterLabelKinds, WATER_LABEL_OPACITY } from './mapLabelRules';
 
 /**
  * Reads one renderer source file.
@@ -70,4 +70,51 @@ test('a broad name is drawn half again as large beside the smaller names', () =>
   assert.equal(largeContinent.letterSpacingEm, plainContinent.letterSpacingEm);
   assert.equal(largeContinent.haloWidthPx, plainContinent.haloWidthPx);
   assert.equal(largeContinent.uppercase, plainContinent.uppercase);
+});
+
+/**
+ * Confirms which water kinds a view draws.
+ *
+ * Purpose: Water names follow the same zoom tiers as land names.
+ * When to use: As the contract test for `visibleWaterLabelKinds`.
+ * Expected outcome: Zoom 3 is oceans. Zoom 5 is oceans and major water. A tactical view is major and minor water.
+ * Exceptions: Assertion failures name the band that moved.
+ */
+test('water kinds follow zoom and the tactical view', () => {
+  assert.deepEqual(visibleWaterLabelKinds(3, false), ['ocean']);
+  assert.deepEqual(visibleWaterLabelKinds(5, false), ['ocean', 'major_water']);
+  assert.deepEqual(visibleWaterLabelKinds(3, true), ['major_water', 'minor_water']);
+});
+
+/**
+ * Confirms water names are italic and use the water type sizes.
+ *
+ * Purpose: Water rows stay smaller than the land rows they sit beside, and an ocean stays in capitals.
+ * When to use: As the contract test for the water rows of `mapLabelStyleForView`.
+ * Expected outcome: An ocean is italic, 12 px, and upper case in every view. Major water is 9.75 px. Minor water is 8.25 px.
+ * Exceptions: Assertion failures name the field that moved.
+ */
+test('water names use the water type sizes', () => {
+  const ocean = mapLabelStyleForView('ocean', 3, false);
+  assert.equal(ocean.fontStyle, 'italic');
+  assert.equal(ocean.sizePx, 12);
+  assert.equal(ocean.uppercase, true);
+  assert.equal(mapLabelStyleForView('ocean', 5, false).sizePx, 12);
+  assert.equal(mapLabelStyleForView('ocean', 7, true).sizePx, 12);
+  assert.equal(mapLabelStyleForView('major_water', 5, false).sizePx, 9.75);
+  assert.equal(mapLabelStyleForView('minor_water', 7, true).sizePx, 8.25);
+  assert.equal(mapLabelStyleForView('major_water', 5, false).fontStyle, 'italic');
+  assert.equal(mapLabelStyleForView('minor_water', 7, true).fontStyle, 'italic');
+});
+
+/**
+ * Confirms water names stay at full strength.
+ *
+ * Purpose: The ink color does the quieting, so opacity does not.
+ * When to use: As the contract test for a water kind in `labelKindOpacity`.
+ * Expected outcome: `WATER_LABEL_OPACITY` for minor water in a tactical view.
+ * Exceptions: Assertion failures when the opacity is faded.
+ */
+test('a water name is painted at full strength', () => {
+  assert.equal(labelKindOpacity('minor_water', 7, true), WATER_LABEL_OPACITY);
 });

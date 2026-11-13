@@ -2,6 +2,7 @@
  * Which place-name kinds a zoom draws, and the limits the label pass uses.
  *
  * Purpose: Continent, country, and state names, and the borders that share their visibility, read one rule.
+ *   Water names use `visibleWaterLabelKinds`.
  * When to use: Before choosing labels or border groups for a frame.
  * Expected outcome: A tactical view draws country and state names. Below the country zoom, only continent names.
  *   From the country zoom, outside a tactical view, continent and country names are both drawn.
@@ -22,8 +23,8 @@ export const COUNTRY_LABEL_MIN_ZOOM = 4;
  * How far below a state's own minimum zoom its name may linger.
  *
  * Purpose: A state that just appeared should not vanish on a tiny zoom-out.
- * When to use: The state branch of `labelFeatureIsCandidate`. Countries do not use it.
- * Expected outcome: A state stays eligible until the zoom is this far below its minimum, and still has to cover `STATE_LABEL_MIN_RADIUS_PX`.
+ * When to use: The state branch of `labelFeatureIsCandidate`, and the minor-water branch when the body is not a strait or channel.
+ * Expected outcome: A state or a minor water body stays eligible until the zoom is this far below its minimum, and still has to cover its radius minimum.
  * Exceptions: None.
  */
 export const LABEL_MIN_ZOOM_SLACK = 1.5;
@@ -47,6 +48,46 @@ export const COUNTRY_LABEL_ZOOM_DELAY = 1;
  * Exceptions: None.
  */
 export const STATE_LABEL_MIN_RADIUS_PX = 40;
+
+/**
+ * Levels past a major water body's minimum zoom before its name appears.
+ *
+ * Purpose: Major seas share the country delay, so a body does not appear at the instant its kind turns on.
+ * When to use: The major-water branch of `labelFeatureIsCandidate`, unless the body is narrow.
+ * Expected outcome: A non-narrow major water body is eligible once the zoom reaches its minimum plus this delay, and it still has to cover `WATER_LABEL_MIN_RADIUS_PX`.
+ * Exceptions: None.
+ */
+export const WATER_LABEL_ZOOM_DELAY = 1;
+
+/**
+ * Smallest on-screen inscribed radius that earns a water body a name.
+ *
+ * Purpose: Seas, gulfs, bays, and lakes that share a minimum zoom are distinguished by how large they are on screen.
+ * When to use: The major-water and minor-water branches of `labelFeatureIsCandidate`, unless the body is narrow.
+ * Expected outcome: A water body whose largest anchor covers fewer than this many CSS pixels is omitted.
+ * Exceptions: None. Straits and channels do not use it.
+ */
+export const WATER_LABEL_MIN_RADIUS_PX = 40;
+
+/**
+ * Levels past a strait's or channel's minimum zoom before its name appears.
+ *
+ * Purpose: Those bodies are too thin for the radius test, so a delay is the only gate.
+ * When to use: The narrow branch of `labelFeatureIsCandidate`.
+ * Expected outcome: A strait or channel is eligible once the zoom reaches its minimum plus this delay. It does not also wait for `WATER_LABEL_ZOOM_DELAY` or the radius test.
+ * Exceptions: None.
+ */
+export const NARROW_WATER_ZOOM_DELAY = 2;
+
+/**
+ * Fill opacity for every water name.
+ *
+ * Purpose: The ink color does the quieting, so water names stay at full strength in every view.
+ * When to use: `labelKindOpacity` for a water kind.
+ * Expected outcome: `1`.
+ * Exceptions: None.
+ */
+export const WATER_LABEL_OPACITY = 1;
 
 /**
  * Most labels drawn in one frame.
@@ -79,28 +120,85 @@ export const LABEL_COLLISION_PADDING_PX = 4;
 export const LABEL_VIEW_INSET_PX = 24;
 
 /**
- * A place-name kind.
+ * A land place-name kind.
  *
- * Purpose: The three annotation levels the map can draw.
+ * Purpose: Borders read the same kinds as land names, and must not receive a water kind.
  * When to use: As the result of `visibleLabelKinds`.
  * Expected outcome: Continent, country, or state.
  * Exceptions: None.
  */
-export type MapLabelKind = 'continent' | 'country' | 'state';
+export type MapLandLabelKind = 'continent' | 'country' | 'state';
 
 /**
- * Place-name kinds for one view.
+ * A water place-name kind.
  *
- * Purpose: Names and the borders that match them appear and disappear together.
+ * Purpose: Oceans sit with continents, major water with countries, and minor water with states. A lake may be major or minor.
+ * When to use: As the result of `visibleWaterLabelKinds`.
+ * Expected outcome: `ocean`, `major_water`, or `minor_water`.
+ * Exceptions: None.
+ */
+export type MapWaterLabelKind = 'ocean' | 'major_water' | 'minor_water';
+
+/**
+ * A place-name kind.
+ *
+ * Purpose: Land and water names share one document and one painter.
+ * When to use: On a parsed feature and on a painted label.
+ * Expected outcome: A land kind or a water kind.
+ * Exceptions: None.
+ */
+export type MapLabelKind = MapLandLabelKind | MapWaterLabelKind;
+
+/**
+ * Water kinds, in tier order.
+ *
+ * Purpose: One list, so the painter and the parser cannot drift.
+ * When to use: `isWaterLabelKind`.
+ * Expected outcome: Ocean, then major water, then minor water.
+ * Exceptions: None.
+ */
+export const WATER_LABEL_KINDS: readonly MapWaterLabelKind[] = ['ocean', 'major_water', 'minor_water'];
+
+/**
+ * Whether a kind is a water name.
+ *
+ * Purpose: Water names use their own ink, opacity, and placement pass.
+ * When to use: Before indexing land colors by kind, and in `labelKindOpacity`.
+ * Expected outcome: True for `ocean`, `major_water`, and `minor_water`.
+ * Exceptions: None.
+ */
+export function isWaterLabelKind(kind: MapLabelKind): kind is MapWaterLabelKind {
+  return (WATER_LABEL_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * Land place-name kinds for one view.
+ *
+ * Purpose: Names and the borders that match them appear and disappear together. Borders read this function, so it never returns a water kind.
  * When to use: Once per frame, with the map zoom and whether tactical hexes are showing.
  * Expected outcome: Tactical view returns country and state. Zoom below `COUNTRY_LABEL_MIN_ZOOM`
  *   returns continent. Any other zoom returns continent and country.
  * Exceptions: None.
  */
-export function visibleLabelKinds(zoom: number, tacticalView: boolean): MapLabelKind[] {
+export function visibleLabelKinds(zoom: number, tacticalView: boolean): MapLandLabelKind[] {
   if (tacticalView) return ['country', 'state'];
   if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ['continent'];
   return ['continent', 'country'];
+}
+
+/**
+ * Water place-name kinds for one view.
+ *
+ * Purpose: Water names follow the same zoom tiers as land names.
+ * When to use: Once per frame, with the same zoom and tactical flag as `visibleLabelKinds`.
+ * Expected outcome: A tactical view returns major and minor water. Zoom below `COUNTRY_LABEL_MIN_ZOOM`
+ *   returns ocean. Any other zoom returns ocean and major water.
+ * Exceptions: None.
+ */
+export function visibleWaterLabelKinds(zoom: number, tacticalView: boolean): MapWaterLabelKind[] {
+  if (tacticalView) return ['major_water', 'minor_water'];
+  if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ['ocean'];
+  return ['ocean', 'major_water'];
 }
 
 /**
@@ -209,13 +307,14 @@ export const COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
  * How strongly one kind is painted in the current view.
  *
  * Purpose: The theme color stays the same. The view decides how much of it shows.
- * When to use: When painting a label. The kind must already be one `visibleLabelKinds` returned.
- * Expected outcome: A world-view continent is `CONTINENT_LABEL_OPACITY`. A continent beside countries is `CONTINENT_BESIDE_COUNTRY_OPACITY`.
+ * When to use: When painting a label.
+ * Expected outcome: A water kind is `WATER_LABEL_OPACITY`. A world-view continent is `CONTINENT_LABEL_OPACITY`. A continent beside countries is `CONTINENT_BESIDE_COUNTRY_OPACITY`.
  *   A country beside continents is `COUNTRY_LABEL_OPACITY`. A country beside states is `COUNTRY_BESIDE_STATE_OPACITY`.
  *   A state is `STATE_LABEL_OPACITY`. The name on top is the theme color. A continent under countries is four fifths. A country under states is three fifths.
  * Exceptions: None.
  */
 export function labelKindOpacity(kind: MapLabelKind, zoom: number, tacticalView: boolean): number {
+  if (isWaterLabelKind(kind)) return WATER_LABEL_OPACITY;
   if (kind === 'country') return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
   if (kind === 'state') return STATE_LABEL_OPACITY;
   if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
@@ -235,9 +334,9 @@ export const METERS_PER_PIXEL_Z0 = 156543.03392804097;
 /**
  * Type size and spacing for one place-name kind.
  *
- * Purpose: Continents, countries, and states are not drawn at the same size.
+ * Purpose: Continents, countries, states, oceans, and other water names are not drawn at the same size.
  * When to use: When measuring and drawing a label.
- * Expected outcome: Size in CSS pixels, a font weight, letter spacing as a fraction of the size, a halo width, and whether the name is capitalized.
+ * Expected outcome: Size in CSS pixels, a font weight, a font style, letter spacing as a fraction of the size, a halo width, and whether the name is capitalized.
  * Exceptions: None.
  */
 export interface MapLabelKindStyle {
@@ -246,19 +345,28 @@ export interface MapLabelKindStyle {
    *
    * Contract: A positive number.
    * When to use: The canvas font size.
-   * Expected outcome: 27, 19.5, 18, 13, or 11.
+   * Expected outcome: 27, 19.5, 18, 13, 12, 11, 9.75, or 8.25.
    * Exceptions: None.
    */
   readonly sizePx: number;
   /**
    * Font weight.
    *
-   * Contract: 600 for continents and countries. 400 for states.
+   * Contract: 600 for continents and countries. 400 for states and water names.
    * When to use: The canvas font weight.
    * Expected outcome: One of those two weights.
    * Exceptions: None.
    */
   readonly weight: 400 | 600;
+  /**
+   * Font style keyword.
+   *
+   * Contract: `normal` or `italic`.
+   * When to use: The canvas font style.
+   * Expected outcome: `normal` for land names. `italic` for water names, the usual mark of a water body.
+   * Exceptions: None.
+   */
+  readonly fontStyle: 'normal' | 'italic';
   /**
    * Extra space between letters, as a fraction of `sizePx`.
    *
@@ -280,27 +388,30 @@ export interface MapLabelKindStyle {
   /**
    * Whether the name is drawn in capitals.
    *
-   * Contract: True for continents and countries.
+   * Contract: True for continents, countries, and oceans.
    * When to use: `labelDisplayText`.
-   * Expected outcome: States keep the name's own case.
+   * Expected outcome: States and non-ocean water names keep the name's own case.
    * Exceptions: None.
    */
   readonly uppercase: boolean;
 }
 
 /**
- * Styles for the three place-name kinds.
+ * Styles for the land and water place-name kinds.
  *
  * Purpose: One table, so the measurer and the painter cannot drift.
- * When to use: `mapLabelStyleForView`, which returns these rows except while the smaller names are drawn.
- * Expected outcome: Continent 18/600, country 13/600, state 11/400, with halo widths 3, 2, and 1.
- *   A continent beside countries is 27 px. A country beside states is 19.5 px. Both otherwise match their row.
+ * When to use: `mapLabelStyleForView`, which returns these rows except while the smaller land names are drawn.
+ * Expected outcome: Continent 18/600, country 13/600, state 11/400, ocean 12/400 italic, major water 9.75/400 italic, minor water 8.25/400 italic.
+ *   A continent beside countries is 27 px. A country beside states is 19.5 px. Both otherwise match their row. Water kinds return their row in every view.
  * Exceptions: None.
  */
 export const MAP_LABEL_KIND_STYLES: Readonly<Record<MapLabelKind, MapLabelKindStyle>> = {
-  continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
-  country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
-  state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
+  continent: { sizePx: 18, weight: 600, fontStyle: 'normal', letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
+  country: { sizePx: 13, weight: 600, fontStyle: 'normal', letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
+  state: { sizePx: 11, weight: 400, fontStyle: 'normal', letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
+  ocean: { sizePx: 12, weight: 400, fontStyle: 'italic', letterSpacingEm: 0.3, haloWidthPx: 2, uppercase: true },
+  major_water: { sizePx: 9.75, weight: 400, fontStyle: 'italic', letterSpacingEm: 0.06, haloWidthPx: 1.5, uppercase: false },
+  minor_water: { sizePx: 8.25, weight: 400, fontStyle: 'italic', letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
 };
 
 /**
@@ -355,7 +466,7 @@ const countryBesideStateStyle: MapLabelKindStyle = {
  * Purpose: A broad name grows only while the smaller names are drawn with it.
  * When to use: Before measuring or drawing a label. `zoom` and `tacticalView` are the same pair `visibleLabelKinds` uses.
  * Expected outcome: 27 px for a continent from the country zoom, outside a tactical view. 19.5 px for a country in a tactical view.
- *   Otherwise the table entry, including a continent below the country zoom and a continent in a tactical view.
+ *   Otherwise the table entry, including a continent below the country zoom, a continent in a tactical view, and every water kind.
  * Exceptions: None.
  */
 export function mapLabelStyleForView(kind: MapLabelKind, zoom: number, tacticalView: boolean): MapLabelKindStyle {
@@ -367,7 +478,7 @@ export function mapLabelStyleForView(kind: MapLabelKind, zoom: number, tacticalV
 /**
  * The text drawn for a feature.
  *
- * Purpose: Continents and countries are letter-spaced capitals. States keep their own case.
+ * Purpose: Continents, countries, and oceans are letter-spaced capitals. States and other water names keep their own case.
  * When to use: Before measuring and before drawing.
  * Expected outcome: `toLocaleUpperCase('en')` when the kind is uppercase. Otherwise the name unchanged.
  * Exceptions: None.

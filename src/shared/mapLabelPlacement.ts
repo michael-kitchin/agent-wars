@@ -15,13 +15,23 @@ import {
   LABEL_MIN_ZOOM_SLACK,
   LABEL_VIEW_INSET_PX,
   MAX_LABELS_PER_FRAME,
+  NARROW_WATER_ZOOM_DELAY,
   STATE_LABEL_MIN_RADIUS_PX,
+  WATER_LABEL_MIN_RADIUS_PX,
+  WATER_LABEL_ZOOM_DELAY,
   labelDisplayText,
   mercatorMetersPerPixel,
   type MapLabelKind,
 } from './mapLabelRules';
 
-const KIND_ORDER: Readonly<Record<MapLabelKind, number>> = { continent: 0, country: 1, state: 2 };
+const KIND_ORDER: Readonly<Record<MapLabelKind, number>> = {
+  continent: 0,
+  country: 1,
+  state: 2,
+  ocean: 3,
+  major_water: 4,
+  minor_water: 5,
+};
 
 /**
  * What the placement pass needs from the current frame.
@@ -44,8 +54,8 @@ export interface LabelPlacementInput {
   /**
    * Kinds the current view draws.
    *
-   * Contract: The result of `visibleLabelKinds`.
-   * When to use: Every frame.
+   * Contract: The result of `visibleLabelKinds` for land, or `visibleWaterLabelKinds` for water.
+   * When to use: Every frame. Pass one list per pass.
    * Expected outcome: A feature of another kind is omitted.
    * Exceptions: None.
    */
@@ -249,13 +259,32 @@ interface ChosenLabel {
  * Places the labels for one frame.
  *
  * Purpose: The same rules run in tests and on the map.
- * When to use: From the label canvas, once per draw.
+ * When to use: From the label canvas, once per draw, for land names. Water names use `chooseMapLabelAnchors` and then their own shift.
  * Expected outcome: Labels in kind, rank, minimum zoom, largest anchor radius, then id order, stopping at the frame cap.
  *   A label is skipped only when it meets another label of the same kind. A later kind is painted on top.
  *   The previous anchor is kept while it stays usable. Otherwise the primary anchor wins, then the usable anchor nearest the center.
  * Exceptions: None.
  */
 export function placeMapLabels(input: LabelPlacementInput): PlacedMapLabel[] {
+  const placed: PlacedMapLabel[] = [];
+  for (const label of chooseMapLabelAnchors(input)) {
+    if (placed.length >= MAX_LABELS_PER_FRAME) break;
+    if (placed.some((other) => boxesOverlap(label, other))) continue;
+    placed.push(label);
+  }
+  return placed;
+}
+
+/**
+ * Chooses an anchor for every candidate, without dropping overlaps.
+ *
+ * Purpose: Water names need both labels of a pair so a later one can move instead of disappearing.
+ * When to use: Before `settleWaterLabels`. Land names go through `placeMapLabels`, which calls this and then rejects same-kind overlaps.
+ * Expected outcome: One label per feature that chose an anchor, sorted by kind, rank, minimum zoom, larger radius, then id.
+ *   Two labels of the same kind may overlap. The frame cap is not applied.
+ * Exceptions: None.
+ */
+export function chooseMapLabelAnchors(input: LabelPlacementInput): PlacedMapLabel[] {
   const chosen: ChosenLabel[] = [];
   for (const feature of input.features) {
     if (!labelFeatureIsCandidate(feature, input.kinds, input.zoom)) continue;
@@ -264,22 +293,16 @@ export function placeMapLabels(input: LabelPlacementInput): PlacedMapLabel[] {
     chosen.push(selection);
   }
   chosen.sort(compareChosen);
-  const placed: PlacedMapLabel[] = [];
-  for (const label of chosen) {
-    if (placed.length >= MAX_LABELS_PER_FRAME) break;
-    if (placed.some((other) => boxesOverlap(label, other))) continue;
-    placed.push({
-      featureId: label.feature.id,
-      kind: label.feature.kind,
-      text: labelDisplayText(label.feature),
-      x: label.x,
-      y: label.y,
-      width: label.width,
-      height: label.height,
-      anchorIndex: label.anchorIndex,
-    });
-  }
-  return placed;
+  return chosen.map((label) => ({
+    featureId: label.feature.id,
+    kind: label.feature.kind,
+    text: labelDisplayText(label.feature),
+    x: label.x,
+    y: label.y,
+    width: label.width,
+    height: label.height,
+    anchorIndex: label.anchorIndex,
+  }));
 }
 
 /**
@@ -303,9 +326,11 @@ function largestAnchorRadiusM(feature: MapLabelFeature): number {
  *
  * Purpose: Kind, minimum zoom, and state size are cheaper than projection, and the canvas uses the same test for memory.
  * When to use: The first filter in `placeMapLabels`, and before the bounds test on the label canvas.
- * Expected outcome: False for a kind that is not visible. Continents pass with no further test.
+ * Expected outcome: False for a kind that is not visible. Continents and oceans pass with no further test.
  *   A country passes once the zoom reaches its minimum plus `COUNTRY_LABEL_ZOOM_DELAY`.
  *   A state passes from `LABEL_MIN_ZOOM_SLACK` below its minimum, once its largest anchor covers `STATE_LABEL_MIN_RADIUS_PX`.
+ *   A non-narrow major water body waits `WATER_LABEL_ZOOM_DELAY` and must cover `WATER_LABEL_MIN_RADIUS_PX`.
+ *   A non-narrow minor water body uses the same slack and radius. A narrow body waits only `NARROW_WATER_ZOOM_DELAY`.
  * Exceptions: None.
  */
 export function labelFeatureIsCandidate(
@@ -314,10 +339,33 @@ export function labelFeatureIsCandidate(
   zoom: number,
 ): boolean {
   if (!kinds.includes(feature.kind)) return false;
-  if (feature.kind === 'continent') return true;
-  if (feature.kind === 'country') return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
-  return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK
-    && largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= STATE_LABEL_MIN_RADIUS_PX;
+  switch (feature.kind) {
+    case 'continent':
+    case 'ocean':
+      return true;
+    case 'country':
+      return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
+    case 'state':
+      return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && coversRadius(feature, zoom, STATE_LABEL_MIN_RADIUS_PX);
+    case 'major_water':
+      if (feature.narrow) return feature.minZoom + NARROW_WATER_ZOOM_DELAY <= zoom;
+      return feature.minZoom + WATER_LABEL_ZOOM_DELAY <= zoom && coversRadius(feature, zoom, WATER_LABEL_MIN_RADIUS_PX);
+    case 'minor_water':
+      if (feature.narrow) return feature.minZoom + NARROW_WATER_ZOOM_DELAY <= zoom;
+      return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && coversRadius(feature, zoom, WATER_LABEL_MIN_RADIUS_PX);
+  }
+}
+
+/**
+ * Whether a feature's largest anchor covers a screen radius.
+ *
+ * Purpose: States and water bodies share one size test.
+ * When to use: From `labelFeatureIsCandidate` for a kind that uses an inscribed radius.
+ * Expected outcome: True when the largest stored radius is at least `minPx` CSS pixels at `zoom`.
+ * Exceptions: None.
+ */
+function coversRadius(feature: MapLabelFeature, zoom: number, minPx: number): boolean {
+  return largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= minPx;
 }
 
 /**
@@ -430,9 +478,9 @@ function distanceSquared(
 /**
  * Priority order for collision.
  *
- * Purpose: Later kinds are painted on top, so a state sits over a country and a country sits over a continent.
- * When to use: Before the greedy pass.
- * Expected outcome: Continent, then country, then state. Within a kind, smaller rank, then smaller minimum zoom, then larger anchor radius, then id.
+ * Purpose: Earlier kinds are considered first. Among land names, a later kind is painted over an earlier one, so a state sits over a country and a country sits over a continent. Water names are painted under land names.
+ * When to use: Before the land collision pass and before the water shift.
+ * Expected outcome: Continent, then country, then state, then ocean, major water, and minor water. Within a kind, smaller rank, then smaller minimum zoom, then larger anchor radius, then id.
  * Exceptions: None.
  */
 function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
@@ -454,8 +502,8 @@ function compareChosen(left: ChosenLabel, right: ChosenLabel): number {
  *   grown by `LABEL_COLLISION_PADDING_PX`, meets the placed box.
  * Exceptions: None.
  */
-function boxesOverlap(candidate: ChosenLabel, placed: PlacedMapLabel): boolean {
-  return candidate.feature.kind === placed.kind
+function boxesOverlap(candidate: PlacedMapLabel, placed: PlacedMapLabel): boolean {
+  return candidate.kind === placed.kind
     && centeredBoxesMeet(candidate, placed, LABEL_COLLISION_PADDING_PX);
 }
 

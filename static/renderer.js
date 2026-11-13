@@ -16670,13 +16670,26 @@
   var LABEL_MIN_ZOOM_SLACK = 1.5;
   var COUNTRY_LABEL_ZOOM_DELAY = 1;
   var STATE_LABEL_MIN_RADIUS_PX = 40;
+  var WATER_LABEL_ZOOM_DELAY = 1;
+  var WATER_LABEL_MIN_RADIUS_PX = 40;
+  var NARROW_WATER_ZOOM_DELAY = 2;
+  var WATER_LABEL_OPACITY = 1;
   var MAX_LABELS_PER_FRAME = 150;
   var LABEL_COLLISION_PADDING_PX = 4;
   var LABEL_VIEW_INSET_PX = 24;
+  var WATER_LABEL_KINDS = ["ocean", "major_water", "minor_water"];
+  function isWaterLabelKind(kind) {
+    return WATER_LABEL_KINDS.includes(kind);
+  }
   function visibleLabelKinds(zoom, tacticalView) {
     if (tacticalView) return ["country", "state"];
     if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["continent"];
     return ["continent", "country"];
+  }
+  function visibleWaterLabelKinds(zoom, tacticalView) {
+    if (tacticalView) return ["major_water", "minor_water"];
+    if (zoom < COUNTRY_LABEL_MIN_ZOOM) return ["ocean"];
+    return ["ocean", "major_water"];
   }
   function annotationViewIsDetail(input) {
     return input.overlayOpen ? input.previewAtDetailZoom : input.readMatchDetailView();
@@ -16687,6 +16700,7 @@
   var CONTINENT_BESIDE_COUNTRY_OPACITY = 4 / 5;
   var COUNTRY_BESIDE_STATE_OPACITY = 3 / 5;
   function labelKindOpacity(kind, zoom, tacticalView) {
+    if (isWaterLabelKind(kind)) return WATER_LABEL_OPACITY;
     if (kind === "country") return tacticalView ? COUNTRY_BESIDE_STATE_OPACITY : COUNTRY_LABEL_OPACITY;
     if (kind === "state") return STATE_LABEL_OPACITY;
     if (!tacticalView && zoom >= COUNTRY_LABEL_MIN_ZOOM) return CONTINENT_BESIDE_COUNTRY_OPACITY;
@@ -16694,9 +16708,12 @@
   }
   var METERS_PER_PIXEL_Z0 = 156543.03392804097;
   var MAP_LABEL_KIND_STYLES = {
-    continent: { sizePx: 18, weight: 600, letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
-    country: { sizePx: 13, weight: 600, letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
-    state: { sizePx: 11, weight: 400, letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
+    continent: { sizePx: 18, weight: 600, fontStyle: "normal", letterSpacingEm: 0.35, haloWidthPx: 3, uppercase: true },
+    country: { sizePx: 13, weight: 600, fontStyle: "normal", letterSpacingEm: 0.12, haloWidthPx: 2, uppercase: true },
+    state: { sizePx: 11, weight: 400, fontStyle: "normal", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false },
+    ocean: { sizePx: 12, weight: 400, fontStyle: "italic", letterSpacingEm: 0.3, haloWidthPx: 2, uppercase: true },
+    major_water: { sizePx: 9.75, weight: 400, fontStyle: "italic", letterSpacingEm: 0.06, haloWidthPx: 1.5, uppercase: false },
+    minor_water: { sizePx: 8.25, weight: 400, fontStyle: "italic", letterSpacingEm: 0.04, haloWidthPx: 1, uppercase: false }
   };
   var CONTINENT_BESIDE_COUNTRY_SIZE_PX = 27;
   var COUNTRY_BESIDE_STATE_SIZE_PX = 19.5;
@@ -16944,6 +16961,7 @@
         state: "#3b3f46",
         halo: "rgba(255, 255, 255, 0.85)"
       },
+      waterLabelColors: { ink: "#2a5676", halo: "rgba(163, 199, 223, 0.8)" },
       transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
@@ -16964,6 +16982,7 @@
         state: "#4a3a28",
         halo: "rgba(251, 246, 228, 0.9)"
       },
+      waterLabelColors: { ink: "#1f5a80", halo: "rgba(166, 217, 239, 0.8)" },
       transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
@@ -16984,6 +17003,7 @@
         state: "#2b2f33",
         halo: "rgba(251, 236, 180, 0.9)"
       },
+      waterLabelColors: { ink: "#3d6a8a", halo: "rgba(227, 241, 248, 0.8)" },
       transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS
     },
     {
@@ -17004,6 +17024,7 @@
         state: "#d7dde5",
         halo: "rgba(10, 14, 20, 0.85)"
       },
+      waterLabelColors: { ink: "#8fb0c9", halo: "rgba(15, 26, 38, 0.8)" },
       transportLineColors: {
         roadCenter: "#8b95a3",
         roadOutline: "#0a0e14",
@@ -17018,6 +17039,10 @@
   var STANDARD_THEME = MAP_THEMES[0];
   function mapThemeById(id) {
     return MAP_THEMES.find((theme) => theme.id === id) ?? STANDARD_THEME;
+  }
+  function labelPaintColors(theme, kind) {
+    if (isWaterLabelKind(kind)) return { fill: theme.waterLabelColors.ink, halo: theme.waterLabelColors.halo };
+    return { fill: theme.labelColors[kind], halo: theme.labelColors.halo };
   }
   function landTransferFunctions(theme) {
     const channel = (index) => ({
@@ -33160,7 +33185,7 @@ ${bonuses}`;
 
   // src/shared/mapLabelPack.ts
   var SCHEMA_VERSION2 = "1.0.0";
-  var LABEL_KINDS = ["continent", "country", "state"];
+  var LABEL_KINDS = ["continent", "country", "state", "ocean", "major_water", "minor_water"];
   function parseMapLabelPack(text) {
     const value = JSON.parse(text);
     if (!isRecord2(value)) throw new Error("map_labels is not an object");
@@ -33184,6 +33209,7 @@ ${bonuses}`;
       name: requireString(value.name, `features ${index} name`),
       rank: requireNumber2(value.rank, `features ${index} rank`),
       minZoom: requireNumber2(value.min_zoom, `features ${index} min_zoom`),
+      narrow: value.narrow === true,
       anchors,
       bounds: boundsOf(anchors)
     };
@@ -33230,8 +33256,24 @@ ${bonuses}`;
   }
 
   // src/shared/mapLabelPlacement.ts
-  var KIND_ORDER2 = { continent: 0, country: 1, state: 2 };
+  var KIND_ORDER2 = {
+    continent: 0,
+    country: 1,
+    state: 2,
+    ocean: 3,
+    major_water: 4,
+    minor_water: 5
+  };
   function placeMapLabels(input) {
+    const placed = [];
+    for (const label of chooseMapLabelAnchors(input)) {
+      if (placed.length >= MAX_LABELS_PER_FRAME) break;
+      if (placed.some((other) => boxesOverlap(label, other))) continue;
+      placed.push(label);
+    }
+    return placed;
+  }
+  function chooseMapLabelAnchors(input) {
     const chosen = [];
     for (const feature of input.features) {
       if (!labelFeatureIsCandidate(feature, input.kinds, input.zoom)) continue;
@@ -33240,22 +33282,16 @@ ${bonuses}`;
       chosen.push(selection);
     }
     chosen.sort(compareChosen);
-    const placed = [];
-    for (const label of chosen) {
-      if (placed.length >= MAX_LABELS_PER_FRAME) break;
-      if (placed.some((other) => boxesOverlap(label, other))) continue;
-      placed.push({
-        featureId: label.feature.id,
-        kind: label.feature.kind,
-        text: labelDisplayText(label.feature),
-        x: label.x,
-        y: label.y,
-        width: label.width,
-        height: label.height,
-        anchorIndex: label.anchorIndex
-      });
-    }
-    return placed;
+    return chosen.map((label) => ({
+      featureId: label.feature.id,
+      kind: label.feature.kind,
+      text: labelDisplayText(label.feature),
+      x: label.x,
+      y: label.y,
+      width: label.width,
+      height: label.height,
+      anchorIndex: label.anchorIndex
+    }));
   }
   function largestAnchorRadiusM(feature) {
     let largest = 0;
@@ -33266,9 +33302,24 @@ ${bonuses}`;
   }
   function labelFeatureIsCandidate(feature, kinds, zoom) {
     if (!kinds.includes(feature.kind)) return false;
-    if (feature.kind === "continent") return true;
-    if (feature.kind === "country") return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
-    return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= STATE_LABEL_MIN_RADIUS_PX;
+    switch (feature.kind) {
+      case "continent":
+      case "ocean":
+        return true;
+      case "country":
+        return feature.minZoom + COUNTRY_LABEL_ZOOM_DELAY <= zoom;
+      case "state":
+        return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && coversRadius(feature, zoom, STATE_LABEL_MIN_RADIUS_PX);
+      case "major_water":
+        if (feature.narrow) return feature.minZoom + NARROW_WATER_ZOOM_DELAY <= zoom;
+        return feature.minZoom + WATER_LABEL_ZOOM_DELAY <= zoom && coversRadius(feature, zoom, WATER_LABEL_MIN_RADIUS_PX);
+      case "minor_water":
+        if (feature.narrow) return feature.minZoom + NARROW_WATER_ZOOM_DELAY <= zoom;
+        return feature.minZoom <= zoom + LABEL_MIN_ZOOM_SLACK && coversRadius(feature, zoom, WATER_LABEL_MIN_RADIUS_PX);
+    }
+  }
+  function coversRadius(feature, zoom, minPx) {
+    return largestAnchorRadiusM(feature) / mercatorMetersPerPixel(zoom) >= minPx;
   }
   function chooseAnchor(feature, input) {
     const measured = input.measure(feature);
@@ -33326,7 +33377,7 @@ ${bonuses}`;
     return left.feature.id < right.feature.id ? -1 : left.feature.id > right.feature.id ? 1 : 0;
   }
   function boxesOverlap(candidate, placed) {
-    return candidate.feature.kind === placed.kind && centeredBoxesMeet(candidate, placed, LABEL_COLLISION_PADDING_PX);
+    return candidate.kind === placed.kind && centeredBoxesMeet(candidate, placed, LABEL_COLLISION_PADDING_PX);
   }
   function centeredBoxesMeet(a, b, paddingPx) {
     return Math.abs(a.x - b.x) * 2 < a.width + b.width + paddingPx * 2 && Math.abs(a.y - b.y) * 2 < a.height + b.height + paddingPx * 2;
@@ -33337,11 +33388,11 @@ ${bonuses}`;
   var LABEL_NUDGE_STEP_PX = 12;
   var LABEL_NUDGE_GAP_PX = 2;
   var ZERO_NUDGE = { dx: 0, dy: 0 };
-  var LABEL_NUDGE_OFFSETS = buildNudgeOffsets();
-  function buildNudgeOffsets() {
-    const steps = LABEL_NUDGE_MAX_PX / LABEL_NUDGE_STEP_PX;
+  var LABEL_NUDGE_OFFSETS = labelNudgeOffsetsWithin(LABEL_NUDGE_MAX_PX);
+  function labelNudgeOffsetsWithin(maxPx) {
+    const steps = maxPx / LABEL_NUDGE_STEP_PX;
     const values = Array.from({ length: steps * 2 + 1 }, (_value, index) => (index - steps) * LABEL_NUDGE_STEP_PX);
-    return values.flatMap((dx) => values.map((dy) => ({ dx, dy }))).filter((offset) => Math.hypot(offset.dx, offset.dy) <= LABEL_NUDGE_MAX_PX).sort(compareNudgeOffsets);
+    return values.flatMap((dx) => values.map((dy) => ({ dx, dy }))).filter((offset) => Math.hypot(offset.dx, offset.dy) <= maxPx).sort(compareNudgeOffsets);
   }
   function compareNudgeOffsets(left, right) {
     const length = Math.hypot(left.dx, left.dy) - Math.hypot(right.dx, right.dy);
@@ -33415,6 +33466,48 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/mapWaterLabelPlacement.ts
+  var WATER_LABEL_NUDGE_MAX_PX = 36;
+  var MAX_WATER_LABELS_PER_FRAME = 40;
+  var WATER_NUDGE_OFFSETS = labelNudgeOffsetsWithin(WATER_LABEL_NUDGE_MAX_PX);
+  function settleWaterLabels(water, frame) {
+    const accepted = [];
+    for (const label of water) {
+      if (accepted.length >= MAX_WATER_LABELS_PER_FRAME) break;
+      const nudge = firstClearNudge(label, accepted, frame);
+      if (nudge == null) continue;
+      accepted.push({
+        ...label,
+        x: label.x + nudge.dx,
+        y: label.y + nudge.dy,
+        nudge
+      });
+    }
+    return accepted;
+  }
+  function firstClearNudge(label, accepted, frame) {
+    const attempts = [{ dx: 0, dy: 0 }];
+    const previous = frame.previousNudges.get(label.featureId);
+    if (previous != null) attempts.push(previous);
+    attempts.push(...WATER_NUDGE_OFFSETS);
+    for (const nudge of attempts) {
+      const box = {
+        x: label.x + nudge.dx,
+        y: label.y + nudge.dy,
+        width: label.width,
+        height: label.height
+      };
+      if (isClearSpot(box, accepted, frame)) return nudge;
+    }
+    return null;
+  }
+  function isClearSpot(box, accepted, frame) {
+    if (!insideInset(box, frame.viewSize)) return false;
+    const hitsLand = frame.landLabels.some((land) => centeredBoxesMeet(box, land, LABEL_COLLISION_PADDING_PX));
+    if (hitsLand) return false;
+    return !accepted.some((other) => centeredBoxesMeet(box, other, LABEL_COLLISION_PADDING_PX));
+  }
+
   // src/renderer/map/visibleCityNames.ts
   var visibleCityNameKeys = /* @__PURE__ */ new Set();
   function clearVisibleCityNames() {
@@ -33433,6 +33526,7 @@ ${bonuses}`;
   var labelFeatures = [];
   var previousAnchors = /* @__PURE__ */ new Map();
   var previousNudges = /* @__PURE__ */ new Map();
+  var previousWaterNudges = /* @__PURE__ */ new Map();
   var measuredBoxes = /* @__PURE__ */ new Map();
   var labelTheme = null;
   function bindMapLabelLayer(requestRedraw3) {
@@ -33462,12 +33556,13 @@ ${bonuses}`;
     const map = getMainLeafletMap();
     if (!theme || !map || labelFeatures.length === 0) return;
     const tacticalView = mapAnnotationsUseDetailView();
-    const placed = labelsForFrame(map, ctx, theme, tacticalView);
+    const frame = labelsForFrame(map, ctx, theme, tacticalView);
     const zoom = map.getZoom();
-    for (const label of placed) {
+    const painted = [...frame.water, ...frame.land];
+    for (const label of painted) {
       paintLabel(ctx, theme, label, mapLabelStyleForView(label.kind, zoom, tacticalView), labelKindOpacity(label.kind, zoom, tacticalView));
     }
-    canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(",");
+    canvas.dataset.drawnLabelKinds = [...new Set(painted.map((label) => label.kind))].sort().join(",");
   }
   async function loadLabelDocument(requestRedraw3) {
     try {
@@ -33478,6 +33573,8 @@ ${bonuses}`;
       await document.fonts.load('400 13px "Agent Wars Map Sans"');
       await document.fonts.load('600 13px "Agent Wars Map Serif"');
       await document.fonts.load('400 13px "Agent Wars Map Serif"');
+      await document.fonts.load('italic 400 13px "Agent Wars Map Sans"');
+      await document.fonts.load('italic 400 13px "Agent Wars Map Serif"');
       requestRedraw3();
     } catch (error) {
       labelFeatures = [];
@@ -33487,21 +33584,20 @@ ${bonuses}`;
   function labelsForFrame(map, ctx, theme, tacticalView) {
     const zoom = map.getZoom();
     const bounds = map.getBounds();
-    const west = bounds.getWest();
-    const south = bounds.getSouth();
-    const east = bounds.getEast();
-    const north = bounds.getNorth();
+    const view = {
+      west: bounds.getWest(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      north: bounds.getNorth()
+    };
     const kinds = visibleLabelKinds(zoom, tacticalView);
     const candidates = withoutStatesNamedForCities(
-      labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)),
+      labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && featureMeetsView(feature, view)),
       getVisibleCityNameKeys()
     );
-    const candidateIds = new Set(candidates.map((feature) => feature.id));
     const size = map.getSize();
     const center = map.getCenter();
-    const placed = placeMapLabels({
-      features: candidates,
-      kinds,
+    const placement = {
       zoom,
       viewSize: { width: size.x, height: size.y },
       project: (lat, lng) => map.latLngToContainerPoint({
@@ -33510,17 +33606,33 @@ ${bonuses}`;
       }),
       measure: (feature) => measureLabel(ctx, theme, feature, zoom, tacticalView),
       previousAnchors
-    });
+    };
+    const placed = placeMapLabels({ ...placement, features: candidates, kinds });
+    const nudged = nudgeBroadLabels(placed, { viewSize: placement.viewSize, previousNudges });
+    previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
+    const water = waterLabelsForFrame({ zoom, tacticalView, view, placement, landLabels: nudged });
     for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
+    for (const label of water.placed) previousAnchors.set(label.featureId, label.anchorIndex);
+    const candidateIds = new Set([...candidates, ...water.candidates].map((feature) => feature.id));
     for (const id of [...previousAnchors.keys()]) {
       if (!candidateIds.has(id)) previousAnchors.delete(id);
     }
-    const nudged = nudgeBroadLabels(placed, {
-      viewSize: { width: size.x, height: size.y },
-      previousNudges
+    previousWaterNudges = new Map(water.settled.map((label) => [label.featureId, label.nudge]));
+    return { land: nudged, water: water.settled };
+  }
+  function waterLabelsForFrame(input) {
+    const waterKinds = visibleWaterLabelKinds(input.zoom, input.tacticalView);
+    const candidates = labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, waterKinds, input.zoom) && featureMeetsView(feature, input.view));
+    const placed = chooseMapLabelAnchors({ ...input.placement, features: candidates, kinds: waterKinds });
+    const settled = settleWaterLabels(placed, {
+      viewSize: input.placement.viewSize,
+      landLabels: input.landLabels,
+      previousNudges: previousWaterNudges
     });
-    previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
-    return nudged;
+    return { candidates, placed, settled };
+  }
+  function featureMeetsView(feature, view) {
+    return longitudeMeets(feature, view.west, view.east) && latitudeMeets(feature, view.south, view.north);
   }
   function longitudeMeets(feature, west, east) {
     const viewWest = west;
@@ -33547,7 +33659,7 @@ ${bonuses}`;
   function applyLabelFont(ctx, theme, style) {
     const family = theme.labelFont === "sans" ? "Agent Wars Map Sans" : "Agent Wars Map Serif";
     const fallback = fallbackFamily(theme.labelFont);
-    ctx.font = `${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
+    ctx.font = `${style.fontStyle} ${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
     ctx.letterSpacing = `${style.letterSpacingEm * style.sizePx}px`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -33557,13 +33669,14 @@ ${bonuses}`;
   }
   function paintLabel(ctx, theme, label, style, opacity) {
     applyLabelFont(ctx, theme, style);
+    const colors = labelPaintColors(theme, label.kind);
     ctx.save();
     ctx.lineWidth = style.haloWidthPx;
     ctx.lineJoin = "round";
-    ctx.strokeStyle = theme.labelColors.halo;
+    ctx.strokeStyle = colors.halo;
     ctx.strokeText(label.text, label.x, label.y);
     ctx.globalAlpha = opacity;
-    ctx.fillStyle = theme.labelColors[label.kind];
+    ctx.fillStyle = colors.fill;
     ctx.fillText(label.text, label.x, label.y);
     ctx.restore();
   }

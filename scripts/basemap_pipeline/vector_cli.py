@@ -14,7 +14,7 @@ from pathlib import Path
 
 from scripts.basemap_pipeline.admin_borders import build_admin_border_document
 from scripts.basemap_pipeline.coast_edge_mask import build_coast_edge_mask_document
-from scripts.basemap_pipeline.label_anchors import build_label_document
+from scripts.basemap_pipeline.label_document import build_label_document
 from scripts.basemap_pipeline.coastline_vectors import (
     build_coastline_document,
     coast_lines_3857,

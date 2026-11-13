@@ -78,6 +78,24 @@ COUNTRY_MIN_FRAGMENT_RADIUS_M = 20000
 STATE_MIN_FRAGMENT_RADIUS_M = 5000
 # Polylabel tolerance, in metres. A coarser value is enough for a label anchor.
 POLYLABEL_TOLERANCE_M = 1000
+# Marine names: oceans, seas, gulfs, bays, straits, and channels.
+MARINE_LABEL_SHP = "ne_10m_geography_marine_polys.shp"
+# Lake names.
+LAKE_LABEL_SHP = "ne_10m_lakes.shp"
+# Marine feature classes that get a name. Sounds, fjords, lagoons, inlets, reefs, rivers, and generic records do not.
+MARINE_LABEL_CLASSES = frozenset({"ocean", "sea", "gulf", "bay", "strait", "channel"})
+# Thin marine classes: no fragment anchors, and the app skips the radius test.
+NARROW_MARINE_CLASSES = frozenset({"strait", "channel"})
+# Marine scalerank at or below this is major water. Above is minor water. Oceans are their own kind.
+MAJOR_MARINE_MAX_SCALERANK = 2
+# Lake scalerank at or below this is major water. Above is minor water.
+MAJOR_LAKE_MAX_SCALERANK = 1
+# Named lakes above this scalerank are too small to label.
+LAKE_LABEL_MAX_SCALERANK = 6
+# Cell size for extra ocean label anchors, in degrees.
+OCEAN_ANCHOR_CELL_DEG = 30.0
+# An ocean piece whose inscribed circle is smaller than this is not an extra anchor, in metres.
+OCEAN_MIN_FRAGMENT_RADIUS_M = 300000
 # State features at or above this Natural Earth minimum zoom are not labeled.
 STATE_NEVER_LABEL_MIN_ZOOM = 18
 # Fixed continent anchors, (latitude, longitude). An inscribed point of a whole continent lands in the wrong place.

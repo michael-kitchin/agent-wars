@@ -16,6 +16,7 @@ import {
 import {
   FLAT_LAND_GRAY,
   MAP_THEMES,
+  labelPaintColors,
   landTransferFunctions,
   mapThemeById,
   themedLandRgb,
@@ -119,6 +120,22 @@ describe('map themes', () => {
       }
     }
   });
+
+  it('paints water names quieter than land names and bluer than they are red', () => {
+    for (const theme of MAP_THEMES) {
+      const painted = labelPaintColors(theme, 'country');
+      assert.equal(painted.fill, theme.labelColors.country, theme.id);
+      assert.equal(painted.halo, theme.labelColors.halo, theme.id);
+      const water = parseRgbColor(theme.waterColor);
+      const waterInk = parseHexColor(theme.waterLabelColors.ink);
+      const landInk = parseHexColor(theme.labelColors.country);
+      const waterContrast = contrastRatio(waterInk, water);
+      const landContrast = contrastRatio(landInk, water);
+      assert.ok(waterContrast >= 4, `${theme.id} water contrast ${waterContrast} is below 4`);
+      assert.ok(waterContrast < landContrast, `${theme.id} water contrast is not quieter than land`);
+      assert.ok(waterInk[2] > waterInk[0], `${theme.id} water ink is not bluer than it is red`);
+    }
+  });
 });
 
 /**
@@ -156,4 +173,52 @@ function relativeLuminance(rgb: readonly [number, number, number]): number {
     return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   };
   return 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+}
+
+/**
+ * Contrast of two opaque colors.
+ *
+ * Purpose: Water ink has to clear 4:1 on the sea and stay quieter than the land ink.
+ * When to use: After both colors are parsed to sRGB channels.
+ * Expected outcome: `(lighter + 0.05) / (darker + 0.05)`.
+ * Exceptions: None.
+ */
+function contrastRatio(
+  left: readonly [number, number, number],
+  right: readonly [number, number, number],
+): number {
+  const lighter = Math.max(relativeLuminance(left), relativeLuminance(right));
+  const darker = Math.min(relativeLuminance(left), relativeLuminance(right));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Channels of a `#rrggbb` color.
+ *
+ * Purpose: Water inks are stored as hex.
+ * When to use: Before a contrast comparison.
+ * Expected outcome: Red, green, and blue, each 0–255.
+ * Exceptions: Throws when `color` is not `#rrggbb`.
+ */
+function parseHexColor(color: string): [number, number, number] {
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error(`color ${color} is not #rrggbb`);
+  return [
+    Number.parseInt(color.slice(1, 3), 16),
+    Number.parseInt(color.slice(3, 5), 16),
+    Number.parseInt(color.slice(5, 7), 16),
+  ];
+}
+
+/**
+ * Channels of an `rgb(r, g, b)` color.
+ *
+ * Purpose: Theme water is stored as `rgb()`, not hex.
+ * When to use: Before comparing an ink with `waterColor`.
+ * Expected outcome: Red, green, and blue, each 0–255.
+ * Exceptions: Throws when `color` is not `rgb(r, g, b)`.
+ */
+function parseRgbColor(color: string): [number, number, number] {
+  const match = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(color);
+  if (match == null) throw new Error(`color ${color} is not rgb()`);
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
 }

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { MapLabelAnchor, MapLabelFeature } from './mapLabelPack';
 import { parseMapLabelPack } from './mapLabelPack';
-import { labelFeatureIsCandidate, placeMapLabels, type LabelPlacementInput } from './mapLabelPlacement';
+import { chooseMapLabelAnchors, labelFeatureIsCandidate, placeMapLabels, type LabelPlacementInput } from './mapLabelPlacement';
 import {
   CONTINENT_BESIDE_COUNTRY_OPACITY,
   CONTINENT_LABEL_OPACITY,
@@ -249,7 +249,7 @@ test('the state with more room wins a collision between equal ranks', () => {
 /**
  * Confirms a document with an unknown kind is rejected.
  *
- * Purpose: Only continents, countries, and states are named.
+ * Purpose: A kind outside the place-name list is rejected. Water kinds are in that list. A city is not.
  * When to use: As the contract test for `parseMapLabelPack`.
  * Expected outcome: An error that names the kind.
  * Exceptions: Assertion failures when the document is accepted.
@@ -261,6 +261,52 @@ test('a city kind is rejected', () => {
     features: [{ id: 'x', kind: 'city', name: 'City', rank: 0, min_zoom: 0, anchors: [[0, 0, 1]] }],
   });
   assert.throws(() => parseMapLabelPack(text), /kind/);
+});
+
+/**
+ * Confirms the water size and zoom gates.
+ *
+ * Purpose: Major water waits one zoom level and needs a 40 px radius. A strait waits two levels and skips the radius.
+ * When to use: As the contract test for the water branches of `labelFeatureIsCandidate`.
+ * Expected outcome: The Mediterranean-sized body appears at zoom 4.3 and not at 4.0. A large body with minimum zoom 4 appears at 5.0 and not at 4.9.
+ *   A narrow minor body appears at 7.7 and not at 7.6. A thin non-narrow minor body is still omitted at zoom 8. An ocean follows the kind list only.
+ * Exceptions: Assertion failures name the gate that moved.
+ */
+test('water names follow the radius, the delay, and the kind list', () => {
+  const mediterranean = water('major_water', 330_000, 2, false);
+  assert.equal(labelFeatureIsCandidate(mediterranean, ['major_water'], 4.0), false);
+  assert.equal(labelFeatureIsCandidate(mediterranean, ['major_water'], 4.3), true);
+  const delayed = water('major_water', 2_000_000, 4, false);
+  assert.equal(labelFeatureIsCandidate(delayed, ['major_water'], 4.9), false);
+  assert.equal(labelFeatureIsCandidate(delayed, ['major_water'], 5.0), true);
+  const strait = water('minor_water', 5_000, 5.7, true);
+  assert.equal(labelFeatureIsCandidate(strait, ['minor_water'], 7.6), false);
+  assert.equal(labelFeatureIsCandidate(strait, ['minor_water'], 7.7), true);
+  const sliver = water('minor_water', 5_000, 5.7, false);
+  assert.equal(labelFeatureIsCandidate(sliver, ['minor_water'], 8), false);
+  const ocean = water('ocean', 1_000_000, 9, false);
+  assert.equal(labelFeatureIsCandidate(ocean, ['ocean'], 1), true);
+  assert.equal(labelFeatureIsCandidate(ocean, ['major_water', 'minor_water'], 1), false);
+});
+
+/**
+ * Confirms two overlapping water names both keep an anchor.
+ *
+ * Purpose: The water pass moves the second name. Placement must not drop it first.
+ * When to use: As the contract test for `chooseMapLabelAnchors`.
+ * Expected outcome: Both feature ids, in sort order.
+ * Exceptions: Assertion failures when either label is omitted.
+ */
+test('two overlapping water names both keep an anchor', () => {
+  const chosen = chooseMapLabelAnchors(input({
+    features: [
+      named('sea-a', 'major_water', [anchor(100, 100, 2_000_000)], 'A', 0),
+      named('sea-b', 'major_water', [anchor(100, 100, 2_000_000)], 'B', 0),
+    ],
+    kinds: ['major_water'],
+    zoom: 5,
+  }));
+  assert.deepEqual(chosen.map((label) => label.featureId), ['sea-a', 'sea-b']);
 });
 
 /**
@@ -303,6 +349,42 @@ function named(
   name = id,
   minZoom = 1,
 ): MapLabelFeature {
+  return feature(id, kind, anchors, name, minZoom, false);
+}
+
+/**
+ * Builds one water feature.
+ *
+ * Purpose: Water tests name the radius, the minimum zoom, and whether the body is narrow.
+ * When to use: From a water candidate test.
+ * Expected outcome: A feature at latitude 0, longitude 0, with the given radius and `narrow` flag.
+ * Exceptions: None.
+ */
+function water(
+  kind: MapLabelKind,
+  radiusM: number,
+  minZoom: number,
+  narrow: boolean,
+): MapLabelFeature {
+  return feature(kind, kind, [anchor(0, 0, radiusM)], kind, minZoom, narrow);
+}
+
+/**
+ * Builds one feature.
+ *
+ * Purpose: The tests name the fields that matter and share the rest.
+ * When to use: From `named` and `water`.
+ * Expected outcome: A feature whose bounds cover its anchors.
+ * Exceptions: None.
+ */
+function feature(
+  id: string,
+  kind: MapLabelKind,
+  anchors: readonly MapLabelAnchor[],
+  name: string,
+  minZoom: number,
+  narrow: boolean,
+): MapLabelFeature {
   let west = anchors[0]!.lng;
   let east = west;
   let south = anchors[0]!.lat;
@@ -313,7 +395,7 @@ function named(
     south = Math.min(south, anchor.lat);
     north = Math.max(north, anchor.lat);
   }
-  return { id, kind, name, rank: 0, minZoom, anchors, bounds: { west, south, east, north } };
+  return { id, kind, name, rank: 0, minZoom, anchors, narrow, bounds: { west, south, east, north } };
 }
 
 /**

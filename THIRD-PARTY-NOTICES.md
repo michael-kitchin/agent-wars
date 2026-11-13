@@ -421,7 +421,7 @@ Country flag SVGs in `static/flags/` are a vendored copy of hampusborgos/country
 
 ## Noto Sans and Noto Serif
 
-Place names use Noto Sans and Noto Serif, version 5.3.0 of the `@fontsource/noto-sans` and `@fontsource/noto-serif` packages. The files are `static/fonts/noto-sans-latin-400-normal.woff2`, `static/fonts/noto-sans-latin-600-normal.woff2`, `static/fonts/noto-sans-latin-ext-400-normal.woff2`, `static/fonts/noto-sans-latin-ext-600-normal.woff2`, `static/fonts/noto-serif-latin-400-normal.woff2`, `static/fonts/noto-serif-latin-600-normal.woff2`, `static/fonts/noto-serif-latin-ext-400-normal.woff2`, and `static/fonts/noto-serif-latin-ext-600-normal.woff2`. `static/mapFonts.css` loads them as Agent Wars Map Sans and Agent Wars Map Serif.
+Place names use Noto Sans and Noto Serif, version 5.3.0 of the `@fontsource/noto-sans` and `@fontsource/noto-serif` packages. The files are `static/fonts/noto-sans-latin-400-normal.woff2`, `static/fonts/noto-sans-latin-400-italic.woff2`, `static/fonts/noto-sans-latin-600-normal.woff2`, `static/fonts/noto-sans-latin-ext-400-normal.woff2`, `static/fonts/noto-sans-latin-ext-400-italic.woff2`, `static/fonts/noto-sans-latin-ext-600-normal.woff2`, `static/fonts/noto-serif-latin-400-normal.woff2`, `static/fonts/noto-serif-latin-400-italic.woff2`, `static/fonts/noto-serif-latin-600-normal.woff2`, `static/fonts/noto-serif-latin-ext-400-normal.woff2`, `static/fonts/noto-serif-latin-ext-400-italic.woff2`, and `static/fonts/noto-serif-latin-ext-600-normal.woff2`. `static/mapFonts.css` loads them as Agent Wars Map Sans and Agent Wars Map Serif.
 
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic) NotoSans-Italic[wdth,wght].ttf: Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
 
@@ -526,7 +526,7 @@ https://www.usgs.gov/coastal-changes-and-impacts/gmted2010
 
 ## Natural Earth
 
-Map names, coasts, lakes, urban areas, airports, and ports are derived from Natural Earth. The app also ships coastlines, lake shores, national borders, state borders, and place names derived from the 1:10m ocean, lakes, admin 0 countries, admin 0 land boundaries, admin 1 states and provinces, admin 1 boundary lines, and geography regions. All versions of Natural Earth raster and vector map data are in the public domain. No permission is needed to use Natural Earth. Crediting the authors is unnecessary.
+Map names, coasts, lakes, urban areas, airports, and ports are derived from Natural Earth. The app also ships coastlines, lake shores, national borders, state borders, and place names derived from the 1:10m ocean, lakes, geography marine polygons, admin 0 countries, admin 0 land boundaries, admin 1 states and provinces, admin 1 boundary lines, and geography regions. All versions of Natural Earth raster and vector map data are in the public domain. No permission is needed to use Natural Earth. Crediting the authors is unnecessary.
 
 The maintainers offer this citation for people who want one: Made with Natural Earth.
 

@@ -9,6 +9,8 @@
  * Exceptions: None. This module does not touch the DOM.
  */
 
+import { isWaterLabelKind, type MapLabelKind } from './mapLabelRules';
+
 /**
  * Stable id of one map theme.
  *
@@ -40,7 +42,7 @@ export type HexPaletteId = 'default' | 'wargame';
 export type MapLabelFontId = 'sans' | 'serif';
 
 /**
- * Fill and halo colors for the three place-name kinds.
+ * Fill and halo colors for continent, country, and state names.
  *
  * Purpose: Each theme needs readable text on its own land color.
  * When to use: When stroking and filling a label.
@@ -81,6 +83,35 @@ export interface MapThemeLabelColors {
    * Contract: A CSS color, usually with alpha.
    * When to use: As the stroke behind the fill.
    * Expected outcome: A light halo on light themes and a dark halo on Night.
+   * Exceptions: None.
+   */
+  readonly halo: string;
+}
+
+/**
+ * Ink and halo for water names.
+ *
+ * Purpose: Water names read quieter than land names and stay blue on every theme.
+ * When to use: `labelPaintColors` for a water kind.
+ * Expected outcome: One fill and one halo for every water kind on that theme.
+ * Exceptions: None.
+ */
+export interface MapThemeWaterLabelColors {
+  /**
+   * Fill for every water name.
+   *
+   * Contract: A CSS `#rrggbb` color. Quieter than the land ink on the same water, and bluer than it is red.
+   * When to use: As the fill of an ocean, major water, or minor water name.
+   * Expected outcome: The name stays readable on that theme's water.
+   * Exceptions: None.
+   */
+  readonly ink: string;
+  /**
+   * Halo for water names.
+   *
+   * Contract: The theme's water color at 0.8 alpha.
+   * When to use: As the stroke behind a water name.
+   * Expected outcome: The halo blends into the sea.
    * Exceptions: None.
    */
   readonly halo: string;
@@ -251,6 +282,15 @@ export interface MapTheme {
    */
   readonly labelColors: MapThemeLabelColors;
   /**
+   * Water-name colors.
+   *
+   * Contract: One ink and one halo for every water kind.
+   * When to use: `labelPaintColors` when the kind is water.
+   * Expected outcome: The ink is quieter than the land ink on the same water, and bluer than it is red.
+   * Exceptions: None.
+   */
+  readonly waterLabelColors: MapThemeWaterLabelColors;
+  /**
    * Road and rail line colors.
    *
    * Contract: One color for each of the four strokes.
@@ -332,6 +372,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#3b3f46',
       halo: 'rgba(255, 255, 255, 0.85)',
     },
+    waterLabelColors: { ink: '#2a5676', halo: 'rgba(163, 199, 223, 0.8)' },
     transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
@@ -352,6 +393,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#4a3a28',
       halo: 'rgba(251, 246, 228, 0.9)',
     },
+    waterLabelColors: { ink: '#1f5a80', halo: 'rgba(166, 217, 239, 0.8)' },
     transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
@@ -372,6 +414,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#2b2f33',
       halo: 'rgba(251, 236, 180, 0.9)',
     },
+    waterLabelColors: { ink: '#3d6a8a', halo: 'rgba(227, 241, 248, 0.8)' },
     transportLineColors: LIGHT_THEME_TRANSPORT_LINE_COLORS,
   },
   {
@@ -392,6 +435,7 @@ export const MAP_THEMES: readonly MapTheme[] = [
       state: '#d7dde5',
       halo: 'rgba(10, 14, 20, 0.85)',
     },
+    waterLabelColors: { ink: '#8fb0c9', halo: 'rgba(15, 26, 38, 0.8)' },
     transportLineColors: {
       roadCenter: '#8b95a3',
       roadOutline: '#0a0e14',
@@ -443,6 +487,22 @@ const STANDARD_THEME = MAP_THEMES[0]!;
  */
 export function mapThemeById(id: string): MapTheme {
   return MAP_THEMES.find((theme) => theme.id === id) ?? STANDARD_THEME;
+}
+
+/**
+ * Fill and halo for one place-name kind.
+ *
+ * Purpose: The painter reads both colors here, so it never indexes `labelColors` by a water kind.
+ * When to use: When stroking and filling one label.
+ * Expected outcome: A water kind returns `waterLabelColors`. A land kind returns its row of `labelColors` and the land halo.
+ * Exceptions: None.
+ */
+export function labelPaintColors(
+  theme: MapTheme,
+  kind: MapLabelKind,
+): { readonly fill: string; readonly halo: string } {
+  if (isWaterLabelKind(kind)) return { fill: theme.waterLabelColors.ink, halo: theme.waterLabelColors.halo };
+  return { fill: theme.labelColors[kind], halo: theme.labelColors.halo };
 }
 
 /**

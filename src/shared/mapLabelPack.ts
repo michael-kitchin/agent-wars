@@ -1,7 +1,7 @@
 /**
  * The place-name document.
  *
- * Purpose: Continents, countries, and states share one list of anchors.
+ * Purpose: Continents, countries, states, and water names share one list of anchors.
  * When to use: After the main process returns the `map_labels` JSON.
  * Expected outcome: Features whose first anchor is the primary point. A bad document throws.
  * Exceptions: This module does not read files and does not log.
@@ -10,7 +10,7 @@
 import type { MapLabelKind } from './mapLabelRules';
 
 const SCHEMA_VERSION = '1.0.0';
-const LABEL_KINDS: readonly MapLabelKind[] = ['continent', 'country', 'state'];
+const LABEL_KINDS: readonly MapLabelKind[] = ['continent', 'country', 'state', 'ocean', 'major_water', 'minor_water'];
 
 /**
  * One stored label point.
@@ -109,7 +109,7 @@ export interface MapLabelFeature {
   /**
    * Stable id.
    *
-   * Contract: A non-empty string. Continents start with `continent:`, countries with `adm0:`, states with `adm1:`.
+   * Contract: A non-empty string. Continents start with `continent:`, countries with `adm0:`, states with `adm1:`, oceans and other marine names with `marine:`, and lakes with `lake:`.
    * When to use: Remembering which anchor was used last frame.
    * Expected outcome: The id from the document.
    * Exceptions: None.
@@ -118,9 +118,9 @@ export interface MapLabelFeature {
   /**
    * Place-name kind.
    *
-   * Contract: `continent`, `country`, or `state`.
-   * When to use: With `visibleLabelKinds`.
-   * Expected outcome: One of those three.
+   * Contract: `continent`, `country`, `state`, `ocean`, `major_water`, or `minor_water`.
+   * When to use: With `visibleLabelKinds` for land and `visibleWaterLabelKinds` for water.
+   * Expected outcome: One of those six.
    * Exceptions: None.
    */
   readonly kind: MapLabelKind;
@@ -146,7 +146,7 @@ export interface MapLabelFeature {
    * Lowest zoom stored for this feature.
    *
    * Contract: A number. Continents are 0 and skip this test.
-   * When to use: `labelFeatureIsCandidate`. A state is compared with `zoom + LABEL_MIN_ZOOM_SLACK`. A country is compared with its minimum plus `COUNTRY_LABEL_ZOOM_DELAY`.
+   * When to use: `labelFeatureIsCandidate`. A state is compared with `zoom + LABEL_MIN_ZOOM_SLACK`. A country is compared with its minimum plus `COUNTRY_LABEL_ZOOM_DELAY`. A non-narrow major water body uses a one-level delay and the water radius. A non-narrow minor water body uses the state slack and that radius. A strait or channel uses only its two-level delay.
    * Expected outcome: The document's minimum zoom.
    * Exceptions: None.
    */
@@ -160,6 +160,15 @@ export interface MapLabelFeature {
    * Exceptions: None.
    */
   readonly anchors: readonly MapLabelAnchor[];
+  /**
+   * Whether the body is a strait or channel, too thin for the radius test.
+   *
+   * Contract: True only for water kinds whose document record has `"narrow": true`. False when the field is absent.
+   * When to use: `labelFeatureIsCandidate`.
+   * Expected outcome: A boolean.
+   * Exceptions: None.
+   */
+  readonly narrow: boolean;
   /**
    * Span of `anchors`.
    *
@@ -201,7 +210,7 @@ export interface MapLabelPack {
   /**
    * Named places.
    *
-   * Contract: The document order: continents, then countries, then states.
+   * Contract: The document order: continents, then countries, then states, then water.
    * When to use: The placement input.
    * Expected outcome: One entry per stored feature.
    * Exceptions: None.
@@ -216,7 +225,7 @@ export interface MapLabelPack {
  * When to use: On the text from `map_labels`.
  * Expected outcome: A pack. Each feature has bounds around its anchors.
  * Exceptions: Throws `Error` naming `schema_version`, `kind`, or the bad feature field.
- *   Kind `"city"` is rejected.
+ *   Kind `"river"` is rejected.
  */
 export function parseMapLabelPack(text: string): MapLabelPack {
   const value: unknown = JSON.parse(text);
@@ -250,6 +259,7 @@ function parseFeature(value: unknown, index: number): MapLabelFeature {
     name: requireString(value.name, `features ${index} name`),
     rank: requireNumber(value.rank, `features ${index} rank`),
     minZoom: requireNumber(value.min_zoom, `features ${index} min_zoom`),
+    narrow: value.narrow === true,
     anchors,
     bounds: boundsOf(anchors),
   };
@@ -300,11 +310,11 @@ function boundsOf(anchors: readonly MapLabelAnchor[]): MapLabelBounds {
 }
 
 /**
- * Whether a value is one of the three place-name kinds.
+ * Whether a value is one of the place-name kinds.
  *
- * Purpose: A city or a typo must not become a label.
+ * Purpose: A river or a typo must not become a label.
  * When to use: While parsing a feature.
- * Expected outcome: True only for continent, country, and state.
+ * Expected outcome: True only for continent, country, state, ocean, major water, and minor water.
  * Exceptions: None.
  */
 function isLabelKind(value: unknown): value is MapLabelKind {

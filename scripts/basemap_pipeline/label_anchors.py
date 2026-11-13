@@ -26,7 +26,6 @@ from scripts.basemap_pipeline.vector_settings import (
     STATE_ANCHOR_CELL_DEG,
     STATE_MIN_FRAGMENT_RADIUS_M,
     STATE_NEVER_LABEL_MIN_ZOOM,
-    VECTOR_SCHEMA_VERSION,
 )
 from scripts.terrain_pipeline.logging_utils import TRACE_LEVEL
 
@@ -56,9 +55,9 @@ def load_continent_features(data_root: Path) -> list[dict[str, object]]:
     with fiona.open(path) as source:
         for feature in source:
             properties = feature.get("properties") or {}
-            if _text(_property(properties, "featurecla")) != "Continent":
+            if label_text(label_property(properties, "featurecla")) != "Continent":
                 continue
-            name = _text(_property(properties, "name"))
+            name = label_text(label_property(properties, "name"))
             anchor = _continent_anchor(name)
             if anchor is None:
                 raise ValueError(f"no label anchor for continent {name}")
@@ -144,7 +143,7 @@ def fragment_anchors(geometry: BaseGeometry, cell_deg: float, min_radius_m: floa
     LOGGER.log(TRACE_LEVEL, "fragment_anchors cell_deg=%s", cell_deg)
     anchors: list[list[float | int]] = []
     for _key, piece in sorted(split_by_grid(geometry, cell_deg).items()):
-        polygon = _largest_polygon(to_mercator(piece))
+        polygon = largest_polygon(to_mercator(piece))
         if polygon is None:
             continue
         point = polylabel(polygon, POLYLABEL_TOLERANCE_M)
@@ -152,32 +151,8 @@ def fragment_anchors(geometry: BaseGeometry, cell_deg: float, min_radius_m: floa
         if radius < min_radius_m:
             continue
         located = to_lonlat(point)
-        anchors.append([_round_lat(located.y), round(located.x, 4), _whole_metres(radius)])
+        anchors.append([round_label_latitude(located.y), round(located.x, 4), whole_metres(radius)])
     return anchors
-
-
-def build_label_document(data_root: Path) -> dict[str, object]:
-    """
-    Why this exists:
-        The app draws place names from one document.
-    When to use:
-        From the vector command that writes ``map_labels``.
-    What to expect:
-        Schema ``1.0.0``, kind ``map_labels``, and features for continents, then countries, then states.
-        Each feature's first anchor is its primary point.
-    Exceptions:
-        ``ValueError`` from a continent that has no fixed anchor. ``fiona.errors.DriverError``
-        when a shapefile cannot be opened.
-    """
-
-    LOGGER.debug("build_label_document root=%s", data_root)
-    features = [
-        *load_continent_features(data_root),
-        *load_country_features(data_root),
-        *load_state_features(data_root),
-    ]
-    LOGGER.debug("build_label_document features=%s", len(features))
-    return {"schema_version": VECTOR_SCHEMA_VERSION, "kind": "map_labels", "features": features}
 
 
 @dataclass(frozen=True)
@@ -224,27 +199,27 @@ def _admin_features(source: _AdminSource) -> list[dict[str, object]]:
     with fiona.open(source.path) as opened:
         for feature in opened:
             properties = feature.get("properties") or {}
-            name = _first_text(properties, source.name_fields)
-            min_zoom = _property(properties, source.min_zoom_field)
-            identifier = _text(_property(properties, source.id_field))
+            name = first_label_text(properties, source.name_fields)
+            min_zoom = label_property(properties, source.min_zoom_field)
+            identifier = label_text(label_property(properties, source.id_field))
             if name == "" or min_zoom is None or identifier == "":
                 continue
-            min_zoom_value = _number(min_zoom)
+            min_zoom_value = label_number(min_zoom)
             if source.skip_min_zoom_at is not None and float(min_zoom_value) >= source.skip_min_zoom_at:
                 continue
             geometry = _geometry(feature.get("geometry"))
             if geometry is None:
                 continue
-            latitude = _property(properties, source.lat_field)
-            longitude = _property(properties, source.lng_field)
+            latitude = label_property(properties, source.lat_field)
+            longitude = label_property(properties, source.lng_field)
             if latitude is None or longitude is None:
                 continue
-            rank = _property(properties, source.rank_field)
+            rank = label_property(properties, source.rank_field)
             features.append(_record(_PendingLabel(
                 source.kind,
                 f"{source.id_prefix}:{identifier}",
                 name,
-                0 if rank is None else _number(rank),
+                0 if rank is None else label_number(rank),
                 min_zoom_value,
                 float(latitude),
                 float(longitude),
@@ -292,7 +267,7 @@ def _record(pending: _PendingLabel) -> dict[str, object]:
     """
 
     primary = [
-        _round_lat(pending.latitude),
+        round_label_latitude(pending.latitude),
         round(pending.longitude, 4),
         _primary_radius_m(pending.geometry, pending.latitude, pending.longitude),
     ]
@@ -324,10 +299,10 @@ def _primary_radius_m(geometry: BaseGeometry, latitude: float, longitude: float)
 
     projected = to_mercator(geometry)
     point = to_mercator(Point(longitude, latitude))
-    host = _polygon_containing(projected, point) or _largest_polygon(projected)
+    host = _polygon_containing(projected, point) or largest_polygon(projected)
     if host is None:
         return 0
-    return _whole_metres(host.boundary.distance(point))
+    return whole_metres(host.boundary.distance(point))
 
 
 def _polygon_containing(geometry: BaseGeometry, point: BaseGeometry) -> Polygon | None:
@@ -353,12 +328,12 @@ def _polygon_containing(geometry: BaseGeometry, point: BaseGeometry) -> Polygon 
     return None
 
 
-def _largest_polygon(geometry: BaseGeometry) -> Polygon | None:
+def largest_polygon(geometry: BaseGeometry) -> Polygon | None:
     """
     Why this exists:
         A cell clip can return a collection. The label belongs in the largest polygon.
     When to use:
-        On a cell piece, after projecting it.
+        On a cell piece after projecting it, and on a water polygon from the water loader.
     What to expect:
         The polygon with the greatest area, or ``None`` when the piece has no polygon.
     Exceptions:
@@ -416,12 +391,12 @@ def _continent_anchor(name: str) -> tuple[float, float] | None:
     return None
 
 
-def _property(properties: dict[str, object], name: str) -> object:
+def label_property(properties: dict[str, object], name: str) -> object:
     """
     Why this exists:
         Shapefile field names arrive uppercase from some readers and lowercase from others.
     When to use:
-        Before reading one attribute.
+        Before reading one attribute, including from the water loader.
     What to expect:
         The value, or ``None`` when the field is absent.
     Exceptions:
@@ -434,12 +409,12 @@ def _property(properties: dict[str, object], name: str) -> object:
     return None
 
 
-def _first_text(properties: dict[str, object], names: tuple[str, ...]) -> str:
+def first_label_text(properties: dict[str, object], names: tuple[str, ...]) -> str:
     """
     Why this exists:
         A state name may be in ``name_en`` or only in ``name``.
     When to use:
-        When choosing the displayed name.
+        When choosing the displayed name, including from the water loader.
     What to expect:
         The first non-empty value, or an empty string.
     Exceptions:
@@ -447,18 +422,18 @@ def _first_text(properties: dict[str, object], names: tuple[str, ...]) -> str:
     """
 
     for name in names:
-        text = _text(_property(properties, name))
+        text = label_text(label_property(properties, name))
         if text != "":
             return text
     return ""
 
 
-def _text(value: object) -> str:
+def label_text(value: object) -> str:
     """
     Why this exists:
         Names and ids are compared after trimming.
     When to use:
-        On a shapefile attribute that should be text.
+        On a shapefile attribute that should be text, including a water feature id.
     What to expect:
         The stripped string, or an empty string when the value is null.
     Exceptions:
@@ -470,12 +445,12 @@ def _text(value: object) -> str:
     return str(value).strip()
 
 
-def _number(value: object) -> int | float:
+def label_number(value: object) -> int | float:
     """
     Why this exists:
         Ranks and minimum zooms are stored as numbers.
     When to use:
-        On a numeric shapefile attribute.
+        On a numeric shapefile attribute, including a water rank or minimum zoom.
     What to expect:
         An int when the value is whole, otherwise a float.
     Exceptions:
@@ -488,12 +463,12 @@ def _number(value: object) -> int | float:
     return number
 
 
-def _round_lat(latitude: float) -> float:
+def round_label_latitude(latitude: float) -> float:
     """
     Why this exists:
         A label past the Mercator limit cannot be drawn on this map.
     When to use:
-        On every stored latitude.
+        On every stored latitude, including a water anchor.
     What to expect:
         The latitude clamped to ``MERCATOR_MAX_LAT`` and rounded to 4 decimals.
     Exceptions:
@@ -504,12 +479,12 @@ def _round_lat(latitude: float) -> float:
     return round(clamped, 4)
 
 
-def _whole_metres(distance: float) -> int:
+def whole_metres(distance: float) -> int:
     """
     Why this exists:
         The document stores the inscribed radius as an integer.
     When to use:
-        After measuring a point against a polygon boundary.
+        After measuring a point against a polygon boundary, including a water anchor.
     What to expect:
         The distance rounded half away from zero.
     Exceptions:

@@ -135,24 +135,25 @@ const ZERO_NUDGE: LabelNudge = { dx: 0, dy: 0 };
  * Purpose: The search order is fixed, so the same overlap chooses the same spot every frame.
  * When to use: `chooseNudge`, after the anchor and the previous shift have been rejected.
  * Expected outcome: `{0, 0}` first. The first entry of length 36 with `dx` 0 is `{0, -36}`.
+ *   A max of 36 includes that entry because 36 divides the 12 px step.
  * Exceptions: None.
  */
-const LABEL_NUDGE_OFFSETS: readonly LabelNudge[] = buildNudgeOffsets();
+const LABEL_NUDGE_OFFSETS: readonly LabelNudge[] = labelNudgeOffsetsWithin(LABEL_NUDGE_MAX_PX);
 
 /**
- * Builds the shift grid once.
+ * Builds the shift grid for one maximum distance.
  *
- * Purpose: The grid does not depend on the frame.
- * When to use: At module load.
- * Expected outcome: Every step-multiple whose length is at most `LABEL_NUDGE_MAX_PX`, nearest first.
+ * Purpose: Land names and water names search the same step, out to different limits.
+ * When to use: At module load for the land grid, and for the water grid.
+ * Expected outcome: Every step-multiple whose length is at most `maxPx`, nearest first. `{0, 0}` is first.
  * Exceptions: None.
  */
-function buildNudgeOffsets(): LabelNudge[] {
-  const steps = LABEL_NUDGE_MAX_PX / LABEL_NUDGE_STEP_PX;
+export function labelNudgeOffsetsWithin(maxPx: number): LabelNudge[] {
+  const steps = maxPx / LABEL_NUDGE_STEP_PX;
   const values = Array.from({ length: steps * 2 + 1 }, (_value, index) => (index - steps) * LABEL_NUDGE_STEP_PX);
   return values
     .flatMap((dx) => values.map((dy) => ({ dx, dy })))
-    .filter((offset) => Math.hypot(offset.dx, offset.dy) <= LABEL_NUDGE_MAX_PX)
+    .filter((offset) => Math.hypot(offset.dx, offset.dy) <= maxPx)
     .sort(compareNudgeOffsets);
 }
 

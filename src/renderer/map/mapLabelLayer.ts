@@ -1,9 +1,10 @@
 /**
- * Draws continent, country, and state names on their own canvas.
+ * Draws continent, country, state, and water names on their own canvas.
  *
  * Purpose: Names sit above the hillshade, coastline, and borders, and under the hex canvas, and follow the theme, the zoom, and the view.
  * When to use: Bind once after the main map exists. Resize with the hex canvas. Draw at the end of each frame.
- * Expected outcome: At most 150 names, in the theme's face, with the previous anchor kept while it stays usable.
+ * Expected outcome: At most 150 land names and 40 water names, in the theme's face, with the previous anchor kept while it stays usable.
+ *   Water names are italic and painted under the land names.
  * Exceptions: A missing document or a thrown load leaves the layer empty and logs once.
  */
 
@@ -12,13 +13,15 @@ import {
   labelKindOpacity,
   mapLabelStyleForView,
   visibleLabelKinds,
+  visibleWaterLabelKinds,
   type MapLabelKindStyle,
 } from '../../shared/mapLabelRules';
 import { withoutStatesNamedForCities } from '../../shared/mapLabelCityNames';
 import { parseMapLabelPack, type MapLabelFeature } from '../../shared/mapLabelPack';
-import { labelFeatureIsCandidate, placeMapLabels, type PlacedMapLabel } from '../../shared/mapLabelPlacement';
+import { chooseMapLabelAnchors, labelFeatureIsCandidate, placeMapLabels, type LabelPlacementInput, type PlacedMapLabel } from '../../shared/mapLabelPlacement';
 import { nudgeBroadLabels, type LabelNudge, type NudgedMapLabel } from '../../shared/mapLabelNudge';
-import type { MapLabelFontId, MapTheme } from '../../shared/mapThemes';
+import { settleWaterLabels } from '../../shared/mapWaterLabelPlacement';
+import { labelPaintColors, type MapLabelFontId, type MapTheme } from '../../shared/mapThemes';
 import { WEB_MERCATOR_MAX_ABS_LAT, alignLongitudeToReference } from '../../shared/webMercator';
 import { rendererSharedState as S } from '../core/state';
 import { loadBasemapVectorText } from './vectorLayerGeometry';
@@ -113,8 +116,18 @@ let labelFeatures: readonly MapLabelFeature[] = [];
 /** Anchor index used last time each feature was a candidate. */
 const previousAnchors = new Map<string, number>();
 
-/** Shift used last time each drawn label was painted. A label that was not drawn is dropped. */
+/** Shift used last time each drawn land label was painted. A label that was not drawn is dropped. */
 let previousNudges = new Map<string, LabelNudge>();
+
+/**
+ * Shift used last time each drawn water label was painted.
+ *
+ * Purpose: A water name keeps its spot while that spot stays clear.
+ * When to use: The next frame's water pass. Replaced at the end of each frame, the same way `previousNudges` is.
+ * Expected outcome: One shift per water name drawn this frame.
+ * Exceptions: None.
+ */
+let previousWaterNudges: ReadonlyMap<string, LabelNudge> = new Map();
 
 /** Measured boxes, keyed by theme, kind, size, and text. */
 const measuredBoxes = new Map<string, { width: number; height: number }>();
@@ -168,7 +181,7 @@ export function setMapLabelTheme(theme: MapTheme): void {
  *
  * Purpose: The hex canvas does not own these names, so each frame draws them here.
  * When to use: At the end of `resizeAndRedraw` and `redraw`.
- * Expected outcome: A halo and a fill for each placed label, at that kind's opacity for the view.
+ * Expected outcome: A halo and a fill for each placed label, water names under land names, at that kind's opacity for the view.
  *   An empty canvas when the map or the document is missing.
  * Exceptions: None.
  */
@@ -186,12 +199,13 @@ export function drawMapLabels(): void {
   const map = getMainLeafletMap() as LabelHostMap | null;
   if (!theme || !map || labelFeatures.length === 0) return;
   const tacticalView = mapAnnotationsUseDetailView();
-  const placed = labelsForFrame(map, ctx, theme, tacticalView);
+  const frame = labelsForFrame(map, ctx, theme, tacticalView);
   const zoom = map.getZoom();
-  for (const label of placed) {
+  const painted = [...frame.water, ...frame.land];
+  for (const label of painted) {
     paintLabel(ctx, theme, label, mapLabelStyleForView(label.kind, zoom, tacticalView), labelKindOpacity(label.kind, zoom, tacticalView));
   }
-  canvas.dataset.drawnLabelKinds = [...new Set(placed.map((label) => label.kind))].sort().join(',');
+  canvas.dataset.drawnLabelKinds = [...new Set(painted.map((label) => label.kind))].sort().join(',');
 }
 
 /**
@@ -211,6 +225,8 @@ async function loadLabelDocument(requestRedraw: () => void): Promise<void> {
     await document.fonts.load('400 13px "Agent Wars Map Sans"');
     await document.fonts.load('600 13px "Agent Wars Map Serif"');
     await document.fonts.load('400 13px "Agent Wars Map Serif"');
+    await document.fonts.load('italic 400 13px "Agent Wars Map Sans"');
+    await document.fonts.load('italic 400 13px "Agent Wars Map Serif"');
     requestRedraw();
   } catch (error) {
     labelFeatures = [];
@@ -223,7 +239,10 @@ async function loadLabelDocument(requestRedraw: () => void): Promise<void> {
  *
  * Purpose: Placement is shared. This function supplies the view, the projection, and the measurement. The tactical flag is read once by the caller, because that read can change the flag.
  * When to use: From `drawMapLabels`, after the canvas is clear.
- * Expected outcome: The placed labels, shifted off the smaller names. `tacticalView` chooses the kinds and the country size. The zoom chooses the continent size from the country zoom up. A state whose name matches a city recorded for this frame is not a candidate. Anchor memory keeps a candidate that was not drawn. Shift memory keeps only labels drawn this frame.
+ * Expected outcome: Land labels, shifted off the smaller names, and water labels that found a clear spot.
+ *   `tacticalView` chooses the kinds and the country size. The zoom chooses the continent size from the country zoom up.
+ *   A state whose name matches a city recorded for this frame is not a candidate. Water names do not use that city test.
+ *   Anchor memory stores the chosen anchor for every placed land name and every water name that chose an anchor, including a water name the shift then omits. An id that is a candidate in neither pass is dropped. Shift memory keeps only names drawn this frame.
  * Exceptions: None.
  */
 function labelsForFrame(
@@ -231,45 +250,185 @@ function labelsForFrame(
   ctx: CanvasRenderingContext2D,
   theme: MapTheme,
   tacticalView: boolean,
-): NudgedMapLabel[] {
+): { readonly land: readonly NudgedMapLabel[]; readonly water: readonly NudgedMapLabel[] } {
   const zoom = map.getZoom();
   const bounds = map.getBounds();
-  const west = bounds.getWest();
-  const south = bounds.getSouth();
-  const east = bounds.getEast();
-  const north = bounds.getNorth();
+  const view = {
+    west: bounds.getWest(),
+    south: bounds.getSouth(),
+    east: bounds.getEast(),
+    north: bounds.getNorth(),
+  };
   const kinds = visibleLabelKinds(zoom, tacticalView);
   const candidates = withoutStatesNamedForCities(
-    labelFeatures.filter((feature) => (
-      labelFeatureIsCandidate(feature, kinds, zoom) && longitudeMeets(feature, west, east) && latitudeMeets(feature, south, north)
-    )),
+    labelFeatures.filter((feature) => labelFeatureIsCandidate(feature, kinds, zoom) && featureMeetsView(feature, view)),
     getVisibleCityNameKeys(),
   );
-  const candidateIds = new Set(candidates.map((feature) => feature.id));
   const size = map.getSize();
   const center = map.getCenter();
-  const placed = placeMapLabels({
-    features: candidates,
-    kinds,
+  const placement = {
     zoom,
     viewSize: { width: size.x, height: size.y },
-    project: (lat, lng) => map.latLngToContainerPoint({
+    project: (lat: number, lng: number) => map.latLngToContainerPoint({
       lat: clampLatitude(lat),
       lng: alignLongitudeToReference(lng, center.lng),
     }),
-    measure: (feature) => measureLabel(ctx, theme, feature, zoom, tacticalView),
+    measure: (feature: MapLabelFeature) => measureLabel(ctx, theme, feature, zoom, tacticalView),
     previousAnchors,
-  });
+  };
+  const placed = placeMapLabels({ ...placement, features: candidates, kinds });
+  const nudged = nudgeBroadLabels(placed, { viewSize: placement.viewSize, previousNudges });
+  previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
+  const water = waterLabelsForFrame({ zoom, tacticalView, view, placement, landLabels: nudged });
   for (const label of placed) previousAnchors.set(label.featureId, label.anchorIndex);
+  for (const label of water.placed) previousAnchors.set(label.featureId, label.anchorIndex);
+  const candidateIds = new Set([...candidates, ...water.candidates].map((feature) => feature.id));
   for (const id of [...previousAnchors.keys()]) {
     if (!candidateIds.has(id)) previousAnchors.delete(id);
   }
-  const nudged = nudgeBroadLabels(placed, {
-    viewSize: { width: size.x, height: size.y },
-    previousNudges,
+  previousWaterNudges = new Map(water.settled.map((label) => [label.featureId, label.nudge]));
+  return { land: nudged, water: water.settled };
+}
+
+/**
+ * The geographic edges of one view.
+ *
+ * Purpose: Both label passes share one bounds test.
+ * When to use: `featureMeetsView`.
+ * Expected outcome: West, south, east, and north in degrees.
+ * Exceptions: None.
+ */
+interface LabelGeographicView {
+  /**
+   * Western edge in degrees.
+   *
+   * Contract: A number.
+   * When to use: The longitude overlap test.
+   * Expected outcome: The view's west edge.
+   * Exceptions: None.
+   */
+  readonly west: number;
+  /**
+   * Southern edge in degrees.
+   *
+   * Contract: A number.
+   * When to use: The latitude overlap test.
+   * Expected outcome: The view's south edge.
+   * Exceptions: None.
+   */
+  readonly south: number;
+  /**
+   * Eastern edge in degrees.
+   *
+   * Contract: A number. It may be less than `west` when the view crosses the antimeridian.
+   * When to use: The longitude overlap test.
+   * Expected outcome: The view's east edge.
+   * Exceptions: None.
+   */
+  readonly east: number;
+  /**
+   * Northern edge in degrees.
+   *
+   * Contract: A number.
+   * When to use: The latitude overlap test.
+   * Expected outcome: The view's north edge.
+   * Exceptions: None.
+   */
+  readonly north: number;
+}
+
+/**
+ * The inputs the water pass reads besides the loaded document.
+ *
+ * Purpose: Keeps `waterLabelsForFrame` within the argument limit.
+ * When to use: From `labelsForFrame` after land names are final.
+ * Expected outcome: The zoom, the view, the shared projection, and the land labels that will be painted.
+ * Exceptions: None.
+ */
+interface WaterPassInput {
+  /**
+   * Map zoom.
+   *
+   * Contract: A number.
+   * When to use: Choosing water kinds and candidates.
+   * Expected outcome: The zoom already read for the land pass.
+   * Exceptions: None.
+   */
+  readonly zoom: number;
+  /**
+   * Whether names use the detail view.
+   *
+   * Contract: The flag already read for this frame.
+   * When to use: `visibleWaterLabelKinds`.
+   * Expected outcome: The same flag the land pass used.
+   * Exceptions: None.
+   */
+  readonly tacticalView: boolean;
+  /**
+   * Geographic edges of the view.
+   *
+   * Contract: The four edges already read for this frame.
+   * When to use: `featureMeetsView`.
+   * Expected outcome: The same box the land pass used.
+   * Exceptions: None.
+   */
+  readonly view: LabelGeographicView;
+  /**
+   * Projection, measurement, and anchor memory shared with the land pass.
+   *
+   * Contract: Everything `placeMapLabels` needs except the features and the kinds.
+   * When to use: `chooseMapLabelAnchors`.
+   * Expected outcome: The same projection the land names used.
+   * Exceptions: None.
+   */
+  readonly placement: Omit<LabelPlacementInput, 'features' | 'kinds'>;
+  /**
+   * Land labels as they will be painted.
+   *
+   * Contract: Centers after the land shift. This pass does not move them.
+   * When to use: `settleWaterLabels`.
+   * Expected outcome: The land names for this frame.
+   * Exceptions: None.
+   */
+  readonly landLabels: readonly NudgedMapLabel[];
+}
+
+/**
+ * Chooses and shifts the water names for one frame.
+ *
+ * Purpose: Water names are placed after land names, and a same-kind overlap is moved rather than dropped first.
+ * When to use: From `labelsForFrame`, after `nudgeBroadLabels`.
+ * Expected outcome: The water candidates, the anchors that were chosen, and the names that found a clear spot.
+ * Exceptions: None.
+ */
+function waterLabelsForFrame(input: WaterPassInput): {
+  readonly candidates: readonly MapLabelFeature[];
+  readonly placed: readonly PlacedMapLabel[];
+  readonly settled: readonly NudgedMapLabel[];
+} {
+  const waterKinds = visibleWaterLabelKinds(input.zoom, input.tacticalView);
+  const candidates = labelFeatures.filter((feature) => (
+    labelFeatureIsCandidate(feature, waterKinds, input.zoom) && featureMeetsView(feature, input.view)
+  ));
+  const placed = chooseMapLabelAnchors({ ...input.placement, features: candidates, kinds: waterKinds });
+  const settled = settleWaterLabels(placed, {
+    viewSize: input.placement.viewSize,
+    landLabels: input.landLabels,
+    previousNudges: previousWaterNudges,
   });
-  previousNudges = new Map(nudged.map((label) => [label.featureId, label.nudge]));
-  return nudged;
+  return { candidates, placed, settled };
+}
+
+/**
+ * Whether a feature's anchors meet the view.
+ *
+ * Purpose: Both passes skip a feature that cannot be seen.
+ * When to use: After the kind test.
+ * Expected outcome: True when longitude and latitude both overlap the view.
+ * Exceptions: None.
+ */
+function featureMeetsView(feature: MapLabelFeature, view: LabelGeographicView): boolean {
+  return longitudeMeets(feature, view.west, view.east) && latitudeMeets(feature, view.south, view.north);
 }
 
 /**
@@ -343,13 +502,13 @@ function measureLabel(
  *
  * Purpose: Measuring and painting must use the same font or the boxes will not match the glyphs.
  * When to use: Before `measureText`, `strokeText`, and `fillText`.
- * Expected outcome: The theme's family, the style's size and weight, and centered middle alignment.
+ * Expected outcome: The theme's family, the style's italic or normal keyword, the style's size and weight, and centered middle alignment.
  * Exceptions: None.
  */
 function applyLabelFont(ctx: CanvasRenderingContext2D, theme: MapTheme, style: MapLabelKindStyle): void {
   const family = theme.labelFont === 'sans' ? 'Agent Wars Map Sans' : 'Agent Wars Map Serif';
   const fallback = fallbackFamily(theme.labelFont);
-  ctx.font = `${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
+  ctx.font = `${style.fontStyle} ${style.weight} ${style.sizePx}px "${family}", ${fallback}`;
   (ctx as CanvasRenderingContext2D & SpacedLabelText).letterSpacing = `${style.letterSpacingEm * style.sizePx}px`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -372,7 +531,8 @@ function fallbackFamily(font: MapLabelFontId): string {
  *
  * Purpose: The halo stays a fixed outline. The fill opacity is what separates the local name from the broader one.
  * When to use: Once per placed label.
- * Expected outcome: A round halo in the theme halo color, at the kind's halo width and not faded by the label opacity, then the kind's fill at `opacity`.
+ * Expected outcome: A round halo in the kind's halo color, at the kind's halo width and not faded by the label opacity, then the kind's fill at `opacity`.
+ *   A water kind uses the theme's water ink and water halo. A land kind uses the land ink and land halo.
  * Exceptions: None.
  */
 function paintLabel(
@@ -383,13 +543,14 @@ function paintLabel(
   opacity: number,
 ): void {
   applyLabelFont(ctx, theme, style);
+  const colors = labelPaintColors(theme, label.kind);
   ctx.save();
   ctx.lineWidth = style.haloWidthPx;
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = theme.labelColors.halo;
+  ctx.strokeStyle = colors.halo;
   ctx.strokeText(label.text, label.x, label.y);
   ctx.globalAlpha = opacity;
-  ctx.fillStyle = theme.labelColors[label.kind];
+  ctx.fillStyle = colors.fill;
   ctx.fillText(label.text, label.x, label.y);
   ctx.restore();
 }
