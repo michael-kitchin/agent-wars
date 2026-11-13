@@ -532,7 +532,7 @@ Each land unit has an `embarkedOn` field (strategic: `embarkedOnCarrierUnitId`; 
 
 ### 9.2 Embark and disembark
 
-Embark requires a legal embark hex as above. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. At Ready, every side other than the human auto-debarks when a movement order leaves the carrier (`autoDebarkNonHumanLandUnitIfMovingIndependently`). The human must debark manually first. A loaded Neutral ship uses the landing rule in §14.1 instead of that auto-debark.
+Embark requires a legal embark hex as above. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. A standing order does not move embarked infantry or armor and does not advance that order. `explicit_move`, `disembark`, and an air drop still unload. At Ready, every side other than the human auto-debarks when a movement order leaves the carrier (`autoDebarkNonHumanLandUnitIfMovingIndependently`). The human must debark manually first. A loaded Neutral ship uses the landing rule in §14.1 instead of that auto-debark.
 
 ### 9.3 Embarked unit combat
 
@@ -569,7 +569,7 @@ A destroyed carrier takes the land units assigned to it. A land unit that has al
 - **Fortifications:** The controller's units are soaked one hit per fortification. Control does not change while any remain. One player alone in an enemy fortified hex sieges it. An empty explored enemy fortified hex is a legal ranged target.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only on the strategic map. Return fire uses planning-parity reverse reach.
 - **Fog:** Infantry vision 1, armor 2, naval 2, air 3. Stale intel lasts 2 turns.
-- **Sealift:** Explicit cargo assignment. Fatal transport loss when the carrier is destroyed. LLM opponent movement orders auto-debark.
+- **Sealift:** Explicit cargo assignment. Fatal transport loss when the carrier is destroyed. A standing order does not move embarked infantry or armor. LLM opponent movement orders that do leave the carrier auto-debark.
 - **WEGO:** embark → missile launches → air strike → air drop → ranged → movement → ferry → cargo sync → melee → siege; automatic casualty assignment; tempo sweep fires unordered legal shots unless `hold_fire`. A missile never rolls and is removed last. Production then fortifies queued cells.
 
 ---

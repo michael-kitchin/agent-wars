@@ -630,7 +630,65 @@ function testStrikingAirUnitIsToldToDefendOnItsCurrentHex(): void {
   assert.strictEqual(defending.has('opponent-m-idle'), false);
 }
 
+/**
+ * An embarked infantry unit is not offered a march.
+ *
+ * Purpose: A suggested march would not run, and assigning it would leave the cargo looking ordered while it stays aboard.
+ * When to use: After the orderless-suggestion loop.
+ * Expected outcome: No map entry when an enemy is visible, when none is visible, and when a campaign order would otherwise apply.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testEmbarkedInfantryIsNotOfferedAMarch(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const unitId = 'opponent-inf-idle';
+  const embarked = {
+    id: unitId,
+    player: 'opponent',
+    unitType: 'infantry',
+    h3Index: chain[0]!,
+    embarkedOnCarrierUnitId: 'opponent-naval-1',
+  };
+  const seats = [
+    { seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
+    { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
+  ];
+  const withEnemy = {
+    ...buildLandChainState({
+      chain,
+      units: [embarked, { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: chain[4]! }],
+    }),
+    seats,
+    homeRegionHexesBySeat: { human: [chain[4]!] },
+  };
+  const blind = {
+    ...buildLandChainState({ chain, units: [embarked] }),
+    seats,
+    homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
+  };
+  assert.equal(suggestApproachDestinationsForOrderlessUnits('opponent', withEnemy, [unitId]).get(unitId), undefined);
+  assert.equal(suggestApproachDestinationsForOrderlessUnits('opponent', blind, [unitId]).get(unitId), undefined);
+  const campaignPlan: CampaignPlan = {
+    objective: { targetH3: chain[2]!, stagingH3: null, phase: 'assault', source: 'engine', chosenTurn: 1 },
+    waypointH3: chain[2]!,
+    campaignUnitIds: new Set([unitId]),
+    holdUnitIds: new Set(),
+    defenderUnitIds: [],
+    homeThreatCount: 0,
+    homeDefenseCapped: false,
+    massedCount: 0,
+    threshold: 1,
+  };
+  const campaign = suggestApproachDestinationsForOrderlessUnits('opponent', blind, [unitId], new Map(), undefined, {
+    campaignPlan,
+  });
+  assert.equal(campaign.get(unitId), undefined);
+}
+
 const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
+  {
+    name: 'suggestApproachDestinationsForOrderlessUnits omits embarked infantry',
+    fn: testEmbarkedInfantryIsNotOfferedAMarch,
+  },
   {
     name: 'suggestApproachDestinationsForOrderlessUnits offers a closing hex that is not the unit\'s own',
     fn: testOrderlessUnitGetsClosingSuggestionThatIsNotItsOwnHex,

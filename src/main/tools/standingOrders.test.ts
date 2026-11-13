@@ -24,6 +24,7 @@ import {
 } from '../gameDb';
 import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './standingOrders';
 import { testMissileRefusesMarchAcceptsHoldAndKeepsIt } from './standingOrdersMissileCases';
+import { testEmbarkedGroundStandingOrdersHold } from './standingOrdersEmbarkedCases';
 import type { GameStateSnapshot } from '../gameDb';
 
 /**
@@ -973,6 +974,7 @@ function run(): void {
   testBriefingNextMoveIsNotTheHexJustEntered();
   testGetInjectionTextAttentionYesForRecedingMarch();
   testHumanMarchDefaultsAvoidEnemiesFalse();
+  testEmbarkedGroundStandingOrdersHold();
   console.log('standingOrders tests passed');
 }
 

@@ -7,7 +7,7 @@
  * unit orderless again next turn, permanently idle. Putting a legal mission beside the question breaks that loop.
  * When an enemy is visible the mission is still a one-step march that closes on that enemy. When none is visible, a
  * ground unit is pointed at the enemy home region. An air unit is told to defend where it sits, strike or not.
- * Campaign units take the campaign order.
+ * Campaign units take the campaign order, except embarked infantry and armor, which are omitted.
  * When to use: Strategic `getInjectionText` and the strategic briefing, for the ids being listed as having no standing order.
  * Expected outcome: A march or defend suggestion per unit that should be ordered, never a march to the unit's current hex.
  * Units with nowhere useful to go are absent from the map so the caller can render an em dash.
@@ -171,7 +171,7 @@ export function collectOrderlessMissionContext(args: {
    *
    * Contract: Omitted or null keeps today's suggested destinations and Best Options rows.
    * When to use: Strategic consults that resolved a campaign.
-   * Expected outcome: Campaign units are offered the campaign order, and their Best Options rows advance toward it.
+   * Expected outcome: Campaign units are offered the campaign order, and their Best Options rows advance toward it. Embarked infantry and armor are omitted from the suggestion map.
    * Exceptions: None.
    */
   campaignPlan?: CampaignPlan | null;
@@ -454,11 +454,11 @@ function nearestEnemyHomeMarchHex(args: {
  * including the turns when no enemy unit has been seen yet.
  * When to use: Strategic briefing assembly, passing only the ids being listed as orderless. This runs a destination
  * search per distinct unit, so do not call it for the whole roster. `airStrikeUnitIds` is recorded in the debug log
- * and is not used to choose the mission. `options.campaignPlan` sends a campaign unit to the campaign order when it has no contact step.
- * Expected outcome: `unitId -> mission`. A campaign unit with no enemy-occupied legal step takes the campaign order: march to the waypoint, or defend on its own hex when it holds. When any enemy is visible and the unit is not a campaign unit, a closing one-step march, enemy-occupied preferred,
+ * and is not used to choose the mission. `options.campaignPlan` sends a campaign unit to the campaign order when it has no contact step, unless that unit is embarked infantry or armor.
+ * Expected outcome: `unitId -> mission`. A campaign unit that is not embarked infantry or armor, and that has no enemy-occupied legal step, takes the campaign order: march to the waypoint, or defend on its own hex when it holds. When any enemy is visible and the unit is not a campaign unit, a closing one-step march, enemy-occupied preferred,
  * and no home-region substitute when that step is missing. When no enemy is visible, a march toward the enemy home
  * region. An air unit is defend on its current hex whether or not it can strike and whether or not an enemy is visible.
- * A missile is omitted. Omitted when the unit is missing, cannot take the mission, or has no legal hex. A march is never the unit's own hex.
+ * A missile is omitted. Embarked infantry and armor are omitted. Omitted when the unit is missing, cannot take the mission, or has no legal hex. A march is never the unit's own hex.
  * Exceptions: A unit that cannot be scored is omitted. Loading the terrain cache for a blind land march throws if that
  * cache cannot be built.
  */
@@ -501,6 +501,10 @@ export function suggestApproachDestinationsForOrderlessUnits(
   for (const unitId of unitIds) {
     const unit = unitsById.get(unitId);
     if (!unit) continue;
+    if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && unit.embarkedOnCarrierUnitId) {
+      logTrace('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits: embarked unit omitted', { unitId: unit.id });
+      continue;
+    }
     const campaignOrder = campaignOrderFor(campaignPlan, { id: unit.id, h3Index: unit.h3Index });
     let suggestion: OrderlessMissionSuggestion | null = null;
     if (standingOrderTypeRejectionReason(unit.unitType, 'march') !== null) {

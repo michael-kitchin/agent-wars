@@ -74,6 +74,7 @@ Strategic movement budgets are `getMovementBudget` (infantry 1, armor 2, naval 2
 - **Order types:** `defend`, `march`, `pursue`, `patrol`, `hold_fire`. Air cannot take `march`, `pursue`, or `patrol` (`AIR_INELIGIBLE_ORDER_TYPES`). A missile is built with `hold_fire` and cannot take another standing order, and that order cannot be cancelled. A launch is a `missileLaunches` row in the strategic response, not a standing order and not `plan_route`.
 - **`hold_fire`:** Suppresses DEFEND auto-engagement and the tempo sweep for that unit until replaced. A missile keeps it for its whole life.
 - Standing orders do **not** move tactical sub-units. They can still generate DEFEND fire from the parent.
+- Embarked infantry and armor are not moved by a standing order, and that stored order is not advanced. `explicit_move`, `disembark`, and an air drop still unload.
 
 ## Production
 

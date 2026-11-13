@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
+import { canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { logDebug, logTrace } from '../logger';
 import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
 import { buildOpeningUserMessage } from './promptSpec/consultationText';
@@ -338,7 +339,7 @@ export function buildToolUsageGuidance(
  *
  * Purpose: That mode's only destination list must not offer the unit's current cell. An explicit_move there is ignored as already arrived, so staying is omitting the order.
  * When to use: When `fallbackMovementEnabled` is true, from the system-prompt builder.
- * Expected outcome: One line per own unit. A line with neighbours says `move to:` those codes and tells the model to omit explicit_move to stay. A line with none says to omit explicit_move. Empty when no unit has a coordinate.
+ * Expected outcome: One line per own unit. A line with neighbours says `move to:` those codes and tells the model to omit explicit_move to stay. A line with none says to omit explicit_move. Naval cargo that cannot debark lists no neighbour. Air cargo is unchanged. Empty when no unit has a coordinate.
  * Exceptions: None.
  */
 export function buildAdjacentCellsFallbackBlock(
@@ -355,14 +356,34 @@ export function buildAdjacentCellsFallbackBlock(
     const current = format(u.h3Index);
     const snapshotUnit = state.units.find((row) => row.id === u.id);
     const assumeDebarkedForReachability = !!snapshotUnit?.embarkedOnCarrierUnitId;
+    const carrier = snapshotUnit?.embarkedOnCarrierUnitId
+      ? state.units.find((row) => row.id === snapshotUnit.embarkedOnCarrierUnitId)
+      : undefined;
+    const hex = state.hexes.find((row) => row.h3Index === u.h3Index);
+    const seaportCount =
+      (state.strategicInfrastructure ?? []).find((row) => row.h3Index === u.h3Index)?.seaportCount ?? 0;
+    const controlled =
+      (state.strategicControl ?? []).find((row) => row.h3Index === u.h3Index)?.controllerPlayerId ===
+      snapshotUnit?.player;
+    const navalCargoStaysAboard =
+      carrier?.unitType === 'naval' &&
+      (!hex ||
+        !canManualDebarkAtHex({
+          nativeTerrain: hex.terrain,
+          terrainKind: hex.terrainKind,
+          hasSeaport: Number(seaportCount) > 0,
+          hexControlledByPlayer: controlled,
+        }));
     const dests = (
-      assumeDebarkedForReachability
-        ? getValidDestinations(
-            { id: u.id, h3Index: u.h3Index, unitType: u.unitType },
-            state,
-            { assumeDebarkedForReachability: true }
-          )
-        : getValidDestinationsUnoccupied(u, state)
+      navalCargoStaysAboard
+        ? []
+        : assumeDebarkedForReachability
+          ? getValidDestinations(
+              { id: u.id, h3Index: u.h3Index, unitType: u.unitType },
+              state,
+              { assumeDebarkedForReachability: true }
+            )
+          : getValidDestinationsUnoccupied(u, state)
     )
       .filter((h3) => h3 === u.h3Index || !occupied.has(h3))
       .filter((h3) => latLngByH3.has(h3))

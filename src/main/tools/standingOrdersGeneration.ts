@@ -218,7 +218,7 @@ function advanceNextMovePastOccupiedCell(playerId: string, row: StandingOrderRow
  * When to use: Before building a strategic briefing, and at the start of standing-order generation.
  * Expected outcome: Arrived marches and pursuits with a missing target are deleted. A defend order is refreshed
  * to `holding`, `en_route`, or `blocked` with the route the briefing will show. A next step equal to the
- * unit's cell becomes the following cached segment when turns remain. Other rows are unchanged.
+ * unit's cell becomes the following cached segment when turns remain. Embarked infantry and armor stay as stored.
  * Exceptions: None. Unresolvable coordinates are left as stored.
  */
 export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void {
@@ -240,6 +240,11 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
   for (const row of rows) {
     if (!existingUnitIds.has(row.unit_id)) {
       deleteStandingOrder(playerId, row.unit_id);
+      continue;
+    }
+    const embarkedHold = state.units.find((unit) => unit.id === row.unit_id);
+    if (embarkedHold && (embarkedHold.unitType === 'infantry' || embarkedHold.unitType === 'armor') && embarkedHold.embarkedOnCarrierUnitId) {
+      logTrace('standingOrders expireAndUpdateStatus: embarked unit holds', { unitId: embarkedHold.id });
       continue;
     }
     // Clears movement orders stored for air units before assign_order began rejecting them; leaving one
@@ -313,7 +318,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
 
  * Purpose: Expires stale rows, runs Tool 1 routes, emits merged movement/ranged rows, and normally persists `computed_route` / deletes like strategic Ready.
  * When to use: Strategic Ready, AI standing-only paths, and tactical Ready **preview** (`mutateProgress: false`) for parent→sub-unit march merge.
- * Expected outcome: Default path mutates SQLite like today; preview path returns the same order shapes without touching standing_orders progression.
+ * Expected outcome: Default path mutates SQLite like today; preview path returns the same order shapes without touching standing_orders progression. Embarked infantry and armor add no movement row and do not advance their stored order.
  * Exceptions: None.
  */
 export function generateOrdersForStandingOrders(
@@ -353,6 +358,10 @@ export function generateOrdersForStandingOrders(
     if (!existingUnitIds.has(row.unit_id)) continue;
     const unit = state.units.find((u) => u.id === row.unit_id);
     if (!unit) continue;
+    if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && unit.embarkedOnCarrierUnitId) {
+      logTrace('standingOrders generateOrdersForStandingOrders: embarked unit holds', { unitId: unit.id });
+      continue;
+    }
     const params = parseOrderParams(row);
     const computed = parseComputedRoute(row);
 

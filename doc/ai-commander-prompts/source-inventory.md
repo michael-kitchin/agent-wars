@@ -242,6 +242,7 @@ Every tool round, the final orders call, and the repair call go through `postOrd
 | `storedPoints` on queues | absent |
 | `contestedHomeRegionHexes` | absent |
 | `pendingOrders` | absent (correctly hidden) |
+| Embarked infantry and armor in Units Without Standing Orders | em dash — the unit stays in the table and is offered no march or defend |
 
 ## 6. Variant-gate catalog
 

@@ -273,7 +273,7 @@ export function getInjectionText(
    *
    * Contract: Omitted or null keeps today's suggested destinations.
    * When to use: Strategic consults that resolved a campaign.
-   * Expected outcome: Orderless campaign units are offered the campaign order.
+   * Expected outcome: Orderless campaign units are offered the campaign order, except embarked infantry and armor, which get an em dash.
    * Exceptions: None.
    */
   campaignPlan?: CampaignPlan | null
