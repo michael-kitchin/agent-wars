@@ -114,7 +114,7 @@ export interface CoachingGates {
    *
    * Contract: True only for `scenarioId === 'region_vs_region'` outside battle. Absent or unrecognised ids must not reuse home-region sentences.
    * When to use: Set from `state.scenarioId` in the assembler. Always false in tactical mode.
-   * Expected outcome: False omits the win-path coaching item and home-region goals (4) and (5).
+   * Expected outcome: False omits the win-path coaching item. The scenario list has six goals. The other branch has four and does not name a home-region raid or scouting.
    * Exceptions: None.
    */
   readonly includeScenarioWinPaths: boolean;
@@ -172,4 +172,40 @@ export interface CoachingGates {
    * Exceptions: None.
    */
   readonly campaignEnabled?: boolean;
+  /**
+   * Whether the consulted seat owns a missile outside battle.
+   *
+   * Contract: Omitted means false. Tactical consultations leave it false.
+   * When to use: The missile tools line and the missile launch coaching bullet.
+   * Expected outcome: True only on a strategic consult whose roster has a missile.
+   * Exceptions: None.
+   */
+  readonly hasMissileUnits?: boolean;
+  /**
+   * Whether a controlled hex can still queue a naval unit.
+   *
+   * Contract: Omitted means false. Comes from `seatBuildCapabilities`, not from the queue snapshot.
+   * When to use: The naval tools line.
+   * Expected outcome: False when the seat has no seaport city or is at the naval cap.
+   * Exceptions: None.
+   */
+  readonly canBuildNaval?: boolean;
+  /**
+   * Whether a controlled hex can still queue a missile.
+   *
+   * Contract: Omitted means false. Comes from `seatBuildCapabilities`, not from the queue snapshot.
+   * When to use: The missile tools line.
+   * Expected outcome: False when no controlled city meets the missile urban minimum or the seat is at the missile cap.
+   * Exceptions: None.
+   */
+  readonly canBuildMissile?: boolean;
+  /**
+   * Whether this consult can teach mercenary hiring.
+   *
+   * Contract: Omitted means false. True when production is on and the snapshot has a mercenary economy.
+   * When to use: The mercenary tools line.
+   * Expected outcome: False in battle and when the match has no mercenary economy.
+   * Exceptions: None.
+   */
+  readonly mercenariesAvailable?: boolean;
 }

@@ -246,6 +246,25 @@ function testFormatBriefingProductionSectionFollowsToolFlag(): void {
 }
 
 /**
+ * Extra attention lines stay under Attention Flags and after the production bullet.
+ *
+ * Purpose: A launch or raise sentence must not be dropped when the five unit flags are full, and it must not jump ahead of the production bullet.
+ * When to use: After `additionalAttention` is added to `formatBriefing`.
+ * Expected outcome: The production bullet precedes the extra bullet, and both are list lines between Attention Flags and Operational Map.
+ * Exceptions: None.
+ */
+function testAdditionalAttentionFollowsTheProductionBullet(): void {
+  const out = formatBriefing(fixtureState, precomputed, '', '', [], '', {
+    productionAttention: 'Queue the idle city.',
+    additionalAttention: ['Missiles: m1 can launch.'],
+  });
+  const flags = out.slice(out.indexOf('## Attention Flags'), out.indexOf('## Operational Map'));
+  const productionAt = flags.indexOf('- Queue the idle city.');
+  const extraAt = flags.indexOf('- Missiles: m1 can launch.');
+  assert.ok(productionAt >= 0 && extraAt > productionAt, flags);
+}
+
+/**
  * Defines the `testFormatBriefingUnitTableRows` function shape (function testFormatBriefingUnitTableRows(): void).
 
  * Purpose: Supports maintainability by documenting why `testFormatBriefingUnitTableRows` exists.
@@ -886,6 +905,7 @@ const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing omits standing order when injection empty', fn: testFormatBriefingOmitsStandingOrderWhenInjectionEmpty },
   { name: 'formatBriefing production section follows tool flag', fn: testFormatBriefingProductionSectionFollowsToolFlag },
+  { name: 'additional attention follows the production bullet', fn: testAdditionalAttentionFollowsTheProductionBullet },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
   {

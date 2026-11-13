@@ -20,6 +20,8 @@ import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
 import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
 import { formatProductionAttentionBullet } from './productionAttention';
 import { formatPausedProductionPointer } from './pausedProductionAttention';
+import { formatMissileLaunchAttention } from './briefingSectionsMissiles';
+import { formatMercenaryRaiseAttention } from './mercenaryRaiseAttention';
 import type { CampaignPlan } from './campaignRules';
 
 /**
@@ -195,6 +197,15 @@ export interface StatusInjectionTexts {
    * Exceptions: None.
    */
   readonly campaignAttention: string | null;
+  /**
+   * Launch and raise bullets that are not part of the five-flag cap.
+   *
+   * Contract: The missile sentence when a target exists, then the mercenary sentence when production is on and a raise is affordable. Empty in a battle.
+   * When to use: `formatBriefing` appends each one after the production and campaign bullets. Tactical injection leaves the list empty.
+   * Expected outcome: Neither bullet counts against the five unit-flag cap.
+   * Exceptions: None.
+   */
+  readonly additionalAttention: readonly string[];
 }
 
 /**
@@ -271,5 +282,19 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,
     campaignText,
     campaignAttention,
+    additionalAttention:
+      args.coordinateContext.mode === 'tactical'
+        ? []
+        : [
+            formatMissileLaunchAttention(args.state, formatCampaignHex),
+            args.productionEnabled
+              ? formatMercenaryRaiseAttention({
+                  state: args.state,
+                  ownSeat: seatId,
+                  format: formatCampaignHex,
+                  campaignTargetH3: campaignPlan?.objective.targetH3 ?? null,
+                })
+              : null,
+          ].filter((bullet): bullet is string => bullet != null),
   };
 }

@@ -111,6 +111,24 @@ export interface GameRuleTextGates {
    */
   readonly hasMissileUnits?: boolean;
   /**
+   * Whether a controlled hex can still queue a naval unit.
+   *
+   * Contract: Omitted means false. Ignored in tactical mode.
+   * When to use: `buildRulesSections`, together with `hasNavalUnits`.
+   * Expected outcome: Strategic naval text prints when this is true even if the seat owns no ship.
+   * Exceptions: None.
+   */
+  readonly canBuildNaval?: boolean;
+  /**
+   * Whether a controlled hex can still queue a missile.
+   *
+   * Contract: Omitted means false. Ignored in tactical mode.
+   * When to use: `buildMissileEmploymentRule`, together with `hasMissileUnits`.
+   * Expected outcome: The build sentence prints when this is true and the seat owns no missile.
+   * Exceptions: None.
+   */
+  readonly canBuildMissile?: boolean;
+  /**
    * Whether the battle being briefed has a fortified cell.
    *
    * Contract: Omitted means false.
@@ -631,7 +649,7 @@ function rulesSubsection(title: string, paragraphs: readonly string[]): string {
  *
  * Purpose: Each topic has its own heading. The words are the same sentences the single rules block used to print.
  * When to use: Once per assembled system prompt, after roster and tool flags are known.
- * Expected outcome: Subsections in topic order. A topic with no paragraph is omitted. Hold-fire only when orders are on. Air, naval, and missiles only when those units exist.
+ * Expected outcome: Subsections in topic order. A topic with no paragraph is omitted. Hold-fire only when orders are on. Air only when an air unit exists. Naval and missiles when the seat owns the type, or, outside battle, when it can build the type.
  * Exceptions: None.
  */
 export function buildRulesSections(gates: GameRuleTextGates): string {
@@ -644,7 +662,7 @@ export function buildRulesSections(gates: GameRuleTextGates): string {
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),
   ].join(' ');
-  const naval = gates.hasNavalUnits
+  const naval = gates.hasNavalUnits || (gates.coordinateMode !== 'tactical' && gates.canBuildNaval === true)
     ? [buildNavalClause(gates.coordinateMode).trim(), gates.navalPlanRouteHint ?? '']
     : [];
   const air = buildAirEmploymentRule(gates);

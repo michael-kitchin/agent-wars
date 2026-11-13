@@ -104,6 +104,8 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /cannot enter land cells/i);
   assert.match(text, /embark at a legal cell/i);
   assert.match(text, /queue is empty, queue something/i);
+  assert.match(text, /Keep one city queued on credits at all times/);
+  assert.match(text, /Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits/);
   assert.match(text, /replace blocked queues/i);
   assert.match(text, /more than one home region/i);
   assert.match(text, /Do not persist enemy positions/i);
@@ -119,10 +121,14 @@ test('strategic conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(strategicGates({ ordersEnabled: false })), /suppresses automatic engagement/i);
   assert.doesNotMatch(joined(strategicGates({ ordersEnabled: false })), /Units Without Standing Orders/i);
   assert.doesNotMatch(joined(strategicGates({ productionEnabled: false })), /queue is empty, queue something/i);
+  assert.doesNotMatch(joined(strategicGates({ productionEnabled: false })), /Keep one city queued on credits at all times/);
   assert.doesNotMatch(joined(strategicGates({ memoryEnabled: false })), /Do not persist enemy positions/i);
   assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /toward the fighting/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /cannot enter land cells/i);
   assert.doesNotMatch(joined(strategicGates({ hasNavalUnits: false })), /embark at a legal cell/i);
+  assert.match(joined(strategicGates({ hasMissileUnits: true })), /Launch every missile that Missile Forces lists a target for/);
+  assert.doesNotMatch(joined(strategicGates({ hasMissileUnits: false })), /Launch every missile/);
+  assert.doesNotMatch(joined(tacticalGates({ hasMissileUnits: true })), /Launch every missile/);
   assert.doesNotMatch(joined(strategicGates({ homeRegionsOverlap: false })), /more than one home region/i);
   assert.match(joined(strategicGates({ hasBestOptionsTable: false })), /When it lists none, call plan_route or leave the unit idle/);
   assert.match(joined(strategicGates({ hasObservedEnemy: true })), /move to regain contact/i);
@@ -150,6 +156,46 @@ test('absent scenario id drops the city-knockout goals from the context block', 
   const withoutScenario = buildContextCoaching(strategicGates({ includeScenarioWinPaths: false }));
   assert.doesNotMatch(withoutScenario, /Take and hold enemy cities/);
   assert.match(withoutScenario, /Destroy enemy forces where you outnumber them/);
+  assert.match(withScenario, /Destroy the city cells, airports, and seaports/);
+  assert.match(withoutScenario, /Destroy the city cells, airports, and seaports/);
+});
+
+test('the tools block numbers only the lines whose gates hold', () => {
+  const airOnly = buildContextCoaching(strategicGates({
+    hasNavalUnits: false,
+    hasMissileUnits: false,
+    canBuildNaval: false,
+    canBuildMissile: false,
+    mercenariesAvailable: false,
+  }));
+  const toolsAt = airOnly.indexOf('- Your tools are:');
+  const afterTools = airOnly.slice(toolsAt, airOnly.indexOf('- Your doctrine is'));
+  assert.ok(toolsAt >= 0);
+  assert.match(afterTools, /\(1\) Air units strike/);
+  assert.doesNotMatch(afterTools, /\(2\)/);
+  const none = buildContextCoaching(strategicGates({
+    hasAirUnits: false,
+    hasNavalUnits: false,
+    hasMissileUnits: false,
+    canBuildNaval: false,
+    canBuildMissile: false,
+    mercenariesAvailable: false,
+  }));
+  assert.doesNotMatch(none, /Your tools are:/);
+});
+
+test('tactical context does not gain strategic tools or production-denial doctrine', () => {
+  const text = buildContextCoaching(tacticalGates({
+    hasAirUnits: true,
+    hasNavalUnits: true,
+    hasMissileUnits: true,
+    canBuildNaval: true,
+    canBuildMissile: true,
+    mercenariesAvailable: true,
+  }));
+  assert.doesNotMatch(text, /Your tools are:/);
+  assert.doesNotMatch(text, /Production the enemy loses/);
+  assert.doesNotMatch(text, /before you commit ground units/);
 });
 
 test('tactical coaching includes every required item when its gate is on', () => {

@@ -9,7 +9,7 @@ import { gridDisk } from 'h3-js';
 import { missileRangeHexes } from '../../shared/gameRules';
 import { AI_SEAT_IDS, HUMAN_SEAT_ID, NEUTRAL_OWNER_ID } from '../../shared/seatIds';
 import type { GameStateSnapshot } from '../gameDb';
-import { buildMissileForcesBriefingBlock, NO_MISSILE_TARGETS_LINE } from './briefingSectionsMissiles';
+import { buildMissileForcesBriefingBlock, formatMissileLaunchAttention, NO_MISSILE_TARGETS_LINE } from './briefingSectionsMissiles';
 
 /** Origin reused so `gridDisk` can supply neighbors. */
 const ORIGIN = '810ebffffffffff';
@@ -97,4 +97,36 @@ test('the block lists the missile and only reachable explored enemy infrastructu
   assert.match(md, /Western Anatolia/);
   assert.match(md, /\| 1 \| a2-m1 \|/);
   assert.doesNotMatch(md, new RegExp(NO_MISSILE_TARGETS_LINE));
+});
+
+test('launch attention names the best target and is absent without a missile or a target', () => {
+  const best = [...gridDisk(ORIGIN, 1)].find((hex) => hex !== ORIGIN);
+  assert.ok(best);
+  const aimed = stateFor({
+    units: [{ id: 'a2-m1', player: AI_SEAT_IDS[0], unitType: 'missile', h3Index: ORIGIN }],
+    seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Western Anatolia' }] as unknown as GameStateSnapshot['seats'],
+    exploredHexes: [ORIGIN, best],
+    strategicControl: [{ h3Index: best, controllerPlayerId: HUMAN_SEAT_ID }],
+    strategicInfrastructure: [{ h3Index: best, urbanHexCount: 10, airportCount: 0, seaportCount: 0 }],
+  });
+  assert.equal(
+    formatMissileLaunchAttention(aimed, (hex) => hex),
+    `Missiles: a2-m1 can launch. Best target: ${best}, a Western Anatolia city with 10 city cells. Add a missileLaunches entry.`
+  );
+  const unarmed = stateFor({
+    units: [{ id: 'a2-i1', player: AI_SEAT_IDS[0], unitType: 'infantry', h3Index: ORIGIN }],
+    seats: [],
+    exploredHexes: [],
+    strategicControl: [],
+    strategicInfrastructure: [],
+  });
+  assert.equal(formatMissileLaunchAttention(unarmed, (hex) => hex), null);
+  const noTarget = stateFor({
+    units: [{ id: 'a2-m1', player: AI_SEAT_IDS[0], unitType: 'missile', h3Index: ORIGIN }],
+    seats: [],
+    exploredHexes: [],
+    strategicControl: [],
+    strategicInfrastructure: [],
+  });
+  assert.equal(formatMissileLaunchAttention(noTarget, (hex) => hex), null);
 });

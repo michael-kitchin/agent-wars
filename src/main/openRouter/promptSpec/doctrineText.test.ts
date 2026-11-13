@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import type { GameStateSnapshot } from '../../gameDb';
 import { buildSystemPromptForTools } from '../openRouterBuildSystemPrompt';
 import { buildContextCoaching, type CoachingGates } from './coachingText';
-import { buildDoctrineBlock } from './doctrineText';
+import { buildDoctrineBlock, buildStrategicDoctrineBlock } from './doctrineText';
 
 /**
  * Gates with every strategic item off except the ones the context block always prints.
@@ -120,4 +120,14 @@ test('each doctrine names the campaign target only when the campaign is on', () 
       assert.match(off, /Advance on the nearest enemy home region/);
     }
   }
+});
+
+test('strategic doctrine adds production denial without changing the shared block', () => {
+  const balanced = buildStrategicDoctrineBlock('balanced', false);
+  const cautious = buildStrategicDoctrineBlock('cautious', true);
+  const aggressive = buildStrategicDoctrineBlock('aggressive', false);
+  assert.match(balanced, /Production the enemy loses is force it cannot bring/);
+  assert.match(cautious, /before you commit ground units/);
+  assert.equal(aggressive, buildDoctrineBlock('aggressive', false));
+  assert.equal(buildDoctrineBlock('balanced', false).includes('Production the enemy loses'), false);
 });

@@ -4,14 +4,28 @@
  */
 
 import assert from 'node:assert/strict';
+import { AI_SEAT_IDS } from '../../shared/seatIds';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
+import {
+  getGameStateForPlayer,
+  getScenarioHomeRegionHexes,
+  getSeatRoster,
+  replaceBuildQueueForHex,
+  setHexController,
+  setStrategicInfrastructureForHex,
+} from '../gameDb';
 import type { GameStateSnapshot } from '../gameDb';
+import { buildLatLngCoordinateMap } from '../mapData';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
   PRODUCTION_EMPTY_QUEUES_SENTENCE,
   buildEmptyProductionQueuesSection,
+  buildProductionBriefing,
   buildProductionBriefingBlock,
   formatBriefingAvailableUnitTypes,
   formatBriefingProductionQueueCell,
 } from './briefingSections';
+import { SECTION_TITLE_CONTROLLED_HEX_QUEUES, SECTION_TITLE_PAUSED_QUEUES, SECTION_TITLE_PRODUCTION_PRIORITIES } from './promptSpec/sectionHeadings';
 
 /**
  * Ensures production briefing copy hides types at deployment cap and marks stalled queues.
@@ -72,9 +86,55 @@ function testProductionSectionGateIsTheToolFlag(): void {
   assert.ok(emptyForm.includes(PRODUCTION_EMPTY_QUEUES_SENTENCE));
 }
 
+/**
+ * Production Priorities sits after Paused Queues and before Controlled Hex Queues.
+ *
+ * Purpose: The subsection is advice about cities that already appear in the queue tables, so it has to stay between those two headings.
+ * When to use: After the production briefing gains the priority lines.
+ * Expected outcome: A match with one paused queue and one city large enough for credits prints the three headings in that order.
+ * Exceptions: Throws when the seeded map has no home hex or no hex outside that home.
+ */
+function testProductionPrioritiesSitBetweenPausedAndControlledQueues(): void {
+  withTempGameDb('aw-brief-priorities-', () => {
+    const ownSeat = AI_SEAT_IDS[0];
+    const seat = getSeatRoster().find((row) => row.seatId === ownSeat);
+    const home = getScenarioHomeRegionHexes(seat?.homeRegion ?? '');
+    const builder = home[0];
+    if (!builder) throw new Error('expected a home hex');
+    const occupied = new Set(getGameStateForPlayer(ownSeat).units.map((unit) => unit.h3Index));
+    const paused = getGameStateForPlayer(ownSeat).hexes.find(
+      (hex) => !home.includes(hex.h3Index) && !occupied.has(hex.h3Index) && !isNeutralBorderHex(hex.h3Index)
+    );
+    if (!paused) throw new Error('expected a hex outside the home region');
+    setHexController(builder, ownSeat);
+    setStrategicInfrastructureForHex(builder, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(builder, []);
+    setHexController(paused.h3Index, ownSeat);
+    setStrategicInfrastructureForHex(paused.h3Index, { urbanHexCount: 4, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(paused.h3Index, [{ unitType: 'infantry', remainingCount: 1 }]);
+    const state = getGameStateForPlayer(ownSeat);
+    const coords = buildLatLngCoordinateMap(state.hexes.map((hex) => hex.h3Index));
+    const briefing = buildProductionBriefing({
+      productionEnabled: true,
+      state: {
+        ...state,
+        mercenaryEconomy: { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 },
+      },
+      latLngByH3: coords.latLngByH3,
+      resolveToH3: coords.resolveToH3,
+      formatHexLabel: (ll) => `${ll[0]},${ll[1]}`,
+    });
+    const pausedAt = briefing.text.indexOf(`## ${SECTION_TITLE_PAUSED_QUEUES}`);
+    const priorityAt = briefing.text.indexOf(`## ${SECTION_TITLE_PRODUCTION_PRIORITIES}`);
+    const queuesAt = briefing.text.indexOf(`## ${SECTION_TITLE_CONTROLLED_HEX_QUEUES}`);
+    assert.ok(pausedAt >= 0 && priorityAt > pausedAt && queuesAt > priorityAt);
+  });
+}
+
 function run(): void {
   testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues();
   testProductionSectionGateIsTheToolFlag();
+  testProductionPrioritiesSitBetweenPausedAndControlledQueues();
   console.log('briefingSections.test.ts passed');
 }
 

@@ -7,14 +7,17 @@
  * Exceptions: None.
  */
 
+import { getRange } from '../../combatConstants';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
 import { PRODUCTION_EXPOSED_RADIUS } from '../productionExposure';
 import { logTrace } from '../../logger';
+import { missileRangeHexes } from '../../../shared/gameRules';
+import { AIR_STRIKE_RANGE_HEXES } from '../../../shared/tacticalRanges';
 import { regionalWinPathsBullet } from '../scenarioGoals';
-import { buildDoctrineBlock } from './doctrineText';
+import { buildStrategicDoctrineBlock } from './doctrineText';
 import type { CoachingGates } from './coachingGates';
 import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
-import { SECTION_TITLE_PAUSED_QUEUES, SECTION_TITLE_PRODUCTION_STATUS } from './sectionHeadings';
+import { SECTION_TITLE_PAUSED_QUEUES, SECTION_TITLE_PRODUCTION_PRIORITIES, SECTION_TITLE_PRODUCTION_STATUS } from './sectionHeadings';
 import {
   SECTION_TITLE_AIR_AND_NAVAL_UNITS,
   SECTION_TITLE_MEMORY_AND_CALLBACKS,
@@ -31,20 +34,23 @@ import { buildCampaignRuleBlock } from './campaignRuleText';
  *
  * Purpose: These used to live in the assembler; they are coaching, not computed state.
  * When to use: `buildContextCoaching` in strategic mode.
- * Expected outcome: The goals, the strategy lines, the doctrine block, and the message. When `campaignEnabled` is true, the Campaign section follows that block.
+ * Expected outcome: The goals, the strategy lines, the tools block when a gate holds, the doctrine block, and the message. When `campaignEnabled` is true, the Campaign section follows that block.
  * Exceptions: None.
  */
 export function buildStrategicContextCoaching(gates: CoachingGates): string {
   const campaignEnabled = gates.campaignEnabled === true;
-  const doctrine = buildDoctrineBlock(gates.doctrine ?? 'balanced', campaignEnabled);
+  const doctrine = buildStrategicDoctrineBlock(gates.doctrine ?? 'balanced', campaignEnabled);
+  const tools = buildStrategicToolsBlock(gates);
   logTrace('promptSpec buildStrategicContextCoaching', {
     includeScenarioWinPaths: gates.includeScenarioWinPaths,
     campaignEnabled,
     doctrineBlock: doctrine.length > 0,
+    toolsBlock: tools.length > 0,
   });
   const doctrineLine = doctrine.length > 0 ? `\n${doctrine}` : '';
+  const toolsLine = tools.length > 0 ? `\n${tools}` : '';
   const message = `${buildStrategicGoalsBlock(gates)}
-${buildStrategyBlock('strategic')}${doctrineLine}
+${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
 ${MESSAGE_BLOCK}`;
   return gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock()}` : message;
 }
@@ -90,6 +96,7 @@ export function buildStrategicCoachingSections(gates: CoachingGates): readonly {
   const airAndNaval: string[] = [];
   if (gates.hasAirUnits) airAndNaval.push(IDLE_AIR_BULLET, AIRLIFT_PREFERENCE_BULLET);
   if (gates.hasNavalUnits) airAndNaval.push(NAVAL_ROUTING_BULLET, SEALIFT_BULLET);
+  if (gates.hasMissileUnits === true) airAndNaval.push(MISSILE_LAUNCH_BULLET);
   const production = gates.productionEnabled ? [PRODUCTION_BULLET] : [];
   const memoryAndCallbacks = [
     ...(gates.memoryEnabled ? [memoryBullet(gates.campaignEnabled === true)] : []),
@@ -122,11 +129,46 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
 }
 
 /**
+ * Capability lines for the strategic context block.
+ *
+ * Purpose: Each line ties one arm to a logistics goal, and only the arms this seat can use are numbered.
+ * When to use: `buildStrategicContextCoaching`, between the strategy list and the doctrine block.
+ * Expected outcome: An empty string when every gate is off. Otherwise a heading and lines numbered from 1.
+ * Exceptions: None.
+ */
+export function buildStrategicToolsBlock(gates: CoachingGates): string {
+  const objective = gates.campaignEnabled === true ? 'the campaign target' : 'your objective';
+  const candidates = [
+    {
+      include: gates.hasMissileUnits === true || gates.canBuildMissile === true,
+      text: `Missiles destroy city cells, airports, and seaports up to ${missileRangeHexes()} hexes away, beyond the reach of aircraft. Build one in a city that reaches a large enemy city, then launch it.`,
+    },
+    {
+      include: gates.hasNavalUnits || gates.canBuildNaval === true,
+      text: `Naval units shell any hex within ${getRange('naval')} of them, and carry ground units to a coast the enemy has left open.`,
+    },
+    {
+      include: gates.hasAirUnits,
+      text: `Air units strike within ${AIR_STRIKE_RANGE_HEXES} hexes of their airport, carry one infantry unit between airports, and drop it within ${AIR_STRIKE_RANGE_HEXES} hexes.`,
+    },
+    {
+      include: gates.mercenariesAvailable === true,
+      text: `Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside ${objective}, or behind the enemy to split its force.`,
+    },
+  ];
+  const kept = candidates.filter((line) => line.include);
+  logTrace('promptSpec buildStrategicToolsBlock', { kept: kept.length });
+  if (kept.length === 0) return '';
+  const lines = kept.map((line, index) => `    (${index + 1}) ${line.text}`);
+  return `- Your tools are:\n${lines.join('\n')}`;
+}
+
+/**
  * Goals list for the strategic context block.
  *
  * Purpose: Taking cities wins, so it is ranked first; massing comes second because piecemeal attacks fail.
  * When to use: `buildStrategicContextCoaching`.
- * Expected outcome: Five numbered objectives when the region-versus-region scenario is active; otherwise the first three only.
+ * Expected outcome: Six numbered objectives when the region-versus-region scenario is active; otherwise four.
  * Exceptions: None.
  */
 function buildStrategicGoalsBlock(gates: CoachingGates): string {
@@ -134,15 +176,17 @@ function buildStrategicGoalsBlock(gates: CoachingGates): string {
   if (gates.includeScenarioWinPaths) {
     return `- Your goals are, in priority order:
     (1) Take and hold enemy cities. Taking cities is how you knock sides out.
-    (2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.
-    (3) Keep enough units at home to stop a raid on your cities.
-    (4) Keep every city building. At your unit caps, bank credits and hire mercenaries.
-    (5) Scout with a few units, not your main force.`;
+    (2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak.
+    (3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units.
+    (4) Keep enough units at home to stop a raid on your cities.
+    (5) Keep every city building, and keep credits coming in for mercenaries.
+    (6) Scout with a few units, not your main force.`;
   }
   return `- Your goals are, in priority order:
     (1) Destroy enemy forces where you outnumber them.
     (2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.
-    (3) Keep every city building.`;
+    (3) Destroy the city cells, airports, and seaports that build and move enemy units.
+    (4) Keep every city building.`;
 }
 
 /**
@@ -292,6 +336,17 @@ const SEALIFT_BULLET =
   '- When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Use the Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex). While embarked, explicit_move and disembark both clear cargo and march in one action.';
 
 /**
+ * A missile with a listed target should be launched this turn.
+ *
+ * Purpose: Holding a missile that can reach a city spends the turn it could have removed production.
+ * When to use: When the seat already has a missile. The attention line names the target.
+ * Expected outcome: One bullet telling the commander to copy the first matching Missile Forces row.
+ * Exceptions: None.
+ */
+const MISSILE_LAUNCH_BULLET =
+  '- Launch every missile that Missile Forces lists a target for. Copy the first target row that names the missile into missileLaunches. A missile that is never launched destroys nothing.';
+
+/**
  * Airlift is the faster crossing when an airport chain already reaches.
  *
  * Purpose: A ship remains available. The model should not wait on it when air can arrive sooner.
@@ -311,7 +366,9 @@ const AIRLIFT_PREFERENCE_BULLET =
  * Exceptions: None.
  */
 const PRODUCTION_BULLET =
-  '- When a controlled cell can build and its queue is empty, queue something.\n\n  ' +
+  '- When a controlled cell can build and its queue is empty, queue something.' +
+  '\n\n  Keep one city queued on credits at all times. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.' +
+  `\n\n  ${SECTION_TITLE_PRODUCTION_PRIORITIES}, under ${SECTION_TITLE_PRODUCTION_STATUS}, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.\n\n  ` +
   PRODUCTION_CAP_QUEUE_GUIDANCE.replace(
     '. A hex whose available types',
     '.\n\n  A hex whose available types'

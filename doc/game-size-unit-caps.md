@@ -2,7 +2,7 @@
 
 Matches can be Small, Medium, or Large. The only gameplay difference among these sizes is per-side unit caps. Map, starting armies, unit costs, fog, and tactical sub-unit counts do not change with size.
 
-Live values come from `MAX_UNITS_PER_TYPE` (Small) and `GAME_SIZE_MULTIPLIER` in `src/shared/gameSize.ts`. Combat and production rules: [combat-rules-v3.md](combat-rules-v3.md) §2.
+Live values come from `MAX_UNITS_PER_TYPE` (Small) and `GAME_SIZE_MULTIPLIER` in `src/shared/gameSize.ts`. The strategic production briefing uses that same multiplier for the credits-city urban floor (`CREDITS_CITY_MIN_URBAN_PER_SIZE` in `src/main/openRouter/productionPriorities.ts`). Costs and starting armies stay unscaled. Combat and production rules: [combat-rules-v3.md](combat-rules-v3.md) §2.
 
 ## Caps
 

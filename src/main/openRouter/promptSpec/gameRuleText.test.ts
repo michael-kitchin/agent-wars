@@ -443,6 +443,35 @@ test('the system-prompt assembler delegates combat-rule prose to this module', (
   assert.ok(!assembler.includes('Hits land on the lowest-defense'));
 });
 
+test('a seat that can build naval or a missile sees those rules before it owns one', () => {
+  const naval = buildRulesSections(gates({ hasNavalUnits: false, canBuildNaval: true }));
+  assert.match(naval, /## Naval Units/);
+  const missile = buildRulesSections(gates({ hasMissileUnits: false, canBuildMissile: true }));
+  assert.match(missile, /## Missiles/);
+  assert.match(missile, /is built in a city/);
+  assert.equal(missile.includes('missileLaunches'), false);
+  const owned = buildRulesSections(gates({ hasMissileUnits: true }));
+  assert.match(owned, /Launch it with a missileLaunches entry/);
+});
+
+test('tactical rules ignore can-build gates when the roster lacks the type', () => {
+  const withBuild = buildRulesSections(gates({
+    coordinateMode: 'tactical',
+    canBuildNaval: true,
+    canBuildMissile: true,
+    hasNavalUnits: false,
+    hasMissileUnits: false,
+  }));
+  const without = buildRulesSections(gates({
+    coordinateMode: 'tactical',
+    canBuildNaval: false,
+    canBuildMissile: false,
+    hasNavalUnits: false,
+    hasMissileUnits: false,
+  }));
+  assert.equal(withBuild, without);
+});
+
 test('the missile rule appears only when the roster has a missile', () => {
   const without = buildRulesSections(gates());
   assert.equal(without.includes('missileLaunches'), false);

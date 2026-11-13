@@ -343,20 +343,24 @@ async function run(): Promise<void> {
         `goal (1) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.'),
+        systemPrompt.includes('(2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak.'),
         `goal (2) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(3) Keep enough units at home to stop a raid on your cities.'),
+        systemPrompt.includes('(3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units.'),
         `goal (3) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(4) Keep every city building. At your unit caps, bank credits and hire mercenaries.'),
+        systemPrompt.includes('(4) Keep enough units at home to stop a raid on your cities.'),
         `goal (4) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(5) Scout with a few units, not your main force.'),
+        systemPrompt.includes('(5) Keep every city building, and keep credits coming in for mercenaries.'),
         `goal (5) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(6) Scout with a few units, not your main force.'),
+        `goal (6) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
       assert.ok(systemPrompt.includes('- Your message is:'), `message coaching header missing for mask=${mask}`);

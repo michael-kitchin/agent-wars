@@ -15,6 +15,7 @@ import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
 import { buildMissileForcesBriefingBlock } from './briefingSectionsMissiles';
 import { buildMercenariesBriefingBlock } from './briefingSectionsMercenaries';
 import { isMissileUnitType } from '../../shared/missileRules';
+import { seatBuildCapabilities } from './seatBuildCapabilities';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import type { CampaignPlan } from './campaignRules';
@@ -187,6 +188,10 @@ export function buildConsultPromptParts(input: {
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasAir = opponentUnits.some((u) => u.unitType === 'air');
   const hasMissile = opponentUnits.some((u) => isMissileUnitType(u.unitType));
+  const strategicProduction = flags.productionEnabled && coordinateContext.mode !== 'tactical';
+  const capabilities = strategicProduction
+    ? seatBuildCapabilities(state, ownSeat)
+    : { canBuildNaval: false, canBuildMissile: false };
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const hasBestOptionsTable =
     hasPrecomputedBriefing && (briefingOverride ?? '').includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN);
@@ -227,6 +232,10 @@ export function buildConsultPromptParts(input: {
     turnLimitVictory: state.victory?.rule === 'most_city_hexes_at_turn_limit',
     doctrine: doctrineForPrompt(state),
     includeExitBattle,
+    hasMissileUnits: hasMissile && coordinateContext.mode !== 'tactical',
+    canBuildNaval: capabilities.canBuildNaval,
+    canBuildMissile: capabilities.canBuildMissile,
+    mercenariesAvailable: strategicProduction && state.mercenaryEconomy != null,
   };
   const toolPromptLines = filtered.map((m) => {
     let line = m.promptLine;
@@ -275,6 +284,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         pausedProductionAttention: null,
         campaignText: '',
         campaignAttention: input.campaignAttention ?? null,
+        additionalAttention: [],
       };
   const memoryBlock = flags.memoryEnabled ? injection.memoryText + '\n\n' : '';
   const campaignBlock = injection.campaignText.trim().length > 0 ? `${injection.campaignText}\n\n` : '';
@@ -460,6 +470,8 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
       hasAirUnits: hasAir,
       hasNavalUnits: hasNaval,
       hasMissileUnits: hasMissile,
+      canBuildNaval: capabilities.canBuildNaval,
+      canBuildMissile: capabilities.canBuildMissile,
       standingOrdersIssuable,
       originBonusSettings: originBonusSettingsFromSnapshot(state),
       rangedTargetHint: combatTargetHint,

@@ -8,9 +8,9 @@ import { isHexExploredInSnapshot } from '../../shared/fortificationSnapshotRules
 import { isMissileUnitType } from '../../shared/missileRules';
 import { isAiSeatId } from '../../shared/seatIds';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
-import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
-import { getDistanceAndTurns, terrainIsPassableForDomain } from '../pathfinding';
+import { getDistanceAndTurns } from '../pathfinding';
+import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from './hexNeighborTerrain';
 import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import type { PassableDomain } from '../pathfinding';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
@@ -612,34 +612,18 @@ function executeAssessHex(
     logTrace('assessment executeAssessHex: omitting stale enemy intel for opponent perspective', { hexH3 });
   }
 
-  let adjacentLand = 0;
-  let adjacentWater = 0;
-  let passableNeighbors = 0;
   const passableFor: PassableDomain =
     forUnitType != null ? (forUnitType === 'naval' ? 'water' : 'land') : terrain === 'water' ? 'water' : 'land';
-  try {
-    const ring = gridDisk(hexH3, 1);
-    for (let i = 1; i < ring.length; i++) {
-      const n = ring[i]!;
-      if (!hexSet.has(n)) continue;
-      const t = terrainByH3.get(n) ?? 'land';
-      if (t === 'land') adjacentLand++;
-      else if (t === 'water') adjacentWater++;
-      else if (t === 'coastal' || t === 'wetlands') {
-        adjacentLand++;
-        adjacentWater++;
-      }
-      if (terrainIsPassableForDomain(t, passableFor)) passableNeighbors++;
-    }
-  } catch (err) {
-    logError('assessment executeAssessHex: gridDisk threw', err);
-  }
+  const counted = countNeighborTerrain({ hexH3, hexSet, terrainByH3, passableFor });
+  const adjacentLand = counted.adjacentLand;
+  const adjacentWater = counted.adjacentWater;
+  const passableNeighbors = counted.passableNeighbors;
   const adjacentTerrain = { land: adjacentLand, water: adjacentWater };
   const strategicNotes: string[] = [];
   if (adjacentWater > 0) {
     strategicNotes.push('Adjacent to water - exposed to naval bombardment (range 2)');
   }
-  if (passableNeighbors <= 3) {
+  if (passableNeighbors <= CHOKEPOINT_MAX_PASSABLE_NEIGHBORS) {
     const adjacentHexWord = passableNeighbors === 1 ? 'hex' : 'hexes';
     strategicNotes.push(`Chokepoint - only ${passableNeighbors} passable adjacent ${adjacentHexWord}`);
   }

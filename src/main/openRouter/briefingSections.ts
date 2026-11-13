@@ -24,12 +24,14 @@ import { isBuildQueueItemType, isBuildUnitType } from '../productionRules';
 import type { ControlledHexQueueSnapshot, ProductionQueueEntrySnapshot } from './productionQueueSnapshotTypes';
 import { findIdleProductionHexes, selectNextQueueEntry, type IdleProductionHex } from './productionAttention';
 import { findPausedProductionHexes, formatPausedQueuesSection, type PausedProductionHex } from './pausedProductionAttention';
+import { buildProductionPriorityLines } from './productionPriorities';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import {
   SECTION_TITLE_CONTROLLED_HEX_QUEUES,
   SECTION_TITLE_PAUSED_QUEUES,
+  SECTION_TITLE_PRODUCTION_PRIORITIES,
   SECTION_TITLE_PRODUCTION_STATUS,
   subHeading,
   topLevelHeading,
@@ -263,7 +265,7 @@ function normalizeControlledHexQueueRow(
  *
  * Purpose: The section text is unchanged. The idle list feeds Attention Flags and is computed from every queue, including queues the table does not show.
  * When to use: `buildProductionBriefingBlock` and `buildStatusInjectionTexts`.
- * Expected outcome: `text` is the production section, or empty when production is off. `idleHexes` is empty when production is off, the snapshot failed, or no hex is idle. `pausedHexes` lists queues paused for occupation or a full city. The section text includes `### Paused Queues` only after `formatBriefing` shifts the heading.
+ * Expected outcome: `text` is the production section, or empty when production is off. `idleHexes` is empty when production is off, the snapshot failed, or no hex is idle. `pausedHexes` lists queues paused for occupation or a full city. When a missile, naval, or credits priority applies, Production Priorities sits after Paused Queues and before Controlled Hex Queues. The section text includes `###` headings only after `formatBriefing` shifts them.
  * Exceptions: None.
  */
 export function buildProductionBriefing(args: {
@@ -329,6 +331,19 @@ export function buildProductionBriefing(args: {
     lines.push(subHeading(SECTION_TITLE_PAUSED_QUEUES));
     lines.push('');
     lines.push(pausedSection);
+  }
+  const priorityLines = buildProductionPriorityLines({
+    state: args.state,
+    ownSeat,
+    queues: queues as ControlledHexQueueSnapshot[],
+    resolveToH3: args.resolveToH3,
+    formatHexLabel: args.formatHexLabel,
+  });
+  if (priorityLines.length > 0) {
+    lines.push('');
+    lines.push(subHeading(SECTION_TITLE_PRODUCTION_PRIORITIES));
+    lines.push('');
+    lines.push(...priorityLines);
   }
   if (queues.length === 0) {
     lines.push(PRODUCTION_EMPTY_QUEUES_SENTENCE);

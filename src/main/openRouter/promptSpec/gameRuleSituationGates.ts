@@ -165,6 +165,24 @@ export interface CombatRuleGateInput {
    */
   readonly hasMissileUnits: boolean;
   /**
+   * Whether a controlled hex can still queue a naval unit.
+   *
+   * Contract: Omitted means false. The assembler sets this only on a strategic production consult.
+   * When to use: Copied onto the returned gates.
+   * Expected outcome: Strategic naval text can print before the seat owns a ship.
+   * Exceptions: None.
+   */
+  readonly canBuildNaval?: boolean;
+  /**
+   * Whether a controlled hex can still queue a missile.
+   *
+   * Contract: Omitted means false. The assembler sets this only on a strategic production consult.
+   * When to use: Copied onto the returned gates.
+   * Expected outcome: The missile build sentence can print before the seat owns a missile.
+   * Exceptions: None.
+   */
+  readonly canBuildMissile?: boolean;
+  /**
    * Standing orders can be issued this consult.
    *
    * Contract: False in battle.
@@ -261,6 +279,8 @@ export function combatRuleGatesForPrompt(input: CombatRuleGateInput): GameRuleTe
     hasAirUnits: input.hasAirUnits,
     hasNavalUnits: input.hasNavalUnits,
     hasMissileUnits: input.hasMissileUnits,
+    canBuildNaval: input.canBuildNaval === true,
+    canBuildMissile: input.canBuildMissile === true,
     hasFortifiedCells: input.coordinateContext.hasFortifiedCells === true,
     ordersEnabled: input.standingOrdersIssuable,
     originBonusSettings: input.originBonusSettings,

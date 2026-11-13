@@ -39,3 +39,24 @@ export function buildDoctrineBlock(doctrine: Doctrine, campaignEnabled: boolean)
   logTrace('promptSpec buildDoctrineBlock', { doctrine, campaignEnabled, included: block.length > 0 });
   return block;
 }
+
+/**
+ * Doctrine block for a strategic consult, including production denial.
+ *
+ * Purpose: Balanced and cautious must name production denial without changing the block the tactical prompt prints.
+ * When to use: `buildStrategicContextCoaching` only. Tactical consultations keep `buildDoctrineBlock`.
+ * Expected outcome: The shared doctrine block, plus one denial line for balanced and one for cautious. Aggressive is unchanged.
+ * Exceptions: None.
+ */
+export function buildStrategicDoctrineBlock(doctrine: Doctrine, campaignEnabled: boolean): string {
+  const block = buildDoctrineBlock(doctrine, campaignEnabled);
+  const extra =
+    doctrine === 'cautious'
+      ? '\n    (4) Strike enemy cities, airports, and seaports from range before you commit ground units.'
+      : doctrine === 'aggressive'
+        ? ''
+        : '\n    (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.';
+  const result = `${block}${extra}`;
+  logTrace('promptSpec buildStrategicDoctrineBlock', { doctrine, campaignEnabled, included: result.length > 0 });
+  return result;
+}

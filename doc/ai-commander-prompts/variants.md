@@ -120,7 +120,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the naval transport section. Air without ships does not print that heading. The airlift sentence is `## Transport` when the side has air. Omit the naval clause from `# Rules`, and the routing tool's land-target clause. |
+| system | Omit the naval transport section. Air without ships does not print that heading. The airlift sentence is `## Transport` when the side has air. Omit the naval clause from `# Rules` unless the prompt is strategic and `canBuildNaval` is true. Omit the routing tool's land-target clause. The strategic tools list still includes the naval line when `canBuildNaval` is true. |
 | user | unchanged |
 | tools | The routing tool's line is emitted without its naval suffix. |
 | envelope | Omit `transport_move`. Omit `embark` and `disembark` only when the roster also has no air. Air without ships keeps those two. |
@@ -179,7 +179,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the scenario objective section. Omit every home-region bullet. The goal statement becomes the generic objective: destroy enemy forces where you outnumber them, mass before each attack, and keep every city building. **Do not reuse region-versus-region sentences.** |
+| system | Omit the scenario objective section. Omit every home-region bullet. The goal statement becomes the generic objective: destroy enemy forces where you outnumber them, mass ground units before each attack, destroy the city cells, airports, and seaports that build and move enemy units, and keep every city building. **Do not reuse region-versus-region sentences.** |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |

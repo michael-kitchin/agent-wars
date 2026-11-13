@@ -132,7 +132,7 @@ Each row states what is omitted and why the model must not be given it.
 Tactical variant, bullets in this order:
 
 1. **Priority**, one line: engage enemy forces and inflict losses when advantageous.
-2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add the same doctrine block strategic adds, immediately after the strategy list. A battle does not name the campaign target.
+2. **Strategy**, the same three lines as strategic, with `beat` in place of `turn`. Balanced, Aggressive, and Cautious each add `buildDoctrineBlock` immediately after the strategy list. A strategic prompt then adds one production-denial line for balanced and one for cautious. A battle prints `buildDoctrineBlock` only, and it does not name the campaign target.
 3. **Message guidance**, identical to strategic.
 
 **Must not** contain the goals list, the explored or controlled progress lines, the home-region bullets, the Sides table, or any claim about what an enemy is doing.

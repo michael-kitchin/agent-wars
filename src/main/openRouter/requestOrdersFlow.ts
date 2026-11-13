@@ -301,6 +301,7 @@ export async function requestOrdersFlow(
         campaignPlan,
         campaignText: injection.campaignText,
         campaignAttention: injection.campaignAttention,
+        additionalAttention: injection.additionalAttention,
       }
     );
     if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {

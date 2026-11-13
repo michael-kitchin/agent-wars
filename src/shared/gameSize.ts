@@ -25,7 +25,7 @@ export const GAME_SIZES: readonly GameSize[] = ['small', 'medium', 'large'];
  * Integer multipliers applied to the Small unit-cap table.
  *
  * Purpose: Medium is 2× Small and Large is 3× Small without copying cap tables.
- * When to use: Only via `getMaxUnitsPerType`; do not scale costs or starting armies.
+ * When to use: `getMaxUnitsPerType`, and the credits-city urban floor in `buildProductionPriorityLines`. Do not scale costs or starting armies.
  * Expected outcome: `small: 1`, `medium: 2`, `large: 3`.
  * Exceptions: None.
  */

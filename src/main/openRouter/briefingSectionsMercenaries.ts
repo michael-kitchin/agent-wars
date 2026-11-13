@@ -7,16 +7,18 @@
  * Exceptions: None.
  */
 
-import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import { computeGridDistanceWithPathFallbackPure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import type { HireRaiseOption } from '../../shared/ipc/mercenaryTypes';
 import type { HopDistance } from './campaignRules';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { unitCostFor } from '../../shared/gameRules';
 import { isHireableUnitType, mercenaryUpkeepFor } from '../../shared/mercenaryRules';
 import { listOccupationPausedHexes } from '../../shared/productionBuildability';
-import { NEUTRAL_OWNER_ID } from '../../shared/seatIds';
+import { NEUTRAL_OWNER_ID, type SeatId } from '../../shared/seatIds';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { listHireOrdersForSeat } from '../gameDb/mercenaryStateAccess';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
+import { CHOKEPOINT_MAX_PASSABLE_NEIGHBORS, countNeighborTerrain } from '../tools/hexNeighborTerrain';
 import { buildHireContext, evaluateHexHire, listHireEntryHexes } from '../mercenaryHireRules';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import {
@@ -42,7 +44,7 @@ import {
  *
  * Purpose: Production-off seats still see upkeep. They are not shown hire tables.
  * When to use: While assembling the system prompt, with the seat's own snapshot.
- * Expected outcome: The section text, or `''` when this view should not include it. A production seat with 0 credits, no mercenary, and nobody to rehire gets the heading and `Treasury: 0 credits. No one to rehire.`
+ * Expected outcome: The section text, or `''` when this view should not include it. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -77,7 +79,8 @@ export function buildMercenariesBriefingBlock(
     const orders = listHireOrdersForSeat(ownSeat);
     const orderedRehires = new Set(orders.filter((order) => order.kind === 'rehire').map((order) => order.neutralUnitId));
     const context = buildHireContext(state, ownSeat);
-    if (!hasRehireCandidate(state, context, orderedRehires)) {
+    const hasRaise = raiseOptionRowsForSeat(state, ownSeat, options.campaignTargetH3 ?? null).length > 0;
+    if (!hasRehireCandidate(state, context, orderedRehires) && !hasRaise) {
       logDebug('briefingSectionsMercenaries buildMercenariesBriefingBlock empty treasury', { ownSeat });
       return `${topLevelHeading(SECTION_TITLE_MERCENARIES)}\n\nTreasury: 0 credits. No one to rehire.`;
     }
@@ -98,7 +101,16 @@ export function buildMercenariesBriefingBlock(
     '',
     subHeading(SECTION_TITLE_RAISE_OPTIONS),
     '',
-    raiseTable(context, orders, ownHexes, format, listOccupationPausedHexes(state, ownSeat), options.campaignTargetH3 ?? null)
+    raiseTable({
+      state,
+      ownSeat,
+      context,
+      orders,
+      ownHexes,
+      format,
+      resumable: listOccupationPausedHexes(state, ownSeat),
+      campaignTargetH3: options.campaignTargetH3 ?? null,
+    })
   );
   return lines.join('\n');
 }
@@ -176,6 +188,123 @@ function rehireTable(
 }
 
 /**
+ * How far an enemy unit counts as near a raise hex.
+ *
+ * Purpose: The Raise Options column and its tests share one radius.
+ * When to use: `isWithinGridRangePure` from the raise hex to the unit.
+ * Expected outcome: Two hexes, inclusive.
+ * Exceptions: None.
+ */
+export const RAISE_OPTIONS_ENEMY_RADIUS = 2;
+
+/**
+ * One raise hex after the capacity filter, before display columns are added.
+ *
+ * Purpose: The table and the attention flag must walk the same rows in the same order.
+ * When to use: The return value of `listRaiseOptionRows`.
+ * Expected outcome: Options are those that still fit in the remaining capacity.
+ * Exceptions: None.
+ */
+export interface RaiseOptionRow {
+  /**
+   * Hex where the units would appear.
+   *
+   * Contract: A hire-entry hex that still has at least one option.
+   * When to use: Distance, enemy, and chokepoint columns.
+   * Expected outcome: An H3 index on the map.
+   * Exceptions: None.
+   */
+  readonly h3Index: string;
+  /**
+   * Raise capacity still unused by this seat's raise orders.
+   *
+   * Contract: Never negative. Options whose unit cost exceeds it are omitted.
+   * When to use: The Capacity column.
+   * Expected outcome: A non-negative integer.
+   * Exceptions: None.
+   */
+  readonly capacityLeft: number;
+  /**
+   * Whether raising here would let the city build again.
+   *
+   * Contract: True when the hex is in the occupation-paused set.
+   * When to use: The sort and the Resumes building column.
+   * Expected outcome: Those rows sort first.
+   * Exceptions: None.
+   */
+  readonly resumes: boolean;
+  /**
+   * Types the seat can still raise on this hex.
+   *
+   * Contract: Non-empty. Each option fits in `capacityLeft`.
+   * When to use: The Options column and the attention flag's fee check.
+   * Expected outcome: Hire options in the order `evaluateHexHire` returned them.
+   * Exceptions: None.
+   */
+  readonly options: readonly HireRaiseOption[];
+}
+
+/**
+ * Raise rows in the order the table shows, including rows past the display limit.
+ *
+ * Purpose: Attention and the table must not build or sort the rows differently.
+ * When to use: `raiseOptionRowsForSeat` and `raiseTable`.
+ * Expected outcome: Every hex that still has an option, resume rows first, then nearer the campaign target.
+ * Exceptions: None.
+ */
+export function listRaiseOptionRows(args: {
+  readonly context: ReturnType<typeof buildHireContext>;
+  readonly orders: ReturnType<typeof listHireOrdersForSeat>;
+  readonly ownHexes: readonly string[];
+  readonly resumable: ReadonlySet<string>;
+  readonly campaignTargetH3: string | null;
+}): RaiseOptionRow[] {
+  const rows = listHireEntryHexes(args.context).flatMap((h3Index) => {
+    const evaluation = evaluateHexHire(args.context, h3Index);
+    const used = args.orders
+      .filter((order) => order.kind === 'raise' && order.h3Index === h3Index)
+      .reduce((sum, order) => sum + unitCostFor(order.unitType) * order.unitCount, 0);
+    const capacityLeft = Math.max(0, evaluation.raiseCapacityPerTurn - used);
+    const options = evaluation.raiseOptions.filter((option) => option.unitCost <= capacityLeft);
+    if (options.length === 0) return [];
+    return [{ h3Index, capacityLeft, resumes: args.resumable.has(h3Index), options }];
+  });
+  const sorted = rows.sort(
+    (left, right) =>
+      Number(right.resumes) - Number(left.resumes) ||
+      compareByCampaignTarget(left.h3Index, right.h3Index, args.campaignTargetH3, computeGridDistanceWithPathFallbackPure) ||
+      compareDistance(left.h3Index, right.h3Index, args.ownHexes) ||
+      left.h3Index.localeCompare(right.h3Index)
+  );
+  logTrace('briefingSectionsMercenaries listRaiseOptionRows', { rowCount: sorted.length });
+  return sorted;
+}
+
+/**
+ * Raise rows for one seat, including the hire-context setup.
+ *
+ * Purpose: The briefing and the attention flag must not assemble orders, context, and resumable hexes twice.
+ * When to use: The zero-credit collapse check and `formatMercenaryRaiseAttention`.
+ * Expected outcome: The same rows `raiseTable` formats, with no display limit.
+ * Exceptions: None.
+ */
+export function raiseOptionRowsForSeat(
+  state: GameStateSnapshot,
+  ownSeat: SeatId,
+  campaignTargetH3: string | null
+): RaiseOptionRow[] {
+  const rows = listRaiseOptionRows({
+    context: buildHireContext(state, ownSeat),
+    orders: listHireOrdersForSeat(ownSeat),
+    ownHexes: state.units.filter((unit) => unit.player === ownSeat).map((unit) => unit.h3Index),
+    resumable: listOccupationPausedHexes(state, ownSeat),
+    campaignTargetH3,
+  });
+  logTrace('briefingSectionsMercenaries raiseOptionRowsForSeat', { ownSeat, rowCount: rows.length });
+  return rows;
+}
+
+/**
  * Hexes that can still raise, with cells that restart a paused city first.
  *
  * Purpose: Capacity left subtracts this seat's raise orders. The function does not rebuild the snapshot.
@@ -183,38 +312,50 @@ function rehireTable(
  * Expected outcome: Cells that would restart a paused city sort first and show `yes` under Resumes building. Then cells nearest the campaign target. A table, or the none-line.
  * Exceptions: None.
  */
-function raiseTable(
-  context: ReturnType<typeof buildHireContext>,
-  orders: ReturnType<typeof listHireOrdersForSeat>,
-  ownHexes: readonly string[],
-  format: (h3Index: string) => string,
-  resumable: ReadonlySet<string>,
-  campaignTargetH3: string | null
-): string {
-  const rows = listHireEntryHexes(context).flatMap((h3Index) => {
-    const evaluation = evaluateHexHire(context, h3Index);
-    const used = orders
-      .filter((order) => order.kind === 'raise' && order.h3Index === h3Index)
-      .reduce((sum, order) => sum + unitCostFor(order.unitType) * order.unitCount, 0);
-    const capacityLeft = Math.max(0, evaluation.raiseCapacityPerTurn - used);
-    const options = evaluation.raiseOptions.filter((option) => option.unitCost <= capacityLeft);
-    if (options.length === 0) return [];
-    const text = options.map((option) => `${option.unitType} (fee ${option.fee}, upkeep ${option.upkeep})`).join('; ');
-    return [{ h3Index, capacityLeft, text, resumes: resumable.has(h3Index) }];
-  });
+function raiseTable(args: {
+  readonly state: GameStateSnapshot;
+  readonly ownSeat: SeatId;
+  readonly context: ReturnType<typeof buildHireContext>;
+  readonly orders: ReturnType<typeof listHireOrdersForSeat>;
+  readonly ownHexes: readonly string[];
+  readonly format: (h3Index: string) => string;
+  readonly resumable: ReadonlySet<string>;
+  readonly campaignTargetH3: string | null;
+}): string {
+  const rows = listRaiseOptionRows(args);
   if (rows.length === 0) return NO_RAISE_OPTIONS_LINE;
-  const shown = rows
-    .sort(
-      (left, right) =>
-        Number(right.resumes) - Number(left.resumes) ||
-        compareByCampaignTarget(left.h3Index, right.h3Index, campaignTargetH3, computeGridDistanceWithPathFallbackPure) ||
-        compareDistance(left.h3Index, right.h3Index, ownHexes) ||
-        left.h3Index.localeCompare(right.h3Index)
-    )
-    .slice(0, MERCENARY_BRIEFING_MAX_ROWS);
+  const shown = rows.slice(0, MERCENARY_BRIEFING_MAX_ROWS);
+  const hexSet = new Set(args.state.hexes.map((hex) => hex.h3Index));
+  const terrainByH3 = new Map(args.state.hexes.map((hex) => [hex.h3Index, hex.terrain]));
   return buildPromptTableLines(
-    ['Hex', 'Capacity', 'Resumes building', 'Options'],
-    shown.map((row) => [format(row.h3Index), String(row.capacityLeft), row.resumes ? 'yes' : 'no', row.text])
+    ['Hex', 'To Campaign Target', `Enemy Units Within ${RAISE_OPTIONS_ENEMY_RADIUS}`, 'Chokepoint', 'Capacity', 'Resumes building', 'Options'],
+    shown.map((row) => {
+      const distance = args.campaignTargetH3 == null
+        ? null
+        : computeGridDistanceWithPathFallbackPure(row.h3Index, args.campaignTargetH3);
+      const enemies = args.state.units.filter(
+        (unit) =>
+          unit.player !== args.ownSeat &&
+          unit.player !== NEUTRAL_OWNER_ID &&
+          isWithinGridRangePure(row.h3Index, unit.h3Index, RAISE_OPTIONS_ENEMY_RADIUS)
+      ).length;
+      const passableNeighbors = countNeighborTerrain({
+        hexH3: row.h3Index,
+        hexSet,
+        terrainByH3,
+        passableFor: 'land',
+      }).passableNeighbors;
+      const options = row.options.map((option) => `${option.unitType} (fee ${option.fee}, upkeep ${option.upkeep})`).join('; ');
+      return [
+        args.format(row.h3Index),
+        distance == null ? '—' : String(distance),
+        String(enemies),
+        passableNeighbors <= CHOKEPOINT_MAX_PASSABLE_NEIGHBORS ? 'yes' : 'no',
+        String(row.capacityLeft),
+        row.resumes ? 'yes' : 'no',
+        options,
+      ];
+    })
   ).join('\n');
 }
 

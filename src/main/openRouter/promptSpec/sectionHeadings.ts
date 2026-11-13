@@ -116,6 +116,16 @@ export const SECTION_TITLE_CONTROLLED_HEX_QUEUES = 'Controlled Hex Queues' as co
 export const SECTION_TITLE_PAUSED_QUEUES = 'Paused Queues' as const;
 
 /**
+ * Title of the production-priority subsection, without ATX hashes.
+ *
+ * Purpose: The production section names one city for a missile, a naval unit, or credits when that build is worth starting.
+ * When to use: `subHeading` in the production briefing, and the production coaching sentence that points at it.
+ * Expected outcome: The words `Production Priorities`.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_PRODUCTION_PRIORITIES = 'Production Priorities' as const;
+
+/**
  * Title of the memory injection block, without ATX hashes.
  *
  * Purpose: Persistent and triggered notes the model wrote for itself. assembly-contract.md section 3.

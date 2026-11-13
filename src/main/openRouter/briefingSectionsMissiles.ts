@@ -10,7 +10,7 @@
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import { missileReachSet } from '../gameActions/missileReach';
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { FORTIFIED_COLUMN_HEADER } from '../../shared/fortificationRules';
 import { isHexExploredInSnapshot } from '../../shared/fortificationSnapshotRules';
@@ -101,6 +101,26 @@ interface MissileReachRow {
 }
 
 /**
+ * Reach sets for the seat's missiles.
+ *
+ * Purpose: The Missile Forces table and the launch attention line must name the same missiles and the same disks.
+ * When to use: Both of those builders. A battle passes tactical mode and gets an empty list.
+ * Expected outcome: Missiles of the briefing seat, sorted by id, each with `missileReachSet`. Empty when the seat has none or the mode is tactical.
+ * Exceptions: None.
+ */
+function ownMissileReaches(state: GameStateSnapshot, mode: 'strategic' | 'tactical'): MissileReachRow[] {
+  const ownSeat = briefingOwnSeatId(state);
+  const missiles = (mode === 'tactical' ? [] : state.units.filter((unit) => unit.player === ownSeat && isMissileUnitType(unit.unitType)))
+    .slice()
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return missiles.map((missile) => ({
+    id: missile.id,
+    h3Index: missile.h3Index,
+    reach: missileReachSet(missile.h3Index),
+  }));
+}
+
+/**
  * Builds the Missile Forces section, or returns empty when it should not appear.
  *
  * Purpose: The commander sees its missiles and a short list of enemy infrastructure it can hit.
@@ -114,16 +134,9 @@ export function buildMissileForcesBriefingBlock(
   mode: 'strategic' | 'tactical'
 ): string {
   const ownSeat = briefingOwnSeatId(state);
-  const missiles = (mode === 'tactical' ? [] : state.units.filter((unit) => unit.player === ownSeat && isMissileUnitType(unit.unitType)))
-    .slice()
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  logDebug('briefingSectionsMissiles buildMissileForcesBriefingBlock', { mode, ownSeat, missileCount: missiles.length });
-  if (missiles.length === 0) return '';
-  const reaches: MissileReachRow[] = missiles.map((missile) => ({
-    id: missile.id,
-    h3Index: missile.h3Index,
-    reach: missileReachSet(missile.h3Index),
-  }));
+  const reaches = ownMissileReaches(state, mode);
+  logDebug('briefingSectionsMissiles buildMissileForcesBriefingBlock', { mode, ownSeat, missileCount: reaches.length });
+  if (reaches.length === 0) return '';
   const missileTable = buildPromptTableLines(
     ['Unit ID', 'Hex'],
     reaches.map((row) => [row.id, format(row.h3Index)])
@@ -147,6 +160,27 @@ export function buildMissileForcesBriefingBlock(
 }
 
 /**
+ * Enemy infrastructure the seat has explored.
+ *
+ * Purpose: Missile targets and production priorities must start from the same hexes.
+ * When to use: Before range or coast filters.
+ * Expected outcome: Infrastructure with a city, airport, or seaport, controlled by another seat, and explored. Own and neutral hexes are absent.
+ * Exceptions: None.
+ */
+export function enemyInfrastructureHexes(state: GameStateSnapshot, ownSeat: string) {
+  const controllerByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  const rows = (state.strategicInfrastructure ?? [])
+    .filter((row) => row.urbanHexCount > 0 || row.airportCount > 0 || row.seaportCount > 0)
+    .filter((row) => {
+      const controller = controllerByHex.get(row.h3Index);
+      return controller != null && isSeatId(controller) && controller !== ownSeat;
+    })
+    .filter((row) => isHexExploredInSnapshot(state, row.h3Index));
+  logTrace('briefingSectionsMissiles enemyInfrastructureHexes', { ownSeat, count: rows.length });
+  return rows;
+}
+
+/**
  * Target-table rows, best infrastructure first, cut to the limit.
  *
  * Purpose: Own, Neutral, unexplored, and out-of-range hexes are not launch advice.
@@ -161,13 +195,7 @@ function missileTargetRows(
   format: (h3Index: string) => string
 ): string[][] {
   const controllerByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  const candidates = (state.strategicInfrastructure ?? [])
-    .filter((row) => row.urbanHexCount > 0 || row.airportCount > 0 || row.seaportCount > 0)
-    .filter((row) => {
-      const controller = controllerByHex.get(row.h3Index);
-      return controller != null && isSeatId(controller) && controller !== ownSeat;
-    })
-    .filter((row) => isHexExploredInSnapshot(state, row.h3Index))
+  const candidates = enemyInfrastructureHexes(state, ownSeat)
     .map((row) => ({ row, inRange: reaches.filter((missile) => missile.reach.has(row.h3Index)) }))
     .filter((item) => item.inRange.length > 0)
     .sort((a, b) => {
@@ -197,4 +225,30 @@ function missileTargetRows(
       item.inRange.map((missile) => missile.id).join(', '),
     ];
   });
+}
+
+/**
+ * The attention line that tells the commander to launch.
+ *
+ * Purpose: Missile Forces lists the target. Attention Flags tells the commander to copy it into `missileLaunches`.
+ * When to use: Strategic status injection. A battle does not call it.
+ * Expected outcome: Null when the seat has no missile or no target row. Otherwise the first target row's missiles, owner, and city cells.
+ * Exceptions: None.
+ */
+export function formatMissileLaunchAttention(
+  state: GameStateSnapshot,
+  format: (h3Index: string) => string
+): string | null {
+  const ownSeat = briefingOwnSeatId(state);
+  const reaches = ownMissileReaches(state, 'strategic');
+  const first = reaches.length === 0 ? undefined : missileTargetRows(state, ownSeat, reaches, format)[0];
+  logTrace('briefingSectionsMissiles formatMissileLaunchAttention', {
+    ownSeat,
+    missileCount: reaches.length,
+    hasTarget: first !== undefined,
+  });
+  if (!first) return null;
+  const cells = first[2] === '1' ? 'city cell' : 'city cells';
+  const ids = first[first.length - 1] ?? '';
+  return `Missiles: ${ids} can launch. Best target: ${first[0]}, a ${first[1]} city with ${first[2]} ${cells}. Add a missileLaunches entry.`;
 }

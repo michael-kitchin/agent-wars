@@ -123,6 +123,15 @@ export type FormatBriefingSharedContext = {
    */
   campaignAttention?: string | null;
   /**
+   * Launch and raise bullets that sit outside the five-flag cap.
+   *
+   * Purpose: A missile that can fire, and a raise the treasury can afford, have to stay visible after the unit flags fill their five lines.
+   * When to use: Strategic `formatBriefing`, after the production and campaign bullets.
+   * Expected outcome: Each string is one attention bullet. Omitted or empty adds nothing.
+   * Exceptions: None.
+   */
+  additionalAttention?: readonly string[];
+  /**
    * The consult's campaign plan.
    *
    * Contract: Omitted or null keeps today's orderless suggestions and Best Options rows.
@@ -870,7 +879,8 @@ export function formatBriefing(
     )
   );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
-  sections.push(
+  const attentionFlags = (sharedContext?.additionalAttention ?? []).reduce(
+    (text, bullet) => appendProductionAttentionBullet(text, bullet),
     appendProductionAttentionBullet(
       appendProductionAttentionBullet(
         appendProductionAttentionBullet(
@@ -888,6 +898,7 @@ export function formatBriefing(
       sharedContext?.campaignAttention ?? null
     )
   );
+  sections.push(attentionFlags);
   const operational = buildStrategicOperationalMapSectionMarkdown({
     state,
     latLngByH3,

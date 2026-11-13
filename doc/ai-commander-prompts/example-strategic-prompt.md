@@ -118,17 +118,24 @@ Production progress/spawn resolves after Ready, after combat and control resolut
 
 - Your goals are, in priority order:
     (1) Take and hold enemy cities. Taking cities is how you knock sides out.
-    (2) Mass your ground units before each attack. Units that arrive one at a time are destroyed one at a time.
-    (3) Keep enough units at home to stop a raid on your cities.
-    (4) Keep every city building. At your unit caps, bank credits and hire mercenaries.
-    (5) Scout with a few units, not your main force.
+    (2) Bring more force to each fight than the enemy can. Mass your ground units before an attack, and use ships, aircraft, and mercenaries to put units where the enemy is weak.
+    (3) Stop the enemy doing the same. Destroy the city cells, airports, and seaports that build and move its units.
+    (4) Keep enough units at home to stop a raid on your cities.
+    (5) Keep every city building, and keep credits coming in for mercenaries.
+    (6) Scout with a few units, not your main force.
 - Your strategy is:
     (1) Attack where you outnumber the defenders, and avoid fights where you do not.
     (2) Strike gaps the enemy cannot reinforce quickly.
     (3) Keep the initiative: move toward your objective every turn.
+- Your tools are:
+    (1) Missiles destroy city cells, airports, and seaports up to 12 hexes away, beyond the reach of aircraft. Build one in a city that reaches a large enemy city, then launch it.
+    (2) Naval units shell any hex within 2 of them, and carry ground units to a coast the enemy has left open.
+    (3) Air units strike within 3 hexes of their airport, carry one infantry unit between airports, and drop it within 3 hexes.
+    (4) Mercenaries are raised for credits in any explored city outside an enemy home region that holds no enemy unit. They do not count toward unit caps. Raise them beside the campaign target, or behind the enemy to split its force.
 - Your doctrine is balanced:
     (1) Advance on the campaign target while your home cities are safe.
     (2) Trade a unit for a city when the odds favor you. At your unit caps, a lost unit is usually rebuilt within a turn or two, and a lost city is not.
+    (3) Strike the cities, airports, and seaports your ground units cannot reach. Production the enemy loses is force it cannot bring.
 - Your message is:
     Address your enemies in character, as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.
 
@@ -253,6 +260,10 @@ Use tools selectively for memory lookup (memory_read) and production queue check
 ## Production Queues
 
 - When a controlled cell can build and its queue is empty, queue something.
+
+  Keep one city queued on credits at all times. Credits are the only way to raise mercenaries, and mercenaries are the only units you can place away from your own cities.
+
+  Production Priorities, under Production Status, names a city for a missile, a naval unit, or credits when one is worth building. Queue what it names before filling the other cities.
 
   Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. When every unit type a hex can build is at cap, queue credits and spend them on mercenaries. Queue fortification only in a city whose Exposed column says yes, and replace a fortification queue in a city that is not exposed with credits.
 
@@ -617,20 +628,24 @@ Your current unit counts: infantry 12/12, armor 5/8, naval 8/8, air 6/6, missile
 
 You are currently at maximum for: infantry, naval, air.
 
+### Production Priorities
+
+- Credits: no city is producing credits. Queue credits in E3.
+
 ### Controlled Hex Queues
 
 | Hex | Urban Hexes | Fortified | Exposed | Airports | Seaports | Available Unit Types | Current Queue | Building |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EJ | 80 | 0/80 | no | 8 | 4 | armor, fortification, credits | — | yes |
-| FO | 65 | 0/65 | no | 2 | 2 | armor, fortification, credits | — | yes |
-| ER | 50 | 0/50 | no | 4 | 3 | armor, fortification, credits | — | yes |
-| FZ | 44 | 0/44 | no | 2 | 3 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
-| DN | 39 | 0/39 | no | 4 | 2 | armor, fortification, credits | 1 naval (blocked: at cap) | yes |
-| EH | 39 | 0/39 | no | 4 | 4 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
-| E0 | 34 | 0/34 | no | 4 | 2 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
-| DJ | 33 | 0/33 | no | 4 | 4 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
-| E3 | 27 | 0/27 | no | 1 | 0 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
-| GF | 27 | 0/27 | no | 2 | 1 | armor, fortification, credits | 1 air (blocked: at cap) | yes |
+| EJ | 80 | 0/80 | no | 8 | 4 | armor, missile, fortification, credits | — | yes |
+| FO | 65 | 0/65 | no | 2 | 2 | armor, missile, fortification, credits | — | yes |
+| ER | 50 | 0/50 | no | 4 | 3 | armor, missile, fortification, credits | — | yes |
+| FZ | 44 | 0/44 | no | 2 | 3 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| DN | 39 | 0/39 | no | 4 | 2 | armor, missile, fortification, credits | 1 naval (blocked: at cap) | yes |
+| EH | 39 | 0/39 | no | 4 | 4 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| E0 | 34 | 0/34 | no | 4 | 2 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| DJ | 33 | 0/33 | no | 4 | 4 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| E3 | 27 | 0/27 | no | 1 | 0 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
+| GF | 27 | 0/27 | no | 2 | 1 | armor, missile, fortification, credits | 1 air (blocked: at cap) | yes |
 
 ## Your Strategic Memory
 
@@ -737,6 +752,26 @@ Enemy infrastructure in your current strike envelope: airports=7, seaports=7.
 | a1-n9 | HI | yes | no | infantry 0, armor 0 | 0/2 | GL at hex distance 1 |
 | a1-n10 | IE | yes | yes | infantry 0, armor 0 | 0/2 | IE at hex distance 0 |
 | a1-n11 | ER | yes | yes | infantry 0, armor 0 | 0/2 | ER at hex distance 0 |
+
+## Mercenaries
+
+Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see.
+
+Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill.
+
+After that each mercenary costs its upkeep every turn: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.
+
+Treasury: 40 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders already taken from the treasury this turn: 0 credits.
+
+### Rehire Candidates
+
+No Neutral unit you can see can be rehired.
+
+### Raise Options
+
+| Hex | To Campaign Target | Enemy Units Within 2 | Chokepoint | Capacity | Resumes building | Options |
+| --- | --- | --- | --- | --- | --- | --- |
+| E3 | 4 | 0 | no | 40 | no | infantry (fee 3, upkeep 3) |
 
 ## Unit Roster
 
