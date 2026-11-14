@@ -30,7 +30,7 @@ import {
   type ResolutionContext,
 } from '../callbackEvaluation';
 import { readCampaignObjectives } from '../gameDb/campaignObjectiveMemory';
-import { operationUnitIdsForSeat } from '../gameDb/operationMemory';
+import { operationUnitIdsForSeat, readOperationEventTurn } from '../gameDb/operationMemory';
 import { campaignAssaultReady } from './campaignRules';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getToolFlags } from './openRouterToolGroups';
@@ -232,6 +232,25 @@ export function campaignReadyOverride(
 }
 
 /**
+ * Whether this seat should be consulted because an operation changed or a menu was offered.
+ *
+ * Purpose: An event-driven commander is asked on the turn a phase changes, an operation ends, or a menu is first shown.
+ * When to use: After `campaignReadyOverride`, with the same orders flag.
+ * Expected outcome: `{ type: 'operation_update' }` when standing orders are on and the stored event turn equals `state.turnNumber`. Otherwise null.
+ * Exceptions: None. A missing row is null.
+ */
+export function operationUpdateOverride(
+  state: GameStateSnapshot,
+  seatId: AiSeatId,
+  ordersEnabled: boolean
+): Extract<MandatoryOverrideResult, { type: 'operation_update' }> | null {
+  const eventTurn = ordersEnabled ? readOperationEventTurn({ getOne: dbGetOne }, seatId) : null;
+  const consult = ordersEnabled && eventTurn === state.turnNumber;
+  logDebug('afterResolution operationUpdateOverride', { seatId, consult, ordersEnabled, eventTurn, turnNumber: state.turnNumber });
+  return consult ? { type: 'operation_update' } : null;
+}
+
+/**
  * Consults one AI seat after a strategic turn and stores the orders it returns.
  *
  * Purpose: Event-driven mode plans the next turn from the resolution that just finished.
@@ -266,8 +285,11 @@ export async function afterResolution(
     removedOpponentUnitIds,
     consumeFogNewContactsForPlayer(seatId)
   );
-  const campaignReady = campaignReadyOverride(state, seatId, getToolFlags(deps.enabledToolNames).ordersEnabled);
+  const ordersEnabled = getToolFlags(deps.enabledToolNames).ordersEnabled;
+  const campaignReady = campaignReadyOverride(state, seatId, ordersEnabled);
   if (campaignReady) mandatoryFired.push(campaignReady);
+  const operationUpdate = operationUpdateOverride(state, seatId, ordersEnabled);
+  if (operationUpdate) mandatoryFired.push(operationUpdate);
 
   addCombatSinceConsultation(seatId, opponentCombatants);
 

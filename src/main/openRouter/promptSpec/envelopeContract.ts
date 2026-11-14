@@ -110,10 +110,19 @@ export interface EnvelopeGates {
    *
    * Contract: Strategic `region_vs_region` consults with standing orders on.
    * When to use: Set from the scenario, the mode, and `ordersEnabled`.
-   * Expected outcome: `campaignTarget` is last in the field list. Omitted means the field is absent.
+   * Expected outcome: `campaignTarget` follows production. Omitted means the field is absent. `operations` follows it when that gate is on.
    * Exceptions: None.
    */
   readonly includeCampaignTarget?: boolean;
+  /**
+   * Whether this consult may launch or cancel an operation.
+   *
+   * Contract: Strategic consults with standing orders on. Omitted means false.
+   * When to use: Set from the mode and `ordersEnabled`.
+   * Expected outcome: `operations` is last in the field list. A tactical consult never includes it.
+   * Exceptions: None.
+   */
+  readonly includeOperations?: boolean;
 }
 
 /**
@@ -137,6 +146,7 @@ export const ENVELOPE_FIELD_ORDER: readonly string[] = [
   'memoryUpdates',
   'productionOrders',
   'campaignTarget',
+  'operations',
 ] as const;
 
 /**
@@ -209,6 +219,7 @@ export function envelopeFieldsForGates(gates: EnvelopeGates): readonly string[] 
     if (field === 'memoryUpdates') return includeMemory;
     if (field === 'productionOrders') return includeProduction;
     if (field === 'campaignTarget') return gates.coordinateMode !== 'tactical' && gates.includeCampaignTarget === true;
+    if (field === 'operations') return gates.coordinateMode !== 'tactical' && gates.includeOperations === true;
     return false;
   });
 }
@@ -414,6 +425,8 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
       example.memoryUpdates = EXAMPLE_MEMORY_UPDATES;
     } else if (field === 'productionOrders') {
       example.productionOrders = EXAMPLE_PRODUCTION_ORDERS;
+    } else if (field === 'operations') {
+      example.operations = [{ action: 'launch', option: 'A' }];
     }
   }
   const json = JSON.stringify(example);

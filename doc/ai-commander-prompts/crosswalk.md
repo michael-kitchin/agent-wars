@@ -63,6 +63,7 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `AIR_ORDER_RESTRICTIONS` | both mode files | Air operations status; legal actions |
 | `EMBARK_LEGALITY` | both mode files | Naval transport status |
 | `ACTIVE_OPERATIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Active Operations |
+| `OPERATION_OPTIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Operation Options |
 | `OPERATION_RULES` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic Context, `## Operations` |
 | `PRODUCTION_QUEUES` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_RULES_COSTS` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
@@ -127,8 +128,9 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |
 | `## Reminders Triggered This Turn` | Kept — 1.6 |
 | `## Standing Order Status` | Kept — 1.6 |
-| `## Active Operations` | Added. One bullet per stored sea operation, after Campaign Objective, when standing orders are on and the consult is not a battle. Omitted when the seat has none. |
-| `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. |
+| `## Active Operations` | Added. One bullet per stored sea operation, after Campaign Objective, when standing orders are on and the consult is not a battle. The heading also stays when Operation Options has a row and no operation is stored. Omitted when the seat has neither. |
+| `## Operation Options` | Added. A table of up to five letters, after Active Operations when that section is present, when standing orders are on, the consult is not a battle, and a candidate exists. It still prints when no operation is stored. |
+| `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. The command paragraph names the launch, the cancel, and the engine's one-turn window. |
 | `## Units Without Standing Orders` | Kept — 1.6 |
 | `## Active Callbacks` | Kept, with a detail-cell contract — 1.6 |
 | `# Scenario Objective (Required)` | Kept — 1.7 |

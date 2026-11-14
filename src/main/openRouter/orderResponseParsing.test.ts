@@ -462,6 +462,7 @@ const tests = [
   { name: 'parseOrdersResponse disembark clears assignment and enqueues movement', fn: testDisembarkClearsAssignmentAndEnqueuesMovement },
   { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
   { name: 'parseOrdersResponse campaignTarget keeps a code and drops a non-code', fn: testCampaignTargetCodeOrDropReason },
+  { name: 'parseOrdersResponse operations yields commands on strategic and nothing on tactical', fn: testOperationsCommandsOnStrategicOnly },
 ];
 
 /**
@@ -472,6 +473,31 @@ const tests = [
  * Expected outcome: Prints `OK` lines and returns normally when all pass.
  * Exceptions: `process.exit(1)` on assertion error.
  */
+/**
+ * Keeps operation commands on a strategic reply and ignores them on a tactical reply.
+ *
+ * Purpose: A battle reply must not gain a drop reason from a field the tactical contract does not teach.
+ * When to use: After the envelope parse of `operations`.
+ * Expected outcome: The strategic parse has the launch and the cancel. The tactical parse has no commands and no operations reason.
+ * Exceptions: None.
+ */
+function testOperationsCommandsOnStrategicOnly(): void {
+  const body = '{"strategy":"hold","orders":[],"operations":[{"action":"launch","option":"b"},{"action":"cancel","id":"op-1"}]}';
+  const strategic = parseFixture(body);
+  assert.ok(strategic);
+  assert.deepEqual(strategic!.operationCommands, [
+    { action: 'launch', option: 'B' },
+    { action: 'cancel', id: 'op-1' },
+  ]);
+  ensureStrategicCoordinateRegistryInitialized();
+  const hexList = minimalState.hexes.map((hex) => hex.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const tactical = parseOrdersResponse(body, resolveToH3, minimalState, latLngByH3, false, { mode: 'tactical', battleId: 'ops' });
+  assert.ok(tactical);
+  assert.strictEqual(tactical!.operationCommands, undefined);
+  assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('operations')));
+}
+
 function run(): void {
   for (const t of tests) {
     try {

@@ -16,8 +16,9 @@ import {
   type OperationPhase,
   type OperationSource,
 } from '../../shared/operationTypes';
+import { EMPTY_OPERATION_OFFER, type OperationOfferState } from '../operations/operationOffer';
 import type { GameConfigKvDbOps } from './gameConfigKv';
-import { selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
+import { deleteGameConfigRow, selectGameConfigValue, upsertGameConfigValue } from './gameConfigRows';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
@@ -29,6 +30,26 @@ import { logDebug, logError, logTrace } from '../logger';
  * Exceptions: None.
  */
 export const OPERATIONS_CONFIG_KEY = 'operations';
+
+/**
+ * The `game_config` key for each seat's menu clocks.
+ *
+ * Purpose: The window survives until the next turn, including across a save and load.
+ * When to use: Reading and writing `announcedTurn` and `clearOfferTurn`.
+ * Expected outcome: The string `operation_offers`.
+ * Exceptions: None.
+ */
+export const OPERATION_OFFERS_CONFIG_KEY = 'operation_offers';
+
+/**
+ * The `game_config` key for the turn a seat should be consulted about operations.
+ *
+ * Purpose: Event-driven consultation reads this after the operation tick.
+ * When to use: Reading and writing that turn number.
+ * Expected outcome: The string `operation_events`.
+ * Exceptions: None.
+ */
+export const OPERATION_EVENTS_CONFIG_KEY = 'operation_events';
 
 /**
  * True when the value is a member of the allowed list.
@@ -157,6 +178,162 @@ export function writeOperationsForSeat(
   for (const key of [...all.keys()].sort()) record[key] = all.get(key)!;
   logDebug('operationMemory writeOperationsForSeat', { seatId, cleared: operations.length === 0, seatCount: all.size });
   upsertGameConfigValue(ops, OPERATIONS_CONFIG_KEY, JSON.stringify(record));
+}
+
+/**
+ * Reads one seat-keyed JSON object.
+ *
+ * Purpose: The offer row and the event row share one parse.
+ * When to use: The offer and event readers.
+ * Expected outcome: The object, or an empty object when the row is missing or not an object.
+ * Exceptions: None. A parse error is logged and returns an empty object.
+ */
+function readConfigObject(ops: Pick<GameConfigKvDbOps, 'getOne'>, key: string): Record<string, unknown> {
+  logTrace('operationMemory readConfigObject', { key });
+  const raw = selectGameConfigValue(ops, key);
+  if (raw == null) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      logError('operationMemory readConfigObject: stored value is not an object', { key, rawLength: raw.length });
+      return {};
+    }
+    return parsed as Record<string, unknown>;
+  } catch (err) {
+    logError('operationMemory readConfigObject: could not parse stored value', { key, rawLength: raw.length }, err);
+    return {};
+  }
+}
+
+/**
+ * Writes one seat-keyed JSON object.
+ *
+ * Purpose: The offer row and the event row share one write.
+ * When to use: After a seat's entry is added or removed.
+ * Expected outcome: The row replaced with the sorted keys, or deleted when no seat remains.
+ * Exceptions: Propagates a database error.
+ */
+function writeConfigObject(
+  ops: Pick<GameConfigKvDbOps, 'run'>,
+  key: string,
+  record: Record<string, unknown>
+): void {
+  const seatIds = Object.keys(record).sort();
+  logDebug('operationMemory writeConfigObject', { key, seatCount: seatIds.length });
+  if (seatIds.length === 0) {
+    deleteGameConfigRow(ops, key);
+    return;
+  }
+  const sorted: Record<string, unknown> = {};
+  for (const seatId of seatIds) sorted[seatId] = record[seatId];
+  upsertGameConfigValue(ops, key, JSON.stringify(sorted));
+}
+
+/**
+ * A stored integer, or null when the value is not one.
+ *
+ * Purpose: A bad clock must not launch or consult.
+ * When to use: While reading an offer turn or an event turn.
+ * Expected outcome: The integer, or null.
+ * Exceptions: None.
+ */
+function storedInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+/**
+ * Reads one seat's menu clocks.
+ *
+ * Purpose: The turn advance continues the window that was stored last tick.
+ * When to use: At the start of a seat's launch step. A missing or malformed row is an empty offer.
+ * Expected outcome: Both turns, or nulls when the seat has no entry.
+ * Exceptions: None. A parse error is logged by the shared reader and returns an empty offer.
+ */
+export function readOperationOffer(
+  ops: Pick<GameConfigKvDbOps, 'getOne'>,
+  seatId: string
+): OperationOfferState {
+  logTrace('operationMemory readOperationOffer', { seatId });
+  const entry = readConfigObject(ops, OPERATION_OFFERS_CONFIG_KEY)[seatId];
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return EMPTY_OPERATION_OFFER;
+  const row = entry as Record<string, unknown>;
+  return {
+    announcedTurn: storedInteger(row.announcedTurn),
+    clearOfferTurn: storedInteger(row.clearOfferTurn),
+  };
+}
+
+/**
+ * Replaces one seat's menu clocks.
+ *
+ * Purpose: The window has to be there on the next turn, and gone when the seat has nothing to show.
+ * When to use: At the end of a seat's launch step, and when that seat is knocked out. Pass null, or an offer whose turns are both null, to remove the seat.
+ * Expected outcome: The row with this seat's entry replaced or removed. Other seats are kept.
+ * Exceptions: Propagates a database error.
+ */
+export function writeOperationOffer(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  offer: OperationOfferState | null
+): void {
+  const record = readConfigObject(ops, OPERATION_OFFERS_CONFIG_KEY);
+  const clear = offer === null || (offer.announcedTurn === null && offer.clearOfferTurn === null);
+  if (clear) delete record[seatId];
+  else record[seatId] = { announcedTurn: offer.announcedTurn, clearOfferTurn: offer.clearOfferTurn };
+  logDebug('operationMemory writeOperationOffer', { seatId, cleared: clear });
+  writeConfigObject(ops, OPERATION_OFFERS_CONFIG_KEY, record);
+}
+
+/**
+ * Reads the turn on which this seat should be consulted about operations.
+ *
+ * Purpose: The consult trigger compares it with the planning turn.
+ * When to use: After resolution, for one seat. A missing or malformed value is null.
+ * Expected outcome: The stored turn, or null.
+ * Exceptions: None. A parse error is logged by the shared reader and returns null.
+ */
+export function readOperationEventTurn(ops: Pick<GameConfigKvDbOps, 'getOne'>, seatId: string): number | null {
+  logTrace('operationMemory readOperationEventTurn', { seatId });
+  return storedInteger(readConfigObject(ops, OPERATION_EVENTS_CONFIG_KEY)[seatId]);
+}
+
+/**
+ * Seat ids stored on the operation, offer, or event rows.
+ *
+ * Purpose: A seat that has left must lose a menu even when it never stored an operation.
+ * When to use: Before the active seats advance.
+ * Expected outcome: Every seat id present on any of the three rows, in sorted order.
+ * Exceptions: None. A malformed row is logged by the reader and contributes no ids.
+ */
+export function operationMemorySeatIds(ops: Pick<GameConfigKvDbOps, 'getOne'>): readonly string[] {
+  const ids = new Set<string>([
+    ...readOperations(ops).keys(),
+    ...Object.keys(readConfigObject(ops, OPERATION_OFFERS_CONFIG_KEY)),
+    ...Object.keys(readConfigObject(ops, OPERATION_EVENTS_CONFIG_KEY)),
+  ]);
+  const seatIds = [...ids].sort();
+  logTrace('operationMemory operationMemorySeatIds', { seatCount: seatIds.length });
+  return seatIds;
+}
+
+/**
+ * Stores, or clears, the turn on which this seat should be consulted.
+ *
+ * Purpose: The operation tick records the moments the commander has to answer.
+ * When to use: When a menu is first shown, an undefended row appears, a phase changes, or the engine launches. Pass null to remove the seat.
+ * Expected outcome: The row with this seat's turn replaced or removed. Other seats are kept.
+ * Exceptions: Propagates a database error.
+ */
+export function writeOperationEventTurn(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  turn: number | null
+): void {
+  const record = readConfigObject(ops, OPERATION_EVENTS_CONFIG_KEY);
+  if (turn === null) delete record[seatId];
+  else record[seatId] = turn;
+  logDebug('operationMemory writeOperationEventTurn', { seatId, turn });
+  writeConfigObject(ops, OPERATION_EVENTS_CONFIG_KEY, record);
 }
 
 /**

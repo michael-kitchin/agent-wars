@@ -10,9 +10,15 @@ import { dbGetOne, dbRun } from '../gameDb';
 import { upsertGameConfigValue } from './gameConfigRows';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
+  OPERATION_EVENTS_CONFIG_KEY,
+  OPERATION_OFFERS_CONFIG_KEY,
   OPERATIONS_CONFIG_KEY,
   nextOperationId,
+  readOperationEventTurn,
+  readOperationOffer,
   readOperations,
+  writeOperationEventTurn,
+  writeOperationOffer,
   writeOperationsForSeat,
 } from './operationMemory';
 
@@ -73,4 +79,29 @@ test('nextOperationId uses the plain id, then the b suffix', () => {
   assert.equal(plain, 'a1-op4');
   const taken = nextOperationId('a1', [sampleOperation('a1-op4')], 4);
   assert.equal(taken, 'a1-op4b');
+});
+
+test('offer and event rows round-trip without disturbing operations', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    writeOperationsForSeat(ops, 'a1', [sampleOperation('a1-op3')]);
+    writeOperationOffer(ops, 'a1', { announcedTurn: 5, clearOfferTurn: 5 });
+    writeOperationOffer(ops, 'a2', { announcedTurn: 4, clearOfferTurn: null });
+    writeOperationEventTurn(ops, 'a1', 5);
+    writeOperationEventTurn(ops, 'a2', 4);
+    assert.deepEqual(readOperationOffer(ops, 'a1'), { announcedTurn: 5, clearOfferTurn: 5 });
+    assert.deepEqual(readOperationOffer(ops, 'a2'), { announcedTurn: 4, clearOfferTurn: null });
+    assert.equal(readOperationEventTurn(ops, 'a1'), 5);
+    assert.equal(readOperations(ops).get('a1')?.[0]?.id, 'a1-op3');
+    writeOperationOffer(ops, 'a1', null);
+    assert.deepEqual(readOperationOffer(ops, 'a1'), { announcedTurn: null, clearOfferTurn: null });
+    assert.equal(readOperationEventTurn(ops, 'a1'), 5);
+    assert.equal(readOperationEventTurn(ops, 'a2'), 4);
+    upsertGameConfigValue(ops, OPERATION_OFFERS_CONFIG_KEY, 'not-json');
+    assert.deepEqual(readOperationOffer(ops, 'a2'), { announcedTurn: null, clearOfferTurn: null });
+    assert.equal(readOperations(ops).get('a1')?.[0]?.id, 'a1-op3');
+    upsertGameConfigValue(ops, OPERATION_EVENTS_CONFIG_KEY, '{"a2":"soon"}');
+    assert.equal(readOperationEventTurn(ops, 'a2'), null);
+    assert.equal(readOperations(ops).size, 1);
+  });
 });

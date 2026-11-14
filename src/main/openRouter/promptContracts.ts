@@ -119,14 +119,23 @@ export function buildFinalJsonContractInstruction(args: {
    */
   includeExitBattle?: boolean;
   /**
-   * When true, the contract names optional `campaignTarget` last.
+   * When true, the contract names optional `campaignTarget`.
    *
    * Contract: Omitted means false. True on a strategic regional consult with standing orders on.
    * When to use: Pass from `buildConsultPromptParts` when `campaignEnabled` is true.
-   * Expected outcome: The header and one paragraph name the field. The example omits it.
+   * Expected outcome: The header and one paragraph name the field. The example omits it. `operations` follows it when that gate is on.
    * Exceptions: None.
    */
   includeCampaignTarget?: boolean;
+  /**
+   * When true, the contract names optional `operations` after `campaignTarget`.
+   *
+   * Contract: Omitted means false. True on a strategic consult with standing orders on.
+   * When to use: Pass from `buildConsultPromptParts` when `operationsEnabled` is true.
+   * Expected outcome: The header and one paragraph name the field. The example omits it.
+   * Exceptions: None.
+   */
+  includeOperations?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -158,6 +167,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeMissileActions = false,
     includeExitBattle = false,
     includeCampaignTarget = false,
+    includeOperations = false,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -173,6 +183,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeMissileActions,
     includeExitBattle,
     includeCampaignTarget,
+    includeOperations,
     coordinateMode,
     structuredOutputs,
   });
@@ -186,6 +197,7 @@ export function buildFinalJsonContractInstruction(args: {
     includeExitBattle,
     includeNavalActions,
     includeCampaignTarget: coordinateMode !== 'tactical' && includeCampaignTarget,
+    includeOperations: coordinateMode !== 'tactical' && includeOperations,
   };
   const fields = envelopeFieldsForGates(gates);
   const headerSlots: Record<string, string> = {
@@ -201,6 +213,7 @@ export function buildFinalJsonContractInstruction(args: {
     memoryUpdates: '"memoryUpdates": [...]',
     productionOrders: '"productionOrders": [...]',
     campaignTarget: '"campaignTarget": "<optional hex code>"',
+    operations: '"operations": [...]',
   };
   const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
@@ -240,6 +253,10 @@ export function buildFinalJsonContractInstruction(args: {
     gates.includeCampaignTarget === true
       ? 'Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.'
       : '';
+  const operationsParagraph =
+    gates.includeOperations === true
+      ? 'Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing.'
+      : '';
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
     ...(structuredOutputs ? strictSchemaParagraphs.slice(1) : strictSchemaParagraphs),
@@ -250,6 +267,7 @@ export function buildFinalJsonContractInstruction(args: {
     movementOrderInstruction.trim(),
     ...callbacksClause.split('\n\n'),
     campaignParagraph,
+    operationsParagraph,
     memoryParagraph,
     ...productionClause.split('\n\n'),
   ].map((part) => part.trim()).filter((part) => part.length > 0);

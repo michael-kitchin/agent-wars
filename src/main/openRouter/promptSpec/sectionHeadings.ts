@@ -176,6 +176,16 @@ export const SECTION_TITLE_CAMPAIGN_ORDERS = 'Campaign Orders' as const;
 export const SECTION_TITLE_OPERATIONS = 'Active Operations' as const;
 
 /**
+ * Title of the landings the commander can choose, without ATX hashes.
+ *
+ * Purpose: The situation message lists a few achievable operations with their gain, cost, and risk.
+ * When to use: `subHeading` inside Active Operations when a sea slot is free and a candidate exists.
+ * Expected outcome: An H2 under Active Operations. Battle prompts omit it.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_OPERATION_OPTIONS = 'Operation Options' as const;
+
+/**
  * Title of the campaign rules in the system prompt, without ATX hashes.
  *
  * Purpose: The cached explanation of assemble, assault, defenders, and advance rows.

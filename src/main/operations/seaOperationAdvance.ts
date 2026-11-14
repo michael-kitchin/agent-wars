@@ -789,6 +789,25 @@ function advanceReturn(operation: Operation, facts: OperationFacts, unitIds: rea
 }
 
 /**
+ * Ends an operation because the commander called it off.
+ *
+ * Purpose: A cancel has to free a force that is still gathering, turn a force at sea back, and stop one that is already ashore.
+ * When to use: When a reply names this operation and it is not already in `return`.
+ * Expected outcome: `muster` cancels every unit and ship and stores nothing. `transit` is the return step. `assault` stores nothing and adds no order. `return` is unchanged.
+ * Exceptions: None.
+ */
+export function cancelSeaOperation(operation: Operation, facts: OperationFacts): OperationStep {
+  logDebug('seaOperationAdvance cancelSeaOperation', { id: operation.id, phase: operation.phase });
+  if (operation.phase === 'muster') {
+    const ids = [...operation.unitIds, ...operation.carrierIds];
+    return ended('abandoned', 'cancel-muster', cancelAll(ids), ids);
+  }
+  if (operation.phase === 'transit') return turnSeaOperationBack(operation, facts);
+  if (operation.phase === 'assault') return ended('abandoned', 'cancel-assault', [], []);
+  return { next: operation, actions: [], releasedIds: [], outcome: 'running', reason: 'already returning' };
+}
+
+/**
  * Turns a transit back toward a home port.
  *
  * Purpose: A transit that cannot finish, and a later cancel, share one way to start a return.

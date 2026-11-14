@@ -92,6 +92,15 @@ export interface OpeningMessageGates {
    */
   readonly hasCampaignOrders?: boolean;
   /**
+   * Whether Operation Options lists at least one row.
+   *
+   * Contract: Omitted means false. True only for a strategic consult whose briefing printed the table.
+   * When to use: From the hoisted briefing flag, through `buildConsultPromptParts`.
+   * Expected outcome: True adds the clause that tells the model to launch an operation when it is worth its cost.
+   * Exceptions: None.
+   */
+  readonly hasOperationOptions?: boolean;
+  /**
    * Whether the adjacent-cell fallback listing is in the situation message.
    *
    * Contract: Used when planning and standing orders are both off.
@@ -209,7 +218,11 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
       gates.ordersEnabled && gates.hasCampaignOrders === true
         ? ' Give each unit in Campaign Orders the order its row names.'
         : '';
-    return optionsClause + orderlessClause + campaignClause;
+    const operationClause =
+      gates.ordersEnabled && gates.hasOperationOptions === true
+        ? ' Launch an operation from Operation Options if one is worth its cost.'
+        : '';
+    return optionsClause + orderlessClause + campaignClause + operationClause;
   }
   if (gates.planningEnabled && !gates.hasBriefing) {
     return 'Use the listed tools to derive destinations; there is no options table.';

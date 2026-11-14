@@ -8,8 +8,8 @@
  */
 
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
-import { GAME_SIZE_MULTIPLIER, parseGameSize } from '../../shared/gameSize';
 import type { AiSeatId } from '../../shared/seatIds';
+import type { GameStateSnapshot } from '../gameDb';
 import { activeAiSeatIds } from '../../shared/seatRoster';
 import type { Operation } from '../../shared/operationTypes';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
@@ -21,17 +21,26 @@ import {
   getSeatRoster,
   listUnitsForSnapshot,
 } from '../gameDb';
-import { logDebug, logError } from '../logger';
-import { CAMPAIGN_CONTACT_RADIUS } from '../openRouter/campaignRules';
-import { campaignPlanForState, loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
+import { logDebug, logError, logTrace } from '../logger';
+import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import { resolveDefendPostH3 } from '../tools/standingOrdersDefendPost';
 import { parseOrderParams, type StandingOrderRow } from '../tools/standingOrdersShared';
-import { nextOperationId, readOperations, writeOperationsForSeat } from '../gameDb/operationMemory';
+import {
+  nextOperationId,
+  readOperationOffer,
+  readOperations,
+  operationMemorySeatIds,
+  writeOperationEventTurn,
+  writeOperationOffer,
+  writeOperationsForSeat,
+} from '../gameDb/operationMemory';
 import { buildLiftTerrain } from './liftTerrain';
 import { applyOperationActions } from './operationActions';
-import { OPERATION_MAX_SEA_PER_SIZE, OPERATION_MUSTER_CANDIDATE_LIMIT } from './operationRules';
+import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
+import { decideOperationOffer, EMPTY_OPERATION_OFFER } from './operationOffer';
+import { OPERATION_MUSTER_CANDIDATE_LIMIT } from './operationRules';
 import { advanceSeaOperation, type OperationFacts, type StoredOrderFact } from './seaOperationAdvance';
-import { listKnownEnemyCities, listSeaOperationCandidates } from './seaOperationCandidates';
+import { listKnownEnemyCities } from './seaOperationCandidates';
 
 /**
  * Database helpers the operations row uses.
@@ -152,11 +161,52 @@ function cargoStillAboard(unitIds: readonly string[], carrierIds: readonly strin
 }
 
 /**
+ * Builds the facts one operation's advance reads.
+ *
+ * Purpose: A launch and a cancel must judge the force with the same terrain, orders, and city facts as the turn advance.
+ * When to use: Once per operation, with the snapshot that includes every unit the decision should see.
+ * Expected outcome: Facts for that operation. Null when the land mass cannot be loaded.
+ * Exceptions: None. A missing land mass is null. A thrown terrain error propagates.
+ */
+export function buildOperationFacts(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly operation: Operation;
+  readonly coordinates: KnockoutCoordinates;
+}): OperationFacts | null {
+  logTrace('operationTurnFlow buildOperationFacts', { seatId: args.seatId, id: args.operation.id, phase: args.operation.phase });
+  const landMass = loadCampaignLandMass(args.seatId);
+  if (landMass === null) {
+    logDebug('operationTurnFlow buildOperationFacts', { seatId: args.seatId, id: args.operation.id, skipped: 'terrain' });
+    return null;
+  }
+  const terrain = buildLiftTerrain({ state: args.state, seatId: args.seatId, landMass });
+  const own = args.state.units.filter((unit) => unit.player === args.seatId);
+  const carrierByCargoId = new Map<string, string>();
+  for (const unit of own) {
+    if (unit.embarkedOnCarrierUnitId) carrierByCargoId.set(unit.id, unit.embarkedOnCarrierUnitId);
+  }
+  const enemyCities = new Set(listKnownEnemyCities(args.state, args.seatId).map((city) => city.h3Index));
+  const controlByHex = new Map((args.state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  return {
+    turnNumber: args.state.turnNumber,
+    unitHexById: new Map(own.map((unit) => [unit.id, unit.h3Index])),
+    unitTypeById: new Map(own.map((unit) => [unit.id, unit.unitType])),
+    carrierByCargoId,
+    storedOrderById: readStoredOrders(args.seatId, args.coordinates),
+    objectiveIsOwn: controlByHex.get(args.operation.objectiveH3) === args.seatId,
+    objectiveIsEnemyCity: enemyCities.has(args.operation.objectiveH3),
+    chooseLanding: (fromH3) => chooseLanding(terrain, args.operation.objectiveH3, fromH3),
+    chooseReturnPort: (fromH3) => chooseReturnPort({ fromH3, seatId: args.seatId, state: args.state, terrain }),
+  };
+}
+
+/**
  * Advances one seat's stored operations and launches into any free slot.
  *
  * Purpose: The seat sees enemy units that fog would hide, so a city is not launched while a defender is standing on it.
  * When to use: Once per active AI seat, after knocked-out seats have been cleared.
- * Expected outcome: The seat's stored list is replaced with the operations still running, including any launch this tick.
+ * Expected outcome: The seat's stored list is replaced with the operations still running. A new landing waits until an undefended option has been offered on an earlier turn.
  * Exceptions: Propagates a database or terrain error. The caller logs it and leaves this seat's previous list in place only when the write has not run.
  */
 export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: KnockoutCoordinates): void {
@@ -168,36 +218,25 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
     logDebug('operationTurnFlow advanceOperationsForSeat', { seatId, skipped: 'terrain' });
     return;
   }
-  const terrain = buildLiftTerrain({ state, seatId, landMass });
-  const own = state.units.filter((unit) => unit.player === seatId);
-  const unitHexById = new Map(own.map((unit) => [unit.id, unit.h3Index]));
-  const unitTypeById = new Map(own.map((unit) => [unit.id, unit.unitType]));
-  const carrierByCargoId = new Map<string, string>();
-  for (const unit of own) {
-    if (unit.embarkedOnCarrierUnitId) carrierByCargoId.set(unit.id, unit.embarkedOnCarrierUnitId);
-  }
-  const storedOrderById = readStoredOrders(seatId, coordinates);
-  const enemyCities = new Set(listKnownEnemyCities(state, seatId).map((city) => city.h3Index));
-  const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  const factsFor = (operation: Operation): OperationFacts => ({
-    turnNumber: state.turnNumber,
-    unitHexById,
-    unitTypeById,
-    carrierByCargoId,
-    storedOrderById,
-    objectiveIsOwn: controlByHex.get(operation.objectiveH3) === seatId,
-    objectiveIsEnemyCity: enemyCities.has(operation.objectiveH3),
-    chooseLanding: (fromH3) => chooseLanding(terrain, operation.objectiveH3, fromH3),
-    chooseReturnPort: (fromH3) => chooseReturnPort({ fromH3, seatId, state, terrain }),
-  });
+  const unitHexById = new Map(
+    state.units.filter((unit) => unit.player === seatId).map((unit) => [unit.id, unit.h3Index]),
+  );
   const kept: Operation[] = [];
   const withheldIds = new Set<string>();
+  let seatEvent = false;
   const stored = [...(readOperations(configOps).get(seatId) ?? [])].sort((left, right) => compareIds(left.id, right.id));
   for (const operation of stored) {
-    const step = advanceSeaOperation(operation, factsFor(operation));
+    const startedPhase = operation.phase;
+    const facts = buildOperationFacts({ state, seatId, operation, coordinates });
+    if (facts === null) {
+      kept.push(operation);
+      continue;
+    }
+    const step = advanceSeaOperation(operation, facts);
     const actionCount = applyOperationActions({ seatId, actions: step.actions, state, coordinates });
     if (step.next !== null) kept.push(step.next);
     for (const unitId of step.releasedIds) withheldIds.add(unitId);
+    if (step.outcome !== 'running' || (step.next !== null && step.next.phase !== startedPhase)) seatEvent = true;
     const shipHexes = (step.next?.carrierIds ?? [])
       .map((shipId) => unitHexById.get(shipId))
       .filter((hex): hex is string => hex !== undefined)
@@ -214,51 +253,65 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
       cargoAboard: cargoStillAboard(step.next?.unitIds ?? [], step.next?.carrierIds ?? []),
     });
   }
-  const slots = OPERATION_MAX_SEA_PER_SIZE * GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)];
-  while (kept.length < slots) {
-    const plan = campaignPlanForState(state);
-    const protectedUnitIds = new Set<string>([...(plan?.defenderUnitIds ?? []), ...withheldIds]);
-    for (const unit of own) {
-      if (unit.unitType !== 'infantry' && unit.unitType !== 'armor') continue;
-      if (terrain.enemyUnitsWithin(unit.h3Index, CAMPAIGN_CONTACT_RADIUS) > 0) protectedUnitIds.add(unit.id);
+  const slots = operationSlotsForState(state);
+  /**
+   * How many sea operations this seat still has.
+   *
+   * Purpose: Another method must not take a sea slot.
+   * When to use: The free-slot check, again after a launch is stored.
+   * Expected outcome: The number of stored rows whose method is sea.
+   * Exceptions: None.
+   */
+  const seaRunning = (): number => kept.filter((operation) => operation.method === 'sea').length;
+  let offer = readOperationOffer(configOps, seatId);
+  if (seaRunning() >= slots) offer = EMPTY_OPERATION_OFFER;
+  else {
+    while (seaRunning() < slots) {
+      const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
+      const decision = decideOperationOffer({
+        turnNumber: state.turnNumber,
+        hasCandidate: candidates.length > 0,
+        hasClear: candidates.some((candidate) => candidate.clear),
+        offer,
+      });
+      offer = decision.offer;
+      if (decision.consult) seatEvent = true;
+      if (!decision.launch) break;
+      const candidate = candidates.find((row) => row.clear);
+      if (candidate === undefined) break;
+      const launched: Operation = {
+        id: nextOperationId(seatId, kept, state.turnNumber),
+        method: 'sea',
+        objectiveH3: candidate.objectiveH3,
+        musterH3: candidate.musterH3,
+        landingH3: null,
+        unitIds: [...candidate.unitIds],
+        carrierIds: [...candidate.carrierIds],
+        phase: 'muster',
+        source: 'engine',
+        launchedTurn: state.turnNumber,
+        phaseTurn: state.turnNumber,
+      };
+      const facts = buildOperationFacts({ state, seatId, operation: launched, coordinates });
+      if (facts === null) break;
+      const step = advanceSeaOperation(launched, facts);
+      applyOperationActions({ seatId, actions: step.actions, state, coordinates });
+      if (step.next === null) break;
+      kept.push(step.next);
+      seatEvent = true;
+      logDebug('operationTurnFlow launched', {
+        seatId,
+        id: launched.id,
+        objectiveH3: launched.objectiveH3,
+        musterH3: launched.musterH3,
+        unitCount: launched.unitIds.length,
+        carrierCount: launched.carrierIds.length,
+      });
     }
-    const candidates = listSeaOperationCandidates({
-      state,
-      seatId,
-      landMass,
-      terrain,
-      active: kept,
-      protectedUnitIds,
-      hasCampaignPlan: plan !== null,
-    });
-    const candidate = candidates.find((row) => row.clear);
-    if (candidate === undefined) break;
-    const launched: Operation = {
-      id: nextOperationId(seatId, kept, state.turnNumber),
-      method: 'sea',
-      objectiveH3: candidate.objectiveH3,
-      musterH3: candidate.musterH3,
-      landingH3: null,
-      unitIds: [...candidate.unitIds],
-      carrierIds: [...candidate.carrierIds],
-      phase: 'muster',
-      source: 'engine',
-      launchedTurn: state.turnNumber,
-      phaseTurn: state.turnNumber,
-    };
-    const step = advanceSeaOperation(launched, factsFor(launched));
-    applyOperationActions({ seatId, actions: step.actions, state, coordinates });
-    if (step.next === null) break;
-    kept.push(step.next);
-    logDebug('operationTurnFlow launched', {
-      seatId,
-      id: launched.id,
-      objectiveH3: launched.objectiveH3,
-      musterH3: launched.musterH3,
-      unitCount: launched.unitIds.length,
-      carrierCount: launched.carrierIds.length,
-    });
   }
+  const offerEmpty = offer.announcedTurn === null && offer.clearOfferTurn === null;
+  writeOperationOffer(configOps, seatId, offerEmpty ? null : offer);
+  if (seatEvent) writeOperationEventTurn(configOps, seatId, state.turnNumber);
   writeOperationsForSeat(configOps, seatId, kept);
 }
 
@@ -267,15 +320,19 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
  *
  * Purpose: The planning turn has already been incremented and fog has been refreshed. This is the operation tick.
  * When to use: Once, after fog refresh and before the database save. Pass the coordinates the turn already built.
- * Expected outcome: Active seats have current operations. Every other seat's operations are removed. A failure is logged and the turn still finishes.
+ * Expected outcome: Active seats have current operations. Every other seat loses its operations, its menu, and its consult turn. A failure is logged and the turn still finishes.
  * Exceptions: None. The outer catch logs a failure of the roster or the clear step. A seat catch logs that seat and continues.
  */
 export function advanceOperationsAfterTurn(coordinates: KnockoutCoordinates): void {
   logDebug('operationTurnFlow advanceOperationsAfterTurn', {});
   try {
     const active = new Set<string>(activeAiSeatIds(getSeatRoster()));
-    for (const seatId of readOperations(configOps).keys()) {
-      if (!active.has(seatId)) writeOperationsForSeat(configOps, seatId, []);
+    for (const seatId of operationMemorySeatIds(configOps)) {
+      if (!active.has(seatId)) {
+        writeOperationsForSeat(configOps, seatId, []);
+        writeOperationOffer(configOps, seatId, null);
+        writeOperationEventTurn(configOps, seatId, null);
+      }
     }
     for (const seatId of activeAiSeatIds(getSeatRoster())) {
       try {

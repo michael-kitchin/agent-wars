@@ -207,6 +207,20 @@ test('production attention clause is a strategic briefing pointer only', () => {
   );
 });
 
+test('opening message names Operation Options only when a menu is listed', () => {
+  const clause = 'Launch an operation from Operation Options if one is worth its cost.';
+  assert.ok(buildOpeningUserMessage(strategicOpening({ hasOperationOptions: true })).includes(clause));
+  assert.equal(buildOpeningUserMessage(strategicOpening()).includes('Operation Options'), false);
+  assert.equal(
+    buildOpeningUserMessage(strategicOpening({ hasOperationOptions: true, ordersEnabled: false })).includes('Operation Options'),
+    false,
+  );
+  assert.equal(
+    buildOpeningUserMessage({ ...strategicOpening({ hasOperationOptions: true }), coordinateMode: 'tactical' }).includes('Operation Options'),
+    false,
+  );
+});
+
 test('corrective message is appended only before the final malformed retry', async () => {
   setMalformedCompletionRetryDelayOverrideForTests(0);
   try {

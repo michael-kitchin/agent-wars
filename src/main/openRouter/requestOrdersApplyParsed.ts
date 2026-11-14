@@ -17,6 +17,8 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import type { AiSeatId } from '../../shared/seatIds';
+import type { OperationCandidate } from '../../shared/operationTypes';
+import { applyOperationCommands } from '../operations/operationCommands';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
 import { applyCampaignTargetOverride } from './campaignTargetOverride';
@@ -149,6 +151,14 @@ export interface ApplyParsedRequestOrdersArgs {
    */
   readonly resolveToH3: (lat: number, lng: number) => string | undefined;
   /**
+   * Rows the briefing listed, in letter order.
+   * Contract: The Operation Options array for this consult. Empty when that table was absent.
+   * When to use: Resolving a launch letter. Do not search again.
+   * Expected outcome: Index 0 is option A.
+   * Exceptions: None.
+   */
+  readonly offeredCandidates: readonly OperationCandidate[];
+  /**
    * Lazy pathfinding session for standing-order expansion.
    *
    * Contract: Strategic only.
@@ -258,6 +268,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     planState,
     latLngByH3,
     resolveToH3,
+    offeredCandidates,
     getOrCreateAiPlanningPathfindingSession,
     aiOrderUnitLabel,
     validateAiOrder,
@@ -277,6 +288,11 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
     battleId: tacticalBattle?.battleId,
   });
 
+  const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
+  if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
+    const operationResult = applyOperationCommands({ state: planState, seatId, commands: parsed.operationCommands, coordinates: { latLngByH3, resolveToH3 }, candidates: offeredCandidates });
+    dropReasons.push(...operationResult.dropReasons);
+  }
   // Tactical beats omit strategic standing-order expansion: assign_order/cancel_order are blocked for sub-unit ids,
   // so auto-generated pursue/march from parents must not substitute for explicit_move this beat.
   const standingGenerated =
@@ -291,7 +307,6 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       battleId: tacticalBattle.battleId,
     });
   }
-  const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
   const heldReasons: string[] = [];
   const convertedUnitIds = new Set<string>();
   const movementSource = parsed.movementOrders ?? [];

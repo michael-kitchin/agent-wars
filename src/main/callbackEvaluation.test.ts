@@ -9,7 +9,8 @@ import { AI_SEAT_IDS } from '../shared/seatIds';
 import { dbGetOne, dbRun, type GameStateSnapshot } from './gameDb';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import { writeCampaignObjectiveForSeat } from './gameDb/campaignObjectiveMemory';
-import { campaignReadyOverride } from './openRouter/afterResolution';
+import { writeOperationEventTurn } from './gameDb/operationMemory';
+import { campaignReadyOverride, operationUpdateOverride } from './openRouter/afterResolution';
 import {
   evaluateMandatoryOverrides,
   evaluateSubscriptionEvents,
@@ -324,8 +325,28 @@ function testCampaignReadyOverride(): void {
   });
 }
 
+/**
+ * A stored operation event on this turn asks for a consult.
+ *
+ * Purpose: An event-driven commander is asked when an operation changed or a menu was offered, and not on a later turn.
+ * When to use: Direct node invocation of this file.
+ * Expected outcome: `operation_update` only when the stored turn equals the state's turn and orders are on.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testOperationUpdateOverride(): void {
+  withTempGameDb('aw-operation-update-', () => {
+    const state = { turnNumber: 4, units: [], hexes: [], phase: 'planning', pendingOrders: [] } as unknown as GameStateSnapshot;
+    const ops = { getOne: dbGetOne, run: dbRun };
+    writeOperationEventTurn(ops, 'opponent', 4);
+    assert.equal(operationUpdateOverride(state, 'opponent', true)?.type, 'operation_update');
+    assert.equal(operationUpdateOverride({ ...state, turnNumber: 5 }, 'opponent', true), null);
+    assert.equal(operationUpdateOverride(state, 'opponent', false), null);
+  });
+}
+
 function run(): void {
   testCampaignReadyOverride();
+  testOperationUpdateOverride();
   testFirstConsultationFires();
   testFirstCombatFires();
   testUnitDestroyedFires();

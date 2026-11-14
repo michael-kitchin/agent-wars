@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Operation } from '../../shared/operationTypes';
-import { advanceSeaOperation, turnSeaOperationBack, type OperationAction, type OperationFacts } from './seaOperationAdvance';
+import { advanceSeaOperation, cancelSeaOperation, turnSeaOperationBack, type OperationAction, type OperationFacts } from './seaOperationAdvance';
 
 const PORT = 'port';
 const CITY = 'city';
@@ -447,4 +447,48 @@ test('turning back sails to the port chosen from the first ship', () => {
   assert.equal(step.next?.musterH3, 'home-2');
   assert.deepEqual(step.actions, [{ kind: 'march', unitId: 'ship-1', toH3: 'home-2' }]);
   assert.equal(step.outcome, 'running');
+});
+
+test('cancelling a muster frees every unit and ship', () => {
+  const step = cancelSeaOperation(
+    operation({ phase: 'muster', unitIds: ['inf-a'], carrierIds: ['ship-1'] }),
+    facts(),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'abandoned');
+  assert.deepEqual(step.actions, [
+    { kind: 'cancelOrder', unitId: 'inf-a' },
+    { kind: 'cancelOrder', unitId: 'ship-1' },
+  ]);
+});
+
+test('cancelling a transit turns the ships back', () => {
+  const { unitHexById } = placed(['inf-a'], 'sea', ['ship-1']);
+  const step = cancelSeaOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a'], carrierIds: ['ship-1'], landingH3: BEACH }),
+    facts({ unitHexById, chooseReturnPort: () => 'home-2' }),
+  );
+  assert.equal(step.next?.phase, 'return');
+  assert.equal(step.next?.musterH3, 'home-2');
+  assert.equal(step.outcome, 'running');
+  assert.deepEqual(step.actions, [{ kind: 'march', unitId: 'ship-1', toH3: 'home-2' }]);
+});
+
+test('cancelling an assault ends it without a new order', () => {
+  const step = cancelSeaOperation(
+    operation({ phase: 'assault', unitIds: ['inf-a'], carrierIds: [] }),
+    facts(),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'abandoned');
+  assert.deepEqual(step.actions, []);
+});
+
+test('cancelling a return leaves the operation', () => {
+  const stored = operation({ phase: 'return', unitIds: ['inf-a'], carrierIds: ['ship-1'] });
+  const step = cancelSeaOperation(stored, facts());
+  assert.equal(step.next, stored);
+  assert.equal(step.outcome, 'running');
+  assert.equal(step.reason, 'already returning');
+  assert.deepEqual(step.actions, []);
 });

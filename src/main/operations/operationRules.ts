@@ -58,14 +58,24 @@ export const OPERATION_MUSTER_MAX_LAND_STEPS = 8;
 export const OPERATION_OBJECTIVE_TEST_LIMIT = 8;
 
 /**
- * Most candidates returned.
+ * How many sea landings the menu letters can name.
  *
- * Purpose: The launch needs the first clear row. A later menu shows at most this many.
- * When to use: The candidate search, after the city order is fixed.
- * Expected outcome: 5.
+ * Purpose: The candidate search and the reply share one cap, and each row needs a letter.
+ * When to use: The candidate search, after the city order is fixed, and when a letter is checked.
+ * Expected outcome: 5. `OPERATION_OPTION_LETTERS` has the same length.
  * Exceptions: None.
  */
 export const OPERATION_MENU_SIZE = 5;
+
+/**
+ * Letters for the rows of Operation Options, in row order.
+ *
+ * Purpose: The briefing and the reply name a row by the same letter.
+ * When to use: Printing the table and reading a launch command.
+ * Expected outcome: `A` through `E`. The length matches `OPERATION_MENU_SIZE`.
+ * Exceptions: None.
+ */
+export const OPERATION_OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
 
 /**
  * Turns in `muster` before going with whoever has arrived, or giving up.

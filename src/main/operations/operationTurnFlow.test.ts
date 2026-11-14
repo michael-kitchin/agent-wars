@@ -14,7 +14,7 @@ import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, getLandStepDistances, STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot } from '../gameDb';
-import { readOperations } from '../gameDb/operationMemory';
+import { readOperationEventTurn, readOperationOffer, readOperations, writeOperationEventTurn, writeOperationOffer } from '../gameDb/operationMemory';
 import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import type { LatLng } from '../tools/h3LatLng';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -43,6 +43,18 @@ function coordinates(): KnockoutCoordinates {
       }
     },
   };
+}
+
+/**
+ * Sets the planning turn the operation tick will read.
+ *
+ * Purpose: The window compares the stored turn with the match's turn number.
+ * When to use: Before an advance that must see a chosen turn.
+ * Expected outcome: The next snapshot reports that turn.
+ * Exceptions: None.
+ */
+function setTurn(turnNumber: number): void {
+  dbRun('UPDATE turn_state SET turn_number = ? WHERE id = 1', [turnNumber]);
 }
 
 /**
@@ -123,12 +135,21 @@ test('one call stores a muster and the next call does not store another', () => 
     assert.ok(landMass, 'expected the terrain cache');
     arrange(landMass, false);
     const coords = coordinates();
+    const ops = { getOne: dbGetOne };
+    setTurn(5);
     advanceOperationsForSeat(SEAT, coords);
-    const first = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(readOperations(ops).get(SEAT), undefined);
+    assert.deepEqual(readOperationOffer(ops, SEAT), { announcedTurn: 5, clearOfferTurn: 5 });
+    assert.equal(readOperationEventTurn(ops, SEAT), 5);
+    setTurn(6);
+    advanceOperationsForSeat(SEAT, coords);
+    const first = readOperations(ops).get(SEAT) ?? [];
     assert.equal(first.length, 1);
     assert.equal(first[0]?.phase, 'muster');
     assert.equal(first[0]?.unitIds.length, 2);
     assert.deepEqual(first[0]?.carrierIds, ['ship-1']);
+    assert.equal(readOperationOffer(ops, SEAT).clearOfferTurn, null);
+    assert.equal(readOperationEventTurn(ops, SEAT), 6);
     const orders = dbGetAll<{ unit_id: string; order_type: string }>(
       'SELECT unit_id, order_type FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
       [SEAT],
@@ -138,7 +159,7 @@ test('one call stores a muster and the next call does not store another', () => 
       assert.equal(marching.has(unitId), true, unitId);
     }
     advanceOperationsForSeat(SEAT, coords);
-    const second = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    const second = readOperations(ops).get(SEAT) ?? [];
     assert.equal(second.length, 1);
     assert.equal(second[0]?.id, first[0]?.id);
   });
@@ -150,10 +171,21 @@ test('a seat that has left the match loses its stored operations', () => {
     assert.ok(landMass, 'expected the terrain cache');
     arrange(landMass, false);
     const coords = coordinates();
+    setTurn(5);
     advanceOperationsForSeat(SEAT, coords);
+    setTurn(6);
+    advanceOperationsForSeat(SEAT, coords);
+    assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).length, 1);
+    const memory = { getOne: dbGetOne, run: dbRun };
+    writeOperationOffer(memory, 'spectator', { announcedTurn: 4, clearOfferTurn: 4 });
+    writeOperationEventTurn(memory, 'spectator', 4);
     dbRun('UPDATE seats SET out_turn = 1 WHERE seat_id = ?', [SEAT]);
     advanceOperationsAfterTurn(coords);
     assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).announcedTurn, null);
+    assert.equal(readOperationEventTurn({ getOne: dbGetOne }, SEAT), null);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, 'spectator').announcedTurn, null);
+    assert.equal(readOperationEventTurn({ getOne: dbGetOne }, 'spectator'), null);
   });
 });
 
@@ -167,5 +199,20 @@ test('a defender hidden by fog still blocks the launch', () => {
     assert.equal(listUnitsForSnapshot().some((unit) => unit.id === 'defender' && unit.h3Index === city), true);
     advanceOperationsForSeat(SEAT, coordinates());
     assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    setTurn(5);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).clearOfferTurn, null);
+    setTurn(6);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    dbRun('DELETE FROM units WHERE id = ?', ['defender']);
+    setTurn(7);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).clearOfferTurn, 7);
+    setTurn(8);
+    advanceOperationsForSeat(SEAT, coordinates());
+    assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).length, 1);
   });
 });

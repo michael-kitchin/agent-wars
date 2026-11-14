@@ -145,6 +145,15 @@ export function buildConsultPromptParts(input: {
    * Exceptions: None.
    */
   readonly campaignAttention?: string | null;
+  /**
+   * Whether the briefing's Operation Options table has a row.
+   *
+   * Contract: Omitted means false. Pass the briefing injection's flag, including false.
+   * When to use: `requestOrdersFlow`, after it has built the briefing.
+   * Expected outcome: The opening mentions Operation Options only when this is true.
+   * Exceptions: None.
+   */
+  readonly hasOperationOptions?: boolean;
 }): { staticSystemText: string; situationText: string } {
   const state = input.state;
   const coordMap = input.coordMap;
@@ -285,6 +294,8 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         pausedProductionAttention: null,
         campaignText: '',
         operationsText: '',
+        offeredCandidates: [],
+        hasOperationOptions: input.hasOperationOptions === true,
         campaignAttention: input.campaignAttention ?? null,
         additionalAttention: [],
       };
@@ -430,6 +441,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     includeStandingOrderActions: standingOrdersIssuable,
     includeExitBattle,
     includeCampaignTarget: coachingGates.campaignEnabled === true,
+    includeOperations: coachingGates.operationsEnabled === true,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
@@ -511,6 +523,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     includeExitBattle,
     hasProductionAttention: injection.productionAttention !== null,
     hasCampaignOrders: injection.campaignAttention !== null,
+    hasOperationOptions: input.hasOperationOptions === true,
   });
   const staticSystemText = wrapLongProseLines(`${topLevelHeading(SECTION_TITLE_YOUR_COMMAND)}
 

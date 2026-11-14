@@ -54,7 +54,7 @@ export function buildStrategicContextCoaching(gates: CoachingGates): string {
 ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
 ${MESSAGE_BLOCK}`;
   const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock()}` : message;
-  return gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock()}` : withCampaign;
+  return gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true)}` : withCampaign;
 }
 
 /**

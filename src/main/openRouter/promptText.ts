@@ -531,6 +531,7 @@ export function getInitialUserMessage(
     readonly includeExitBattle?: boolean;
     readonly hasProductionAttention?: boolean;
     readonly hasCampaignOrders?: boolean;
+    readonly hasOperationOptions?: boolean;
   } = {}
 ): string {
   logDebug('promptText getInitialUserMessage', {
@@ -542,6 +543,7 @@ export function getInitialUserMessage(
     includeExitBattle: roster.includeExitBattle === true,
     hasProductionAttention: roster.hasProductionAttention === true,
     hasCampaignOrders: roster.hasCampaignOrders === true,
+    hasOperationOptions: roster.hasOperationOptions === true,
   });
   return buildOpeningUserMessage({
     coordinateMode,
@@ -557,5 +559,6 @@ export function getInitialUserMessage(
     includeExitBattle: roster.includeExitBattle === true,
     hasProductionAttention: roster.hasProductionAttention === true,
     hasCampaignOrders: roster.hasCampaignOrders === true,
+    hasOperationOptions: roster.hasOperationOptions === true,
   });
 }

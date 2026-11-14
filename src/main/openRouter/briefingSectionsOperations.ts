@@ -9,8 +9,11 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
-import type { Operation } from '../../shared/operationTypes';
-import { SECTION_TITLE_OPERATIONS, topLevelHeading } from './promptSpec/sectionHeadings';
+import { buildPromptTableLines } from '../promptTableHelpers';
+import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import { LIFT_OBJECTIVE_CLEAR_RADIUS } from '../operations/liftRules';
+import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
+import { SECTION_TITLE_OPERATION_OPTIONS, SECTION_TITLE_OPERATIONS, subHeading, topLevelHeading } from './promptSpec/sectionHeadings';
 
 /**
  * The noun for a count, singular at one.
@@ -93,21 +96,97 @@ function operationBullet(state: GameStateSnapshot, operation: Operation, format:
 }
 
 /**
+ * A count out of the seat's total, singular only when both are one.
+ *
+ * Purpose: The cost column says "1 ground unit" or "1 of 4 ground units" from the same numbers.
+ * When to use: Ground units and ships in an option row.
+ * Expected outcome: `1 ${singular}` when both counts are 1. Otherwise `${count} of ${total}` plus the noun for the total.
+ * Exceptions: None.
+ */
+function ofTotal(count: number, total: number, singular: string): string {
+  if (count === 1 && total === 1) return `1 ${singular}`;
+  return `${count} of ${total} ${noun(total, singular)}`;
+}
+
+/**
+ * One Operation Options row.
+ *
+ * Purpose: The letter, the route, and the three numbers come from the candidate the engine would launch.
+ * When to use: Once per candidate that has a letter.
+ * Expected outcome: Seven cells. A count of 1 uses the singular noun.
+ * Exceptions: None.
+ */
+function optionRow(args: {
+  readonly candidate: OperationCandidate;
+  readonly letter: string;
+  readonly groundTotal: number;
+  readonly navalTotal: number;
+  readonly format: (h3Index: string) => string;
+}): string[] {
+  const { candidate, letter, groundTotal, navalTotal, format } = args;
+  const units = candidate.unitIds.length;
+  const ships = candidate.carrierIds.length;
+  const plan = `${units} ${noun(units, 'ground unit')} muster at ${format(candidate.musterH3)}; ${ships} ${noun(ships, 'ship')} sail to ${format(candidate.landingH3)}; assault ${format(candidate.objectiveH3)}`;
+  const impact = `${candidate.urbanHexCount} ${noun(candidate.urbanHexCount, 'city cell')}${candidate.inEnemyHome ? ', in an enemy home region' : ''}`;
+  const cost = `${ofTotal(units, groundTotal, 'ground unit')}, ${ofTotal(ships, navalTotal, 'ship')}, about ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
+  const risk = `${candidate.defenders} ${noun(candidate.defenders, 'enemy unit')} within ${LIFT_OBJECTIVE_CLEAR_RADIUS} hexes; ${candidate.reinforcers} more can reach it in ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
+  const fortified = candidate.knownFortifiedCount > 0
+    ? `; ${candidate.knownFortifiedCount} ${noun(candidate.knownFortifiedCount, 'fortified cell')}`
+    : '';
+  return [letter, format(candidate.objectiveH3), candidate.method, plan, impact, cost, `${risk}${fortified}`];
+}
+
+/**
+ * Writes the Operation Options table.
+ *
+ * Purpose: The commander sees a short list of landings, each with what it gains, what it ties up, and what stands in the way.
+ * When to use: When the seat has a free slot and at least one candidate. Pass the same array the reply will launch from.
+ * Expected outcome: An empty string when there is no candidate. Otherwise an H2, a blank line, and a table of at most `OPERATION_OPTION_LETTERS` rows.
+ * Exceptions: None.
+ */
+export function buildOperationOptionsSection(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly candidates: readonly OperationCandidate[];
+  readonly format: (h3Index: string) => string;
+}): string {
+  const listed = args.candidates.slice(0, OPERATION_OPTION_LETTERS.length);
+  logTrace('briefingSectionsOperations buildOperationOptionsSection', { seatId: args.seatId, candidateCount: listed.length });
+  if (listed.length === 0) return '';
+  const own = args.state.units.filter((unit) => unit.player === args.seatId);
+  const groundTotal = own.filter((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor').length;
+  const navalTotal = own.filter((unit) => unit.unitType === 'naval').length;
+  const rows = listed.map((candidate, index) => optionRow({
+    candidate,
+    letter: OPERATION_OPTION_LETTERS[index] ?? '',
+    groundTotal,
+    navalTotal,
+    format: args.format,
+  }));
+  return `${subHeading(SECTION_TITLE_OPERATION_OPTIONS)}\n\n${buildPromptTableLines(['Option', 'Objective', 'Method', 'Plan', 'Impact', 'Cost', 'Risk'], rows).join('\n')}`;
+}
+
+/**
  * Writes the Active Operations section.
  *
  * Purpose: The briefing and the no-briefing situation message share one wording.
- * When to use: When `ordersEnabled` is true and the mode is not tactical. Pass the seat's stored operations.
- * Expected outcome: An empty string when there are no operations. Otherwise the H1 heading, a blank line, and one bullet per operation in id order.
+ * When to use: When `ordersEnabled` is true and the mode is not tactical. Pass the seat's stored operations and, when a menu was built, its table.
+ * Expected outcome: An empty string when there is no operation and no options. Otherwise the H1 heading, the bullets when there are any, and the options table when it is non-empty.
  * Exceptions: None.
  */
 export function buildOperationsSection(args: {
   readonly state: GameStateSnapshot;
   readonly operations: readonly Operation[];
   readonly format: (h3Index: string) => string;
+  readonly options?: string;
 }): string {
-  logTrace('briefingSectionsOperations buildOperationsSection', { operationCount: args.operations.length });
-  if (args.operations.length === 0) return '';
+  const options = args.options ?? '';
+  logTrace('briefingSectionsOperations buildOperationsSection', { operationCount: args.operations.length, hasOptions: options.length > 0 });
+  if (args.operations.length === 0 && options.length === 0) return '';
   const ordered = [...args.operations].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   const bullets = ordered.map((operation) => operationBullet(args.state, operation, args.format));
-  return `${topLevelHeading(SECTION_TITLE_OPERATIONS)}\n\n${bullets.join('\n')}`;
+  let text = topLevelHeading(SECTION_TITLE_OPERATIONS);
+  if (bullets.length > 0) text += `\n\n${bullets.join('\n')}`;
+  if (options.length > 0) text += `\n\n${options}`;
+  return text;
 }

@@ -17,6 +17,7 @@ import { createPathfindingSession } from '../tools/pathfinding';
 import { expireAndUpdateStatus } from '../tools/standingOrders';
 import { campaignPlanForState, resolveCampaignObjectiveForSeat } from './campaignObjectiveFlow';
 import type { CampaignPlan } from './campaignRules';
+import type { OperationCandidate } from '../../shared/operationTypes';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -249,6 +250,8 @@ export async function requestOrdersFlow(
   let pausedProductionAttention: string | null = null;
   let campaignPlan: CampaignPlan | null = null;
   let campaignAttention: string | null = null;
+  let hasOperationOptions = false;
+  let offeredCandidates: readonly OperationCandidate[] = [];
   if (!tacticalBattle) {
     expireAndUpdateStatus(seatId, planState);
     if (flags.ordersEnabled) {
@@ -283,6 +286,8 @@ export async function requestOrdersFlow(
     productionAttention = injection.productionAttention;
     pausedProductionAttention = injection.pausedProductionAttention;
     campaignAttention = injection.campaignAttention;
+    hasOperationOptions = injection.hasOperationOptions;
+    offeredCandidates = injection.offeredCandidates;
     const possibleActionsIndexed = buildPossibleActionsIndexedState(planState);
     briefingOverride = formatBriefing(
       planState,
@@ -311,6 +316,7 @@ export async function requestOrdersFlow(
     }
     logDebug('openRouter requestOrders: strategic briefing prepared', {
       briefingLength: briefingOverride.length,
+      offeredCandidates: offeredCandidates.length,
       unitAssessments: precomputed.unitAssessments.length,
       hexAssessments: precomputed.hexAssessments.length,
       precomputationCount: toolInvocationCounts['precomputation'] ?? 0,
@@ -355,6 +361,7 @@ export async function requestOrdersFlow(
     productionAttention,
     campaignPlan,
     campaignAttention,
+    hasOperationOptions,
   });
   const messages: RequestOrdersChatMessage[] = buildConsultMessages(
     promptParts,
@@ -424,6 +431,7 @@ export async function requestOrdersFlow(
     includeProductionOrders: flags.productionEnabled,
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
     includeCampaignTarget: !tacticalBattle && flags.ordersEnabled && planState.scenarioId === 'region_vs_region',
+    includeOperations: !tacticalBattle && flags.ordersEnabled,
     includeExitBattle,
   };
   const wallClockStart = Date.now();
@@ -576,6 +584,7 @@ export async function requestOrdersFlow(
       planState,
       latLngByH3,
       resolveToH3,
+      offeredCandidates,
       getOrCreateAiPlanningPathfindingSession,
       aiOrderUnitLabel,
       validateAiOrder,

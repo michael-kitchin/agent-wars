@@ -157,6 +157,8 @@ To choose a different target, set "campaignTarget" to the hex code of an enemy c
 
 The engine runs operations: several turns of orders that carry ground units to an enemy city by sea. It musters the units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. The Active Operations section of the briefing lists each one and how far it has got.
 
+When you have room for another operation, Operation Options lists up to 5 you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. The engine launches the first undefended row on the turn after that row was offered, and it never launches a defended row. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
+
 Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units.
 
 A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
@@ -311,7 +313,8 @@ Submit your final JSON only (one compact JSON object, no markdown fence, no extr
   "callbacks": [...],
   "memoryUpdates": [...],
   "productionOrders": [...],
-  "campaignTarget": "<optional hex code>"
+  "campaignTarget": "<optional hex code>",
+  "operations": [...]
 }
 ```
 
@@ -348,6 +351,8 @@ Include optional "callbacks" for re-consultation planning. Each response replace
 Legal events and their parameters: turns (n: fires after n turns have passed since the subscription); unit_engaged (unitId: fires when that unit takes part in combat); unit_destroyed (side or unitId: fires when an own or enemy unit, or a named unit, is destroyed); unit_arrived (unitId: fires when that unit's standing march arrives); threat_escalation (unitId, severity: fires when that unit's threat reaches the named severity); infrastructure_destroyed (targetType, hex (omit both for an unfiltered watch): fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any).
 
 Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
+
+Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing.
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
@@ -608,6 +613,13 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 
 - opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 2 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
 
+## Operation Options
+
+| Option | Objective | Method | Plan | Impact | Cost | Risk |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | KQ | sea | 2 ground units muster at FH; 1 ship sail to J0; assault KQ | 4 city cells, in an enemy home region | 2 of 12 ground units, 1 of 4 ships, about 6 turns | 0 enemy units within 2 hexes; 3 more can reach it in 6 turns |
+| B | J0 | sea | 2 ground units muster at FH; 1 ship sail to KQ; assault J0 | 9 city cells | 2 of 12 ground units, 1 of 4 ships, about 8 turns | 1 enemy unit within 2 hexes; 2 more can reach it in 8 turns |
+
 ## Supplemental Hex Intelligence
 
 - LP: terrain land; passableBy: infantry, armor; origin Colombia notes: Adjacent to water - exposed to naval bombardment (range 2)
@@ -789,4 +801,4 @@ No Neutral unit you can see can be rehired.
 
 Enemy units (currently observed): South America: h1-i31 (infantry) at LP; h1-i32 (infantry) at J0; h1-i34 (infantry) at KQ; h1-i35 (infantry) at LP; h1-i36 (infantry) at LP; h1-i37 (infantry) at LP; h1-i38 (infantry) at LP
 
-Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Give each unit in Campaign Orders the order its row names. Queue production for every hex named in the Production attention flag. Then submit JSON with "message", "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".
+Use the Commander's Briefing above. Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination. Give the units in the orderless table standing orders. Give each unit in Campaign Orders the order its row names. Launch an operation from Operation Options if one is worth its cost. Queue production for every hex named in the Production attention flag. Then submit JSON with "message", "strategy", "orders", "airStrikes", "ferryOrders", "airDrops", "callbacks", "memoryUpdates", "productionOrders".

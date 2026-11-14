@@ -291,6 +291,17 @@ turnsSince: number }
        * Exceptions: None.
        */
       type: 'campaign_ready';
+    }
+  | {
+      /**
+       * This seat's operation changed, ended, or a new menu was offered.
+       *
+       * Contract: The stored operation event turn equals the planning turn.
+       * When to use: After resolution, so an event-driven commander is asked on that turn.
+       * Expected outcome: The post-resolution runner consults this seat.
+       * Exceptions: None.
+       */
+      type: 'operation_update';
     };
 
 /**

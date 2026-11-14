@@ -18,7 +18,9 @@ import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
 import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
-import { buildOperationsSection } from './briefingSectionsOperations';
+import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
+import { operationCandidatesForSeat } from '../operations/operationCandidates';
+import type { OperationCandidate } from '../../shared/operationTypes';
 import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
 import { formatProductionAttentionBullet } from './productionAttention';
 import { formatPausedProductionPointer } from './pausedProductionAttention';
@@ -200,6 +202,24 @@ export interface StatusInjectionTexts {
    */
   readonly operationsText: string;
   /**
+   * The candidate rows printed in Operation Options.
+   *
+   * Contract: The same array the table used, in that order. Empty when orders are off, the mode is tactical, or there is no candidate.
+   * When to use: A launch command resolves its letter against this array. Do not search again.
+   * Expected outcome: At most the menu size. Each row is a sea candidate.
+   * Exceptions: None.
+   */
+  readonly offeredCandidates: readonly OperationCandidate[];
+  /**
+   * Whether Operation Options has at least one row.
+   *
+   * Contract: True only when `offeredCandidates` is non-empty.
+   * When to use: The opening sentence that tells the commander a menu is waiting.
+   * Expected outcome: False when the table is omitted.
+   * Exceptions: None.
+   */
+  readonly hasOperationOptions: boolean;
+  /**
    * The campaign attention bullet, or null when no campaign unit needs a new order.
    *
    * Contract: Null when the Campaign Orders table would be empty.
@@ -265,14 +285,27 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? buildCampaignObjectiveSection({ state: args.state, plan: campaignPlan, format: formatCampaignHex })
       : '';
-  const operationsText =
-    args.ordersEnabled && args.coordinateContext.mode !== 'tactical'
-      ? buildOperationsSection({
-          state: args.state,
-          operations: readOperations({ getOne: dbGetOne }).get(seatId) ?? [],
-          format: formatCampaignHex,
-        })
-      : '';
+  const showOperations = args.ordersEnabled && args.coordinateContext.mode !== 'tactical';
+  const activeOperations = showOperations ? (readOperations({ getOne: dbGetOne }).get(seatId) ?? []) : [];
+  const offeredCandidates = showOperations
+    ? operationCandidatesForSeat({ state: args.state, seatId, active: activeOperations })
+    : [];
+  const operationOptions = offeredCandidates.length > 0
+    ? buildOperationOptionsSection({
+        state: args.state,
+        seatId,
+        candidates: offeredCandidates,
+        format: formatCampaignHex,
+      })
+    : '';
+  const operationsText = showOperations
+    ? buildOperationsSection({
+        state: args.state,
+        operations: activeOperations,
+        format: formatCampaignHex,
+        options: operationOptions,
+      })
+    : '';
   const campaignAttention =
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? formatCampaignAttentionBullet(
@@ -301,6 +334,8 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,
     campaignText,
     operationsText,
+    offeredCandidates,
+    hasOperationOptions: offeredCandidates.length > 0,
     campaignAttention,
     additionalAttention:
       args.coordinateContext.mode === 'tactical'

@@ -15,6 +15,7 @@ import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } fro
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import { processV3OrdersArray } from './envelopeOrderRows';
 import { normalizeMissileLaunchOrders } from './missileLaunchOrderParsing';
+import { normalizeOperationCommands, type OperationCommand } from './operationCommandParsing';
 import { normalizeAirDropOrders } from './airDropOrderRows';
 import { expandGroupedActorEntries, normalizeOrderEntries } from './orderEntryNormalization';
 /**
@@ -501,11 +502,10 @@ function normalizeFerryOrders(
 }
 
 /**
- * Defines the `parseOrdersResponse` function shape (export function parseOrdersResponse( content, resolveToH3, state, latLngByH3, productionEnabled, context )).
-
- * Purpose: Supports maintainability by documenting why `parseOrdersResponse` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Reads the orders envelope into movement, fire, and the optional tails.
+ * Purpose: A bad field becomes a drop reason and does not reject the rest of the reply.
+ * When to use: After the model's final message, including a repaired one.
+ * Expected outcome: Normalized rows, or null when no envelope can be read.
  * Exceptions: None.
  */
 export function parseOrdersResponse(
@@ -562,17 +562,23 @@ export function parseOrdersResponse(
   memoryUpdates?: MemoryUpdateItem[];
   /**
    * Briefing code the commander named as the next campaign city.
-   *
    * Contract: Present only when the strategic envelope's `campaignTarget` is one two-character code. Absent otherwise, including every tactical envelope.
    * When to use: `applyCampaignTargetOverride` after the orders are stored.
    * Expected outcome: The trimmed code. A present non-code adds a drop reason and leaves this absent.
    * Exceptions: None.
    */
   campaignTargetCode?: string;
+  /**
+   * Launch and cancel commands from a strategic reply.
+   * Contract: Present when `operations` held at least one command. Absent for a tactical reply, an omitted field, and an empty array.
+   * When to use: `applyOperationCommands` before standing orders are expanded.
+   * Expected outcome: At most one launch, and every well-formed cancel. A bad entry is only a drop reason.
+   * Exceptions: None.
+   */
+  operationCommands?: readonly OperationCommand[];
   productionAppliedCount?: number;
   /**
    * Units whose standing order this response assigned or cancelled.
-   *
    * Contract: Present when at least one assign succeeded or one cancel ran. Absent when that list is empty.
    * When to use: Skipping a defend-post move for a unit this response already changed through a standing-order row.
    * Expected outcome: Unit ids in envelope order. Undefined when none.
@@ -582,7 +588,6 @@ export function parseOrdersResponse(
   dropReasons?: string[];
   /**
    * True when the envelope named actor rows and none of them were kept.
-   *
    * Contract: True only when the expanded `orders`, `airStrikes`, and `ferryOrders` arrays together are non-empty, and movement, ranged, embark, air, ferry, and applied standing-order counts are all zero. Empty actor arrays are false.
    * When to use: The consultation flow, to decide whether one repair call should replace this parse.
    * Expected outcome: False when at least one actor row was applied, or when no actor row was submitted.
@@ -700,6 +705,7 @@ export function parseOrdersResponse(
         const callbacks = normalizeCallbacks(obj.callbacks, context);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         const rawCampaignTarget = obj.campaignTarget;
+        const operationCommands = context.mode !== 'tactical' ? normalizeOperationCommands(obj.operations) : { commands: [], dropReasons: [] };
         const campaignTargetCode =
           context.mode !== 'tactical' && typeof rawCampaignTarget === 'string' && HEX_CODE_PATTERN.test(rawCampaignTarget.trim())
             ? rawCampaignTarget.trim()
@@ -711,6 +717,7 @@ export function parseOrdersResponse(
           ...normalizedFerryOrders.dropReasons,
           ...normalizedAirDrops.dropReasons,
           ...normalizedMissileLaunches.dropReasons,
+          ...operationCommands.dropReasons,
         ];
         if (rawCampaignTarget !== undefined && campaignTargetCode === undefined) {
           dropReasons.push('campaignTarget dropped: expected one two-character hex code.');
@@ -729,6 +736,7 @@ export function parseOrdersResponse(
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           campaignTargetCode,
+          operationCommands: operationCommands.commands.length > 0 ? operationCommands.commands : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           standingOrderUnitIds: standingOrderUnitIds.length > 0 ? standingOrderUnitIds : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

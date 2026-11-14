@@ -1,0 +1,56 @@
+/**
+ * Operation command parsing: absent, empty, malformed, and one launch.
+ *
+ * Purpose: A bad `operations` value must become a drop reason and must not reject the reply.
+ * When to use: After changes to `normalizeOperationCommands`.
+ * Expected outcome: Process exit 0.
+ * Exceptions: None.
+ */
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { normalizeOperationCommands } from './operationCommandParsing';
+
+const ENTRY_REASON =
+  'operations entry dropped: expected {"action":"launch","option":"<letter>"} or {"action":"cancel","id":"<operation id>"}.';
+
+test('an absent or empty operations value adds nothing', () => {
+  assert.deepEqual(normalizeOperationCommands(undefined), { commands: [], dropReasons: [] });
+  assert.deepEqual(normalizeOperationCommands([]), { commands: [], dropReasons: [] });
+});
+
+test('a non-array operations value is one reason', () => {
+  assert.deepEqual(normalizeOperationCommands({ action: 'launch', option: 'A' }), {
+    commands: [],
+    dropReasons: ['operations dropped: expected an array.'],
+  });
+});
+
+test('a launch letter is trimmed and a cancel id is kept', () => {
+  const parsed = normalizeOperationCommands([
+    { action: 'launch', option: ' b ' },
+    { action: 'cancel', id: ' seat-op1 ' },
+  ]);
+  assert.deepEqual(parsed.commands, [
+    { action: 'launch', option: 'B' },
+    { action: 'cancel', id: 'seat-op1' },
+  ]);
+  assert.deepEqual(parsed.dropReasons, []);
+});
+
+test('a malformed entry is dropped and a second launch is dropped', () => {
+  const parsed = normalizeOperationCommands([
+    { action: 'launch', option: 'A' },
+    { action: 'launch', option: 'B' },
+    { action: 'wait' },
+    { action: 'launch', option: 'Z' },
+    { action: 'cancel', id: '  ' },
+  ]);
+  assert.deepEqual(parsed.commands, [{ action: 'launch', option: 'A' }]);
+  assert.deepEqual(parsed.dropReasons, [
+    'operations entry dropped: one launch per turn.',
+    ENTRY_REASON,
+    ENTRY_REASON,
+    ENTRY_REASON,
+  ]);
+});

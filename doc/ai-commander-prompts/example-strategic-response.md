@@ -2,7 +2,7 @@
 
 One OpenRouter completion from a single strategic consultation, laid out for reading. The assistant message is the order envelope. The same consultation's prompt is [example-strategic-prompt.md](example-strategic-prompt.md). The field contract is [strategic-prompt.md](strategic-prompt.md) section 3, and [assembly-contract.md](assembly-contract.md) section 5. The builders under `src/main/openRouter/` win if this snapshot disagrees with them. This file is a reading copy of that one reply.
 
-The capture stores the envelope as a string on `choices[0].message.content`. It is parsed and indented below. That body also carried an encrypted reasoning blob, which is left out.
+The capture stores the envelope as a string on `choices[0].message.content`. It is parsed and indented below. That body also carried an encrypted reasoning blob, which is left out. The reading copy adds one `operations` launch the captured body did not carry, so the field is visible.
 
 The host applies `memoryUpdates` through `executeMemory`. This sample's write has no `content`. `write` in `src/main/tools/memory.ts` rejects empty content, so that row is a drop reason, and the rest of the envelope still applies.
 
@@ -150,6 +150,12 @@ The host applies `memoryUpdates` through `executeMemory`. This sample's write ha
       "hex": "EJ",
       "unitType": "armor",
       "count": 1
+    }
+  ],
+  "operations": [
+    {
+      "action": "launch",
+      "option": "A"
     }
   ]
 }

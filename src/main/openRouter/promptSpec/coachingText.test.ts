@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildCoachingBullets, buildContextCoaching, type CoachingGates } from './coachingText';
+import { buildOperationRuleBlock } from './operationRuleText';
 
 /**
  * Fully enabled strategic gates used as the baseline for presence assertions.
@@ -354,4 +355,7 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   assert.equal(campaignOnly.includes('## Operations'), false);
   assert.equal(buildContextCoaching(strategicGates()).includes('## Operations'), false);
   assert.equal(buildContextCoaching(tacticalGates({ operationsEnabled: true })).includes('The engine runs operations'), false);
+  assert.ok(withBoth.includes('Operation Options lists up to 5 you could launch'));
+  assert.ok(withBoth.includes('it never launches a defended row'));
+  assert.equal(buildOperationRuleBlock(false).includes('Operation Options lists up to'), false);
 });

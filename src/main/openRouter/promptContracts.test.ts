@@ -662,6 +662,10 @@ const tests = [
     name: 'campaign rule appears only when the campaign gate is on',
     fn: testCampaignRuleAppearsOnlyWhenEnabled,
   },
+  {
+    name: 'operations paragraph appears only when the operations gate is on',
+    fn: testOperationsParagraphFollowsTheGate,
+  },
 ];
 
 /**
@@ -702,6 +706,31 @@ function testCampaignRuleAppearsOnlyWhenEnabled(): void {
   const disabled = buildStrategicContextCoaching({ ...gates, campaignEnabled: false });
   assert.ok(!disabled.includes('## Campaign'));
   assert.ok(!disabled.includes('Copy it into explicit_move like an approach row.'));
+}
+
+/**
+ * The operations paragraph is taught only when that gate is on.
+ *
+ * Purpose: A battle prompt and an orders-off prompt must not teach the launch command.
+ * When to use: After edits to `buildFinalJsonContractInstruction`.
+ * Expected outcome: The paragraph and the header slot appear together, and neither appears when the gate is off or the mode is tactical.
+ * Exceptions: None.
+ */
+function testOperationsParagraphFollowsTheGate(): void {
+  const shared = {
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: 'Move.',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  };
+  const enabled = buildFinalJsonContractInstruction({ ...shared, includeOperations: true });
+  assert.ok(enabled.includes('Optional "operations": launch or cancel an operation.'));
+  assert.ok(enabled.includes('"operations": [...]'));
+  const disabled = buildFinalJsonContractInstruction(shared);
+  assert.ok(!disabled.includes('Optional "operations"'));
+  const tactical = buildFinalJsonContractInstruction({ ...shared, includeOperations: true, coordinateMode: 'tactical' });
+  assert.ok(!tactical.includes('Optional "operations"'));
 }
 
 function run(): void {
