@@ -27,9 +27,9 @@ This plan adds that list to the briefing, two commands to the reply, a one-turn 
 | R1 | When a seat has a free operation slot and at least one candidate, the briefing prints an Operation Options table with up to five rows. Each row carries a letter, the objective, the method, a one-line plan, and impact, cost, and risk as plain numbers. |
 | R2 | The reply may carry an `operations` array. `{"action":"launch","option":"B"}` launches that row. `{"action":"cancel","id":"<operation id>"}` calls an operation off. |
 | R3 | A launch may pick any listed row, including one whose objective is defended. The engine's own launch still takes only a clear one. |
-| R4 | The engine launches by itself only after the options have been offered for one full planning phase and the slot is still free. |
+| R4 | The engine launches by itself only after a menu that contains an undefended row has been offered for one full planning phase, and only while that slot is still free. A menu of only defended rows does not start that clock. A later gap with no undefended row clears it, so the next undefended row waits a full phase. |
 | R5 | A cancelled operation never strands cargo. In `muster` its units are freed. At sea it turns back. Ashore it simply ends. |
-| R6 | A seat is consulted on the turn an operation of its own changes phase or ends, and on the turn options are first offered, whatever its consultation policy. |
+| R6 | A seat is consulted on the turn an operation of its own changes phase or ends, on the turn any options are first offered, and on the turn an undefended row is first offered, whatever its consultation policy. It is not consulted again only because the same menu is still there. |
 | R7 | A command that cannot be carried out is dropped with a reason in the drop list, the way a bad `campaignTarget` is. It never fails the consult. |
 | R8 | The tactical prompt and the tactical reply contract are unchanged. |
 | R9 | Living docs match the builders in the same change. |
@@ -38,11 +38,11 @@ This plan adds that list to the briefing, two commands to the reply, a one-turn 
 
 Do not reopen these.
 
-- Option letters are positions in the candidate list at consult time. The same function builds the list for the briefing and for the launch, from the same state, so a letter means the same row in both.
+- Option letters are indexes into the candidate array built once for that consult's briefing. The reply resolves a letter against that same array. It does not search again.
 - Factors are shown as counts and turns. There is no combined score. The rows are in the engine's order: clear objectives first, larger cities first.
 - The commander does not choose units or a force size in this plan. The candidate already names them.
-- The offer window is one planning phase. It is stored per seat as the turn number the options were first offered.
-- A launch from the reply takes effect at once: the operation is stored and its first marches are assigned while the reply is applied. Those marches begin moving on the following turn, because standing-order moves for the current turn are generated before commands are applied.
+- The offer window is one planning phase, and only for a menu that contains an undefended row. Each seat stores `announcedTurn`, the turn any menu was first shown, and `clearOfferTurn`, the turn an undefended row was shown. `announcedTurn` clears when the seat has no candidate. `clearOfferTurn` clears when the menu has no undefended row, when the commander launches, and after the engine launches one. Orders being off does not freeze the clock.
+- A launch or cancel from the reply is applied before standing orders for that consult are expanded into this turn's movement plan. The operation is stored and its first marches are assigned then, so those marches are in the plan the next Ready executes.
 - The consult trigger is a mandatory override, built the way `campaign_ready` is.
 - Combat odds for the assault are not shown. The existing estimator works on units in place, not on a force that has not sailed.
 - `operations` is omitted from the reply example. The contract paragraph and the system prompt describe it.
@@ -81,51 +81,58 @@ Goal: R4, and the shared function R1 and R2 both need.
 
 ### Step 1: Share the candidate inputs
 
-Read `advanceOperationsForSeat` in `src/main/operations/operationTurnFlow.ts` first. Its launch step builds `landMass`, `terrain`, `protectedUnitIds`, and `hasCampaignPlan`, then calls `listSeaOperationCandidates`.
+Read `advanceOperationsForSeat` in `src/main/operations/operationTurnFlow.ts` first. It loads land mass before the advance loop and returns without advancing stored operations when that load is null. Keep that early return. The launch step, inside the free-slot loop, builds `protectedUnitIds` (campaign defenders, units released earlier in this tick, and ground units in contact) and `hasCampaignPlan`, then calls `listSeaOperationCandidates`.
 
-- [ ] Move that into an exported function in a new file `src/main/operations/operationCandidates.ts`:
+- [ ] Move that launch search into an exported function in a new file `src/main/operations/operationCandidates.ts`:
 
 ```ts
 export function operationCandidatesForSeat(args: {
   readonly state: GameStateSnapshot;
   readonly seatId: string;
   readonly active: readonly Operation[];
+  readonly withheldIds?: ReadonlySet<string>;
 }): OperationCandidate[]
 ```
 
-  It returns `[]` when `loadCampaignLandMass` returns `null`, and `[]` when the active operations already fill every slot. On a thrown error it logs with `logError` and returns `[]`. Also export `operationSlotsForState(state): number` from this file; it holds the `OPERATION_MAX_SEA_PER_SIZE × GAME_SIZE_MULTIPLIER` expression.
-- [ ] `advanceOperationsForSeat` calls the new function. Its tests must pass unchanged.
+  It returns `[]` when `loadCampaignLandMass` returns `null`, and `[]` when the active sea operations already fill the sea slots. Sea slots are `OPERATION_MAX_SEA_PER_SIZE × GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)]`. Do not treat "full" as every later method. On a thrown error it logs with `logError` and returns `[]`. Also export `operationSlotsForState(state): number` from this file; it holds that sea-slot expression. Pass `withheldIds` through to the protected set. Omit means an empty set.
+- [ ] `advanceOperationsForSeat` calls the new function for the launch search only. Tests that advance an operation already underway stay as they are. The launch test changes in Step 4.
 
 ### Step 2: Offer and event storage
 
-In `src/main/gameDb/operationMemory.ts`. Both values are JSON objects keyed by seat id, holding one integer each.
+In `src/main/gameDb/operationMemory.ts`. `operation_events` is a JSON object keyed by seat id, holding one integer. `operation_offers` is a JSON object keyed by seat id, holding `{ announcedTurn: number | null, clearOfferTurn: number | null }`.
 
-- [ ] `readOperationOfferTurn(ops, seatId): number | null` and `writeOperationOfferTurn(ops, seatId, turn: number | null)`. `null` removes the seat's entry.
+- [ ] `readOperationOffer(ops, seatId)` and `writeOperationOffer(ops, seatId, offer | null)`. `null`, or both turns null, removes the seat's entry. A missing or malformed value reads as both turns null.
 - [ ] `readOperationEventTurn(ops, seatId): number | null` and `writeOperationEventTurn(ops, seatId, turn: number)`.
-- [ ] Share one private reader and one private writer between the four; do not copy the JSON handling.
-- [ ] Clear both keys where plan 2 cleared `OPERATIONS_CONFIG_KEY`: in `resetGame.ts`, and for the seat in `deleteSeatPrivateRows`.
+- [ ] Share one private reader and one private writer for the seat-keyed JSON; do not copy the JSON handling.
+- [ ] Clear both keys in `resetGame.ts`, beside `OPERATIONS_CONFIG_KEY`. In `deleteSeatPrivateRows` (`src/main/gameActions/knockoutConsequences.ts`) remove that seat's entry only. Do not delete the whole config row there; other seats share it.
 
 ### Step 3: The launch rule
 
+Put the window rule in a pure `decideOperationOffer` in a new file `src/main/operations/operationOffer.ts`. One args object: `turnNumber`, `hasCandidate`, `hasClear`, and the current offer. It returns the next offer, `launch`, and `consult`.
+
+- [ ] No candidate: both turns null, do not launch, do not consult.
+- [ ] Candidates, none clear: `consult` only when `announcedTurn` is null, then `announcedTurn` is that turn or the stored one. `clearOfferTurn` is null. Do not launch.
+- [ ] A clear row and `clearOfferTurn` null: set `clearOfferTurn` to this turn, keep or set `announcedTurn`, `consult` true, do not launch.
+- [ ] A clear row and `clearOfferTurn` less than this turn: `launch` true and `clearOfferTurn` null. `consult` false on that result. The caller launches one clear row, then calls the function again for the next free slot. The next call opens a new window and does not launch a second row.
+- [ ] A clear row and `clearOfferTurn` equal to this turn: leave the offer, do not launch, do not consult.
+
 In `advanceOperationsForSeat`, replace the launch step with:
 
-- [ ] `candidates = operationCandidatesForSeat({ state, seatId, active: kept })`. `clear = candidates.find((candidate) => candidate.clear)`.
-- [ ] No candidate at all: `writeOperationOfferTurn(..., null)`. Stop.
-- [ ] `offered = readOperationOfferTurn(...)`.
-  - `offered === null`: `writeOperationOfferTurn(..., state.turnNumber)`, `writeOperationEventTurn(..., state.turnNumber)`. Do not launch. Stop.
-  - `offered < state.turnNumber` and `clear` exists: launch `clear` as plan 2 does, then `writeOperationOfferTurn(..., null)`. Then repeat this step for the next slot.
-  - Otherwise: stop.
+- [ ] When sea slots are already full, write a null offer and skip the loop.
+- [ ] Otherwise, for each free slot, `candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds })`, then `decideOperationOffer`. Persist the offer once after the loop. When `consult` is true, `writeOperationEventTurn(..., state.turnNumber)`.
+- [ ] On `launch`, launch the first clear candidate the way the engine launch does now, then continue the loop.
 - [ ] Also call `writeOperationEventTurn(..., state.turnNumber)` when any stored operation's step had an `outcome` other than `'running'`, or a `next.phase` different from the phase it started the turn in, or when the engine launched one.
 
 ### Step 4: Tests
 
-- [ ] `operationMemory.test.ts`: offer turn write, read, and clear; the two keys do not disturb each other or the operations key.
-- [ ] `operationTurnFlow.test.ts`: change the plan 2 launch test. First call on turn 5: no operation, offer turn 5, event turn 5. Second call on turn 6: one operation in `muster`, offer cleared, event turn 6. A call with no candidate clears a stored offer.
-- [ ] New `operationCandidates.test.ts`: full slots give `[]`; a missing land mass gives `[]`.
+- [ ] `operationMemory.test.ts`: offer write, read, and clear for both turn numbers; the two keys do not disturb each other or the operations key. A malformed offer reads as both turns null.
+- [ ] `operationOffer.test.ts`: the five bullets of `decideOperationOffer`.
+- [ ] `operationTurnFlow.test.ts`: change the launch test. A clear candidate on turn 5 stores `announcedTurn` 5 and `clearOfferTurn` 5, writes event turn 5, and does not launch. Turn 6 launches one operation in `muster`, clears `clearOfferTurn`, and writes event turn 6. A defended-only menu does not set `clearOfferTurn` and does not launch on the next turn. When a clear row appears after that, that call sets `clearOfferTurn` and does not launch; the call after that launches. A call with no candidate clears a stored offer.
+- [ ] New `operationCandidates.test.ts`: full sea slots give `[]`; a missing land mass gives `[]`.
 
 ### Phase 1 verification
 
-- [ ] `npm run build:main; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/gameDb/operationMemory.test.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/operations/operationTurnFlow.test.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/operations/operationCandidates.test.js`
+- [ ] `npm run build:main; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/gameDb/operationMemory.test.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/operations/operationOffer.test.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/operations/operationTurnFlow.test.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node dist/main/operations/operationCandidates.test.js`
 
 ## Phase 2: The Options Table
 
@@ -147,13 +154,14 @@ Goal: R1.
   - Impact: `${urban} city cells`, plus `, in an enemy home region` when `inEnemyHome`.
   - Cost: `${units} of ${groundTotal} ground units, ${ships} of ${navalTotal} ships, about ${etaTurns} turns`. The totals count the seat's units in `state.units`.
   - Risk: `${defenders} enemy units within ${LIFT_OBJECTIVE_CLEAR_RADIUS} hexes; ${reinforcers} more can reach it in ${etaTurns} turns`, plus `; ${fortified} fortified cells` when `knownFortifiedCount > 0`.
-  - Use the singular (`1 ground unit`, `1 ship`, `1 turn`, `1 enemy unit`, `1 city cell`, `1 fortified cell`) when a count is 1.
+  - Use the singular noun for a count of 1, and only for that count: `1 ground unit`, `1 ship`, `1 turn`, `1 enemy unit`, `1 more`, `1 city cell`, `1 fortified cell`. A cost of one out of many stays `1 of 12 ground units`. Both the force and the total being 1 is `1 ground unit`.
 - [ ] `buildOperationsSection` (plan 2) gains an optional `readonly options?: string` in its `args`. When `options` is not empty, the section is the heading, the operation bullets when there are any, a blank line, and `options`. With no operation and no options it stays `''`.
 
 ### Step 3: Feed it
 
-- [ ] `requestOrdersInjection.ts`, where `operationsText` is built: `candidates = operationCandidatesForSeat({ state: args.state, seatId, active })`, then pass `buildOperationOptionsSection(...)` as `options`. Add `readonly hasOperationOptions: boolean;` to `StatusInjectionTexts`, true when `candidates.length > 0`.
-- [ ] `consultPromptParts.ts`: the `else` branch literal needs `hasOperationOptions: false`.
+- [ ] `requestOrdersInjection.ts`, where `operationsText` is built: build `candidates = operationCandidatesForSeat({ state: args.state, seatId, active })` once, then pass `buildOperationOptionsSection(...)` as `options`. Add `readonly offeredCandidates: readonly OperationCandidate[];` and `readonly hasOperationOptions: boolean;` to `StatusInjectionTexts`. The flag is true when `candidates.length > 0`. Copy the candidate array onto the result so the consult can keep it.
+- [ ] `requestOrdersFlow.ts`: the injection that builds the briefing is block-scoped. Hoist `offeredCandidates` and `hasOperationOptions` beside `campaignAttention`, assign them from that injection, and pass `hasOperationOptions` into `buildConsultPromptParts`.
+- [ ] `consultPromptParts.ts`: add `readonly hasOperationOptions?: boolean` to the input. The else-branch literal copies `input.hasOperationOptions === true`. It must not hardcode false: that branch is the live consult, because a briefing override and `productionAttention` are both supplied. Omitted means false. Also put `offeredCandidates: []` on that literal if the injection type requires the field.
 
 ### Step 4: Tests in `briefingSectionsOperations.test.ts`
 
@@ -197,7 +205,7 @@ export function normalizeOperationCommands(raw: unknown): {
 }
 ```
 
-  - `undefined` gives no command and no reason.
+  - `undefined` or an empty array gives no command and no reason.
   - Anything that is not an array gives the reason `operations dropped: expected an array.`
   - A `launch` entry needs `option`, a string that after `trim()` and `toUpperCase()` is in `OPERATION_OPTION_LETTERS`.
   - A `cancel` entry needs `id`, a non-empty string after `trim()`.
@@ -223,24 +231,25 @@ export function applyOperationCommands(args: {
   readonly seatId: string;
   readonly commands: readonly OperationCommand[];
   readonly coordinates: KnockoutCoordinates;
+  readonly candidates: readonly OperationCandidate[];
 }): { readonly appliedCount: number; readonly dropReasons: string[] }
 ```
 
-  - Read the seat's stored operations once. Before anything is changed, build `listed = operationCandidatesForSeat({ state, seatId, active })`. This is the list the briefing printed, so a letter means the row the commander saw.
+  - Read the seat's stored operations once. `candidates` is the array the briefing printed. Do not call `operationCandidatesForSeat` again.
+  - Resolve every command in memory before writing. Then apply the actions, then `writeOperationsForSeat` once. A throw before those writes leaves the match unchanged: log it with `logError` and return `{ appliedCount: 0, dropReasons: ['operations dropped: the engine could not apply them.'] }`.
   - Apply every `cancel` first, then the `launch`.
-  - `cancel`: no stored operation with that id gives `operations cancel dropped: ${id} is not one of your operations.` Otherwise run `cancelSeaOperation`, `applyOperationActions`, and keep `step.next` in place of the operation.
-  - `launch`: take the candidate from `listed` by the letter's index. An index beyond the list gives `operations launch dropped: option ${letter} is not listed this turn.` Otherwise create the `Operation` exactly as the engine launch does, with `source: 'commander'`; run `advanceSeaOperation` once and apply its actions; keep it. Then `writeOperationOfferTurn(..., null)`. `listed` is empty whenever every slot was full when the briefing was built, so a cancel and a launch by letter cannot both succeed in one reply; that is intended.
-  - Build the `OperationFacts` for that one advance with the same function `advanceOperationsForSeat` uses. Export that fact builder from `operationTurnFlow.ts` as `buildOperationFacts`; do not copy it.
-  - `writeOperationsForSeat` once at the end. `writeOperationEventTurn(..., state.turnNumber)` when anything was applied.
+  - `cancel`: no stored operation with that id gives `operations cancel dropped: ${id} is not one of your operations.` A `return` operation gives `operations cancel dropped: ${id} is already returning.` and is not applied. Otherwise run `cancelSeaOperation` and keep `step.next` in place of the operation. Assault still ends with no new order; the units keep the march they have.
+  - `launch`: take the candidate from `candidates` by the letter's index. An index beyond the list gives `operations launch dropped: option ${letter} is not listed this turn.` If one of that row's units is already in a stored operation, drop `operations launch dropped: option ${letter} is no longer available.` Otherwise create the `Operation` exactly as the engine launch does, with `source: 'commander'`; run `advanceSeaOperation` once and keep `step.next`. Then set `clearOfferTurn` to null and keep `announcedTurn`. `candidates` is empty when every sea slot was full at briefing time, so a cancel and a launch by letter cannot both succeed in one reply; that is intended.
+  - Build the `OperationFacts` for that one advance with `buildOperationFacts`, exported from `operationTurnFlow.ts`. It is the closure `advanceOperationsForSeat` already uses, with an args object. A missing land mass drops that command with a reason. Do not copy the closure.
+  - `writeOperationEventTurn(..., state.turnNumber)` when anything was applied.
   - Log each launch with `logDebug('operationCommands launched', { seatId, id, option, objectiveH3 })` and each cancel with `logDebug('operationCommands cancelled', { seatId, id, phase })`.
-  - The whole body is inside a `try`/`catch`. A throw is logged with `logError` and returns `{ appliedCount: 0, dropReasons: ['operations dropped: the engine could not apply them.'] }`.
-- [ ] Tests in `operationCommands.test.ts`, against the database of `operationTurnFlow.test.ts`: launching `A` stores a `commander` operation in `muster` and clears the offer; launching `C` with two candidates is dropped with the reason; cancelling an operation in `muster` removes it and cancels its marches; cancelling an unknown id is dropped; with the slot full, a reply that cancels and launches `A` applies the cancel and drops the launch with the not-listed reason.
+- [ ] Tests in `operationCommands.test.ts`, against the database of `operationTurnFlow.test.ts`: launching `A` from the passed array stores a `commander` operation in `muster`, clears `clearOfferTurn`, and the following standing-order expansion includes the new marches. A force already at the port embarks, the ships are in that expansion, and the cargo has no movement row. Launching `C` with two candidates is dropped with the reason. Cancelling an operation in `muster` removes it and cancels its marches. Cancelling an unknown id is dropped. Cancelling a `return` operation is dropped with the already-returning reason and leaves it stored. With the slot full, a reply that cancels and launches `A` applies the cancel and drops the launch with the not-listed reason. Rebuilding the board cannot retarget letter `A`: the passed array wins.
 
 ### Step 5: Call it when the reply is applied
 
-Read the `applyCampaignTargetOverride` call in `src/main/openRouter/requestOrdersApplyParsed.ts` first.
+Read `generateOrdersForStandingOrders` in `src/main/openRouter/requestOrdersApplyParsed.ts` first. It runs before `applyCampaignTargetOverride`. `latLngByH3` there is already a `Map`; pass it through.
 
-- [ ] Directly after that block add:
+- [ ] Directly before that expansion, add:
 
 ```ts
   if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
@@ -249,19 +258,20 @@ Read the `applyCampaignTargetOverride` call in `src/main/openRouter/requestOrder
       seatId,
       commands: parsed.operationCommands,
       coordinates: { latLngByH3, resolveToH3 },
+      candidates: offeredCandidates,
     });
     dropReasons.push(...operationResult.dropReasons);
   }
 ```
 
-  If `latLngByH3` in that function is not a `Map<string, LatLng>`, wrap it with `new Map(latLngByH3)`.
+  `offeredCandidates` is the array hoisted in `requestOrdersFlow.ts`. Thread it into `applyParsedRequestOrders` on the existing args object. The call stays inside the 15-line budget for this file.
 
 ### Step 6: The reply contract
 
 Read every `campaignTarget` hit from `rg -n "campaignTarget|includeCampaignTarget" src/main/openRouter --glob "!*.test.ts"` first. Add `operations` beside each, with a gate named `includeOperations`.
 
 - [ ] `promptSpec/envelopeContract.ts`: add `'operations'` to `ENVELOPE_FIELD_ORDER` after `'campaignTarget'`; add `readonly includeOperations?: boolean;` to `EnvelopeGates`; in the field filter add `if (field === 'operations') return gates.coordinateMode !== 'tactical' && gates.includeOperations === true;`.
-- [ ] `promptSpec/envelopeJsonSchema.ts`: add a `case 'operations':` that returns an array schema whose items are `anyOf` two object schemas: `action` const `launch` with `option` an enum of `OPERATION_OPTION_LETTERS`; `action` const `cancel` with `id` a string. Build them the way `productionOrderRowSchema` builds its rows. Read it first. Wherever the schema builder treats `campaignTarget` as optional (left out of a `required` list, or allowed to be absent under structured outputs), treat `operations` the same way.
+- [ ] `promptSpec/envelopeJsonSchema.ts`: add a `case 'operations':` that returns an array of objects whose `action`, `option`, and `id` are optional strings. Do not use `anyOf` or an enum of letters. A bad entry must reach the parser and become a drop reason, not a rejected reply. Read `productionOrderRowSchema` only to copy the closed-object helper. Wherever the schema builder treats `campaignTarget` as optional, treat `operations` the same way.
 - [ ] `promptContracts.ts`: add `operations: '"operations": [...]'` to `headerSlots`; add `includeOperations` beside `includeCampaignTarget` in the three places it appears; add a paragraph after `campaignParagraph`, printed when `gates.includeOperations === true`:
 
 ```text
@@ -273,7 +283,7 @@ Optional "operations": launch or cancel an operation. To launch a row of Operati
 
 ### Step 7: Tests
 
-- [ ] `promptSpec/envelopeContract.test.ts` and `envelopeJsonSchema.test.ts`: `operations` is present for strategic gates with `includeOperations: true`, absent otherwise, and absent for every tactical gate set. The schema accepts a launch and a cancel and rejects an entry with neither.
+- [ ] `promptSpec/envelopeContract.test.ts` and `envelopeJsonSchema.test.ts`: `operations` is present for strategic gates with `includeOperations: true`, absent otherwise, and absent for every tactical gate set. The item schema accepts a launch object and a cancel object, and does not require `action` to be an enum. Bad letters are covered by the parser tests.
 - [ ] `orderResponseParsing.test.ts`: a strategic reply with `operations` yields `operationCommands`; a tactical reply with the same field yields none and no reason.
 - [ ] `promptContracts.test.ts`: the paragraph prints with the gate and not without.
 
@@ -315,12 +325,12 @@ Goal: the commander knows the commands exist.
 - [ ] `promptSpec/operationRuleText.ts`: `buildOperationRuleBlock` gains a parameter `commandsEnabled: boolean`. When true, insert this paragraph after the first paragraph:
 
 ```text
-When you have room for another operation, Operation Options lists up to ${OPERATION_MENU_SIZE} you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. If you launch none, the engine launches the first undefended one the next turn. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
+When you have room for another operation, Operation Options lists up to ${OPERATION_MENU_SIZE} you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. The engine launches the first undefended row on the turn after that row was offered, and it never launches a defended row. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
 ```
 
   The caller in `coachingTextStrategic.ts` passes `gates.operationsEnabled === true`.
 - [ ] `promptSpec/consultationText.ts`: add `readonly hasOperationOptions?: boolean;` to `OpeningMessageGates`. In `buildOpeningActionClause`, after `campaignClause`, add `const operationClause = gates.ordersEnabled && gates.hasOperationOptions === true ? ' Launch an operation from Operation Options if one is worth its cost.' : '';` and append it to the returned string.
-- [ ] Run `rg -n "hasCampaignOrders" src` and add `hasOperationOptions` beside every hit, fed from `injection.hasOperationOptions`.
+- [ ] Run `rg -n "hasCampaignOrders" src`. Add `hasOperationOptions` beside every hit. The live consult gets it from the hoisted briefing injection, through `buildConsultPromptParts` into `getInitialUserMessage`. Do not read it from the else-branch injection, which does not rebuild the menu.
 - [ ] Tests: `promptSpec/coachingText.test.ts` for the paragraph; `promptSpec/consultationContract.test.ts` for the clause; tactical cases unchanged.
 
 ### Phase 5 verification
@@ -329,14 +339,14 @@ When you have room for another operation, Operation Options lists up to ${OPERAT
 
 ## Phase 6: Documentation and Final Verification
 
-- [ ] `doc/hybrid-ai.md`: the offer window, the two commands, and the consult trigger, in the Operations section.
+- [ ] `doc/hybrid-ai.md`: the two offer clocks, same-turn movement for a commander launch, the two commands, and the consult trigger, in the Operations section.
 - [ ] `doc/ai-commander-prompts/strategic-prompt.md`, `assembly-contract.md`, `consultation-flow.md`, `information-decision-model.md`, `variants.md`, `source-inventory.md`, `crosswalk.md`: the Operation Options table, the `operations` field, the contract paragraph, the opening clause, and the new consult trigger.
 - [ ] `doc/ai-commander-prompts/example-strategic-prompt.md`: an Operation Options table with two rows. `example-strategic-response.md`: one `launch`.
 - [ ] `doc/ai-tools.md`: only if it lists reply fields.
 - [ ] `node scripts/check-doc-links.cjs` passes.
 - [ ] `npm test` passes. `npm run check:circular` reports no new cycle.
 - [ ] `rg -n "Phase [0-9]|Step [0-9]|\bR[0-9]+\b" src doc` shows no hit introduced by this change.
-- [ ] `orderResponseParsing.ts` grew by at most 8 lines and `requestOrdersApplyParsed.ts` by at most 10.
+- [ ] `orderResponseParsing.ts` grew by at most 8 lines and `requestOrdersApplyParsed.ts` by at most 15.
 
 ## Phase 7: Verification Run
 
