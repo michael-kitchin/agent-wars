@@ -10,9 +10,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
-import { canLandUnitTraverseEdge, getLandStepDistances, STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3 } from '../../shared/landTraversalStrategic';
-import type { Operation } from '../../shared/operationTypes';
+import { canLandUnitTraverseEdge, getLandStepDistances, landUnitCanOccupyHex, STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3 } from '../../shared/landTraversalStrategic';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import type { Operation, OperationCandidate } from '../../shared/operationTypes';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot, type GameStateSnapshot } from '../gameDb';
 import { readOperationEventTurn, readOperationOffer, readOperations, writeOperationOffer, writeOperationsForSeat } from '../gameDb/operationMemory';
@@ -336,5 +339,201 @@ test('a cancel beside a launch with no listed row applies the cancel only', () =
     assert.equal(result.appliedCount, 1);
     assert.deepEqual(result.dropReasons, ['operations launch dropped: option A is not listed this turn.']);
     assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).length, 0);
+  });
+});
+
+test('a passed air candidate stores the air method and its launch airport', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    arrange(landMass);
+    const infantry = dbGetOne<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units WHERE id = ?', ['inf-a']);
+    assert.ok(infantry);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-1', SEAT, 'air', infantry.h3Index]);
+    const candidate: OperationCandidate = {
+      method: 'air',
+      objectiveH3: 'city',
+      musterH3: infantry.h3Index,
+      landingH3: 'launch-airport',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      etaTurns: 2,
+      urbanHexCount: 1,
+      inEnemyHome: false,
+      knownFortifiedCount: 0,
+      defenders: 0,
+      reinforcers: 0,
+      clear: true,
+    };
+    const result = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'launch', option: 'A' }],
+      coordinates: coordinates(),
+      candidates: [candidate],
+    });
+    assert.deepEqual(result.dropReasons, []);
+    const stored = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(stored[0]?.method, 'air');
+    assert.equal(stored[0]?.landingH3, 'launch-airport');
+    const sea = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'launch', option: 'A' }],
+      coordinates: coordinates(),
+      candidates: [{ ...candidate, method: 'sea', landingH3: 'beach', unitIds: ['inf-b', 'inf-c'], carrierIds: ['ship-1'] }],
+    });
+    assert.equal(sea.dropReasons.length, 0);
+    const rows = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    const seaRow = rows.find((operation) => operation.method === 'sea');
+    assert.equal(seaRow?.landingH3, null);
+  });
+});
+
+/**
+ * The briefing code for one hex of the open match.
+ *
+ * Purpose: A named launch speaks in codes, and the registry is built lazily.
+ * When to use: After the temporary match is open.
+ * Expected outcome: The two-character code. Throws when the hex is not on this map.
+ * Exceptions: Throws from `h3ToCode` when the hex has no code.
+ */
+function codeFor(h3Index: string): string {
+  ensureStrategicCoordinateRegistryInitialized();
+  return h3ToCode(h3Index, { mode: 'strategic' });
+}
+
+/**
+ * Applies one named launch against the current match.
+ *
+ * Purpose: The refusal tests share the command shape.
+ * When to use: After the city or the code under test is known.
+ * Expected outcome: The apply result. The menu candidates are empty, so only the named city can be chosen.
+ * Exceptions: None.
+ */
+function namedLaunch(objective: string, method: 'sea' | 'air') {
+  ensureStrategicCoordinateRegistryInitialized();
+  return applyOperationCommands({
+    state: seatState(),
+    seatId: SEAT,
+    commands: [{ action: 'launch', objective, method }],
+    coordinates: coordinates(),
+    candidates: [],
+  });
+}
+
+test('a named launch against an unknown code is dropped and the translator logs it', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...parts: unknown[]) => {
+      errors.push(parts.map((part) => String(part)).join(' '));
+    };
+    try {
+      const result = namedLaunch('ZZ', 'sea');
+      assert.deepEqual(result.dropReasons, ['operations launch dropped: ZZ is not a hex code on this map.']);
+      assert.equal(result.appliedCount, 0);
+      assert.ok(errors.some((line) => line.includes('hex-code-translator codeToH3: unknown code')));
+    } finally {
+      console.error = original;
+    }
+  });
+});
+
+test('a named launch against a hex that is not an enemy city is dropped', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    const own = (getGameState().homeRegionHexesBySeat?.opponent ?? []).find((hex) => hex !== city);
+    assert.ok(own, 'expected a home hex');
+    const code = codeFor(own);
+    const result = namedLaunch(code, 'sea');
+    assert.deepEqual(result.dropReasons, [`operations launch dropped: ${code} is not a known enemy city.`]);
+  });
+});
+
+test('a named sea launch against a defended city stores a sea operation', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['defender', 'human', 'infantry', city]);
+    const code = codeFor(city);
+    const result = namedLaunch(code, 'sea');
+    assert.deepEqual(result.dropReasons, []);
+    const stored = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(stored[0]?.method, 'sea');
+    assert.equal(stored[0]?.objectiveH3, city);
+    assert.equal(stored[0]?.landingH3, null);
+  });
+});
+
+test('a named launch is dropped when that method already fills its slots', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, SEAT, [storedOperation({ id: 'opponent-op1', phase: 'transit' })]);
+    const code = codeFor(city);
+    const result = namedLaunch(code, 'sea');
+    assert.deepEqual(result.dropReasons, ['operations launch dropped: you already have as many sea operations as you can run.']);
+  });
+});
+
+test('a named air launch against an occupied city is dropped before the search', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['defender', 'human', 'infantry', city]);
+    const code = codeFor(city);
+    const result = namedLaunch(code, 'air');
+    assert.deepEqual(result.dropReasons, [`operations launch dropped: ${code} is defended, and an air drop needs an empty, unfortified city.`]);
+  });
+});
+
+test('a named launch against a city the free units cannot reach is dropped', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('DELETE FROM units');
+    const code = codeFor(city);
+    const result = namedLaunch(code, 'sea');
+    assert.deepEqual(result.dropReasons, [`operations launch dropped: ${code} cannot be reached by sea with the units you have free.`]);
+  });
+});
+
+test('a named air launch against an empty city stores the air method and its launch airport', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    dbRun('UPDATE res_s_infrastructure SET fortified_count = 0 WHERE h3_index = ?', [city]);
+    assert.equal(landUnitCanOccupyHex(city, landMass), true, 'expected the city to accept infantry');
+    const hexById = new Map(getGameState().hexes.map((hex) => [hex.h3Index, hex]));
+    const base = gridDisk(city, AIR_STRIKE_RANGE_HEXES).find((hex) => {
+      if (hex === city) return false;
+      const row = hexById.get(hex);
+      return row !== undefined && row.terrain !== 'water' && landUnitCanOccupyHex(hex, landMass);
+    });
+    assert.ok(base, 'expected land in drop range of the city');
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [base, SEAT]);
+    dbRun(
+      `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+       VALUES (?, 0, 1, 0)
+       ON CONFLICT(h3_index) DO UPDATE SET airport_count = 1`,
+      [base],
+    );
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-1', SEAT, 'air', base]);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['inf-air', SEAT, 'infantry', base]);
+    const code = codeFor(city);
+    const result = namedLaunch(code, 'air');
+    assert.deepEqual(result.dropReasons, []);
+    const stored = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(stored[0]?.method, 'air');
+    assert.equal(stored[0]?.objectiveH3, city);
+    assert.equal(stored[0]?.landingH3, base);
   });
 });

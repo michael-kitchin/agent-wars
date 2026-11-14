@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { normalizeOperationCommands } from './operationCommandParsing';
 
 const ENTRY_REASON =
-  'operations entry dropped: expected {"action":"launch","option":"<letter>"} or {"action":"cancel","id":"<operation id>"}.';
+  'operations entry dropped: expected {"action":"launch","option":"<letter>"}, {"action":"launch","objective":"<hex code>","method":"sea"|"air"}, or {"action":"cancel","id":"<operation id>"}.';
 
 test('an absent or empty operations value adds nothing', () => {
   assert.deepEqual(normalizeOperationCommands(undefined), { commands: [], dropReasons: [] });
@@ -53,4 +53,21 @@ test('a malformed entry is dropped and a second launch is dropped', () => {
     ENTRY_REASON,
     ENTRY_REASON,
   ]);
+});
+
+test('a named launch stores the uppercased code and a bad code or method is that entry', () => {
+  const parsed = normalizeOperationCommands([
+    { action: 'launch', objective: ' ab ', method: 'air' },
+  ]);
+  assert.deepEqual(parsed.commands, [{ action: 'launch', objective: 'AB', method: 'air' }]);
+  assert.deepEqual(parsed.dropReasons, []);
+  const dropped = normalizeOperationCommands([
+    { action: 'launch', objective: 'A', method: 'air' },
+    { action: 'launch', objective: 'AB', method: 'land' },
+    { action: 'launch', option: 'A', objective: 'CD', method: 'sea' },
+  ]);
+  assert.deepEqual(dropped.commands, [{ action: 'launch', option: 'A' }]);
+  assert.equal(dropped.dropReasons.length, 2);
+  assert.ok(dropped.dropReasons.every((reason) => reason.startsWith('operations ')));
+  assert.ok(!dropped.dropReasons.some((reason) => reason.includes('one launch per turn')));
 });

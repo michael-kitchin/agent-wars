@@ -496,6 +496,11 @@ function testOperationsCommandsOnStrategicOnly(): void {
   assert.ok(tactical);
   assert.strictEqual(tactical!.operationCommands, undefined);
   assert.ok(!(tactical!.dropReasons ?? []).some((reason) => reason.includes('operations')));
+  const named = '{"strategy":"hold","orders":[],"operations":[{"action":"launch","objective":"AA","method":"air"}]}';
+  const tacticalNamed = parseOrdersResponse(named, resolveToH3, minimalState, latLngByH3, false, { mode: 'tactical', battleId: 'ops' });
+  assert.ok(tacticalNamed);
+  assert.strictEqual(tacticalNamed!.operationCommands, undefined);
+  assert.ok(!(tacticalNamed!.dropReasons ?? []).some((reason) => reason.includes('operations')));
 }
 
 function run(): void {

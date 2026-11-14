@@ -31,15 +31,17 @@ import {
   readOperations,
   operationMemorySeatIds,
   writeOperationEventTurn,
+  writeOperationNote,
   writeOperationOffer,
   writeOperationsForSeat,
 } from '../gameDb/operationMemory';
 import { buildLiftTerrain } from './liftTerrain';
 import { applyOperationActions } from './operationActions';
-import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
-import { decideOperationOffer, EMPTY_OPERATION_OFFER } from './operationOffer';
+import { advanceOperation } from './operationAdvance';
+import { operationCandidatesForSeat } from './operationCandidates';
+import { decideOperationOffer } from './operationOffer';
 import { OPERATION_MUSTER_CANDIDATE_LIMIT } from './operationRules';
-import { advanceSeaOperation, type OperationFacts, type StoredOrderFact } from './seaOperationAdvance';
+import { type OperationFacts, type StoredOrderFact } from './seaOperationAdvance';
 import { listKnownEnemyCities } from './seaOperationCandidates';
 
 /**
@@ -196,6 +198,7 @@ export function buildOperationFacts(args: {
     storedOrderById: readStoredOrders(args.seatId, args.coordinates),
     objectiveIsOwn: controlByHex.get(args.operation.objectiveH3) === args.seatId,
     objectiveIsEnemyCity: enemyCities.has(args.operation.objectiveH3),
+    objectiveHasEnemyUnit: terrain.enemyUnitsWithin(args.operation.objectiveH3, 0) > 0,
     chooseLanding: (fromH3) => chooseLanding(terrain, args.operation.objectiveH3, fromH3),
     chooseReturnPort: (fromH3) => chooseReturnPort({ fromH3, seatId: args.seatId, state: args.state, terrain }),
   };
@@ -232,7 +235,7 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
       kept.push(operation);
       continue;
     }
-    const step = advanceSeaOperation(operation, facts);
+    const step = advanceOperation(operation, facts);
     const actionCount = applyOperationActions({ seatId, actions: step.actions, state, coordinates });
     if (step.next !== null) kept.push(step.next);
     for (const unitId of step.releasedIds) withheldIds.add(unitId);
@@ -253,61 +256,50 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
       cargoAboard: cargoStillAboard(step.next?.unitIds ?? [], step.next?.carrierIds ?? []),
     });
   }
-  const slots = operationSlotsForState(state);
-  /**
-   * How many sea operations this seat still has.
-   *
-   * Purpose: Another method must not take a sea slot.
-   * When to use: The free-slot check, again after a launch is stored.
-   * Expected outcome: The number of stored rows whose method is sea.
-   * Exceptions: None.
-   */
-  const seaRunning = (): number => kept.filter((operation) => operation.method === 'sea').length;
   let offer = readOperationOffer(configOps, seatId);
-  if (seaRunning() >= slots) offer = EMPTY_OPERATION_OFFER;
-  else {
-    while (seaRunning() < slots) {
-      const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
-      const decision = decideOperationOffer({
-        turnNumber: state.turnNumber,
-        hasCandidate: candidates.length > 0,
-        hasClear: candidates.some((candidate) => candidate.clear),
-        offer,
-      });
-      offer = decision.offer;
-      if (decision.consult) seatEvent = true;
-      if (!decision.launch) break;
-      const candidate = candidates.find((row) => row.clear);
-      if (candidate === undefined) break;
-      const launched: Operation = {
-        id: nextOperationId(seatId, kept, state.turnNumber),
-        method: 'sea',
-        objectiveH3: candidate.objectiveH3,
-        musterH3: candidate.musterH3,
-        landingH3: null,
-        unitIds: [...candidate.unitIds],
-        carrierIds: [...candidate.carrierIds],
-        phase: 'muster',
-        source: 'engine',
-        launchedTurn: state.turnNumber,
-        phaseTurn: state.turnNumber,
-      };
-      const facts = buildOperationFacts({ state, seatId, operation: launched, coordinates });
-      if (facts === null) break;
-      const step = advanceSeaOperation(launched, facts);
-      applyOperationActions({ seatId, actions: step.actions, state, coordinates });
-      if (step.next === null) break;
-      kept.push(step.next);
-      seatEvent = true;
-      logDebug('operationTurnFlow launched', {
-        seatId,
-        id: launched.id,
-        objectiveH3: launched.objectiveH3,
-        musterH3: launched.musterH3,
-        unitCount: launched.unitIds.length,
-        carrierCount: launched.carrierIds.length,
-      });
-    }
+  let launchedThisTick = false;
+  while (true) {
+    const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
+    const decision = decideOperationOffer({
+      turnNumber: state.turnNumber,
+      hasCandidate: candidates.length > 0,
+      hasClear: candidates.some((candidate) => candidate.clear),
+      offer,
+    });
+    offer = decision.offer;
+    if (decision.consult) seatEvent = true;
+    if (!decision.launch || launchedThisTick) break;
+    const candidate = candidates.find((row) => row.clear);
+    if (candidate === undefined) break;
+    const launched: Operation = {
+      id: nextOperationId(seatId, kept, state.turnNumber),
+      method: candidate.method,
+      objectiveH3: candidate.objectiveH3,
+      musterH3: candidate.musterH3,
+      landingH3: candidate.method === 'air' ? candidate.landingH3 : null,
+      unitIds: [...candidate.unitIds],
+      carrierIds: [...candidate.carrierIds],
+      phase: 'muster',
+      source: 'engine',
+      launchedTurn: state.turnNumber,
+      phaseTurn: state.turnNumber,
+    };
+    const facts = buildOperationFacts({ state, seatId, operation: launched, coordinates });
+    if (facts === null) break;
+    const step = advanceOperation(launched, facts);
+    applyOperationActions({ seatId, actions: step.actions, state, coordinates });
+    launchedThisTick = true;
+    if (step.next !== null) kept.push(step.next);
+    seatEvent = true;
+    logDebug('operationTurnFlow launched', {
+      seatId,
+      id: launched.id,
+      method: launched.method,
+      objectiveH3: launched.objectiveH3,
+      musterH3: launched.musterH3,
+      unitCount: launched.unitIds.length,
+      carrierCount: launched.carrierIds.length,
+    });
   }
   const offerEmpty = offer.announcedTurn === null && offer.clearOfferTurn === null;
   writeOperationOffer(configOps, seatId, offerEmpty ? null : offer);
@@ -320,7 +312,7 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
  *
  * Purpose: The planning turn has already been incremented and fog has been refreshed. This is the operation tick.
  * When to use: Once, after fog refresh and before the database save. Pass the coordinates the turn already built.
- * Expected outcome: Active seats have current operations. Every other seat loses its operations, its menu, and its consult turn. A failure is logged and the turn still finishes.
+ * Expected outcome: Active seats have current operations. Every other seat loses its operations, its menu, its consult turn, and its refusal note. A failure is logged and the turn still finishes.
  * Exceptions: None. The outer catch logs a failure of the roster or the clear step. A seat catch logs that seat and continues.
  */
 export function advanceOperationsAfterTurn(coordinates: KnockoutCoordinates): void {
@@ -332,6 +324,7 @@ export function advanceOperationsAfterTurn(coordinates: KnockoutCoordinates): vo
         writeOperationsForSeat(configOps, seatId, []);
         writeOperationOffer(configOps, seatId, null);
         writeOperationEventTurn(configOps, seatId, null);
+        writeOperationNote(configOps, seatId, null);
       }
     }
     for (const seatId of activeAiSeatIds(getSeatRoster())) {

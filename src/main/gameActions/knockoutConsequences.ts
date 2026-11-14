@@ -15,7 +15,7 @@ import {
   dbRun,
   setHexController,
 } from '../gameDb';
-import { writeOperationEventTurn, writeOperationOffer, writeOperationsForSeat } from '../gameDb/operationMemory';
+import { writeOperationEventTurn, writeOperationNote, writeOperationOffer, writeOperationsForSeat } from '../gameDb/operationMemory';
 import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 import { convertUnitsToNeutral, type KnockoutCoordinates } from './unitOwnershipTransfer';
@@ -88,6 +88,7 @@ function deleteSeatPrivateRows(seatId: SeatId): void {
   writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, seatId, []);
   writeOperationOffer({ getOne: dbGetOne, run: dbRun }, seatId, null);
   writeOperationEventTurn({ getOne: dbGetOne, run: dbRun }, seatId, null);
+  writeOperationNote({ getOne: dbGetOne, run: dbRun }, seatId, null);
 }
 
 /**

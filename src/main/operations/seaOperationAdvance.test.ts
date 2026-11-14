@@ -55,6 +55,7 @@ function facts(patch: Partial<OperationFacts> = {}): OperationFacts {
     storedOrderById: new Map(),
     objectiveIsEnemyCity: true,
     objectiveIsOwn: false,
+    objectiveHasEnemyUnit: false,
     chooseLanding: () => BEACH,
     chooseReturnPort: () => PORT,
     ...patch,

@@ -234,7 +234,7 @@ function countReinforcers(args: {
  *
  * Purpose: One search produces the engine's launch and, later, the commander's menu.
  * When to use: When the seat has a free slot. Pass the terrain built from the full unit list so a hidden defender still blocks a city. Ids in `protectedUnitIds`, ground units and ships, are not chosen.
- * Expected outcome: Clear cities first, then the rest, each in rank order. Empty when there is no free ship, fewer than two available units, or no reachable city. At most `OPERATION_MENU_SIZE` rows, after testing at most `OPERATION_OBJECTIVE_TEST_LIMIT` cities.
+ * Expected outcome: Clear cities first, then the rest, each in rank order. Empty when there is no free ship, fewer than two available units, or no reachable city. At most `OPERATION_MENU_SIZE` rows, after testing at most `OPERATION_OBJECTIVE_TEST_LIMIT` cities. `onlyObjectiveH3` tests that one city, clear or not, and skips both caps.
  * Exceptions: None.
  */
 export function listSeaOperationCandidates(args: {
@@ -245,6 +245,7 @@ export function listSeaOperationCandidates(args: {
   readonly active: readonly Operation[];
   readonly protectedUnitIds: ReadonlySet<string>;
   readonly hasCampaignPlan: boolean;
+  readonly onlyObjectiveH3?: string;
 }): OperationCandidate[] {
   const finish = (candidates: readonly OperationCandidate[]): OperationCandidate[] => {
     logDebug('seaOperationCandidates listSeaOperationCandidates', {
@@ -329,14 +330,18 @@ export function listSeaOperationCandidates(args: {
   const force = forces[0];
   if (!force) return finish([]);
   const ranked = rankLiftCities(listKnownEnemyCities(args.state, args.seatId));
+  const named = args.onlyObjectiveH3;
+  const pool = named === undefined ? ranked : ranked.filter((city) => city.h3Index === named);
   const clearIds = new Set(
-    ranked.filter((city) => args.terrain.enemyUnitsWithin(city.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS) === 0).map((city) => city.h3Index)
+    pool.filter((city) => args.terrain.enemyUnitsWithin(city.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS) === 0).map((city) => city.h3Index)
   );
-  const ordered = [...ranked.filter((city) => clearIds.has(city.h3Index)), ...ranked.filter((city) => !clearIds.has(city.h3Index))];
+  const ordered = named === undefined
+    ? [...pool.filter((city) => clearIds.has(city.h3Index)), ...pool.filter((city) => !clearIds.has(city.h3Index))]
+    : pool;
   const candidates: OperationCandidate[] = [];
   let tested = 0;
   for (const city of ordered) {
-    if (candidates.length >= OPERATION_MENU_SIZE || tested >= OPERATION_OBJECTIVE_TEST_LIMIT) break;
+    if (named === undefined && (candidates.length >= OPERATION_MENU_SIZE || tested >= OPERATION_OBJECTIVE_TEST_LIMIT)) break;
     tested += 1;
     let landing: { readonly hex: string; readonly turns: number } | null = null;
     for (const hex of args.terrain.landingHexes(city.h3Index)) {

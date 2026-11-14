@@ -572,7 +572,7 @@ function testCampaignTargetSchemaFollowsTheGate(): void {
  *
  * Purpose: A bad letter must reach the parser as a drop reason, so the schema must not reject it.
  * When to use: After the envelope field list changes.
- * Expected outcome: The property is not required. `action`, `option`, and `id` are strings, and `action` is not an enum. The property is absent when the gate is off or the mode is tactical.
+ * Expected outcome: The property is not required. `action`, `option`, `id`, `objective`, and `method` are optional strings, and `action` is not an enum. The property is absent when the gate is off or the mode is tactical.
  * Exceptions: None.
  */
 function testOperationsSchemaFollowsTheGate(): void {
@@ -589,6 +589,13 @@ function testOperationsSchemaFollowsTheGate(): void {
   assert.ok(!('enum' in action));
   assert.equal(asRecord(properties.option, 'option').type, 'string');
   assert.equal(asRecord(properties.id, 'id').type, 'string');
+  assert.equal(asRecord(properties.objective, 'objective').type, 'string');
+  assert.equal(asRecord(properties.method, 'method').type, 'string');
+  const required = items.required as readonly string[];
+  assert.ok(!required.includes('objective'));
+  assert.ok(!required.includes('method'));
+  assert.ok(!('anyOf' in items));
+  assert.ok(!('enum' in asRecord(properties.method, 'method')));
   const off = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
   assert.ok(!('operations' in off));
   const tactical = asRecord(envelopeSchema({ ...TACTICAL, includeOperations: true }).properties, 'properties');

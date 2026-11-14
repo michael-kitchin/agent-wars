@@ -454,7 +454,14 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'campaignTarget':
       return { ...STRING_SCHEMA };
     case 'operations':
-      return arraySchema(closedObjectSchema({ action: STRING_SCHEMA, option: STRING_SCHEMA, id: STRING_SCHEMA }, []));
+      // Optional strings, with nothing required. A method enum or an anyOf of command shapes would reject the consult
+      // or be ignored beside this object's type, so a bad entry stays a drop reason.
+      return arraySchema(
+        closedObjectSchema(
+          { action: STRING_SCHEMA, option: STRING_SCHEMA, id: STRING_SCHEMA, objective: STRING_SCHEMA, method: STRING_SCHEMA },
+          []
+        )
+      );
     default:
       throw new Error(`envelopeJsonSchema: no schema for envelope field "${field}"`);
   }

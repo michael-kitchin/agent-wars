@@ -22,7 +22,7 @@ import {
  *
  * Purpose: The turn hook performs these in order and does not invent its own.
  * When to use: The `actions` list of an `OperationStep`.
- * Expected outcome: A march, defend, embark, unload, or cancel for one unit.
+ * Expected outcome: A march, defend, hold-fire, embark, unload, or cancel for one unit.
  * Exceptions: None.
  */
 export type OperationAction =
@@ -30,7 +30,8 @@ export type OperationAction =
   | { readonly kind: 'defend'; readonly unitId: string; readonly atH3: string }
   | { readonly kind: 'embark'; readonly unitId: string; readonly carrierId: string }
   | { readonly kind: 'unload'; readonly unitId: string }
-  | { readonly kind: 'cancelOrder'; readonly unitId: string };
+  | { readonly kind: 'cancelOrder'; readonly unitId: string }
+  | { readonly kind: 'holdFire'; readonly unitId: string };
 
 /**
  * The standing order a unit already has, reduced to the two fields a release compares.
@@ -133,6 +134,15 @@ export interface OperationFacts {
    * Exceptions: None.
    */
   readonly objectiveIsOwn: boolean;
+  /**
+   * Whether an enemy unit is standing on the objective.
+   *
+   * Contract: An air transit unloads instead of dropping when this is true. Fog-hidden units still count.
+   * When to use: The air transit check. A sea advance does not read it.
+   * Expected outcome: True when `enemyUnitsWithin` at radius 0 is greater than zero.
+   * Exceptions: None.
+   */
+  readonly objectiveHasEnemyUnit: boolean;
   /**
    * Picks the landing a loaded force sails to from a port.
    *

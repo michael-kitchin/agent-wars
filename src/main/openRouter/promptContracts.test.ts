@@ -726,6 +726,7 @@ function testOperationsParagraphFollowsTheGate(): void {
   };
   const enabled = buildFinalJsonContractInstruction({ ...shared, includeOperations: true });
   assert.ok(enabled.includes('Optional "operations": launch or cancel an operation.'));
+  assert.ok(enabled.includes('To launch against a city that is not listed'));
   assert.ok(enabled.includes('"operations": [...]'));
   const disabled = buildFinalJsonContractInstruction(shared);
   assert.ok(!disabled.includes('Optional "operations"'));

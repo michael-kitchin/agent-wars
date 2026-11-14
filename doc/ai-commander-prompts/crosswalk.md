@@ -128,9 +128,9 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |
 | `## Reminders Triggered This Turn` | Kept — 1.6 |
 | `## Standing Order Status` | Kept — 1.6 |
-| `## Active Operations` | Added. One bullet per stored sea operation, after Campaign Objective, when standing orders are on and the consult is not a battle. The heading also stays when Operation Options has a row and no operation is stored. Omitted when the seat has neither. |
-| `## Operation Options` | Added. A table of up to five letters, after Active Operations when that section is present, when standing orders are on, the consult is not a battle, and a candidate exists. It still prints when no operation is stored. |
-| `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. The command paragraph names the launch, the cancel, and the engine's one-turn window. |
+| `## Active Operations` | Added. One bullet per stored operation, sea or air, after Campaign Objective, when standing orders are on and the consult is not a battle. A refusal from the previous turn is `- Last turn:` before the bullets. The heading also stays when Operation Options has a row and no operation is stored. Omitted when the seat has neither an operation, a row, nor a note. |
+| `## Operation Options` | Added. A table of up to five letters, sea rows first and air rows in the reserved places, after Active Operations when that section is present, when standing orders are on, the consult is not a battle, and a candidate exists. An air row counts as clear. It still prints when no operation is stored. A full sea slot does not omit an air row. |
+| `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. The command paragraph names the letter launch, the named city and method, the cancel, and the engine's one-turn window. |
 | `## Units Without Standing Orders` | Kept — 1.6 |
 | `## Active Callbacks` | Kept, with a detail-cell contract — 1.6 |
 | `# Scenario Objective (Required)` | Kept — 1.7 |

@@ -218,6 +218,162 @@ test('one defender and one fortified cell use the singular', () => {
   assert.match(text, /1 city cell \| 1 ground unit, 1 ship, about 1 turn \| 1 enemy unit within 2 hexes; 1 more can reach it in 1 turn; 1 fortified cell/);
 });
 
+test('an air muster names the infantry marching to the air unit', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [operation({
+      method: 'air',
+      phase: 'muster',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      landingH3: 'port',
+    })],
+    format: (hex) => hex,
+  });
+  assert.equal(
+    text,
+    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 1 city cell. inf-a is marching to port to board air-1.',
+  );
+});
+
+test('an air transit says the air unit drops when it is already on the launch airport', () => {
+  const text = buildOperationsSection({
+    state: state({
+      units: [
+        { id: 'air-1', player: 'opponent', unitType: 'air', h3Index: 'port' },
+        { id: 'inf-a', player: 'opponent', unitType: 'infantry', h3Index: 'port', embarkedOnCarrierUnitId: 'air-1' },
+      ],
+      urban: 2,
+    }),
+    operations: [operation({
+      method: 'air',
+      phase: 'transit',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      landingH3: 'port',
+    })],
+    format: (hex) => hex,
+  });
+  assert.equal(
+    text,
+    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which drops it this turn.',
+  );
+});
+
+test('an air transit says the air unit ferries when it is not yet on the launch airport', () => {
+  const text = buildOperationsSection({
+    state: state({
+      units: [{ id: 'air-1', player: 'opponent', unitType: 'air', h3Index: 'other' }],
+      urban: 2,
+    }),
+    operations: [operation({
+      method: 'air',
+      phase: 'transit',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      landingH3: 'airport',
+    })],
+    format: (hex) => hex,
+  });
+  assert.equal(
+    text,
+    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which ferries to airport this turn.',
+  );
+});
+
+test('an air assault says the infantry holds the city', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 2 }),
+    operations: [operation({
+      method: 'air',
+      phase: 'assault',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+    })],
+    format: (hex) => hex,
+  });
+  assert.equal(
+    text,
+    '# Active Operations\n\n- seat-op1: by air to city. inf-a has landed and holds it until control passes to you.',
+  );
+});
+
+test('an air option names the air unit and counts one air unit when the seat has one', () => {
+  const carried = buildOperationOptionsSection({
+    state: state({
+      units: [
+        { id: 'inf-a', player: 'opponent', unitType: 'infantry', h3Index: 'port' },
+        { id: 'air-1', player: 'opponent', unitType: 'air', h3Index: 'port' },
+      ],
+      urban: 4,
+    }),
+    seatId: 'opponent',
+    candidates: [candidate({
+      method: 'air',
+      musterH3: 'port',
+      landingH3: 'port',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      etaTurns: 3,
+    })],
+    format: (hex) => hex,
+  });
+  assert.match(carried, /\| A \| city \| air \| 1 infantry unit musters at port; air-1 carries it; drops on city \| 4 city cells, in an enemy home region \| 1 ground unit, 1 air unit, about 3 turns \|/);
+  const ferried = buildOperationOptionsSection({
+    state: state({
+      units: [
+        { id: 'inf-a', player: 'opponent', unitType: 'infantry', h3Index: 'port' },
+        { id: 'inf-b', player: 'opponent', unitType: 'infantry', h3Index: 'home' },
+        { id: 'air-1', player: 'opponent', unitType: 'air', h3Index: 'port' },
+        { id: 'air-2', player: 'opponent', unitType: 'air', h3Index: 'home' },
+      ],
+      urban: 4,
+    }),
+    seatId: 'opponent',
+    candidates: [candidate({
+      method: 'air',
+      musterH3: 'port',
+      landingH3: 'airport',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+      etaTurns: 4,
+      inEnemyHome: false,
+      urbanHexCount: 1,
+    })],
+    format: (hex) => hex,
+  });
+  assert.match(ferried, /\| A \| city \| air \| 1 infantry unit musters at port; air-1 ferries it to airport; drops on city \| 1 city cell \| 1 of 2 ground units, 1 of 2 air units, about 4 turns \|/);
+});
+
+test('a note prints under the heading and a note alone is enough', () => {
+  const withOperation = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [operation({ phase: 'return', unitIds: ['inf-a'], carrierIds: ['ship-1'] })],
+    format: (hex) => hex,
+    note: 'operations launch dropped: AA is not a known enemy city.',
+  });
+  assert.equal(
+    withOperation,
+    '# Active Operations\n\n- Last turn: operations launch dropped: AA is not a known enemy city.\n\n- seat-op1: turned back from city. Returning to port. Ships: ship-1.',
+  );
+  const alone = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [],
+    format: (hex) => hex,
+    note: 'operations dropped: expected an array.',
+  });
+  assert.equal(alone, '# Active Operations\n\n- Last turn: operations dropped: expected an array.');
+  assert.equal(
+    buildOperationsSection({
+      state: state({ units: [], urban: 1 }),
+      operations: [],
+      format: (hex) => hex,
+      note: '',
+    }),
+    '',
+  );
+});
+
 test('options with no operation still print the table', () => {
   const table = buildOperationOptionsSection({
     state: state({ units: [], urban: 1 }),

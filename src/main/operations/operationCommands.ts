@@ -1,14 +1,14 @@
 /**
  * Applies the launch and cancel commands from one reply.
  *
- * Purpose: The commander picks a listed row or calls a stored operation off, and the engine writes that once.
+ * Purpose: The commander picks a listed row, names a city, or calls a stored operation off, and the engine writes that once.
  * When to use: Before standing orders for that consult are expanded, with the candidate array the briefing printed.
  * Expected outcome: Stored operations match the commands that could be carried out. A command that cannot is a drop reason.
  * Exceptions: None. A throw while the commands are being resolved writes nothing. The caller receives one drop reason.
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { dbGetOne, dbRun } from '../gameDb';
+import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import {
   nextOperationId,
@@ -18,13 +18,17 @@ import {
   writeOperationOffer,
   writeOperationsForSeat,
 } from '../gameDb/operationMemory';
-import { logDebug, logError } from '../logger';
+import { codeToH3 } from '../briefing/map/hexCodeTranslator';
+import { logDebug, logError, logTrace } from '../logger';
 import type { OperationCommand } from '../openRouter/operationCommandParsing';
-import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import type { Operation, OperationCandidate, OperationMethod } from '../../shared/operationTypes';
 import { applyOperationActions } from './operationActions';
+import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
 import { OPERATION_OPTION_LETTERS } from './operationRules';
+import { listKnownEnemyCities } from './seaOperationCandidates';
 import { buildOperationFacts } from './operationTurnFlow';
-import { advanceSeaOperation, cancelSeaOperation, type OperationAction } from './seaOperationAdvance';
+import { advanceOperation, cancelOperation } from './operationAdvance';
+import { type OperationAction, type OperationStep } from './seaOperationAdvance';
 
 /**
  * Database helpers for the operations, offer, and event rows.
@@ -67,7 +71,7 @@ interface ResolvedCommands {
   /**
    * Orders from the commands that were accepted, cancel first.
    *
-   * Contract: The same action order `cancelSeaOperation` and `advanceSeaOperation` returned.
+   * Contract: The same action order `cancelOperation` and `advanceOperation` returned.
    * When to use: Once, before the operations are stored.
    * Expected outcome: Zero or more actions.
    * Exceptions: None.
@@ -178,7 +182,9 @@ function resolveCommands(args: {
   if (launch === undefined || launch.action !== 'launch') {
     return { operations, actions, appliedCount, dropReasons, launched: false };
   }
-  const launched = resolveLaunch({ ...args, option: launch.option, operations });
+  const launched = 'option' in launch
+    ? resolveLaunch({ ...args, option: launch.option, operations })
+    : resolveNamedLaunch({ ...args, objective: launch.objective, method: launch.method, operations });
   dropReasons.push(...launched.dropReasons);
   if (launched.operation === null || launched.step === undefined) {
     return { operations, actions, appliedCount, dropReasons, launched: false };
@@ -188,8 +194,9 @@ function resolveCommands(args: {
   logDebug('operationCommands launched', {
     seatId: args.seatId,
     id: launched.operation.id,
-    option: launch.option,
+    option: 'option' in launch ? launch.option : null,
     objectiveH3: launched.operation.objectiveH3,
+    method: launched.operation.method,
   });
   return {
     operations: next,
@@ -206,7 +213,7 @@ function resolveCommands(args: {
  * Purpose: A cancel names an id from Active Operations. A return is already doing the only thing a cancel would do.
  * When to use: Each cancel, before the launch.
  * Expected outcome: A step to keep, or one drop reason.
- * Exceptions: Propagates from `buildOperationFacts` or `cancelSeaOperation`.
+ * Exceptions: Propagates from `buildOperationFacts` or `cancelOperation`.
  */
 function resolveCancel(args: {
   readonly state: GameStateSnapshot;
@@ -215,7 +222,7 @@ function resolveCancel(args: {
   readonly coordinates: KnockoutCoordinates;
   readonly stored: readonly Operation[];
   readonly replacements: ReadonlyMap<string, Operation | null>;
-}): { readonly applied: boolean; readonly phase?: string; readonly step?: ReturnType<typeof cancelSeaOperation>; readonly dropReasons: readonly string[] } {
+}): { readonly applied: boolean; readonly phase?: string; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
   const operation = args.stored.find((row) => row.id === args.command.id);
   if (operation === undefined || args.replacements.has(operation.id)) {
     return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} is not one of your operations.`] };
@@ -232,7 +239,7 @@ function resolveCancel(args: {
   if (facts === null) {
     return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} could not be read.`] };
   }
-  return { applied: true, phase: operation.phase, step: cancelSeaOperation(operation, facts), dropReasons: [] };
+  return { applied: true, phase: operation.phase, step: cancelOperation(operation, facts), dropReasons: [] };
 }
 
 /**
@@ -241,7 +248,7 @@ function resolveCancel(args: {
  * Purpose: The letter is an index into the array the table printed. A later search could list a different row.
  * When to use: After every cancel has been resolved.
  * Expected outcome: An operation and its first step, or one drop reason.
- * Exceptions: Propagates from `buildOperationFacts` or `advanceSeaOperation`.
+ * Exceptions: Propagates from `buildOperationFacts` or `advanceOperation`.
  */
 function resolveLaunch(args: {
   readonly state: GameStateSnapshot;
@@ -250,25 +257,124 @@ function resolveLaunch(args: {
   readonly coordinates: KnockoutCoordinates;
   readonly candidates: readonly OperationCandidate[];
   readonly operations: readonly Operation[];
-}): { readonly operation: Operation | null; readonly step?: ReturnType<typeof advanceSeaOperation>; readonly dropReasons: readonly string[] } {
+}): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
   const index = (OPERATION_OPTION_LETTERS as readonly string[]).indexOf(args.option);
   const candidate = index < 0 ? undefined : args.candidates[index];
   if (candidate === undefined) {
     return { operation: null, dropReasons: [`operations launch dropped: option ${args.option} is not listed this turn.`] };
   }
-  const busy = new Set(args.operations.flatMap((operation) => [...operation.unitIds, ...operation.carrierIds]));
-  const taken = [...candidate.unitIds, ...candidate.carrierIds].some((unitId) => busy.has(unitId));
-  if (taken) {
-    return { operation: null, dropReasons: [`operations launch dropped: option ${args.option} is no longer available.`] };
+  return acceptCandidate({
+    ...args,
+    candidate,
+    unavailableReason: `operations launch dropped: option ${args.option} is no longer available.`,
+    unreadReason: `operations launch dropped: option ${args.option} could not be read.`,
+  });
+}
+
+/**
+ * Decides a launch that names a city instead of a letter.
+ *
+ * Purpose: The commander can start an operation the menu did not list, when the free units can reach that city.
+ * When to use: A launch command that carries `objective` and `method`.
+ * Expected outcome: The same first step a letter launch would store for the candidate the search returns, or one drop reason.
+ * Exceptions: `codeToH3` throws on an unknown code and logs that throw. This function catches it and returns a drop reason.
+ */
+function resolveNamedLaunch(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly objective: string;
+  readonly method: OperationMethod;
+  readonly coordinates: KnockoutCoordinates;
+  readonly operations: readonly Operation[];
+}): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
+  let objectiveH3: string;
+  try {
+    objectiveH3 = codeToH3(args.objective, { mode: 'strategic' });
+  } catch {
+    logDebug('operationCommands resolveNamedLaunch: code rejected', { seatId: args.seatId, objective: args.objective });
+    return { operation: null, dropReasons: [`operations launch dropped: ${args.objective} is not a hex code on this map.`] };
   }
+  const city = listKnownEnemyCities(args.state, args.seatId).find((row) => row.h3Index === objectiveH3);
+  if (city === undefined) {
+    return { operation: null, dropReasons: [`operations launch dropped: ${args.objective} is not a known enemy city.`] };
+  }
+  const running = args.operations.filter((operation) => operation.method === args.method).length;
+  if (running >= operationSlotsForState(args.state, args.method)) {
+    return { operation: null, dropReasons: [`operations launch dropped: you already have as many ${args.method} operations as you can run.`] };
+  }
+  if (args.method === 'air' && airObjectiveBlocked(args.state, args.seatId, objectiveH3, city.knownFortifiedCount)) {
+    return {
+      operation: null,
+      dropReasons: [`operations launch dropped: ${args.objective} is defended, and an air drop needs an empty, unfortified city.`],
+    };
+  }
+  const candidates = operationCandidatesForSeat({
+    state: args.state,
+    seatId: args.seatId,
+    active: args.operations,
+    only: { objectiveH3, method: args.method },
+  });
+  const candidate = candidates[0];
+  if (candidate === undefined) {
+    return {
+      operation: null,
+      dropReasons: [`operations launch dropped: ${args.objective} cannot be reached by ${args.method} with the units you have free.`],
+    };
+  }
+  return acceptCandidate({
+    state: args.state,
+    seatId: args.seatId,
+    coordinates: args.coordinates,
+    operations: args.operations,
+    candidate,
+    unavailableReason: `operations launch dropped: ${args.objective} cannot be reached by ${args.method} with the units you have free.`,
+    unreadReason: `operations launch dropped: ${args.objective} could not be read.`,
+  });
+}
+
+/**
+ * Whether an air drop on this city is blocked before the search.
+ *
+ * Purpose: An occupied or fortified city is never an air objective, even when a sea landing could use it.
+ * When to use: A named air launch, after the city is known and before the candidate search.
+ * Expected outcome: True when an unmasked enemy unit stands on the hex or the known fortified count is above zero.
+ * Exceptions: None.
+ */
+function airObjectiveBlocked(state: GameStateSnapshot, seatId: string, objectiveH3: string, knownFortifiedCount: number): boolean {
+  if (knownFortifiedCount > 0) return true;
+  const occupied = listUnitsForSnapshot().some((unit) => unit.player !== seatId && unit.h3Index === objectiveH3);
+  logTrace('operationCommands airObjectiveBlocked', { seatId, objectiveH3, occupied });
+  return occupied;
+}
+
+/**
+ * Stores one candidate the way a letter launch does.
+ *
+ * Purpose: A named city and a menu letter build the same operation, including the air launch airport.
+ * When to use: After the candidate has been chosen.
+ * Expected outcome: An operation whose method is the candidate's method. An air operation keeps `landingH3`. A sea operation stores it as null. Or one drop reason.
+ * Exceptions: Propagates from `buildOperationFacts` or `advanceOperation`.
+ */
+function acceptCandidate(args: {
+  readonly state: GameStateSnapshot;
+  readonly seatId: string;
+  readonly coordinates: KnockoutCoordinates;
+  readonly operations: readonly Operation[];
+  readonly candidate: OperationCandidate;
+  readonly unavailableReason: string;
+  readonly unreadReason: string;
+}): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
+  const busy = new Set(args.operations.flatMap((operation) => [...operation.unitIds, ...operation.carrierIds]));
+  const taken = [...args.candidate.unitIds, ...args.candidate.carrierIds].some((unitId) => busy.has(unitId));
+  if (taken) return { operation: null, dropReasons: [args.unavailableReason] };
   const operation: Operation = {
     id: nextOperationId(args.seatId, args.operations, args.state.turnNumber),
-    method: 'sea',
-    objectiveH3: candidate.objectiveH3,
-    musterH3: candidate.musterH3,
-    landingH3: null,
-    unitIds: [...candidate.unitIds],
-    carrierIds: [...candidate.carrierIds],
+    method: args.candidate.method,
+    objectiveH3: args.candidate.objectiveH3,
+    musterH3: args.candidate.musterH3,
+    landingH3: args.candidate.method === 'air' ? args.candidate.landingH3 : null,
+    unitIds: [...args.candidate.unitIds],
+    carrierIds: [...args.candidate.carrierIds],
     phase: 'muster',
     source: 'commander',
     launchedTurn: args.state.turnNumber,
@@ -280,10 +386,8 @@ function resolveLaunch(args: {
     operation,
     coordinates: args.coordinates,
   });
-  if (facts === null) {
-    return { operation: null, dropReasons: [`operations launch dropped: option ${args.option} could not be read.`] };
-  }
-  return { operation, step: advanceSeaOperation(operation, facts), dropReasons: [] };
+  if (facts === null) return { operation: null, dropReasons: [args.unreadReason] };
+  return { operation, step: advanceOperation(operation, facts), dropReasons: [] };
 }
 
 /**

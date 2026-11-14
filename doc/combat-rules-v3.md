@@ -159,6 +159,8 @@ Using the **current** (pre-movement) positions:
 
 **Air drop:** `resolveAirDropPhase` runs after air-strike transport losses and before the ranged-fire list is built. The air unit stays on its airport. One embarked infantry unit lands on a land hex within strike range, including a hex another side occupies. There is no attack roll against the defenders. Units on that hex may shoot the air unit down the way they counter an air strike. If they do, the infantry is lost and never lands. Anti-air dice join `airStrikeDiceRolls` with `kind: 'antiAir'`. Strategic infantry does not shoot (`getRange` is 0). Armor does. In a battle, a drop covers the footprint, a cell fortified by the other side is illegal, and a drop onto an enemy cell is fought in that beat's melee if both remain. Tactical infantry can shoot a drop down.
 
+An AI seat's air operation supplies the ferry and the drop for that air unit. Ready adds one of those orders and replaces any other strike, ferry, or drop already stored for the same unit. The air unit holds fire for the rest of the operation.
+
 ### 4.2 Ranged phase (pre-move positions)
 
 Using the **current** positions, after air strike casualties:

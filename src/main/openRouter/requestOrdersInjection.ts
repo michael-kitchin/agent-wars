@@ -9,7 +9,7 @@
  */
 
 import { dbGetOne, type GameStateSnapshot } from '../gameDb';
-import { readOperations } from '../gameDb/operationMemory';
+import { operationNoteTextForTurn, readOperationNote, readOperations } from '../gameDb/operationMemory';
 import { logDebug, logTrace } from '../logger';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -298,12 +298,16 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         format: formatCampaignHex,
       })
     : '';
+  const operationNote = showOperations
+    ? operationNoteTextForTurn(readOperationNote({ getOne: dbGetOne }, seatId), args.state.turnNumber)
+    : '';
   const operationsText = showOperations
     ? buildOperationsSection({
         state: args.state,
         operations: activeOperations,
         format: formatCampaignHex,
         options: operationOptions,
+        note: operationNote,
       })
     : '';
   const campaignAttention =

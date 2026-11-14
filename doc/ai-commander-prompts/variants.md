@@ -183,7 +183,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. |
+| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. The menu includes air rows. A launch may name a city and a method. A refusal from the previous turn is one note line. |
 | empty-state | Explored and controlled progress lines remain, since they do not depend on a scenario. |
 
 Adding a scenario is a change to this file and to the goal statement. Silently letting a new scenario inherit region-versus-region wording is the specific regression this row forbids.

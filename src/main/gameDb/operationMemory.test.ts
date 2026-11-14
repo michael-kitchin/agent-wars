@@ -11,14 +11,19 @@ import { upsertGameConfigValue } from './gameConfigRows';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
   OPERATION_EVENTS_CONFIG_KEY,
+  OPERATION_NOTES_CONFIG_KEY,
   OPERATION_OFFERS_CONFIG_KEY,
   OPERATIONS_CONFIG_KEY,
   nextOperationId,
   readOperationEventTurn,
   readOperationOffer,
   readOperations,
+  operationNoteTextForTurn,
+  readOperationNote,
   writeOperationEventTurn,
+  writeOperationNote,
   writeOperationOffer,
+  writeOperationRefusal,
   writeOperationsForSeat,
 } from './operationMemory';
 
@@ -103,5 +108,27 @@ test('offer and event rows round-trip without disturbing operations', () => {
     upsertGameConfigValue(ops, OPERATION_EVENTS_CONFIG_KEY, '{"a2":"soon"}');
     assert.equal(readOperationEventTurn(ops, 'a2'), null);
     assert.equal(readOperations(ops).size, 1);
+  });
+});
+
+test('a refusal note round-trips, a bad value reads as none, and clearing one seat leaves the other', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    assert.equal(readOperationNote(ops, 'a1'), null);
+    writeOperationNote(ops, 'a1', { turn: 5, text: 'operations launch dropped: AA is not a known enemy city.' });
+    writeOperationNote(ops, 'a2', { turn: 5, text: 'operations dropped: expected an array.' });
+    assert.deepEqual(readOperationNote(ops, 'a1'), { turn: 5, text: 'operations launch dropped: AA is not a known enemy city.' });
+    assert.equal(operationNoteTextForTurn(readOperationNote(ops, 'a1'), 6), 'operations launch dropped: AA is not a known enemy city.');
+    assert.equal(operationNoteTextForTurn(readOperationNote(ops, 'a1'), 7), '');
+    upsertGameConfigValue(ops, OPERATION_NOTES_CONFIG_KEY, JSON.stringify({ a1: { turn: 'soon', text: 'x' }, a2: { turn: 5, text: '' } }));
+    assert.equal(readOperationNote(ops, 'a1'), null);
+    assert.equal(readOperationNote(ops, 'a2'), null);
+    writeOperationRefusal(ops, 'a1', 8, ['ignored', 'operations launch dropped: AA is defended, and an air drop needs an empty, unfortified city.']);
+    assert.equal(readOperationNote(ops, 'a1')?.text, 'operations launch dropped: AA is defended, and an air drop needs an empty, unfortified city.');
+    writeOperationRefusal(ops, 'a1', 8, ['ignored']);
+    assert.equal(readOperationNote(ops, 'a1'), null);
+    writeOperationNote(ops, 'a2', { turn: 8, text: 'operations dropped: expected an array.' });
+    writeOperationNote(ops, 'a1', null);
+    assert.equal(readOperationNote(ops, 'a2')?.turn, 8);
   });
 });

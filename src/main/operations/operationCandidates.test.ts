@@ -10,8 +10,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GameStateSnapshot } from '../gameDb';
-import type { Operation } from '../../shared/operationTypes';
-import { operationCandidatesForSeat } from './operationCandidates';
+import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import { operationCandidatesForSeat, operationMenuRows, operationSlotsForState } from './operationCandidates';
 
 /**
  * One stored sea operation.
@@ -45,6 +45,61 @@ test('full sea slots give no candidates', () => {
     active: [fillingOperation()],
   });
   assert.deepEqual(candidates, []);
+});
+
+/**
+ * One menu row named by its objective, so a composition test can see the order.
+ *
+ * Purpose: The menu cut does not read the route, only the two lists.
+ * When to use: The composition cases.
+ * Expected outcome: A sea or air candidate whose objective is the given hex.
+ * Exceptions: None.
+ */
+function row(method: 'sea' | 'air', objectiveH3: string): OperationCandidate {
+  return {
+    method,
+    objectiveH3,
+    musterH3: 'muster',
+    landingH3: 'landing',
+    unitIds: method === 'air' ? ['inf-a'] : ['inf-a', 'inf-b'],
+    carrierIds: method === 'air' ? ['air-1'] : ['ship-1'],
+    etaTurns: 3,
+    urbanHexCount: 1,
+    inEnemyHome: false,
+    knownFortifiedCount: 0,
+    defenders: 0,
+    reinforcers: 0,
+    clear: true,
+  };
+}
+
+test('the menu keeps sea rows first and reserves the last rows for air', () => {
+  const threeSea = ['s1', 's2', 's3'].map((id) => row('sea', id));
+  const twoAir = ['a1', 'a2'].map((id) => row('air', id));
+  assert.deepEqual(
+    operationMenuRows({ sea: threeSea, air: twoAir }).map((candidate) => candidate.objectiveH3),
+    ['s1', 's2', 's3', 'a1', 'a2']
+  );
+  const sixSea = ['s1', 's2', 's3', 's4', 's5', 's6'].map((id) => row('sea', id));
+  assert.deepEqual(
+    operationMenuRows({ sea: sixSea, air: [row('air', 'a1')] }).map((candidate) => candidate.objectiveH3),
+    ['s1', 's2', 's3', 's4', 'a1']
+  );
+  const fiveSea = ['s1', 's2', 's3', 's4', 's5'].map((id) => row('sea', id));
+  assert.deepEqual(
+    operationMenuRows({ sea: fiveSea, air: twoAir }).map((candidate) => candidate.objectiveH3),
+    ['s1', 's2', 's3', 'a1', 'a2']
+  );
+  assert.deepEqual(
+    operationMenuRows({ sea: [], air: twoAir }).map((candidate) => candidate.objectiveH3),
+    ['a1', 'a2']
+  );
+});
+
+test('air and sea slots are counted separately', () => {
+  const state = { gameSize: 'small' } as GameStateSnapshot;
+  assert.equal(operationSlotsForState(state, 'sea'), 1);
+  assert.equal(operationSlotsForState(state, 'air'), 1);
 });
 
 test('a search that throws gives no candidates', () => {

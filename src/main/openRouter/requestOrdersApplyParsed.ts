@@ -14,10 +14,11 @@ import type { AirDropOrder } from '../../shared/ipc/airDropTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { MissileLaunchOrder } from '../../shared/ipc/missileTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import type { GameStateSnapshot } from '../gameDb';
+import { dbGetOne, dbRun, type GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import type { AiSeatId } from '../../shared/seatIds';
 import type { OperationCandidate } from '../../shared/operationTypes';
+import { writeOperationRefusal } from '../gameDb/operationMemory';
 import { applyOperationCommands } from '../operations/operationCommands';
 import { applyParsedCallbackSubscriptions } from './applyParsedCallbackSubscriptions';
 import { applyParsedMemoryUpdates } from './applyParsedMemoryUpdates';
@@ -250,6 +251,7 @@ export interface ApplyParsedRequestOrdersArgs {
  * discarded earlier row is a drop reason. A tactical explicit move shortened to the first reachable leg is omitted
  * when the sub-unit can already shoot, unless that step enters an enemy cell. A move that reaches the ordered cell
  * is kept. Strategic memory rows are applied when memory tools are on. A rejected memory row does not fail the consultation.
+ * A strategic apply with orders on stores one refusal note from the operation reasons collected before standing orders expand, and clears that note when none remain.
  * Exceptions: None. Invalid rows are dropped with reasons rather than thrown.
  */
 export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): RequestOrdersResult {
@@ -292,6 +294,9 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
     const operationResult = applyOperationCommands({ state: planState, seatId, commands: parsed.operationCommands, coordinates: { latLngByH3, resolveToH3 }, candidates: offeredCandidates });
     dropReasons.push(...operationResult.dropReasons);
+  }
+  if (!tacticalBattle && ordersEnabled) {
+    writeOperationRefusal({ getOne: dbGetOne, run: dbRun }, seatId, planState.turnNumber, dropReasons);
   }
   // Tactical beats omit strategic standing-order expansion: assign_order/cancel_order are blocked for sub-unit ids,
   // so auto-generated pursue/march from parents must not substitute for explicit_move this beat.

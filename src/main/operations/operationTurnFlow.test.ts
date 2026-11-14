@@ -14,7 +14,7 @@ import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { canLandUnitTraverseEdge, getLandStepDistances, STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import type { KnockoutCoordinates } from '../gameActions/knockoutConsequences';
 import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer, listUnitsForSnapshot } from '../gameDb';
-import { readOperationEventTurn, readOperationOffer, readOperations, writeOperationEventTurn, writeOperationOffer } from '../gameDb/operationMemory';
+import { readOperationEventTurn, readOperationNote, readOperationOffer, readOperations, writeOperationEventTurn, writeOperationNote, writeOperationOffer } from '../gameDb/operationMemory';
 import { loadCampaignLandMass } from '../openRouter/campaignObjectiveFlow';
 import type { LatLng } from '../tools/h3LatLng';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -179,6 +179,7 @@ test('a seat that has left the match loses its stored operations', () => {
     const memory = { getOne: dbGetOne, run: dbRun };
     writeOperationOffer(memory, 'spectator', { announcedTurn: 4, clearOfferTurn: 4 });
     writeOperationEventTurn(memory, 'spectator', 4);
+    writeOperationNote(memory, 'spectator', { turn: 4, text: 'operations dropped: expected an array.' });
     dbRun('UPDATE seats SET out_turn = 1 WHERE seat_id = ?', [SEAT]);
     advanceOperationsAfterTurn(coords);
     assert.equal(readOperations({ getOne: dbGetOne }).get(SEAT), undefined);
@@ -186,6 +187,7 @@ test('a seat that has left the match loses its stored operations', () => {
     assert.equal(readOperationEventTurn({ getOne: dbGetOne }, SEAT), null);
     assert.equal(readOperationOffer({ getOne: dbGetOne }, 'spectator').announcedTurn, null);
     assert.equal(readOperationEventTurn({ getOne: dbGetOne }, 'spectator'), null);
+    assert.equal(readOperationNote({ getOne: dbGetOne }, 'spectator'), null);
   });
 });
 

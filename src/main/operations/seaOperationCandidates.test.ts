@@ -165,6 +165,7 @@ function search(
     readonly active?: readonly Operation[];
     readonly protectedUnitIds?: ReadonlySet<string>;
     readonly hasCampaignPlan?: boolean;
+    readonly onlyObjectiveH3?: string;
   }
 ): { readonly candidates: ReturnType<typeof listSeaOperationCandidates>; readonly routeChecks: number } {
   const terrain = buildLiftTerrain({ state, seatId: SEAT, landMass });
@@ -176,6 +177,7 @@ function search(
     active: extra?.active ?? [],
     protectedUnitIds: extra?.protectedUnitIds ?? new Set(),
     hasCampaignPlan: extra?.hasCampaignPlan ?? false,
+    onlyObjectiveH3: extra?.onlyObjectiveH3,
   });
   return { candidates, routeChecks: terrain.routeChecks() };
 }
@@ -363,4 +365,43 @@ test('the muster port is the one the ground units can reach', () => {
   ]);
   const { candidates } = search(state, landMass);
   assert.equal(candidates[0]?.musterH3, troopsPort);
+});
+
+test('a named defended city is returned even though it is not clear', () => {
+  const port = latLngToCell(0, 0, 1);
+  const city = gridDisk(port, 9).find((h3) => !gridDisk(port, 8).includes(h3))!;
+  const built = coast({
+    radius: 9,
+    infantry: ['inf-a', 'inf-b', 'inf-c', 'inf-d'],
+    cities: [{ h3Index: city, urbanHexCount: 4 }],
+    extraUnits: [{ id: 'defender', player: 'human', unitType: 'infantry', h3Index: city }],
+  });
+  const { candidates } = search(built.state, built.landMass, { onlyObjectiveH3: city });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.objectiveH3, city);
+  assert.equal(candidates[0]?.clear, false);
+});
+
+test('a named city with no sail landing returns nothing', () => {
+  const port = latLngToCell(0, 0, 1);
+  const inland = gridDisk(port, 12).find((h3) => !gridDisk(port, 11).includes(h3))!;
+  const built = coast({
+    radius: 3,
+    infantry: ['inf-a', 'inf-b'],
+    cities: [],
+  });
+  const state = {
+    ...built.state,
+    hexes: [...built.state.hexes, { h3Index: inland, terrain: 'land', terrainKind: 'plains' }],
+    strategicInfrastructure: [
+      ...(built.state.strategicInfrastructure ?? []),
+      { h3Index: inland, urbanHexCount: 3, airportCount: 0, seaportCount: 0 },
+    ],
+    strategicControl: [
+      ...(built.state.strategicControl ?? []),
+      { h3Index: inland, controllerPlayerId: 'human' },
+    ],
+  };
+  const { candidates } = search(state, built.landMass, { onlyObjectiveH3: inland });
+  assert.deepEqual(candidates, []);
 });

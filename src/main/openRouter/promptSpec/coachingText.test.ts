@@ -357,5 +357,8 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   assert.equal(buildContextCoaching(tacticalGates({ operationsEnabled: true })).includes('The engine runs operations'), false);
   assert.ok(withBoth.includes('Operation Options lists up to 5 you could launch'));
   assert.ok(withBoth.includes('it never launches a defended row'));
+  assert.ok(withBoth.includes('by sea or by air'));
+  assert.ok(withBoth.includes('An air unit in an operation does not strike'));
+  assert.ok(withBoth.includes('with "objective" and "method" in place of "option"'));
   assert.equal(buildOperationRuleBlock(false).includes('Operation Options lists up to'), false);
 });

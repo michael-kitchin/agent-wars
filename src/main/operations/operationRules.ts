@@ -18,6 +18,36 @@
 export const OPERATION_MAX_SEA_PER_SIZE = 1;
 
 /**
+ * Active air operations one seat may have on a small map.
+ *
+ * Purpose: Larger matches multiply this by `GAME_SIZE_MULTIPLIER`, separately from the sea cap.
+ * When to use: The launch loop and the menu, once per seat per turn.
+ * Expected outcome: 1, before the size multiplier.
+ * Exceptions: None.
+ */
+export const OPERATION_MAX_AIR_PER_SIZE = 1;
+
+/**
+ * Air rows kept at the end of Operation Options when an air candidate exists.
+ *
+ * Purpose: Sea rows stay first, and a menu that also has air landings still fits in `OPERATION_MENU_SIZE`.
+ * When to use: Combining the two candidate lists.
+ * Expected outcome: 2.
+ * Exceptions: None.
+ */
+export const OPERATION_MENU_AIR_ROWS = 2;
+
+/**
+ * Turns in air `transit` before the infantry is unloaded and the operation ends.
+ *
+ * Purpose: A ferry or a drop that never finishes does not keep the air unit out of the fight forever.
+ * When to use: When elapsed turns, which are zero on the tick the phase began, reach this value.
+ * Expected outcome: 6. The infantry is unloaded on the carrier's hex and the operation ends.
+ * Exceptions: None.
+ */
+export const OPERATION_AIR_TRANSIT_TIMEOUT_TURNS = 6;
+
+/**
  * Fewest ground units worth putting on ships.
  *
  * Purpose: A landing of one unit is not started, and a muster that never gathers two units is given up.

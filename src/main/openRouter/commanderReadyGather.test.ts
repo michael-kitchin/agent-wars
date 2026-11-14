@@ -11,8 +11,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
-import { getGameStateForPlayer } from '../gameDb';
+import { dbGetOne, dbRun, getGameState, getGameStateForPlayer } from '../gameDb';
 import { setAiPendingOrders } from '../gameDb';
+import { writeOperationsForSeat } from '../gameDb/operationMemory';
+import type { Operation } from '../../shared/operationTypes';
 import { listGameMaps } from '../gameMap/listGameMaps';
 import { withSeatedTempGameDbAsync } from '../testSupport/withSeatedTempGameDb';
 import { resetCommanderPool, setCommanderConsultRunnerForTests, startStrategicPlanning } from './commanderPool';
@@ -110,4 +112,54 @@ test('ready gathers a stored plan, a late plan, and standing orders', async (t) 
     setCommanderConsultRunnerForTests(null);
     resetCommanderPool([]);
   });
+});
+
+test('an air operation in transit replaces that carrier tempo strike with a drop', async (t) => {
+  const map = regionalMap();
+  if (!map) {
+    t.skip('no regional map with three side groups is extracted');
+    return;
+  }
+  const seats = [
+    aiSeat(map.sideGroupIds[0] ?? '', null),
+    aiSeat(map.sideGroupIds[1] ?? '', null),
+  ];
+  await withSeatedTempGameDbAsync(
+    'aw-ready-air-drop-',
+    { gameMapId: map.id, fogOfWarEnabled: false, seats },
+    async () => {
+      const seatId: AiSeatId = AI_SEAT_IDS[0];
+      const hex = getGameState().hexes[0]?.h3Index;
+      assert.ok(hex);
+      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-op', seatId, 'air', hex]);
+      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['inf-op', seatId, 'infantry', hex]);
+      dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['inf-op', 'air-op']);
+      const operation: Operation = {
+        id: `${seatId}-op1`,
+        method: 'air',
+        objectiveH3: 'city-hex',
+        musterH3: hex,
+        landingH3: hex,
+        unitIds: ['inf-op'],
+        carrierIds: ['air-op'],
+        phase: 'transit',
+        source: 'engine',
+        launchedTurn: 1,
+        phaseTurn: 1,
+      };
+      writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, seatId, [operation]);
+      const orders = await gatherCommanderOrdersForReady({
+        useEventDriven: true,
+        turnNumber: 1,
+        aiPlanningRunEnabled: false,
+        hasKey: false,
+        getGameStateForPlayer: (id) => getGameStateForPlayer(id),
+      });
+      const seatOrders = orders.get(seatId);
+      assert.ok(seatOrders);
+      assert.equal(seatOrders.airDropOrders?.some((order) => order.unitId === 'air-op' && order.targetH3Index === 'city-hex'), true);
+      assert.equal(seatOrders.airStrikeOrders.some((order) => order.unitId === 'air-op'), false);
+      resetCommanderPool([]);
+    }
+  );
 });

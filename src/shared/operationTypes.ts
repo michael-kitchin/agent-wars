@@ -12,10 +12,10 @@
  *
  * Purpose: Callers branch on the method without stringly typed checks.
  * When to use: Stored operations and candidate rows.
- * Expected outcome: `sea` for a landing by ship.
+ * Expected outcome: `sea` for a landing by ship, or `air` for one infantry unit dropped from an air unit.
  * Exceptions: None.
  */
-export type OperationMethod = 'sea';
+export type OperationMethod = 'sea' | 'air';
 
 /**
  * Where an operation is in its sequence.
@@ -42,10 +42,10 @@ export type OperationSource = 'engine' | 'commander';
  *
  * Purpose: Parsing rejects anything outside this list.
  * When to use: When reading a stored operation.
- * Expected outcome: `sea`.
+ * Expected outcome: `sea` and `air`.
  * Exceptions: None.
  */
-export const OPERATION_METHODS: readonly OperationMethod[] = ['sea'];
+export const OPERATION_METHODS: readonly OperationMethod[] = ['sea', 'air'];
 
 /**
  * The phases a stored row may contain.
@@ -90,7 +90,7 @@ export interface Operation {
    *
    * Contract: A member of `OPERATION_METHODS`.
    * When to use: Choosing the advance function.
-   * Expected outcome: `sea`.
+   * Expected outcome: `sea` or `air`.
    * Exceptions: None.
    */
   readonly method: OperationMethod;
@@ -189,9 +189,9 @@ export interface OperationCandidate {
   /**
    * How the force travels.
    *
-   * Contract: `sea` for every row this builder returns.
-   * When to use: Filtering a mixed menu later.
-   * Expected outcome: `sea`.
+   * Contract: `sea` for a ship landing and `air` for an air drop.
+   * When to use: Filtering a mixed menu.
+   * Expected outcome: `sea` or `air`.
    * Exceptions: None.
    */
   readonly method: OperationMethod;

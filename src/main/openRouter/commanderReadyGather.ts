@@ -18,6 +18,7 @@ import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { collectTempoRuleAttacks } from '../tools/tempoRuleAttacks';
 import { logDebug, logError } from '../logger';
 import { readCommanderPoolSnapshot, startStrategicPlanning, waitForSeatsSettled } from './commanderPool';
+import { mergeOperationTurnOrders, operationTurnOrders } from '../operations/operationTurnOrders';
 
 /**
  * What Ready knows about the consultation mode.
@@ -112,7 +113,7 @@ export function buildUnconsultedCommanderOrders(seatId: AiSeatId, aiState: GameS
  *
  * Purpose: The turn resolves stored plans, plans that finish during the wait, and standing orders for the rest.
  * When to use: `handleGameReady`.
- * Expected outcome: The map has an entry for each active AI seat. A seat that is `planning` is waited on until it leaves that status, up to the consultation wait. No shorter race is started.
+ * Expected outcome: The map has an entry for each active AI seat. A seat that is `planning` is waited on until it leaves that status, up to the consultation wait. An air operation's ferry or drop replaces other air orders for that air unit.
  * Exceptions: A seat whose state throws is logged and omitted.
  */
 export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherArgs): Promise<TurnOrdersByOwner> {
@@ -147,6 +148,12 @@ export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherAr
     } catch (err) {
       logError('commanderReadyGather could not build standing orders', err);
     }
+  }
+  for (const [seatId, seatOrders] of orders) {
+    orders.set(
+      seatId,
+      mergeOperationTurnOrders(seatOrders, operationTurnOrders(seatId, args.getGameStateForPlayer(seatId)))
+    );
   }
   return orders;
 }

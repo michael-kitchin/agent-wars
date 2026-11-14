@@ -111,6 +111,9 @@ function applyOne(batch: ActionBatch, action: OperationAction): boolean {
       : { type: 'defend' as const, defendHex: center };
     return applyStandingOrder(batch, action.unitId, 'assign_order', { unitId: action.unitId, order });
   }
+  if (action.kind === 'holdFire') {
+    return applyStandingOrder(batch, action.unitId, 'assign_order', { unitId: action.unitId, order: { type: 'hold_fire' } });
+  }
   if (action.kind === 'cancelOrder') return applyStandingOrder(batch, action.unitId, 'cancel_order', { unitId: action.unitId });
   if (action.kind === 'embark') {
     try {

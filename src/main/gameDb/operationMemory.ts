@@ -1,7 +1,7 @@
 /**
  * An AI side keeps its sea operations between turns and across a save and load.
  *
- * Purpose: The next planning phase continues the same landing instead of starting over.
+ * Purpose: The next planning phase continues the same operation instead of starting over.
  * When to use: Read once per turn advance. Replace one seat's list when that advance finishes. A new match deletes the row.
  * Expected outcome: Seat id to operations. A missing row is an empty map.
  * Exceptions: A parse error is logged and treated as an empty memory. A database error from the write propagates.
@@ -50,6 +50,45 @@ export const OPERATION_OFFERS_CONFIG_KEY = 'operation_offers';
  * Exceptions: None.
  */
 export const OPERATION_EVENTS_CONFIG_KEY = 'operation_events';
+
+/**
+ * The `game_config` key for the refusal shown on the following turn.
+ *
+ * Purpose: A dropped operation command has to survive until the next briefing, and only that briefing.
+ * When to use: Reading and writing one seat's note.
+ * Expected outcome: The string `operation_notes`.
+ * Exceptions: None.
+ */
+export const OPERATION_NOTES_CONFIG_KEY = 'operation_notes';
+
+/**
+ * The refusal a seat sees on the turn after it was dropped.
+ *
+ * Purpose: The briefing prints one sentence, and the turn number decides whether that sentence is still due.
+ * When to use: The value stored under `OPERATION_NOTES_CONFIG_KEY`.
+ * Expected outcome: `turn` is the consult that produced `text`.
+ * Exceptions: None.
+ */
+export interface OperationNote {
+  /**
+   * The turn whose reply produced the note.
+   *
+   * Contract: The following turn is `turn + 1`.
+   * When to use: Comparing with the briefing's turn number.
+   * Expected outcome: An integer.
+   * Exceptions: None.
+   */
+  readonly turn: number;
+  /**
+   * The joined refusal text.
+   *
+   * Contract: Non-empty. A stored empty string reads as no note.
+   * When to use: The Active Operations line.
+   * Expected outcome: One or more drop reasons that start with `operations `.
+   * Exceptions: None.
+   */
+  readonly text: string;
+}
 
 /**
  * True when the value is a member of the allowed list.
@@ -302,7 +341,7 @@ export function readOperationEventTurn(ops: Pick<GameConfigKvDbOps, 'getOne'>, s
  *
  * Purpose: A seat that has left must lose a menu even when it never stored an operation.
  * When to use: Before the active seats advance.
- * Expected outcome: Every seat id present on any of the three rows, in sorted order.
+ * Expected outcome: Every seat id present on the operation, offer, event, or note row, in sorted order.
  * Exceptions: None. A malformed row is logged by the reader and contributes no ids.
  */
 export function operationMemorySeatIds(ops: Pick<GameConfigKvDbOps, 'getOne'>): readonly string[] {
@@ -310,6 +349,7 @@ export function operationMemorySeatIds(ops: Pick<GameConfigKvDbOps, 'getOne'>): 
     ...readOperations(ops).keys(),
     ...Object.keys(readConfigObject(ops, OPERATION_OFFERS_CONFIG_KEY)),
     ...Object.keys(readConfigObject(ops, OPERATION_EVENTS_CONFIG_KEY)),
+    ...Object.keys(readConfigObject(ops, OPERATION_NOTES_CONFIG_KEY)),
   ]);
   const seatIds = [...ids].sort();
   logTrace('operationMemory operationMemorySeatIds', { seatCount: seatIds.length });
@@ -324,6 +364,77 @@ export function operationMemorySeatIds(ops: Pick<GameConfigKvDbOps, 'getOne'>): 
  * Expected outcome: The row with this seat's turn replaced or removed. Other seats are kept.
  * Exceptions: Propagates a database error.
  */
+/**
+ * Reads one seat's refusal note.
+ *
+ * Purpose: The next briefing repeats why a launch or cancel was dropped.
+ * When to use: While building Active Operations. A missing or malformed value is no note.
+ * Expected outcome: The stored turn and text, or null.
+ * Exceptions: None. A parse error is logged by the shared reader and returns null.
+ */
+export function readOperationNote(ops: Pick<GameConfigKvDbOps, 'getOne'>, seatId: string): OperationNote | null {
+  logTrace('operationMemory readOperationNote', { seatId });
+  const entry = readConfigObject(ops, OPERATION_NOTES_CONFIG_KEY)[seatId];
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const row = entry as Record<string, unknown>;
+  const turn = storedInteger(row.turn);
+  if (turn === null || typeof row.text !== 'string' || row.text.length === 0) return null;
+  return { turn, text: row.text };
+}
+
+/**
+ * The note text still due on this turn.
+ *
+ * Purpose: A refusal is shown once, on the turn after it was stored.
+ * When to use: When the briefing decides whether to print the note.
+ * Expected outcome: The text when `note.turn` is the previous turn. Otherwise an empty string.
+ * Exceptions: None.
+ */
+export function operationNoteTextForTurn(note: OperationNote | null, turnNumber: number): string {
+  const text = note !== null && note.turn === turnNumber - 1 ? note.text : '';
+  logTrace('operationMemory operationNoteTextForTurn', { turnNumber, shown: text.length > 0 });
+  return text;
+}
+
+/**
+ * Replaces one seat's refusal note.
+ *
+ * Purpose: The sentence has to be there for the next briefing, and gone once that briefing has passed.
+ * When to use: After a strategic apply, and when the seat is knocked out or leaves. Pass null to remove the seat.
+ * Expected outcome: The row with this seat's entry replaced or removed. Other seats are kept.
+ * Exceptions: Propagates a database error.
+ */
+export function writeOperationNote(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  note: OperationNote | null
+): void {
+  const record = readConfigObject(ops, OPERATION_NOTES_CONFIG_KEY);
+  if (note === null) delete record[seatId];
+  else record[seatId] = { turn: note.turn, text: note.text };
+  logDebug('operationMemory writeOperationNote', { seatId, cleared: note === null });
+  writeConfigObject(ops, OPERATION_NOTES_CONFIG_KEY, record);
+}
+
+/**
+ * Stores the operation refusals from one reply, or clears them.
+ *
+ * Purpose: The next briefing can say why, and a reply with no operation refusal must not repeat an old one.
+ * When to use: Once, after a strategic apply with orders enabled, with the drop reasons collected so far.
+ * Expected outcome: One note whose text joins every reason that starts with `operations `. No such reason removes the seat's note.
+ * Exceptions: Propagates a database error.
+ */
+export function writeOperationRefusal(
+  ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
+  seatId: string,
+  turn: number,
+  reasons: readonly string[]
+): void {
+  const kept = reasons.filter((reason) => reason.startsWith('operations '));
+  logDebug('operationMemory writeOperationRefusal', { seatId, turn, kept: kept.length });
+  writeOperationNote(ops, seatId, kept.length === 0 ? null : { turn, text: kept.join(' ') });
+}
+
 export function writeOperationEventTurn(
   ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>,
   seatId: string,

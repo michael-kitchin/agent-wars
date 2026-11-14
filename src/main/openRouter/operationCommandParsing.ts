@@ -7,6 +7,8 @@
  * Exceptions: None.
  */
 
+import { OPERATION_METHODS, type OperationMethod } from '../../shared/operationTypes';
+import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
 import { logTrace } from '../logger';
 import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
 
@@ -15,11 +17,12 @@ import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
  *
  * Purpose: The apply step branches on `action` without reading the raw reply again.
  * When to use: The `commands` list from `normalizeOperationCommands`.
- * Expected outcome: A launch names a letter. A cancel names an operation id.
+ * Expected outcome: A letter launch names a row. A named launch names a hex code and a method. A cancel names an operation id.
  * Exceptions: None.
  */
 export type OperationCommand =
   | { readonly action: 'launch'; readonly option: string }
+  | { readonly action: 'launch'; readonly objective: string; readonly method: OperationMethod }
   | { readonly action: 'cancel'; readonly id: string };
 
 /**
@@ -31,14 +34,14 @@ export type OperationCommand =
  * Exceptions: None.
  */
 const ENTRY_DROP_REASON =
-  'operations entry dropped: expected {"action":"launch","option":"<letter>"} or {"action":"cancel","id":"<operation id>"}.';
+  'operations entry dropped: expected {"action":"launch","option":"<letter>"}, {"action":"launch","objective":"<hex code>","method":"sea"|"air"}, or {"action":"cancel","id":"<operation id>"}.';
 
 /**
  * Reads the commands from one `operations` value.
  *
  * Purpose: The parser keeps the reply when the array is missing, empty, or partly wrong.
  * When to use: Once per strategic envelope, with `obj.operations`.
- * Expected outcome: No command and no reason when the value is absent or an empty array. A non-array is one reason and no command. A second launch is dropped. Letters are trimmed and uppercased.
+ * Expected outcome: No command and no reason when the value is absent or an empty array. A non-array is one reason and no command. A second launch is dropped. Letters and hex codes are trimmed and uppercased. An entry that has both a letter and a hex code uses the letter.
  * Exceptions: None.
  */
 export function normalizeOperationCommands(raw: unknown): {
@@ -73,7 +76,7 @@ export function normalizeOperationCommands(raw: unknown): {
  *
  * Purpose: The letter and the id are normalized here, so apply does not trim them again.
  * When to use: Each entry of an `operations` array.
- * Expected outcome: A command, or null when the entry is not one of the two shapes.
+ * Expected outcome: A command, or null when the entry is not one of the three shapes. A bad hex code or a bad method is null, so it becomes that entry's drop reason.
  * Exceptions: None.
  */
 function readEntry(entry: unknown): OperationCommand | null {
@@ -81,8 +84,12 @@ function readEntry(entry: unknown): OperationCommand | null {
   const record = entry as Record<string, unknown>;
   if (record.action === 'launch') {
     const option = typeof record.option === 'string' ? record.option.trim().toUpperCase() : '';
-    if (!(OPERATION_OPTION_LETTERS as readonly string[]).includes(option)) return null;
-    return { action: 'launch', option };
+    if ((OPERATION_OPTION_LETTERS as readonly string[]).includes(option)) return { action: 'launch', option };
+    if (typeof record.option === 'string' && record.option.trim().length > 0) return null;
+    const objective = typeof record.objective === 'string' ? record.objective.trim().toUpperCase() : '';
+    if (!HEX_CODE_PATTERN.test(objective)) return null;
+    if (typeof record.method !== 'string' || !(OPERATION_METHODS as readonly string[]).includes(record.method)) return null;
+    return { action: 'launch', objective, method: record.method as OperationMethod };
   }
   if (record.action === 'cancel') {
     const id = typeof record.id === 'string' ? record.id.trim() : '';

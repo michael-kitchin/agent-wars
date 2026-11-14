@@ -155,11 +155,11 @@ To choose a different target, set "campaignTarget" to the hex code of an enemy c
 
 ## Operations
 
-The engine runs operations: several turns of orders that carry ground units to an enemy city by sea. It musters the units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. The Active Operations section of the briefing lists each one and how far it has got.
+The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air. By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. By air, it marches one infantry unit to an air unit's airport, loads it, ferries to an airport in range when it must, and drops it onto a city that holds no enemy unit. The Active Operations section of the briefing lists each one and how far it has got.
 
-When you have room for another operation, Operation Options lists up to 5 you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. The engine launches the first undefended row on the turn after that row was offered, and it never launches a defended row. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
+When you have room for another operation, Operation Options lists up to 5 you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option". The engine launches the first undefended row on the turn after that row was offered, and it never launches a defended row. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
 
-Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units.
+Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
 
 A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
 
@@ -352,7 +352,7 @@ Legal events and their parameters: turns (n: fires after n turns have passed sin
 
 Optional "campaignTarget": the hex code of an enemy city for your ground campaign, as a string. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
 
-Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing.
+Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"sea"} or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing.
 
 Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools). Memory write keys are at most 64 characters and may contain only letters, digits, hyphen, and underscore; content is at most 500 characters.
 
@@ -619,6 +619,7 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 | --- | --- | --- | --- | --- | --- | --- |
 | A | KQ | sea | 2 ground units muster at FH; 1 ship sail to J0; assault KQ | 4 city cells, in an enemy home region | 2 of 12 ground units, 1 of 4 ships, about 6 turns | 0 enemy units within 2 hexes; 3 more can reach it in 6 turns |
 | B | J0 | sea | 2 ground units muster at FH; 1 ship sail to KQ; assault J0 | 9 city cells | 2 of 12 ground units, 1 of 4 ships, about 8 turns | 1 enemy unit within 2 hexes; 2 more can reach it in 8 turns |
+| C | LP | air | 1 infantry unit musters at FH; a1-a1 carries it; drops on LP | 8 city cells, in an enemy home region | 1 of 12 ground units, 1 of 2 air units, about 3 turns | 0 enemy units within 2 hexes; 1 more can reach it in 3 turns |
 
 ## Supplemental Hex Intelligence
 
