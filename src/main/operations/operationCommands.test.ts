@@ -130,6 +130,42 @@ function arrange(landMass: LandMassByH3): { readonly city: string } {
 }
 
 /**
+ * The standing-order type stored for one unit, if any.
+ *
+ * Purpose: A cancel test checks which orders the cancel left in place.
+ * When to use: After `applyOperationCommands`.
+ * Expected outcome: The `order_type` column, or undefined when the row is gone.
+ * Exceptions: None.
+ */
+function orderTypeFor(unitId: string): string | undefined {
+  return dbGetOne<{ order_type: string }>(
+    'SELECT order_type FROM standing_orders WHERE player_id = ? AND unit_id = ?',
+    [SEAT, unitId],
+  )?.order_type;
+}
+
+/**
+ * Stores one standing order the way a reply's assign_order would.
+ *
+ * Purpose: A cancel test needs an order that was written before the cancel.
+ * When to use: After the unit is on the map.
+ * Expected outcome: One row whose type is `orderType`.
+ * Exceptions: None. A bad hex still inserts the row.
+ */
+function rememberOrder(unitId: string, orderType: 'defend' | 'march', hex: string): void {
+  const center = cellToLatLng(hex);
+  const params = orderType === 'march'
+    ? { type: 'march', destination: center, avoidEnemies: false, engageEnRoute: false }
+    : { type: 'defend', defendHex: center };
+  dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [SEAT, unitId]);
+  dbRun(
+    `INSERT INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+     VALUES (?, ?, ?, ?, NULL, 'en_route', ?, ?)`,
+    [SEAT, unitId, orderType, JSON.stringify(params), seatState().turnNumber, JSON.stringify(center)],
+  );
+}
+
+/**
  * One stored operation with the fields a cancel does not care about filled in.
  *
  * Purpose: A cancel case names the phase and the id.
@@ -185,6 +221,31 @@ test('launching A stores a commander muster and the expansion includes its march
     for (const unitId of [...(stored[0]?.unitIds ?? []), ...(stored[0]?.carrierIds ?? [])]) {
       assert.equal(moving.has(unitId), true, unitId);
     }
+  });
+});
+
+test('a cancel and a launch on the same turn do not reuse the cancelled id', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    arrange(landMass);
+    dbRun('UPDATE turn_state SET turn_number = ? WHERE id = 1', [6]);
+    const db = { getOne: dbGetOne, run: dbRun };
+    writeOperationsForSeat(db, SEAT, [storedOperation({ id: `${SEAT}-op6`, phase: 'muster' })]);
+    const state = seatState();
+    const candidates = operationCandidatesForSeat({ state, seatId: SEAT, active: [] });
+    assert.equal(candidates.length >= 1, true);
+    const result = applyOperationCommands({
+      state,
+      seatId: SEAT,
+      commands: [{ action: 'cancel', id: `${SEAT}-op6` }, { action: 'launch', option: 'A' }],
+      coordinates: coordinates(),
+      candidates: candidates.slice(0, 1),
+    });
+    assert.deepEqual(result.dropReasons, []);
+    const stored = readOperations({ getOne: dbGetOne }).get(SEAT) ?? [];
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0]?.id, `${SEAT}-op6b`);
   });
 });
 
@@ -287,6 +348,118 @@ test('cancelling a muster removes it and cancels its marches', () => {
     for (const unitId of [...launched.unitIds, ...launched.carrierIds]) {
       assert.equal(remaining.has(unitId), false, unitId);
     }
+  });
+});
+
+test('a muster cancel keeps a standing order given to one of its units', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    arrange(landMass);
+    const state = seatState();
+    const candidates = operationCandidatesForSeat({ state, seatId: SEAT, active: [] });
+    const coords = coordinates();
+    applyOperationCommands({ state, seatId: SEAT, commands: [{ action: 'launch', option: 'A' }], coordinates: coords, candidates });
+    const launched = (readOperations({ getOne: dbGetOne }).get(SEAT) ?? [])[0];
+    assert.ok(launched && launched.unitIds.length >= 2, 'expected a muster with two units');
+    const kept = launched.unitIds[0];
+    const cleared = launched.unitIds[1];
+    assert.ok(kept && cleared);
+    const hex = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', [kept])?.h3_index;
+    assert.ok(hex);
+    rememberOrder(kept, 'defend', hex);
+    const result = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'cancel', id: launched.id }],
+      coordinates: coords,
+      candidates: [],
+      keepOrderIds: new Set([kept]),
+    });
+    assert.deepEqual(result.dropReasons, []);
+    assert.equal(orderTypeFor(kept), 'defend');
+    assert.equal(orderTypeFor(cleared), undefined);
+  });
+});
+
+test('a transit cancel keeps a standing order given to its ship', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    const state = seatState();
+    const candidates = operationCandidatesForSeat({ state, seatId: SEAT, active: [] });
+    const coords = coordinates();
+    applyOperationCommands({ state, seatId: SEAT, commands: [{ action: 'launch', option: 'A' }], coordinates: coords, candidates });
+    const launched = (readOperations({ getOne: dbGetOne }).get(SEAT) ?? [])[0];
+    assert.ok(launched && launched.carrierIds[0], 'expected a ship');
+    const shipId = launched.carrierIds[0];
+    const shipHex = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', [shipId])?.h3_index;
+    assert.ok(shipHex);
+    const db = { getOne: dbGetOne, run: dbRun };
+    writeOperationsForSeat(db, SEAT, [{ ...launched, phase: 'transit', objectiveH3: city, landingH3: shipHex }]);
+    rememberOrder(shipId, 'defend', shipHex);
+    const result = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'cancel', id: launched.id }],
+      coordinates: coords,
+      candidates: [],
+      keepOrderIds: new Set([shipId]),
+    });
+    assert.deepEqual(result.dropReasons, []);
+    assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? [])[0]?.phase, 'return');
+    assert.equal(orderTypeFor(shipId), 'defend');
+  });
+});
+
+test('an air cancel keeps a standing order given to the infantry or the air unit', () => {
+  withTempGameDb('aw-operation-command-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    const { city } = arrange(landMass);
+    const infantryHex = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', ['inf-a'])?.h3_index;
+    assert.ok(infantryHex);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-1', SEAT, 'air', infantryHex]);
+    const db = { getOne: dbGetOne, run: dbRun };
+    const operation = {
+      ...storedOperation({ id: `${SEAT}-op1`, phase: 'muster' }),
+      method: 'air' as const,
+      objectiveH3: city,
+      musterH3: infantryHex,
+      landingH3: infantryHex,
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+    };
+    writeOperationsForSeat(db, SEAT, [operation]);
+    rememberOrder('inf-a', 'defend', infantryHex);
+    const coords = coordinates();
+    const keptInfantry = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'cancel', id: operation.id }],
+      coordinates: coords,
+      candidates: [],
+      keepOrderIds: new Set(['inf-a']),
+    });
+    assert.deepEqual(keptInfantry.dropReasons, []);
+    assert.equal(orderTypeFor('inf-a'), 'defend');
+    assert.equal((readOperations({ getOne: dbGetOne }).get(SEAT) ?? []).length, 0);
+
+    writeOperationsForSeat(db, SEAT, [operation]);
+    rememberOrder('air-1', 'march', infantryHex);
+    rememberOrder('inf-a', 'defend', infantryHex);
+    const keptAir = applyOperationCommands({
+      state: seatState(),
+      seatId: SEAT,
+      commands: [{ action: 'cancel', id: operation.id }],
+      coordinates: coords,
+      candidates: [],
+      keepOrderIds: new Set(['air-1']),
+    });
+    assert.deepEqual(keptAir.dropReasons, []);
+    assert.equal(orderTypeFor('air-1'), 'march');
+    assert.equal(orderTypeFor('inf-a'), undefined);
   });
 });
 

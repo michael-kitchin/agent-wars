@@ -11,8 +11,11 @@ import type { GameRuleTextGates } from './gameRuleText';
 import { fortificationCostPerCell } from '../../../shared/gameRules';
 import { logTrace } from '../../logger';
 
-const STRATEGIC_FORTIFICATION_RULE =
-  'Fortifications: a hex\'s controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller\'s units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains. Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row. Air strikes and missiles remove a cell\'s fortification before they can destroy the cell.';
+const STRATEGIC_FORTIFICATION_RULE = [
+  'Fortifications: a hex\'s controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller\'s units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains.',
+  'Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row.',
+  'Air strikes and missiles remove a cell\'s fortification before they can destroy the cell.',
+].join('\n\n');
 
 const TACTICAL_FORTIFICATION_RULE =
   'Fortified cells (F for yours, f for the enemy\'s) belong to the controller of their hex, and enemy units cannot enter them. Inside the battle hex, each fortified cell absorbs one hit aimed at its owner\'s units on that cell, and fire at it removes the fortification first.';

@@ -30,8 +30,6 @@ import {
   buildTacticalBriefingNarrative,
 } from './tacticalBriefingAssessments';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
-import { tacticalWeatherApplies } from './promptSpec/gameRuleSituationGates';
-
 /**
  * Builds the full tactical briefing override for `buildSystemPromptForTools`.
  *
@@ -65,8 +63,6 @@ export function formatTacticalBriefing(args: {
     battleId: tacticalBattle.battleId,
     tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
     battleWeather: tacticalBattle.weather,
-    omitWeatherColumn:
-      tacticalBattle.weatherBonusEnabled === true && !tacticalWeatherApplies(tacticalBattle.weather),
   };
   const ownSeat = briefingOwnSeatId(planState);
   const assessments = buildLightweightTacticalUnitAssessments(

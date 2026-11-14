@@ -166,6 +166,24 @@ test('one call stores a muster and the next call does not store another', () => 
   });
 });
 
+test('no candidate clears a stored offer', () => {
+  withTempGameDb('aw-operation-turn-clear-', () => {
+    const landMass = loadCampaignLandMass(SEAT);
+    assert.ok(landMass, 'expected the terrain cache');
+    arrange(landMass, false);
+    const coords = coordinates();
+    setTurn(5);
+    advanceOperationsForSeat(SEAT, coords);
+    assert.equal(readOperationOffer({ getOne: dbGetOne }, SEAT).announcedTurn, 5);
+    dbRun('DELETE FROM units WHERE id = ?', ['ship-1']);
+    setTurn(6);
+    advanceOperationsForSeat(SEAT, coords);
+    const offer = readOperationOffer({ getOne: dbGetOne }, SEAT);
+    assert.equal(offer.announcedTurn, null);
+    assert.equal(offer.clearOfferTurn, null);
+  });
+});
+
 test('a seat that has left the match loses its stored operations', () => {
   withTempGameDb('aw-operation-turn-', () => {
     const landMass = loadCampaignLandMass(SEAT);

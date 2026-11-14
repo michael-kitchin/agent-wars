@@ -63,14 +63,13 @@ test('operations round-trip per seat and drop a bad operation', () => {
     assert.equal(readOperations(ops).get('a2')?.[0]?.id, 'a2-op3');
     writeOperationsForSeat(ops, 'a1', []);
     assert.deepEqual([...readOperations(ops).keys()], ['a2']);
+    const bad = sampleOperation('bad');
+    Reflect.set(bad, 'phase', 'flying');
     upsertGameConfigValue(
       ops,
       OPERATIONS_CONFIG_KEY,
       JSON.stringify({
-        a2: [
-          { id: 'bad', phase: 'flying' },
-          sampleOperation('a2-op3'),
-        ],
+        a2: [bad, sampleOperation('a2-op3')],
       })
     );
     assert.deepEqual(readOperations(ops).get('a2'), [sampleOperation('a2-op3')]);

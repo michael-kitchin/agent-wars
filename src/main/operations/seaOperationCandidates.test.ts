@@ -198,6 +198,12 @@ test('a clear coastal city across water is one candidate', () => {
   assert.deepEqual(candidates[0]?.carrierIds, ['ship-1']);
   assert.equal(candidates[0]?.clear, true);
   assert.equal(candidates[0]?.objectiveH3, city);
+  const two = coast({
+    radius: 3,
+    infantry: ['inf-a', 'inf-b'],
+    cities: [{ h3Index: city, urbanHexCount: 4 }],
+  });
+  assert.deepEqual(search(two.state, two.landMass).candidates, []);
 });
 
 test('no free ship or a single ground unit yields no candidate', () => {
@@ -296,7 +302,7 @@ test('a city on an inland sea the ship cannot reach is skipped', () => {
   const farOrigin = latLngToCell(40, 40, 1);
   assert.equal(gridDisk(port, 3).includes(farOrigin), false);
   const city = gridDisk(farOrigin, 1).find((h3) => h3 !== farOrigin)!;
-  const built = coast({ radius: 2, infantry: ['inf-a', 'inf-b'], cities: [] });
+  const built = coast({ radius: 2, infantry: ['inf-a', 'inf-b', 'inf-c', 'inf-d'], cities: [] });
   const farHexes = gridDisk(farOrigin, 1).map((h3Index) => ({
     h3Index,
     terrain: h3Index === city ? 'coastal' : 'water',
@@ -312,19 +318,30 @@ test('a city on an inland sea the ship cannot reach is skipped', () => {
     strategicControl: [...(built.state.strategicControl ?? []), { h3Index: city, controllerPlayerId: 'human' }],
   };
   assert.deepEqual(search(state, built.landMass).candidates, []);
+  const reachable = gridDisk(port, 2).find((h3) => !gridDisk(port, 1).includes(h3))!;
+  const reached = coast({
+    radius: 3,
+    infantry: ['inf-a', 'inf-b', 'inf-c', 'inf-d'],
+    cities: [{ h3Index: reachable, urbanHexCount: 4 }],
+  });
+  assert.equal(search(reached.state, reached.landMass).candidates.length, 1);
 });
 
 test('a campaign that has already committed the lift cap yields nothing', () => {
+  const port = latLngToCell(0, 0, 1);
+  const city = gridDisk(port, 2).find((h3) => !gridDisk(port, 1).includes(h3))!;
   const built = coast({
-    radius: 2,
+    radius: 3,
     infantry: ['inf-a', 'inf-b', 'inf-c', 'inf-d', 'inf-e', 'inf-f', 'inf-g', 'inf-h'],
-    cities: [],
+    cities: [{ h3Index: city, urbanHexCount: 4 }],
   });
-  const { candidates } = search(built.state, built.landMass, {
+  const open = search(built.state, built.landMass, { active: [], hasCampaignPlan: true });
+  const closed = search(built.state, built.landMass, {
     active: [claimed(['inf-a', 'inf-b'])],
     hasCampaignPlan: true,
   });
-  assert.deepEqual(candidates, []);
+  assert.equal(open.candidates.length, 1);
+  assert.deepEqual(closed.candidates, []);
 });
 
 test('the muster port is the one the ground units can reach', () => {

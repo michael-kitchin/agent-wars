@@ -4,7 +4,7 @@
  * Purpose: Ready resolves every commander together. A seat that is still planning is waited on, not replaced by a second race.
  * When to use: `handleGameReady`, after the deferred-playback guard.
  * Expected outcome: A map with one entry per active AI seat. Pending orders are used and cleared. Otherwise standing orders and the sweep, or one inline consult when every-turn mode has a model and Run is on.
- * Exceptions: Logs and skips a seat whose state cannot be read.
+ * Exceptions: A throw while building standing orders logs and omits that seat. A throw while adding operation orders logs and leaves that seat's orders unchanged.
  */
 
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
@@ -71,7 +71,7 @@ export type CommanderReadyGatherArgs = {
    * Contract: The same getter Ready uses for a player snapshot.
    * When to use: Standing orders and the sweep.
    * Expected outcome: That seat's units and hexes.
-   * Exceptions: May throw when the database is unavailable. The gather logs and skips that seat.
+   * Exceptions: May throw when the database is unavailable. A throw while building standing orders logs and omits that seat. A throw while adding operation orders logs and leaves that seat's orders unchanged.
    */
   readonly getGameStateForPlayer: (seatId: AiSeatId) => GameStateSnapshot;
 };
@@ -114,7 +114,7 @@ export function buildUnconsultedCommanderOrders(seatId: AiSeatId, aiState: GameS
  * Purpose: The turn resolves stored plans, plans that finish during the wait, and standing orders for the rest.
  * When to use: `handleGameReady`.
  * Expected outcome: The map has an entry for each active AI seat. A seat that is `planning` is waited on until it leaves that status, up to the consultation wait. An air operation's ferry or drop replaces other air orders for that air unit.
- * Exceptions: A seat whose state throws is logged and omitted.
+ * Exceptions: A throw while building standing orders logs and omits that seat. A throw while adding operation orders logs and leaves that seat's orders unchanged.
  */
 export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherArgs): Promise<TurnOrdersByOwner> {
   const active = activeAiSeatIds(getSeatRoster());
@@ -150,10 +150,14 @@ export async function gatherCommanderOrdersForReady(args: CommanderReadyGatherAr
     }
   }
   for (const [seatId, seatOrders] of orders) {
-    orders.set(
-      seatId,
-      mergeOperationTurnOrders(seatOrders, operationTurnOrders(seatId, args.getGameStateForPlayer(seatId)))
-    );
+    try {
+      orders.set(
+        seatId,
+        mergeOperationTurnOrders(seatOrders, operationTurnOrders(seatId, args.getGameStateForPlayer(seatId)))
+      );
+    } catch (err) {
+      logError('commanderReadyGather could not add operation orders', { seatId }, err);
+    }
   }
   return orders;
 }

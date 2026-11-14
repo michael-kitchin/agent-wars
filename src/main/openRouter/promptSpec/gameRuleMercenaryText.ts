@@ -72,7 +72,7 @@ export function buildBuildabilityRule(): string {
  * The full mercenary rule, including how to hire.
  *
  * Purpose: A seat that can produce is also told how hiring works.
- * When to use: The Mercenaries section when production tools are on.
+ * When to use: The cached `## Mercenaries` rules subsection when production tools are on.
  * Expected outcome: Three paragraphs. The first ends at the rehire sentence, the second at the unfilled-count sentence, and the third is upkeep through unit caps. Upkeep lists the basic and Advanced figures.
  * Exceptions: None.
  */
@@ -88,7 +88,7 @@ export function buildMercenaryRule(): string {
  * Upkeep only, for a seat that cannot produce.
  *
  * Purpose: That seat still pays mercenaries and is not taught how to hire.
- * When to use: The Mercenaries section when production tools are off and the seat has mercenaries.
+ * When to use: The cached `## Mercenaries` rules subsection when production tools are off and the seat has mercenaries.
  * Expected outcome: One paragraph without raise or rehire instructions.
  * Exceptions: None.
  */
@@ -100,7 +100,7 @@ export function buildMercenaryUpkeepRule(): string {
  * The treasury line in the Mercenaries section.
  *
  * Purpose: The model sees the same figures the top bar shows its seat.
- * When to use: After the rule, when the snapshot has an economy.
+ * When to use: The situation Mercenaries section, when the snapshot has an economy. The hire and upkeep rules are the cached subsection, not this line.
  * Expected outcome: Credits, upkeep, the mercenary count, and the hire amount already taken from the treasury.
  * Exceptions: None.
  */

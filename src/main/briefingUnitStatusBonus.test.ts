@@ -62,7 +62,16 @@ test('the Weather column names the weather where the unit stands and its tags', 
   assert.ok(rowB?.includes('| Snow |'), rowB);
 });
 
-test('a mild battle omits the Weather column and a snow battle keeps it', () => {
+test('a mild unit with no tags still shows the Weather column', () => {
+  const tagged = assessment('opp-a');
+  tagged.result.unit.weatherHere = 'mild';
+  tagged.result.unit.weatherTags = [];
+  const shown = buildUnitStatusTable([tagged], { mode: 'strategic' }, false);
+  assert.ok(shown.includes('| Weather |'));
+  assert.ok(shown.includes('| Mild |'));
+});
+
+test('the hide flag removes the Weather column and a snow battle keeps it', () => {
   const tagged = assessment('opp-a');
   tagged.result.unit.weatherHere = 'mild';
   tagged.result.unit.weatherTags = ['heat'];

@@ -66,7 +66,7 @@ function builderFor(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): { readonly h3: string; readonly ll: [number, number]; readonly urban: number } | null {
   if (row.buildPaused === true) return null;
-  if (Array.isArray(row.pausedReasons) && row.pausedReasons.length > 0) return null;
+  if (rowIsPaused(row)) return null;
   if (!Array.isArray(row.hex) || row.hex.length < 2) return null;
   const lat = Number(row.hex[0]);
   const lng = Number(row.hex[1]);
@@ -98,11 +98,41 @@ function rowQueuesItem(row: ControlledHexQueueSnapshot, itemType: string): boole
  *
  * Purpose: A type already queued anywhere does not need a priority line.
  * When to use: Missile and naval conditions. The missile condition is skipped when the posture asks for another city.
- * Expected outcome: True when any row's entries include the type.
+ * Expected outcome: True when any row that is not paused has an entry of that type.
  * Exceptions: None.
  */
 function typeIsQueued(queues: readonly ControlledHexQueueSnapshot[], itemType: string): boolean {
-  return queues.some((row) => rowQueuesItem(row, itemType));
+  return queues.some((row) => !rowIsPaused(row) && rowQueuesItem(row, itemType));
+}
+
+/**
+ * True when occupation has paused this queue.
+ *
+ * Purpose: A paused city is not producing, and a missile waiting there does not fill the cap.
+ * When to use: The builder check, the queued-type checks, and the credits scan.
+ * Expected outcome: True when `pausedReasons` is a non-empty list. `buildPaused` is a separate check.
+ * Exceptions: None.
+ */
+function rowIsPaused(row: ControlledHexQueueSnapshot): boolean {
+  return Array.isArray(row.pausedReasons) && row.pausedReasons.length > 0;
+}
+
+/**
+ * Missiles already waiting in a queue.
+ *
+ * Purpose: A posture that asks for a missile in every city still spends a cap slot on each one already queued.
+ * When to use: The missile gate when that posture is on.
+ * Expected outcome: The number of missile entries on queues that are not paused.
+ * Exceptions: None.
+ */
+function queuedMissileCount(queues: readonly ControlledHexQueueSnapshot[]): number {
+  return queues.reduce((total, row) => {
+    const entries = Array.isArray(row.entries) ? row.entries : [];
+    const missiles = entries.filter(
+      (entry) => !rowIsPaused(row) && String((entry as ProductionQueueEntrySnapshot).unitType ?? '') === 'missile'
+    );
+    return total + missiles.length;
+  }, 0);
 }
 
 /**
@@ -153,7 +183,7 @@ function ownerName(state: GameStateSnapshot, h3Index: string): string {
  *
  * Purpose: The commander is told which city should build a missile, a ship, or credits, and why.
  * When to use: Once per production briefing, with the same queues the table will show.
- * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. Labels come from `formatHexLabel`. Absent `settings` uses the same shares and floors as before.
+ * Expected outcome: Missile, then naval, then credits. Each line is omitted when its condition fails. A paused queue does not count as producing or as already queued. Labels come from `formatHexLabel`. Absent `settings` uses the same shares and floors as before.
  * Exceptions: None.
  */
 export function buildProductionPriorityLines(args: {
@@ -177,7 +207,10 @@ export function buildProductionPriorityLines(args: {
   const enemies = enemyInfrastructureHexes(args.state, args.ownSeat);
   const lines: string[] = [];
   const missileEveryCity = args.settings?.missilePriorityEveryCity === true;
-  if (counts.missile < caps.missile && (missileEveryCity || !typeIsQueued(args.queues, 'missile'))) {
+  const missileRoom = missileEveryCity
+    ? counts.missile + queuedMissileCount(args.queues) < caps.missile
+    : counts.missile < caps.missile;
+  if (missileRoom && (missileEveryCity || !typeIsQueued(args.queues, 'missile'))) {
     let best: {
       readonly urban: number;
       readonly turns: number;
@@ -254,6 +287,7 @@ export function buildProductionPriorityLines(args: {
   const urbanFactor = args.settings?.creditsCityUrbanFactor ?? 1;
   const minUrban = CREDITS_CITY_MIN_URBAN_PER_SIZE * GAME_SIZE_MULTIPLIER[parseGameSize(args.state.gameSize)] * urbanFactor;
   const creditsNext = args.queues.some((row) => {
+    if (rowIsPaused(row)) return false;
     const entries = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
     const next = selectNextQueueEntry(entries);
     return next != null && String(next.unitType ?? '') === CREDITS_QUEUE_ITEM;

@@ -34,12 +34,12 @@ export function applyPostureChoice(args: {
     const stored = readPosture(ops, args.seatId);
     const current = stored?.posture ?? DEFAULT_POSTURE;
     if (args.posture === current) {
-      logDebug('postureChoice applied', { seatId: args.seatId, from: current, to: args.posture, turnNumber: args.turnNumber, echoed: true });
+      logDebug('postureChoice unchanged', { seatId: args.seatId, from: current, to: args.posture, turnNumber: args.turnNumber, echoed: true });
       return { applied: true, dropReasons: [] };
     }
     if (stored !== null && args.turnNumber - stored.sinceTurn < POSTURE_MIN_HOLD_TURNS) {
       const nextTurn = stored.sinceTurn + POSTURE_MIN_HOLD_TURNS;
-      logDebug('postureChoice applied', { seatId: args.seatId, from: current, to: args.posture, turnNumber: args.turnNumber, refusedUntil: nextTurn });
+      logDebug('postureChoice refused', { seatId: args.seatId, from: current, to: args.posture, turnNumber: args.turnNumber, refusedUntil: nextTurn });
       return {
         applied: false,
         dropReasons: [`posture dropped: you set ${current} on turn ${stored.sinceTurn} and may change it from turn ${nextTurn}.`],

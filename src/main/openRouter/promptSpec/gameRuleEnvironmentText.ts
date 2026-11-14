@@ -1,9 +1,9 @@
 /**
- * Weather and terrain-cover sentences for the combat paragraph.
+ * Weather and terrain-cover sentences for the rules section.
  *
  * Purpose: Those sentences are long enough to stand apart from dice, movement, and reach.
- * When to use: `buildRulesSections` after the tech or origin sentence, and before occupancy.
- * Expected outcome: Weather is five paragraphs when the bonus is on, and null when it is off. Cover is one sentence in both modes.
+ * When to use: `buildRulesSections`, as the Weather and Terrain Cover subsections.
+ * Expected outcome: Weather is five paragraphs when the bonus is on, including a mild month, and null when it is off. Cover is one sentence in both modes.
  * Exceptions: None.
  */
 
@@ -41,8 +41,8 @@ function formatOrList(items: readonly string[]): string {
  * Weather penalty sentence for a match that has the weather bonus on.
  *
  * Purpose: The model must know movement and attack are reduced, and that tags cancel the reduction.
- * When to use: Combat paragraph after the tech sentence, or after the origin sentence when tech is off.
- * Expected outcome: Null when the weather bonus is off or `weatherApplies` is false. Otherwise the date rule, the movement budgets, the attack penalties, the tag exemption, and the Weather column. Tactical text omits the strategic movement sentence and the strategic ferry sentence. The air-strike sentence is omitted when `includeWeatherAirSentence` is false.
+ * When to use: The Weather subsection, whenever the weather bonus is on.
+ * Expected outcome: The date rule, the movement budgets, the strategic ferry sentence as its own paragraph, the attack penalties, the tag exemption, and the Weather column, whenever the weather bonus is on. A mild month does not drop the rule. Tactical text omits the strategic movement sentence and the strategic ferry paragraph. The air-strike sentence is omitted when `includeWeatherAirSentence` is false.
  * Exceptions: None.
  */
 export function buildWeatherRule(gates: {
@@ -59,7 +59,6 @@ export function buildWeatherRule(gates: {
     weatherApplies: gates.weatherApplies !== false,
     includeWeatherAirSentence: gates.includeWeatherAirSentence !== false,
   });
-  if (gates.weatherApplies === false) return null;
   if (gates.originBonusSettings.weatherBonusEnabled !== true || level === 'off') return null;
   const armor = formatOrList(WEATHER_SLOWING_STATES[level].armor ?? []);
   const naval = formatOrList(WEATHER_SLOWING_STATES[level].naval ?? []);
@@ -72,11 +71,12 @@ export function buildWeatherRule(gates: {
   const airStrike = gates.includeWeatherAirSentence === false
     ? ''
     : ` An air strike is ${penalty} lower once when its base or its target is snow, rain, or heat the unit lacks.`;
-  const ferry = tactical ? '' : ' A strategic ferry into snow is 2 hexes.';
+  const ferry = tactical ? '' : 'A strategic ferry into snow is 2 hexes.';
   return [
     'Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex\'s weather.',
     movement,
-    `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire.${airStrike}${ferry}`,
+    ...(ferry.length > 0 ? [ferry] : []),
+    `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire.${airStrike}`,
     'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
       'Weather does not change defense, melee, or casualty order.',
     'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.',

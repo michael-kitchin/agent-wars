@@ -1,7 +1,7 @@
 /**
  * The Mercenaries section follows the seat's economy and whether it can produce.
  *
- * Purpose: A battle hides the section. A seat that cannot produce still sees upkeep.
+ * Purpose: A battle hides the section. A production-off seat with a mercenary sees the treasury and its mercenaries. The upkeep rule is in the cached rules section.
  * When to use: After changing `buildMercenariesBriefingBlock`.
  * Expected outcome: The cases below. Each case removes its temporary match.
  * Exceptions: None.
@@ -33,11 +33,11 @@ test('the section names the treasury and the mercenary, and a battle omits it', 
     const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
     const block = buildMercenariesBriefingBlock(state, (hex) => hex, 'strategic', { productionEnabled: true });
     assert.ok(block.includes(`# ${SECTION_TITLE_MERCENARIES}`));
-    assert.ok(block.includes('Treasury: 40 credits.'));
+    assert.equal(block.match(/Treasury: 40 credits\./g)?.length, 1);
     assert.ok(block.includes('## Your Mercenaries'));
     assert.equal(buildMercenariesBriefingBlock(state, (hex) => hex, 'tactical', { productionEnabled: true }), '');
     const quiet = buildMercenariesBriefingBlock(state, (hex) => hex, 'strategic', { productionEnabled: false });
-    assert.ok(quiet.includes('Treasury: 40 credits.'));
+    assert.equal(quiet.match(/Treasury: 40 credits\./g)?.length, 1);
     assert.ok(quiet.includes('## Your Mercenaries'));
     assert.equal(quiet.includes('## Rehire Candidates'), false);
     assert.equal(quiet.includes('## Raise Options'), false);
@@ -64,7 +64,8 @@ test('zero credits with nothing to rehire is one line, and an owned mercenary ke
     createStrategicUnit({ owner: seat, unitType: 'infantry', h3Index: h3, turnNumber: 1, isMercenary: true });
     const owned = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
     const full = buildMercenariesBriefingBlock(owned, (hex) => hex, 'strategic', { productionEnabled: true });
-    assert.ok(full.includes('each mercenary costs its upkeep'));
+    assert.ok(full.includes('Mercenary upkeep:'));
+    assert.equal(full.includes('each mercenary costs its upkeep'), false);
     assert.ok(full.includes('## Your Mercenaries'));
     assert.equal(full.includes('No one to rehire.'), false);
   });
@@ -136,7 +137,7 @@ function outsideCity(seat: string): string {
   return hex;
 }
 
-test('zero credits with a raise option prints the hire rule and the raise table', () => {
+test('zero credits with a raise option prints the raise table and not the hire rule', () => {
   withTempGameDb('aw-brief-merc-raise-', () => {
     const seat = AI_SEAT_IDS[0];
     const hex = outsideCity(seat);
@@ -151,8 +152,9 @@ test('zero credits with a raise option prints the hire rule and the raise table'
       productionEnabled: true,
       campaignTargetH3: hex,
     });
-    assert.ok(block.includes(buildMercenaryRule()));
+    assert.equal(block.includes(buildMercenaryRule()), false);
     assert.ok(block.includes('## Raise Options'));
+    assert.ok(block.split('\n').some((line) => line.startsWith('| Hex | To Campaign Target |')));
     assert.equal(block.includes('No one to rehire.'), false);
   });
 });

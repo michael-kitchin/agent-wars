@@ -402,7 +402,8 @@ const TACTICAL_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
  * order, as `envelopeFieldsForGates`, and must not teach a game rule beyond the envelope shape.
  * When to use: The parse-repair user message.
  * Expected outcome: Tactical text contains no assign_order, cancel_order, memoryUpdates, or
- * productionOrders; every gate combination mentions fields in canonical relative order.
+ * productionOrders; every gate combination mentions fields in canonical relative order. The
+ * operations example is an empty array, so copying it launches nothing.
  * Exceptions: None.
  */
 export function buildRepairSchemaText(gates: EnvelopeGates): string {
@@ -437,7 +438,7 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
     } else if (field === 'productionOrders') {
       example.productionOrders = EXAMPLE_PRODUCTION_ORDERS;
     } else if (field === 'operations') {
-      example.operations = [{ action: 'launch', option: 'A' }];
+      example.operations = [];
     }
   }
   const json = JSON.stringify(example);

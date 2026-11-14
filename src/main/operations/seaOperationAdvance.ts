@@ -481,17 +481,19 @@ function ended(outcome: OperationOutcome, reason: string, actions: readonly Oper
 }
 
 /**
- * True when every id that left the operation this tick was released.
+ * Lost only when a unit or ship that was not released is missing from the map.
  *
- * Purpose: A transit that loses its last ship to the commander is abandoned. One whose ship was destroyed is lost.
- * When to use: When transit has no ship and no ground unit left.
- * Expected outcome: True only when every original id is in `releasedIds`. A unit missing from the map is not released, so the operation is lost.
+ * Purpose: A transit that the commander emptied is abandoned. One that lost a unit or a ship is lost.
+ * When to use: When transit has no ground unit left, including when no ship remains either.
+ * Expected outcome: `lost` when any id still named by the operation, and not in `releasedIds`, is absent from `unitHexById`. Otherwise `abandoned`.
  * Exceptions: None.
  */
-function departuresWereReleases(operation: Operation, releasedIds: readonly string[]): boolean {
+function departureOutcome(operation: Operation, releasedIds: readonly string[], facts: OperationFacts): 'abandoned' | 'lost' {
   const released = new Set(releasedIds);
-  const departed = [...operation.unitIds, ...operation.carrierIds];
-  return departed.every((id) => released.has(id));
+  const gone = [...operation.unitIds, ...operation.carrierIds]
+    .filter((id) => !released.has(id))
+    .some((id) => !facts.unitHexById.has(id));
+  return gone ? 'lost' : 'abandoned';
 }
 
 /**
@@ -671,13 +673,17 @@ function unloadAtLanding(operation: Operation, facts: OperationFacts, unitIds: r
  *
  * Purpose: Ships that arrive unload. A voyage that loses its objective, or that runs out of time, turns back.
  * When to use: `operation.phase` is `transit`.
- * Expected outcome: `assault` when no ship remains and ground units do. `return` when the voyage turns back.
+ * Expected outcome: `assault` when no ship remains and ground units do. `return` when the voyage turns back. An end when no ground unit remains.
  * Exceptions: None.
  */
 function advanceTransit(operation: Operation, facts: OperationFacts, unitIds: readonly string[], carrierIds: readonly string[], releasedIds: readonly string[]): OperationStep {
   if (carrierIds.length === 0 && unitIds.length === 0) {
-    const outcome = departuresWereReleases(operation, releasedIds) ? 'abandoned' : 'lost';
+    const outcome = departureOutcome(operation, releasedIds, facts);
     return ended(outcome, outcome === 'abandoned' ? 'transit-abandoned' : 'transit-lost', [], releasedIds);
+  }
+  if (unitIds.length === 0) {
+    const outcome = departureOutcome(operation, releasedIds, facts);
+    return ended(outcome, 'transit-empty', cancelAll(carrierIds), releasedIds);
   }
   if (carrierIds.length === 0) {
     return {
@@ -822,7 +828,7 @@ export function cancelSeaOperation(operation: Operation, facts: OperationFacts):
  *
  * Purpose: A transit that cannot finish, and a later cancel, share one way to start a return.
  * When to use: When the objective is gone, or the transit timeout has fired, and at least one ship remains. Also directly when a caller already holds the remaining force.
- * Expected outcome: Phase `return`, `musterH3` set from the first remaining ship's hex, and a march there for every remaining ship. `outcome` is `running`.
+ * Expected outcome: Phase `return`. Carried units stay. Units already ashore leave the operation and defend where they stand, and they are not released. Ships march to the port chosen from the first remaining ship. `outcome` is `running`.
  * Exceptions: None. A null port keeps the operation's current muster hex. `releasedIds` is empty; the caller merges releases.
  */
 export function turnSeaOperationBack(operation: Operation, facts: OperationFacts): OperationStep {
@@ -830,9 +836,18 @@ export function turnSeaOperationBack(operation: Operation, facts: OperationFacts
   const firstShip = ships[0];
   const fromHex = firstShip === undefined ? operation.musterH3 : (facts.unitHexById.get(firstShip) ?? operation.musterH3);
   const port = ships.length === 0 ? operation.musterH3 : (facts.chooseReturnPort(fromHex) ?? operation.musterH3);
-  const actions: OperationAction[] = ships.map((shipId) => ({ kind: 'march', unitId: shipId, toH3: port }));
+  const presentUnits = operation.unitIds.filter((unitId) => facts.unitHexById.has(unitId));
+  const carried = presentUnits.filter((unitId) => isCarried(unitId, facts, ships));
+  const ashore = presentUnits.filter((unitId) => !isCarried(unitId, facts, ships));
+  const actions: OperationAction[] = [
+    ...ships.map((shipId): OperationAction => ({ kind: 'march', unitId: shipId, toH3: port })),
+    ...ashore.flatMap((unitId): OperationAction[] => {
+      const atH3 = facts.unitHexById.get(unitId);
+      return atH3 === undefined ? [] : [{ kind: 'defend', unitId, atH3 }];
+    }),
+  ];
   const next = continueOperation(operation, {
-    unitIds: operation.unitIds.filter((unitId) => facts.unitHexById.has(unitId)),
+    unitIds: carried,
     carrierIds: ships,
     phase: 'return',
     phaseTurn: facts.turnNumber,
@@ -845,6 +860,7 @@ export function turnSeaOperationBack(operation: Operation, facts: OperationFacts
     fromHex,
     port,
     shipCount: ships.length,
+    ashoreCount: ashore.length,
   });
   return step;
 }

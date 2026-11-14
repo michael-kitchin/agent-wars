@@ -129,4 +129,14 @@ test('launch attention names the best target and is absent without a missile or 
     strategicInfrastructure: [],
   });
   assert.equal(formatMissileLaunchAttention(noTarget, (hex) => hex), null);
+  const airportOnly = stateFor({
+    units: [{ id: 'a2-m1', player: AI_SEAT_IDS[0], unitType: 'missile', h3Index: ORIGIN }],
+    seats: [{ seatId: HUMAN_SEAT_ID, seatOrder: 1, homeRegion: 'Western Anatolia' }] as unknown as GameStateSnapshot['seats'],
+    exploredHexes: [ORIGIN, best],
+    strategicControl: [{ h3Index: best, controllerPlayerId: HUMAN_SEAT_ID }],
+    strategicInfrastructure: [{ h3Index: best, urbanHexCount: 0, airportCount: 1, seaportCount: 0 }],
+  });
+  const airportLine = formatMissileLaunchAttention(airportOnly, (hex) => hex);
+  assert.ok(airportLine?.includes('airport or seaport'));
+  assert.equal(airportLine?.includes('0 city cells'), false);
 });

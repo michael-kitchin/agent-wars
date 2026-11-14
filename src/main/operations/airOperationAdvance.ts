@@ -141,7 +141,7 @@ export function advanceAirOperation(operation: Operation, facts: OperationFacts)
 /**
  * Walks the infantry to the airport and loads it once both are there.
  *
- * Purpose: The air unit holds fire while the infantry marches. A foreign order or a missing unit ends the operation.
+ * Purpose: The air unit holds fire while the infantry marches. A foreign order or a missing unit ends the operation. The launch tick replaces the infantry's earlier order.
  * When to use: The `muster` phase only.
  * Expected outcome: A march, or an embark into `transit`, or an end that defends the air unit.
  * Exceptions: None.
@@ -172,7 +172,8 @@ function advanceMuster(args: {
   const onMuster = stored !== undefined
     && (stored.type === 'march' || stored.type === 'defend')
     && stored.h3Index === operation.musterH3;
-  if (stored !== undefined && !onMuster) {
+  const launchTick = operation.launchedTurn === facts.turnNumber;
+  if (!launchTick && stored !== undefined && !onMuster) {
     return endAirOperation({
       outcome: 'abandoned',
       reason: 'infantry-order',

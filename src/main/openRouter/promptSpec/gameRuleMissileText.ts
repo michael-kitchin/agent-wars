@@ -37,7 +37,14 @@ export function buildMissileEmploymentRule(gates: GameRuleTextGates): string {
   if (!hasMissileUnits && !canBuildMissile) return '';
   if (gates.coordinateMode === 'tactical') return hasMissileUnits ? 'Missile sub-units never move or fire.' : '';
   if (hasMissileUnits) {
-    return `A missile never moves and is spent when it launches. Launch it with a missileLaunches entry at any hex you have explored within ${missileRangeHexes()} hexes. Launches resolve before air strikes and always hit: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of ${getAttack('air')}, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed. A missile keeps its hold_fire order and takes no other standing order.`;
+    return [
+      `A missile never moves and is spent when it launches. Launch it with a missileLaunches entry at any hex you have explored within ${missileRangeHexes()} hexes.`,
+      `Launches resolve before air strikes and always hit: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of ${getAttack('air')}, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed.`,
+      'A missile keeps its hold_fire order and takes no other standing order.',
+    ].join('\n\n');
   }
-  return `A missile is built in a city with at least ${buildMinimumUrbanCells('missile')} urban cells. It never moves and is spent when it launches. It reaches any explored hex within ${missileRangeHexes()} hexes of the hex where it was built. A launch always hits: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of ${getAttack('air')}, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed.`;
+  return [
+    `A missile is built in a city with at least ${buildMinimumUrbanCells('missile')} urban cells. It never moves and is spent when it launches. It reaches any explored hex within ${missileRangeHexes()} hexes of the hex where it was built.`,
+    `A launch always hits: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of ${getAttack('air')}, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed.`,
+  ].join('\n\n');
 }

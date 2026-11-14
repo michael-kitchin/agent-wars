@@ -26,8 +26,6 @@ import {
   MERCENARY_FUNDS_WARNING,
   NO_RAISE_OPTIONS_LINE,
   NO_REHIRE_CANDIDATES_LINE,
-  buildMercenaryRule,
-  buildMercenaryUpkeepRule,
   formatMercenaryFundsLine,
 } from './promptSpec/gameRuleMercenaryText';
 import {
@@ -42,9 +40,9 @@ import {
 /**
  * Builds the Mercenaries section.
  *
- * Purpose: Production-off seats still see upkeep. They are not shown hire tables.
- * When to use: While assembling the system prompt, with the seat's own snapshot.
- * Expected outcome: The section text, or `''` when this view should not include it. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
+ * Purpose: Production-off seats still see their treasury and their mercenaries. They are not shown hire tables.
+ * When to use: While assembling the situation message, with the seat's own snapshot.
+ * Expected outcome: The heading, the treasury line, and the tables that apply. The hire and upkeep rules stay in the cached rules section. A production seat with 0 credits, no mercenary, no rehire candidate, and no raise option gets the heading and `Treasury: 0 credits. No one to rehire.`
  * Exceptions: None.
  */
 export function buildMercenariesBriefingBlock(
@@ -85,8 +83,7 @@ export function buildMercenariesBriefingBlock(
       return `${topLevelHeading(SECTION_TITLE_MERCENARIES)}\n\nTreasury: 0 credits. No one to rehire.`;
     }
   }
-  const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', options.productionEnabled ? buildMercenaryRule() : buildMercenaryUpkeepRule()];
-  lines.push('', formatMercenaryFundsLine(economy));
+  const lines = [topLevelHeading(SECTION_TITLE_MERCENARIES), '', formatMercenaryFundsLine(economy)];
   if (economy.credits < economy.upkeepPerTurn) lines.push(MERCENARY_FUNDS_WARNING);
   if (mercenaries.length > 0) {
     lines.push('', subHeading(SECTION_TITLE_YOUR_MERCENARIES), '', mercenaryTable(mercenaries, format));
@@ -141,14 +138,6 @@ function mercenaryTable(
 }
 
 /**
- * Neutral units the seat can rehire and has not already ordered.
- *
- * Purpose: The nearest candidates come first.
- * When to use: When production tools are on.
- * Expected outcome: A table, or the none-line.
- * Exceptions: None.
- */
-/**
  * True when a Neutral unit can still be rehired.
  *
  * Purpose: An empty treasury with nothing to rehire does not need the hire tables.
@@ -167,6 +156,14 @@ function hasRehireCandidate(
   );
 }
 
+/**
+ * Neutral units the seat can rehire and has not already ordered.
+ *
+ * Purpose: The nearest candidates come first.
+ * When to use: When production tools are on.
+ * Expected outcome: A table, or the none-line.
+ * Exceptions: None.
+ */
 function rehireTable(
   state: GameStateSnapshot,
   context: ReturnType<typeof buildHireContext>,

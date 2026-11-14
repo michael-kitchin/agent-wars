@@ -21,7 +21,7 @@ import {
 import { buildTechBonusRule } from './gameRuleTechText';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
-import { subHeading } from './sectionHeadings';
+import { SECTION_TITLE_MERCENARIES, subHeading } from './sectionHeadings';
 import {
   SECTION_TITLE_AIR_UNITS,
   SECTION_TITLE_BONUSES,
@@ -60,7 +60,12 @@ import { buildTerrainCoverRule, buildWeatherRule } from './gameRuleEnvironmentTe
 import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
 import { buildMissileEmploymentRule, MISSILE_CASUALTY_ORDER_SENTENCE } from './gameRuleMissileText';
 import { buildFortificationProductionRulePart, buildFortificationRule } from './gameRuleFortificationText';
-import { buildBuildabilityRule, buildCreditsProductionRulePart } from './gameRuleMercenaryText';
+import {
+  buildBuildabilityRule,
+  buildCreditsProductionRulePart,
+  buildMercenaryRule,
+  buildMercenaryUpkeepRule,
+} from './gameRuleMercenaryText';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 export { buildTerrainCoverRule, buildWeatherRule };
@@ -158,9 +163,9 @@ export interface GameRuleTextGates {
   /**
    * Whether this consultation's map has weather the rules must explain.
    *
-   * Contract: Omitted includes the weather text when the bonus is on. False omits it.
-   * When to use: Tactical when the battle weather is not mild. Strategic when some hex is not mild, or a hex has no weather.
-   * Expected outcome: False returns no weather paragraph and the briefing hides the Weather column.
+   * Contract: Recorded for the trace. The cached weather rule follows the match's weather-bonus setting, not this flag.
+   * When to use: Set from `strategicWeatherApplies` or `tacticalWeatherApplies`. Do not use it to omit the rule or the Weather column.
+   * Expected outcome: A mild turn and a snow turn share the same cached weather rule when the bonus is on.
    * Exceptions: None.
    */
   readonly weatherApplies?: boolean;
@@ -254,6 +259,15 @@ export interface GameRuleTextGates {
    * Exceptions: None.
    */
   readonly productionRules?: readonly string[];
+  /**
+   * Which mercenary rule the cached system prompt teaches.
+   *
+   * Contract: Omitted or `none` omits the subsection. `full` is the hire rule. `upkeep` is the pay-only rule.
+   * When to use: Strategic production uses `full`. A seat that cannot produce and still owns a mercenary uses `upkeep`.
+   * Expected outcome: The situation message keeps the treasury and the tables, and does not repeat these paragraphs.
+   * Exceptions: None.
+   */
+  readonly mercenaryRule?: 'full' | 'upkeep' | 'none';
   /**
    * Pointer to the rules tool.
    *
@@ -518,13 +532,13 @@ export function buildAirEmploymentRule(gates: GameRuleTextGates): string {
     return 'An air unit strikes and drops anywhere in the battle footprint and ferries one hop between intact airport cells. An air sub-unit carries one infantry sub-unit. A drop onto a cell fortified by the other side is illegal. A drop onto an enemy cell is fought in melee if both remain.';
   }
   const snowHop = strategicFerryRangeHexes({ weatherAtDestination: 'snow', tags: [], enabled: true });
-  return (
-    `An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${snowHop} into snow when the unit lacks the snow tag. ` +
-    `It strikes within ${AIR_STRIKE_RANGE_HEXES} hexes of its current airport. It does not strike from the end of a ferry on the same turn. ` +
-    `It carries one infantry unit. embark with that air unit's id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed. ` +
-    `airDrops lands that infantry on a land hex within ${AIR_STRIKE_RANGE_HEXES} of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered. ` +
-    'When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.'
-  );
+  return [
+    `An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most ${AIR_FERRY_RANGE_HEXES} hexes, or ${snowHop} into snow when the unit lacks the snow tag.`,
+    `It strikes within ${AIR_STRIKE_RANGE_HEXES} hexes of its current airport. It does not strike from the end of a ferry on the same turn.`,
+    'It carries one infantry unit. embark with that air unit\'s id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed.',
+    `airDrops lands that infantry on a land hex within ${AIR_STRIKE_RANGE_HEXES} of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered.`,
+    'When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.',
+  ].join('\n\n');
 }
 
 /**
@@ -645,6 +659,19 @@ function rulesSubsection(title: string, paragraphs: readonly string[]): string {
 }
 
 /**
+ * Mercenary paragraphs for the cached rules section.
+ *
+ * Purpose: Hire costs and upkeep are fixed for the match. The treasury and the tables change every turn.
+ * When to use: `buildRulesSections` only.
+ * Expected outcome: The full rule, the upkeep rule, or nothing. Blank lines already in the rule stay.
+ * Exceptions: None.
+ */
+function mercenaryRuleParagraphs(rule: GameRuleTextGates['mercenaryRule']): string[] {
+  const text = rule === 'full' ? buildMercenaryRule() : rule === 'upkeep' ? buildMercenaryUpkeepRule() : '';
+  return text.split('\n\n').map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
+}
+
+/**
  * Composes the rules subsections for this consultation.
  *
  * Purpose: Each topic has its own heading. The words are the same sentences the single rules block used to print.
@@ -688,6 +715,7 @@ export function buildRulesSections(gates: GameRuleTextGates): string {
     rulesSubsection(SECTION_TITLE_FORTIFICATIONS, fortification ? [fortification] : []),
     rulesSubsection(SECTION_TITLE_HOLDING_FIRE, gates.ordersEnabled ? [buildHoldFireRule()] : []),
     rulesSubsection(SECTION_TITLE_PRODUCTION, gates.productionRules ?? []),
+    rulesSubsection(SECTION_TITLE_MERCENARIES, mercenaryRuleParagraphs(gates.mercenaryRule)),
     rulesSubsection(SECTION_TITLE_RULE_LOOKUP, gates.rulesPointer ? [gates.rulesPointer] : []),
   ];
   return sections.filter((section) => section.length > 0).join('\n\n');

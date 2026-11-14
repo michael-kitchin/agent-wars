@@ -293,7 +293,14 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
 
   const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
   if (!tacticalBattle && ordersEnabled && parsed.operationCommands) {
-    const operationResult = applyOperationCommands({ state: planState, seatId, commands: parsed.operationCommands, coordinates: { latLngByH3, resolveToH3 }, candidates: offeredCandidates });
+    const operationResult = applyOperationCommands({
+      state: planState,
+      seatId,
+      commands: parsed.operationCommands,
+      coordinates: { latLngByH3, resolveToH3 },
+      candidates: offeredCandidates,
+      keepOrderIds: new Set(parsed.standingOrderUnitIds ?? []),
+    });
     dropReasons.push(...operationResult.dropReasons);
   }
   if (!tacticalBattle && ordersEnabled && parsed.postureChoice) {

@@ -102,7 +102,7 @@ function airOperationBullet(state: GameStateSnapshot, operation: Operation, form
  *
  * Purpose: Each stage has its own sentence, and every hex goes through the briefing's formatter.
  * When to use: Once per operation, after the operations have been sorted.
- * Expected outcome: A markdown list line. An air operation uses the air sentences. Counts of one use the singular noun.
+ * Expected outcome: A markdown list line. An air operation uses the air sentences. Counts of one use the singular noun and, on an assault, the singular verb.
  * Exceptions: None.
  */
 function operationBullet(state: GameStateSnapshot, operation: Operation, format: (h3Index: string) => string): string {
@@ -123,7 +123,8 @@ function operationBullet(state: GameStateSnapshot, operation: Operation, format:
     return `- ${operation.id}: by sea to ${objective}, ${city}. At sea, heading for ${landing}, with ${cargo} ${noun(cargo, 'ground unit')} aboard. Ships: ${ships}.`;
   }
   if (operation.phase === 'assault') {
-    return `- ${operation.id}: by sea to ${objective}, ${city}. Landed. ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} are marching on it: ${units}.`;
+    const verb = operation.unitIds.length === 1 ? 'is' : 'are';
+    return `- ${operation.id}: by sea to ${objective}, ${city}. Landed. ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} ${verb} marching on it: ${units}.`;
   }
   return `- ${operation.id}: turned back from ${objective}. Returning to ${muster}. Ships: ${ships}.`;
 }

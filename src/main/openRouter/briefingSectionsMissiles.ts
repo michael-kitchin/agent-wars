@@ -232,7 +232,7 @@ function missileTargetRows(
  *
  * Purpose: Missile Forces lists the target. Attention Flags tells the commander to copy it into `missileLaunches`.
  * When to use: Strategic status injection. A battle does not call it.
- * Expected outcome: Null when the seat has no missile or no target row. Otherwise the first target row's missiles, owner, and city cells.
+ * Expected outcome: Null when the seat has no missile or no target row. Otherwise the first target row's missiles and owner, with city cells, or an airport or seaport when that row has no city cells.
  * Exceptions: None.
  */
 export function formatMissileLaunchAttention(
@@ -248,7 +248,10 @@ export function formatMissileLaunchAttention(
     hasTarget: first !== undefined,
   });
   if (!first) return null;
-  const cells = first[2] === '1' ? 'city cell' : 'city cells';
   const ids = first[first.length - 1] ?? '';
+  if (first[2] === '0') {
+    return `Missiles: ${ids} can launch. Best target: ${first[0]}, a ${first[1]} airport or seaport. Add a missileLaunches entry.`;
+  }
+  const cells = first[2] === '1' ? 'city cell' : 'city cells';
   return `Missiles: ${ids} can launch. Best target: ${first[0]}, a ${first[1]} city with ${first[2]} ${cells}. Add a missileLaunches entry.`;
 }

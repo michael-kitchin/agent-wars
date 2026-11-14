@@ -317,6 +317,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     ? buildPostureSection({
         stored: readPosture({ getOne: dbGetOne }, seatId),
         turnNumber: args.state.turnNumber,
+        campaignEnabled: args.state.scenarioId === 'region_vs_region',
       })
     : '';
   const operationsText = postureText.length === 0

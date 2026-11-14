@@ -104,6 +104,18 @@ test('transit names the landing and the units aboard', () => {
   );
 });
 
+test('assault uses the singular when one ground unit is marching', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 2 }),
+    operations: [operation({ phase: 'assault', unitIds: ['inf-a'], carrierIds: [] })],
+    format: (hex) => hex,
+  });
+  assert.equal(
+    text,
+    '# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. Landed. 1 ground unit is marching on it: inf-a.',
+  );
+});
+
 test('assault names the units marching on the city', () => {
   const text = buildOperationsSection({
     state: state({ units: [], urban: 2 }),

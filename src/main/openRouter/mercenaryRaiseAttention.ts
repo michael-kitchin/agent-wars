@@ -9,7 +9,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import { HIREABLE_UNIT_TYPES } from '../../shared/mercenaryRules';
+import { HIRE_COUNT_MAX, HIREABLE_UNIT_TYPES } from '../../shared/mercenaryRules';
 import { isSeatId, type SeatId } from '../../shared/seatIds';
 import type { HireRaiseOption } from '../../shared/ipc/mercenaryTypes';
 import { raiseOptionRowsForSeat, type RaiseOptionRow } from './briefingSectionsMercenaries';
@@ -55,11 +55,25 @@ function cheapestAffordableOption(credits: number, row: RaiseOptionRow): HireRai
 }
 
 /**
+ * How many of this option the treasury, the hex, and the raise limit can take.
+ *
+ * Purpose: The attention line names a count the commander can copy into the raise order.
+ * When to use: After the cheapest affordable option on the chosen row is known.
+ * Expected outcome: The smaller of the credit budget, the unused capacity, and `HIRE_COUNT_MAX`. Zero when the hex cannot hold one.
+ * Exceptions: None.
+ */
+function affordableRaiseCount(credits: number, row: RaiseOptionRow, option: HireRaiseOption): number {
+  const byCredits = Math.floor(credits / (option.fee + MERCENARY_UPKEEP_RESERVE_TURNS * option.upkeep));
+  const byCapacity = Math.floor(row.capacityLeft / option.unitCost);
+  return Math.max(0, Math.min(byCredits, byCapacity, HIRE_COUNT_MAX));
+}
+
+/**
  * One raise the commander can order this turn.
  *
  * Purpose: Attention Flags names a hex even when the Raise Options table cut it off.
  * When to use: Strategic production injection. Pass the campaign target the table uses, or null when there is no campaign.
- * Expected outcome: Null when the economy is missing, the seat id is not a seat, or no option is affordable. Otherwise the sentence for the first affordable hex outside the seat's home region, or the first affordable hex when every affordable hex is at home.
+ * Expected outcome: Null when the economy is missing, the seat id is not a seat, or no option is affordable. Otherwise the sentence names the largest count the treasury can carry at the first affordable hex outside the seat's home region, or the first affordable hex when every affordable hex is at home.
  * Exceptions: `raiseOptionRowsForSeat` propagates a database error when no match is open.
  */
 export function formatMercenaryRaiseAttention(args: {
@@ -72,6 +86,7 @@ export function formatMercenaryRaiseAttention(args: {
   const seatIsKnown = isSeatId(args.ownSeat);
   let text: string | null = null;
   let hex: string | null = null;
+  let count: number | null = null;
   if (economy != null && seatIsKnown) {
     const ownSeat: SeatId = args.ownSeat;
     const home = new Set(args.state.homeRegionHexesBySeat?.[ownSeat] ?? []);
@@ -80,16 +95,20 @@ export function formatMercenaryRaiseAttention(args: {
     const chosen = rows.find((row) => !home.has(row.h3Index) && affordableRow(row)) ?? rows.find(affordableRow) ?? null;
     const option = chosen ? cheapestAffordableOption(economy.credits, chosen) : null;
     if (chosen && option) {
-      hex = chosen.h3Index;
-      text =
-        `Mercenaries: your treasury of ${economy.credits} credits can raise ${option.unitType} at ${args.format(chosen.h3Index)} for ${option.fee}. ` +
-        'Add a raise_mercenaries row to productionOrders.';
+      count = affordableRaiseCount(economy.credits, chosen, option);
+      if (count > 0) {
+        hex = chosen.h3Index;
+        text =
+          `Mercenaries: your treasury of ${economy.credits} credits can raise ${count} ${option.unitType} at ${args.format(chosen.h3Index)} for ${count * option.fee}, keeping ${MERCENARY_UPKEEP_RESERVE_TURNS} turns of their upkeep. ` +
+          `Add a raise_mercenaries row with "count": ${count} to productionOrders.`;
+      }
     }
   }
   logDebug('mercenaryRaiseAttention formatMercenaryRaiseAttention', {
     ownSeat: args.ownSeat,
     credits: economy?.credits ?? null,
     hex,
+    count,
   });
   return text;
 }

@@ -56,7 +56,7 @@ ${buildStrategyBlock('strategic')}${toolsLine}${doctrineLine}
 ${MESSAGE_BLOCK}`;
   const withCampaign = gates.campaignEnabled === true ? `${message}\n\n${buildCampaignRuleBlock(gates.operationsEnabled === true)}` : message;
   const withOperations = gates.operationsEnabled === true ? `${withCampaign}\n\n${buildOperationRuleBlock(gates.operationsEnabled === true, gates.campaignEnabled === true)}` : withCampaign;
-  return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock()}` : withOperations;
+  return gates.postureEnabled === true ? `${withOperations}\n\n${buildPostureRuleBlock(gates.campaignEnabled === true)}` : withOperations;
 }
 
 /**

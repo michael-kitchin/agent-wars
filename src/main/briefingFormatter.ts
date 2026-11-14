@@ -54,7 +54,6 @@ import {
 } from './openRouter/promptSpec/sectionHeadings';
 import { formatBonusTableCellWithTech } from '../shared/techBonusRules';
 import { ORIGIN_BONUS_OFF, originBonusSettingsFromSnapshot } from '../shared/originBonusRules';
-import { strategicWeatherApplies } from './openRouter/promptSpec/gameRuleSituationGates';
 import type { OriginBonusSettings } from '../shared/originBonusTypes';
 
 /**
@@ -480,7 +479,7 @@ function isQuiet(
  * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in the Standing Order Status section when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
- *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that when some assessment carries `weatherTags`, unless `omitWeatherColumn` is set because the weather rules were omitted. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
+ *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that when some assessment carries `weatherTags`, which the snapshot sets whenever the weather bonus is on, including a mild month. `omitWeatherColumn` hides it. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
  *   An air unit in `airStrikeRowUnitIds` is Action needed yes and is not quiet, including a healthy defend order. Callers that omit the set keep the previous cells.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
@@ -839,10 +838,7 @@ export function formatBriefing(
   });
   ensureStrategicCoordinateRegistryInitialized();
   const originBonusSettings = originBonusSettingsFromSnapshot(state);
-  const coordCtx: CoordinateContext = {
-    mode: 'strategic',
-    omitWeatherColumn: originBonusSettings.weatherBonusEnabled === true && !strategicWeatherApplies(state.hexes),
-  };
+  const coordCtx: CoordinateContext = { mode: 'strategic' };
   const standingOrdersActive = standingOrderText.trim().length > 0;
   const latLngByH3 =
     sharedContext?.latLngByH3 ??

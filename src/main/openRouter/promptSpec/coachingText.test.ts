@@ -357,8 +357,9 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   assert.equal(campaignOnly.includes('## Operations'), false);
   assert.equal(buildContextCoaching(strategicGates()).includes('## Operations'), false);
   assert.equal(buildContextCoaching(tacticalGates({ operationsEnabled: true })).includes('The engine runs operations'), false);
-  assert.ok(withBoth.includes('Operation Options lists up to 5 you could launch'));
-  assert.ok(withBoth.includes('it never launches a defended row'));
+  assert.ok(withBoth.includes('Operation Options lists up to 5 operations you could launch'));
+  assert.ok(withBoth.includes('or a lightly held one when your posture allows it'));
+  assert.equal(withBoth.includes('never launches a defended row'), false);
   assert.ok(withBoth.includes('It never launches a land row'));
   assert.ok(withBoth.includes('by sea or by air'));
   assert.ok(withBoth.includes('An air unit in an operation does not strike'));
@@ -388,8 +389,12 @@ test('posture rules follow the operation rules only when the gate is on', () => 
   assert.equal(POSTURE_SETTINGS.blitz.airOperationSlotFactor, 2);
   assert.equal(POSTURE_SETTINGS.blitz.campaignAssaultFactor, 0.5);
   assert.equal(POSTURE_SETTINGS.blitz.engineLaunchMaxDefenders, 1);
-  assert.ok(buildPostureRuleBlock().includes('full cap'));
-  assert.ok(buildPostureRuleBlock().includes('half your ground units'));
-  assert.ok(buildPostureRuleBlock().includes('twice the air operations'));
-  assert.ok(buildPostureRuleBlock().includes('half the usual mass'));
+  assert.ok(buildPostureRuleBlock(true).includes('full cap'));
+  assert.ok(buildPostureRuleBlock(true).includes('half your ground units'));
+  assert.ok(buildPostureRuleBlock(true).includes('twice the air operations'));
+  assert.ok(buildPostureRuleBlock(true).includes('half the usual mass'));
+  const globalPosture = buildPostureRuleBlock(false);
+  assert.equal(globalPosture.includes('half the usual mass'), false);
+  assert.equal(globalPosture.includes('Land options come first'), false);
+  assert.ok(globalPosture.includes('twice the air operations'));
 });

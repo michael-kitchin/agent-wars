@@ -62,7 +62,9 @@ Weather bonus is on: the date is on the turn line, weather changes when that dat
 
 Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain.
 
-Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks. A strategic ferry into snow is 2 hexes.
+A strategic ferry into snow is 2 hexes.
+
+Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks.
 
 None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. Weather does not change defense, melee, or casualty order.
 
@@ -90,11 +92,29 @@ To move a naval unit toward a land target, copy a Best Options Target Hex for th
 
 ## Air Units
 
-An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most 4 hexes, or 2 into snow when the unit lacks the snow tag. It strikes within 3 hexes of its current airport. It does not strike from the end of a ferry on the same turn. It carries one infantry unit. embark with that air unit's id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed. airDrops lands that infantry on a land hex within 3 of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered. When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.
+An air unit ferries any distance in one turn by hopping controlled intact airports. Each hop is at most 4 hexes, or 2 into snow when the unit lacks the snow tag.
+
+It strikes within 3 hexes of its current airport. It does not strike from the end of a ferry on the same turn.
+
+It carries one infantry unit. embark with that air unit's id in navalUnitId loads infantry on the same hex. disembark clears the assignment and then marches the infantry by normal land movement. The destination does not have to be a port or a coast. A destination of the current hex unloads and stays. ferryOrders carries the infantry along. While aboard, the infantry cannot fight and is destroyed if the air unit is destroyed.
+
+airDrops lands that infantry on a land hex within 3 of the current airport, including an enemy hex, and the air unit stays based where it is. Enemy units there may shoot the air unit down; if they do, the infantry is lost. A drop and a strike cannot both be ordered. A drop and a ferry cannot both be ordered.
+
+When infantry cannot reach the fight by land this turn, embark it on air and drop it, or ferry it through airports, when a chain exists. Use a ship when no airport chain reaches.
+
+## Missiles
+
+A missile is built in a city with at least 21 urban cells. It never moves and is spent when it launches. It reaches any explored hex within 12 hexes of the hex where it was built.
+
+A launch always hits: each city, airport, and seaport cell in the target hex is destroyed when its own d20 roll is at or below the air unit's attack of 10, and every air unit based there is destroyed when an airport cell is destroyed. Other units in the hex are unharmed.
 
 ## Fortifications
 
-Fortifications: a hex's controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains. Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row. Air strikes and missiles remove a cell's fortification before they can destroy the cell.
+Fortifications: a hex's controller may fortify its intact city cells through production, one cell per item. Every hit that would destroy one of the controller's units in a fortified hex destroys one fortification instead, until none remain. Control of a fortified hex cannot change while any fortification remains.
+
+Units alone in an enemy fortified hex roll their attack against the fortifications each turn. A ranged_attack may target an explored enemy fortified hex that holds no units. This is the one ranged target you may order without a Best Options row.
+
+Air strikes and missiles remove a cell's fortification before they can destroy the cell.
 
 ## Holding Fire
 
@@ -113,6 +133,14 @@ You can build only in your home region and in cells that hold one of your units 
 Elsewhere a queue pauses, and its points are lost at the end of each turn until you end a turn with a unit there or raise a mercenary there.
 
 Production progress/spawn resolves after Ready, after combat and control resolution.
+
+## Mercenaries
+
+Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see.
+
+Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill.
+
+After that each mercenary costs its upkeep every turn: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.
 
 # Strategic Context
 
@@ -155,11 +183,23 @@ To choose a different target, set "campaignTarget" to the hex code of an enemy c
 
 ## Operations
 
-The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air. By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. By air, it marches one infantry unit to an air unit's airport, loads it, ferries to an airport in range when it must, and drops it onto a city that holds no enemy unit. The Active Operations section of the briefing lists each one and how far it has got.
+The engine runs operations: several turns of orders that carry ground units to an enemy city by sea or by air.
+
+By sea, it musters units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it.
+
+By air, it marches one infantry unit to an air unit's airport, loads it, ferries to an airport in range when it must, and drops it onto a city that holds no enemy unit.
+
+The Active Operations section of the briefing lists each one and how far it has got.
 
 Your land campaign is listed there too, as "campaign". It is described under Campaign. Operation Options may list land rows: other cities the campaign could turn to. Launching one gives the campaign that target.
 
-When you have room for another operation, Operation Options lists up to 5 you could launch, with what each would gain, what it would tie up, and what stands in its way. Launch one with "operations": [{"action":"launch","option":"<letter>"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option". The engine launches the first undefended sea or air row on the turn after that row was offered. It never launches a land row, and it never launches a defended row. Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
+Operation Options lists up to 5 operations you could launch, with what each would gain, what it would tie up, and what stands in its way. A sea or air row is listed only while you have room for another operation by that method.
+
+Launch one with "operations": [{"action":"launch","option":"<letter>"}]. You may also name a city that is not listed, with "objective" and "method" in place of "option".
+
+On the turn after a sea or air row was offered, the engine launches the first one it counts as clear: an undefended row, or a lightly held one when your posture allows it. It never launches a land row.
+
+Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
 
 Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
 
@@ -327,7 +367,8 @@ Submit your final JSON only (one compact JSON object, no markdown fence, no extr
   "memoryUpdates": [...],
   "productionOrders": [...],
   "campaignTarget": "<optional hex code>",
-  "operations": [...]
+  "operations": [...],
+  "posture": "<optional posture>"
 }
 ```
 
@@ -501,7 +542,8 @@ Turn 40: you command 31 unit(s); currently observed enemy units: 7. 13 of your u
 - a1-i12 faces a critical threat (nearest enemy: h1-i32, distance 0).
 - a1-i6 faces a moderate threat (nearest enemy: h1-i32, distance 1).
 - 12 unit(s) have a legal attack this turn — copy a Best Options ranged or air-strike row for each and do not invent a target: a1-a4, a1-a5, a1-a6, a1-a7, a1-a8, a1-n4, a1-n5, a1-n6, a1-n7, a1-n8, a1-n9, a1-n10.
-- Production: 10 controlled hexes can build but are not building — empty queue, can build armor, credits: EJ, FO, ER; blocked at cap, can build armor, credits: FZ, DN, EH, E0, DJ, E3, GF. Add a set_build_queue row to productionOrders for each.
+- Production: 10 controlled hexes can build but are not building — empty queue, can build armor, missile, credits: EJ, FO, ER; blocked at cap, can build armor, missile, credits: FZ, DN, EH, E0, DJ, E3, GF. Add a set_build_queue row to productionOrders for each.
+- Mercenaries: your treasury of 40 credits can raise 2 infantry at E3 for 6, keeping 3 turns of their upkeep. Add a raise_mercenaries row with "count": 2 to productionOrders.
 - Campaign: 2 units need a new standing order. Copy each Campaign Orders row into an assign_order entry.
 
 ## Operational Map
@@ -632,7 +674,7 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 ## Active Operations
 
 - campaign: by land to LP, an enemy city with 8 city cells. Assembling at G5: 0 of 6 ground units are within 2 hexes.
-- opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 2 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
+- opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 1 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
 
 ## Operation Options
 
@@ -641,7 +683,7 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 | A | JN | land | the campaign turns to JN; ground units assemble at G5 and march on it | 18 city cells | your campaign units, about 8 turns' march | 0 enemy units within 2 hexes; 0 more can reach it in 8 turns |
 | B | KQ | sea | 2 ground units muster at FH; 1 ship sail to J0; assault KQ | 4 city cells, in an enemy home region | 2 of 12 ground units, 1 of 4 ships, about 6 turns | 0 enemy units within 2 hexes; 3 more can reach it in 6 turns |
 | C | J0 | sea | 2 ground units muster at FH; 1 ship sail to KQ; assault J0 | 9 city cells | 2 of 12 ground units, 1 of 4 ships, about 8 turns | 1 enemy unit within 2 hexes; 2 more can reach it in 8 turns |
-| D | LP | air | 1 infantry unit musters at FH; a1-a1 carries it; drops on LP | 8 city cells, in an enemy home region | 1 of 12 ground units, 1 of 2 air units, about 3 turns | 0 enemy units within 2 hexes; 1 more can reach it in 3 turns |
+| D | LP | air | 1 infantry unit musters at G9; a1-a1 carries it; drops on LP | 8 city cells, in an enemy home region | 1 of 12 ground units, 1 of 6 air units, about 3 turns | 0 enemy units within 2 hexes; 1 more can reach it in 3 turns |
 
 ## Supplemental Hex Intelligence
 
@@ -802,12 +844,6 @@ Enemy infrastructure in your current strike envelope: airports=7, seaports=7.
 
 ## Mercenaries
 
-Credits hire mercenaries. Raise new units in an explored cell outside other sides' home regions that holds no units but yours and no fortifications but yours, up to twice the cell's production in unit cost each turn, or rehire a Neutral unit you can see.
-
-Hired units arrive at the end of the turn and take orders the next turn. A raise costs one turn of upkeep and a rehire costs two. That fee is taken when the order is placed, returned when the order is removed, and returned for any count the end of the turn does not fill.
-
-After that each mercenary costs its upkeep every turn: infantry 3 (Advanced 5), armor 5 (10), naval 13 (25), air 8 (15) credits per turn. The Advanced figure applies when tech bonuses are on. Credits produced this turn arrive before upkeep is paid. If your treasury cannot pay, random mercenaries desert to Neutral. A rehired unit that shares its cell with other sides' units, Neutral included, fights them at the next resolution, and so does a deserter that shares a cell with your units. Mercenaries do not count toward unit caps.
-
 Treasury: 40 credits. Mercenary upkeep: 0 credits per turn for 0 mercenaries. Hire orders already taken from the treasury this turn: 0 credits.
 
 ### Rehire Candidates
@@ -818,7 +854,7 @@ No Neutral unit you can see can be rehired.
 
 | Hex | To Campaign Target | Enemy Units Within 2 | Chokepoint | Capacity | Resumes building | Options |
 | --- | --- | --- | --- | --- | --- | --- |
-| E3 | 4 | 0 | no | 40 | no | infantry (fee 3, upkeep 3) |
+| E3 | 4 | 0 | no | 54 | no | infantry (fee 3, upkeep 3) |
 
 ## Unit Roster
 

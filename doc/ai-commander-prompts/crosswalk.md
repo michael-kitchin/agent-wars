@@ -124,7 +124,7 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Production Status` | Kept and extended — 1.6 adds the income rule. The cost line now ends with the credits sentence, and the queue table adds a Building column. |
 | `### Paused Queues` | Under Production Status when a queue is paused for occupation or a full city. `###` in the situation message, `##` when production stands alone. |
 | `### Production Priorities` | Under Production Status, after Paused Queues and before Controlled Hex Queues, when `buildProductionPriorityLines` returns a line. |
-| `# Mercenaries` | Added. Treasury, upkeep, and, when production tools are on, rehire and raise tables. Raise Options columns are Hex, To Campaign Target, Enemy Units Within 2, Chokepoint, Capacity, Resumes building, and Options. A production seat with 0 credits, no mercenary, no rehire, and no raise row collapses to `Treasury: 0 credits. No one to rehire.` Production off keeps the upkeep-only form when the seat has mercenaries. |
+| `# Mercenaries` | Added. Treasury, upkeep figures, and, when production tools are on, rehire and raise tables. The hire and upkeep rules are `## Mercenaries` under `# Rules`. Raise Options columns are Hex, To Campaign Target, Enemy Units Within 2, Chokepoint, Capacity, Resumes building, and Options. A production seat with 0 credits, no mercenary, no rehire, and no raise row collapses to `Treasury: 0 credits. No one to rehire.` Production off keeps the treasury and the owned-mercenary table when the seat has mercenaries. |
 | `## Controlled Hex Queues` | Kept — 1.6 and 2 |
 | `## Your Strategic Memory` | Kept and extended — 1.6 adds write limits |
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |

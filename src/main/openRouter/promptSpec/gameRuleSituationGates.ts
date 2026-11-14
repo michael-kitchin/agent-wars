@@ -2,7 +2,7 @@
  * Decides which combat-rule clauses this consultation needs.
  *
  * Purpose: The rules paragraph stays short when the roster and the map make a clause useless.
- * When to use: `buildSystemPromptForTools`, and the briefing builders that hide the Weather column.
+ * When to use: `buildSystemPromptForTools`. The weather flag is recorded and does not hide the Weather column.
  * Expected outcome: A complete `GameRuleTextGates`. A missing fact includes the clause.
  * Exceptions: None.
  */
@@ -232,8 +232,8 @@ export interface CombatRuleGateInput {
 /**
  * True when a tactical battle's weather is not mild, or was not recorded.
  *
- * Purpose: Mild battles do not need the weather rules. A missing value must not hide them.
- * When to use: The combat paragraph and the tactical Unit Status column.
+ * Purpose: Records whether this battle's weather is mild. The cached weather rule and the Unit Status column do not read this flag.
+ * When to use: `combatRuleGatesForPrompt`, so the trace can show a mild battle.
  * Expected outcome: False only for `mild`.
  * Exceptions: None.
  */
@@ -246,8 +246,8 @@ export function tacticalWeatherApplies(weather: string | undefined): boolean {
 /**
  * True when some strategic hex is not mild, or some hex has no recorded weather.
  *
- * Purpose: A unit can march into weather it is not standing in, so mild occupied hexes are not enough to hide the rules.
- * When to use: The combat paragraph and the strategic Unit Status column.
+ * Purpose: Records whether this map's month is all mild. The cached weather rule and the Unit Status column do not read this flag.
+ * When to use: `combatRuleGatesForPrompt`, so the trace can show an all-mild map.
  * Expected outcome: False only when every hex records `mild`.
  * Exceptions: None.
  */

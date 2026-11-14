@@ -10,10 +10,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
-import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
+import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { STRATEGIC_LAND_MAX_WATER_PCT, type LandMassByH3, type StrategicLandMassRecord } from '../../shared/landTraversalStrategic';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import type { GameStateSnapshot } from '../gameDb';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { buildLiftTerrain } from './liftTerrain';
 import { listAirOperationCandidates } from './airOperationCandidates';
 
@@ -212,4 +214,114 @@ test('a named objective restricts the list to that city', () => {
   const candidates = search(built.state, built.landMass, second);
   assert.equal(candidates.length, 1);
   assert.equal(candidates[0]?.objectiveH3, second);
+});
+
+/**
+ * A January snow airport and a home airport three hexes away.
+ *
+ * Purpose: The ferry hop is 4 hexes, or 2 when snow shortens it. Distance 3 is inside one and outside the other.
+ * When to use: The weather-range case.
+ * Expected outcome: `far` displays snow in January. `city` is in drop range of `far` and out of drop range of `home`.
+ * Exceptions: Fails when the climate pack has no such airport.
+ */
+function snowFerryGeometry(): { readonly home: string; readonly far: string; readonly city: string; readonly snowBirth: string } {
+  const far = '8101bffffffffff';
+  assert.equal(displayWeatherForHex(far, 1, 1), 'snow', 'climate pack has no January snow at the known hex');
+  const homes = gridDisk(far, 3).filter((hex) => computeGridDistancePure(hex, far) === 3);
+  for (const home of homes) {
+    const city = gridDisk(far, AIR_STRIKE_RANGE_HEXES).find((hex) => {
+      if (hex === far || hex === home) return false;
+      const fromFar = computeGridDistancePure(hex, far);
+      const fromHome = computeGridDistancePure(hex, home);
+      return fromFar != null && fromFar <= AIR_STRIKE_RANGE_HEXES && fromHome != null && fromHome > AIR_STRIKE_RANGE_HEXES;
+    });
+    if (!city) continue;
+    const snowBirth = snowAcclimatedBirth(far);
+    assert.ok(snowBirth, 'climate pack has no snow-acclimated birth hex');
+    return { home, far, city, snowBirth };
+  }
+  assert.fail('climate pack cannot supply a snow airport with a city outside the home drop range');
+}
+
+/**
+ * A birth hex whose climate includes snow.
+ *
+ * Purpose: The long ferry hop is allowed only for a unit acclimated to snow.
+ * When to use: After the snow airport is known.
+ * Expected outcome: The airport itself when it qualifies, otherwise a northern hex that does.
+ * Exceptions: None. A missing hex is reported by the caller.
+ */
+function snowAcclimatedBirth(far: string): string | undefined {
+  if (weatherTagsForBirthHex(far).includes('snow')) return far;
+  for (let lat = 75; lat >= 55; lat -= 5) {
+    for (let lng = -180; lng < 180; lng += 24) {
+      const hex = latLngToCell(lat, lng, 1);
+      if (weatherTagsForBirthHex(hex).includes('snow')) return hex;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The air unit, infantry, and the two airports for one weather case.
+ *
+ * Purpose: The candidate search needs a real walk to the home airport and an enemy city past its drop range.
+ * When to use: Each weather flag and birth-hex combination.
+ * Expected outcome: Infantry is one land step from `home`. `birthH3Index` is set only when the case supplies one.
+ * Exceptions: None.
+ */
+function snowField(args: {
+  readonly home: string;
+  readonly far: string;
+  readonly city: string;
+  readonly weatherBonusEnabled: boolean;
+  readonly birthH3Index?: string;
+}): { readonly state: GameStateSnapshot; readonly landMass: LandMassByH3 } {
+  const infantryHex = gridDisk(args.home, 1).find((hex) => hex !== args.home)!;
+  const walk = [args.home, infantryHex];
+  const hexIds = [...new Set([...walk, args.far, args.city])];
+  const origin: UnitOrigin | undefined = args.birthH3Index
+    ? {
+        birthH3Index: args.birthH3Index,
+        birthTacticalH3Index: null,
+        birthTerrainKind: null,
+        birthIsUrban: false,
+        birthCountryName: null,
+        birthCountryCode: null,
+      }
+    : undefined;
+  const state = {
+    ...snapshot({
+      hexes: hexIds.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
+      units: [
+        { id: 'air-1', player: SEAT, unitType: 'air' as const, h3Index: args.home, ...(origin ? { origin } : {}) },
+        { id: 'inf-a', player: SEAT, unitType: 'infantry' as const, h3Index: infantryHex },
+      ],
+      strategicInfrastructure: [
+        { h3Index: args.home, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+        { h3Index: args.far, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+        { h3Index: args.city, urbanHexCount: 4, airportCount: 0, seaportCount: 0, fortifiedCount: 0 },
+      ],
+      strategicControl: [
+        { h3Index: args.home, controllerPlayerId: SEAT },
+        { h3Index: args.far, controllerPlayerId: SEAT },
+        { h3Index: args.city, controllerPlayerId: 'human' },
+      ],
+    }),
+    turnNumber: 1,
+    startMonth: 1,
+    ...(args.weatherBonusEnabled ? { weatherBonusEnabled: true as const } : {}),
+  };
+  const landMass: LandMassByH3 = new Map([...walk, args.city].map((h3Index) => [h3Index, landRecord(h3Index)]));
+  return { state, landMass };
+}
+
+test('snow shortens a ferry to an airport the air unit is not acclimated for', () => {
+  const geometry = snowFerryGeometry();
+  const untaggedOn = snowField({ ...geometry, weatherBonusEnabled: true });
+  const untaggedOff = snowField({ ...geometry, weatherBonusEnabled: false });
+  const taggedOn = snowField({ ...geometry, weatherBonusEnabled: true, birthH3Index: geometry.snowBirth });
+  assert.equal(search(untaggedOn.state, untaggedOn.landMass).some((candidate) => candidate.landingH3 === geometry.far), false);
+  assert.equal(search(untaggedOff.state, untaggedOff.landMass).some((candidate) => candidate.landingH3 === geometry.far), true);
+  assert.equal(search(taggedOn.state, taggedOn.landMass).some((candidate) => candidate.landingH3 === geometry.far), true);
 });

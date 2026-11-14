@@ -39,10 +39,10 @@ function percent(share: number): string {
  *
  * Purpose: The numbers come from `POSTURE_SETTINGS`, so the sentence cannot drift from the row.
  * When to use: The effect line of `buildPostureSection`.
- * Expected outcome: The sentence for that posture. `overland` says land options come first and only undefended objectives are launched.
+ * Expected outcome: The sentence for that posture. Without a campaign, overland omits the land-options clause and blitz omits the campaign-assault clause.
  * Exceptions: None.
  */
-export function postureEffectLine(posture: Posture): string {
+export function postureEffectLine(posture: Posture, campaignEnabled: boolean): string {
   const settings: PostureSettings = POSTURE_SETTINGS[posture];
   const line =
     posture === 'maritime'
@@ -50,9 +50,13 @@ export function postureEffectLine(posture: Posture): string {
       : posture === 'strangle'
         ? 'Production Priorities names another city for a missile even when one is already queued, and names a larger city for credits. Strike city, airport, and seaport cells before units.'
         : posture === 'blitz'
-          ? `Air options are listed first and you may run ${settings.airOperationSlotFactor} times as many. The campaign assaults with ${campaignAssaultMinUnitsFor(settings.campaignAssaultFactor)} ground units massed instead of ${CAMPAIGN_ASSAULT_MIN_UNITS}, and the engine launches against an objective with ${settings.engineLaunchMaxDefenders} defender.`
-          : 'Land options are listed first, and the engine launches only against undefended objectives.';
-  logTrace('briefingSectionsPosture postureEffectLine', { posture });
+          ? campaignEnabled
+            ? `Air options are listed first and you may run ${settings.airOperationSlotFactor} times as many. The campaign assaults with ${campaignAssaultMinUnitsFor(settings.campaignAssaultFactor)} ground units massed instead of ${CAMPAIGN_ASSAULT_MIN_UNITS}, and the engine launches against an objective with ${settings.engineLaunchMaxDefenders} defender.`
+            : `Air options are listed first and you may run ${settings.airOperationSlotFactor} times as many, and the engine launches against an objective with ${settings.engineLaunchMaxDefenders} defender.`
+          : campaignEnabled
+            ? 'Land options are listed first, and the engine launches only against undefended objectives.'
+            : 'The engine launches only against undefended objectives.';
+  logTrace('briefingSectionsPosture postureEffectLine', { posture, campaignEnabled });
   return line;
 }
 
@@ -64,7 +68,11 @@ export function postureEffectLine(posture: Posture): string {
  * Expected outcome: The heading, the posture line, and the effect line. The change sentence says the next turn while that turn is still ahead, and says the posture may change now otherwise.
  * Exceptions: None.
  */
-export function buildPostureSection(args: { readonly stored: StoredPosture | null; readonly turnNumber: number }): string {
+export function buildPostureSection(args: {
+  readonly stored: StoredPosture | null;
+  readonly turnNumber: number;
+  readonly campaignEnabled: boolean;
+}): string {
   const posture = args.stored?.posture ?? DEFAULT_POSTURE;
   const status = args.stored === null
     ? `- Posture: ${DEFAULT_POSTURE}, the default. You may set another at any time.`
@@ -73,8 +81,9 @@ export function buildPostureSection(args: { readonly stored: StoredPosture | nul
     posture,
     sinceTurn: args.stored?.sinceTurn ?? null,
     turnNumber: args.turnNumber,
+    campaignEnabled: args.campaignEnabled,
   });
-  return `${topLevelHeading(SECTION_TITLE_POSTURE)}\n\n${status}\n- Effect: ${postureEffectLine(posture)}`;
+  return `${topLevelHeading(SECTION_TITLE_POSTURE)}\n\n${status}\n- Effect: ${postureEffectLine(posture, args.campaignEnabled)}`;
 }
 
 /**

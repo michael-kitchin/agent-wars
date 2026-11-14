@@ -275,6 +275,9 @@ test('buildRepairSchemaText matches field order and forbids tactical standing-or
   assert.ok(strategicText.includes('productionOrders'));
   assert.ok(strategicText.includes('a1-t1'), 'repair schema must use compact armor id');
   assert.ok(strategicText.includes('a1-a1'), 'repair schema must use compact air id');
+  const withOperations = buildRepairSchemaText({ ...strategic, includeOperations: true });
+  assert.ok(withOperations.includes('"operations":[]'));
+  assert.equal(withOperations.includes('"launch"'), false);
   assert.ok(!strategicText.includes('opponent-armor-1'), 'repair schema must not use a live-looking armor id');
   assert.ok(!strategicText.includes('opponent-air-1'), 'repair schema must not use a live-looking air id');
   assert.ok(tacticalText.includes('a1-t1-s1'), 'tactical repair schema must use compact sub-unit ids');

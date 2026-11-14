@@ -77,7 +77,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 | --- | --- |
 | system | Omit the production section, the cap lines, the queue table, the Production attention bullet, and every production clause elsewhere. |
 | user | Do not name the production tail, the Production attention clause, or production doctrine. |
-| tools | All four production and hire tools are absent. The Mercenaries section stays, in its upkeep-only form, when the seat has mercenaries. |
+| tools | All four production and hire tools are absent. The situation Mercenaries section stays, as the treasury and the owned-mercenary table, when the seat has mercenaries. The upkeep rule is `## Mercenaries` under `# Rules`. |
 | envelope | Omit the production tail from the contract, the example, and the repair schema. |
 | coaching | Drop the keep-production-queued rule and the cap rule. |
 | empty-state | n/a. |
@@ -183,7 +183,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. The menu includes air rows and no land row, and there is no campaign bullet. A launch may name a city and a method. A refusal from the previous turn is one note line. |
+| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. The menu includes air rows and no land row, and there is no campaign bullet. The Posture effect line and the `## Postures` block omit the campaign and land clauses. A launch may name a city and a method. A refusal from the previous turn is one note line. |
 | empty-state | Explored and controlled progress lines remain, since they do not depend on a scenario. |
 
 Adding a scenario is a change to this file and to the goal statement. Silently letting a new scenario inherit region-versus-region wording is the specific regression this row forbids.
@@ -305,7 +305,7 @@ Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read thro
 
 | Surface | Contract |
 | --- | --- |
-| system | The turn line names the date. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present, when the battle weather is not mild or some strategic hex is not mild. Missing weather includes the rules. A mild battle, and a map whose every hex is mild, omit the paragraph and the Weather column. Tactical weather text omits the strategic movement sentence and the strategic ferry sentence. The air-strike weather sentence is included only when the consulted side has air. When the column is shown, the cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` column lists at most 8 nearest reachable airports. A hop into snow is 2 hexes when the unit lacks the snow tag. Best Options ferry rows are chain-reachable owned intact airports, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
+| system | The turn line names the date. The Weather subsection (`buildWeatherRule`) follows Bonuses and precedes Terrain Cover whenever the weather bonus is on. A mild battle, and a map whose every hex is mild, keep that subsection and the Weather column. Tactical weather text omits the strategic movement sentence and the strategic ferry sentence. The air-strike weather sentence is included only when the consulted side has air. The cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` column lists at most 8 nearest reachable airports. A hop into snow is 2 hexes when the unit lacks the snow tag. Best Options ferry rows are chain-reachable owned intact airports, then at most five per unit, so the count can be higher than the number of listed rows. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
 | tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged, return-fire, and air-strike thresholds as resolution. |
 | empty-state | A unit with no tags has `weatherTags: []`. The Unit Status cell is the weather where it stands, with no parentheses. The unit tooltip omits Weather when the unit has no tags. |
 

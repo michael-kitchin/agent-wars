@@ -9,9 +9,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { gridDisk } from 'h3-js';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { AI_SEAT_IDS, type AiSeatId } from '../../shared/seatIds';
-import { dbGetOne, dbRun, getGameState, getGameStateForPlayer } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getGameState, getGameStateForPlayer } from '../gameDb';
 import { setAiPendingOrders } from '../gameDb';
 import { writeOperationsForSeat } from '../gameDb/operationMemory';
 import type { Operation } from '../../shared/operationTypes';
@@ -19,7 +22,7 @@ import { listGameMaps } from '../gameMap/listGameMaps';
 import { withSeatedTempGameDbAsync } from '../testSupport/withSeatedTempGameDb';
 import { resetCommanderPool, setCommanderConsultRunnerForTests, startStrategicPlanning } from './commanderPool';
 import { emptyConsultOutcome } from './commanderPoolSupport';
-import { gatherCommanderOrdersForReady } from './commanderReadyGather';
+import { gatherCommanderOrdersForReady, buildUnconsultedCommanderOrders } from './commanderReadyGather';
 
 /**
  * The first regional map with at least three side groups.
@@ -129,17 +132,26 @@ test('an air operation in transit replaces that carrier tempo strike with a drop
     { gameMapId: map.id, fogOfWarEnabled: false, seats },
     async () => {
       const seatId: AiSeatId = AI_SEAT_IDS[0];
-      const hex = getGameState().hexes[0]?.h3Index;
-      assert.ok(hex);
-      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-op', seatId, 'air', hex]);
-      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['inf-op', seatId, 'infantry', hex]);
+      const enemySeat: AiSeatId = AI_SEAT_IDS[1];
+      const airport = dbGetAll<{ h3Index: string }>(
+        'SELECT h3_index AS h3Index FROM res_s_infrastructure WHERE airport_count > 0'
+      )
+        .map((row) => row.h3Index)
+        .find((h3Index) => !isNeutralBorderHex(h3Index));
+      assert.ok(airport, 'expected an airport that is not a neutral border');
+      const onMap = new Set(getGameState().hexes.map((hex) => hex.h3Index));
+      const enemyHex = gridDisk(airport, AIR_STRIKE_RANGE_HEXES).find((hex) => hex !== airport && onMap.has(hex));
+      assert.ok(enemyHex, 'expected an enemy hex inside air strike range');
+      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['air-op', seatId, 'air', airport]);
+      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['inf-op', seatId, 'infantry', airport]);
+      dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', ['enemy-1', enemySeat, 'infantry', enemyHex]);
       dbRun('INSERT INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', ['inf-op', 'air-op']);
       const operation: Operation = {
         id: `${seatId}-op1`,
         method: 'air',
         objectiveH3: 'city-hex',
-        musterH3: hex,
-        landingH3: hex,
+        musterH3: airport,
+        landingH3: airport,
         unitIds: ['inf-op'],
         carrierIds: ['air-op'],
         phase: 'transit',
@@ -148,6 +160,8 @@ test('an air operation in transit replaces that carrier tempo strike with a drop
         phaseTurn: 1,
       };
       writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, seatId, [operation]);
+      const unconsulted = buildUnconsultedCommanderOrders(seatId, getGameStateForPlayer(seatId));
+      assert.equal(unconsulted.airStrikeOrders.some((strike) => strike.unitId === 'air-op'), true);
       const orders = await gatherCommanderOrdersForReady({
         useEventDriven: true,
         turnNumber: 1,
@@ -162,4 +176,41 @@ test('an air operation in transit replaces that carrier tempo strike with a drop
       resetCommanderPool([]);
     }
   );
+});
+
+test('a state read that throws while adding operation orders keeps that seat pending orders', async () => {
+  const map = regionalMap();
+  assert.ok(map, 'a regional map with three side groups is required');
+  const seats = [
+    aiSeat(map.sideGroupIds[0] ?? '', null),
+    aiSeat(map.sideGroupIds[1] ?? '', null),
+    { kind: 'human' as const, sideGroupId: map.sideGroupIds[2] ?? '' },
+  ];
+  await withSeatedTempGameDbAsync('aw-ready-gather-throw-', { gameMapId: map.id, fogOfWarEnabled: false, seats }, async () => {
+    const keptSeat: AiSeatId = AI_SEAT_IDS[0];
+    const otherSeat: AiSeatId = AI_SEAT_IDS[1];
+    const pending = (unitId: string) => ({
+      movementOrders: [{ unitId, toH3Index: '8129fffffffffff' }],
+      rangedOrders: [],
+      airStrikeOrders: [],
+      ferryOrders: [],
+      embarkOrders: [],
+      missileLaunchOrders: [],
+    });
+    setAiPendingOrders(keptSeat, pending('kept-unit'));
+    setAiPendingOrders(otherSeat, pending('other-unit'));
+    const orders = await gatherCommanderOrdersForReady({
+      useEventDriven: true,
+      turnNumber: 1,
+      aiPlanningRunEnabled: false,
+      hasKey: false,
+      getGameStateForPlayer: (seatId) => {
+        if (seatId === keptSeat) throw new Error('state unavailable');
+        return getGameStateForPlayer(seatId);
+      },
+    });
+    assert.equal(orders.get(keptSeat)?.movementOrders[0]?.unitId, 'kept-unit');
+    assert.equal(orders.get(otherSeat)?.movementOrders[0]?.unitId, 'other-unit');
+    resetCommanderPool([]);
+  });
 });

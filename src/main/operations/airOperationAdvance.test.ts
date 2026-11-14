@@ -94,6 +94,36 @@ test('a carrier defending its airport gets hold-fire and the infantry marches', 
   assert.ok(step.actions.some((action) => action.kind === 'march' && action.unitId === 'inf-a' && action.toH3 === AIRPORT));
 });
 
+test('the launch tick keeps an infantry order that is not on the muster', () => {
+  const step = advanceAirOperation(
+    operation({ launchedTurn: 1 }),
+    facts({
+      turnNumber: 1,
+      storedOrderById: new Map([
+        ['air-1', { type: 'defend', h3Index: AIRPORT }],
+        ['inf-a', { type: 'defend', h3Index: OTHER }],
+      ]),
+    }),
+  );
+  assert.equal(step.outcome, 'running');
+  assert.ok(step.actions.some((action) => action.kind === 'march' && action.unitId === 'inf-a' && action.toH3 === AIRPORT));
+});
+
+test('a later tick abandons when the infantry order is not on the muster', () => {
+  const step = advanceAirOperation(
+    operation({ launchedTurn: 1 }),
+    facts({
+      turnNumber: 2,
+      storedOrderById: new Map([
+        ['air-1', { type: 'defend', h3Index: AIRPORT }],
+        ['inf-a', { type: 'defend', h3Index: OTHER }],
+      ]),
+    }),
+  );
+  assert.equal(step.outcome, 'abandoned');
+  assert.deepEqual(step.releasedIds, ['inf-a']);
+});
+
 test('infantry already on the airport embarks and the phase becomes transit', () => {
   const step = advanceAirOperation(
     operation(),

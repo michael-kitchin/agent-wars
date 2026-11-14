@@ -259,6 +259,31 @@ test('a stored posture orders the briefing list', () => {
   });
 });
 
+test('one full method leaves the other method listed', () => {
+  withTempGameDb('aw-operation-slots-', () => {
+    const landMass = loadCampaignLandMass('opponent');
+    assert.ok(landMass, 'expected the terrain cache');
+    placeMixedForce(landMass);
+    const state = getGameStateForPlayer('opponent', { maskUnexploredTerrain: false });
+    const seaActive = Array.from({ length: operationSlotsForState(state, 'sea') }, (_, index) => ({
+      ...fillingOperation(),
+      id: `opponent-sea-${index}`,
+      method: 'sea' as const,
+    }));
+    const withSea = operationCandidatesForSeat({ state, seatId: 'opponent', active: seaActive });
+    assert.equal(withSea.some((candidate) => candidate.method === 'air'), true);
+    assert.equal(withSea.some((candidate) => candidate.method === 'sea'), false);
+    const airActive = Array.from({ length: operationSlotsForState(state, 'air') }, (_, index) => ({
+      ...fillingOperation(),
+      id: `opponent-air-${index}`,
+      method: 'air' as const,
+      carrierIds: [`air-stored-${index}`],
+    }));
+    const withAir = operationCandidatesForSeat({ state, seatId: 'opponent', active: airActive });
+    assert.equal(withAir.some((candidate) => candidate.method === 'air'), false);
+  });
+});
+
 test('a search that throws gives no candidates', () => {
   const state = new Proxy({ gameSize: 'small' }, {
     get(target, property) {

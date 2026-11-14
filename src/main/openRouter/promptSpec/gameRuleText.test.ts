@@ -219,9 +219,9 @@ test('the weather sentence keeps its exact wording', () => {
     "Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex's weather.\n\n" +
       'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. ' +
       "In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain.\n\n" +
-      'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
-      'An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes.\n\n' +
+      'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks.\n\n' +
       'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
       'Weather does not change defense, melee, or casualty order.\n\n' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
@@ -243,9 +243,9 @@ test('the High weather sentence widens the slowing weather and deepens the penal
     "Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex's weather.\n\n" +
       'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain. ' +
       "In battle, armor's point budget is 1 in snow, rain, or heat and naval's is 1 in snow or rain; infantry pays 2 to enter open ground in snow or rain.\n\n" +
-      'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +
-      'An air strike is 5 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes.\n\n' +
+      'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 5 lower once when its base or its target is snow, rain, or heat the unit lacks.\n\n' +
       'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
       'Weather does not change defense, melee, or casualty order.\n\n' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
@@ -494,13 +494,13 @@ const WEATHER_ON = {
   weatherBonusEnabled: true,
 } as const;
 
-test('tactical mild weather omits the weather rules', () => {
+test('tactical mild weather still states the battle weather rules', () => {
   const paragraph = buildRulesSections(gates({
     coordinateMode: 'tactical',
     originBonusSettings: WEATHER_ON,
     weatherApplies: false,
   }));
-  assert.doesNotMatch(paragraph, /snow/);
+  assert.match(paragraph, /armor's point budget/);
   assert.doesNotMatch(paragraph, /strategic ferry/);
 });
 
@@ -543,10 +543,11 @@ test('a roster with no missile omits the hit-last sentence', () => {
   assert.doesNotMatch(paragraph, /hit last/);
 });
 
-test('a mild strategic map omits weather and one snow hex keeps strategic movement', () => {
+test('a mild strategic map still states the weather rules when the bonus is on', () => {
   const mild = buildRulesSections(gates({ originBonusSettings: WEATHER_ON, weatherApplies: false }));
-  assert.doesNotMatch(mild, /Weather bonus is on/);
+  assert.match(mild, /Weather bonus is on/);
   const snow = buildRulesSections(gates({ originBonusSettings: WEATHER_ON, weatherApplies: true }));
+  assert.equal(mild, snow);
   assert.match(snow, /Armor strategic movement/);
 });
 
@@ -611,4 +612,13 @@ test('roster and map facts turn the gates off only when the clause cannot apply'
   });
   assert.equal(snowHex.weatherApplies, true);
   assert.equal(snowHex.includeFortificationRule, true);
+});
+
+test('mercenary rules stay in the cached rules section', () => {
+  const full = buildRulesSections(gates({ mercenaryRule: 'full' }));
+  assert.match(full, /## Mercenaries\n\nCredits hire mercenaries/);
+  const upkeep = buildRulesSections(gates({ mercenaryRule: 'upkeep' }));
+  assert.match(upkeep, /## Mercenaries/);
+  assert.doesNotMatch(upkeep, /Credits hire mercenaries/);
+  assert.equal(buildRulesSections(gates()).includes('## Mercenaries'), false);
 });

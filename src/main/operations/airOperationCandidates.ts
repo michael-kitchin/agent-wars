@@ -10,6 +10,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
+import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { AIRLIFT_INFANTRY_CAPACITY } from '../../shared/carrierCargoRules';
 import { findReachableAirportFerryDestinations } from '../../shared/airportFerryRoute';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
@@ -68,8 +69,8 @@ function countReinforcers(args: {
  *
  * Purpose: The drop is legal only from an airport the air unit is on or can ferry to.
  * When to use: Once per free air unit.
- * Expected outcome: The unit's own controlled airport, plus every reachable controlled airport. Enemy airports are not included.
- * Exceptions: None.
+ * Expected outcome: The unit's own controlled airport, plus every reachable controlled airport. When the weather bonus is on, the hop uses the birth hex's acclimation tags. Enemy airports are not included.
+ * Exceptions: When the weather bonus is on and the air unit has a birth hex, `weatherTagsForBirthHex` throws if the climate pack cannot load.
  */
 function launchAirports(args: {
   readonly state: GameStateSnapshot;
@@ -92,7 +93,14 @@ function launchAirports(args: {
     nodes,
     gridDistance: computeGridDistancePure,
     unmeasuredHopWithinRange: isWithinGridRangePure,
-    hopRangeHexes: (destinationH3Index) => strategicFerryRangeOnState(args.air, destinationH3Index, args.state),
+    hopRangeHexes: (destinationH3Index) =>
+      strategicFerryRangeOnState(
+        args.state.weatherBonusEnabled === true
+          ? { weatherTags: weatherTagsForBirthHex(args.air.origin?.birthH3Index) }
+          : args.air,
+        destinationH3Index,
+        args.state,
+      ),
   });
   const airports = new Set<string>(reachable);
   const ownCount = (args.state.strategicInfrastructure ?? []).find((row) => row.h3Index === args.air.h3Index)?.airportCount ?? 0;

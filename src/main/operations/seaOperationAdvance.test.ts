@@ -279,6 +279,33 @@ test('transit is lost when the ship and its cargo are gone', () => {
   assert.deepEqual(step.releasedIds, []);
 });
 
+test('a transit whose only cargo was released abandons and cancels the ship', () => {
+  const { unitHexById, unitTypeById } = placed(['inf-a'], 'sea', ['ship-1']);
+  const step = advanceSeaOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a'], carrierIds: ['ship-1'], landingH3: BEACH }),
+    facts({
+      turnNumber: 2,
+      unitHexById,
+      unitTypeById,
+      carrierByCargoId: new Map([['inf-a', 'ship-1']]),
+      storedOrderById: new Map([['inf-a', { type: 'defend', h3Index: 'elsewhere' }]]),
+    }),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'abandoned');
+  assert.deepEqual(step.actions, [{ kind: 'cancelOrder', unitId: 'ship-1' }]);
+});
+
+test('a transit whose only cargo is missing from the map is lost', () => {
+  const { unitHexById, unitTypeById } = placed([], 'sea', ['ship-1']);
+  const step = advanceSeaOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a'], carrierIds: ['ship-1'], landingH3: BEACH }),
+    facts({ turnNumber: 2, unitHexById, unitTypeById }),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'lost');
+});
+
 test('one ship landing does not drop that cargo on the next tick', () => {
   const firstHex = placed(['inf-a', 'inf-b'], 'sea', ['ship-1', 'ship-2']);
   firstHex.unitHexById.set('ship-1', BEACH);
@@ -437,6 +464,7 @@ test('turning back sails to the port chosen from the first ship', () => {
     operation({ phase: 'transit', unitIds: ['inf-a'], carrierIds: ['ship-1'], landingH3: BEACH }),
     facts({
       unitHexById,
+      carrierByCargoId: new Map([['inf-a', 'ship-1']]),
       chooseReturnPort: (fromH3) => {
         seen.push(fromH3);
         return 'home-2';
@@ -448,6 +476,43 @@ test('turning back sails to the port chosen from the first ship', () => {
   assert.equal(step.next?.musterH3, 'home-2');
   assert.deepEqual(step.actions, [{ kind: 'march', unitId: 'ship-1', toH3: 'home-2' }]);
   assert.equal(step.outcome, 'running');
+});
+
+test('units already ashore leave a turned-back transit and defend where they stand', () => {
+  const carried = placed(['inf-a'], 'sea', ['ship-1']);
+  const unitHexById = new Map(carried.unitHexById);
+  unitHexById.set('inf-b', BEACH);
+  const unitTypeById = new Map(carried.unitTypeById);
+  unitTypeById.set('inf-b', 'infantry');
+  const first = advanceSeaOperation(
+    operation({ phase: 'transit', unitIds: ['inf-a', 'inf-b'], carrierIds: ['ship-1'], landingH3: BEACH, phaseTurn: 1 }),
+    facts({
+      turnNumber: 2,
+      unitHexById,
+      unitTypeById,
+      carrierByCargoId: new Map([['inf-a', 'ship-1']]),
+      objectiveIsEnemyCity: false,
+      objectiveIsOwn: false,
+    }),
+  );
+  assert.deepEqual(first.next?.unitIds, ['inf-a']);
+  assert.deepEqual(first.releasedIds, []);
+  assert.ok(first.actions.some((action) => action.kind === 'defend' && action.unitId === 'inf-b' && action.atH3 === BEACH));
+  const returned = first.next;
+  assert.ok(returned);
+  const second = advanceSeaOperation(
+    returned,
+    facts({
+      turnNumber: 3,
+      unitHexById,
+      unitTypeById,
+      carrierByCargoId: new Map([['inf-a', 'ship-1']]),
+      storedOrderById: new Map([['inf-b', { type: 'defend', h3Index: BEACH }]]),
+      objectiveIsEnemyCity: false,
+      objectiveIsOwn: false,
+    }),
+  );
+  assert.equal(second.releasedIds.includes('inf-b'), false);
 });
 
 test('cancelling a muster frees every unit and ship', () => {
@@ -467,7 +532,7 @@ test('cancelling a transit turns the ships back', () => {
   const { unitHexById } = placed(['inf-a'], 'sea', ['ship-1']);
   const step = cancelSeaOperation(
     operation({ phase: 'transit', unitIds: ['inf-a'], carrierIds: ['ship-1'], landingH3: BEACH }),
-    facts({ unitHexById, chooseReturnPort: () => 'home-2' }),
+    facts({ unitHexById, carrierByCargoId: new Map([['inf-a', 'ship-1']]), chooseReturnPort: () => 'home-2' }),
   );
   assert.equal(step.next?.phase, 'return');
   assert.equal(step.next?.musterH3, 'home-2');

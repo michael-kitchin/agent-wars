@@ -80,7 +80,7 @@ export interface CoordinateContext {
    * Weather of the enclosing strategic hex for this battle.
    *
    * Contract: Set only for a tactical consultation. Absent when the battle did not record weather.
-   * When to use: The combat-rules weather gate. Mild omits the weather rules; absent includes them.
+   * When to use: The situation message's weather column. The cached weather rule follows the match setting, not this beat.
    * Expected outcome: The battle's single weather value, or absent.
    * Exceptions: None.
    */
@@ -88,8 +88,8 @@ export interface CoordinateContext {
   /**
    * Hides the Unit Status Weather column for this briefing.
    *
-   * Contract: True only when the weather rules are omitted. Absent leaves the column on its tag check.
-   * When to use: Strategic and tactical briefing builders, from the same weather gate as the combat rules.
+   * Contract: Absent leaves the column on when an assessment carries `weatherTags`. True hides the column.
+   * When to use: A caller that must suppress the column. The strategic and tactical briefings leave it unset, so a mild month still shows Mild.
    * Expected outcome: The table has no Weather column.
    * Exceptions: None.
    */

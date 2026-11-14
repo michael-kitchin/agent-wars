@@ -500,6 +500,13 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     productionRules: flags.productionEnabled && coordinateContext.mode !== 'tactical'
       ? buildProductionRulesParagraphs(getMaxUnitsPerType(parseGameSize(state.gameSize)))
       : [],
+    mercenaryRule: coordinateContext.mode === 'tactical'
+      ? 'none'
+      : flags.productionEnabled
+        ? 'full'
+        : opponentUnits.some((unit) => unit.isMercenary === true)
+          ? 'upkeep'
+          : 'none',
     rulesPointer: filtered.some((tool) => tool.name === 'rules') ? RULES_POINTER_LINE : '',
   });
   const ordersGuidance = buildOrdersGuidanceSection(coachingGates);

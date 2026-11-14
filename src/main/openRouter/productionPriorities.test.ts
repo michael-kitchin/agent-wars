@@ -76,6 +76,7 @@ function queueRow(args: {
   readonly center: (h3: string) => [number, number];
   readonly entries?: ReadonlyArray<{ readonly unitType: string; readonly queueIndex: number }>;
   readonly buildPaused?: boolean;
+  readonly pausedReasons?: readonly string[];
 }): ControlledHexQueueSnapshot {
   return {
     hex: args.center(args.h3),
@@ -83,6 +84,7 @@ function queueRow(args: {
     availableUnitTypes: [...args.types],
     entries: [...(args.entries ?? [])],
     buildPaused: args.buildPaused,
+    pausedReasons: args.pausedReasons ? [...args.pausedReasons] : undefined,
   };
 }
 
@@ -458,4 +460,93 @@ test('strangle names the next missile city and a larger credits city', () => {
   });
   assert.deepEqual(bankedDefault, []);
   assert.deepEqual(banked, [`- Credits: no city is producing credits. Queue credits in ${openCity}.`]);
+});
+
+test('strangle omits the missile line when owned and queued missiles fill the cap', () => {
+  const ring = neighbors();
+  const queuedCity = ring[0]!;
+  const openCity = ring[1]!;
+  const target = ring[2]!;
+  const labels = labelsFor([queuedCity, openCity, target]);
+  const economy = { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 };
+  const queues = [
+    queueRow({
+      h3: queuedCity,
+      urban: CREDITS_CITY_MIN_URBAN_PER_SIZE,
+      types: ['missile', 'credits'],
+      center: labels.center,
+      entries: [{ unitType: 'missile', queueIndex: 0 }],
+    }),
+    queueRow({
+      h3: openCity,
+      urban: CREDITS_CITY_MIN_URBAN_PER_SIZE * POSTURE_SETTINGS.strangle.creditsCityUrbanFactor,
+      types: ['missile', 'credits'],
+      center: labels.center,
+    }),
+  ];
+  const cap = getMaxUnitsPerType(parseGameSize('small')).missile;
+  const oneOwned = linesFor({
+    hexes: [queuedCity, openCity, target],
+    queues: queues.map((row) => ({ ...row, entries: [] })),
+    settings: POSTURE_SETTINGS.strangle,
+    state: world({
+      ...enemies([{ h3: target, urban: 20 }]),
+      mercenaryEconomy: economy,
+      units: [{ id: 'm0', player: OWN, unitType: 'missile', h3Index: ORIGIN }],
+    }),
+  });
+  const filled = linesFor({
+    hexes: [queuedCity, openCity, target],
+    queues,
+    settings: POSTURE_SETTINGS.strangle,
+    state: world({
+      ...enemies([{ h3: target, urban: 20 }]),
+      mercenaryEconomy: economy,
+      units: [{ id: 'm0', player: OWN, unitType: 'missile', h3Index: ORIGIN }],
+    }),
+  });
+  assert.equal(cap, 2);
+  assert.equal(oneOwned.some((line) => line.startsWith('- Missile:')), true);
+  assert.equal(filled.some((line) => line.startsWith('- Missile:')), false);
+});
+
+test('a paused queue does not count as producing credits or as a queued missile', () => {
+  const ring = neighbors();
+  const pausedCity = ring[0]!;
+  const openCity = ring[1]!;
+  const target = ring[2]!;
+  const labels = labelsFor([pausedCity, openCity, target]);
+  const economy = { credits: 0, upkeepPerTurn: 0, pendingHireFees: 0, mercenaryCount: 0 };
+  const credits = linesFor({
+    hexes: [pausedCity, openCity],
+    queues: [
+      queueRow({
+        h3: pausedCity,
+        urban: 40,
+        types: ['credits'],
+        center: labels.center,
+        entries: [{ unitType: 'credits', queueIndex: 0 }],
+        pausedReasons: ['occupied'],
+      }),
+      queueRow({ h3: openCity, urban: 12, types: ['credits'], center: labels.center }),
+    ],
+    state: world({ mercenaryEconomy: economy }),
+  });
+  const missile = linesFor({
+    hexes: [pausedCity, openCity, target],
+    queues: [
+      queueRow({
+        h3: pausedCity,
+        urban: 30,
+        types: ['missile'],
+        center: labels.center,
+        entries: [{ unitType: 'missile', queueIndex: 0 }],
+        pausedReasons: ['occupied'],
+      }),
+      queueRow({ h3: openCity, urban: 20, types: ['missile'], center: labels.center }),
+    ],
+    state: world({ ...enemies([{ h3: target, urban: 20 }]), mercenaryEconomy: economy }),
+  });
+  assert.deepEqual(credits, [`- Credits: no city is producing credits. Queue credits in ${openCity}.`]);
+  assert.equal(missile.some((line) => line.startsWith('- Missile:')), true);
 });

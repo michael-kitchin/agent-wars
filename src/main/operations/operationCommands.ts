@@ -122,12 +122,22 @@ export function applyOperationCommands(args: {
   readonly commands: readonly OperationCommand[];
   readonly coordinates: KnockoutCoordinates;
   readonly candidates: readonly OperationCandidate[];
+  /**
+   * Units and ships that this reply already gave a standing order to, or cancelled one for.
+   *
+   * Contract: A cancel does not touch their orders. Absent or empty drops nothing.
+   * When to use: The consult passes the ids whose standing orders were written before this call.
+   * Expected outcome: Cancel actions that would replace those orders are left out. Launch actions are not filtered.
+   * Exceptions: None.
+   */
+  readonly keepOrderIds?: ReadonlySet<string>;
 }): { readonly appliedCount: number; readonly dropReasons: string[] } {
   logDebug('operationCommands applyOperationCommands', {
     seatId: args.seatId,
     turnNumber: args.state.turnNumber,
     commandCount: args.commands.length,
     candidateCount: args.candidates.length,
+    keepOrderCount: args.keepOrderIds?.size ?? 0,
   });
   try {
     const resolved = resolveCommands(args);
@@ -163,6 +173,15 @@ function resolveCommands(args: {
   readonly commands: readonly OperationCommand[];
   readonly coordinates: KnockoutCoordinates;
   readonly candidates: readonly OperationCandidate[];
+  /**
+   * Units and ships that this reply already gave a standing order to, or cancelled one for.
+   *
+   * Contract: Read only while dropping cancel actions. Absent or empty drops nothing.
+   * When to use: The cancel loop.
+   * Expected outcome: Those units keep the order this reply already stored.
+   * Exceptions: None.
+   */
+  readonly keepOrderIds?: ReadonlySet<string>;
 }): ResolvedCommands {
   const stored = [...(readOperations(configOps).get(args.seatId) ?? [])];
   const replacements = new Map<string, Operation | null>();
@@ -175,7 +194,7 @@ function resolveCommands(args: {
     dropReasons.push(...outcome.dropReasons);
     if (!outcome.applied || outcome.step === undefined) continue;
     replacements.set(command.id, outcome.step.next);
-    actions.push(...outcome.step.actions);
+    actions.push(...withoutKeptOrders(outcome.step.actions, args.keepOrderIds));
     appliedCount += 1;
     logDebug('operationCommands cancelled', { seatId: args.seatId, id: command.id, phase: outcome.phase });
   }
@@ -185,8 +204,8 @@ function resolveCommands(args: {
     return { operations, actions, appliedCount, dropReasons, launched: false };
   }
   const launched = 'option' in launch
-    ? resolveLaunch({ ...args, option: launch.option, operations })
-    : resolveNamedLaunch({ ...args, objective: launch.objective, method: launch.method, operations });
+    ? resolveLaunch({ ...args, option: launch.option, operations, stored })
+    : resolveNamedLaunch({ ...args, objective: launch.objective, method: launch.method, operations, stored });
   dropReasons.push(...launched.dropReasons);
   if (launched.operation === null || launched.step === undefined) {
     return { operations, actions, appliedCount, dropReasons, launched: false };
@@ -207,6 +226,22 @@ function resolveCommands(args: {
     dropReasons,
     launched: true,
   };
+}
+
+/**
+ * Drops cancel actions that would replace an order this reply already gave.
+ *
+ * Purpose: A cancel must not erase a standing order written earlier in the same reply.
+ * When to use: The cancel loop only. Launch actions are not passed here.
+ * Expected outcome: `cancelOrder`, `march`, and `defend` for an id in the set are removed. `unload`, `embark`, and `holdFire` stay. An absent or empty set returns the actions unchanged.
+ * Exceptions: None.
+ */
+function withoutKeptOrders(actions: readonly OperationAction[], keepOrderIds: ReadonlySet<string> | undefined): OperationAction[] {
+  if (keepOrderIds === undefined || keepOrderIds.size === 0) return [...actions];
+  return actions.filter((action) => {
+    if (action.kind !== 'cancelOrder' && action.kind !== 'march' && action.kind !== 'defend') return true;
+    return !keepOrderIds.has(action.unitId);
+  });
 }
 
 /**
@@ -265,6 +300,15 @@ function resolveLaunch(args: {
   readonly coordinates: KnockoutCoordinates;
   readonly candidates: readonly OperationCandidate[];
   readonly operations: readonly Operation[];
+  /**
+   * Operations stored at the start of the reply, including one this reply just cancelled.
+   *
+   * Contract: Passed through to `acceptCandidate` so the new id does not reuse a cancelled one.
+   * When to use: Every letter launch after the cancel loop.
+   * Expected outcome: `nextOperationId` sees the cancelled id and picks the next suffix.
+   * Exceptions: None.
+   */
+  readonly stored: readonly Operation[];
 }): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
   const index = (OPERATION_OPTION_LETTERS as readonly string[]).indexOf(args.option);
   const candidate = index < 0 ? undefined : args.candidates[index];
@@ -301,6 +345,15 @@ function resolveNamedLaunch(args: {
   readonly method: OperationChoiceMethod;
   readonly coordinates: KnockoutCoordinates;
   readonly operations: readonly Operation[];
+  /**
+   * Operations stored at the start of the reply, including one this reply just cancelled.
+   *
+   * Contract: Passed through to `acceptCandidate` so the new id does not reuse a cancelled one.
+   * When to use: A named launch after the cancel loop.
+   * Expected outcome: The same id `nextOperationId` would pick for a letter launch.
+   * Exceptions: None.
+   */
+  readonly stored: readonly Operation[];
 }): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
   let objectiveH3: string;
   try {
@@ -344,6 +397,7 @@ function resolveNamedLaunch(args: {
     seatId: args.seatId,
     coordinates: args.coordinates,
     operations: args.operations,
+    stored: args.stored,
     candidate,
     unavailableReason: `operations launch dropped: ${args.objective} cannot be reached by ${args.method} with the units you have free.`,
     unreadReason: `operations launch dropped: ${args.objective} could not be read.`,
@@ -378,6 +432,15 @@ function acceptCandidate(args: {
   readonly seatId: string;
   readonly coordinates: KnockoutCoordinates;
   readonly operations: readonly Operation[];
+  /**
+   * Operations stored at the start of the reply, including one this reply just cancelled.
+   *
+   * Contract: Combined with `operations` only when choosing the new id. The busy check stays on `operations`.
+   * When to use: After the candidate has been chosen.
+   * Expected outcome: A cancelled id is not given to the operation stored beside it.
+   * Exceptions: None.
+   */
+  readonly stored: readonly Operation[];
   readonly candidate: OperationCandidate;
   readonly unavailableReason: string;
   readonly unreadReason: string;
@@ -387,7 +450,7 @@ function acceptCandidate(args: {
   const taken = [...args.candidate.unitIds, ...args.candidate.carrierIds].some((unitId) => busy.has(unitId));
   if (taken) return { operation: null, dropReasons: [args.unavailableReason] };
   const operation: Operation = {
-    id: nextOperationId(args.seatId, args.operations, args.state.turnNumber),
+    id: nextOperationId(args.seatId, [...args.stored, ...args.operations], args.state.turnNumber),
     method: args.candidate.method,
     objectiveH3: args.candidate.objectiveH3,
     musterH3: args.candidate.musterH3,
