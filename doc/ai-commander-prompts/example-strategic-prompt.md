@@ -201,9 +201,9 @@ On the turn after a sea or air row was offered, the engine launches the first on
 
 Call an operation off with {"action":"cancel","id":"<operation id>"}: one that is still mustering frees its units, and one at sea turns back.
 
-Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
+Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take out a unit that is not aboard, or a ship, give it any standing order of your own; it keeps that order and the operation goes on without it. A unit aboard one of an operation's ships or air units takes no order of its own: the engine refuses it and says so next turn. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
 
-A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
+Outside an operation, a unit aboard a ship takes no standing order. An explicit_move or a disembark unloads it where the ship is.
 
 ## Postures
 
@@ -675,6 +675,8 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 
 - campaign: by land to LP, an enemy city with 8 city cells. Assembling at G5: 0 of 6 ground units are within 2 hexes.
 - opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 1 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
+
+Give the units and ships named in these operations no orders unless you mean to take them out. A standing order takes out a unit that is not aboard, or a ship. A unit aboard one of their ships or air units takes no order.
 
 ## Operation Options
 

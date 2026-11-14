@@ -15,6 +15,17 @@ import { CAMPAIGN_MASS_RADIUS, type CampaignPlan } from './campaignRules';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
 
 /**
+ * The sentence after a stored operation.
+ *
+ * Purpose: The expected sections share one closing paragraph.
+ * When to use: Every case that stores an operation.
+ * Expected outcome: The paragraph the commander is told to leave those units alone.
+ * Exceptions: None.
+ */
+const LEAVE_THEM =
+  'Give the units and ships named in these operations no orders unless you mean to take them out. A standing order takes out a unit that is not aboard, or a ship. A unit aboard one of their ships or air units takes no order.';
+
+/**
  * A snapshot that carries only the units and the city the bullet reads.
  *
  * Purpose: Present, aboard, and urban counts come from the snapshot, not from the operation alone.
@@ -85,6 +96,8 @@ test('muster uses the singular when one unit and one ship are at the port', () =
       '# Active Operations',
       '',
       '- seat-op1: by sea to city, an enemy city with 1 city cell. Mustering at port: 1 of 1 ground unit and 1 of 1 ship are there. Units: inf-a. Ships: ship-1.',
+      '',
+      LEAVE_THEM,
     ].join('\n'),
   );
 });
@@ -100,7 +113,7 @@ test('transit names the landing and the units aboard', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. At sea, heading for beach, with 1 ground unit aboard. Ships: ship-1.',
+    `# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. At sea, heading for beach, with 1 ground unit aboard: inf-a. Ships: ship-1.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -112,7 +125,7 @@ test('assault uses the singular when one ground unit is marching', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. Landed. 1 ground unit is marching on it: inf-a.',
+    `# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. Landed. 1 ground unit is marching on it: inf-a.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -124,8 +137,59 @@ test('assault names the units marching on the city', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. Landed. 2 ground units are marching on it: inf-a, inf-b.',
+    `# Active Operations\n\n- seat-op1: by sea to city, an enemy city with 2 city cells. Landed. 2 ground units are marching on it: inf-a, inf-b.\n\n${LEAVE_THEM}`,
   );
+});
+
+test('a sea transit lists every ground unit aboard, in unit id order', () => {
+  const text = buildOperationsSection({
+    state: state({
+      units: [
+        { id: 'u2', player: 'opponent', unitType: 'infantry', h3Index: 'sea', embarkedOnCarrierUnitId: 's1' },
+        { id: 'u1', player: 'opponent', unitType: 'infantry', h3Index: 'sea', embarkedOnCarrierUnitId: 's1' },
+      ],
+      urban: 1,
+    }),
+    operations: [operation({ phase: 'transit', unitIds: ['u1', 'u2'], carrierIds: ['s1'] })],
+    format: (hex) => hex,
+  });
+  assert.match(text, /with 2 ground units aboard: u1, u2\./);
+});
+
+test('a sea transit with no cargo keeps the zero count and no list', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [operation({ phase: 'transit', unitIds: ['u1'], carrierIds: ['s1'] })],
+    format: (hex) => hex,
+  });
+  assert.match(text, /with 0 ground units aboard\. Ships:/);
+});
+
+test('a return with cargo names who is aboard', () => {
+  const text = buildOperationsSection({
+    state: state({
+      units: [{ id: 'u1', player: 'opponent', unitType: 'infantry', h3Index: 'sea', embarkedOnCarrierUnitId: 's1' }],
+      urban: 1,
+    }),
+    operations: [operation({ phase: 'return', unitIds: ['u1'], carrierIds: ['s1'] })],
+    format: (hex) => hex,
+  });
+  assert.match(text, /with u1 aboard\./);
+  assert.match(text, /Units:/);
+});
+
+test('an air return names the infantry and the air unit', () => {
+  const text = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [operation({
+      method: 'air',
+      phase: 'return',
+      unitIds: ['inf-a'],
+      carrierIds: ['air-1'],
+    })],
+    format: (hex) => hex,
+  });
+  assert.match(text, /inf-a is with air-1\./);
 });
 
 test('return names the port the ships are sailing to', () => {
@@ -136,7 +200,7 @@ test('return names the port the ships are sailing to', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: turned back from city. Returning to port. Ships: ship-1.',
+    `# Active Operations\n\n- seat-op1: turned back from city. Returning to port. Units: inf-a. Ships: ship-1.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -245,7 +309,7 @@ test('an air muster names the infantry marching to the air unit', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 1 city cell. inf-a is marching to port to board air-1.',
+    `# Active Operations\n\n- seat-op1: by air to city, an enemy city with 1 city cell. inf-a is marching to port to board air-1.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -269,7 +333,7 @@ test('an air transit says the air unit drops when it is already on the launch ai
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which drops it this turn.',
+    `# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which drops it this turn.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -290,7 +354,7 @@ test('an air transit says the air unit ferries when it is not yet on the launch 
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which ferries to airport this turn.',
+    `# Active Operations\n\n- seat-op1: by air to city, an enemy city with 2 city cells. inf-a is aboard air-1, which ferries to airport this turn.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -307,7 +371,7 @@ test('an air assault says the infantry holds the city', () => {
   });
   assert.equal(
     text,
-    '# Active Operations\n\n- seat-op1: by air to city. inf-a has landed and holds it until control passes to you.',
+    `# Active Operations\n\n- seat-op1: by air to city. inf-a has landed and holds it until control passes to you.\n\n${LEAVE_THEM}`,
   );
 });
 
@@ -367,7 +431,7 @@ test('a note prints under the heading and a note alone is enough', () => {
   });
   assert.equal(
     withOperation,
-    '# Active Operations\n\n- Last turn: operations launch dropped: AA is not a known enemy city.\n\n- seat-op1: turned back from city. Returning to port. Ships: ship-1.',
+    `# Active Operations\n\n- Last turn: operations launch dropped: AA is not a known enemy city.\n\n- seat-op1: turned back from city. Returning to port. Units: inf-a. Ships: ship-1.\n\n${LEAVE_THEM}`,
   );
   const alone = buildOperationsSection({
     state: state({ units: [], urban: 1 }),
@@ -479,6 +543,8 @@ test('the campaign bullet leads the section in each phase and a missing plan wri
     campaignPlan: campaignPlan({ phase: 'assault', stagingH3: null, massedCount: 2, threshold: 3 }),
   });
   assert.equal(assaulting, '# Active Operations\n\n- campaign: by land to city, an enemy city with 1 city cell. Assaulting.');
+  assert.equal(assembling.includes(LEAVE_THEM), false);
+  assert.equal(assaulting.includes(LEAVE_THEM), false);
   assert.equal(
     buildOperationsSection({
       state: state({ units: [], urban: 1 }),

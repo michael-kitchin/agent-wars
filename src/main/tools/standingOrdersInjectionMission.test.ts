@@ -206,6 +206,36 @@ function testCampaignOrdersRecallMarchingDefenders(): void {
 }
 
 /**
+ * An operation's unit is not offered a standing order.
+ *
+ * Purpose: The orderless table was the push that made the commander take loaded cargo out.
+ * When to use: After edits to the held-unit filter in `getInjectionText`.
+ * Expected outcome: The held unit has no orderless row. The other orderless unit still has one.
+ * Exceptions: Throws if no geodesic land chain exists.
+ */
+function testOperationHeldUnitIsLeftOutOfOrderlessTable(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const chain = findGeodesicLandMassChain(4);
+  const text = getInjectionText('opponent', {
+    ...buildLandChainState({
+      chain,
+      units: [
+        { id: 'opponent-held', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+        { id: 'opponent-free', player: 'opponent', unitType: 'infantry', h3Index: chain[1]! },
+      ],
+    }),
+    seats: [
+      { seatId: 'human' as const, seatOrder: 1, kind: 'human' as const, homeRegion: 'Home', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
+      { seatId: 'opponent' as const, seatOrder: 2, kind: 'ai' as const, homeRegion: 'Away', nickname: null, outTurn: null, outBy: null, outReasons: [], place: null, consultationCount: 0, costUsd: 0, thinkTimeMs: 0, commander: null },
+    ],
+    homeRegionHexesBySeat: { human: [chain[4]!, chain[2]!] },
+  }, STRATEGIC, null, new Set(['opponent-held']));
+  const section = text.slice(text.indexOf('## Units Without Standing Orders'));
+  assert.equal(section.includes('| opponent-held |'), false);
+  orderlessRow(text, 'opponent-free');
+}
+
+/**
  * Opens a temporary game database, runs the cell contract, and closes the database.
  *
  * Purpose: `getInjectionText` reads standing orders, so it needs an open database even when no orders exist.
@@ -224,6 +254,8 @@ function run(): void {
     console.log('OK campaign orders list only units whose standing order differs from their campaign order');
     testCampaignOrdersRecallMarchingDefenders();
     console.log('OK campaign orders recall a home defender still marching on the campaign');
+    testOperationHeldUnitIsLeftOutOfOrderlessTable();
+    console.log('OK an operation-held unit is left out of Units Without Standing Orders');
   } finally {
     closeGameDatabaseForTests();
   }

@@ -308,6 +308,7 @@ export async function requestOrdersFlow(
         operationsText: injection.operationsText,
         campaignAttention: injection.campaignAttention,
         additionalAttention: injection.additionalAttention,
+        operationHeldUnitIds: injection.operationHeldUnitIds,
       }
     );
     if (!briefingOverride.includes(subHeading(SECTION_TITLE_OPERATIONAL_MAP))) {

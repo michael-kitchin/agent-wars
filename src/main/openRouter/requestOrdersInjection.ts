@@ -22,6 +22,7 @@ import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
 import { buildPostureSection } from './briefingSectionsPosture';
 import { operationCandidatesForSeat } from '../operations/operationCandidates';
+import { operationForceIds } from '../operations/operationForce';
 import type { OperationCandidate } from '../../shared/operationTypes';
 import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
 import { formatProductionAttentionBullet } from './productionAttention';
@@ -159,6 +160,15 @@ export interface StatusInjectionTexts {
    */
   readonly standingOrderText: string;
   /**
+   * Units an operation holds.
+   *
+   * Contract: Empty when orders are off or the mode is tactical.
+   * When to use: The briefing leaves these units out of the orderless count, table, and attention.
+   * Expected outcome: Ground units and carriers from the seat's stored operations.
+   * Exceptions: None.
+   */
+  readonly operationHeldUnitIds: ReadonlySet<string>;
+  /**
    * Production status section, or empty when production tools are off.
    *
    * Contract: Empty string when `productionEnabled` is false; otherwise a full Production Status section including the empty-queue form.
@@ -266,6 +276,10 @@ export function formatCampaignAttentionBullet(count: number): string | null {
  */
 export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInjectionTexts {
   const seatId = args.seatId ?? briefingOwnSeatId(args.state);
+  const campaignPlan = args.campaignPlan ?? null;
+  const showOperations = args.ordersEnabled && args.coordinateContext.mode !== 'tactical';
+  const activeOperations = showOperations ? (readOperations({ getOne: dbGetOne }).get(seatId) ?? []) : [];
+  const operationHeldUnitIds = operationForceIds(activeOperations);
   logDebug('requestOrdersInjection buildStatusInjectionTexts', {
     memoryEnabled: args.memoryEnabled,
     ordersEnabled: args.ordersEnabled,
@@ -273,12 +287,12 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     seatId,
     turnNumber: args.state.turnNumber,
     mode: args.coordinateContext.mode,
+    operationHeldUnitCount: operationHeldUnitIds.size,
   });
   const memoryText = args.memoryEnabled ? getInjectionText(seatId, args.state.turnNumber) : '';
   const standingOrderText = args.ordersEnabled
-    ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext, args.campaignPlan ?? null)
+    ? getStandingOrderInjectionText(seatId, args.state, args.coordinateContext, campaignPlan, operationHeldUnitIds)
     : '';
-  const campaignPlan = args.campaignPlan ?? null;
   const formatCampaignHex = (h3: string): string => {
     const ll = args.latLngByH3.get(h3);
     return ll ? args.formatHexLabel(ll) : h3;
@@ -287,8 +301,6 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? buildCampaignObjectiveSection({ state: args.state, plan: campaignPlan, format: formatCampaignHex })
       : '';
-  const showOperations = args.ordersEnabled && args.coordinateContext.mode !== 'tactical';
-  const activeOperations = showOperations ? (readOperations({ getOne: dbGetOne }).get(seatId) ?? []) : [];
   const offeredCandidates = showOperations
     ? operationCandidatesForSeat({ state: args.state, seatId, active: activeOperations, includeLand: true })
     : [];
@@ -348,6 +360,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   return {
     memoryText,
     standingOrderText,
+    operationHeldUnitIds,
     productionText: production.text,
     productionAttention: args.productionEnabled ? formatProductionAttentionBullet(production.idleHexes) : null,
     pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,

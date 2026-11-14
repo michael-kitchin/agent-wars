@@ -11,6 +11,7 @@ import { isMissileUnitType } from '../shared/missileRules';
 
 import type { GameStateSnapshot } from './gameDb';
 import { armedUnitsBulletText } from './briefing/briefingArmedUnits';
+import { missionActionNeeded, orderlessMissionCount } from './briefing/briefingOrderlessMission';
 import { briefingOwnSeatId } from './briefing/briefingPerspective';
 import { buildRecentTurnNotesSection } from './briefing/recentTurnNotesSection';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
@@ -38,7 +39,6 @@ import {
   collectBestOptionsAirStrikeUnitIds,
   collectOrderlessMissionContext,
   orderlessMissionAttentionText,
-  orderlessUnitNeedsMission,
   type OrderlessActionNeededSets,
 } from './tools/orderlessUnitSuggestions';
 import {
@@ -148,6 +148,15 @@ export type FormatBriefingSharedContext = {
    * Exceptions: None.
    */
   campaignPlan?: CampaignPlan | null;
+  /**
+   * Units an operation holds.
+   *
+   * Contract: Omitted is the same as empty. These units are left out of the orderless count, the critical count, the threat and mission attention, and the orderless mission sets.
+   * When to use: Strategic `formatBriefing` after the injection loaded the seat's operations.
+   * Expected outcome: The narrative and attention flags skip them. Unit Status rows keep their columns.
+   * Exceptions: None.
+   */
+  operationHeldUnitIds?: ReadonlySet<string>;
 };
 
 /**
@@ -210,7 +219,7 @@ export function markdownHeading2(title: string): string {
  *
  * Purpose: Short turn-opening sentences for the Commander briefing (contact, optional standing-order gaps, critical threats).
  * When to use: Strategic `formatBriefing` after assessments are ready.
- * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; names air strikes only when the opponent roster includes air; the critical-threat sentence counts only units that also need Action when standing orders are active. When the commander has no units, the scout clause is omitted and the next sentence says the side is still in the match and should set production.
+ * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; names air strikes only when the opponent roster includes air; the critical-threat sentence counts only units that also need Action when standing orders are active. Units in `operationHeldUnitIds` are left out of the no-order and critical-threat counts. Contact is unchanged. When the commander has no units, the scout clause is omitted and the next sentence says the side is still in the match and should set production.
  * Exceptions: None.
  */
 export function buildStrategicNarrative(
@@ -219,7 +228,16 @@ export function buildStrategicNarrative(
   /**
    * When false, skip “no standing order” sentences (Orders tools off — assign_order is unavailable).
    */
-  standingOrdersActive = true
+  standingOrdersActive = true,
+  /**
+   * Units an operation holds.
+   *
+   * Contract: Omitted is the same as empty.
+   * When to use: Strategic briefings that loaded the seat's operations.
+   * Expected outcome: Those units are left out of the no-order and critical-threat counts.
+   * Exceptions: None.
+   */
+  operationHeldUnitIds: ReadonlySet<string> = EMPTY_OPERATION_HELD_UNIT_IDS
 ): string {
   const ownSeat = briefingOwnSeatId(state);
   const aiUnits = state.units.filter((u) => u.player === ownSeat);
@@ -228,9 +246,10 @@ export function buildStrategicNarrative(
     (a) => (a.result.threats?.length ?? 0) > 0 && a.result.nearbyEnemies?.some((e) => e.inRangedRange || e.inMeleeRange)
   ).length;
   const noOrder = standingOrdersActive
-    ? unitAssessments.filter((a) => a.result.unit?.currentStandingOrder == null).length
+    ? unitAssessments.filter((a) => a.result.unit?.currentStandingOrder == null && !operationHeldUnitIds.has(a.unitId)).length
     : 0;
   const critical = unitAssessments.filter((a) => {
+    if (operationHeldUnitIds.has(a.unitId)) return false;
     const isCritical = (a.result.threats ?? []).some((t) => t.severity === 'critical');
     if (!isCritical) return false;
     return standingOrdersActive ? needsAction(a, true, true) : true;
@@ -247,6 +266,7 @@ export function buildStrategicNarrative(
     hasAir,
     standingOrdersActive,
     criticalCount: critical,
+    operationHeldUnitCount: operationHeldUnitIds.size,
   });
   const sentences: string[] = [];
   sentences.push(observedEnemySentence);
@@ -394,6 +414,16 @@ function canCloseThisTurn(assessment: UnitAssessmentResult, useGridHopBudget: bo
  * Exceptions: None.
  */
 const EMPTY_AIR_STRIKE_ROW_UNIT_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * No operation units, used when a caller omits the held set.
+ *
+ * Purpose: Default arguments must not allocate a fresh set on every call.
+ * When to use: `buildStrategicNarrative`, `buildAttentionFlags`, and `formatBriefing`.
+ * Expected outcome: An empty set that callers do not mutate.
+ * Exceptions: None.
+ */
+const EMPTY_OPERATION_HELD_UNIT_IDS: ReadonlySet<string> = new Set();
 
 /**
  * True when Best Options lists an air strike for this air unit.
@@ -615,7 +645,7 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
  *
  * Purpose: Short triage bullets for units that need attention this consultation.
  * When to use: Strategic and tactical Commander briefings after assessments.
- * Expected outcome: Up to five bullets, threats first, then the attack bullet, then the orderless-mission bullet, or `None.`. Tactical mode and inactive standing orders omit standing-order language and the mission bullet. An air unit in the air-strike set is named on the armed-units bullet. Tactical calls that omit the set are unchanged.
+ * Expected outcome: Up to five bullets, threats first, then the attack bullet, then the orderless-mission bullet, or `None.`. Tactical mode and inactive standing orders omit standing-order language and the mission bullet. An air unit in the air-strike set is named on the armed-units bullet. A unit in `operationHeldUnitIds` gets no threat, warning, receding, or mission bullet, and may still be named on the legal-attack bullet. Tactical calls that omit the set are unchanged.
  * Exceptions: None.
  */
 export function buildAttentionFlags(
@@ -646,12 +676,22 @@ export function buildAttentionFlags(
    * Expected outcome: An air unit in the set is named on the armed-units bullet, and the clause says air-strike.
    * Exceptions: None.
    */
-  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS
+  airStrikeRowUnitIds: ReadonlySet<string> = EMPTY_AIR_STRIKE_ROW_UNIT_IDS,
+  /**
+   * Units an operation holds.
+   *
+   * Contract: Omitted is the same as empty. This is the last parameter this function takes.
+   * When to use: Strategic briefings that loaded the seat's operations.
+   * Expected outcome: Those units stay off the threat and mission bullets.
+   * Exceptions: None.
+   */
+  operationHeldUnitIds: ReadonlySet<string> = EMPTY_OPERATION_HELD_UNIT_IDS
 ): string {
   logDebug('briefingFormatter buildAttentionFlags', {
     unitCount: unitAssessments.length,
     coordinateMode,
     standingOrdersActive,
+    operationHeldUnitCount: operationHeldUnitIds.size,
   });
   // Ranks 0-3 are threat severities. Rank 4 is the attack bullet and rank 5 is the orderless-mission bullet.
   // Both are reserved, so they cannot push a higher threat out of the five-line cap. When both are present the
@@ -673,6 +713,8 @@ export function buildAttentionFlags(
     if (hasOrderableShotThisTurn(a, coordinateMode) || hasListedAirStrike(a, airStrikeRowUnitIds)) {
       armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
     }
+    // An operation already orders this unit. It may still shoot, so it stays in the armed list.
+    if (operationHeldUnitIds.has(a.unitId)) continue;
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {
@@ -744,7 +786,13 @@ export function buildAttentionFlags(
       }),
     });
   }
-  const missionCount = orderlessMissionCount(unitAssessments, soActive, coordinateMode === 'strategic', orderlessAction);
+  const missionCount = orderlessMissionCount(
+    unitAssessments,
+    soActive,
+    coordinateMode === 'strategic',
+    orderlessAction,
+    operationHeldUnitIds
+  );
   if (missionCount > 0) {
     candidates.push({ rank: 5, text: orderlessMissionAttentionText(missionCount) });
   }
@@ -758,55 +806,6 @@ export function buildAttentionFlags(
   if (armedCandidate) selected.push(armedCandidate);
   if (missionCandidate) selected.push(missionCandidate);
   return selected.map((c) => `- ${c.text}`).join('\n');
-}
-
-/**
- * Counts orderless units whose mission, shot, or listed one-step move is not already a standing order.
- *
- * Purpose: The mission bullet is one sentence for the whole group. Counting here keeps that sentence off the
- * legal-attack bullet and out of `needsAction`.
- * When to use: The end of `buildAttentionFlags`, strategic mode with standing orders active.
- * Expected outcome: Zero when the sets are omitted, the mode is tactical, or no orderless unit qualifies.
- * Exceptions: None.
- */
-function orderlessMissionCount(
-  unitAssessments: readonly UnitAssessmentResult[],
-  standingOrdersActive: boolean,
-  strategic: boolean,
-  orderlessAction: OrderlessActionNeededSets | undefined
-): number {
-  if (!orderlessAction) return 0;
-  let count = 0;
-  for (const assessment of unitAssessments) {
-    if (missionActionNeeded(assessment, standingOrdersActive, strategic, orderlessAction)) count += 1;
-  }
-  return count;
-}
-
-/**
- * Applies the orderless-mission Action needed rule without searching destinations.
- *
- * Purpose: `needsAction` stays the threat predicate. This adds a mission only from sets the caller already computed.
- * When to use: Unit Status rows and the mission-bullet count.
- * Expected outcome: True when `orderlessUnitNeedsMission` is true for this assessment. False when the sets were omitted.
- * Exceptions: None.
- */
-function missionActionNeeded(
-  assessment: UnitAssessmentResult,
-  standingOrdersActive: boolean,
-  strategic: boolean,
-  orderlessAction: OrderlessActionNeededSets | undefined
-): boolean {
-  if (!orderlessAction) return false;
-  return orderlessUnitNeedsMission({
-    strategic,
-    standingOrdersActive,
-    hasStandingOrder: assessment.result.unit?.currentStandingOrder != null,
-    hasLegalAttack: hasLegalAttackThisTurn(assessment),
-    unitId: assessment.unitId,
-    suggestedUnitIds: orderlessAction.suggestedUnitIds,
-    oneStepMoveUnitIds: orderlessAction.oneStepMoveUnitIds,
-  });
 }
 
 /**
@@ -835,11 +834,13 @@ export function formatBriefing(
     includeProductionSection: Boolean(sharedContext?.includeProductionSection),
     standingOrdersInBriefing: standingOrderText.trim().length > 0,
     reusedLatLngByH3: Boolean(sharedContext?.latLngByH3),
+    operationHeldUnitCount: sharedContext?.operationHeldUnitIds?.size ?? 0,
   });
   ensureStrategicCoordinateRegistryInitialized();
   const originBonusSettings = originBonusSettingsFromSnapshot(state);
   const coordCtx: CoordinateContext = { mode: 'strategic' };
   const standingOrdersActive = standingOrderText.trim().length > 0;
+  const held = sharedContext?.operationHeldUnitIds ?? EMPTY_OPERATION_HELD_UNIT_IDS;
   const latLngByH3 =
     sharedContext?.latLngByH3 ??
     (() => {
@@ -852,7 +853,7 @@ export function formatBriefing(
     })();
   const sections: string[] = [];
   sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));
-  sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
+  sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive, held));
   sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
   const distanceCaveats = briefingDistanceCaveatLines(state);
   logDebug('briefingFormatter formatBriefing: distance caveat', {
@@ -865,7 +866,7 @@ export function formatBriefing(
         playerId: briefingOwnSeatId(state),
         state,
         orderlessUnitIds: precomputed.unitAssessments
-          .filter((assessment) => assessment.result.unit?.currentStandingOrder == null)
+          .filter((assessment) => assessment.result.unit?.currentStandingOrder == null && !held.has(assessment.unitId))
           .map((assessment) => assessment.unitId),
         latLngByH3,
         campaignPlan: sharedContext?.campaignPlan ?? null,
@@ -894,7 +895,8 @@ export function formatBriefing(
             'strategic',
             standingOrdersActive,
             orderlessAction,
-            airStrikeRowUnitIds
+            airStrikeRowUnitIds,
+            held
           ),
           sharedContext?.productionAttention ?? null
         ),

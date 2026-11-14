@@ -50,20 +50,20 @@ function arrived(state: GameStateSnapshot, operation: Operation, hex: string): {
 }
 
 /**
- * Ground units of one operation that are still aboard one of its ships.
+ * Ground units of one operation that are still aboard one of its carriers.
  *
- * Purpose: The transit bullet names the cargo still at sea.
- * When to use: The transit line only.
- * Expected outcome: A count of operation units whose carrier is one of the operation's ships.
+ * Purpose: The transit and return bullets name the cargo, in the operation's own unit order.
+ * When to use: The sea transit line and the sea return line.
+ * Expected outcome: The ids from `unitIds` whose carrier is one of the operation's carriers. Empty when none are aboard.
  * Exceptions: None.
  */
-function cargoAboard(state: GameStateSnapshot, operation: Operation): number {
-  const units = new Set(operation.unitIds);
+function cargoAboardIds(state: GameStateSnapshot, operation: Operation): readonly string[] {
   const ships = new Set(operation.carrierIds);
-  return state.units.filter((unit) => {
-    const carrierId = unit.embarkedOnCarrierUnitId;
-    return units.has(unit.id) && typeof carrierId === 'string' && ships.has(carrierId);
-  }).length;
+  const carrierByUnit = new Map(state.units.map((unit) => [unit.id, unit.embarkedOnCarrierUnitId]));
+  return operation.unitIds.filter((unitId) => {
+    const carrierId = carrierByUnit.get(unitId);
+    return typeof carrierId === 'string' && ships.has(carrierId);
+  });
 }
 
 /**
@@ -71,7 +71,7 @@ function cargoAboard(state: GameStateSnapshot, operation: Operation): number {
  *
  * Purpose: An air operation has no ships at sea, so its sentence names the infantry and the air unit.
  * When to use: When `operation.method` is `air`.
- * Expected outcome: A markdown list line. Transit says the air unit drops this turn when it is already on the launch airport, and otherwise that it ferries there.
+ * Expected outcome: A markdown list line. Transit says the air unit drops this turn when it is already on the launch airport, and otherwise that it ferries there. A return names the infantry and the air unit.
  * Exceptions: None.
  */
 function airOperationBullet(state: GameStateSnapshot, operation: Operation, format: (h3Index: string) => string): string {
@@ -94,7 +94,7 @@ function airOperationBullet(state: GameStateSnapshot, operation: Operation, form
   if (operation.phase === 'assault') {
     return `- ${operation.id}: by air to ${objective}. ${infantry} has landed and holds it until control passes to you.`;
   }
-  return `- ${operation.id}: by air, turned back from ${objective}.`;
+  return `- ${operation.id}: by air, turned back from ${objective}. ${infantry} is with ${carrierId}.`;
 }
 
 /**
@@ -119,14 +119,19 @@ function operationBullet(state: GameStateSnapshot, operation: Operation, format:
   }
   if (operation.phase === 'transit') {
     const landing = operation.landingH3 === null ? 'an unknown landing' : format(operation.landingH3);
-    const cargo = cargoAboard(state, operation);
-    return `- ${operation.id}: by sea to ${objective}, ${city}. At sea, heading for ${landing}, with ${cargo} ${noun(cargo, 'ground unit')} aboard. Ships: ${ships}.`;
+    const cargo = cargoAboardIds(state, operation);
+    const aboard = cargo.length === 0
+      ? 'with 0 ground units aboard'
+      : `with ${cargo.length} ${noun(cargo.length, 'ground unit')} aboard: ${cargo.join(', ')}`;
+    return `- ${operation.id}: by sea to ${objective}, ${city}. At sea, heading for ${landing}, ${aboard}. Ships: ${ships}.`;
   }
   if (operation.phase === 'assault') {
     const verb = operation.unitIds.length === 1 ? 'is' : 'are';
     return `- ${operation.id}: by sea to ${objective}, ${city}. Landed. ${operation.unitIds.length} ${noun(operation.unitIds.length, 'ground unit')} ${verb} marching on it: ${units}.`;
   }
-  return `- ${operation.id}: turned back from ${objective}. Returning to ${muster}. Ships: ${ships}.`;
+  const cargo = cargoAboardIds(state, operation);
+  const aboard = cargo.length === 0 ? '' : ` with ${cargo.join(', ')} aboard`;
+  return `- ${operation.id}: turned back from ${objective}. Returning to ${muster}${aboard}. Units: ${units}. Ships: ${ships}.`;
 }
 
 /**
@@ -243,7 +248,7 @@ export function buildOperationOptionsSection(args: {
  *
  * Purpose: The briefing and the no-briefing situation message share one wording.
  * When to use: When `ordersEnabled` is true and the mode is not tactical. Pass the seat's stored operations and, when a menu was built, its table.
- * Expected outcome: An empty string when there is no operation, no campaign plan, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the campaign bullet first when a plan was passed, the operation bullets, and the options table when it is non-empty.
+ * Expected outcome: An empty string when there is no operation, no campaign plan, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the campaign bullet first when a plan was passed, the operation bullets, one paragraph telling the commander to leave a stored operation's units alone, and the options table when it is non-empty. A campaign with no stored operation does not get that paragraph.
  * Exceptions: None.
  */
 export function buildOperationsSection(args: {
@@ -272,6 +277,9 @@ export function buildOperationsSection(args: {
   let text = topLevelHeading(SECTION_TITLE_OPERATIONS);
   if (note.length > 0) text += `\n\n- Last turn: ${note}`;
   if (bullets.length > 0) text += `\n\n${bullets.join('\n')}`;
+  if (ordered.length > 0) {
+    text += '\n\nGive the units and ships named in these operations no orders unless you mean to take them out. A standing order takes out a unit that is not aboard, or a ship. A unit aboard one of their ships or air units takes no order.';
+  }
   if (options.length > 0) text += `\n\n${options}`;
   return text;
 }

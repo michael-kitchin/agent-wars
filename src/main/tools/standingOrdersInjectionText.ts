@@ -261,7 +261,7 @@ function suggestedDestinationCell(
  *
  * Purpose: Injects parent-unit standing-order tables into strategic Commander prompts only. Arrived marches are expired first so completed missions are not listed as active.
  * When to use: Strategic `formatBriefing` / `buildSystemPromptForTools` when Orders tools are enabled.
- * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode. Units already at their march destination appear under Units Without Standing Orders. Suggested Destination is a bare briefing hex for a march, `defend` plus that hex for a striking air unit, or an em dash when no mission was chosen.
+ * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode. Units already at their march destination appear under Units Without Standing Orders. Units an operation holds do not. Suggested Destination is a bare briefing hex for a march, `defend` plus that hex for a striking air unit, or an em dash when no mission was chosen.
  * Exceptions: None.
  */
 export function getInjectionText(
@@ -276,7 +276,16 @@ export function getInjectionText(
    * Expected outcome: Orderless campaign units are offered the campaign order, except embarked infantry and armor, which get an em dash.
    * Exceptions: None.
    */
-  campaignPlan?: CampaignPlan | null
+  campaignPlan?: CampaignPlan | null,
+  /**
+   * Units an operation holds.
+   *
+   * Contract: Omitted is the same as empty.
+   * When to use: Strategic consults that already loaded the seat's operations.
+   * Expected outcome: Those units are left out of Units Without Standing Orders and of the orderless mission sets.
+   * Exceptions: None.
+   */
+  operationHeldUnitIds?: ReadonlySet<string>
 ): string {
   const ctx: CoordinateContext = coordinateContext ?? { mode: 'strategic' };
   if (ctx.mode === 'tactical') {
@@ -288,10 +297,12 @@ export function getInjectionText(
   }
   expireAndUpdateStatus(playerId, state);
   ensureStrategicCoordinateRegistryInitialized();
+  const heldUnitIds = operationHeldUnitIds ?? new Set<string>();
   logDebug('standingOrders getInjectionText', {
     playerId,
     turnNumber: state.turnNumber,
     coordinateMode: ctx.mode,
+    operationHeldUnitCount: heldUnitIds.size,
   });
 
   const hexList = state.hexes.map((h) => h.h3Index);
@@ -312,7 +323,7 @@ export function getInjectionText(
 
   const aiUnitIdSet = new Set(aiUnitIds);
   const unitIdsWithOrders = new Set(rows.map((r) => r.unit_id));
-  const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
+  const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id) && !heldUnitIds.has(id));
   const unitH3ById = new Map(aiUnits.map((u) => [u.id, u.h3Index]));
   const enemyH3s = state.units.filter((u) => u.player !== playerId).map((u) => u.h3Index);
 

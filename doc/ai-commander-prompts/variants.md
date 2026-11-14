@@ -153,7 +153,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | The orderless table is emitted whenever the standing-order block is present, listing every unit without an order. Embarked infantry and armor are an em dash whether or not an enemy is visible. When an enemy is visible, every other unit gets a bare hex when a closing cell exists, and an em dash when none does, including when the unit is already on the enemy. When no enemy is visible, a bare hex is the enemy-home march when a passable home hex remains: same landmass and below the land-route water cap for land and armor, or `water` or `coastal` on the snapshot for naval (fog-masked `unknown` is not water). `defend` plus the current hex is used for every orderless air unit. An em dash also means no such mission was chosen. |
+| system | The orderless table is emitted whenever the standing-order block is present, listing every unit without an order except units an operation holds, including its ships and air units. Embarked infantry and armor that remain in the table are an em dash whether or not an enemy is visible. When an enemy is visible, every other unit gets a bare hex when a closing cell exists, and an em dash when none does, including when the unit is already on the enemy. When no enemy is visible, a bare hex is the enemy-home march when a passable home hex remains: same landmass and below the land-route water cap for land and armor, or `water` or `coastal` on the snapshot for naval (fog-masked `unknown` is not water). `defend` plus the current hex is used for every orderless air unit. An em dash also means no such mission was chosen. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |

@@ -16,6 +16,7 @@ import type { LatLng } from '../tools/pathfinding';
 import { executeStandingOrders } from '../tools/standingOrders';
 import type { EmbarkOrder } from '../../shared/ipcTypes';
 import { clearEmbarkAssignmentForLandUnit, isEmbarkedLandUnit } from '../gameActions/sealift';
+import { createOperationCargoLookup, type OperationCargo } from '../operations/operationForce';
 
 /**
  * Orders collected from the `orders[]` rows of one envelope.
@@ -142,13 +143,46 @@ function dropRow(dropReasons: string[], reason: string): void {
 }
 
 /**
+ * Actions that must not run for a unit aboard an operation's ship or air unit.
+ *
+ * Purpose: Each of these would give that unit an order or take it off the carrier.
+ * When to use: The row loop, before the action branch.
+ * Expected outcome: The six commander actions that name the embarked unit.
+ * Exceptions: None.
+ */
+const CARGO_REFUSED_ACTIONS: ReadonlySet<string> = new Set([
+  'assign_order',
+  'cancel_order',
+  'explicit_move',
+  'disembark',
+  'embark',
+  'transport_move',
+]);
+
+/**
+ * The drop reason for one order on operation cargo.
+ *
+ * Purpose: The next briefing shows reasons that start with `operations `.
+ * When to use: After the cargo lookup matches the row's unit.
+ * Expected outcome: A sea sentence that names the ship, or an air sentence that names the cancel.
+ * Exceptions: None.
+ */
+function operationCargoRefusal(cargo: OperationCargo, unitId: string): string {
+  const aboard = `operations order dropped: ${unitId} is aboard ${cargo.carrierId} in ${cargo.operationId} and takes no order.`;
+  if (cargo.method === 'air') return `${aboard} To take it out, cancel ${cargo.operationId}.`;
+  return `${aboard} To take it out, give ${cargo.carrierId} a standing order of your own.`;
+}
+
+/**
  * Applies each `orders[]` row by action.
  *
  * Purpose: Turns the model's rows into engine orders and explains every row it cannot use.
  * When to use: `parseOrdersResponse`, after `expandGroupedActorEntries`.
- * Expected outcome: Standing-order rows run immediately (strategic only). Move, transport, disembark, ranged, and
- * embark rows are collected. A row with no unit, an unknown action, a missing or unresolvable destination or target,
- * or no naval unit where one is needed is dropped with a reason.
+ * Expected outcome: Standing-order rows run immediately (strategic only). In strategic mode, a row of
+ * `assign_order`, `cancel_order`, `explicit_move`, `disembark`, `embark`, or `transport_move` for a unit aboard
+ * one of the seat's operation ships or air units is dropped with a reason. Move, transport, disembark, ranged, and
+ * embark rows are otherwise collected. A row with no unit, an unknown action, a missing or unresolvable destination
+ * or target, or no naval unit where one is needed is dropped with a reason.
  * Exceptions: None.
  */
 export function processV3OrdersArray(
@@ -159,6 +193,7 @@ export function processV3OrdersArray(
   context: CoordinateContext
 ): EnvelopeOrderRowsResult {
   logDebug('openRouter processV3OrdersArray', { rowCount: entries.length, mode: context.mode });
+  const cargoOf = context.mode === 'tactical' ? null : createOperationCargoLookup(coordinateContextSeatId(context));
   const result: EnvelopeOrderRowsResult = {
     movementOrders: [],
     rangedAttacks: [],
@@ -184,6 +219,13 @@ export function processV3OrdersArray(
     if (!unitId) {
       dropRow(dropReasons, `${String(action)} entry dropped: requires unitId or unitIds`);
       continue;
+    }
+    if (cargoOf !== null && typeof action === 'string' && CARGO_REFUSED_ACTIONS.has(action)) {
+      const cargo = cargoOf(unitId);
+      if (cargo !== null) {
+        dropRow(dropReasons, operationCargoRefusal(cargo, unitId));
+        continue;
+      }
     }
 
     if (action === 'assign_order') {

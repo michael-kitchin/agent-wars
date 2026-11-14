@@ -561,6 +561,59 @@ function testStrategicNarrativeCriticalSentenceMatchesNeedsAction(): void {
 }
 
 /**
+ * An operation's units stay out of the orderless and critical counts, and out of threat bullets.
+ *
+ * Purpose: The briefing was telling the commander to order cargo the operation had just loaded.
+ * When to use: After edits to the operation-held filter in the narrative and attention flags.
+ * Expected outcome: One held unit leaves both counts at 1. The same input without the set says 2. Flags name the other unit only.
+ * Exceptions: None.
+ */
+function testOperationHeldUnitsLeaveTheOrderlessAndCriticalCounts(): void {
+  const heldCritical: UnitAssessmentResult = {
+    unitId: 'u1',
+    result: {
+      status: 'ok',
+      unit: { unitId: 'u1', type: 'infantry', position: [1, 1], currentStandingOrder: null },
+      nearbyEnemies: [
+        { unitId: 'hum-1', hexDistance: 2, inRangedRange: false, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [],
+    } as unknown as UnitAssessmentResult['result'],
+  };
+  const freeCritical: UnitAssessmentResult = {
+    unitId: 'u2',
+    result: {
+      status: 'ok',
+      unit: { unitId: 'u2', type: 'infantry', position: [3, 3], currentStandingOrder: null },
+      nearbyEnemies: [
+        { unitId: 'hum-1', hexDistance: 2, inRangedRange: false, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [],
+    } as unknown as UnitAssessmentResult['result'],
+  };
+  const state: GameStateSnapshot = {
+    ...fixtureState,
+    units: [
+      { id: 'u1', player: 'opponent', unitType: 'infantry', h3Index: fixtureOriginH3 },
+      { id: 'u2', player: 'opponent', unitType: 'infantry', h3Index: fixtureOriginH3 },
+      { id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: fixtureNeighborH3 },
+    ],
+  };
+  const held = new Set(['u1']);
+  const filtered = buildStrategicNarrative(state, [heldCritical, freeCritical], true, held);
+  assert.ok(filtered.includes('1 unit(s) have no standing order'), filtered);
+  assert.ok(filtered.includes('1 unit(s) face a critical threat'), filtered);
+  const unfiltered = buildStrategicNarrative(state, [heldCritical, freeCritical], true);
+  assert.ok(unfiltered.includes('2 unit(s) have no standing order'), unfiltered);
+  assert.ok(unfiltered.includes('2 unit(s) face a critical threat'), unfiltered);
+  const flags = buildAttentionFlags([heldCritical, freeCritical], 'strategic', true, undefined, undefined, held);
+  assert.equal(flags.includes('u1'), false, flags);
+  assert.ok(flags.includes('u2'), flags);
+}
+
+/**
  * A unit that can close to melee this turn is a worklist row even when a healthy march is already assigned.
  *
  * Purpose: Turn 18 marked CF/EC armor Action needed = no while Best Options listed move/melee onto the naval at CQ,
@@ -945,6 +998,10 @@ const tests = [
   {
     name: 'strategic narrative critical sentence matches needsAction',
     fn: testStrategicNarrativeCriticalSentenceMatchesNeedsAction,
+  },
+  {
+    name: 'operation-held units leave the orderless and critical counts',
+    fn: testOperationHeldUnitsLeaveTheOrderlessAndCriticalCounts,
   },
   {
     name: 'strategic narrative keeps a unitless side in the match',
