@@ -114,6 +114,15 @@ export type FormatBriefingSharedContext = {
    */
   campaignText?: string;
   /**
+   * The Active Operations section.
+   *
+   * Contract: Empty or omitted when the seat has no operation. Otherwise the H1 section from `buildOperationsSection`.
+   * When to use: Strategic `formatBriefing` after the injection is built.
+   * Expected outcome: Shifted one level and placed immediately after the campaign section.
+   * Exceptions: None.
+   */
+  operationsText?: string;
+  /**
    * The campaign attention bullet, without a leading list marker.
    *
    * Contract: Null or omitted when no campaign unit needs a new standing order.
@@ -912,6 +921,10 @@ export function formatBriefing(
   const campaignText = sharedContext?.campaignText ?? '';
   if (campaignText.trim().length > 0) {
     sections.push('\n\n' + shiftMarkdownHeadings(campaignText.trim(), 1));
+  }
+  const operationsText = sharedContext?.operationsText ?? '';
+  if (operationsText.trim().length > 0) {
+    sections.push('\n\n' + shiftMarkdownHeadings(operationsText.trim(), 1));
   }
   const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments, coordCtx);
   if (supplementalHex.trim().length > 0) {

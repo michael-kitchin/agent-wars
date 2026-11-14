@@ -11,9 +11,11 @@ import { NEUTRAL_OWNER_ID, type SeatId } from '../../shared/seatIds';
 import {
   clearBuildQueueAndProgressForHex,
   dbGetAll,
+  dbGetOne,
   dbRun,
   setHexController,
 } from '../gameDb';
+import { writeOperationsForSeat } from '../gameDb/operationMemory';
 import { deleteGameConfigRow } from '../gameDb/gameConfigRows';
 import { logDebug, logError } from '../logger';
 import { convertUnitsToNeutral, type KnockoutCoordinates } from './unitOwnershipTransfer';
@@ -83,6 +85,7 @@ function deleteSeatPrivateRows(seatId: SeatId): void {
     dbRun(`DELETE FROM ${table} WHERE player_id = ?`, [seatId]);
   }
   deleteGameConfigRow({ run: dbRun }, `fog_new_contacts_${seatId}`);
+  writeOperationsForSeat({ getOne: dbGetOne, run: dbRun }, seatId, []);
 }
 
 /**

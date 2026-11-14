@@ -343,3 +343,15 @@ test('prohibited claims appear in no gate combination', () => {
     }
   }
 });
+
+test('operation rules follow the campaign rules only when the gate is on', () => {
+  const withBoth = buildContextCoaching(strategicGates({ campaignEnabled: true, operationsEnabled: true }));
+  const campaignAt = withBoth.indexOf('## Campaign');
+  const operationsAt = withBoth.indexOf('## Operations');
+  assert.ok(campaignAt >= 0);
+  assert.ok(operationsAt > campaignAt);
+  const campaignOnly = buildContextCoaching(strategicGates({ campaignEnabled: true }));
+  assert.equal(campaignOnly.includes('## Operations'), false);
+  assert.equal(buildContextCoaching(strategicGates()).includes('## Operations'), false);
+  assert.equal(buildContextCoaching(tacticalGates({ operationsEnabled: true })).includes('The engine runs operations'), false);
+});

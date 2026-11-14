@@ -62,7 +62,7 @@ Gate: the enabled tool-name set, reduced to flags by `getToolFlags`. Each group 
 
 | Surface | Contract |
 | --- | --- |
-| system | Omit the standing-order status section and the orderless table. |
+| system | Omit the standing-order status section, the orderless table, Active Operations, and `## Operations` under Strategic Context. |
 | user | Do not name standing-order actions among the legal ones. |
 | tools | The order-query tool is absent. |
 | envelope | Omit the standing-order assignment and cancellation actions from the legal-action list, the example, and the repair schema. |
@@ -183,14 +183,14 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Drop the win-path rule and the shared-home-cell rule. |
+| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations` and Active Operations stay when standing orders are on. They do not require a scenario. |
 | empty-state | Explored and controlled progress lines remain, since they do not depend on a scenario. |
 
 Adding a scenario is a change to this file and to the goal statement. Silently letting a new scenario inherit region-versus-region wording is the specific regression this row forbids.
 
 ### 4.3 Tactical mode
 
-Scenario surfaces are omitted in battle regardless of the scenario id, per [`tactical-prompt.md`](tactical-prompt.md).
+Scenario surfaces are omitted in battle regardless of the scenario id, per [`tactical-prompt.md`](tactical-prompt.md). Active Operations and `## Operations` are omitted in battle too, even when standing orders are on.
 
 ## 5. Game size and large rosters
 

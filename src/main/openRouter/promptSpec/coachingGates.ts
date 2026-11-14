@@ -173,6 +173,15 @@ export interface CoachingGates {
    */
   readonly campaignEnabled?: boolean;
   /**
+   * Whether this consult teaches sea operations.
+   *
+   * Contract: True on a strategic consult with standing orders on, including a match that has no campaign. Omitted means false.
+   * When to use: Set from the mode and `ordersEnabled`.
+   * Expected outcome: True appends the Operations section after the Campaign section, or after the context block when there is no campaign.
+   * Exceptions: None.
+   */
+  readonly operationsEnabled?: boolean;
+  /**
    * Whether the consulted seat owns a missile outside battle.
    *
    * Contract: Omitted means false. Tactical consultations leave it false.

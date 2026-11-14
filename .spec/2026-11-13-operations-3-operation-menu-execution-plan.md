@@ -176,7 +176,7 @@ Goal: R2, R3, R5, R7.
 | Phase | Result |
 |-------|--------|
 | `muster` | `next: null`, `outcome: 'abandoned'`, a `cancelOrder` for every unit and ship |
-| `transit` | the result of plan 2's private `turnBack(operation, facts)`: `phase: 'return'`, the return port chosen, a `march` there for every ship; `outcome: 'running'` |
+| `transit` | the result of `turnSeaOperationBack(operation, facts)` exported by plan 2: `phase: 'return'`, the return port chosen, a `march` there for every ship; `outcome: 'running'` |
 | `assault` | `next: null`, `outcome: 'abandoned'`, no action |
 | `return` | `next: operation`, no action, `outcome: 'running'`, `reason: 'already returning'` |
 

@@ -166,6 +166,16 @@ export const SECTION_TITLE_CAMPAIGN_OBJECTIVE = 'Campaign Objective' as const;
 export const SECTION_TITLE_CAMPAIGN_ORDERS = 'Campaign Orders' as const;
 
 /**
+ * Title of the live operations block, without ATX hashes.
+ *
+ * Purpose: The situation message lists each sea operation and how far it has got.
+ * When to use: Strategic consults when standing orders are on. This is not Air Operations Status.
+ * Expected outcome: Coaching can point at this section without restating the heading string.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_OPERATIONS = 'Active Operations' as const;
+
+/**
  * Title of the campaign rules in the system prompt, without ATX hashes.
  *
  * Purpose: The cached explanation of assemble, assault, defenders, and advance rows.
@@ -174,6 +184,16 @@ export const SECTION_TITLE_CAMPAIGN_ORDERS = 'Campaign Orders' as const;
  * Exceptions: None.
  */
 export const SECTION_TITLE_CAMPAIGN = 'Campaign' as const;
+
+/**
+ * Title of the operation rules in the system prompt, without ATX hashes.
+ *
+ * Purpose: The cached explanation of muster, loading, release, and a unit that is already aboard.
+ * When to use: Strategic context coaching when standing orders are on and the consult is not a battle.
+ * Expected outcome: An H2 under Strategic Context, after the Campaign section when that section is present. Battle prompts omit it.
+ * Exceptions: None.
+ */
+export const SECTION_TITLE_OPERATION_RULES = 'Operations' as const;
 
 /**
  * Title of the callback subscription list, without ATX hashes.

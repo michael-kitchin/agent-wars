@@ -8,7 +8,8 @@
  * Exceptions: None.
  */
 
-import type { GameStateSnapshot } from '../gameDb';
+import { dbGetOne, type GameStateSnapshot } from '../gameDb';
+import { readOperations } from '../gameDb/operationMemory';
 import { logDebug, logTrace } from '../logger';
 import { briefingOwnSeatId } from '../briefing/briefingPerspective';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -17,6 +18,7 @@ import { getInjectionText } from '../tools/memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefing } from './briefingSections';
 import { buildCampaignObjectiveSection } from './briefingSectionsCampaign';
+import { buildOperationsSection } from './briefingSectionsOperations';
 import { buildCampaignOrderRows } from '../tools/standingOrdersInjectionText';
 import { formatProductionAttentionBullet } from './productionAttention';
 import { formatPausedProductionPointer } from './pausedProductionAttention';
@@ -189,6 +191,15 @@ export interface StatusInjectionTexts {
    */
   readonly campaignText: string;
   /**
+   * The Active Operations section, or empty when the seat has none.
+   *
+   * Contract: Empty when orders are off or the mode is tactical. Otherwise one bullet per stored operation.
+   * When to use: The no-briefing situation message, immediately after the campaign block, and `formatBriefing`.
+   * Expected outcome: An H1 section. An empty string when there is no operation.
+   * Exceptions: None.
+   */
+  readonly operationsText: string;
+  /**
    * The campaign attention bullet, or null when no campaign unit needs a new order.
    *
    * Contract: Null when the Campaign Orders table would be empty.
@@ -254,6 +265,14 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? buildCampaignObjectiveSection({ state: args.state, plan: campaignPlan, format: formatCampaignHex })
       : '';
+  const operationsText =
+    args.ordersEnabled && args.coordinateContext.mode !== 'tactical'
+      ? buildOperationsSection({
+          state: args.state,
+          operations: readOperations({ getOne: dbGetOne }).get(seatId) ?? [],
+          format: formatCampaignHex,
+        })
+      : '';
   const campaignAttention =
     args.ordersEnabled && args.coordinateContext.mode !== 'tactical' && campaignPlan
       ? formatCampaignAttentionBullet(
@@ -281,6 +300,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
     productionAttention: args.productionEnabled ? formatProductionAttentionBullet(production.idleHexes) : null,
     pausedProductionAttention: args.productionEnabled ? formatPausedProductionPointer(production.pausedHexes) : null,
     campaignText,
+    operationsText,
     campaignAttention,
     additionalAttention:
       args.coordinateContext.mode === 'tactical'

@@ -532,6 +532,8 @@ Each land unit has an `embarkedOn` field (strategic: `embarkedOnCarrierUnitId`; 
 
 ### 9.2 Embark and disembark
 
+When a strategic turn becomes ready, after fog refresh and before the save, an AI seat's sea operation embarks ground units that have reached its muster port and unloads cargo whose ship has reached the landing or the home port (`advanceOperationsAfterTurn`). That is the start of the next planning window. The tick an operation is launched replaces standing orders those units and ships already have. After that tick, a standing order that is not the one the operation assigned releases that unit. A standing order on a loaded ship releases the ship and the units aboard it, and those units stay embarked. Auto-debark is unchanged: a movement order that leaves the carrier still unloads a non-human land unit at Ready.
+
 Embark requires a legal embark hex as above. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. A standing order does not move embarked infantry or armor and does not advance that order. `explicit_move`, `disembark`, and an air drop still unload. At Ready, every side other than the human auto-debarks when a movement order leaves the carrier (`autoDebarkNonHumanLandUnitIfMovingIndependently`). The human must debark manually first. A loaded Neutral ship uses the landing rule in §14.1 instead of that auto-debark.
 
 ### 9.3 Embarked unit combat

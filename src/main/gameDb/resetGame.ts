@@ -19,6 +19,7 @@ import { AI_ONLY_BEAT_LIMIT_CONFIG_KEY, aiOnlyBeatLimitForRequest, aiOnlyBeatLim
 import { aiOnlyBattlesForRequest, type AiOnlyBattleMode } from '../../shared/aiOnlyBattles';
 import { SIGHT_CUE_SEEN_UNITS_CONFIG_KEY, SIGHT_CUES_CONFIG_KEY, sightCuesForRequest } from '../../shared/sightCueSettings';
 import { CAMPAIGN_OBJECTIVES_CONFIG_KEY } from './campaignObjectiveMemory';
+import { OPERATIONS_CONFIG_KEY } from './operationMemory';
 import { QUEUE_PAUSED_HEXES_CONFIG_KEY } from './queuePauseMemory';
 import { victorySettingsForRequest, type VictoryRule } from '../../shared/victoryRules';
 import type { NewGameSeatInput } from '../../shared/ipc/ordersTypes';
@@ -523,6 +524,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   deleteGameConfigRow({ run }, SIGHT_CUE_SEEN_UNITS_CONFIG_KEY);
   deleteGameConfigRow({ run }, QUEUE_PAUSED_HEXES_CONFIG_KEY);
   deleteGameConfigRow({ run }, CAMPAIGN_OBJECTIVES_CONFIG_KEY);
+  deleteGameConfigRow({ run }, OPERATIONS_CONFIG_KEY);
   run("DELETE FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');

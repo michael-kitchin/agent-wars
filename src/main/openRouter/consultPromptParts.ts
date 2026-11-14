@@ -227,6 +227,7 @@ export function buildConsultPromptParts(input: {
     hasObservedEnemy: enemyGroups.some((group) => group.roster.length > 0),
     includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
     campaignEnabled: coordinateContext.mode !== 'tactical' && state.scenarioId === 'region_vs_region' && flags.ordersEnabled,
+    operationsEnabled: coordinateContext.mode !== 'tactical' && flags.ordersEnabled,
     controlWinMinUrbanShare: controlWinMinUrbanShare ?? null,
     seatCount,
     turnLimitVictory: state.victory?.rule === 'most_city_hexes_at_turn_limit',
@@ -283,11 +284,13 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
         productionAttention: input.productionAttention ?? null,
         pausedProductionAttention: null,
         campaignText: '',
+        operationsText: '',
         campaignAttention: input.campaignAttention ?? null,
         additionalAttention: [],
       };
   const memoryBlock = flags.memoryEnabled ? injection.memoryText + '\n\n' : '';
   const campaignBlock = injection.campaignText.trim().length > 0 ? `${injection.campaignText}\n\n` : '';
+  const operationsBlock = injection.operationsText.trim().length > 0 ? `${injection.operationsText}\n\n` : '';
   const standingOrderBlock = flags.ordersEnabled ? injection.standingOrderText + '\n\n' : '';
   const productionBlock = flags.productionEnabled ? injection.productionText + '\n\n' : '';
   const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
@@ -414,7 +417,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
       });
   const liveStatus = hasPrecomputedBriefing
     ? `${briefingOverride}\n\n`
-    : `${memoryBlock}${campaignBlock}${standingOrderBlock}${productionBlock}`;
+    : `${memoryBlock}${campaignBlock}${operationsBlock}${standingOrderBlock}${productionBlock}`;
   const rosterBody = hasPrecomputedBriefing ? humanUnitsLine : `${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';

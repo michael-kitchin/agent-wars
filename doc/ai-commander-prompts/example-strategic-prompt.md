@@ -153,6 +153,14 @@ Best Options lists advance rows for campaign units. An advance row is a one-step
 
 To choose a different target, set "campaignTarget" to the hex code of an enemy city in your final JSON. Omit it to keep the target. Sending the current target changes nothing. The engine keeps your target until you take it, it stops being an enemy city, or no ground unit can reach it by land. An unknown or unreachable city is dropped.
 
+## Operations
+
+The engine runs operations: several turns of orders that carry ground units to an enemy city by sea. It musters the units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. The Active Operations section of the briefing lists each one and how far it has got.
+
+Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units.
+
+A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
+
 # Reading the Briefing
 
 ## Distances and Intel Age
@@ -595,6 +603,10 @@ Units at featured hexes: ER(B), EH(B), FQ(A), FZ(B), GL(B), G9(B), HV(B), IE(B),
 - Target: LP, a South America city with 8 city cells and no known fortifications. The engine chose it on turn 38.
 - Staging hex: G5.
 - Phase: assemble. 0 of 6 ground units are within 2 hexes of G5. The assault starts when 6 are.
+
+## Active Operations
+
+- opponent-op38: by sea to LP, an enemy city with 8 city cells. Mustering at FH: 2 of 2 ground units and 1 of 1 ship are there. Units: a1-i20, a1-i21. Ships: a1-n11.
 
 ## Supplemental Hex Intelligence
 

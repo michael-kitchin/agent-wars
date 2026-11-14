@@ -62,6 +62,8 @@ Every item defined in [`information-decision-model.md`](information-decision-mod
 | `MARCH_CURRENT_HEX_RULE` | both mode files | Legal actions; invalid-output rules; strategic coaching item 5 |
 | `AIR_ORDER_RESTRICTIONS` | both mode files | Air operations status; legal actions |
 | `EMBARK_LEGALITY` | both mode files | Naval transport status |
+| `ACTIVE_OPERATIONS` | [`strategic-prompt.md`](strategic-prompt.md) | Active Operations |
+| `OPERATION_RULES` | [`strategic-prompt.md`](strategic-prompt.md) | Strategic Context, `## Operations` |
 | `PRODUCTION_QUEUES` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_RULES_COSTS` | [`strategic-prompt.md`](strategic-prompt.md) | Production status |
 | `PRODUCTION_CAPS` | [`variants.md`](variants.md) | Game size and large rosters |
@@ -125,6 +127,8 @@ Every heading the strategic prompt emits today, from [`source-inventory.md`](sou
 | `## Persistent (Active Strategic Context)` | Kept — 1.6 |
 | `## Reminders Triggered This Turn` | Kept — 1.6 |
 | `## Standing Order Status` | Kept — 1.6 |
+| `## Active Operations` | Added. One bullet per stored sea operation, after Campaign Objective, when standing orders are on and the consult is not a battle. Omitted when the seat has none. |
+| `## Operations` | Added under `# Strategic Context`, after `## Campaign` when that block is present, when standing orders are on and the consult is not a battle. |
 | `## Units Without Standing Orders` | Kept — 1.6 |
 | `## Active Callbacks` | Kept, with a detail-cell contract — 1.6 |
 | `# Scenario Objective (Required)` | Kept — 1.7 |

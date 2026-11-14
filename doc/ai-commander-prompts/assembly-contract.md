@@ -26,7 +26,7 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 | 2 | `# Scenario Objective (Required)`, the home-region hex lists, and `## Sides` | system message, strategic. The objective block is `region_vs_region` only. Sides is every strategic prompt |
 | 3 | `# Coordinates` | system message |
 | 4 | `# Rules` and its subsections (`## Combat`, and the gated subsections through `## Rule Lookup`) | system message |
-| 5 | `# Strategic Context`, or `# Battle Context` in a battle. `## Campaign` when the campaign gate is on | system message |
+| 5 | `# Strategic Context`, or `# Battle Context` in a battle. `## Campaign` when the campaign gate is on. `## Operations` when standing orders are on and the consult is not a battle | system message |
 | 6 | `# Reading the Briefing` and the subsections whose gates hold | system message, omitted when none hold |
 | 7 | `# Available Tools`, then `## How to Use These Tools Effectively` — tool lines only | system message |
 | 8 | `# Orders Guidance` and its subsections | system message, omitted when there are no coaching bullets |
@@ -70,12 +70,13 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `## Controlled Hex Queues` | when production is present and at least one controlled cell has an editable queue | never | replace the table with `No currently controlled hexes with editable production queues.` |
 | `## Your Strategic Memory` | when memory tools are enabled. H1 when the briefing is absent | never | omit |
 | `## Campaign Objective` | when a campaign plan exists. H2 inside the briefing; H1 immediately before Standing Order Status when the briefing is absent | never | omit |
+| `## Active Operations` | when standing orders are on, the consult is not a battle, and the seat has a stored sea operation. H2 inside the briefing, after Campaign Objective. H1 after Campaign Objective and before Standing Order Status when the briefing is absent. It does not require `region_vs_region` | never | omit |
 | `## Standing Order Status` | when standing-order tools are enabled. H1 when the briefing is absent | never | omit |
 | `### Campaign Orders` | inside Standing Order Status when a campaign plan exists | never | omit |
 | `## Units Without Standing Orders` | when the standing-order block is present | never | one row of `—` |
 | `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and `None.` The callbacks coaching bullet states the empty-list rule |
 | `# Scenario Objective (Required)` | system message, when `scenarioId === 'region_vs_region'`. Home hex lists, the shared-hex line, and the territory sentence are in that section. `## Sides` follows them | never | omit |
-| `# Strategic Context` | always. Goals, then strategy, then `Your tools are:` when a missile, naval, air, or mercenary gate holds, then doctrine, then the message. `## Campaign` follows the message guidance when the consult is strategic `region_vs_region` and standing orders are on | `# Battle Context`. No tools list and no production-denial doctrine line | n/a |
+| `# Strategic Context` | always. Goals, then strategy, then `Your tools are:` when a missile, naval, air, or mercenary gate holds, then doctrine, then the message. `## Campaign` follows the message guidance when the consult is strategic `region_vs_region` and standing orders are on. `## Operations` follows that block when standing orders are on, and follows the message guidance when the campaign block is absent | `# Battle Context`. No tools list, no production-denial doctrine line, and no Operations block | n/a |
 | `# Scenario Progress` | situation message, when `scenarioId === 'region_vs_region'`. H2 inside a briefing, H1 without one. Explored, controlled, home-control, and urban-share counts | never | omit |
 | `# Mercenaries` | when the snapshot has an economy and production is on, or the seat has a mercenary. The envelope-rows sentence stays in the response format | never | omit. Production off keeps the upkeep-only form when the seat has a mercenary |
 | `# Air Operations Status` | when the opponent has at least one air unit. Counts and the table only; the air rules and the callback sentence are `## Air Operations Table` | when the opponent has at least one air sub-unit in this battle | omit the section |

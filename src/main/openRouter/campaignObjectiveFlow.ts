@@ -10,6 +10,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
+import { operationUnitIdsForSeat } from '../gameDb/operationMemory';
 import { briefingOwnSeatId, ownHomeHexes } from '../briefing/briefingPerspective';
 import { getLandStepDistances, landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { isAiSeatId } from '../../shared/seatIds';
@@ -115,7 +116,7 @@ export interface CampaignStateInputs {
  *
  * Purpose: Ground units are the seat's infantry and armor that are not aboard a carrier. Enemy units are visible units of active enemy seats, and enemy ground units are the infantry and armor among them. Cities follow `knownCampaignCities`. A hex in more than one enemy home has no assumed owner.
  * When to use: Once per resolve and once per plan build.
- * Expected outcome: The inputs above. An unexplored hex in two enemy homes is not a candidate.
+ * Expected outcome: The inputs above. Ground units already assigned to a sea operation are omitted. An unexplored hex in two enemy homes is not a candidate.
  * Exceptions: None.
  */
 export function campaignInputsFromState(state: GameStateSnapshot, landMass: LandMassByH3): CampaignStateInputs {
@@ -123,12 +124,14 @@ export function campaignInputsFromState(state: GameStateSnapshot, landMass: Land
   const activeEnemySeatIds = new Set<string>(
     (state.seats ?? []).filter((seat) => seat.seatId !== seatId && seat.outTurn == null).map((seat) => seat.seatId)
   );
+  const inOperation = operationUnitIdsForSeat(seatId);
   const groundUnits = state.units
     .filter(
       (unit) =>
         unit.player === seatId &&
         (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
-        !unit.embarkedOnCarrierUnitId
+        !unit.embarkedOnCarrierUnitId &&
+        !inOperation.has(unit.id)
     )
     .map((unit) => ({ id: unit.id, h3Index: unit.h3Index }));
   const enemyUnits = state.units.filter((unit) => activeEnemySeatIds.has(unit.player));

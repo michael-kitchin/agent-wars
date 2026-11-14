@@ -12,7 +12,7 @@
 | 5 | `2026-11-13-operations-5-land-campaign-execution-plan.md` | The land campaign shown and chosen as an operation |
 | 6 | `2026-11-13-operations-6-posture-execution-plan.md` | A posture the commander declares, which shifts the engine's settings |
 
-Plans 0 and 1 must be complete before this plan starts.
+Plans 0 and 1 must be complete before this plan starts. Both are in `.spec/completed/2026-11/`.
 
 ## Why This Change
 
@@ -55,9 +55,10 @@ Do not reopen these.
 - Operations are stored as JSON under one `game_config` key, the way campaign objectives are. No table is added and the schema version does not change.
 - Embarking and unloading are done by the engine when it advances, with the same functions the turn resolution uses (`applyEmbarkOrdersForPlayer`, `clearEmbarkAssignmentForLandUnit`). Embark resolves first in a turn in any case, so doing it at the start of planning changes no outcome.
 - One sea operation per seat at a time, times the game-size multiplier.
-- Ships go to the troops' port. The muster port is a seaport hex the seat controls.
-- The engine launches only against a clear objective: no enemy unit within `LIFT_OBJECTIVE_CLEAR_RADIUS`.
-- A released unit keeps whatever standing order it has. The engine does not try to win it back.
+- Ships go to the troops' port. The muster port is a seaport hex the seat controls. The ports tested are the ones nearest the available ground units, not the first free ship.
+- The engine launches only against a clear objective: no enemy unit within `LIFT_OBJECTIVE_CLEAR_RADIUS`. Clear and reinforcer counts use every unit on the map. City knowledge still follows the seat's explored hexes. `maskUnexploredTerrain: false` does not reveal enemy units.
+- A released unit keeps whatever standing order it has. The engine does not try to win it back. Releasing a loaded ship also releases the ground units aboard it. They stay embarked, and later ticks do not unload them. Other ships continue. If that was the last ship and no ground unit remains, the outcome is `abandoned`. The game's existing auto-debark still runs when a released unit's own order moves it off the ship.
+- A phase times out when `turnNumber - phaseTurn` reaches the constant for that phase. The launch tick counts as zero. `return` has no timeout.
 - The engine code lives in `src/main/operations/`. The briefing and prompt text live under `src/main/openRouter/`.
 - No unit, range, capacity, or movement rule changes.
 
@@ -98,6 +99,9 @@ Read these before Phase 1. They apply to every phase.
 - Distances between hexes use `computeGridDistanceWithPathFallbackPure` or `isWithinGridRangePure`. Never call `gridDistance` from `h3-js` directly.
 - Sort unit ids and hex ids with `<` on the strings, not with `localeCompare`.
 - Numbers in prompt text come from the named constant or helper.
+- Code blocks in this plan are shapes. Write the orienting comment blocks before saving. They are not in the snippets.
+- `listSeaOperationCandidates` logs at debug, including `routeChecks`, because the verification run reads that count at debug level.
+- A file already over 600 lines may grow only by the lines this plan names, and must stay at or under 1000. `briefingFormatter.ts` is one of those files.
 
 ## Phase 1: Types and Storage
 
@@ -138,10 +142,10 @@ export interface Operation {
 Read `src/main/gameDb/campaignObjectiveMemory.ts` first and copy its shape: one config key, a strict parser, a reader that drops bad entries with a log line, and a writer that sorts seats.
 
 - [ ] `export const OPERATIONS_CONFIG_KEY = 'operations';`
-- [ ] `export function readOperations(ops: Pick<GameConfigKvDbOps, 'getOne'>): Map<string, Operation[]>`. The stored value is an object whose keys are seat ids and whose values are arrays. An entry that fails the parser is dropped and logged with `logDebug`. A value that is not valid JSON, or not an object, logs with `logError` and returns an empty map.
-- [ ] The parser rejects an entry unless: `id`, `objectiveH3`, and `musterH3` are non-empty strings; `landingH3` is `null` or a non-empty string; `unitIds` and `carrierIds` are arrays of strings; `method`, `phase`, and `source` are in the three exported lists; `launchedTurn` and `phaseTurn` are integers.
+- [ ] `export function readOperations(ops: Pick<GameConfigKvDbOps, 'getOne'>): Map<string, Operation[]>`. The stored value is an object whose keys are seat ids and whose values are arrays. A missing row returns an empty map and logs with `logTrace`. An entry that fails the parser is dropped and logged with `logDebug`. A value that is not valid JSON, or not an object, logs with `logError` and returns an empty map.
+- [ ] The parser rejects an entry unless: `id`, `objectiveH3`, and `musterH3` are non-empty strings; `landingH3` is `null` or a non-empty string; `unitIds` and `carrierIds` are arrays of non-empty strings; `method`, `phase`, and `source` are in the three exported lists; `launchedTurn` and `phaseTurn` are integers (`Number.isInteger`).
 - [ ] `export function writeOperationsForSeat(ops: Pick<GameConfigKvDbOps, 'getOne' | 'run'>, seatId: string, operations: readonly Operation[]): void`. An empty array removes the seat's key. Operations are written sorted by `id`.
-- [ ] `export function nextOperationId(seatId: string, existing: readonly Operation[], turnNumber: number): string` returns `${seatId}-op${turnNumber}` when no existing operation has that id, otherwise `${seatId}-op${turnNumber}b`, then `c`, and so on.
+- [ ] `export function nextOperationId(seatId: string, existing: readonly Operation[], turnNumber: number): string` returns `${seatId}-op${turnNumber}` when no existing operation has that id, otherwise the same id plus `b`, then `c`, through `z`. It returns the first unused id. It does not loop past `z`.
 
 ### Step 3: Clear on reset and on knockout
 
@@ -208,27 +212,29 @@ export function listSeaOperationCandidates(args: {
   2. Free ships: the seat's naval units that are not in `busy`, carry no cargo (no unit's `embarkedOnCarrierUnitId` names them), and have `terrain.enemyUnitsWithin(ship.h3Index, getRange('naval')) === 0`. Sorted by id. None: `[]`.
   3. Available ground units: the seat's infantry and armor that are not embarked, not in `busy`, and not in `protectedUnitIds`. Fewer than `OPERATION_MIN_GROUND_UNITS`: `[]`.
   4. `cap = liftGroundCap({ groundUnitCount, committedCount, hasCampaignPlan })` from plan 1, where `groundUnitCount` is every infantry and armor unit of the seat and `committedCount` is those embarked plus those in `busy`. Below `OPERATION_MIN_GROUND_UNITS`: `[]`.
-  5. Muster port. Candidates are hexes the seat controls with `seaportCount > 0` for which `terrain.embarkLegal` and `terrain.shipCanEnter` are true. Keep the `OPERATION_MUSTER_CANDIDATE_LIMIT` nearest to the first free ship by `computeGridDistanceWithPathFallbackPure`, ties by hex id. For each, compute `steps = getLandStepDistances({ originH3s: [port], hexSet, data: args.landMass, maxDepth: OPERATION_MUSTER_MAX_LAND_STEPS })` from `src/shared/landTraversalStrategic.ts`. The units that can muster there are the available units whose hex is in `steps`. The ships that can muster there are the free ships with a non-null `terrain.sailTurns(ship.h3Index, port)`.
+  5. Muster port. Candidates are hexes the seat controls with `seaportCount > 0` for which `terrain.embarkLegal` and `terrain.shipCanEnter` are true. Run `getLandStepDistances` once from every available ground-unit hex, with `maxDepth: OPERATION_MUSTER_MAX_LAND_STEPS`, from `src/shared/landTraversalStrategic.ts`. Keep ports that appear in that map. If more than `OPERATION_MUSTER_CANDIDATE_LIMIT` do, keep the ones with the smallest step count, ties by hex id. For each kept port, compute `steps` again from that port alone. The units that can muster there are the available units whose hex is in `steps`. The ships that can muster there are the free ships with a non-null `terrain.sailTurns(ship.h3Index, port)`. A port no ship can reach is dropped.
   6. For each port, the force is built like this: take the units that can muster, nearest first (fewer steps, then infantry before armor, then id); keep at most `cap`; then drop units from the end until `shipsNeeded(types)` from plan 1 is at most the number of ships that can muster there. The ships are the first `shipsNeeded` of those, fewest sail turns first, then id.
   7. Choose the port whose force has the most ground units, then the lowest total steps, then the lowest hex id. If its force has fewer than `OPERATION_MIN_GROUND_UNITS`: `[]`.
   8. `musterTurns` is the larger of: the largest step count of a chosen unit (use the step count as turns for infantry and for armor), and the largest sail turns of a chosen ship.
-  9. Cities: add and export `listKnownEnemyCities(state: GameStateSnapshot, seatId: string): LiftCity[]` in this file. It calls `knownCampaignCities(...)` from `src/main/openRouter/campaignTargetSelection.ts`. Read `campaignInputsFromState` in `campaignObjectiveFlow.ts` first and build that function's five arguments the same way. Map each result to a `LiftCity`. The builder calls it and then `rankLiftCities`.
+  9. Cities: add and export `listKnownEnemyCities(state: GameStateSnapshot, seatId: string): LiftCity[]` in this file. It calls `knownCampaignCities(...)` from `src/main/openRouter/campaignTargetSelection.ts`. Read `campaignInputsFromState` in `campaignObjectiveFlow.ts` first and build `knownCampaignCities`'s five arguments the same way that function does inside `campaignInputsFromState`. Do not call `campaignInputsFromState` itself. Map each result to a `LiftCity` (`h3Index`, `urbanHexCount`, `inEnemyHome`, `knownFortifiedCount`). The builder calls it and then `rankLiftCities`. `urbanHexCount`, `inEnemyHome`, and `knownFortifiedCount` on a candidate are copied from that city. `clear` is the rule in the next item.
   10. Order to test: clear cities first in rank order, then the rest in rank order. A city is clear when `terrain.enemyUnitsWithin(city.h3Index, LIFT_OBJECTIVE_CLEAR_RADIUS) === 0`.
   11. For each city, until `OPERATION_MENU_SIZE` candidates are found or `OPERATION_OBJECTIVE_TEST_LIMIT` cities have been tested: among `terrain.landingHexes(city.h3Index)`, take the one with the fewest non-null `terrain.sailTurns(port, hex)`, then the lowest hex id. No landing with a route: skip the city.
-  12. A candidate's `etaTurns` is `musterTurns + sailTurns + 1`. `defenders` is `terrain.enemyUnitsWithin(city, LIFT_OBJECTIVE_CLEAR_RADIUS)`. `reinforcers` is the number of enemy infantry and armor units within `etaTurns` hexes of the city, minus `defenders`, never below 0.
+  12. A candidate's `etaTurns` is `musterTurns + sailTurns + 1`. `defenders` is `terrain.enemyUnitsWithin(city, LIFT_OBJECTIVE_CLEAR_RADIUS)`. `reinforcers` is the number of enemy infantry and armor units for which `isWithinGridRangePure(city, unit, etaTurns)` is true and `isWithinGridRangePure(city, unit, LIFT_OBJECTIVE_CLEAR_RADIUS)` is false. Never below 0. Do not use `computeGridDistanceWithPathFallbackPure` for this count.
 - [ ] `logDebug('seaOperationCandidates listSeaOperationCandidates', { seatId, candidateCount, routeChecks: terrain.routeChecks() })`.
 
 ### Step 3: Tests in `src/main/operations/seaOperationCandidates.test.ts`
 
 Build the snapshot and land mass as `liftTerrain.test.ts` does.
 
-- [ ] Two infantry inland within reach of a controlled seaport, one free ship, and one clear enemy coastal city across water give one candidate naming that port, both infantry, and the ship.
+- [ ] Four infantry inland within reach of a controlled seaport, so the no-campaign cap is two, one free ship, and one clear enemy coastal city across water give one candidate naming that port, the two lowest infantry ids, and the ship. Two infantry alone give `[]` because the cap is one.
 - [ ] No free ship gives `[]`. One available ground unit gives `[]`.
 - [ ] A unit in `protectedUnitIds` and a unit in an active operation are never chosen.
-- [ ] Three infantry and one ship give a force of two.
+- [ ] Six infantry and one ship, with no campaign, keep three under the lift cap and then cut them to two because one ship cannot carry three.
 - [ ] A clear city is listed before a larger city that has a defender; the larger one has `clear: false` and `defenders: 1`.
 - [ ] Twelve reachable cities give five candidates, and `routeChecks` is finite and recorded in the test as an upper bound.
 - [ ] A city on an inland sea the ship cannot reach is skipped.
+- [ ] A campaign plan that has already consumed `liftGroundCap` gives `[]`.
+- [ ] The chosen port is the one the ground units can reach, even when the free ship is farther from that port than from another legal seaport.
 
 ### Phase 2 verification
 
@@ -283,18 +289,20 @@ export function advanceSeaOperation(operation: Operation, facts: OperationFacts)
 ### Step 2: Rules shared by every phase
 
 - [ ] Drop from `unitIds` and `carrierIds` every id missing from `unitHexById`.
-- [ ] Release. A unit is released when it has a stored order whose `(type, h3Index)` is not one the current phase would assign to it. Released units are dropped from the operation with no action and listed in `releasedIds`. The orders each phase assigns are:
+- [ ] Release. A unit is released when it has a stored order whose `(type, h3Index)` is not one the current phase would assign to it. The tick `launchedTurn === facts.turnNumber` is the exception: that tick replaces orders the units already have and releases nobody. Released units are dropped from the operation with no action and listed in `releasedIds`. The orders each phase assigns are:
 
 | Phase | Ground unit | Ship |
 |-------|-------------|------|
 | `muster` | `march` or `defend` on the muster hex | `march` or `defend` on the muster hex |
-| `transit` | none; cargo has no order | `march` on the landing hex |
+| `transit` | none while carried; a landed unit may hold `march` or `defend` on the objective | `march` on the landing hex |
 | `assault` | `march` or `defend` on the objective | not in the operation |
 | `return` | none | `march` on the muster hex |
 
   A unit with no stored order is never released; the phase assigns its order again.
-- [ ] In `transit` and `return`, a ground unit that no carrier is carrying is dropped with no action.
-- [ ] When a rule changes `phase`, set `phaseTurn` to `facts.turnNumber`.
+- [ ] Releasing a ship also releases every ground unit whose `carrierByCargoId` names that ship. Those units are listed in `releasedIds` and get no action. They stay embarked.
+- [ ] In `transit`, drop an uncarried ground unit with no action unless its stored order is a `march` or `defend` on the objective, or its hex is the landing hex or the objective. Those kept units are the landed wave. In `return`, drop every uncarried ground unit with no action.
+- [ ] Unload actions name only cargo ids that are still in the operation after release.
+- [ ] When a rule changes `phase`, set `phaseTurn` to `facts.turnNumber`. Elapsed turns are `facts.turnNumber - phaseTurn`. A timeout fires when elapsed is `>=` the constant for that phase. The tick that set `phaseTurn` has elapsed 0.
 
 ### Step 3: `muster`
 
@@ -313,17 +321,18 @@ export function advanceSeaOperation(operation: Operation, facts: OperationFacts)
 
 ### Step 4: `transit`
 
-- [ ] No ship left: `next: null`, `outcome: 'lost'`.
-- [ ] `!facts.objectiveIsEnemyCity && !facts.objectiveIsOwn`, or `facts.turnNumber - phaseTurn > OPERATION_TRANSIT_TIMEOUT_TURNS`: `phase: 'return'`; `musterH3` becomes `facts.chooseReturnPort(hex of the first ship) ?? musterH3`; and a `march` action to that hex for every ship. Put this in one private function, `turnBack(operation, facts)`, so a cancel can reuse it.
-- [ ] For each ship at the landing hex: an `unload` action for each unit it carries; then for each of those units a `march` action to the objective, or a `defend` action there when the landing hex is the objective; then a `defend` action for the ship on the landing hex. Drop the ship from `carrierIds`.
+- [ ] No ship left and no ground unit left: `next: null`. `outcome: 'abandoned'` when every id that left this tick is in `releasedIds`. Otherwise `outcome: 'lost'`.
+- [ ] No ship left and at least one ground unit left: `phase: 'assault'`.
+- [ ] `!facts.objectiveIsEnemyCity && !facts.objectiveIsOwn`, or elapsed `>= OPERATION_TRANSIT_TIMEOUT_TURNS`: call `turnSeaOperationBack(operation, facts)`. Export that function. It sets `phase: 'return'`, sets `musterH3` to `facts.chooseReturnPort(hex of the first remaining ship) ?? musterH3`, and adds a `march` action to that hex for every remaining ship. `outcome: 'running'`.
+- [ ] For each ship at the landing hex: an `unload` action for each operation cargo unit it carries; then for each of those units a `march` action to the objective, or a `defend` action there when the landing hex is the objective; then a `defend` action for the ship on the landing hex. Drop the ship from `carrierIds`. The unloaded units stay in `unitIds`.
 - [ ] For each other ship with no stored order: a `march` action to the landing hex.
-- [ ] No ship left in `carrierIds` after that: `phase: 'assault'`.
+- [ ] No ship left in `carrierIds` after that, and at least one ground unit left: `phase: 'assault'`.
 
 ### Step 5: `assault`
 
 - [ ] No ground unit left: `next: null`, `outcome: 'lost'`.
 - [ ] `facts.objectiveIsOwn`: a `defend` action on the objective for each ground unit standing on it; `next: null`, `outcome: 'completed'`.
-- [ ] `facts.turnNumber - phaseTurn > OPERATION_ASSAULT_TIMEOUT_TURNS`: `next: null`, `outcome: 'abandoned'`, no action. The units keep their march.
+- [ ] Elapsed `>= OPERATION_ASSAULT_TIMEOUT_TURNS`: `next: null`, `outcome: 'abandoned'`, no action. The units keep their march.
 - [ ] Otherwise, for each ground unit with no stored order: a `march` action to the objective.
 
 ### Step 6: `return`
@@ -347,10 +356,13 @@ Build `OperationFacts` by hand. One test per bullet:
 - [ ] Transit, ship at the landing: `unload`, a `march` to the objective, a ship `defend`; phase `assault`.
 - [ ] Transit, landing hex equals objective: cargo gets `defend`, not `march`.
 - [ ] Transit, objective no longer an enemy city and not own: phase `return`.
-- [ ] Transit, ship gone: `lost`.
+- [ ] Transit, ship gone and its cargo gone with it: `lost`.
+- [ ] Transit, one of two ships at the landing: that ship's cargo stays in the operation with a march to the objective, the other ship keeps sailing, and the next tick does not drop the landed unit.
+- [ ] Transit, a loaded ship's stored order is a march to another hex: the ship and its cargo are in `releasedIds`, there is no `unload`, and the operation continues if another ship remains. When it was the last ship, the outcome is `abandoned`.
+- [ ] Transit, an embarked unit has a stored order: that unit is released with no `unload`, and the ship still unloads only the units that remain.
 - [ ] Assault, objective own: `completed`, with a `defend` for a unit on it.
 - [ ] Return, ship at the muster hex: `unload` and `defend`; then `abandoned` once no ship is left. Return, 100 turns in with a ship still at sea: still `running`.
-- [ ] Transit turning back with `chooseReturnPort` returning another hex: `musterH3` is that hex and the ships march to it.
+- [ ] Transit turning back with `chooseReturnPort` returning another hex: `musterH3` is that hex and the ships march to it. `turnSeaOperationBack` is the function under test.
 
 ### Phase 3 verification
 
@@ -378,7 +390,7 @@ Goal: R2, R4, R6, R9.
   - `seats = activeAiSeatIds(getSeatRoster())`. Remove the stored operations of every seat not in `seats`.
   - For each seat call `advanceOperationsForSeat(seatId, coordinates)` inside a `try`/`catch` that logs with `logError('operationTurnFlow: seat failed; operations left as stored', { seatId }, err)`.
 - [ ] `export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: KnockoutCoordinates): void`
-  1. `state = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false })` from `../gameDb`.
+  1. `state = getGameStateForPlayer(seatId, { maskUnexploredTerrain: false })` from `../gameDb`. Then replace `state.units` with `listUnitsForSnapshot()` so clear checks and reinforcers see enemy units in fog. Keep `exploredHexes` from the seat state. Pass that combined state to `listKnownEnemyCities` and `buildLiftTerrain`. Own-unit maps still filter `player === seatId`.
   2. `landMass = loadCampaignLandMass(seatId)` from `../openRouter/campaignObjectiveFlow`. `null`: return.
   3. `terrain = buildLiftTerrain({ state, seatId, landMass })`.
   4. Build `OperationFacts`:
@@ -388,8 +400,8 @@ Goal: R2, R4, R6, R9.
      - Per operation: `objectiveIsOwn` is true when `state.strategicControl` gives the objective to the seat. `objectiveIsEnemyCity` is true when the objective is in `listKnownEnemyCities(state, seatId)`. Call that once per seat, not once per operation.
      - `chooseLanding(fromH3)`: among `terrain.landingHexes(objective)`, the one with the fewest non-null `terrain.sailTurns(fromH3, hex)`, then the lowest id; `null` when none has a route.
      - `chooseReturnPort(fromH3)`: among hexes the seat controls for which `terrain.debarkLegal` and `terrain.shipCanEnter` are true, take the `OPERATION_MUSTER_CANDIDATE_LIMIT` nearest by `computeGridDistanceWithPathFallbackPure`, then of those the one with the fewest non-null `terrain.sailTurns(fromH3, hex)`, then the lowest id; `null` when none has a route.
-  5. For each stored operation, in id order: `step = advanceSeaOperation(operation, facts)`; `applyOperationActions`; keep `step.next` when it is not `null`. Log each with `logDebug('operationTurnFlow advanced', { seatId, id, phase: step.next?.phase ?? null, outcome: step.outcome, reason: step.reason, actionCount, releasedIds: step.releasedIds })`.
-  6. Launch. `slots = OPERATION_MAX_SEA_PER_SIZE × GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)]`. While the kept operations number fewer than `slots`: build `protectedUnitIds` and `hasCampaignPlan` (below), call `listSeaOperationCandidates`, take the first candidate with `clear: true`. None: stop. Otherwise create an `Operation` with `phase: 'muster'`, `source: 'engine'`, `landingH3: null`, `launchedTurn` and `phaseTurn` the current turn, and the id from `nextOperationId`; run `advanceSeaOperation` on it once and apply its actions; keep it. Log `logDebug('operationTurnFlow launched', { seatId, id, objectiveH3, musterH3, unitCount, carrierCount })`.
+  5. For each stored operation, in id order: `step = advanceSeaOperation(operation, facts)`; `applyOperationActions`; keep `step.next` when it is not `null`. Log each with `logDebug('operationTurnFlow advanced', { seatId, id, phase: step.next?.phase ?? null, outcome: step.outcome, reason: step.reason, actionCount, releasedIds: step.releasedIds, shipHexes, cargoAboard })`. `shipHexes` is the sorted hex of each remaining ship. `cargoAboard` is how many remaining ground units are still embarked.
+  6. Launch. `slots = OPERATION_MAX_SEA_PER_SIZE × GAME_SIZE_MULTIPLIER[parseGameSize(state.gameSize)]`. While the kept operations number fewer than `slots`: build `protectedUnitIds` and `hasCampaignPlan` (below), add every id released by an operation this tick to `protectedUnitIds`, call `listSeaOperationCandidates`, take the first candidate with `clear: true`. None: stop. Otherwise create an `Operation` with `phase: 'muster'`, `source: 'engine'`, `landingH3: null`, `launchedTurn` and `phaseTurn` the current turn, and the id from `nextOperationId`; run `advanceSeaOperation` on it once and apply its actions; keep it. Log `logDebug('operationTurnFlow launched', { seatId, id, objectiveH3, musterH3, unitCount, carrierCount })`. `protectedUnitIds` covers ground units and ships.
   7. `writeOperationsForSeat` with the kept operations.
 - [ ] `protectedUnitIds` and `hasCampaignPlan`: `plan = campaignPlanForState(state)` from `../openRouter/campaignObjectiveFlow`. `hasCampaignPlan` is `plan !== null`. `protectedUnitIds` is `plan?.defenderUnitIds ?? []` plus every own ground unit with `terrain.enemyUnitsWithin(unit.h3Index, CAMPAIGN_CONTACT_RADIUS) > 0`.
 
@@ -410,13 +422,13 @@ Read `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyF
 Read `campaignInputsFromState` in `src/main/openRouter/campaignObjectiveFlow.ts` first.
 
 - [ ] Before `groundUnits` is built, add `const inOperation = operationUnitIdsForSeat(seatId);`. In the `groundUnits` filter add `&& !inOperation.has(unit.id)`.
-- [ ] Add `operationUnitIdsForSeat(seatId: string): ReadonlySet<string>` to `src/main/gameDb/operationMemory.ts`. It reads the seat's operations and returns every id in `unitIds`. On any thrown error it logs with `logError` and returns an empty set.
+- [ ] Add `operationUnitIdsForSeat(seatId: string): ReadonlySet<string>` to `src/main/gameDb/operationMemory.ts`. It reads the seat's operations and returns every id in `unitIds`. It logs with `logTrace`. On any thrown error it logs with `logError` and returns an empty set.
 - [ ] `campaignReadyOverride` in `src/main/openRouter/afterResolution.ts` builds its own `groundUnitHexes`. Add the same exclusion there.
 
 ### Step 5: Tests
 
 - [ ] New `src/main/operations/operationActions.test.ts`, against a test database built as `standingOrders.test.ts` builds one: a `march` action stores a march; `embark` on a ship at the same legal hex creates the assignment; `embark` on a ship at another hex is counted as failed and does not throw; `unload` removes the assignment.
-- [ ] New `src/main/operations/operationTurnFlow.test.ts`, same database: with two infantry, a ship, a controlled seaport, and a clear enemy coastal city, one call stores one operation in `muster` and stores marches for the three units. A second call in the same state stores no second operation. With the seat removed from the roster, a call deletes its stored operations.
+- [ ] New `src/main/operations/operationTurnFlow.test.ts`, same database: with two infantry, a ship, a controlled seaport, and a clear enemy coastal city, one call stores one operation in `muster` and stores marches for the three units. A second call in the same state stores no second operation. With the seat removed from the roster, a call deletes its stored operations. An enemy unit inside `LIFT_OBJECTIVE_CLEAR_RADIUS` that is absent from the seat's fogged unit list still blocks the launch when `listUnitsForSnapshot` includes it.
 - [ ] `campaignObjectiveFlow.test.ts`: a ground unit named in a stored operation is not in `campaignInputsFromState(...).groundUnits`.
 
 ### Phase 4 verification
@@ -431,7 +443,7 @@ Goal: R7, R11.
 
 ### Step 1: Headings
 
-- [ ] In `src/main/openRouter/promptSpec/sectionHeadings.ts`, after `SECTION_TITLE_CAMPAIGN_ORDERS`, add `export const SECTION_TITLE_OPERATIONS = 'Active Operations' as const;` with an orienting block. Run `rg -n "SECTION_TITLE_CAMPAIGN_OBJECTIVE" src` and add the new constant beside it in every registry, list, or heading test.
+- [ ] In `src/main/openRouter/promptSpec/sectionHeadings.ts`, after `SECTION_TITLE_CAMPAIGN_ORDERS`, add `export const SECTION_TITLE_OPERATIONS = 'Active Operations' as const;` with an orienting block. This title is not `Air Operations Status`. Add it to `src/main/openRouter/promptSpec/sectionHeadings.test.ts` beside `SECTION_TITLE_CAMPAIGN_ORDERS`, and to every other registry that lists `SECTION_TITLE_CAMPAIGN_OBJECTIVE`.
 
 ### Step 2: New file `src/main/openRouter/briefingSectionsOperations.ts`
 
@@ -442,11 +454,11 @@ Goal: R7, R11.
 | Phase | Bullet |
 |-------|--------|
 | `muster` | `- ${id}: by sea to ${objective}, an enemy city with ${urban} city cells. Mustering at ${muster}: ${present} of ${total} ground units and ${shipsPresent} of ${ships} ships are there. Units: ${unitIds}. Ships: ${carrierIds}.` |
-| `transit` | `- ${id}: by sea to ${objective}, an enemy city with ${urban} city cells. At sea for ${landing} with ${cargo} ground units aboard. Ships: ${carrierIds}.` |
+| `transit` | `- ${id}: by sea to ${objective}, an enemy city with ${urban} city cells. At sea, heading for ${landing}, with ${cargo} ground units aboard. Ships: ${carrierIds}.` |
 | `assault` | `- ${id}: by sea to ${objective}, an enemy city with ${urban} city cells. Landed. ${count} ground units are marching on it: ${unitIds}.` |
 | `return` | `- ${id}: turned back from ${objective}. Returning to ${muster}. Ships: ${carrierIds}.` |
 
-  - Hexes go through `format`. Counts come from `state.units`. Use `city cell`, `ground unit`, and `ship` in the singular when the count is 1. Lists are joined with `, `.
+  - Hexes go through `format`. `urban` is `state.strategicInfrastructure` for the objective, the same lookup `buildCampaignObjectiveSection` uses. Present, aboard, and ship counts come from `state.units`. Use `city cell`, `ground unit`, and `ship` in the singular when the count is 1. Lists are joined with `, `.
 
 ### Step 3: New file `src/main/openRouter/promptSpec/operationRuleText.ts`
 
@@ -457,7 +469,7 @@ Goal: R7, R11.
 
 The engine runs operations: several turns of orders that carry ground units to an enemy city by sea. It musters the units and ships at a port, loads them, sails to a landing beside the city, unloads, and marches onto it. The Active Operations section of the briefing lists each one and how far it has got.
 
-Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it.
+Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take a unit or a ship out of an operation, give it any standing order of your own; it keeps that order and the operation goes on without it. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units.
 
 A unit aboard a ship takes no order. An explicit_move or a disembark unloads it where the ship is.
 ```
@@ -480,15 +492,15 @@ A unit aboard a ship takes no order. An explicit_move or a disembark unloads it 
 Follow the campaign wiring. Read each call site first.
 
 - [ ] `requestOrdersInjection.ts`: add `readonly operationsText: string;` to `StatusInjectionTexts`. Build it when `args.ordersEnabled` and the mode is not tactical: read `readOperations({ getOne: dbGetOne }).get(seatId) ?? []` and call `buildOperationsSection` with the existing `formatCampaignHex` closure. Otherwise `''`.
-- [ ] `consultPromptParts.ts`: the `else` branch that builds an `injection` literal needs `operationsText: ''`.
-- [ ] `briefingFormatter.ts`: add `operationsText?: string;` beside `campaignText` in the shared-context interface. Directly after the block that pushes `campaignText`, add the same three lines for `operationsText`. The file must stay under 960 lines.
+- [ ] `consultPromptParts.ts`: the `else` branch that builds an `injection` literal needs `operationsText: ''`. In the no-briefing `liveStatus` string, put an operations block immediately after `campaignBlock`.
+- [ ] `briefingFormatter.ts`: add `operationsText?: string;` beside `campaignText` in the shared-context interface, with an orienting block. Directly after the block that pushes `campaignText`, add the same three lines for `operationsText`. The file is already over 600 lines. Stay at or under 1000.
 - [ ] `requestOrdersFlow.ts`: pass `operationsText: injection.operationsText` in the object given to `formatBriefing`.
 
 ### Step 6: Tests
 
 - [ ] New `briefingSectionsOperations.test.ts`: no operation gives `''`; one test per phase checks the bullet text, including one singular form.
 - [ ] `promptSpec/coachingText.test.ts`: `operationsEnabled: true` appends the block after the campaign block; false or absent leaves the text as before; tactical gates never include it.
-- [ ] The briefing test that checks Campaign Objective placement (`rg -l "campaignText" src --glob "*.test.ts"`): `operationsText` prints directly after the campaign section.
+- [ ] Add a case to `briefingFormatter.test.ts`. There is no existing `campaignText` placement test. Pass `campaignText` and `operationsText` and assert the operations text is printed after the campaign text.
 
 ### Phase 5 verification
 
@@ -497,6 +509,7 @@ Follow the campaign wiring. Read each call site first.
 
 ## Phase 6: Living Documentation
 
+- [ ] `doc/README.md`: in the engine-constants paragraph, beside the lift sentence, name `OPERATION_MAX_SEA_PER_SIZE`, `OPERATION_MIN_GROUND_UNITS`, `OPERATION_MUSTER_CANDIDATE_LIMIT`, `OPERATION_MUSTER_MAX_LAND_STEPS`, `OPERATION_OBJECTIVE_TEST_LIMIT`, `OPERATION_MENU_SIZE`, `OPERATION_MUSTER_TIMEOUT_TURNS`, `OPERATION_TRANSIT_TIMEOUT_TURNS`, and `OPERATION_ASSAULT_TIMEOUT_TURNS` in `src/main/operations/operationRules.ts`.
 - [ ] `doc/hybrid-ai.md`: an Operations section beside the Campaign section. What an operation is, the four phases, when it advances, how a unit is released, how the engine launches one.
 - [ ] `doc/ai-commander-prompts/strategic-prompt.md`, `assembly-contract.md`, `information-decision-model.md`, `variants.md`, `source-inventory.md`, `crosswalk.md`: the Operations block, the Active Operations section, their include conditions, and the new files.
 - [ ] `doc/ai-commander-prompts/example-strategic-prompt.md`: add the Operations block and an Active Operations section with one `muster` bullet.
@@ -518,7 +531,7 @@ This phase is for the user, not the implementing agent. The agent stops after th
 - [ ] Set `AGENT_WARS_LOG_LEVEL=debug`. Run 40 turns on the global map with home regions on different continents, no fog, no tactical battles, balanced doctrine. Keep `debug.log`.
 - [ ] From `debug.log`, per seat: list every `operationTurnFlow launched` line and, for each id, the sequence of `phase` and `outcome` values in its `operationTurnFlow advanced` lines. Read the largest `routeChecks`. Count `operationActions` error lines. Count the ids in every `releasedIds`; a large count means the commander is pulling units out, and plan 3 should look at why. Count `sealift autoDebarkNonHumanLandUnitIfMovingIndependently` lines.
 - [ ] Repeat for 40 turns on one regional map.
-- [ ] Pass when, on the global map, at least one operation goes `muster`, `transit`, `assault` and ends `completed` or reaches `assault` with units ashore on another landmass; no operation stays in `return` for more than 20 turns; and no turn takes visibly longer than before.
+- [ ] Pass when, on the global map, at least one operation goes `muster`, `transit`, `assault` and ends `completed` or reaches `assault` with units ashore on another landmass; a `return` fails only when `shipHexes` is unchanged for 20 turns or the operation ends with `cargoAboard` above 0; and no turn takes visibly longer than before. A long return whose ships are still changing hexes passes.
 - [ ] Report the sequences and counts whether or not the run passes.
 
 ## Out of Scope

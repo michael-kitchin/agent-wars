@@ -300,6 +300,7 @@ export async function requestOrdersFlow(
         mentionGetMap: enabledToolNames.includes('get_map'),
         campaignPlan,
         campaignText: injection.campaignText,
+        operationsText: injection.operationsText,
         campaignAttention: injection.campaignAttention,
         additionalAttention: injection.additionalAttention,
       }

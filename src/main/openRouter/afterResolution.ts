@@ -30,6 +30,7 @@ import {
   type ResolutionContext,
 } from '../callbackEvaluation';
 import { readCampaignObjectives } from '../gameDb/campaignObjectiveMemory';
+import { operationUnitIdsForSeat } from '../gameDb/operationMemory';
 import { campaignAssaultReady } from './campaignRules';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getToolFlags } from './openRouterToolGroups';
@@ -194,7 +195,7 @@ function reportedToolCounts(
  *
  * Purpose: The assault starts on the turn the force finishes gathering, instead of waiting for the next scheduled consult.
  * When to use: After `evaluateMandatoryOverrides` and before the consult trigger is computed. Pass whether standing orders are enabled for this consult.
- * Expected outcome: `{ type: 'campaign_ready' }` when orders are on, the match is region versus region, and enough ground units stand near the staging hex. Otherwise null. Orders off does not consult, because the phase only advances on an orders-enabled consult.
+ * Expected outcome: `{ type: 'campaign_ready' }` when orders are on, the match is region versus region, and enough ground units stand near the staging hex. Units assigned to a sea operation are not counted. Otherwise null. Orders off does not consult, because the phase only advances on an orders-enabled consult.
  * Exceptions: None. A missing row is null.
  */
 export function campaignReadyOverride(
@@ -211,12 +212,14 @@ export function campaignReadyOverride(
     logTrace('afterResolution campaignReadyOverride', { seatId, ready: false, stored: false });
     return null;
   }
+  const inOperation = operationUnitIdsForSeat(seatId);
   const groundUnitHexes = state.units
     .filter(
       (unit) =>
         unit.player === seatId &&
         (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
-        !unit.embarkedOnCarrierUnitId
+        !unit.embarkedOnCarrierUnitId &&
+        !inOperation.has(unit.id)
     )
     .map((unit) => unit.h3Index);
   const ready = campaignAssaultReady({

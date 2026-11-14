@@ -225,6 +225,23 @@ function testFormatBriefingOmitsStandingOrderWhenInjectionEmpty(): void {
 }
 
 /**
+ * The operations section is printed after the campaign section.
+ * Purpose: The briefing shows the campaign first and the live operations next.
+ * When to use: After `operationsText` is added to `formatBriefing`.
+ * Expected outcome: The shifted operations heading follows the shifted campaign heading.
+ * Exceptions: None.
+ */
+function testOperationsTextFollowsCampaignText(): void {
+  const out = formatBriefing(fixtureState, precomputed, '', '', [], '', {
+    campaignText: '# Campaign Objective\n\n- Target: here.',
+    operationsText: '# Active Operations\n\n- seat-op1: by sea.',
+  });
+  const campaignAt = out.indexOf('## Campaign Objective');
+  const operationsAt = out.indexOf('## Active Operations');
+  assert.ok(campaignAt >= 0 && operationsAt > campaignAt, out);
+}
+
+/**
  * Production appears when the tool flag is on, including the empty-queue form, and is omitted when off.
  *
  * Purpose: An empty production string used to hide the section even when tools were enabled.
@@ -905,6 +922,7 @@ const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing omits standing order when injection empty', fn: testFormatBriefingOmitsStandingOrderWhenInjectionEmpty },
   { name: 'formatBriefing production section follows tool flag', fn: testFormatBriefingProductionSectionFollowsToolFlag },
+  { name: 'operations text follows campaign text', fn: testOperationsTextFollowsCampaignText },
   { name: 'additional attention follows the production bullet', fn: testAdditionalAttentionFollowsTheProductionBullet },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },

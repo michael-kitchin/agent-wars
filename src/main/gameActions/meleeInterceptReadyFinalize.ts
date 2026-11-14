@@ -24,6 +24,7 @@ import type { SightCueBeam } from '../../shared/ipc/sightCueTypes';
 import { evaluateEndOfTurnOutcome, recordEndOfTurnOutcome } from './endOfTurnOutcome';
 import type { EndOfTurnOutcome } from './endOfTurnOutcomeRules';
 import { applyKnockout, type KnockoutCoordinates } from './knockoutConsequences';
+import { advanceOperationsAfterTurn } from '../operations/operationTurnFlow';
 import { resolveMercenariesAtEndOfTurn } from './mercenaryTurnStep';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 import { logDebug } from '../logger';
@@ -372,6 +373,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     traversedForFog[owner] = [...hexes];
   }
   refreshFogOfWarIntelFromCurrentState({ traversedHexesByPlayer: traversedForFog });
+  advanceOperationsAfterTurn(args.knockoutCoordinates);
 
   saveDatabase();
   const allRemovedIds = [
