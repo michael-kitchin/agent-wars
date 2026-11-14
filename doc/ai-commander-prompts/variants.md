@@ -172,7 +172,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Include the win-path rule. Include the shared-home-cell rule only when an intersection exists. On a strategic consult with standing orders on, the doctrine blocks name the campaign target, and Cautious gathers to the campaign staging hex. Otherwise they name the nearest enemy home region. Balanced has its own block in every case. |
+| coaching | Include the win-path rule. Include the shared-home-cell rule only when an intersection exists. On a strategic consult with standing orders on, the doctrine blocks name the campaign target, and Cautious gathers to the campaign staging hex. The Campaign block says a land row of Operation Options does the same thing as `campaignTarget`, and the Operations block names the land campaign. Otherwise they name the nearest enemy home region. Balanced has its own block in every case. |
 | empty-state | A region with no cells produces a progress line of zero of zero rather than a missing bullet. When the two regions are the same set, the exclusive hex lists are omitted and only the shared line and the progress lines appear. |
 
 ### 4.2 Scenario id absent or unrecognised
@@ -183,7 +183,7 @@ Gate: `state.scenarioId`, which is optional on the snapshot and today has exactl
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. The menu includes air rows. A launch may name a city and a method. A refusal from the previous turn is one note line. |
+| coaching | Drop the win-path rule and the shared-home-cell rule. `## Operations`, Active Operations, and Operation Options stay when standing orders are on. They do not require a scenario. The menu includes air rows and no land row, and there is no campaign bullet. A launch may name a city and a method. A refusal from the previous turn is one note line. |
 | empty-state | Explored and controlled progress lines remain, since they do not depend on a scenario. |
 
 Adding a scenario is a change to this file and to the goal statement. Silently letting a new scenario inherit region-versus-region wording is the specific regression this row forbids.

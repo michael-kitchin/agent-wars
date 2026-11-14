@@ -79,6 +79,17 @@ test('operations round-trip per seat and drop a bad operation', () => {
   });
 });
 
+test('a stored land method is dropped and a sea sibling remains', () => {
+  withTempGameDb('aw-operation-memory-', () => {
+    const ops = { getOne: dbGetOne, run: dbRun };
+    const sea = sampleOperation('a1-op3');
+    upsertGameConfigValue(ops, OPERATIONS_CONFIG_KEY, JSON.stringify({
+      a1: [{ ...sea, id: 'a1-land', method: 'land' }, sea],
+    }));
+    assert.deepEqual(readOperations(ops).get('a1'), [sea]);
+  });
+});
+
 test('nextOperationId uses the plain id, then the b suffix', () => {
   const plain = nextOperationId('a1', [], 4);
   assert.equal(plain, 'a1-op4');

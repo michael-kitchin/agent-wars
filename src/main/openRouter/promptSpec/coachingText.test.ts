@@ -357,8 +357,17 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   assert.equal(buildContextCoaching(tacticalGates({ operationsEnabled: true })).includes('The engine runs operations'), false);
   assert.ok(withBoth.includes('Operation Options lists up to 5 you could launch'));
   assert.ok(withBoth.includes('it never launches a defended row'));
+  assert.ok(withBoth.includes('It never launches a land row'));
   assert.ok(withBoth.includes('by sea or by air'));
   assert.ok(withBoth.includes('An air unit in an operation does not strike'));
   assert.ok(withBoth.includes('with "objective" and "method" in place of "option"'));
   assert.equal(buildOperationRuleBlock(false).includes('Operation Options lists up to'), false);
+  assert.ok(withBoth.includes('Your land campaign is listed there too, as "campaign".'));
+  assert.ok(withBoth.includes('You may instead launch a land row of Operation Options; both do the same thing.'));
+  assert.equal(campaignOnly.includes('You may instead launch a land row of Operation Options'), false);
+  const operationsOnly = buildContextCoaching(strategicGates({ operationsEnabled: true }));
+  assert.equal(operationsOnly.includes('Your land campaign is listed there too'), false);
+  const tactical = buildContextCoaching(tacticalGates({ operationsEnabled: true, campaignEnabled: true }));
+  assert.equal(tactical.includes('Your land campaign is listed there too'), false);
+  assert.equal(tactical.includes('You may instead launch a land row of Operation Options'), false);
 });

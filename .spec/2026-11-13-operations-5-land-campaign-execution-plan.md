@@ -53,7 +53,7 @@ Do not reopen these.
 | `OPERATION_MENU_LAND_ROWS` | `src/main/operations/operationRules.ts` | 2 | new |
 | `CAMPAIGN_OPERATION_ID` | `src/shared/operationTypes.ts` | `'campaign'` | new; the id shown for the land campaign |
 
-Existing values used, never retyped: `CAMPAIGN_MAX_LAND_STEPS`, `CAMPAIGN_MASS_RADIUS`, `OPERATION_MENU_SIZE`, `OPERATION_MENU_AIR_ROWS`.
+Existing values used, never retyped: `CAMPAIGN_MAX_LAND_STEPS` (12, `src/main/openRouter/campaignTargetSelection.ts`), `CAMPAIGN_REACH_LIMIT_STEPS` (30, `src/main/openRouter/campaignRules.ts`), `CAMPAIGN_MASS_RADIUS`, `OPERATION_MENU_SIZE`, `OPERATION_MENU_AIR_ROWS`. The menu lists cities within 12 land steps, the pool the engine scores. A named land launch and `campaignTarget` stay at 30, because that is the check `applyCampaignTargetOverride` already makes. Do not use one limit in place of the other. A listed row is inside 30, so applying it is not refused for distance.
 
 ## Rules for the Implementing Agent
 
@@ -104,7 +104,7 @@ In `src/shared/operationTypes.ts`:
 
 In `src/shared/operationTypes.ts`:
 
-- [ ] `OperationCandidate.method` becomes `OperationChoiceMethod`. Run `npm run build:main` and fix what the compiler names. Where a candidate becomes a stored `Operation`, add a guard that returns without launching when `candidate.method === 'land'`, with a `logError`; the launch paths in Phase 3 never reach it.
+- [ ] `OperationCandidate.method` becomes `OperationChoiceMethod`. Run `npm run build:main` and fix what the compiler names. A stored `Operation.method` stays `OperationMethod`. The launch loop skips a `land` candidate, as Phase 2 describes. The letter path handles `land` before any operation is stored.
 
 ### Step 2: New file `src/main/operations/landOperationCandidates.ts`
 
@@ -126,19 +126,22 @@ export function listLandOperationCandidates(args: {
   3. `steps = campaignLandSteps(inputs, landMass, inputs.groundUnits.map((unit) => unit.h3Index))`.
   4. `current = readCampaignObjectives({ getOne: dbGetOne }).get(seatId)?.targetH3 ?? null`.
   5. Keep the cities of `inputs.cities` that are not `current`, whose step count exists and is at most `CAMPAIGN_MAX_LAND_STEPS`. When `onlyObjectiveH3` is given, keep only that city and do not exclude `current`.
-  6. Sort by `scoreCampaignCity(city, steps)` descending, then hex id. Take the first `OPERATION_MENU_LAND_ROWS`.
+  6. Rank with the same comparison `chooseCampaignTarget` uses: the cross-multiply in `campaignScoreBeats`, then fewer steps, then the lower hex id. Do not sort by `scoreCampaignCity`. That helper is not what target choice compares, and `campaignScoreBeats` is private, so copy the comparison into this file. Do not edit `campaignTargetSelection.ts`. Take the first `OPERATION_MENU_LAND_ROWS`.
   7. For each: `staging = chooseStagingHex({ ownControlledLandHexes: inputs.ownControlledLandHexes, landStepsFromTarget: campaignLandSteps(inputs, landMass, [city.h3Index]), landStepsFromForce: steps })`.
-  8. Candidate: `method: 'land'`, `objectiveH3` the city, `musterH3` the staging hex or the city when staging is `null`, `landingH3` the city, `unitIds` every id in `inputs.groundUnits`, `carrierIds: []`, `etaTurns` the step count, `clear`, `defenders`, and `reinforcers` as the sea builder computes them, and the city's `urbanHexCount`, `inEnemyHome`, and `knownFortifiedCount`.
-- [ ] Tests in `landOperationCandidates.test.ts`, built as `campaignObjectiveFlow.test.ts` builds its state: three reachable enemy cities with one of them the current target give two candidates, neither the current target; a city beyond `CAMPAIGN_MAX_LAND_STEPS` is not listed; a state with no `scenarioId` gives `[]`; `onlyObjectiveH3` returns that one city even when it is the current target.
+  8. Candidate: `method: 'land'`, `objectiveH3` the city, `musterH3` the staging hex or the city when staging is `null`, `landingH3` the city, `unitIds` every id in `inputs.groundUnits`, `carrierIds: []`, `etaTurns` the step count, and the city's `urbanHexCount`, `inEnemyHome`, and `knownFortifiedCount`. `defenders` is `terrain.enemyUnitsWithin(city, LIFT_OBJECTIVE_CLEAR_RADIUS)`. `clear` is `defenders === 0`. `reinforcers` copies the private sea formula: enemy ground units within `etaTurns` and outside that radius. Copy it. Do not export it from the sea file. `clear` does not open the engine window, because the engine list does not include these rows.
+- [ ] The caller's snapshot is the one `campaignInputsFromState` already reads. Pass that snapshot into this search. Do not pass the unmasked unit list the sea and air searches use. Build this search's terrain from that same snapshot.
+- [ ] `readCampaignObjectives` reads the database. The current-target test runs inside `withTempGameDb` and writes that objective first. A missing row is no current target.
+- [ ] Tests in `landOperationCandidates.test.ts`, built as `campaignObjectiveFlow.test.ts` builds its state: three reachable enemy cities with one of them the current target give two candidates, neither the current target; a city beyond `CAMPAIGN_MAX_LAND_STEPS` is not listed; a state with no `scenarioId` gives `[]`; `onlyObjectiveH3` returns that one city even when it is the current target. A city farther than 12 steps and within 30 is not a menu row. The named launch in Phase 3 can still reach it.
 
 ### Step 3: Add land rows to the shared list
 
 In `src/main/operations/operationCandidates.ts`:
 
-- [ ] `operationCandidatesForSeat` gains `readonly includeLand?: boolean`. When it is true and `only` is absent, the result is: land candidates, then sea candidates cut to `OPERATION_MENU_SIZE - land.length - Math.min(OPERATION_MENU_AIR_ROWS, air.length)` and never below 0, then air candidates. When `only.method === 'land'`, it returns `listLandOperationCandidates` with `onlyObjectiveH3`.
-- [ ] `only.method` becomes `OperationChoiceMethod`.
-- [ ] The engine's own launch in `operationTurnFlow.ts`, and its offer-window test (`candidates` empty or not), must not pass `includeLand`. Confirm by reading it; do not change it.
-- [ ] Tests in `operationCandidates.test.ts`: with `includeLand`, two land, two sea, and one air candidate come back in that order; without it, no land row; with two land, four sea, and two air, the result is two land, one sea, two air.
+- [ ] `operationMenuRows` gains `readonly land?: readonly OperationCandidate[]`. Omitted or empty, the result stays today's cut: sea first, then air, with the last `OPERATION_MENU_AIR_ROWS` reserved. The existing sea-and-air cases must keep passing. With land rows, slice land to `OPERATION_MENU_LAND_ROWS`, slice sea to `max(0, OPERATION_MENU_SIZE - land.length - min(OPERATION_MENU_AIR_ROWS, air.length))`, then append the air rows. Two land, four sea, and two air come back as two land, one sea, two air.
+- [ ] `operationCandidatesForSeat` gains `readonly includeLand?: boolean`. `only.method` becomes `OperationChoiceMethod`. When `only.method === 'land'`, return `listLandOperationCandidates` and do not search sea or air. When `includeLand` is true and `only` is absent, the result is `operationMenuRows({ land, sea, air })`.
+- [ ] Land has no slot. The two early returns in `operationCandidatesForSeat` (both slots full, and sea not searched with no air unit) must not run before a land search. A seat with a full sea slot and no air unit still gets its land rows. The engine call omits `includeLand`, so those returns stay for the engine.
+- [ ] The engine's launch in `operationTurnFlow.ts` must not pass `includeLand`. Confirm by reading it. Where a candidate is copied onto a stored `Operation`, a `land` method does not store a row and does not count as this tick's launch. Skip it and take the next clear sea or air row. Do not change the offer because of it.
+- [ ] Tests in `operationCandidates.test.ts` cover the menu cutter above. They do not need a map. `operationTurnFlow.test.js` still passes with no change.
 
 ### Phase 2 verification
 
@@ -153,11 +156,12 @@ Goal: R2, R4, R6.
 
 In `src/main/operations/operationCommands.ts`:
 
-- [ ] Both the briefing and this file must build the option list the same way. Change the option launch to call `operationCandidatesForSeat({ state, seatId, active, includeLand: true })`.
-- [ ] When the chosen candidate's method is `land`: call `applyCampaignTargetH3({ state, targetH3: candidate.objectiveH3, label })`, where `label` is the objective's hex code from `h3ToCode(candidate.objectiveH3, { mode: 'strategic' })` in `../briefing/map/hexCodeTranslator`, inside a `try`/`catch` that falls back to `option ${letter}`. The campaign's reasons name the city, so they need its code. Rewrite each returned reason by replacing the prefix `campaignTarget dropped: ` with `operations launch dropped: `. Do not create a stored operation and do not touch the offer turn.
-- [ ] A named launch with `method: 'land'`: after the hex-code and known-city checks, call `applyCampaignTargetH3` with `label` the hex code, and rewrite the reasons the same way. The slot check does not apply to `land`.
-- [ ] A cancel whose id is `CAMPAIGN_OPERATION_ID`: `operations cancel dropped: the land campaign cannot be cancelled; launch a land option to give it a new target.`
-- [ ] Tests in `operationCommands.test.ts`: launching a land row changes the stored campaign target and stores no operation; a named land launch against an unreachable city is refused with the campaign's own reason under the `operations launch dropped: ` prefix; cancelling `campaign` is refused.
+- [ ] A letter is an index into the candidates the briefing already built. `resolveLaunch` does not search again. `requestOrdersInjection.ts` is the call that builds `offeredCandidates`, and Phase 4 passes `includeLand: true` there. `requestOrdersApplyParsed.ts` already hands that same array to `applyOperationCommands`. Do not build a second list.
+- [ ] When the chosen candidate's method is `land`, do this before `acceptCandidate`. Call `applyCampaignTargetH3({ state, targetH3: candidate.objectiveH3, label })`. `label` is `h3ToCode(candidate.objectiveH3, { mode: 'strategic' })` from `../briefing/map/hexCodeTranslator`, inside a `try`/`catch` that falls back to `option ${letter}`. Rewrite each returned reason by replacing the prefix `campaignTarget dropped: ` with `operations launch dropped: `. Do not append an operation. Do not set the flag that clears the offer. Do not let this success make `applyOperationCommands` call `writeOperationEventTurn`. That write is what asks for the next consult, and a land launch must not. Today that write runs whenever `appliedCount > 0`, so a land-only success has to leave `appliedCount` unchanged. The campaign row is already stored by `applyCampaignTargetH3`.
+- [ ] A named launch with `method: 'land'`: after `codeToH3` succeeds, call `applyCampaignTargetH3` with `label` the hex code and rewrite the reasons the same way. Do not use the known-city check, the slot check, or the air occupied check. Those read a different city list. `applyCampaignTargetH3` already refuses a city the campaign does not know and a city farther than `CAMPAIGN_REACH_LIMIT_STEPS`, and an echo of the current target changes nothing.
+- [ ] A reply that carries both a land launch and `campaignTarget` keeps today's order. `campaignTarget` is applied later and is the target that remains. Do not reorder those writes.
+- [ ] A cancel whose id is `CAMPAIGN_OPERATION_ID` is refused before the stored-id lookup: `operations cancel dropped: the land campaign cannot be cancelled; launch a land option to give it a new target.`
+- [ ] Tests in `operationCommands.test.ts`: launching a land row changes the stored campaign target, stores no operation, and does not write the operation event turn; a named land launch against an unreachable city is refused with the campaign's own reason under the `operations launch dropped: ` prefix; cancelling `campaign` is refused with the land sentence, not the missing-id sentence.
 
 ### Step 2: Parse
 
@@ -168,7 +172,7 @@ In `src/main/openRouter/operationCommandParsing.ts`:
 
 ### Step 3: Contract
 
-- [ ] `promptSpec/envelopeJsonSchema.ts`: the named-launch alternative's `method` enum becomes `OPERATION_CHOICE_METHODS`.
+- [ ] `promptSpec/envelopeJsonSchema.ts`: leave the `operations` item a closed object of optional strings, with nothing required. Do not add an enum, an `anyOf`, or a const. A method enum would reject the consult. The parser accepts `land`. The schema test still asserts that `method` is an unconstrained string.
 - [ ] `promptContracts.ts`: in the `operations` paragraph, the named-launch sentence reads `"method":"land"`, `"sea"`, or `"air"`. After the paragraph's last sentence add: `A land launch gives your ground campaign a new target, the same as "campaignTarget".`
 - [ ] Update `promptContracts.test.ts` and `envelopeJsonSchema.test.ts`.
 
@@ -186,9 +190,9 @@ In `src/main/openRouter/briefingSectionsOperations.ts`:
 
 - [ ] `buildOperationOptionsSection`, for a land candidate: Method `land`. Plan: `the campaign turns to ${objective}; ground units assemble at ${muster} and march on it`, or `the campaign turns to ${objective}; ground units march on it directly` when `musterH3 === objectiveH3`. Cost: `your campaign units, about ${etaTurns} turns' march`. Impact and Risk are unchanged.
 - [ ] `buildOperationsSection` gains an optional `readonly campaignPlan?: CampaignPlan | null`. When it is not null, the first bullet is:
-  - `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, an enemy city with ${urban} city cells. Assembling at ${staging}: ${massed} of ${threshold} ground units are within ${CAMPAIGN_MASS_RADIUS} hexes.` in the `assemble` phase;
-  - `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, an enemy city with ${urban} city cells. Assaulting.` in the `assault` phase or when there is no staging hex.
-  Read `buildCampaignObjectiveSection` in `briefingSectionsCampaign.ts` first and take `massed`, `threshold`, and `urban` from the same fields it uses. A campaign bullet alone is enough to print the section.
+  - `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, an enemy city with ${urban} ${noun(urban, 'city cell')}. Assembling at ${staging}: ${massed} of ${threshold} ground units ${massed === 1 ? 'is' : 'are'} within ${CAMPAIGN_MASS_RADIUS} hexes.` in the `assemble` phase;
+  - `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, an enemy city with ${urban} ${noun(urban, 'city cell')}. Assaulting.` in the `assault` phase or when there is no staging hex.
+  Read `buildCampaignObjectiveSection` in `briefingSectionsCampaign.ts` first and take `massed`, `threshold`, and `urban` from the same fields it uses. Use the section's existing `noun` helper so a count of 1 stays singular. A campaign bullet alone is enough to print the section.
 - [ ] `requestOrdersInjection.ts`: pass `campaignPlan` to `buildOperationsSection`, and build the options with `includeLand: true`. `hasOperationOptions` stays true only when the list is not empty.
 - [ ] Tests in `briefingSectionsOperations.test.ts`: one land option row in each Plan form; the campaign bullet in each phase; no campaign plan and no operation and no option gives `''`.
 
@@ -211,8 +215,8 @@ Your land campaign is listed there too, as "campaign". It is described under Cam
 
 ## Phase 5: Documentation and Final Verification
 
-- [ ] `doc/hybrid-ai.md`: in the Operations section, that the land campaign is shown and chosen as an operation and is otherwise unchanged; in the Campaign section, a pointer to it.
-- [ ] `doc/ai-commander-prompts/strategic-prompt.md`, `assembly-contract.md`, `information-decision-model.md`, `variants.md`, `source-inventory.md`, `crosswalk.md`: land rows, the campaign bullet, the `land` method, and the two added sentences.
+- [ ] `doc/hybrid-ai.md`: the commander's table is land, then sea, then air. The engine's own list stays sea, then air, and a land row does not start the offer window or the operation consult. The land campaign is otherwise unchanged. The Campaign section points at the menu.
+- [ ] `doc/ai-commander-prompts/strategic-prompt.md`, `assembly-contract.md`, `information-decision-model.md`, `variants.md`, `source-inventory.md`, `crosswalk.md`: replace each "sea rows come first" sentence for the commander's table with land, then sea, then air. Add the campaign bullet, the `land` method, and the two added sentences. Leave the engine-launch sentences as sea before air.
 - [ ] `doc/ai-commander-prompts/example-strategic-prompt.md`: the campaign bullet and one land row. `example-strategic-response.md`: unchanged.
 - [ ] `node scripts/check-doc-links.cjs` passes.
 - [ ] `npm test` passes. `npm run check:circular` reports no new cycle.

@@ -55,7 +55,7 @@ test('full sea slots give no candidates', () => {
  * Expected outcome: A sea or air candidate whose objective is the given hex.
  * Exceptions: None.
  */
-function row(method: 'sea' | 'air', objectiveH3: string): OperationCandidate {
+function row(method: 'land' | 'sea' | 'air', objectiveH3: string): OperationCandidate {
   return {
     method,
     objectiveH3,
@@ -93,6 +93,16 @@ test('the menu keeps sea rows first and reserves the last rows for air', () => {
   assert.deepEqual(
     operationMenuRows({ sea: [], air: twoAir }).map((candidate) => candidate.objectiveH3),
     ['a1', 'a2']
+  );
+});
+
+test('land rows come first and sea takes the seats that remain', () => {
+  const land = ['l1', 'l2'].map((id) => row('land', id));
+  const sea = ['s1', 's2', 's3', 's4'].map((id) => row('sea', id));
+  const air = ['a1', 'a2'].map((id) => row('air', id));
+  assert.deepEqual(
+    operationMenuRows({ land, sea, air }).map((candidate) => candidate.objectiveH3),
+    ['l1', 'l2', 's1', 'a1', 'a2'],
   );
 });
 

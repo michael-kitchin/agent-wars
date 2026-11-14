@@ -41,34 +41,55 @@ export function applyCampaignTargetOverride(args: {
   } catch {
     return drop(`${args.code} is not a hex code on this map.`);
   }
+  return applyCampaignTargetH3({ state: args.state, targetH3, label: args.code });
+}
+
+/**
+ * Stores a commander-chosen campaign target that is already an H3 index.
+ *
+ * Purpose: A menu letter and a hex code share one reach check and one write.
+ * When to use: After `codeToH3`, and when a land row already names the city hex.
+ * Expected outcome: `{ applied: true }` for a stored target or an echo. A drop reason names the city with `label`.
+ * Exceptions: None. A match with no campaign, a missing land mass, an unknown city, and an unreachable city are drop reasons.
+ */
+export function applyCampaignTargetH3(args: {
+  readonly state: GameStateSnapshot;
+  readonly targetH3: string;
+  readonly label: string;
+}): { readonly applied: boolean; readonly dropReasons: string[] } {
+  const drop = (reason: string): { readonly applied: boolean; readonly dropReasons: string[] } => {
+    logDebug('campaignTargetOverride applyCampaignTargetH3', { applied: false, reason, label: args.label });
+    return { applied: false, dropReasons: [`campaignTarget dropped: ${reason}`] };
+  };
+  if (args.state.scenarioId !== 'region_vs_region') return drop('this scenario has no campaign.');
   const seatId = briefingOwnSeatId(args.state);
   const ops = { getOne: dbGetOne, run: dbRun };
   const stored = readCampaignObjectives(ops).get(seatId) ?? null;
-  if (stored?.targetH3 === targetH3) {
-    logDebug('campaignTargetOverride: echo of the current target ignored', { seatId, code: args.code });
+  if (stored?.targetH3 === args.targetH3) {
+    logDebug('campaignTargetOverride: echo of the current target ignored', { seatId, label: args.label });
     return { applied: true, dropReasons: [] };
   }
   const landMass = loadCampaignLandMass(seatId);
   if (landMass === null) return drop('terrain data is not loaded.');
   const inputs = campaignInputsFromState(args.state, landMass);
-  if (!inputs.cities.some((city) => city.h3Index === targetH3)) return drop(`${args.code} is not a known enemy city.`);
+  if (!inputs.cities.some((city) => city.h3Index === args.targetH3)) return drop(`${args.label} is not a known enemy city.`);
   const landStepsFromForce = campaignLandSteps(inputs, landMass, inputs.groundUnits.map((unit) => unit.h3Index));
-  const steps = landStepsFromForce.get(targetH3);
+  const steps = landStepsFromForce.get(args.targetH3);
   if (steps === undefined || steps > CAMPAIGN_REACH_LIMIT_STEPS) {
-    return drop(`no ground unit of yours can reach ${args.code} by land.`);
+    return drop(`no ground unit of yours can reach ${args.label} by land.`);
   }
   const stagingH3 = chooseStagingHex({
     ownControlledLandHexes: inputs.ownControlledLandHexes,
-    landStepsFromTarget: campaignLandSteps(inputs, landMass, [targetH3]),
+    landStepsFromTarget: campaignLandSteps(inputs, landMass, [args.targetH3]),
     landStepsFromForce,
   });
   writeCampaignObjectiveForSeat(ops, seatId, {
-    targetH3,
+    targetH3: args.targetH3,
     stagingH3,
     phase: stagingH3 === null ? 'assault' : 'assemble',
     source: 'commander',
     chosenTurn: args.state.turnNumber,
   });
-  logDebug('campaignTargetOverride: commander target stored', { seatId, code: args.code, stagingH3 });
+  logDebug('campaignTargetOverride: commander target stored', { seatId, label: args.label, stagingH3 });
   return { applied: true, dropReasons: [] };
 }

@@ -260,17 +260,18 @@ export function advanceOperationsForSeat(seatId: AiSeatId, coordinates: Knockout
   let launchedThisTick = false;
   while (true) {
     const candidates = operationCandidatesForSeat({ state, seatId, active: kept, withheldIds });
+    const launchable = candidates.filter((candidate) => candidate.method !== 'land');
     const decision = decideOperationOffer({
       turnNumber: state.turnNumber,
-      hasCandidate: candidates.length > 0,
-      hasClear: candidates.some((candidate) => candidate.clear),
+      hasCandidate: launchable.length > 0,
+      hasClear: launchable.some((candidate) => candidate.clear),
       offer,
     });
     offer = decision.offer;
     if (decision.consult) seatEvent = true;
     if (!decision.launch || launchedThisTick) break;
-    const candidate = candidates.find((row) => row.clear);
-    if (candidate === undefined) break;
+    const candidate = launchable.find((row) => row.clear);
+    if (candidate === undefined || candidate.method === 'land') break;
     const launched: Operation = {
       id: nextOperationId(seatId, kept, state.turnNumber),
       method: candidate.method,

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GameStateSnapshot } from '../gameDb';
 import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import { CAMPAIGN_MASS_RADIUS, type CampaignPlan } from './campaignRules';
 import { buildOperationOptionsSection, buildOperationsSection } from './briefingSectionsOperations';
 
 /**
@@ -393,6 +394,85 @@ test('options with no operation still print the table', () => {
       state: state({ units: [], urban: 1 }),
       operations: [],
       format: (hex) => hex,
+    }),
+    '',
+  );
+});
+
+/**
+ * A campaign plan with only the fields the operations bullet reads filled in.
+ *
+ * Purpose: The bullet names the phase, the staging hex, and the mass count.
+ * When to use: The campaign-bullet cases.
+ * Expected outcome: A plan whose objective matches the arguments.
+ * Exceptions: None.
+ */
+function campaignPlan(args: {
+  readonly phase: 'assemble' | 'assault';
+  readonly stagingH3: string | null;
+  readonly massedCount: number;
+  readonly threshold: number;
+}): CampaignPlan {
+  return {
+    objective: {
+      targetH3: 'city',
+      stagingH3: args.stagingH3,
+      phase: args.phase,
+      source: 'engine',
+      chosenTurn: 1,
+    },
+    waypointH3: args.stagingH3 ?? 'city',
+    campaignUnitIds: new Set<string>(),
+    holdUnitIds: new Set<string>(),
+    defenderUnitIds: [],
+    homeThreatCount: 0,
+    homeDefenseCapped: false,
+    massedCount: args.massedCount,
+    threshold: args.threshold,
+  };
+}
+
+test('a land option says the campaign turns toward the city', () => {
+  const gathered = buildOperationOptionsSection({
+    state: state({ units: [], urban: 1 }),
+    seatId: 'opponent',
+    candidates: [candidate({ method: 'land', musterH3: 'port', landingH3: 'city', carrierIds: [], etaTurns: 4, urbanHexCount: 1, inEnemyHome: false })],
+    format: (hex) => hex,
+  });
+  assert.match(gathered, /\| A \| city \| land \| the campaign turns to city; ground units assemble at port and march on it \| 1 city cell \| your campaign units, about 4 turns' march \|/);
+  const direct = buildOperationOptionsSection({
+    state: state({ units: [], urban: 1 }),
+    seatId: 'opponent',
+    candidates: [candidate({ method: 'land', musterH3: 'city', landingH3: 'city', carrierIds: [], etaTurns: 1, urbanHexCount: 1, inEnemyHome: false })],
+    format: (hex) => hex,
+  });
+  assert.match(direct, /\| A \| city \| land \| the campaign turns to city; ground units march on it directly \| 1 city cell \| your campaign units, about 1 turns' march \|/);
+});
+
+test('the campaign bullet leads the section in each phase and a missing plan writes nothing', () => {
+  const assembling = buildOperationsSection({
+    state: state({ units: [], urban: 2 }),
+    operations: [],
+    format: (hex) => hex,
+    campaignPlan: campaignPlan({ phase: 'assemble', stagingH3: 'port', massedCount: 1, threshold: 3 }),
+  });
+  assert.equal(
+    assembling,
+    `# Active Operations\n\n- campaign: by land to city, an enemy city with 2 city cells. Assembling at port: 1 of 3 ground units is within ${CAMPAIGN_MASS_RADIUS} hexes.`,
+  );
+  const assaulting = buildOperationsSection({
+    state: state({ units: [], urban: 1 }),
+    operations: [],
+    format: (hex) => hex,
+    campaignPlan: campaignPlan({ phase: 'assault', stagingH3: null, massedCount: 2, threshold: 3 }),
+  });
+  assert.equal(assaulting, '# Active Operations\n\n- campaign: by land to city, an enemy city with 1 city cell. Assaulting.');
+  assert.equal(
+    buildOperationsSection({
+      state: state({ units: [], urban: 1 }),
+      operations: [],
+      format: (hex) => hex,
+      campaignPlan: null,
     }),
     '',
   );

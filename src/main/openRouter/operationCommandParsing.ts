@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { OPERATION_METHODS, type OperationMethod } from '../../shared/operationTypes';
+import { OPERATION_CHOICE_METHODS, type OperationChoiceMethod } from '../../shared/operationTypes';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
 import { logTrace } from '../logger';
 import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
@@ -22,7 +22,7 @@ import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
  */
 export type OperationCommand =
   | { readonly action: 'launch'; readonly option: string }
-  | { readonly action: 'launch'; readonly objective: string; readonly method: OperationMethod }
+  | { readonly action: 'launch'; readonly objective: string; readonly method: OperationChoiceMethod }
   | { readonly action: 'cancel'; readonly id: string };
 
 /**
@@ -34,7 +34,7 @@ export type OperationCommand =
  * Exceptions: None.
  */
 const ENTRY_DROP_REASON =
-  'operations entry dropped: expected {"action":"launch","option":"<letter>"}, {"action":"launch","objective":"<hex code>","method":"sea"|"air"}, or {"action":"cancel","id":"<operation id>"}.';
+  'operations entry dropped: expected {"action":"launch","option":"<letter>"}, {"action":"launch","objective":"<hex code>","method":"land"|"sea"|"air"}, or {"action":"cancel","id":"<operation id>"}.';
 
 /**
  * Reads the commands from one `operations` value.
@@ -88,8 +88,8 @@ function readEntry(entry: unknown): OperationCommand | null {
     if (typeof record.option === 'string' && record.option.trim().length > 0) return null;
     const objective = typeof record.objective === 'string' ? record.objective.trim().toUpperCase() : '';
     if (!HEX_CODE_PATTERN.test(objective)) return null;
-    if (typeof record.method !== 'string' || !(OPERATION_METHODS as readonly string[]).includes(record.method)) return null;
-    return { action: 'launch', objective, method: record.method as OperationMethod };
+    if (typeof record.method !== 'string' || !(OPERATION_CHOICE_METHODS as readonly string[]).includes(record.method)) return null;
+    return { action: 'launch', objective, method: record.method as OperationChoiceMethod };
   }
   if (record.action === 'cancel') {
     const id = typeof record.id === 'string' ? record.id.trim() : '';

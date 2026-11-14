@@ -38,6 +38,16 @@ export const OPERATION_MAX_AIR_PER_SIZE = 1;
 export const OPERATION_MENU_AIR_ROWS = 2;
 
 /**
+ * Land rows kept at the front of Operation Options when a campaign city is available.
+ *
+ * Purpose: The land campaign uses most of the force, so its choices stay ahead of sea and air.
+ * When to use: Combining the candidate lists for the commander's table.
+ * Expected outcome: 2.
+ * Exceptions: None.
+ */
+export const OPERATION_MENU_LAND_ROWS = 2;
+
+/**
  * Turns in air `transit` before the infantry is unloaded and the operation ends.
  *
  * Purpose: A ferry or a drop that never finishes does not keep the air unit out of the fight forever.

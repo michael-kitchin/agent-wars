@@ -10,7 +10,8 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableHelpers';
-import type { Operation, OperationCandidate } from '../../shared/operationTypes';
+import { CAMPAIGN_OPERATION_ID, type Operation, type OperationCandidate } from '../../shared/operationTypes';
+import { CAMPAIGN_MASS_RADIUS, type CampaignPlan } from './campaignRules';
 import { LIFT_OBJECTIVE_CLEAR_RADIUS } from '../operations/liftRules';
 import { OPERATION_OPTION_LETTERS } from '../operations/operationRules';
 import { SECTION_TITLE_OPERATION_OPTIONS, SECTION_TITLE_OPERATIONS, subHeading, topLevelHeading } from './promptSpec/sectionHeadings';
@@ -183,12 +184,20 @@ function optionRow(args: {
   const { candidate, letter, groundTotal, navalTotal, airTotal, format } = args;
   const units = candidate.unitIds.length;
   const ships = candidate.carrierIds.length;
+  const objective = format(candidate.objectiveH3);
+  const muster = format(candidate.musterH3);
   const air = candidate.method === 'air'
     ? airPlanAndCost({ candidate, groundTotal, airTotal, format })
     : null;
-  const plan = air?.plan ?? `${units} ${noun(units, 'ground unit')} muster at ${format(candidate.musterH3)}; ${ships} ${noun(ships, 'ship')} sail to ${format(candidate.landingH3)}; assault ${format(candidate.objectiveH3)}`;
+  const plan = candidate.method === 'land'
+    ? candidate.musterH3 === candidate.objectiveH3
+      ? `the campaign turns to ${objective}; ground units march on it directly`
+      : `the campaign turns to ${objective}; ground units assemble at ${muster} and march on it`
+    : air?.plan ?? `${units} ${noun(units, 'ground unit')} muster at ${muster}; ${ships} ${noun(ships, 'ship')} sail to ${format(candidate.landingH3)}; assault ${objective}`;
   const impact = `${candidate.urbanHexCount} ${noun(candidate.urbanHexCount, 'city cell')}${candidate.inEnemyHome ? ', in an enemy home region' : ''}`;
-  const cost = air?.cost ?? `${ofTotal(units, groundTotal, 'ground unit')}, ${ofTotal(ships, navalTotal, 'ship')}, about ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
+  const cost = candidate.method === 'land'
+    ? `your campaign units, about ${candidate.etaTurns} turns' march`
+    : air?.cost ?? `${ofTotal(units, groundTotal, 'ground unit')}, ${ofTotal(ships, navalTotal, 'ship')}, about ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
   const risk = `${candidate.defenders} ${noun(candidate.defenders, 'enemy unit')} within ${LIFT_OBJECTIVE_CLEAR_RADIUS} hexes; ${candidate.reinforcers} more can reach it in ${candidate.etaTurns} ${noun(candidate.etaTurns, 'turn')}`;
   const fortified = candidate.knownFortifiedCount > 0
     ? `; ${candidate.knownFortifiedCount} ${noun(candidate.knownFortifiedCount, 'fortified cell')}`
@@ -199,8 +208,8 @@ function optionRow(args: {
 /**
  * Writes the Operation Options table.
  *
- * Purpose: The commander sees a short list of landings, each with what it gains, what it ties up, and what stands in the way.
- * When to use: When the seat has a free slot and at least one candidate. Pass the same array the reply will launch from.
+ * Purpose: The commander sees a short list of landings and campaign turns, each with what it gains, what it ties up, and what stands in the way.
+ * When to use: When at least one candidate was listed, including a land row while both sea and air slots are full. Pass the same array the reply will launch from.
  * Expected outcome: An empty string when there is no candidate. Otherwise an H2, a blank line, and a table of at most `OPERATION_OPTION_LETTERS` rows.
  * Exceptions: None.
  */
@@ -233,7 +242,7 @@ export function buildOperationOptionsSection(args: {
  *
  * Purpose: The briefing and the no-briefing situation message share one wording.
  * When to use: When `ordersEnabled` is true and the mode is not tactical. Pass the seat's stored operations and, when a menu was built, its table.
- * Expected outcome: An empty string when there is no operation, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the bullets when there are any, and the options table when it is non-empty.
+ * Expected outcome: An empty string when there is no operation, no campaign plan, no options, and no note. Otherwise the H1 heading, the previous turn's note when it is non-empty, the campaign bullet first when a plan was passed, the operation bullets, and the options table when it is non-empty.
  * Exceptions: None.
  */
 export function buildOperationsSection(args: {
@@ -242,20 +251,50 @@ export function buildOperationsSection(args: {
   readonly format: (h3Index: string) => string;
   readonly options?: string;
   readonly note?: string;
+  readonly campaignPlan?: CampaignPlan | null;
 }): string {
   const options = args.options ?? '';
   const note = args.note ?? '';
+  const campaign = args.campaignPlan == null ? null : campaignBullet({ state: args.state, plan: args.campaignPlan, format: args.format });
   logTrace('briefingSectionsOperations buildOperationsSection', {
     operationCount: args.operations.length,
     hasOptions: options.length > 0,
     hasNote: note.length > 0,
+    hasCampaign: campaign !== null,
   });
-  if (args.operations.length === 0 && options.length === 0 && note.length === 0) return '';
+  if (args.operations.length === 0 && options.length === 0 && note.length === 0 && campaign === null) return '';
   const ordered = [...args.operations].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
-  const bullets = ordered.map((operation) => operationBullet(args.state, operation, args.format));
+  const bullets = [
+    ...(campaign === null ? [] : [campaign]),
+    ...ordered.map((operation) => operationBullet(args.state, operation, args.format)),
+  ];
   let text = topLevelHeading(SECTION_TITLE_OPERATIONS);
   if (note.length > 0) text += `\n\n- Last turn: ${note}`;
   if (bullets.length > 0) text += `\n\n${bullets.join('\n')}`;
   if (options.length > 0) text += `\n\n${options}`;
   return text;
+}
+
+/**
+ * The first Active Operations bullet, naming the land campaign.
+ *
+ * Purpose: The commander sees the campaign in the same list as sea and air operations.
+ * When to use: When a campaign plan was built for this consult.
+ * Expected outcome: An assemble sentence when the force is gathering at a staging hex. An assault sentence otherwise, including when there is no staging hex.
+ * Exceptions: None.
+ */
+function campaignBullet(args: {
+  readonly state: GameStateSnapshot;
+  readonly plan: CampaignPlan;
+  readonly format: (h3Index: string) => string;
+}): string {
+  const objective = args.plan.objective;
+  const target = args.format(objective.targetH3);
+  const urban = (args.state.strategicInfrastructure ?? []).find((row) => row.h3Index === objective.targetH3)?.urbanHexCount ?? 0;
+  const city = `an enemy city with ${urban} ${noun(urban, 'city cell')}`;
+  if (objective.phase === 'assemble' && objective.stagingH3 !== null) {
+    const verb = args.plan.massedCount === 1 ? 'is' : 'are';
+    return `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, ${city}. Assembling at ${args.format(objective.stagingH3)}: ${args.plan.massedCount} of ${args.plan.threshold} ground units ${verb} within ${CAMPAIGN_MASS_RADIUS} hexes.`;
+  }
+  return `- ${CAMPAIGN_OPERATION_ID}: by land to ${target}, ${city}. Assaulting.`;
 }

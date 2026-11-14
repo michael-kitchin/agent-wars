@@ -288,7 +288,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
   const showOperations = args.ordersEnabled && args.coordinateContext.mode !== 'tactical';
   const activeOperations = showOperations ? (readOperations({ getOne: dbGetOne }).get(seatId) ?? []) : [];
   const offeredCandidates = showOperations
-    ? operationCandidatesForSeat({ state: args.state, seatId, active: activeOperations })
+    ? operationCandidatesForSeat({ state: args.state, seatId, active: activeOperations, includeLand: true })
     : [];
   const operationOptions = offeredCandidates.length > 0
     ? buildOperationOptionsSection({
@@ -308,6 +308,7 @@ export function buildStatusInjectionTexts(args: StatusInjectionArgs): StatusInje
         format: formatCampaignHex,
         options: operationOptions,
         note: operationNote,
+        campaignPlan,
       })
     : '';
   const campaignAttention =

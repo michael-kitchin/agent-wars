@@ -13,7 +13,7 @@ import { dbGetOne, dbRun, getGameStateForPlayer, type GameStateSnapshot } from '
 import { readCampaignObjectives, writeCampaignObjectiveForSeat } from '../gameDb/campaignObjectiveMemory';
 import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { applyCampaignTargetOverride } from './campaignTargetOverride';
+import { applyCampaignTargetH3, applyCampaignTargetOverride } from './campaignTargetOverride';
 import { campaignInputsFromState, campaignLandSteps, loadCampaignLandMass } from './campaignObjectiveFlow';
 import { CAMPAIGN_REACH_LIMIT_STEPS } from './campaignRules';
 import type { CampaignCity } from './campaignTargetSelection';
@@ -140,5 +140,27 @@ test('a reachable enemy city is stored, an echo keeps the phase, and bad codes a
     const missing = unknownCode();
     const missingDrop = applyCampaignTargetOverride({ state, code: missing, context: STRATEGIC });
     assert.deepEqual(missingDrop.dropReasons, [`campaignTarget dropped: ${missing} is not a hex code on this map.`]);
+  });
+});
+
+test('a known reachable city hex is stored as a commander target', () => {
+  ensureTerrainClassificationCacheLoaded();
+  withTempGameDb('aw-campaign-target-h3-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const seat = AI_SEAT_IDS[0];
+    const state = getGameStateForPlayer(seat, { maskUnexploredTerrain: false });
+    const landMass = loadCampaignLandMass(seat);
+    assert.ok(landMass);
+    const reached = stateThatReachesACity(state, landMass, seat);
+    const applied = applyCampaignTargetH3({
+      state: reached.state,
+      targetH3: reached.city.h3Index,
+      label: h3ToCode(reached.city.h3Index, STRATEGIC),
+    });
+    assert.deepEqual(applied.dropReasons, []);
+    assert.equal(applied.applied, true);
+    const stored = readCampaignObjectives(ops()).get(seat);
+    assert.equal(stored?.targetH3, reached.city.h3Index);
+    assert.equal(stored?.source, 'commander');
   });
 });

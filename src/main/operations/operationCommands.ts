@@ -18,10 +18,11 @@ import {
   writeOperationOffer,
   writeOperationsForSeat,
 } from '../gameDb/operationMemory';
-import { codeToH3 } from '../briefing/map/hexCodeTranslator';
+import { codeToH3, h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { logDebug, logError, logTrace } from '../logger';
+import { applyCampaignTargetH3 } from '../openRouter/campaignTargetOverride';
 import type { OperationCommand } from '../openRouter/operationCommandParsing';
-import type { Operation, OperationCandidate, OperationMethod } from '../../shared/operationTypes';
+import { CAMPAIGN_OPERATION_ID, type Operation, type OperationCandidate, type OperationChoiceMethod } from '../../shared/operationTypes';
 import { applyOperationActions } from './operationActions';
 import { operationCandidatesForSeat, operationSlotsForState } from './operationCandidates';
 import { OPERATION_OPTION_LETTERS } from './operationRules';
@@ -223,6 +224,12 @@ function resolveCancel(args: {
   readonly stored: readonly Operation[];
   readonly replacements: ReadonlyMap<string, Operation | null>;
 }): { readonly applied: boolean; readonly phase?: string; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
+  if (args.command.id === CAMPAIGN_OPERATION_ID) {
+    return {
+      applied: false,
+      dropReasons: ['operations cancel dropped: the land campaign cannot be cancelled; launch a land option to give it a new target.'],
+    };
+  }
   const operation = args.stored.find((row) => row.id === args.command.id);
   if (operation === undefined || args.replacements.has(operation.id)) {
     return { applied: false, dropReasons: [`operations cancel dropped: ${args.command.id} is not one of your operations.`] };
@@ -247,7 +254,7 @@ function resolveCancel(args: {
  *
  * Purpose: The letter is an index into the array the table printed. A later search could list a different row.
  * When to use: After every cancel has been resolved.
- * Expected outcome: An operation and its first step, or one drop reason.
+ * Expected outcome: A land launch stores the campaign target and returns no operation. A sea or air launch returns the operation and its first step, or one drop reason.
  * Exceptions: Propagates from `buildOperationFacts` or `advanceOperation`.
  */
 function resolveLaunch(args: {
@@ -263,6 +270,13 @@ function resolveLaunch(args: {
   if (candidate === undefined) {
     return { operation: null, dropReasons: [`operations launch dropped: option ${args.option} is not listed this turn.`] };
   }
+  if (candidate.method === 'land') {
+    return applyLandLaunch({
+      state: args.state,
+      targetH3: candidate.objectiveH3,
+      label: landOptionLabel(candidate.objectiveH3, args.option),
+    });
+  }
   return acceptCandidate({
     ...args,
     candidate,
@@ -274,16 +288,16 @@ function resolveLaunch(args: {
 /**
  * Decides a launch that names a city instead of a letter.
  *
- * Purpose: The commander can start an operation the menu did not list, when the free units can reach that city.
+ * Purpose: The commander can start a sea or air operation the menu did not list, or turn the campaign to a named city.
  * When to use: A launch command that carries `objective` and `method`.
- * Expected outcome: The same first step a letter launch would store for the candidate the search returns, or one drop reason.
+ * Expected outcome: A land launch stores the campaign target and returns no operation. A sea or air launch returns the operation and its first step, or one drop reason.
  * Exceptions: `codeToH3` throws on an unknown code and logs that throw. This function catches it and returns a drop reason.
  */
 function resolveNamedLaunch(args: {
   readonly state: GameStateSnapshot;
   readonly seatId: string;
   readonly objective: string;
-  readonly method: OperationMethod;
+  readonly method: OperationChoiceMethod;
   readonly coordinates: KnockoutCoordinates;
   readonly operations: readonly Operation[];
 }): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
@@ -293,6 +307,9 @@ function resolveNamedLaunch(args: {
   } catch {
     logDebug('operationCommands resolveNamedLaunch: code rejected', { seatId: args.seatId, objective: args.objective });
     return { operation: null, dropReasons: [`operations launch dropped: ${args.objective} is not a hex code on this map.`] };
+  }
+  if (args.method === 'land') {
+    return applyLandLaunch({ state: args.state, targetH3: objectiveH3, label: args.objective });
   }
   const city = listKnownEnemyCities(args.state, args.seatId).find((row) => row.h3Index === objectiveH3);
   if (city === undefined) {
@@ -352,7 +369,7 @@ function airObjectiveBlocked(state: GameStateSnapshot, seatId: string, objective
  *
  * Purpose: A named city and a menu letter build the same operation, including the air launch airport.
  * When to use: After the candidate has been chosen.
- * Expected outcome: An operation whose method is the candidate's method. An air operation keeps `landingH3`. A sea operation stores it as null. Or one drop reason.
+ * Expected outcome: A land candidate returns the unavailable reason and stores nothing. A sea or air operation uses the candidate's method. An air operation keeps `landingH3`. A sea operation stores it as null. Or one drop reason.
  * Exceptions: Propagates from `buildOperationFacts` or `advanceOperation`.
  */
 function acceptCandidate(args: {
@@ -364,6 +381,7 @@ function acceptCandidate(args: {
   readonly unavailableReason: string;
   readonly unreadReason: string;
 }): { readonly operation: Operation | null; readonly step?: OperationStep; readonly dropReasons: readonly string[] } {
+  if (args.candidate.method === 'land') return { operation: null, dropReasons: [args.unavailableReason] };
   const busy = new Set(args.operations.flatMap((operation) => [...operation.unitIds, ...operation.carrierIds]));
   const taken = [...args.candidate.unitIds, ...args.candidate.carrierIds].some((unitId) => busy.has(unitId));
   if (taken) return { operation: null, dropReasons: [args.unavailableReason] };
@@ -388,6 +406,45 @@ function acceptCandidate(args: {
   });
   if (facts === null) return { operation: null, dropReasons: [args.unreadReason] };
   return { operation, step: advanceOperation(operation, facts), dropReasons: [] };
+}
+
+/**
+ * Gives the land campaign the city a land row or a named land launch chose.
+ *
+ * Purpose: The campaign row is the record. A land choice must not store an operation or ask for another consult.
+ * When to use: Before `acceptCandidate`, for a candidate or a named launch whose method is `land`.
+ * Expected outcome: `{ operation: null }`. Drop reasons use the operations prefix. An accepted city is already stored.
+ * Exceptions: None.
+ */
+function applyLandLaunch(args: {
+  readonly state: GameStateSnapshot;
+  readonly targetH3: string;
+  readonly label: string;
+}): { readonly operation: null; readonly dropReasons: readonly string[] } {
+  const applied = applyCampaignTargetH3({ state: args.state, targetH3: args.targetH3, label: args.label });
+  const prefix = 'campaignTarget dropped: ';
+  const dropReasons = applied.dropReasons.map((reason) =>
+    reason.startsWith(prefix) ? `operations launch dropped: ${reason.slice(prefix.length)}` : reason,
+  );
+  logDebug('operationCommands applyLandLaunch', { label: args.label, applied: applied.applied, dropCount: dropReasons.length });
+  return { operation: null, dropReasons };
+}
+
+/**
+ * The city label a letter launch can put in a drop reason.
+ *
+ * Purpose: The campaign reasons name the city the way a hex code does.
+ * When to use: A land row chosen by letter.
+ * Expected outcome: The strategic hex code, or `option` plus the letter when the hex has no code.
+ * Exceptions: `h3ToCode` throws and logs when the hex has no code. This function catches that and returns the letter.
+ */
+function landOptionLabel(objectiveH3: string, letter: string): string {
+  try {
+    return h3ToCode(objectiveH3, { mode: 'strategic' });
+  } catch {
+    logDebug('operationCommands land launch: hex code unavailable', { objectiveH3, letter });
+    return `option ${letter}`;
+  }
 }
 
 /**

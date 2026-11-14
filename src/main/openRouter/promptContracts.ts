@@ -255,7 +255,7 @@ export function buildFinalJsonContractInstruction(args: {
       : '';
   const operationsParagraph =
     gates.includeOperations === true
-      ? 'Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"sea"} or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing.'
+      ? 'Optional "operations": launch or cancel an operation. To launch a row of Operation Options, add {"action":"launch","option":"<letter>"}. To launch against a city that is not listed, add {"action":"launch","objective":"<hex code>","method":"land"}, "sea", or "air"; the engine builds the operation if your free units can reach it, and the next briefing says why if they cannot. To call one off, add {"action":"cancel","id":"<operation id>"} with an id from the Active Operations section. At most one launch per turn. Omit the array to change nothing. A land launch gives your ground campaign a new target, the same as "campaignTarget".'
       : '';
   const paragraphs = [
     ...(structuredOutputs ? [] : [submitHeader]),
