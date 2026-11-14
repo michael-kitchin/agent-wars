@@ -497,6 +497,28 @@ function departureOutcome(operation: Operation, releasedIds: readonly string[], 
 }
 
 /**
+ * Lost only when the side that emptied lost a member to the map.
+ *
+ * Purpose: A sunk ship or a destroyed force is a loss, while a muster the commander emptied is abandoned.
+ * When to use: When a muster has no ground unit or no ship left.
+ * Expected outcome: `lost` when the ground units are all gone and one of them, not released, is absent from `unitHexById`, or the same for the ships. Otherwise `abandoned`.
+ * Exceptions: None.
+ */
+function emptyMusterOutcome(args: {
+  readonly operation: Operation;
+  readonly facts: OperationFacts;
+  readonly unitIds: readonly string[];
+  readonly carrierIds: readonly string[];
+  readonly releasedIds: readonly string[];
+}): 'abandoned' | 'lost' {
+  const released = new Set(args.releasedIds);
+  const lostFrom = (ids: readonly string[]): boolean => ids.some((id) => !released.has(id) && !args.facts.unitHexById.has(id));
+  const groundLost = args.unitIds.length === 0 && lostFrom(args.operation.unitIds);
+  const shipsLost = args.carrierIds.length === 0 && lostFrom(args.operation.carrierIds);
+  return groundLost || shipsLost ? 'lost' : 'abandoned';
+}
+
+/**
  * The march or defend that brings a unit to the muster, or null when it already has it.
  *
  * Purpose: A unit standing on the port defends there. Any other unit marches there.
@@ -600,13 +622,14 @@ function loadAndSail(args: {
  *
  * Purpose: The force marches to the port and boards only when enough of it, and a ship, are there.
  * When to use: `operation.phase` is `muster`.
- * Expected outcome: `transit` when the force loads. `abandoned` when it cannot. Otherwise the same phase.
+ * Expected outcome: `transit` when the force loads. `abandoned` when it cannot, or `lost` when it emptied because a unit or ship is gone from the map. Otherwise the same phase.
  * Exceptions: None. A null landing abandons without embarking.
  */
 function advanceMuster(operation: Operation, facts: OperationFacts, unitIds: readonly string[], carrierIds: readonly string[], releasedIds: readonly string[]): OperationStep {
   const remaining = [...unitIds, ...carrierIds];
   if (unitIds.length === 0 || carrierIds.length === 0) {
-    return ended('abandoned', 'muster-empty', cancelAll(remaining), releasedIds);
+    const outcome = emptyMusterOutcome({ operation, facts, unitIds, carrierIds, releasedIds });
+    return ended(outcome, 'muster-empty', cancelAll(remaining), releasedIds);
   }
   const presentIds = unitIds.filter((unitId) => facts.unitHexById.get(unitId) === operation.musterH3);
   const shipsPresent = carrierIds.filter((shipId) => facts.unitHexById.get(shipId) === operation.musterH3);

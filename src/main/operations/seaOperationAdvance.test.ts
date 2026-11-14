@@ -558,3 +558,44 @@ test('cancelling a return leaves the operation', () => {
   assert.equal(step.reason, 'already returning');
   assert.deepEqual(step.actions, []);
 });
+
+test('a muster whose only ship is gone from the map ends as lost', () => {
+  const { unitHexById, unitTypeById } = placed(['inf-a', 'inf-b'], 'away');
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', unitIds: ['inf-a', 'inf-b'], carrierIds: ['ship-1'] }),
+    facts({ turnNumber: 3, unitHexById, unitTypeById }),
+  );
+  assert.equal(step.next, null);
+  assert.equal(step.outcome, 'lost');
+  assert.equal(step.reason, 'muster-empty');
+});
+
+test('a muster whose only ship the commander took out ends as abandoned', () => {
+  const { unitHexById, unitTypeById } = placed(['inf-a', 'inf-b'], 'away', ['ship-1']);
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', unitIds: ['inf-a', 'inf-b'], carrierIds: ['ship-1'] }),
+    facts({
+      turnNumber: 3,
+      unitHexById,
+      unitTypeById,
+      storedOrderById: new Map([['ship-1', { type: 'march', h3Index: 'elsewhere' }]]),
+    }),
+  );
+  assert.equal(step.outcome, 'abandoned');
+  assert.equal(step.reason, 'muster-empty');
+  assert.deepEqual(step.releasedIds, ['ship-1']);
+});
+
+test('a muster with its ship taken out is abandoned even when a ground unit was also lost', () => {
+  const { unitHexById, unitTypeById } = placed(['inf-b'], 'away', ['ship-1']);
+  const step = advanceSeaOperation(
+    operation({ phase: 'muster', unitIds: ['inf-a', 'inf-b'], carrierIds: ['ship-1'] }),
+    facts({
+      turnNumber: 3,
+      unitHexById,
+      unitTypeById,
+      storedOrderById: new Map([['ship-1', { type: 'march', h3Index: 'elsewhere' }]]),
+    }),
+  );
+  assert.equal(step.outcome, 'abandoned');
+});

@@ -203,7 +203,7 @@ Call an operation off with {"action":"cancel","id":"<operation id>"}: one that i
 
 Units and ships in an operation already have their orders. Leave them alone and they carry on, including on turns you are not consulted. To take out a unit that is not aboard, or a ship, give it any standing order of your own; it keeps that order and the operation goes on without it. A unit aboard one of an operation's ships or air units takes no order of its own: the engine refuses it and says so next turn. A standing order on a loaded ship takes that ship and the units aboard it out together. The operation does not unload those units. An air unit in an operation does not strike; cancel the operation to get it back.
 
-Outside an operation, a unit aboard a ship takes no standing order. An explicit_move or a disembark unloads it where the ship is.
+Outside an operation, a standing order does not move a unit while it is aboard a ship. An explicit_move or a disembark unloads it where the ship is.
 
 ## Postures
 

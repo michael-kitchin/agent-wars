@@ -364,7 +364,7 @@ test('operation rules follow the campaign rules only when the gate is on', () =>
   assert.ok(withBoth.includes('by sea or by air'));
   assert.ok(withBoth.includes('An air unit in an operation does not strike'));
   assert.ok(withBoth.includes('takes no order of its own'));
-  assert.ok(withBoth.includes('takes no standing order'));
+  assert.ok(withBoth.includes('does not move a unit while it is aboard a ship'));
   assert.ok(withBoth.includes('with "objective" and "method" in place of "option"'));
   assert.equal(buildOperationRuleBlock(false).includes('Operation Options lists up to'), false);
   assert.ok(withBoth.includes('Your land campaign is listed there too, as "campaign".'));
